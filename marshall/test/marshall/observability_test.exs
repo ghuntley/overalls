@@ -133,7 +133,15 @@ defmodule Marshall.ObservabilityTest do
   end
 
   property "metric sanitization keeps only bounded numeric allowlisted values" do
-    entries = draw("entries", list(tuple({binary(0, 32), one_of([integer(-1_000, 10_000), binary(0, 32)])}), min: 0, max: 16))
+    entries =
+      draw(
+        "entries",
+        list(tuple({binary(0, 32), one_of([integer(-1_000, 10_000), binary(0, 32)])}),
+          min: 0,
+          max: 16
+        )
+      )
+
     metrics = Map.new(entries)
     sanitized = Marshall.Observability.sanitize_metrics(metrics)
 

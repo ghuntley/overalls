@@ -15,6 +15,7 @@ defmodule Marshall.DocumentationMessages do
     dgettext_noop("documentation", "## Connect"),
     dgettext_noop("documentation", "## Devices"),
     dgettext_noop("documentation", "## Endpoints"),
+    dgettext_noop("documentation", "## Examples"),
     dgettext_noop("documentation", "## First commands"),
     dgettext_noop("documentation", "## Install the Overalls CLI"),
     dgettext_noop("documentation", "## Install the developer archive"),
@@ -49,6 +50,10 @@ defmodule Marshall.DocumentationMessages do
     ),
     dgettext_noop("documentation", "Accept a pending ownership offer."),
     dgettext_noop("documentation", "Add or change an admin or member."),
+    dgettext_noop(
+      "documentation",
+      "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+    ),
     dgettext_noop(
       "documentation",
       "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
@@ -130,6 +135,10 @@ defmodule Marshall.DocumentationMessages do
     dgettext_noop(
       "documentation",
       "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
+    ),
+    dgettext_noop(
+      "documentation",
+      "Fetch only the guest metadata when an agent does not need integration details:"
     ),
     dgettext_noop(
       "documentation",
@@ -268,6 +277,10 @@ defmodule Marshall.DocumentationMessages do
     dgettext_noop("documentation", "Revoke a push notification device."),
     dgettext_noop("documentation", "Revoke an account's shared access."),
     dgettext_noop("documentation", "Revoke one of your SSH keys."),
+    dgettext_noop(
+      "documentation",
+      "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+    ),
     dgettext_noop("documentation", "Send a prompt read from standard input to a thread."),
     dgettext_noop("documentation", "Show a machine's web endpoint, port and visibility."),
     dgettext_noop("documentation", "Show command help."),
@@ -329,6 +342,10 @@ defmodule Marshall.DocumentationMessages do
     ),
     dgettext_noop(
       "documentation",
+      "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+    ),
+    dgettext_noop(
+      "documentation",
       "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
     ),
     dgettext_noop(
@@ -338,6 +355,10 @@ defmodule Marshall.DocumentationMessages do
     dgettext_noop(
       "documentation",
       "This reference uses the same v1 command grammar as the SSH service."
+    ),
+    dgettext_noop(
+      "documentation",
+      "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
     ),
     dgettext_noop("documentation", "Turn push notifications on or off for one device."),
     dgettext_noop(

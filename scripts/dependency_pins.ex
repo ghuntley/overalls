@@ -181,7 +181,10 @@ defmodule Overalls.DependencyPins do
         root,
         "nix",
         ["eval", "--json", ".#lib.dependencyPins.#{ecosystem}", "--apply", @eval_apply],
-        echo: false
+        echo: false,
+        # Warnings such as "Git tree is dirty" go to stderr and must not
+        # corrupt the JSON on stdout.
+        stderr: false
       )
 
     with {:ok, decoded} <- JSON.decode(json),

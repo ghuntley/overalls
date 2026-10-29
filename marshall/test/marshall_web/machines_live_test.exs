@@ -86,10 +86,17 @@ defmodule MarshallWeb.MachinesLiveTest do
     assert has_element?(detail, "#machine-os.status-label", "Windows Server 2025 (agents)")
     assert has_element?(detail, "#stop-machine")
     stop_key = power_key(detail, "#stop-machine")
-    assert Regex.match?(~r/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/, stop_key)
+
+    assert Regex.match?(
+             ~r/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/,
+             stop_key
+           )
 
     render_click(detail, "machine-power", %{"kind" => "stop", "key" => stop_key})
-    assert [%{kind: :stop, request_key: ^stop_key}] = Ledger.read!(Operation, vm_id: vm.id, kind: :stop)
+
+    assert [%{kind: :stop, request_key: ^stop_key}] =
+             Ledger.read!(Operation, vm_id: vm.id, kind: :stop)
+
     assert has_element?(detail, "#start-machine")
     start_key = power_key(detail, "#start-machine")
     refute start_key == stop_key

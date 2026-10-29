@@ -8,17 +8,15 @@ defmodule Marshall.Redaction.Scanner do
   @external_resource @profile_source
   @profile_bytes File.read!(@profile_source)
   @profile_digest :crypto.hash(:sha256, @profile_bytes) |> Base.encode16(case: :lower)
-  @compiled_rules (
-                   @profile_bytes
-                   |> Jason.decode!()
-                   |> Map.fetch!("rules")
-                   |> Enum.flat_map(fn %{"id" => id, "pattern" => pattern} ->
-                     case Regex.compile(pattern, "s") do
-                       {:ok, regex} -> [{id, regex}]
-                       {:error, _} -> []
-                     end
-                   end)
-                 )
+  @compiled_rules @profile_bytes
+                  |> Jason.decode!()
+                  |> Map.fetch!("rules")
+                  |> Enum.flat_map(fn %{"id" => id, "pattern" => pattern} ->
+                    case Regex.compile(pattern, "s") do
+                      {:ok, regex} -> [{id, regex}]
+                      {:error, _} -> []
+                    end
+                  end)
 
   @spec profile_digest() :: String.t()
   def profile_digest, do: @profile_digest

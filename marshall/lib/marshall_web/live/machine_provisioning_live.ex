@@ -45,7 +45,10 @@ defmodule MarshallWeb.MachineProvisioningLive do
           {dgettext("machines", "Retry setup")}
         </button>
         <p :if={!@error and @thread}>
-          {dgettext("machines", "Provisioning is in progress. This page will open the machine when it is ready.")}
+          {dgettext(
+            "machines",
+            "Provisioning is in progress. This page will open the machine when it is ready."
+          )}
         </p>
       </main>
     </Layouts.app>
@@ -67,7 +70,10 @@ defmodule MarshallWeb.MachineProvisioningLive do
         assign(socket, thread: thread, error: nil)
 
       _ ->
-        assign(socket, thread: nil, error: dgettext("machines", "Provisioning request unavailable."))
+        assign(socket,
+          thread: nil,
+          error: dgettext("machines", "Provisioning request unavailable.")
+        )
     end
   end
 end

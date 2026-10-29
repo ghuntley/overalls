@@ -11,7 +11,7 @@ concurrency:
 
 jobs:
   update:
-    runs-on: namespace-profile-cached-amd64
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     permissions:
       contents: write
       actions: write

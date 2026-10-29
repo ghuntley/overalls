@@ -41,8 +41,8 @@ test("Kotlin and Swift notes are contiguous slash comment groups", () => {
   for (const path of ["A.kt", "A.swift"]) {
     assert.deepEqual(extractNativeNotes(path, source), [{line: 4, lines: contract.trimEnd().split("\n")}])
   }
-  assert.throws(() => extractNativeNotes("a.native", `${slashNote}\n${slashNote}`), /exactly one/)
-  fixture({"a.native": source}, (root, paths) => assert.equal(checkFiles(root, paths).nativeNotes, 1))
+  assert.throws(() => extractNativeNotes("A.kt", `${slashNote}\n${slashNote}`), /exactly one/)
+  fixture({"A.kt": source}, (root, paths) => assert.equal(checkFiles(root, paths).nativeNotes, 1))
 })
 
 test("native block rejects multiple directives", () => {
