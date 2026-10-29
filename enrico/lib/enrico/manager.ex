@@ -86,24 +86,25 @@ defmodule Enrico.Manager do
         manager = self()
         generation = make_ref()
 
-        work = Overalls.Diagnostics.Context.wrap(fn ->
-               receive do
-                 {:slo_ticket, ticket} ->
-                   started = System.monotonic_time(:microsecond)
-                   result = Git.refresh(root, owner, repo)
+        work =
+          Overalls.Diagnostics.Context.wrap(fn ->
+            receive do
+              {:slo_ticket, ticket} ->
+                started = System.monotonic_time(:microsecond)
+                result = Git.refresh(root, owner, repo)
 
-                   Overalls.RequestAccounting.Producer.complete(
-                     Enrico.RequestRecorder,
-                     ticket,
-                     if(match?({:ok, _}, result), do: :success, else: :failure),
-                     max(0, System.monotonic_time(:microsecond) - started)
-                   )
+                Overalls.RequestAccounting.Producer.complete(
+                  Enrico.RequestRecorder,
+                  ticket,
+                  if(match?({:ok, _}, result), do: :success, else: :failure),
+                  max(0, System.monotonic_time(:microsecond) - started)
+                )
 
-                   send(manager, {:finished, id, attempt, generation, result})
-               after
-                 8_000 -> exit(:measurement_admission_timeout)
-               end
-             end)
+                send(manager, {:finished, id, attempt, generation, result})
+            after
+              8_000 -> exit(:measurement_admission_timeout)
+            end
+          end)
 
         case Task.Supervisor.start_child(Enrico.Tasks, work) do
           {:ok, pid} ->

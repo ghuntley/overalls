@@ -94,6 +94,7 @@ defmodule Audi.PrivateDNSTest do
     # The wire decoder canonicalizes labels to lowercase, so queries behave
     # case-insensitively; character validity is checked on the lowercased form.
     label = label |> String.downcase() |> then(&if(upper?, do: String.upcase(&1), else: &1))
+
     valid =
       label
       |> String.downcase()

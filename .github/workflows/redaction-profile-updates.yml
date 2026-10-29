@@ -22,8 +22,17 @@ jobs:
       - uses: ./.github/actions/devenv
       - name: Generate profile
         run: devenv shell -- python scripts/update_redaction_profile.py
+      - name: Start PostgreSQL
+        run: |
+          devenv up --detach postgres
+          for _ in $(seq 1 60); do
+            if devenv shell -- pg_isready -q; then exit 0; fi
+            sleep 2
+          done
+          echo "PostgreSQL did not become ready" >&2
+          exit 1
       - name: Verify profile and scanner
-        run: devenv shell -- bash -euo pipefail -c 'cd marshall && mix test test/marshall/redaction/scanner_test.exs'
+        run: devenv shell -- bash -euo pipefail -c 'cd marshall && mix local.hex --force --if-missing && mix local.rebar --force --if-missing && mix deps.get && mix test test/marshall/redaction/scanner_test.exs'
       - name: Commit profile
         env:
           GH_TOKEN: ${{ github.token }}
