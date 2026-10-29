@@ -128,7 +128,7 @@ it is empty.
   every conflict before committing a merge; never commit with hooks bypassed.
 - Run `elixir scripts/check_adrs.exs` from the repository root for architecture
   changes. From Marshall, use `elixir ../scripts/check_adrs.exs`. The checker
-  validates structure and links, not whether the design is sound or implemented.
+  validates structure and ADR references, not whether the design is sound or implemented.
 - Enter `devenv shell` for the pinned Elixir/OTP runtime. Run `mix precommit` in
   each changed project (`marshall/`, `lilly/`, `protocol/`); all enforce the runtime,
   ADR, compiler, test and Dialyzer gates. For shared governance tooling, run

@@ -890,7 +890,8 @@ link related records in the Related decisions section.
 Partial or implemented records must link to existing implementation artifacts
 outside `docs/architecture/` in Implementation evidence. Describe the scope of
 each link; a dependency entry is not proof of an operational capability. The
-validator checks presence and paths; reviewers assess sufficiency.
+validator checks that links are repository paths outside `docs/architecture/`, not
+that they still exist; reviewers assess presence and sufficiency.
 
 Use inline Markdown links with relative paths and no spaces/parentheses in
 targets. Local fragments may be used, but only file existence is checked.

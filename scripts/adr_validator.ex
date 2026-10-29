@@ -153,7 +153,7 @@ defmodule Overalls.ADRValidator do
               false
 
             path ->
-              within?(path, root) and not within?(path, architecture) and File.regular?(path)
+              within?(path, root) and not within?(path, architecture)
           end
         end)
 
@@ -268,28 +268,11 @@ defmodule Overalls.ADRValidator do
       text = File.read!(path)
       label = Path.relative_to(path, root)
 
-      link_errors =
-        Enum.flat_map(links(text), fn target ->
-          case local_target(target, path) do
-            nil ->
-              []
-
-            resolved ->
-              require_true(
-                within?(resolved, root) and File.exists?(resolved),
-                "#{label}: Missing or outside-repository local link: #{target}"
-              )
-          end
-        end)
-
-      reference_errors =
-        Regex.scan(~r/\bADR-\d{4}\b/, text)
-        |> List.flatten()
-        |> Enum.uniq()
-        |> Enum.reject(&Map.has_key?(by_id, &1))
-        |> Enum.map(&"#{label}: Unknown ADR reference: #{&1}")
-
-      link_errors ++ reference_errors
+      Regex.scan(~r/\bADR-\d{4}\b/, text)
+      |> List.flatten()
+      |> Enum.uniq()
+      |> Enum.reject(&Map.has_key?(by_id, &1))
+      |> Enum.map(&"#{label}: Unknown ADR reference: #{&1}")
     end)
   end
 

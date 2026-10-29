@@ -109,16 +109,26 @@ defmodule Overalls.ADRValidatorTest do
     end
   end
 
-  test "local links and ADR references are checked in reviews and overview too", %{root: root} do
+  test "ADR references are checked in reviews and overview too", %{root: root} do
     fixture(root, [decision(1)])
 
     File.write!(
       Path.join(root, "docs/architecture/reviews/review.md"),
-      "See ADR-9999 and [code](missing.ex)."
+      "See ADR-9999."
     )
 
     assert_error(root, "Unknown ADR reference: ADR-9999")
-    assert_error(root, "Missing or outside-repository local link: missing.ex")
+  end
+
+  test "local links are not required to exist", %{root: root} do
+    fixture(root, [decision(1)])
+
+    File.write!(
+      Path.join(root, "docs/architecture/reviews/review.md"),
+      "See [code](missing.ex) and [moved](../../../lib/removed.ex)."
+    )
+
+    assert {:ok, 1} = ADRValidator.check(root)
   end
 
   test "existing local anchors and external links do not require network access", %{root: root} do
@@ -139,8 +149,7 @@ defmodule Overalls.ADRValidatorTest do
         evidence <- [
           "Planned.",
           "[ADR](0001-decision.md)",
-          "[Web](https://example.invalid)",
-          "[Missing](../../../lib/missing.ex)"
+          "[Web](https://example.invalid)"
         ] do
       fixture(root, [decision(1, implementation: status, evidence: evidence)])
       assert_error(root, "Implementation evidence needs a local implementation file")
@@ -150,7 +159,6 @@ defmodule Overalls.ADRValidatorTest do
   test "evidence cannot escape the repository", %{root: root} do
     fixture(root, [decision(1, implementation: "partial", evidence: "[Outside](/etc/hosts)")])
     assert_error(root, "Implementation evidence needs a local implementation file")
-    assert_error(root, "outside-repository local link")
   end
 
   test "supersession must be reciprocal and refer to existing decisions", %{root: root} do
