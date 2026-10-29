@@ -331,7 +331,7 @@ class PublicationTest(unittest.TestCase):
                         "generation": 1,
                         "expires_at_ms": 1100,
                         "ready": True,
-                        "proofs": [PROOF],
+                        "proofs": [],
                     }
                 ),
             )
@@ -341,7 +341,7 @@ class PublicationTest(unittest.TestCase):
                 result["records"],
                 [
                     {"label": LABEL, "ready": True, "proofs": []},
-                    {"label": "control", "ready": True, "proofs": [PROOF]},
+                    {"label": "control", "ready": True, "proofs": []},
                 ],
             )
             self.assertEqual(calls, [])

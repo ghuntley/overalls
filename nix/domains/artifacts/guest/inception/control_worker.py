@@ -7,10 +7,11 @@ import os
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
-from typing import Never, Protocol, TypedDict, cast
+from typing import BinaryIO, Never, Protocol, TypedDict, cast
 
 import control_proofs as proofs
 import control_tls as tls
@@ -32,6 +33,68 @@ class Image(TypedDict):
 
 class IssuerFiles(Protocol):
     def issuer_file(self, path: Path, issuer: int) -> bytes: ...
+
+
+def process_category(status: int | None, expired: bool, diagnostic: bytes) -> str:
+    """@cc [owner:ghuntley,label:observability;security] inception-issuer-exit-category
+    A completed issuer attempt MUST expose only one fixed diagnostic category
+    (including the transport subcategories `transport_http`,
+    `transport_verify` and `transport_parse`); raw process output, hostnames,
+    challenge values and credentials MUST NOT be retained or published. A
+    timeout MUST take precedence over child status.
+    """
+    if expired or status is None:
+        return "timeout"
+    text = diagnostic[:65536].lower()
+    if b"exec:" in text or b"hook" in text:
+        return "hook"
+    if (
+        b"permission denied" in text
+        or b"no such file" in text
+        or b"unable to save" in text
+        or b"could not create" in text
+    ):
+        return "filesystem"
+    # Network/read failures must win over the generic "certificate" wording
+    # used by Lego for a failed fetch; otherwise a stalled certZ response is
+    # misreported as a TLS validation failure.
+    if (
+        b"dial tcp" in text
+        or b"network" in text
+        or b"i/o timeout" in text
+        or b"timeout" in text
+        or b"reset by peer" in text
+    ):
+        return "network"
+    if b"asn1" in text or b"malformed" in text or b"parse" in text or b"decode" in text:
+        return "transport_parse"
+    if (
+        b"unexpected eof" in text
+        or b"eof" in text
+        or b"connection reset" in text
+        or b"read" in text
+        or b"response" in text
+        or b"http" in text
+        or b"unable to obtain" in text
+        or b"could not obtain" in text
+    ):
+        return "transport_http"
+    if b"x509" in text or b"tls" in text or b"certificate" in text:
+        return "transport_verify"
+    if b"acme" in text or b"order" in text or b"authorization" in text:
+        return "acme"
+    return "unknown" if status != 0 else "success"
+
+
+def read_diagnostic(stream: BinaryIO | None) -> bytes:
+    """Read and discard at most one bounded private child diagnostic."""
+    if stream is None:
+        return b""
+    try:
+        stream.seek(0)
+        return stream.read(65536)
+    finally:
+        stream.close()
 
 
 def issued_material(module: IssuerFiles, directory: Path, hostname: str) -> bytes:
@@ -93,6 +156,17 @@ def stop_job(process: subprocess.Popen[bytes] | None) -> None:
         process.wait(timeout=5)
 
 
+def clear_issuer_output(directory: Path, hostname: str) -> None:
+    """Fence an earlier Lego attempt before granting a new job authority."""
+    # Lego creates its certificate directory lazily.  The first worker attempt
+    # must still fence any stale output before spawning Lego; make the private
+    # directory here so a new guest does not crash before the ACME order is
+    # submitted.
+    private_directory(directory)
+    for suffix in (".key", ".crt", ".issuer.crt"):
+        (directory / (hostname + suffix)).unlink(missing_ok=True)
+
+
 def invocation(
     image: Image, config: proofs.Configuration, job: proofs.Job
 ) -> tuple[list[str], dict[str, str]]:
@@ -101,13 +175,22 @@ def invocation(
     consent, independent persistent account state and a fixed image-owned hook.
     No ambient proxy, provider credential or parent credential may be inherited.
     The hook's bound parent observation MUST establish propagation; direct DNS
-    propagation and CNAME lookups MUST NOT bypass that observation. The child
-    resolver MUST NOT be passed to lego because it is authoritative only for the
-    child application zone, while the control owner is projected by the parent.
+    propagation and CNAME lookups MUST NOT bypass that observation. Only the
+    validated parent authorities may be passed to lego for propagation checks;
+    the child resolver is authoritative only for the child application zone.
+    Certificate retrieval MUST use a bounded timeout long enough for the
+    operator's delayed response while remaining within the job deadline.
     """
     public = config["public"]
     if public["accept_terms"] is not True:
         raise SetupError("control issuer consent unavailable")
+    # The inner Audi resolver is authoritative only for the child application
+    # zone. The control name is projected by the parent, so Lego's propagation
+    # checks must query the validated parent authorities from public settings.
+    resolvers = [f"{peer['address']}:{peer['port']}" for peer in public["nameservers"]]
+    resolver_arguments = [
+        argument for resolver in resolvers for argument in ("--dns.resolvers", resolver)
+    ]
     arguments = [
         image["lego"],
         "--path",
@@ -119,19 +202,22 @@ def invocation(
         public["mailbox"].rstrip(".").replace(".", "@", 1),
         "--domains",
         config["origins"]["control"],
+        *resolver_arguments,
         "--dns",
         "exec",
-        # The exec hook waits for the parent observation.  Passing the inner
-        # Audi resolver here makes lego resolve the parent-owned control name
-        # against a child-only authority and can reject an otherwise valid
-        # challenge before the ACME server checks the projected TXT record.
-        # Lego 4.x uses hyphenated DNS propagation flags.  Passing the old
-        # dotted spelling makes every issuance invocation fail before it can
-        # contact the fixture issuer, leaving the control proxy without TLS
-        # material and surfacing only as a public TLS EOF.
+        # The exec hook waits for the parent observation.  The inner Audi
+        # resolver is deliberately absent: it is authoritative only for the
+        # child application zone and would reject this parent-owned challenge.
+        # Lego treats `run` as the subcommand; global flags must precede it.
+        # The fixture issuer may hold its certificate response while delayed
+        # validation completes. Keep this bounded timeout above that response
+        # delay while remaining below the job authority window.
+        "--cert.timeout",
+        "720",
+        "--http-timeout",
+        "720",
         "--dns.propagation-wait",
         "1s",
-        # Lego treats `run` as the subcommand; global flags must precede it.
         "run",
     ]
     environment = {
@@ -141,6 +227,16 @@ def invocation(
         "EXEC_POLLING_INTERVAL": "1",
         "LEGO_DISABLE_CNAME_SUPPORT": "true",
         "LEGO_CA_CERTIFICATES": "/run/inception/audi-issuer-ca.pem",
+        # Go's standard transport also consults SSL_CERT_FILE while Lego's
+        # client-specific pool reads LEGO_CA_CERTIFICATES. Set both to the
+        # same immutable issuer CA so every ACME request, including the final
+        # certificate fetch, uses the fixture/operator trust root.
+        "SSL_CERT_FILE": "/run/inception/audi-issuer-ca.pem",
+        # The nested Firecracker path can deliver the small ACME requests but
+        # loses the HTTP/2 certificate response after Pebble emits /certZ.
+        # Keep ACME on Go's bounded HTTP/1.1 transport until the nested
+        # virtio/TAP framing path can preserve HTTP/2 DATA frames reliably.
+        "GODEBUG": "http2client=0",
         "INCEPTION_CONTROL_JOB": job["run_id"],
     }
     return arguments, environment
@@ -191,6 +287,7 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
     with os.fdopen(fd, "r+b") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         clear_job()
+        stderr_files = contextlib.ExitStack()
         config = proofs.configuration(boot)
         hostname = config["origins"]["control"]
         proxy = proofs.ROOT / "haproxy.cfg"
@@ -204,7 +301,9 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
             proxy,
         )
         module = tls.validator(image["validator"])
-        process, job, material, retry, proxy_retry = None, None, None, 0, 0
+        process: subprocess.Popen[bytes] | None = None
+        process_stderr: BinaryIO | None = None
+        job, material, retry, proxy_retry = None, None, 0, 0
 
         def service(action: str) -> None:
             subprocess.run(
@@ -234,12 +333,6 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                 raise
             return candidate
 
-        def clear_issuer_output() -> None:
-            """Discard an earlier attempt before granting a new job authority."""
-            directory = STATE / "acme" / "certificates"
-            for suffix in (".key", ".crt", ".issuer.crt"):
-                (directory / (hostname + suffix)).unlink(missing_ok=True)
-
         try:
             with contextlib.suppress(OSError, ValueError, subprocess.SubprocessError, SetupError):
                 material = accept(module.issuer_file(tls.CERTIFICATES / "full.pem", 0))
@@ -264,6 +357,8 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                     if status is not None or current >= job["expires_at_ms"]:
                         stop_job(process)
                         process = None
+                        diagnostic = read_diagnostic(process_stderr)
+                        process_stderr = None
                         # `current` was sampled before stopping the child.  A
                         # process that exits at the deadline can spend several
                         # seconds in stop_job while its final files are flushed.
@@ -271,6 +366,17 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                         # candidate is never consumed after the original job
                         # authority has expired.
                         completed_at = proofs.now()
+                        publish(
+                            proofs.ROOT / "process-category",
+                            (
+                                process_category(
+                                    status,
+                                    completed_at >= job["expires_at_ms"],
+                                    diagnostic,
+                                )
+                                + "\n"
+                            ).encode("ascii"),
+                        )
                         # Old hooks are dead before removing job authority.
                         clear_job()
                         retry = completed_at + 60000
@@ -313,20 +419,38 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                 elif current >= retry and (material is None or tls.renewal_due(material)):
                     job = proofs.begin(boot)
                     arguments, environment = invocation(image, config, job)
-                    clear_issuer_output()
-                    process = subprocess.Popen(
-                        arguments,
-                        env=environment,
-                        start_new_session=True,
-                        stdin=subprocess.DEVNULL,
-                        stdout=subprocess.DEVNULL,
-                        stderr=subprocess.DEVNULL,
+                    clear_issuer_output(STATE / "acme" / "certificates", hostname)
+                    # The handle must outlive Popen while ExitStack owns its
+                    # cleanup; SIM115 cannot see this indirect context manager.
+                    process_stderr = stderr_files.enter_context(
+                        tempfile.TemporaryFile(mode="w+b")  # noqa: SIM115
                     )
+                    try:
+                        process = subprocess.Popen(
+                            arguments,
+                            env=environment,
+                            start_new_session=True,
+                            stdin=subprocess.DEVNULL,
+                            # Lego's logger writes actionable failures to
+                            # stdout; keep it in the same bounded private
+                            # diagnostic stream as stderr.  Only the fixed
+                            # category derived from this stream is published.
+                            stdout=process_stderr,
+                            stderr=process_stderr,
+                        )
+                    except BaseException:
+                        process_stderr.close()
+                        process_stderr = None
+                        raise
                 time.sleep(0.25)
         finally:
-            stop_job(process)
-            clear_job()
-            service("stop")
+            try:
+                stop_job(process)
+                read_diagnostic(process_stderr)
+                clear_job()
+                service("stop")
+            finally:
+                stderr_files.close()
 
 
 def main() -> None:

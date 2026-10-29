@@ -433,8 +433,12 @@ with subtest("inner control obtains a real DNS-01 certificate through both paren
                     )
                     # Parent DNS observation and Pebble's bounded ACME polling
                     # can each consume several minutes under native pool load.
+                    # The issuer job has a single fifteen-minute authority
+                    # window; keep this probe inside that same bound so a
+                    # valid certificate is not declared absent while Lego is
+                    # completing its final certificate fetch.
                     internet.wait_until_succeeds(
-                        'test "$(' + command + ')" = 11.0.0.5', timeout=420
+                        'test "$(' + command + ')" = 11.0.0.5', timeout=900
                     )
             internet.wait_until_succeeds(
                 "curl --fail --silent --show-error --max-time 5 --cacert /var/lib/inception-fixture-issuer/root.pem "
@@ -443,7 +447,7 @@ with subtest("inner control obtains a real DNS-01 certificate through both paren
                 + " "
                 + shlex.quote("https://" + control_hostname + "/health/ready")
                 + " >/dev/null",
-                timeout=420,
+                timeout=900,
             )
     except Exception:
         for instance in [1, 2]:

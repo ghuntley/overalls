@@ -109,11 +109,11 @@ class ControlProofTest(unittest.TestCase):
     def test_exact_owner_and_proof_never_refresh_the_job_deadline(self) -> None:
         job = self.begin()
         changed = self.update(job)
-        self.assertEqual(changed["expires_at_ms"], 601000)
+        self.assertEqual(changed["expires_at_ms"], 901000)
         self.assertEqual(changed["proofs"], [PROOF])
-        self.assertEqual(self.update(job, current=600999), changed)
+        self.assertEqual(self.update(job, current=900999), changed)
         with self.assertRaises(SetupError):
-            self.update(job, current=601000)
+            self.update(job, current=901000)
         for owner in [self.owner[:-1], self.owner + "other.", "_acme-challenge.other.example."]:
             with self.assertRaises(SetupError):
                 self.update(job, owner=owner)
@@ -151,7 +151,7 @@ class ControlProofTest(unittest.TestCase):
         ingress.install(self.config, self.namespace)
         for field, value in [
             ("generation", True),
-            ("expires_at_ms", 601001),
+            ("expires_at_ms", 901001),
             ("started_at_ms", 2000),
             ("binding", dict(self.boot, execution_epoch=True)),
         ]:
@@ -167,10 +167,10 @@ class ControlProofTest(unittest.TestCase):
         value = control.record(self.boot, False, self.root, self.namespace, 600500)
         self.assertFalse(value["ready"])
         self.assertEqual(value["proofs"], [PROOF])
-        self.assertEqual(value["expires_at_ms"], 601000)
-        expired = control.record(self.boot, False, self.root, self.namespace, 601000)
+        self.assertEqual(value["expires_at_ms"], 605500)
+        expired = control.record(self.boot, False, self.root, self.namespace, 901000)
         self.assertEqual(expired["proofs"], [])
-        self.assertEqual(expired["expires_at_ms"], 606000)
+        self.assertEqual(expired["expires_at_ms"], 906000)
         with self.assertRaises(SetupError):
             control.record(self.boot, 1, self.root, self.namespace, 1200)
 

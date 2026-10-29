@@ -11,7 +11,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
-from typing import TypedDict
+from typing import TypedDict, cast
 from unittest.mock import patch
 
 source = Path(sys.argv.pop(1))
@@ -80,13 +80,27 @@ class Boot(TypedDict):
     boot_challenge: str
 
 
+class Nameserver(TypedDict):
+    address: str
+    port: int
+
+
+class PublicConfiguration(TypedDict):
+    issuer: str
+    accept_terms: bool
+    nameservers: list[Nameserver]
+    mailbox: str
+    issuer_ca_pem: str
+    trust_pem: str
+
+
 class Configuration(TypedDict):
     version: int
     binding: Boot
     request_id: str
     generation: int
     origins: dict[str, str]
-    public: dict[str, object]
+    public: PublicConfiguration
 
 
 class WorkerTest(unittest.TestCase):
@@ -117,10 +131,24 @@ class WorkerTest(unittest.TestCase):
                 "control": "control." + namespace,
                 "apps": "apps." + namespace,
             },
-            "public": copy.deepcopy(
-                next(item["value"] for item in CASES if item["name"] == "public")
+            "public": cast(
+                PublicConfiguration,
+                copy.deepcopy(next(item["value"] for item in CASES if item["name"] == "public")),
             ),
         }
+
+    def test_process_category_redacts_transport_diagnostics_to_fixed_enums(self) -> None:
+        self.assertEqual(worker.process_category(1, False, b"unexpected EOF"), "transport_http")
+        self.assertEqual(
+            worker.process_category(1, False, b"x509: unknown authority"), "transport_verify"
+        )
+        self.assertEqual(
+            worker.process_category(1, False, b"asn1: malformed certificate"), "transport_parse"
+        )
+        self.assertEqual(
+            worker.process_category(1, False, b"certificate unavailable"), "transport_verify"
+        )
+        self.assertEqual(worker.process_category(1, True, b"unexpected EOF"), "timeout")
 
     def test_issuer_environment_is_closed_and_fixed_hook_owns_propagation(self) -> None:
         with patch.dict(
@@ -135,19 +163,33 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(args[-1], "run")
         self.assertEqual(args[args.index("--path") + 1], "/var/lib/inception-control/acme")
         self.assertEqual(args[args.index("--domains") + 1], self.config["origins"]["control"])
-        self.assertNotIn("--dns.resolvers", args)
+        self.assertEqual(
+            [
+                args[index + 1]
+                for index, argument in enumerate(args)
+                if argument == "--dns.resolvers"
+            ],
+            [f"{peer['address']}:{peer['port']}" for peer in self.config["public"]["nameservers"]],
+        )
         self.assertEqual(args[args.index("--dns.propagation-wait") + 1], "1s")
+        self.assertEqual(args[args.index("--cert.timeout") + 1], "720")
+        self.assertEqual(args[args.index("--http-timeout") + 1], "720")
+        self.assertLess(args.index("--dns.propagation-wait"), args.index("run"))
         self.assertEqual(env["EXEC_PATH"], "/immutable/hook")
         self.assertEqual(env["LEGO_DISABLE_CNAME_SUPPORT"], "true")
+        self.assertEqual(env["GODEBUG"], "http2client=0")
+        self.assertEqual(env["SSL_CERT_FILE"], "/run/inception/audi-issuer-ca.pem")
         self.assertEqual(
             set(env),
             {
                 "HOME",
+                "GODEBUG",
                 "LANG",
                 "EXEC_PATH",
                 "EXEC_POLLING_INTERVAL",
                 "LEGO_DISABLE_CNAME_SUPPORT",
                 "LEGO_CA_CERTIFICATES",
+                "SSL_CERT_FILE",
                 "INCEPTION_CONTROL_JOB",
             },
         )

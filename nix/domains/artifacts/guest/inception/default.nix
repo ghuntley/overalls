@@ -83,10 +83,37 @@ in
     iifname "lu*" oifname "eth0" ip saddr 169.254.255.2 ct state { new, established, related } accept
   '';
 
+  # @cc [owner:ghuntley,label:recovery;verification] inception-guest-network-offloads
+  # The Firecracker guest MUST disable segmentation and receive offloads on
+  # its uplink before the public control worker starts.  Large ACME
+  # certificate responses otherwise can be lost across the nested TAP path
+  # while small directory and authorization responses still succeed.
+  systemd.services.inception-network-offloads = {
+    description = "Disable nested Inception network offloads";
+    wantedBy = [ "multi-user.target" ];
+    before = [ "inception-control-certificate.service" ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      TimeoutStartSec = 30;
+      ExecStart = pkgs.writeShellScript "inception-disable-guest-network-offloads" ''
+        set -eu
+        for attempt in $(seq 1 30); do
+          if ${pkgs.iproute2}/bin/ip link show eth0 >/dev/null 2>&1; then
+            ${pkgs.ethtool}/bin/ethtool -K eth0 tso off gso off gro off tx off rx off >/dev/null 2>&1
+            exit 0
+          fi
+          sleep 1
+        done
+        exit 1
+      '';
+    };
+  };
+
   environment.systemPackages = [
     pkgs.git pkgs.devenv pkgs.gnumake pkgs.gcc pkgs.pkg-config pkgs.openssl
     pkgs.nodejs pkgs.rustc pkgs.cargo pkgs.python3 pkgs.util-linux pkgs.nftables
-    pkgs.jq pkgs.postgresql_18 packages.toolchain.elixir packages.toolchain.erlang
+    pkgs.jq pkgs.ethtool pkgs.postgresql_18 packages.toolchain.elixir packages.toolchain.erlang
     packages.marshall packages.lilly zfs
   ];
   # Inception owns its checkout bootstrap and deliberately does not enable the

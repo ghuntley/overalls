@@ -126,6 +126,58 @@ in
       iifname "lu*" oifname "eth1" ip saddr 10.40.0.0/16 ct state { new, established, related } accept
       iifname "eth1" oifname "lu*" ip daddr 10.40.0.0/16 ct state { established, related } accept
     '';
+    # Clamp TCP MSS across the nested TAP/NAT path so larger ACME certificate
+    # responses do not depend on fragmented packets surviving the provider VLAN.
+    networking.nftables.tables.inception-mss = {
+      family = "ip";
+      content = ''
+        chain forward {
+          type filter hook forward priority mangle; policy accept;
+          iifname "lu*" oifname "eth1" tcp flags syn tcp option maxseg size set 1200
+          iifname "eth1" oifname "lu*" tcp flags syn tcp option maxseg size set 1200
+        }
+      '';
+    };
+    # Nested Firecracker TAP traffic crosses the outer VM's virtio uplink and
+    # dynamically-created Lilly uplinks (lu*) and guest TAPs (lv*) in its
+    # network namespace. Disable segmentation/coalescing on this fixture path
+    # so a large ACME certificate response is delivered as normal MTU-sized
+    # frames; both loops cover links created after boot.
+    systemd.services.inception-disable-network-offloads = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      serviceConfig = {
+        Type = "simple";
+        Restart = "always";
+        RestartSec = 1;
+        ExecStart = pkgs.writeShellScript "inception-disable-network-offloads" ''
+          set -eu
+          while :; do
+            for device in eth1 lu*; do
+              test -e "/sys/class/net/$device" || continue
+              ${pkgs.ethtool}/bin/ethtool -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
+            done
+            for namespace in $(${pkgs.iproute2}/bin/ip netns list | ${pkgs.coreutils}/bin/cut -d' ' -f1); do
+              case "$namespace" in
+                lilly-*)
+                  ${pkgs.iproute2}/bin/ip netns exec "$namespace" \
+                    ${pkgs.runtimeShell} -c '
+                      ethtool="$1"
+                      for device_path in /sys/class/net/lv*; do
+                        test -e "$device_path" || continue
+                        device="''${device_path##*/}"
+                        "$ethtool" -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
+                      done
+                    ' -- ${pkgs.ethtool}/bin/ethtool || true
+                  ;;
+              esac
+            done
+            sleep 1
+          done
+        '';
+      };
+    };
     boot.supportedFilesystems = [ "zfs" ];
     boot.extraModprobeConfig = "options zfs zfs_arc_max=536870912";
     systemd.services.zfs-zed.enable = false;

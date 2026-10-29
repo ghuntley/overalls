@@ -50,8 +50,12 @@ in
 
   systemd.services.inception-control-certificate = {
     wantedBy = [ "multi-user.target" ];
-    requires = [ "inception-audi.service" ];
-    after = [ "inception-audi.service" "marshall-inception.service" ];
+    requires = [ "inception-audi.service" "inception-network-offloads.service" ];
+    after = [
+      "inception-audi.service"
+      "inception-network-offloads.service"
+      "marshall-inception.service"
+    ];
     serviceConfig = {
       Type = "exec"; User = "root"; UMask = "0077";
       ExecStart = "${python}/bin/python3 ${./.}/control_worker.py ${image}";

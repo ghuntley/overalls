@@ -331,12 +331,13 @@ def collect(
     state: Path = STATE,
 ) -> ChildPublication:
     """@cc [owner:ghuntley,label:security;recovery] inception-control-proof-fast-path
-    While a control proof is present, publication MUST return that proof before
-    optional gateway lookups. This also applies when an older certificate is
-    already serving: renewal must not let the slow gateway lookups outlive the
-    control heartbeat before the parent observes the new proof. A still-valid
-    prior route and host-key snapshot MUST be retained so publishing a control
-    proof cannot withdraw the child's A record during certificate issuance.
+    While a control proof or ready control heartbeat is present, publication
+    MUST return the control record before optional gateway lookups. This also
+    applies when an older certificate is already serving: renewal must not let
+    the slow gateway lookups outlive the control heartbeat before the parent
+    observes the new proof or ready route. A still-valid prior route and
+    host-key snapshot MUST be retained so publishing a control record cannot
+    withdraw the child's A record during certificate issuance.
     """
     # Validate the closed boot/namespace schema before consuming any authority.
     ingress.request(encode(dict(config, request_id=boot["placement_id"])), boot)
@@ -365,7 +366,7 @@ def collect(
         control, expiry = control_record(
             json.loads(read_private(root / "control-publication.json", 4096)), config, now()
         )
-        if control["proofs"]:
+        if control["proofs"] or control["ready"]:
             # DNS/SSH lookups can take the whole control heartbeat under load.
             # Keep the last complete local snapshot when it is still valid; the
             # parent will cap its lease by that snapshot's remaining lifetime.
