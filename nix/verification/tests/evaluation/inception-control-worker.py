@@ -163,6 +163,7 @@ class WorkerTest(unittest.TestCase):
         self.assertEqual(args[-1], "run")
         self.assertEqual(args[args.index("--path") + 1], "/var/lib/inception-control/acme")
         self.assertEqual(args[args.index("--domains") + 1], self.config["origins"]["control"])
+        self.assertEqual(args[args.index("--key-type") + 1], "ec256")
         self.assertEqual(
             [
                 args[index + 1]

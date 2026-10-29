@@ -202,6 +202,11 @@ def invocation(
         public["mailbox"].rstrip(".").replace(".", "@", 1),
         "--domains",
         config["origins"]["control"],
+        # Keep the issued chain and key material compact across the nested
+        # Firecracker/TAP path. EC256 provides the same authenticated TLS
+        # identity while avoiding a multi-segment certZ response.
+        "--key-type",
+        "ec256",
         *resolver_arguments,
         "--dns",
         "exec",
