@@ -1,5 +1,6 @@
 # Architecture reviews
 
+- [eMudhra distrust backout (2026-10-29)](2026-10-29-emudhra-distrust-backout.md): removal of the temporary fleet blacklist after the `nixos-26.05` distrust, the coordinated nixpkgs/devenv/nix-compact bump, Rust 1.99 lint fixes and the sandbox `openat2` test gap; `fleet-guest-trust` acceptance remains open.
 - [Mila Apple host app and build targets (2026-10-29)](2026-10-29-mila-apple-host-app.md): `App` host and `mila-build`/`mila-run` for iOS and macOS under ADR-0235, the unreachable WebKit navigation guard, iOS compile and resource-bundle fixes, and the Darwin rust-overlay toolchain.
 - [Underclass egress without an exit node (2026-10-28)](2026-10-28-underclass-egress-without-exit-node.md): route-only egress mode, stale exit-node preference clearing and the `d7a0ccf` pin under ADR-0260.
 - [Mila native release readiness (2026-10-24)](2026-10-24-mila-native-release-readiness.md): native release/source-bundle replacement obligations, centralized catalog evidence and incomplete platform acceptance under ADR-0249.

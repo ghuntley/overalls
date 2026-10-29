@@ -1,6 +1,6 @@
 inputs:
   nix-compact:
-    url: github:ghuntley/nix-compact/9e43798f4ebf1b969432b6e1eb9f8a0bdf69fede
+    url: github:ghuntley/nix-compact/84475ca7652fcdabd36428d80d4c1122bb03bab6
   git-hooks:
     url: github:cachix/git-hooks.nix
     inputs:

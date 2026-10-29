@@ -528,6 +528,10 @@ fn host_rule_files_touch_only_lillys_tables() {
 /// The checked bytes, not the caller's file, are what nft loads.
 #[test]
 fn host_rule_files_load_from_a_private_checked_copy() {
+    if crate::descriptor_resolution::unavailable("host_rule_files_load_from_a_private_checked_copy")
+    {
+        return;
+    }
     let f = fixture();
     let directory = tempfile::tempdir().unwrap();
     let base = directory.path().canonicalize().unwrap();

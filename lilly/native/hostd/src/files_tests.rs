@@ -26,6 +26,9 @@ fn text(path: &Path) -> String {
 /// Each accepted shape performs its effect natively.
 #[test]
 fn native_file_effects_perform_lillys_shapes() {
+    if crate::descriptor_resolution::unavailable("native_file_effects_perform_lillys_shapes") {
+        return;
+    }
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().canonicalize().unwrap();
     let p = |name: &str| text(&root.join(name));
@@ -192,6 +195,11 @@ fn checkpoint_outputs_require_individual_native_ownership_requests() {
 /// owners are refused without any effect.
 #[test]
 fn native_file_effects_refuse_out_of_policy_requests() {
+    if crate::descriptor_resolution::unavailable(
+        "native_file_effects_refuse_out_of_policy_requests",
+    ) {
+        return;
+    }
     let directory = tempfile::tempdir().unwrap();
     let base = directory.path().canonicalize().unwrap();
     let root = base.join("root");

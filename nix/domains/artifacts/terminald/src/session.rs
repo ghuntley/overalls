@@ -933,9 +933,17 @@ fn ensure_account(_helper: &std::path::Path, _user: &str) -> std::io::Result<()>
   Err(std::io::Error::other("account helper unsupported"))
 }
 
-fn reserve(total: &AtomicUsize, amount: usize, limit: usize) -> bool {
-  total.fetch_update(Ordering::SeqCst, Ordering::SeqCst,
-    |current| current.checked_add(amount).filter(|next| *next <= limit)).is_ok()
+pub(crate) fn reserve(total: &AtomicUsize, amount: usize, limit: usize) -> bool {
+  let mut current = total.load(Ordering::SeqCst);
+  loop {
+    let Some(next) = current.checked_add(amount).filter(|next| *next <= limit) else {
+      return false;
+    };
+    match total.compare_exchange_weak(current, next, Ordering::SeqCst, Ordering::SeqCst) {
+      Ok(_) => return true,
+      Err(actual) => current = actual,
+    }
+  }
 }
 
 #[cfg(unix)]

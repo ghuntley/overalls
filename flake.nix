@@ -8,7 +8,7 @@
   # pinned only by flake.lock; the package-input-lock check MUST fail when
   # flake.lock and devenv.lock lock different revisions.
   inputs = {
-    nix-compact.url = "github:ghuntley/nix-compact/9e43798f4ebf1b969432b6e1eb9f8a0bdf69fede";
+    nix-compact.url = "github:ghuntley/nix-compact/84475ca7652fcdabd36428d80d4c1122bb03bab6";
     buildNixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-images = {
@@ -123,7 +123,6 @@
           inherit system;
             modules = [ nixos-images.nixosModules.kexec-installer nixos-images.nixosModules.noninteractive
               ./nix/domains/system/nix-cache.nix
-              ./nix/domains/system/public-trust.nix
             ({ config, pkgs, ... }: {
               system.kexec-installer.name = "overalls-host-installer";
               environment.systemPackages = [ pkgs.python3 config.boot.zfs.package ];

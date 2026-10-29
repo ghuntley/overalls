@@ -69,12 +69,21 @@ impl PipeSlots {
     /// buffer, completion storage and handles may safely be released. Exhaustion
     /// MUST refuse new pipes without evicting an outstanding operation.
     pub fn reserve(&self) -> Option<PipeSlot<'_>> {
-        self.used
-            .fetch_update(Ordering::AcqRel, Ordering::Acquire, |used| {
-                (used < PIPE_LIMIT).then_some(used + 1)
-            })
-            .ok()
-            .map(|_| PipeSlot { slots: self })
+        let mut used = self.used.load(Ordering::Acquire);
+        loop {
+            if used >= PIPE_LIMIT {
+                return None;
+            }
+            match self.used.compare_exchange_weak(
+                used,
+                used + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => return Some(PipeSlot { slots: self }),
+                Err(current) => used = current,
+            }
+        }
     }
 }
 

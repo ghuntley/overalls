@@ -37,10 +37,14 @@ let
     configurePlatforms = [ "build" "host" ];
     configureFlags = old.configureFlags ++ [ "--target=x86_64-pc-solaris2.11" ];
   });
-  clang = pkgs.llvmPackages.clang-unwrapped.override {
+  clang = (pkgs.llvmPackages.clang-unwrapped.override {
     enableClangToolsExtra = false;
     extraPatches = [ ./overalls-clang-solaris-linker-path.patch ];
-  };
+  }).overrideAttrs (old: {
+    # run-clang-tidy is installed only with clang-tools-extra, but the pinned
+    # postInstall moves it unconditionally.
+    postInstall = builtins.replaceStrings [ "run-clang-tidy," ] [ "" ] old.postInstall;
+  });
   # @cc [owner:ghuntley,label:build] illumos-sdk-linker-semantics
   # The compiler MUST select the pinned Solaris GNU linker through Clang's
   # validated --ld-path and GNU driver mode. Rust's Solaris -z ignore/record

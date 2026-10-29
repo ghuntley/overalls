@@ -52,31 +52,7 @@ pending upstream fixes. On or after 2026-10-22 check each item below; recheck an
 still pending every two days. Delete an item once it is done and this section when
 it is empty.
 
-1. **Back out the blacklist.** Check whether the `nixos-26.05` channel contains nixpkgs
-   commit `7816d39` (the backported `security/ca.nix` distrust of the eMudhra roots):
-   take the channel revision from
-   `nix eval --raw --refresh --impure --expr '(builtins.getFlake "github:NixOS/nixpkgs/nixos-26.05").rev'`,
-   then run `gh api repos/NixOS/nixpkgs/compare/7816d39daadb7412b886bf5a9a3b607561a7bd2c...<rev> --jq .status`;
-   `ahead` or `identical` means it is included. Once it is, update the `nixpkgs` pin,
-   delete `nix/domains/system/public-trust.nix` (contract `fleet-distrust-emudhra-roots`)
-   and its imports in `nix/domains/system/catalog.nix`,
-   `nix/domains/artifacts/guest/configuration.nix` and the `host-kexec` modules in
-   `flake.nix`. Verify the built host and guest bundles still
-   lack the four roots. Keep Marshall's system-store TLS defaults
-   (`runtime-postgres-system-trust`, `mail-smtp-system-trust`) and the `rustls-webpki`
-   update; they are not part of the workaround.
-2. **`cacert` 3.131.1.** nixpkgs PR #576347 updates the NSS root bundle. Once it is in
-   `nixos-26.05`, update the pin so packages built outside the NixOS module (for example
-   in Nix build sandboxes) also drop the roots.
-3. **Go 1.27.3 / 1.26.10.** `nixos-26.05` had Go 1.26.8. Update the pin once it ships a
-   fixed Go, then rebuild `nix/domains/artifacts/guest/github/transport`.
-4. **Node.js (fix pending upstream).** Node uses its own bundled root store, not the
-   system bundle. The VS Code web runtime (`nix/domains/artifacts/vscode-web/node-runtime.nix`)
-   follows nixpkgs `nodejs-slim_24`; update the pin once nixpkgs ships the fixed Node.
-5. **castore (no fixed release yet).** castore 1.0.21 still contains the emSign roots.
-   Marshall no longer uses it by default, but Mint falls back to it and tests use it;
-   update `castore` in every `mix.lock` once a release drops the roots.
-6. **Non-NixOS guest images.** Ubuntu, Arch, Alma, FreeBSD and Windows guests use their
+1. **Non-NixOS guest images.** Ubuntu, Arch, Alma, FreeBSD and Windows guests use their
    distribution's trust store. Rebuild those images once their `ca-certificates`
    (or equivalent) updates ship.
 

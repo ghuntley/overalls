@@ -10,7 +10,6 @@ let
     fileset = lib.fileset.unions [
       ../.
       ../../../system/nix-cache.nix
-      ../../../system/public-trust.nix
       ../../../../platform/nix-cache.nix
     ];
   };

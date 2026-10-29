@@ -204,6 +204,9 @@ fn leases(root: &Path) -> Leases {
 /// exclusive lease may ever overlap another lease on the same inode.
 #[hegel::test(test_cases = 30)]
 fn lease_grants_follow_arrival_order(tc: TestCase) {
+    if crate::descriptor_resolution::unavailable("lease_grants_follow_arrival_order") {
+        return;
+    }
     let modes: Vec<Mode> = (0..tc.draw(gs::integers::<usize>().min_value(1).max_value(6)))
         .map(|_| {
             if tc.draw(gs::booleans()) {
@@ -291,6 +294,11 @@ fn lease_grants_follow_arrival_order(tc: TestCase) {
 
 #[test]
 fn zero_wait_is_one_attempt_and_contention_is_distinct() {
+    if crate::descriptor_resolution::unavailable(
+        "zero_wait_is_one_attempt_and_contention_is_distinct",
+    ) {
+        return;
+    }
     let directory = tempfile::tempdir().expect("tempdir");
     let table = leases(directory.path());
     let never = AtomicBool::new(false);
@@ -603,6 +611,11 @@ fn commands_capture_output_and_mutations_need_a_lease() {
 /// same confined lifecycle grammar becomes executable under a live lease.
 #[test]
 fn systemctl_queries_are_lease_free_but_lifecycle_is_serialized() {
+    if crate::descriptor_resolution::unavailable(
+        "systemctl_queries_are_lease_free_but_lifecycle_is_serialized",
+    ) {
+        return;
+    }
     let fixture = daemon();
     let client = Client::connect(&fixture);
     let vm = "lilly-vm-11111111-2222-4333-8444-555555555555.service";
@@ -655,6 +668,9 @@ fn systemctl_queries_are_lease_free_but_lifecycle_is_serialized() {
 
 #[test]
 fn timeouts_kill_and_leases_serialize_commands() {
+    if crate::descriptor_resolution::unavailable("timeouts_kill_and_leases_serialize_commands") {
+        return;
+    }
     let fixture = daemon();
     let client = Client::connect(&fixture);
     let Reply::Granted { lease } = client.acquire(2, &fixture.root, 0) else {
@@ -684,6 +700,10 @@ fn timeouts_kill_and_leases_serialize_commands() {
 /// release likewise cancels its lease's command first.
 #[test]
 fn session_death_kills_commands_and_releases_leases() {
+    if crate::descriptor_resolution::unavailable("session_death_kills_commands_and_releases_leases")
+    {
+        return;
+    }
     let fixture = daemon();
     let first = Client::connect(&fixture);
     let Reply::Granted { lease } = first.acquire(2, &fixture.root, 0) else {
@@ -770,6 +790,9 @@ fn options_parse_strictly() {
 /// granted the lease only once the job finished.
 #[test]
 fn durable_jobs_outlive_their_session() {
+    if crate::descriptor_resolution::unavailable("durable_jobs_outlive_their_session") {
+        return;
+    }
     let fixture = daemon();
     let key = [7_u8; JOB_KEY];
     let first = Client::connect(&fixture);
@@ -1112,6 +1135,10 @@ fn local_stream(lease: u64, producer: Option<crate::transfer::Producer>) -> Requ
 /// exactly the helper's exit code; generic runs of the helper are refused.
 #[test]
 fn transfer_streams_run_the_helper_under_the_lease() {
+    if crate::descriptor_resolution::unavailable("transfer_streams_run_the_helper_under_the_lease")
+    {
+        return;
+    }
     let fixture = daemon();
     let client = Client::connect(&fixture);
     client.send(2, local_stream(0, None));
@@ -1162,6 +1189,9 @@ fn transfer_streams_run_the_helper_under_the_lease() {
 /// A local resume runs only after lilly-resume-token confirmed the token.
 #[test]
 fn local_resume_requires_the_token_check() {
+    if crate::descriptor_resolution::unavailable("local_resume_requires_the_token_check") {
+        return;
+    }
     let fixture = daemon();
     let client = Client::connect(&fixture);
     let directory = fixture.root.join("resume");

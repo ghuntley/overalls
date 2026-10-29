@@ -7,7 +7,6 @@ in
   imports = [
     (modulesPath + "/profiles/minimal.nix")
     ../../system/nix-cache.nix
-    ../../system/public-trust.nix
     ./private-services.nix
     ./terminald.nix
   ];

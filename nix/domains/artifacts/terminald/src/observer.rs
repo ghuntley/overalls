@@ -55,8 +55,7 @@ pub fn start(daemon: Arc<session::Daemon>) -> io::Result<()> {
           unsafe { libc::close(fd) };
           continue;
         }
-        if active.fetch_update(Ordering::SeqCst, Ordering::SeqCst,
-          |count| (count < 8).then_some(count + 1)).is_err() {
+        if !session::reserve(&active, 1, 8) {
           unsafe { libc::close(fd) };
           continue;
         }

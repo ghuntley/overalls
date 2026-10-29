@@ -225,6 +225,8 @@ pub fn own_cgroup() -> Option<PathBuf> {
 }
 
 #[cfg(test)]
+mod descriptor_resolution;
+#[cfg(test)]
 mod descriptor_tests;
 #[cfg(test)]
 mod files_tests;
