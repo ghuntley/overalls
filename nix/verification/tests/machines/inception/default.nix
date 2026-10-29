@@ -520,6 +520,24 @@ in
       iifname "eth1" oifname "eth0" ip saddr { 11.0.0.0/24, 169.254.255.2, 10.40.0.0/16 } accept
       iifname "eth0" oifname "eth1" ip daddr { 11.0.0.0/24, 169.254.255.2, 10.40.0.0/16 } ct state { established, related } accept
     '';
+    # The provider router is the final segment for nested ACME traffic. Keep
+    # its QEMU-facing and isolated-VLAN links from coalescing the certificate
+    # response into an oversized frame before it returns to the outer guest.
+    systemd.services.inception-provider-offloads = {
+      wantedBy = [ "multi-user.target" ];
+      after = [ "network-online.target" ];
+      wants = [ "network-online.target" ];
+      serviceConfig = {
+        Type = "oneshot";
+        RemainAfterExit = true;
+        ExecStart = pkgs.writeShellScript "inception-disable-provider-offloads" ''
+          set -eu
+          for device in eth0 eth1; do
+            ${pkgs.ethtool}/bin/ethtool -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
+          done
+        '';
+      };
+    };
     # Preserve the image's explicit public resolver addresses while routing
     # their DNS packets to the fixture's local forwarder.  The DNAT is
     # limited to DNS from the isolated provider VLAN and both transports so
