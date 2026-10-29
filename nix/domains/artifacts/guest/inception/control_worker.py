@@ -60,14 +60,25 @@ def wait_for_issued_material(
     completion while the filesystem writes are still being flushed.  Keep the
     original job deadline as the authority fence and poll only for this
     already-owned output; no new authority is granted during the grace period.
+    A successful read MUST finish before the deadline; a read that crosses the
+    fence MUST be discarded even when both files are already present.
     """
     while True:
+        # The deadline is an authority boundary, not merely a retry hint. Check
+        # both sides of the filesystem read so a file that becomes visible at
+        # the boundary cannot be consumed after its job has expired.
+        if clock() >= deadline:
+            raise SetupError("control certificate material deadline expired")
         try:
-            return issued_material(module, directory, hostname)
-        except (FileNotFoundError, NotADirectoryError):
+            material = issued_material(module, directory, hostname)
+        except (OSError, ValueError):
             if clock() >= deadline:
                 raise
             time.sleep(0.25)
+            continue
+        if clock() >= deadline:
+            raise SetupError("control certificate material deadline expired")
+        return material
 
 
 def stop_job(process: subprocess.Popen[bytes] | None) -> None:
@@ -253,15 +264,22 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                     if status is not None or current >= job["expires_at_ms"]:
                         stop_job(process)
                         process = None
+                        # `current` was sampled before stopping the child.  A
+                        # process that exits at the deadline can spend several
+                        # seconds in stop_job while its final files are flushed.
+                        # Re-sample after the process group is dead so a
+                        # candidate is never consumed after the original job
+                        # authority has expired.
+                        completed_at = proofs.now()
                         # Old hooks are dead before removing job authority.
                         clear_job()
-                        retry = current + 60000
+                        retry = completed_at + 60000
                         # Lego may report a cleanup-hook failure after Pebble has
                         # issued a valid certificate.  The candidate is still
                         # safe to install because accept() performs complete
                         # key, chain, hostname, lifetime and trust validation;
                         # stale output is fenced by clear_issuer_output().
-                        if current < job["expires_at_ms"]:
+                        if completed_at < job["expires_at_ms"]:
                             try:
                                 directory = STATE / "acme" / "certificates"
                                 try:
@@ -273,7 +291,7 @@ def supervise(boot: proofs.Boot, image: Image) -> None:
                                         # the five-second publication TTL so this
                                         # worker never appears stopped while
                                         # waiting for Lego's final close.
-                                        min(job["expires_at_ms"], current + 4000),
+                                        min(job["expires_at_ms"], completed_at + 4000),
                                     )
                                 except (
                                     OSError,

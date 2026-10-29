@@ -186,10 +186,15 @@ class WorkerTest(unittest.TestCase):
                 nonlocal calls
                 calls += 1
                 if calls == 1:
-                    raise FileNotFoundError(path)
+                    # Lego may expose a freshly-created file before its final
+                    # mode/ownership metadata is visible to the custody
+                    # reader.  The worker must keep polling within its
+                    # bounded deadline instead of classifying that race as a
+                    # permanently missing material set.
+                    raise ValueError("issuer file still settling")
                 return path.name.encode("ascii")
 
-        clock = iter([100, 100, 1000]).__next__
+        clock = iter([100, 100, 100, 1000]).__next__
         with patch.object(worker.time, "sleep", sleeps.append):
             material = worker.wait_for_issued_material(
                 Issuer(),
@@ -201,6 +206,25 @@ class WorkerTest(unittest.TestCase):
         hostname = self.config["origins"]["control"]
         self.assertEqual(material, (hostname + ".key" + hostname + ".crt").encode("ascii"))
         self.assertEqual(sleeps, [0.25])
+
+    def test_wait_for_issued_material_discards_read_crossing_deadline(self) -> None:
+        class Issuer:
+            @staticmethod
+            def issuer_file(path: Path, issuer: int) -> bytes:
+                return path.name.encode("ascii")
+
+        # The files are complete when the read starts, but the authority fence
+        # expires before the read returns.  Material must not be consumed using
+        # the stale pre-read timestamp.
+        clock = iter([100, 2000]).__next__
+        with self.assertRaises(SetupError):
+            worker.wait_for_issued_material(
+                Issuer(),
+                self.root / "certificates",
+                self.config["origins"]["control"],
+                2000,
+                clock,
+            )
 
     def test_abandoned_issuer_and_hook_are_both_killed(self) -> None:
         marker = self.root / "child.pid"
