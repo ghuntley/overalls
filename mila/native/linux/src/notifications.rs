@@ -116,14 +116,15 @@ impl NotificationState {
         self.devices.len() != before
     }
 
+    /// @cc [owner:ghuntley,label:security;desktop] linux-notifications-registration
+    /// Registration MUST fail closed when the platform has no push provider,
+    /// and a failed attempt MUST leave the state disabled.
+    ///
     /// Attempts to register this host with the platform push provider.
     ///
     /// Linux has no provider in the shared Susan protocol. Keeping a distinct
     /// registration operation prevents the GTK host from treating a local
     /// toggle as a completed server registration.
-    /// @cc [owner:ghuntley,label:security;desktop] linux-notifications-registration
-    /// Registration MUST fail closed when the platform has no push provider,
-    /// and a failed attempt MUST leave the state disabled.
     pub fn register(&mut self) -> Result<(), NotificationUnavailable> {
         self.enabled = false;
         Err(NotificationUnavailable::NoPushProvider)

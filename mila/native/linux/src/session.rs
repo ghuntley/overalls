@@ -18,14 +18,15 @@ pub trait DeviceSigner: Send + Sync {
     fn sign(&self, message: &[u8]) -> Result<[u8; 64], RuntimeError>;
 }
 
+/// @cc [owner:ghuntley,label:security] linux-file-signer-custody
+/// A file-backed Linux signer MUST reject symlinks and any group/world
+/// permission bits before reading key material, and MUST expose only signatures
+/// and the configured public key to the session boundary.
+///
 /// A Linux software signer backed by an owner-only raw P-256 key file.
 /// Hardware-backed desktop signers can implement [`DeviceSigner`] directly;
 /// this adapter exists for the Linux development and release bundle where the
 /// key is provisioned outside the GTK process.
-/// @cc [owner:ghuntley,label=security] linux-file-signer-custody
-/// A file-backed Linux signer MUST reject symlinks and any group/world
-/// permission bits before reading key material, and MUST expose only signatures
-/// and the configured public key to the session boundary.
 pub struct FileDeviceSigner {
     key: SigningKey,
     public_key: String,

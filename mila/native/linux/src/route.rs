@@ -119,7 +119,7 @@ impl NavigationDecision {
 }
 
 impl ActivationBatch {
-    /// @cc [owner:ghuntley,label=security;navigation] linux-open-activation-batch
+    /// @cc [owner:ghuntley,label:security;navigation] linux-open-activation-batch
     /// Desktop activation MUST retain only bounded typed routes; malformed and
     /// excess values become a count and never reach UI text or persistence.
     pub fn parse<'a>(uris: impl IntoIterator<Item = &'a str>) -> Self {

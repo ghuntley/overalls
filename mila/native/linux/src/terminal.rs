@@ -169,11 +169,12 @@ pub enum PtyError {
     Render,
 }
 
-/// Host transport implemented by the authenticated runtime adapter.
-/// Output is already decoded display text; PTY bytes never cross this seam.
-/// @cc [owner:ghuntley,label=security;terminal] linux-terminal-transport-authenticated
+/// @cc [owner:ghuntley,label:security;terminal] linux-terminal-transport-authenticated
 /// Attach and every subsequent operation MUST be bound to an authenticated
 /// session generation; PTY bytes stay inside the host transport.
+///
+/// Host transport implemented by the authenticated runtime adapter.
+/// Output is already decoded display text; PTY bytes never cross this seam.
 pub trait PtyTransport {
     fn attach(&mut self, request: &PtyAttachRequest) -> Result<(), PtyError>;
     /// Binds the host channel opened by `attach` to the reducer generation.
@@ -325,11 +326,12 @@ pub trait PorschePtyClient {
     fn close(&mut self, channel: u64) -> Result<(), PtyError>;
 }
 
-/// Concrete bridge from Porsche's host PTY client to the authenticated native
-/// terminal transport.  A channel cannot be reused for a different session.
-/// @cc [owner:ghuntley,label=security;terminal] porsche-pty-session-binding
+/// @cc [owner:ghuntley,label:security;terminal] porsche-pty-session-binding
 /// `open` MUST be called with the same authenticated session for the lifetime
 /// of this backend; operations for another session are refused before client.
+///
+/// Concrete bridge from Porsche's host PTY client to the authenticated native
+/// terminal transport.  A channel cannot be reused for a different session.
 pub struct PorschePtyBackend<C> {
     client: C,
     session_id: Option<String>,
@@ -379,12 +381,13 @@ impl<C: PorschePtyClient> HostPtyBackend for PorschePtyBackend<C> {
     }
 }
 
+/// @cc [owner:ghuntley,label:security;terminal] linux-host-pty-binding
+/// A host channel MUST be used only after `bind_generation`, and every
+/// operation with a different generation MUST be refused before the backend.
+///
 /// Host-owned PTY transport that binds every operation to one session and
 /// authenticated reducer generation. A runtime supplies the backend to keep
 /// SSH credentials and raw PTY bytes outside the native presentation crate.
-/// @cc [owner:ghuntley,label=security;terminal] linux-host-pty-binding
-/// A host channel MUST be used only after `bind_generation`, and every
-/// operation with a different generation MUST be refused before the backend.
 pub struct HostPtyTransport<B> {
     backend: B,
     session_id: Option<String>,

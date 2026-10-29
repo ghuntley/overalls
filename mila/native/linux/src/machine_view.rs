@@ -28,7 +28,7 @@ pub enum MachineViewError {
 
 const MAX_UI_MACHINES: usize = 256;
 
-/// @cc [owner:ghuntley,label=security;desktop] linux-machine-view-bounded
+/// @cc [owner:ghuntley,label:security;desktop] linux-machine-view-bounded
 /// GTK rows MUST derive from validated session listings and reject unsafe display text.
 pub fn project_listing(listing: &MachineListing) -> Result<Vec<MachineRow>, MachineViewError> {
     if listing.machines().len() > MAX_UI_MACHINES {

@@ -97,12 +97,12 @@ pub unsafe extern "C" fn mila_trust_document_validate(
         .unwrap_or(MilaFfiStatus::InvalidRequest)
 }
 
-/// Validates and selects a deployment trust document for native enrollment.
-///
 /// @cc [owner:ghuntley,label:security] mila-trust-enrollment-reconciles
 /// Enrollment MUST persist only the document selected by Rust after HTTPS
 /// validation and pinned-authority reconciliation; a malformed or conflicting
 /// document MUST return no output.
+///
+/// Validates and selects a deployment trust document for native enrollment.
 ///
 /// `fetched` is the bounded HTTPS response. `pinned` is the previously persisted
 /// document, or an empty slice when no pin exists. A missing fetched document is

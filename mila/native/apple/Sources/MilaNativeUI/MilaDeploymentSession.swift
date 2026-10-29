@@ -7,11 +7,12 @@ public enum MilaDeploymentSessionState: Equatable, Sendable {
     case failed(UUID, String)
 }
 
-/// Coordinates the durable deployment selection with the authenticated adapter.
-/// The coordinator is the single owner of session generation fencing for native UI.
 /// @cc [owner:ghuntley,label:security] deployment-session-generation
 /// Every sign-in/reconnect gets a fresh generation; consumers must discard work from
 /// an earlier generation after sign-out or switching deployments.
+///
+/// Coordinates the durable deployment selection with the authenticated adapter.
+/// The coordinator is the single owner of session generation fencing for native UI.
 public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
     public typealias AdapterFactory = @Sendable (MilaDeployment) throws -> any MilaFFIAdapter
 

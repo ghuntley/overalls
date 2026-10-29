@@ -139,6 +139,9 @@ public final class MilaAppleNotificationService: NSObject, UNUserNotificationCen
     public func refreshDevices() { guard sessionActive else { devices = []; return }; devices = store.list() }
     @discardableResult public func removeDevice(id: String) -> Bool { guard sessionActive else { return false }; let ok = store.remove(id: id); refreshDevices(); return ok }
     /// @cc [owner:ghuntley,label:security] mila-apple-push-token-boundary
+    /// Registration MUST require an active session, a 32–200 byte token and an
+    /// HTTPS endpoint without credentials or fragment; any refusal or validator
+    /// failure MUST leave the state failed and MUST NOT store a device record.
     public func register(token: String, endpoint: String, environment: MilaPushEnvironment = .production) {
         guard sessionActive,
               (32...200).contains(token.utf8.count),

@@ -21,21 +21,21 @@ characters and oversized chunks, and retain at most its configured viewport; ter
 remain owned by the authenticated transport and MUST NOT be logged or exposed to GTK state.
 
 
-@cc [owner:ghuntley,label=security;navigation] linux-open-activation-batch
+@cc [owner:ghuntley,label:security;navigation] linux-open-activation-batch
 A desktop open activation MUST retain only the bounded set of parsed navigation routes; malformed
 or excess URIs MUST become a count and MUST NOT be echoed, executed, or persisted.
 
 
-@cc [owner:ghuntley,label=security;desktop] linux-machine-view-bounded
+@cc [owner:ghuntley,label:security;desktop] linux-machine-view-bounded
 Machine list and detail labels MUST be derived from the validated authenticated listing, reject
 control characters before GTK display, and expose permissions only as presentation hints.
 
 
-@cc [owner:ghuntley,label=security;terminal] linux-terminal-transport-authenticated
+@cc [owner:ghuntley,label:security;terminal] linux-terminal-transport-authenticated
 The Linux PTY seam MUST require an authenticated session before attach, bind all operations to the
 current generation, validate input and resize permissions, and keep PTY bytes outside GTK state.
 
-@cc [owner:ghuntley,label=security;web] linux-web-browser-fence
+@cc [owner:ghuntley,label:security;web] linux-web-browser-fence
 The GTK web action MUST launch only a Rust-validated public HTTPS endpoint whose
 port matches the authenticated projection; private, stale, malformed, or
 non-matching destinations MUST be refused before invoking the desktop browser.
