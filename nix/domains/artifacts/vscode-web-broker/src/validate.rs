@@ -1,6 +1,7 @@
 //! Closed syntax validators for admission identifiers, names and labels.
 
 use crate::{Binding, Descriptor, Refusal};
+use std::fmt::Write as _;
 
 pub fn hex(value: &str, length: usize) -> bool {
     value.len() == length
@@ -74,7 +75,7 @@ pub(crate) fn base32_uuid(value: &str) -> Option<String> {
         bits += 5;
         if bits >= 8 {
             bits -= 8;
-            bytes.push((accumulator >> bits) as u8);
+            bytes.push(u8::try_from(accumulator >> bits).ok()?);
             accumulator &= (1 << bits) - 1;
         }
     }
@@ -83,15 +84,17 @@ pub(crate) fn base32_uuid(value: &str) -> Option<String> {
     }
     let encoded = bytes
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+        .fold(String::with_capacity(32), |mut out, byte| {
+            let _ = write!(out, "{byte:02x}");
+            out
+        });
     Some(format!(
         "{}-{}-{}-{}-{}",
-        &encoded[..8],
-        &encoded[8..12],
-        &encoded[12..16],
-        &encoded[16..20],
-        &encoded[20..]
+        encoded.get(..8)?,
+        encoded.get(8..12)?,
+        encoded.get(12..16)?,
+        encoded.get(16..20)?,
+        encoded.get(20..)?
     ))
 }
 

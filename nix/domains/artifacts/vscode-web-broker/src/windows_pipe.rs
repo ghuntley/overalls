@@ -29,6 +29,7 @@ static SLOTS: PipeSlots = PipeSlots::new();
 static RETIRED: Mutex<Vec<Pending>> = Mutex::new(Vec::new());
 static REAPER: OnceLock<io::Result<()>> = OnceLock::new();
 
+#[derive(Debug)]
 struct Resources {
     file: File,
     event: OwnedHandle,
@@ -60,11 +61,12 @@ impl Pending {
 impl Operation {
     fn result(&self, resources: &Resources) -> io::Result<Option<usize>> {
         let mut transferred = 0;
+        // SAFETY: the file handle is open, `overlapped` is this operation's owned boxed OVERLAPPED, and `transferred` is a live local; bWait is 0 so the call never blocks.
         if unsafe {
             GetOverlappedResult(
                 resources.file.as_raw_handle(),
                 self.overlapped.get(),
-                &mut transferred,
+                &raw mut transferred,
                 0,
             )
         } != 0
@@ -75,7 +77,7 @@ impl Operation {
             Ok(Some(transferred as usize))
         } else {
             let error = io::Error::last_os_error();
-            if error.raw_os_error() == Some(ERROR_IO_INCOMPLETE as i32) {
+            if error.raw_os_error() == Some(ERROR_IO_INCOMPLETE.cast_signed()) {
                 Ok(None)
             } else {
                 // Every error other than IO_INCOMPLETE describes a completed
@@ -89,7 +91,7 @@ impl Operation {
 fn drain() {
     let mut retired = RETIRED
         .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     retired.retain(|pending| !pending.completed());
 }
 
@@ -115,6 +117,7 @@ enum Direction<'a> {
     Write(&'a [u8]),
 }
 
+#[derive(Clone, Copy)]
 enum CompletionWait<'a> {
     Deadline(Instant),
     Relay(&'a AtomicBool),
@@ -144,6 +147,7 @@ impl CompletionWait<'_> {
 }
 
 /// A connected pipe. A timed-out instance is closed to further operations.
+#[derive(Debug)]
 pub struct Pipe {
     resources: Option<Resources>,
 }
@@ -160,6 +164,7 @@ impl Pipe {
     }
 
     pub fn from_file(file: File, reservation: PipeSlot<'static>) -> io::Result<Self> {
+        // SAFETY: null security attributes and name request an unnamed, non-inheritable manual-reset event.
         let event = unsafe { CreateEventW(null(), 1, 0, null()) };
         if event.is_null() || event == windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE {
             return Err(io::Error::last_os_error());
@@ -185,32 +190,39 @@ impl Pipe {
         use windows_sys::Win32::Foundation::ERROR_PIPE_CONNECTED;
         use windows_sys::Win32::System::Pipes::ConnectNamedPipe;
         let resources = self.resources()?;
+        // SAFETY: OVERLAPPED is a plain C struct for which all-zero bytes are a valid value.
         let mut overlapped: OVERLAPPED = unsafe { zeroed() };
         overlapped.hEvent = resources.event.as_raw_handle();
+        #[expect(
+            clippy::large_stack_arrays,
+            reason = "the 64 KiB buffer is a temporary before boxing on a 1 MiB or larger thread stack"
+        )]
         let operation = Operation {
             overlapped: Box::new(UnsafeCell::new(overlapped)),
             buffer: Box::new(UnsafeCell::new([0; BUFFER_LIMIT])),
             length: 0,
         };
+        // SAFETY: the listener handle is open and the boxed OVERLAPPED stays owned until completion or retirement.
         if unsafe { ConnectNamedPipe(resources.file.as_raw_handle(), operation.overlapped.get()) }
             != 0
         {
             return Ok(());
         }
         let error = io::Error::last_os_error();
-        if error.raw_os_error() == Some(ERROR_PIPE_CONNECTED as i32) {
+        if error.raw_os_error() == Some(ERROR_PIPE_CONNECTED.cast_signed()) {
             return Ok(());
         }
-        if error.raw_os_error() != Some(ERROR_IO_PENDING as i32) {
+        if error.raw_os_error() != Some(ERROR_IO_PENDING.cast_signed()) {
             return Err(error);
         }
         loop {
+            // SAFETY: the event handle is owned by `resources` and remains open for the wait.
             match unsafe { WaitForSingleObject(resources.event.as_raw_handle(), 100) } {
-                WAIT_TIMEOUT => continue,
+                WAIT_TIMEOUT => {}
                 WAIT_OBJECT_0 => match operation.result(resources) {
                     Ok(Some(_)) => return Ok(()),
                     Err(error) => return Err(error),
-                    Ok(None) => continue,
+                    Ok(None) => {}
                 },
                 _ => {
                     let error = io::Error::last_os_error();
@@ -249,16 +261,27 @@ impl Pipe {
             Direction::Write(buffer) => buffer.len(),
         }
         .min(BUFFER_LIMIT);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "length is at most BUFFER_LIMIT (64 KiB)"
+        )]
+        let kernel_length = length as u32;
         if length == 0 {
             return Ok(0);
         }
         wait.interval()?;
         let resources = self.resources()?;
+        // SAFETY: the event handle is owned by `resources` and remains open.
         if unsafe { ResetEvent(resources.event.as_raw_handle()) } == 0 {
             return Err(io::Error::last_os_error());
         }
+        // SAFETY: OVERLAPPED is a plain C struct for which all-zero bytes are a valid value.
         let mut overlapped: OVERLAPPED = unsafe { zeroed() };
         overlapped.hEvent = resources.event.as_raw_handle();
+        #[expect(
+            clippy::large_stack_arrays,
+            reason = "the 64 KiB buffer is a temporary before boxing on a 1 MiB or larger thread stack"
+        )]
         let operation = Operation {
             overlapped: Box::new(UnsafeCell::new(overlapped)),
             buffer: Box::new(UnsafeCell::new([0; BUFFER_LIMIT])),
@@ -277,17 +300,18 @@ impl Pipe {
                     WriteFile(
                         resources.file.as_raw_handle(),
                         operation.buffer.get().cast(),
-                        length as u32,
+                        kernel_length,
                         null_mut(),
                         operation.overlapped.get(),
                     )
                 }
             }
+            // SAFETY: the stable boxed buffer and OVERLAPPED are retained through completion, including after cancellation and caller return; `length` is at most the buffer size.
             Direction::Read(_) => unsafe {
                 ReadFile(
                     resources.file.as_raw_handle(),
                     operation.buffer.get().cast(),
-                    length as u32,
+                    kernel_length,
                     null_mut(),
                     operation.overlapped.get(),
                 )
@@ -295,7 +319,7 @@ impl Pipe {
         };
         if started == 0 {
             let error = io::Error::last_os_error();
-            if error.raw_os_error() != Some(ERROR_IO_PENDING as i32) {
+            if error.raw_os_error() != Some(ERROR_IO_PENDING.cast_signed()) {
                 return Err(error);
             }
             loop {
@@ -306,12 +330,16 @@ impl Pipe {
                         return Err(error);
                     }
                 };
-                let milliseconds = interval.as_millis().clamp(1, u128::from(u32::MAX - 1));
-                match unsafe {
-                    WaitForSingleObject(resources.event.as_raw_handle(), milliseconds as u32)
-                } {
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "clamped to at most u32::MAX - 1"
+                )]
+                let milliseconds = interval.as_millis().clamp(1, u128::from(u32::MAX - 1)) as u32;
+                // SAFETY: the event handle is owned by `resources` and remains open for the wait.
+                match unsafe { WaitForSingleObject(resources.event.as_raw_handle(), milliseconds) }
+                {
                     WAIT_OBJECT_0 => break,
-                    WAIT_TIMEOUT => continue,
+                    WAIT_TIMEOUT => {}
                     _ => {
                         let error = io::Error::last_os_error();
                         self.cancel_and_retire(operation);
@@ -358,7 +386,7 @@ impl Pipe {
             // so this queue and its one reaper cannot grow per request.
             RETIRED
                 .lock()
-                .unwrap_or_else(|poisoned| poisoned.into_inner())
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
                 .push(pending);
         }
     }
@@ -382,6 +410,10 @@ impl Pipe {
     /// read timeout. Its overlapped read MUST poll shutdown at most every 100ms
     /// and retire/cancel owned kernel storage when either relay direction ends.
     /// Worker pipe loss MUST still complete or fail the retained operation.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn read_until_cancelled(
         &mut self,
         buffer: &mut [u8],
@@ -430,14 +462,15 @@ mod tests {
             NEXT.fetch_add(1, Ordering::Relaxed)
         );
         let wide: Vec<u16> = name.encode_utf16().chain([0]).collect();
+        // SAFETY: the name is a live NUL-terminated UTF-16 string and null security attributes are permitted.
         let server = unsafe {
             CreateNamedPipeW(
                 wide.as_ptr(),
                 PIPE_ACCESS_DUPLEX,
                 PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT,
                 1,
-                BUFFER_LIMIT as u32,
-                BUFFER_LIMIT as u32,
+                u32::try_from(BUFFER_LIMIT).unwrap(),
+                u32::try_from(BUFFER_LIMIT).unwrap(),
                 0,
                 null(),
             )
@@ -453,7 +486,9 @@ mod tests {
             .open(name)
             .unwrap();
         assert!(
+            // SAFETY: the server handle is a live synchronous pipe, so a null OVERLAPPED is permitted.
             unsafe { ConnectNamedPipe(server.as_raw_handle(), null_mut()) } != 0
+                // SAFETY: GetLastError only reads this thread's last-error value.
                 || unsafe { GetLastError() } == ERROR_PIPE_CONNECTED
         );
         (Pipe::from_file(client, reservation).unwrap(), server)

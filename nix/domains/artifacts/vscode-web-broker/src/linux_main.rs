@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeMap;
 use std::ffi::{CStr, CString};
+use std::fmt::Write as _;
 use std::fs;
 use std::io::{Read, Write};
 use std::mem::{self, MaybeUninit};
@@ -168,25 +169,29 @@ fn account(binding: &Binding) -> Result<PathBuf, Refusal> {
     let mut buffer = [0_i8; 16384];
     let mut result = std::ptr::null_mut();
     // The result's strings borrow this fixed buffer through the checks below.
+    // SAFETY: `name` is NUL-terminated, `record` and `result` are valid writable out-pointers, and `buffer`/`buffer.len()` describe one live writable allocation that outlives every use of the returned strings.
     let status = unsafe {
         libc::getpwnam_r(
             name.as_ptr(),
             record.as_mut_ptr(),
             buffer.as_mut_ptr(),
             buffer.len(),
-            &mut result,
+            &raw mut result,
         )
     };
     if status != 0 || result.is_null() {
         return Err(Refusal::Account);
     }
+    // SAFETY: getpwnam_r returned 0 with a non-null result, so it fully initialized `record`.
     let record = unsafe { record.assume_init() };
     if record.pw_name.is_null() || record.pw_dir.is_null() {
         return Err(Refusal::Account);
     }
+    // SAFETY: `pw_name` is non-null and points to a NUL-terminated string inside `buffer`, which is still live.
     let actual_name = unsafe { CStr::from_ptr(record.pw_name) }
         .to_str()
         .map_err(|_| Refusal::Account)?;
+    // SAFETY: `pw_dir` is non-null and points to a NUL-terminated string inside `buffer`, which is still live.
     let actual_home = unsafe { CStr::from_ptr(record.pw_dir) }
         .to_str()
         .map_err(|_| Refusal::Account)?;
@@ -224,6 +229,7 @@ fn command(program: &Path, arguments: &[String], deadline: Instant) -> Result<bo
         }
         if Instant::now() >= deadline {
             // The reconciler can launch subprocesses; kill its whole new group.
+            // SAFETY: kill takes plain integers; the negated child PID names the process group that `process_group(0)` created.
             let _ = unsafe { libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL) };
             let _ = child.wait();
             return Err(Refusal::Startup);
@@ -263,8 +269,10 @@ fn launch_description(binding: &Binding) -> Result<String, Refusal> {
     let bytes = serde_json::to_vec(&identity).map_err(|_| Refusal::Startup)?;
     let digest = Sha256::digest(bytes)
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect::<String>();
+        .fold(String::with_capacity(64), |mut out, byte| {
+            let _ = write!(out, "{byte:02x}");
+            out
+        });
     Ok(format!("Overalls editor {digest}"))
 }
 
@@ -321,8 +329,10 @@ fn unit_metadata(
     let mut reaped = false;
     let result = (|| {
         let mut output = child.stdout.take().ok_or(Refusal::Startup)?;
+        // SAFETY: F_GETFL on the child's open stdout descriptor, which `output` owns for this call.
         let flags = unsafe { libc::fcntl(output.as_raw_fd(), libc::F_GETFL) };
         if flags < 0
+            // SAFETY: F_SETFL on the same owned open descriptor with flags just read from it.
             || unsafe { libc::fcntl(output.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) }
                 < 0
         {
@@ -341,9 +351,8 @@ fn unit_metadata(
                     Ok(length) if bytes.len() + length <= MAX_UNIT_METADATA => {
                         bytes.extend_from_slice(&buffer[..length]);
                     }
-                    Ok(_) => return Err(Refusal::Startup),
                     Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => break,
-                    Err(_) => return Err(Refusal::Startup),
+                    Ok(_) | Err(_) => return Err(Refusal::Startup),
                 }
             }
             // Keep the leader unreaped while a descendant retains stdout, so
@@ -359,6 +368,7 @@ fn unit_metadata(
         }
     })();
     if result.is_err() && !reaped {
+        // SAFETY: kill takes plain integers; the negated child PID names the process group that `process_group(0)` created.
         let _ = unsafe { libc::kill(-(child.id() as libc::pid_t), libc::SIGKILL) };
         let _ = child.wait();
     }
@@ -377,6 +387,7 @@ fn runtime_directory(uid: u32) -> Result<PathBuf, Refusal> {
                 .map_err(|_| Refusal::Custody)?;
             let encoded =
                 CString::new(path.as_os_str().as_encoded_bytes()).map_err(|_| Refusal::Custody)?;
+            // SAFETY: `encoded` is a live NUL-terminated path; chown does not retain the pointer.
             if unsafe { libc::chown(encoded.as_ptr(), uid, uid) } != 0 {
                 return Err(Refusal::Custody);
             }
@@ -409,18 +420,22 @@ fn socket_custody(path: &Path, uid: u32) -> Result<(), Refusal> {
 
 /// @cc [owner:ghuntley,label:security] editor-unix-kernel-peer
 /// Every connected socket MUST independently prove its server's expected UID
-/// through SO_PEERCRED; pathname ownership alone MUST NOT authorize forwarding.
+/// through `SO_PEERCRED`; pathname ownership alone MUST NOT authorize forwarding.
 fn connect(path: &Path, uid: u32, deadline: Instant) -> Result<UnixStream, Refusal> {
     socket_custody(path, uid)?;
+    // SAFETY: sockaddr_un is a plain C struct for which all-zero bytes are a valid value.
     let mut address = unsafe { mem::zeroed::<libc::sockaddr_un>() };
-    address.sun_family = libc::AF_UNIX as libc::sa_family_t;
+    #[expect(clippy::cast_possible_truncation, reason = "AF_UNIX is the constant 1")]
+    let family = libc::AF_UNIX as libc::sa_family_t;
+    address.sun_family = family;
     let path = path.as_os_str().as_encoded_bytes();
     if path.is_empty() || path.len() >= address.sun_path.len() || path.contains(&0) {
         return Err(Refusal::Custody);
     }
     for (destination, source) in address.sun_path.iter_mut().zip(path) {
-        *destination = *source as libc::c_char;
+        *destination = libc::c_char::from_ne_bytes([*source]);
     }
+    // SAFETY: socket takes only integer arguments and returns a new descriptor or -1.
     let raw = unsafe {
         libc::socket(
             libc::AF_UNIX,
@@ -431,12 +446,16 @@ fn connect(path: &Path, uid: u32, deadline: Instant) -> Result<UnixStream, Refus
     if raw < 0 {
         return Err(Refusal::Readiness);
     }
+    // SAFETY: `raw` is a freshly created, non-negative descriptor that nothing else owns.
     let descriptor = unsafe { OwnedFd::from_raw_fd(raw) };
+    let address_length = libc::socklen_t::try_from(size_of::<libc::sockaddr_un>())
+        .map_err(|_| Refusal::Readiness)?;
+    // SAFETY: the descriptor is open and owned, and `address` is a live initialized sockaddr_un whose exact size is passed.
     let status = unsafe {
         libc::connect(
             descriptor.as_raw_fd(),
             (&raw const address).cast(),
-            mem::size_of::<libc::sockaddr_un>() as libc::socklen_t,
+            address_length,
         )
     };
     if status != 0 {
@@ -454,11 +473,14 @@ fn connect(path: &Path, uid: u32, deadline: Instant) -> Result<UnixStream, Refus
             revents: 0,
         };
         let milliseconds = i32::try_from(remaining.as_millis().max(1)).unwrap_or(i32::MAX);
+        // SAFETY: `poll` is one live pollfd and the count is 1.
         if unsafe { libc::poll(&raw mut poll, 1, milliseconds) } <= 0 {
             return Err(Refusal::Readiness);
         }
         let mut error = 0_i32;
-        let mut length = mem::size_of::<i32>() as libc::socklen_t;
+        let mut length =
+            libc::socklen_t::try_from(size_of::<i32>()).map_err(|_| Refusal::Readiness)?;
+        // SAFETY: `error` and `length` are live writable locals and `length` holds the size of `error`.
         if unsafe {
             libc::getsockopt(
                 descriptor.as_raw_fd(),
@@ -483,20 +505,23 @@ fn connect(path: &Path, uid: u32, deadline: Instant) -> Result<UnixStream, Refus
 
 fn check_peer(stream: &UnixStream, uid: u32) -> Result<(), Refusal> {
     let mut peer = MaybeUninit::<libc::ucred>::uninit();
-    let mut length = mem::size_of::<libc::ucred>() as libc::socklen_t;
+    let mut length =
+        libc::socklen_t::try_from(size_of::<libc::ucred>()).map_err(|_| Refusal::Custody)?;
+    // SAFETY: `peer` is writable storage for one ucred and `length` holds its size; the descriptor is borrowed from the live stream.
     if unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
             peer.as_mut_ptr().cast(),
-            &mut length,
+            &raw mut length,
         )
     } != 0
-        || length as usize != mem::size_of::<libc::ucred>()
+        || length as usize != size_of::<libc::ucred>()
     {
         return Err(Refusal::Custody);
     }
+    // SAFETY: getsockopt succeeded and reported exactly size_of::<ucred>() bytes, so `peer` is initialized.
     let peer = unsafe { peer.assume_init() };
     if peer.uid != uid || peer.pid <= 0 {
         return Err(Refusal::Custody);
@@ -579,6 +604,10 @@ fn editor_arguments(executable: &Path, home: &Path, socket: &Path) -> Result<Vec
     ])
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one single-flight reuse/stop/start sequence held under the account lock"
+)]
 fn ensure_worker(
     runtime: &Runtime,
     binding: &Binding,
@@ -711,7 +740,7 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn connection(mut client: TcpStream, runtime: Arc<Runtime>) -> Result<(), Refusal> {
+fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refusal> {
     let _guard = ConnectionGuard(runtime.clone());
     client
         .set_read_timeout(Some(STARTUP))
@@ -729,7 +758,7 @@ fn connection(mut client: TcpStream, runtime: Arc<Runtime>) -> Result<(), Refusa
         &runtime.boot,
         &runtime.configuration.descriptor,
     )?;
-    let socket = ensure_worker(&runtime, &preface.binding, deadline)?;
+    let socket = ensure_worker(runtime, &preface.binding, deadline)?;
     let worker = connect(&socket, preface.binding.uid, deadline)?;
     let remaining = deadline.saturating_duration_since(Instant::now());
     if remaining.is_zero() {
@@ -775,6 +804,7 @@ fn notify_ready_to(path: &std::ffi::OsStr) {
 }
 
 fn serve(configuration: Configuration) -> Result<(), Refusal> {
+    // SAFETY: geteuid has no preconditions and cannot fail.
     if unsafe { libc::geteuid() } != 0 {
         return Err(Refusal::Account);
     }
@@ -782,13 +812,15 @@ fn serve(configuration: Configuration) -> Result<(), Refusal> {
     let boot = overalls_vscode_web_broker::parse_boot(&cmdline)?;
     let listener = TcpListener::bind((boot.address, PORT)).map_err(|_| Refusal::Transport)?;
     let device = b"eth0\0";
+    let device_length = libc::socklen_t::try_from(device.len()).map_err(|_| Refusal::Transport)?;
+    // SAFETY: `device` is a live NUL-terminated interface name whose exact length is passed, and the listener descriptor is open.
     if unsafe {
         libc::setsockopt(
             listener.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_BINDTODEVICE,
             device.as_ptr().cast(),
-            device.len() as libc::socklen_t,
+            device_length,
         )
     } != 0
     {
@@ -815,7 +847,7 @@ fn serve(configuration: Configuration) -> Result<(), Refusal> {
         }
         let runtime = runtime.clone();
         thread::spawn(move || {
-            if let Err(reason) = connection(client, runtime) {
+            if let Err(reason) = connection(client, &runtime) {
                 emit(Event::Refused, Some(reason));
             }
         });
@@ -1031,6 +1063,7 @@ mod tests {
     #[test]
     fn kernel_peer_credentials_are_independent_of_socket_path_ownership() {
         let (stream, _peer) = UnixStream::pair().unwrap();
+        // SAFETY: geteuid has no preconditions and cannot fail.
         let uid = unsafe { libc::geteuid() };
         assert_eq!(check_peer(&stream, uid), Ok(()));
         assert_eq!(check_peer(&stream, uid + 1), Err(Refusal::Custody));

@@ -6,7 +6,7 @@ let
     filter = path: type:
       let name = builtins.baseNameOf path;
       in name != "target" && name != ".hegel" && (type == "directory" || lib.hasSuffix ".rs" name ||
-        builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
+        builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
   vendor = pkgs.rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
 in
@@ -24,7 +24,7 @@ pkgs.stdenv.mkDerivation {
   dontConfigure = true;
   dontStrip = true;
   doCheck = false;
-  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils ];
+  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils rustfmt ];
   buildPhase = ''
     runHook preBuild
     export CARGO_HOME="$TMPDIR/cargo-home"
@@ -37,6 +37,10 @@ pkgs.stdenv.mkDerivation {
     substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" \
       --replace-fail 'directory = "cargo-vendor-dir"' 'directory = "${vendor}"'
     cargo zigbuild --release --locked --offline --target x86_64-pc-windows-gnu --bin overalls-vscode-web-broker
+    # Tests cannot run on the build host; rustfmt and a cross-target clippy
+    # with the pinned toolchain gate the cfg(windows) modules instead.
+    cargo fmt --check
+    PATH="${toolchain}/bin:$PATH" cargo clippy --target x86_64-pc-windows-gnu --all-targets --locked --offline -- -D warnings
     runHook postBuild
   '';
   installPhase = ''

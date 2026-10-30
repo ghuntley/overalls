@@ -61,6 +61,10 @@ pub fn name(physical_key: &str) -> Result<String, Refusal> {
 /// The first protected SYSTEM-only pipe instance MUST reserve the fixed boot
 /// name before accepting requests. Remote clients MUST be rejected by the
 /// kernel. No request may choose a pipe path, ACL, executable or process token.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn listener(name: &str, first: bool) -> Result<Pipe, Refusal> {
     let reservation = Pipe::reserve().map_err(|_| Refusal::Capacity)?;
     let sddl: Vec<u16> = "O:SYG:SYD:P(A;;FA;;;SY)"
@@ -68,11 +72,12 @@ pub fn listener(name: &str, first: bool) -> Result<Pipe, Refusal> {
         .chain([0])
         .collect();
     let mut descriptor = null_mut();
+    // SAFETY: `sddl` is a live NUL-terminated UTF-16 string and `descriptor` is a writable out-pointer; the optional length pointer is null.
     if unsafe {
         ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl.as_ptr(),
             1,
-            &mut descriptor,
+            &raw mut descriptor,
             null_mut(),
         )
     } == 0
@@ -80,11 +85,12 @@ pub fn listener(name: &str, first: bool) -> Result<Pipe, Refusal> {
         return Err(Refusal::Custody);
     }
     let attributes = SECURITY_ATTRIBUTES {
-        nLength: size_of::<SECURITY_ATTRIBUTES>() as u32,
+        nLength: u32::try_from(size_of::<SECURITY_ATTRIBUTES>()).map_err(|_| Refusal::Custody)?,
         lpSecurityDescriptor: descriptor,
         bInheritHandle: 0,
     };
     let name: Vec<u16> = name.encode_utf16().chain([0]).collect();
+    // SAFETY: `name` is a live NUL-terminated UTF-16 string and `attributes` points to the converted descriptor, both live for the call.
     let handle = unsafe {
         CreateNamedPipeW(
             name.as_ptr(),
@@ -100,9 +106,10 @@ pub fn listener(name: &str, first: bool) -> Result<Pipe, Refusal> {
             65536,
             65536,
             0,
-            &attributes,
+            &raw const attributes,
         )
     };
+    // SAFETY: `descriptor` was allocated by ConvertStringSecurityDescriptorToSecurityDescriptorW and is freed exactly once after its last use.
     unsafe { LocalFree(descriptor) };
     if handle.is_null() || handle == INVALID_HANDLE_VALUE {
         return Err(Refusal::Custody);
@@ -118,7 +125,13 @@ pub fn connect(name: &str, deadline: Instant) -> Result<Pipe, Refusal> {
     let wait = deadline
         .saturating_duration_since(Instant::now())
         .min(Duration::from_secs(2));
-    if wait.is_zero() || unsafe { WaitNamedPipeW(wide.as_ptr(), wait.as_millis() as u32) } == 0 {
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the wait is capped at two seconds"
+    )]
+    let milliseconds = wait.as_millis() as u32;
+    // SAFETY: `wide` is a live NUL-terminated UTF-16 pipe name.
+    if wait.is_zero() || unsafe { WaitNamedPipeW(wide.as_ptr(), milliseconds) } == 0 {
         return Err(Refusal::Readiness);
     }
     let file = OpenOptions::new()
@@ -130,6 +143,7 @@ pub fn connect(name: &str, deadline: Instant) -> Result<Pipe, Refusal> {
     Pipe::from_file(file, reservation).map_err(|_| Refusal::Transport)
 }
 
+#[derive(Debug)]
 pub struct Deadline<'a> {
     pub pipe: &'a mut Pipe,
     pub deadline: Instant,
@@ -158,8 +172,9 @@ pub fn write_frame<T: Serialize>(
     if bytes.is_empty() || bytes.len() > maximum {
         return Err(Refusal::Frame);
     }
+    let length = u32::try_from(bytes.len()).map_err(|_| Refusal::Frame)?;
     let mut io = Deadline { pipe, deadline };
-    io.write_all(&(bytes.len() as u32).to_be_bytes())
+    io.write_all(&length.to_be_bytes())
         .and_then(|()| io.write_all(&bytes))
         .map_err(|_| Refusal::Transport)
 }
@@ -184,12 +199,12 @@ pub fn read_frame<T: DeserializeOwned>(
 fn peer_pid(pipe: &Pipe, server: bool) -> Result<u32, Refusal> {
     let handle = pipe.raw_handle().map_err(|_| Refusal::Custody)?;
     let mut pid = 0;
-    let result = unsafe {
-        if server {
-            GetNamedPipeClientProcessId(handle, &mut pid)
-        } else {
-            GetNamedPipeServerProcessId(handle, &mut pid)
-        }
+    let result = if server {
+        // SAFETY: the pipe handle is open for the borrow of `pipe` and `pid` is a live writable local.
+        unsafe { GetNamedPipeClientProcessId(handle, &raw mut pid) }
+    } else {
+        // SAFETY: the pipe handle is open for the borrow of `pipe` and `pid` is a live writable local.
+        unsafe { GetNamedPipeServerProcessId(handle, &raw mut pid) }
     };
     if result == 0 || pid == 0 {
         return Err(Refusal::Custody);
@@ -202,6 +217,10 @@ fn peer_pid(pipe: &Pipe, server: bool) -> Result<u32, Refusal> {
 /// validate its creation time, SYSTEM token and fixed installed executable.
 /// The closed versioned hello MUST match that kernel identity. Neither side
 /// may impersonate the other or accept a caller-supplied process as authority.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn authenticate(
     pipe: &mut Pipe,
     server: bool,

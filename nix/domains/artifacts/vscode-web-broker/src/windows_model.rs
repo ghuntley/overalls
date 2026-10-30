@@ -3,12 +3,14 @@
 use crate::{Binding, Boot, Descriptor, Preface, Refusal, validate};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 pub const CUSTODIAN_ACCOUNT_LIMIT: usize = 64;
 
 /// A bounded account registry retains ownership independent of individual streams.
 /// Entries are never evicted implicitly, including empty or quarantined slots.
+#[derive(Debug)]
 pub struct CustodianAccounts<T> {
     entries: std::sync::Mutex<std::collections::BTreeMap<u32, std::sync::Arc<std::sync::Mutex<T>>>>,
 }
@@ -27,6 +29,10 @@ impl<T> CustodianAccounts<T> {
     /// launching. Concurrent admissions for one UID MUST share the same lock
     /// and retained state. Full or poisoned registries MUST refuse; dropping a
     /// connection reference MUST NOT evict or release its worker's ownership.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn slot(
         &self,
         uid: u32,
@@ -46,6 +52,7 @@ impl<T> CustodianAccounts<T> {
 pub const PIPE_LIMIT: usize = 128;
 
 /// Broker-wide custody budget shared by live pipes and cancelled operations.
+#[derive(Debug)]
 pub struct PipeSlots {
     used: AtomicUsize,
 }
@@ -68,6 +75,10 @@ impl PipeSlots {
     /// reservations. A reservation MUST remain owned until its operation's
     /// buffer, completion storage and handles may safely be released. Exhaustion
     /// MUST refuse new pipes without evicting an outstanding operation.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn reserve(&self) -> Option<PipeSlot<'_>> {
         let mut used = self.used.load(Ordering::Acquire);
         loop {
@@ -88,6 +99,7 @@ impl PipeSlots {
 }
 
 /// Moving a reservation transfers its capacity; only releasing it returns a slot.
+#[derive(Debug)]
 pub struct PipeSlot<'a> {
     slots: &'a PipeSlots,
 }
@@ -107,6 +119,10 @@ impl AccountSid {
     /// Account custody MUST use a complete S-1-5-21 SID with an ordinary
     /// account RID. SYSTEM, built-in groups and partial SIDs MUST NOT become
     /// editor account identities. Only native SAM lookup establishes locality.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn parse(bytes: &[u8]) -> Result<Self, Refusal> {
         if bytes.len() != 28
             || bytes[..8] != [1, 5, 0, 0, 0, 0, 0, 5]
@@ -140,8 +156,12 @@ pub struct WorkerIdentity {
 impl WorkerIdentity {
     /// @cc [owner:ghuntley,label:security] windows-editor-identity-closed-admission
     /// A Windows worker identity MUST pass the existing exact boot/package/
-    /// origin admission and use the canonical u<uid> roster name. A caller
+    /// origin admission and use the canonical `u<uid>` roster name. A caller
     /// hint or a valid SID alone MUST NOT create a worker identity.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn admitted(
         preface: &Preface,
         boot: &Boot,
@@ -207,6 +227,10 @@ impl WorkerIdentity {
     /// and generation rotation only when its validated stable worker identity
     /// equals the current account, SID, placement/epoch, package and origins.
     /// This comparison MUST NOT authorize receipts from another boot namespace.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn matches_retained_binding(
         &self,
         binding: &Binding,
@@ -229,11 +253,18 @@ impl WorkerIdentity {
         // Struct fields have a fixed serialization order and no unchecked values.
         let mut hash = Sha256::new();
         hash.update(b"overalls-windows-editor-worker-v1\0");
-        hash.update(serde_json::to_vec(self).expect("closed identity serialization"));
+        #[expect(
+            clippy::expect_used,
+            reason = "derived Serialize of string and integer fields into a Vec cannot fail"
+        )]
+        let serialized = serde_json::to_vec(self).expect("closed identity serialization");
+        hash.update(serialized);
         hash.finalize()
             .iter()
-            .map(|byte| format!("{byte:02x}"))
-            .collect()
+            .fold(String::with_capacity(64), |mut out, byte| {
+                let _ = write!(out, "{byte:02x}");
+                out
+            })
     }
 
     /// Kernel names include the owning custodian generation, so a job or pipe
@@ -276,6 +307,10 @@ impl CustodianGeneration {
     /// A starting custodian MUST take a generation strictly greater than every
     /// generation previously recorded in its boot namespace. Absence starts at
     /// one; overflow MUST refuse rather than wrap or reuse an earlier lifetime.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn successor(previous: Option<Self>) -> Result<Self, Refusal> {
         match previous {
             None => Ok(Self(1)),
@@ -310,7 +345,7 @@ impl LogonSession {
 
     /// Combine a Win32 LUID without sign extension of its high part.
     pub fn from_luid(low: u32, high: i32) -> Result<Self, Refusal> {
-        Self::new((u64::from(high as u32) << 32) | u64::from(low))
+        Self::new((u64::from(high.cast_unsigned()) << 32) | u64::from(low))
     }
 }
 
@@ -384,6 +419,10 @@ pub enum ProcessClass {
 /// account and kernel-created entries are unrelated and MUST NOT be touched.
 /// A possibly-descendant process whose token or creation is unobservable MUST
 /// be ambiguous, never unrelated.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn classify_process(prior: &PriorWorker, observation: &ProcessObservation) -> ProcessClass {
     match observation {
         ProcessObservation::Exited | ProcessObservation::KernelCreated => ProcessClass::Unrelated,
@@ -414,6 +453,10 @@ pub fn classify_process(prior: &PriorWorker, observation: &ProcessObservation) -
 /// the current admitted worker, and its generation-scoped named job no longer
 /// exists. Current/future generations, identity drift, a surviving job and
 /// observation errors MUST refuse without adoption, termination or deletion.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn prior_receipt_admission(
     current: CustodianGeneration,
     recorded: CustodianGeneration,
@@ -453,6 +496,10 @@ pub const PRIOR_SESSION_ROUNDS: usize = 8;
 /// session. Each pass MAY terminate only planned stragglers; any ambiguous
 /// observation, scan error or termination error MUST refuse. Exhausting the
 /// bounded passes without an empty observation MUST refuse replacement.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn drain_prior_session(
     prior: &PriorWorker,
     rounds: usize,
@@ -490,6 +537,10 @@ pub struct PipePeer {
 /// A pipe MUST be reusable only when its server has the exact retained PID and
 /// creation time, account SID, named-job membership and configured executable.
 /// Matching a name, PID alone or same-account SID alone MUST NOT authorize it.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn verify_peer(
     identity: &WorkerIdentity,
     expected: ProcessIdentity,
@@ -519,6 +570,10 @@ pub enum HeldWorkerDecision {
 /// without authorizing termination. Only a conclusively dead root whose exact
 /// job handle is still held MAY authorize whole-job drainage before replacement.
 /// Process-observation errors MUST propagate without probing or cleanup.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn held_worker_decision(
     root_running: Result<bool, Refusal>,
     probe: impl FnOnce() -> Result<(), Refusal>,
@@ -545,6 +600,14 @@ pub enum RecoveryDecision {
 /// mismatched owned worker may be stopped only after root-owned job/process
 /// custody is established. Incomplete or foreign metadata MUST refuse without
 /// terminating a process, removing a pipe or deleting personal data.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "four independent custody observations form the decision truth table"
+)]
 pub fn recovery_decision(
     exists: bool,
     system_owned_job: bool,
@@ -573,13 +636,17 @@ impl LocalPath {
             || bytes.len() > 4096
             || !bytes[0].is_ascii_alphabetic()
             || &bytes[1..3] != b":\\"
-            || value[3..].contains([':', '/', '"', '\0', '\r', '\n'])
-            || value[3..].split('\\').any(|part| {
-                part.is_empty()
-                    || part == "."
-                    || part == ".."
-                    || part.ends_with(['.', ' '])
-                    || dos_device(part)
+            || value
+                .get(3..)
+                .is_none_or(|tail| tail.contains([':', '/', '"', '\0', '\r', '\n']))
+            || value.get(3..).is_none_or(|tail| {
+                tail.split('\\').any(|part| {
+                    part.is_empty()
+                        || part == "."
+                        || part == ".."
+                        || part.ends_with(['.', ' '])
+                        || dos_device(part)
+                })
             })
         {
             return Err(Refusal::Package);
@@ -626,6 +693,10 @@ impl WorkerPath {
     /// environment-expanded, device and ambiguous entries MUST refuse;
     /// configuration authority alone MUST NOT bypass the native directory
     /// ownership and write-ACL checks.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn parse(value: &str) -> Result<Self, Refusal> {
         if value.is_empty() || value.len() > 4096 || !value.is_ascii() {
             return Err(Refusal::Package);
@@ -714,11 +785,11 @@ mod tests {
         }
         let dropped = std::sync::Arc::new(AtomicUsize::new(0));
         let registry = CustodianAccounts::default();
-        let stream = registry.slot(200000, || Owner(dropped.clone())).unwrap();
+        let stream = registry.slot(200_000, || Owner(dropped.clone())).unwrap();
         drop(stream);
         assert_eq!(dropped.load(Ordering::SeqCst), 0);
         let retained = registry
-            .slot(200000, || panic!("must reuse retained owner"))
+            .slot(200_000, || panic!("must reuse retained owner"))
             .unwrap();
         drop(retained);
         assert_eq!(dropped.load(Ordering::SeqCst), 0);
@@ -734,7 +805,7 @@ mod tests {
             for _ in 0..32 {
                 scope.spawn(|| {
                     let slot = registry
-                        .slot(200000, || {
+                        .slot(200_000, || {
                             initialized.fetch_add(1, Ordering::SeqCst);
                             0_u32
                         })
@@ -744,7 +815,7 @@ mod tests {
             }
         });
         assert_eq!(initialized.load(Ordering::SeqCst), 1);
-        assert_eq!(*registry.slot(200000, || 0).unwrap().lock().unwrap(), 32);
+        assert_eq!(*registry.slot(200_000, || 0).unwrap().lock().unwrap(), 32);
     }
 
     /// @cc [owner:ghuntley,label:verification;capacity] broker-custodian-registry-retention
@@ -778,7 +849,7 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;capacity] broker-custodian-slot-limit
-    /// CustodianAccounts::slot MUST never hold more than 64 accounts, MUST
+    /// `CustodianAccounts::slot` MUST never hold more than 64 accounts, MUST
     /// hold exactly the first 64 distinct admitted UIDs, and MUST accept a
     /// request exactly when its UID is retained or capacity remains.
     #[hegel::test(test_cases = 64)]
@@ -799,7 +870,7 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;capacity] broker-pipe-slot-limit
-    /// PipeSlots::reserve MUST succeed exactly while fewer than 128
+    /// `PipeSlots::reserve` MUST succeed exactly while fewer than 128
     /// reservations are held, and the shared count MUST equal the held
     /// reservations after every reserve and release.
     #[hegel::test(test_cases = 64)]
@@ -882,7 +953,7 @@ mod tests {
                 port: crate::PORT,
                 user_id: id.clone(),
                 guest_account_id: id,
-                uid: 200001,
+                uid: 200_001,
                 username: "u200001".to_owned(),
                 editor_protocol: descriptor.protocol,
                 editor_commit: descriptor.commit.clone(),
@@ -1250,7 +1321,7 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;recovery] broker-logon-session-luid
-    /// LogonSession MUST refuse zero, and every nonzero LUID MUST combine
+    /// `LogonSession` MUST refuse zero, and every nonzero LUID MUST combine
     /// without sign extension into the little-endian (low, high) value that
     /// round-trips through new, u64 and serialization.
     #[hegel::test(test_cases = 128)]
@@ -1288,7 +1359,7 @@ mod tests {
     ];
 
     /// @cc [owner:ghuntley,label:verification;security] broker-dos-device-lattice
-    /// dos_device MUST recognize every reserved DOS device name in any ASCII
+    /// `dos_device` MUST recognize every reserved DOS device name in any ASCII
     /// case and with any extension, and MUST NOT recognize a device name with
     /// any extra or missing base character.
     #[hegel::test(test_cases = 128)]
@@ -1344,7 +1415,7 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;security] broker-local-path-lattice
-    /// LocalPath::parse MUST accept a drive root or a drive-absolute path of at
+    /// `LocalPath::parse` MUST accept a drive root or a drive-absolute path of at
     /// most 4096 bytes exactly when every component is safe; any empty, dot,
     /// trailing dot or space, device, stream, separator, quote or control
     /// component, or a non-letter drive, MUST refuse.
@@ -1398,7 +1469,7 @@ mod tests {
     ];
 
     /// @cc [owner:ghuntley,label:verification;security] broker-worker-path-lattice
-    /// WorkerPath::parse MUST accept exactly 1..=32 distinct safe local
+    /// `WorkerPath::parse` MUST accept exactly 1..=32 distinct safe local
     /// directories; a poisoned entry, a case-insensitive duplicate or a 33rd
     /// entry MUST refuse, and accepted paths MUST preserve value and order.
     #[hegel::test(test_cases = 192)]
@@ -1495,7 +1566,7 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;security] broker-command-line-roundtrip
-    /// command_line MUST refuse NUL-bearing or empty argument lists and lines
+    /// `command_line` MUST refuse NUL-bearing or empty argument lists and lines
     /// of 32767 or more UTF-16 units, and every accepted line MUST be
     /// NUL-terminated and split back into exactly the original arguments by
     /// an independent CommandLineToArgvW-style parser.
@@ -1707,7 +1778,7 @@ mod tests {
             r"C:\Program Files\node.exe".to_owned(),
             "a\"b".to_owned(),
             "x\\".to_owned(),
-            "".to_owned(),
+            String::new(),
         ])
         .unwrap();
         assert_eq!(

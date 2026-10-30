@@ -63,7 +63,7 @@ fn generations_preserve_boot_but_foreign_epochs_never_authorize(tc: TestCase) {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] broker-preface-length-bound
-/// Every length header above MAX_PREFACE MUST refuse as a frame error before
+/// Every length header above `MAX_PREFACE` MUST refuse as a frame error before
 /// any body allocation or read.
 #[hegel::test(test_cases = 64)]
 fn size_headers_never_allocate_unbounded_frames(tc: TestCase) {
@@ -90,7 +90,7 @@ fn non_account_uids_and_wrong_packages_cannot_authorize(tc: TestCase) {
     preface
         .binding
         .editor_commit
-        .replace_range(mutation..mutation + 1, "c");
+        .replace_range(mutation..=mutation, "c");
     assert_eq!(validate(&preface, &boot, &package), Err(Refusal::Package));
 }
 
@@ -233,8 +233,8 @@ fn dns_label_model(value: &str) -> bool {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] broker-dns-bounds
-/// dns_label MUST accept exactly 1..=63 lowercase LDH bytes without edge
-/// hyphens; dns_name MUST accept exactly 3..=189 bytes of at least two such
+/// `dns_label` MUST accept exactly 1..=63 lowercase LDH bytes without edge
+/// hyphens; `dns_name` MUST accept exactly 3..=189 bytes of at least two such
 /// labels.
 #[hegel::test(test_cases = 128)]
 fn dns_labels_and_names_respect_bounds(tc: TestCase) {
@@ -284,7 +284,7 @@ fn canonical_uuid(value: u128) -> String {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] broker-base32-uuid-roundtrip
-/// base32_uuid MUST decode every RFC 4648 lowercase encoding of 16 bytes to
+/// `base32_uuid` MUST decode every RFC 4648 lowercase encoding of 16 bytes to
 /// the canonical UUID that uuid accepts, and MUST refuse every other length,
 /// foreign digit or nonzero padding.
 #[hegel::test(test_cases = 128)]
@@ -348,7 +348,7 @@ fn refusal_index(refusal: Refusal) -> usize {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] broker-refusal-names-injective
-/// Refusal::name MUST be injective over every variant and yield only closed
+/// `Refusal::name` MUST be injective over every variant and yield only closed
 /// lowercase diagnostic reasons.
 #[hegel::test(test_cases = 64)]
 fn refusal_names_are_injective(tc: TestCase) {
@@ -356,12 +356,12 @@ fn refusal_names_are_injective(tc: TestCase) {
     let second = tc.draw(gs::sampled_from(REFUSALS.as_slice()));
     assert_eq!(REFUSALS[refusal_index(first)], first);
     assert_eq!(first.name() == second.name(), first == second);
-    assert!(!first.name().is_empty());
+    assert_ne!(first.name(), "");
     assert!(first.name().bytes().all(|byte| byte.is_ascii_lowercase()));
 }
 
 /// @cc [owner:ghuntley,label:verification;security] broker-webview-origin-refusal
-/// webview_template MUST pin every canonical label-bound HTTPS origin's zone,
+/// `webview_template` MUST pin every canonical label-bound HTTPS origin's zone,
 /// port and release, and MUST refuse with Origin for any scheme, userinfo,
 /// path, query, fragment, default-port, case, foreign-label, trailing-dot,
 /// single-label-zone or release mutation and for arbitrary text.
@@ -447,7 +447,7 @@ fn duplicate_and_unknown_fields_are_refused() {
         br#"{"version":1,"version":1,"binding":{}}"#.as_slice(),
         br#"{"version":1,"binding":{},"extra":1}"#.as_slice(),
     ] {
-        let mut framed = (body.len() as u32).to_be_bytes().to_vec();
+        let mut framed = u32::try_from(body.len()).unwrap().to_be_bytes().to_vec();
         framed.extend_from_slice(body);
         assert_eq!(read_preface(&mut framed.as_slice()), Err(Refusal::Frame));
     }

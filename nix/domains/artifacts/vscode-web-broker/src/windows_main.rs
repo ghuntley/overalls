@@ -327,7 +327,7 @@ fn probe(worker: &Worker, binding: &Binding, deadline: Instant) -> Result<(), Re
 /// MUST retain live and quarantined jobs across stream loss, never evict them.
 /// Replacement MUST drain all exact-job descendants to zero; accounting or
 /// identity ambiguity MUST quarantine/refuse without deleting the receipt.
-fn ensure_worker(runtime: &Runtime, preface: Preface, deadline: Instant) -> Result<Pipe, Refusal> {
+fn ensure_worker(runtime: &Runtime, preface: &Preface, deadline: Instant) -> Result<Pipe, Refusal> {
     let binding = &preface.binding;
     let generation = runtime.generation.ok_or(Refusal::Custody)?;
     let slot = runtime.workers.slot(binding.uid, || WorkerState::Empty)?;
@@ -337,7 +337,7 @@ fn ensure_worker(runtime: &Runtime, preface: Preface, deadline: Instant) -> Resu
             binding,
             deadline,
         )?;
-        let identity = worker_identity(runtime, &preface)?;
+        let identity = worker_identity(runtime, preface)?;
 
         let path = receipt_path(&runtime.state, binding.uid)?;
         let account_dir = local(&format!(r"{}\u{}", runtime.state.as_str(), binding.uid))?;
@@ -482,6 +482,10 @@ fn pipe_relay(mut client: Pipe, mut worker: Pipe) -> Result<(), Refusal> {
     let cancelled = AtomicBool::new(false);
     thread::scope(|scope| {
         scope.spawn(|| {
+            #[expect(
+                clippy::large_stack_arrays,
+                reason = "a 64 KiB relay buffer fits the 2 MiB default spawned-thread stack"
+            )]
             let mut bytes = [0; 65536];
             while let Ok(length) = worker_reader.read_until_cancelled(&mut bytes, &cancelled) {
                 if length == 0 || client_writer.write_all(&bytes[..length]).is_err() {
@@ -490,6 +494,10 @@ fn pipe_relay(mut client: Pipe, mut worker: Pipe) -> Result<(), Refusal> {
             }
             cancelled.store(true, Ordering::Release);
         });
+        #[expect(
+            clippy::large_stack_arrays,
+            reason = "a 64 KiB relay buffer fits the 2 MiB default spawned-thread stack"
+        )]
         let mut bytes = [0; 65536];
         while let Ok(length) = client.read_until_cancelled(&mut bytes, &cancelled) {
             if length == 0 || worker.write_all(&bytes[..length]).is_err() {
@@ -501,7 +509,7 @@ fn pipe_relay(mut client: Pipe, mut worker: Pipe) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn custody_connection(mut client: Pipe, runtime: Arc<Runtime>) -> Result<(), Refusal> {
+fn custody_connection(mut client: Pipe, runtime: &Arc<Runtime>) -> Result<(), Refusal> {
     let deadline = Instant::now() + STARTUP;
     let peer = ipc::authenticate(&mut client, true, &runtime.executable, deadline)?;
     let preface = overalls_vscode_web_broker::read_preface(&mut ipc::Deadline {
@@ -510,7 +518,7 @@ fn custody_connection(mut client: Pipe, runtime: Arc<Runtime>) -> Result<(), Ref
     })?;
     validate(&preface, &runtime.boot, &runtime.descriptor)?;
     peer.verify(&runtime.executable)?;
-    let worker_pipe = ensure_worker(&runtime, preface, deadline)?;
+    let worker_pipe = ensure_worker(runtime, &preface, deadline)?;
     peer.verify(&runtime.executable)?;
     ready(&mut ipc::Deadline {
         pipe: &mut client,
@@ -529,6 +537,10 @@ fn relay(mut client: TcpStream, mut worker: Pipe) -> Result<(), Refusal> {
     let cancelled = AtomicBool::new(false);
     thread::scope(|scope| {
         scope.spawn(|| {
+            #[expect(
+                clippy::large_stack_arrays,
+                reason = "a 64 KiB relay buffer fits the 2 MiB default spawned-thread stack"
+            )]
             let mut buffer = [0_u8; 64 * 1024];
             while let Ok(length) = worker_reader.read_until_cancelled(&mut buffer, &cancelled) {
                 if length == 0 || client_writer.write_all(&buffer[..length]).is_err() {
@@ -545,7 +557,13 @@ fn relay(mut client: TcpStream, mut worker: Pipe) -> Result<(), Refusal> {
     Ok(())
 }
 
-fn connection(mut client: TcpStream, runtime: Arc<Runtime>) -> Result<(), Refusal> {
+fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refusal> {
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Ready {
+        version: u8,
+        ready: bool,
+    }
     client
         .set_read_timeout(Some(STARTUP))
         .map_err(|_| Refusal::Transport)?;
@@ -563,12 +581,6 @@ fn connection(mut client: TcpStream, runtime: Arc<Runtime>) -> Result<(), Refusa
         overalls_vscode_web_broker::MAX_PREFACE,
         deadline,
     )?;
-    #[derive(Deserialize)]
-    #[serde(deny_unknown_fields)]
-    struct Ready {
-        version: u8,
-        ready: bool,
-    }
     let accepted: Ready = ipc::read_frame(&mut worker, 128, deadline)?;
     if accepted.version != 1 || !accepted.ready {
         return Err(Refusal::Readiness);
@@ -631,7 +643,7 @@ fn serve(configuration: Configuration, custodian: bool) -> Result<(), Refusal> {
         connections: AtomicUsize::new(0),
     });
     if let Some((listener, _)) = custody {
-        return custody_serve(runtime, listener);
+        return custody_serve(&runtime, listener);
     }
     let listener =
         TcpListener::bind((runtime.boot.address, PORT)).map_err(|_| Refusal::Transport)?;
@@ -652,7 +664,7 @@ fn serve(configuration: Configuration, custodian: bool) -> Result<(), Refusal> {
         }
         let runtime = runtime.clone();
         thread::spawn(move || {
-            let result = connection(client, runtime.clone());
+            let result = connection(client, &runtime);
             runtime.connections.fetch_sub(1, Ordering::AcqRel);
             if let Err(reason) = result {
                 event("refused", Some(reason));
@@ -662,7 +674,7 @@ fn serve(configuration: Configuration, custodian: bool) -> Result<(), Refusal> {
     Err(Refusal::Transport)
 }
 
-fn custody_serve(runtime: Arc<Runtime>, mut listener: Pipe) -> Result<(), Refusal> {
+fn custody_serve(runtime: &Arc<Runtime>, mut listener: Pipe) -> Result<(), Refusal> {
     // The first instance was reserved before any request. Create its
     // successor while the accepted instance remains owned, so the name never
     // becomes available for another server between connections.
@@ -686,7 +698,7 @@ fn custody_serve(runtime: Arc<Runtime>, mut listener: Pipe) -> Result<(), Refusa
         }
         let runtime = runtime.clone();
         thread::spawn(move || {
-            let result = custody_connection(client, runtime.clone());
+            let result = custody_connection(client, &runtime);
             runtime.connections.fetch_sub(1, Ordering::AcqRel);
             if let Err(reason) = result {
                 event("refused", Some(reason));

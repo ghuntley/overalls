@@ -7,14 +7,15 @@ pkgs.pkgsStatic.rustPlatform.buildRustPackage {
     filter = path: type:
       let name = builtins.baseNameOf path;
       in name != "target" && name != ".hegel" && (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
-        builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
+        builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
   cargoLock.lockFile = ./Cargo.lock;
   doCheck = true;
   strictDeps = true;
-  nativeCheckInputs = [ pkgs.clippy ];
+  nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
   postCheck = ''
-    cargo clippy --locked --offline --all-targets -- -D warnings
+    cargo fmt --check
+    cargo clippy --all-targets --locked --offline -- -D warnings
   '';
   meta = {
     description = "Account-bound Overalls guest broker for source-built VS Code";

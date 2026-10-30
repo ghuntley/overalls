@@ -8,6 +8,7 @@ use crate::{Boot, Refusal, hex, parse_boot};
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::net::{Ipv4Addr, SocketAddrV4, TcpStream};
 use std::time::{Duration, Instant};
@@ -45,12 +46,16 @@ impl Identity {
 
 /// @cc [owner:ghuntley,label:security] editor-mmds-physical-network-identity
 /// A document MUST have exactly Lilly's version-1 fields, a valid boot
-/// challenge, and the placement/epoch/profile address accepted by parse_boot.
+/// challenge, and the placement/epoch/profile address accepted by `parse_boot`.
 /// Its prefix MUST be 32 and its gateway and MAC MUST match the address's
 /// deterministic Lilly network identity. Invalid, duplicate or unknown fields
 /// MUST refuse; neither the challenge nor metadata text may be returned.
 /// The opaque state namespace MUST change when the physical boot challenge,
 /// placement or execution epoch changes, including reboot at the same epoch.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn parse_document(body: &[u8]) -> Result<Identity, Refusal> {
     if body.is_empty() || body.len() > MAX_RESPONSE {
         return Err(Refusal::Boot);
@@ -82,8 +87,10 @@ pub fn parse_document(body: &[u8]) -> Result<Identity, Refusal> {
     let state_key = hash
         .finalize()
         .iter()
-        .map(|byte| format!("{byte:02x}"))
-        .collect();
+        .fold(String::with_capacity(64), |mut out, byte| {
+            let _ = write!(out, "{byte:02x}");
+            out
+        });
     Ok(Identity { boot, state_key })
 }
 
@@ -270,6 +277,10 @@ fn fetch_at(address: SocketAddrV4, timeout: Duration) -> Result<Identity, Refusa
 /// No proxy, redirect, retry or durable token state is allowed. Token and body
 /// bytes MUST NOT enter diagnostics or returned error values. The supplied
 /// timeout MUST bound both requests together.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+)]
 pub fn fetch(timeout: Duration) -> Result<Identity, Refusal> {
     fetch_at(SocketAddrV4::new(ADDRESS, 80), timeout)
 }
