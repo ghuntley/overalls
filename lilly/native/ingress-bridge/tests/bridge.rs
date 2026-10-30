@@ -207,6 +207,20 @@ fn guest_loss_ends_the_bridge_and_closes_lilly() {
     assert!(!wait(&mut bridge.child).success());
 }
 
+/// Splicing into a socket whose peer closed MUST end the bridge with its
+/// I/O failure status, never by SIGPIPE, even when its parent restored the
+/// default SIGPIPE disposition before exec (hostd's `spawn_detached` does).
+#[test]
+fn guest_loss_while_relaying_exits_with_io_failure_not_sigpipe() {
+    use std::os::unix::process::ExitStatusExt;
+    let mut bridge = spawn(&[]);
+    drop(bridge.guest);
+    let _ = bridge.lilly.write_all(&payload(262_144, 11));
+    let status = wait(&mut bridge.child);
+    assert_eq!(status.signal(), None, "{status:?}");
+    assert_eq!(status.code(), Some(74), "{status:?}");
+}
+
 /// @cc [owner:ghuntley,label:verification] bridge-refuses-bad-input
 /// A malformed command line exits 64 and a descriptor that is not a socket
 /// exits 70, before any byte moves.

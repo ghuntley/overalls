@@ -479,3 +479,21 @@ fn production_command_places_the_bridge_in_its_own_scope() {
         ]
     );
 }
+
+#[test]
+fn detached_bridge_exits_are_reported_by_closed_class() {
+    use crate::exec::BridgeExit;
+    let cases = [
+        ((Some(0), None), ("ok", "none")),
+        ((Some(74), None), ("exit_io", "none")),
+        ((Some(70), None), ("setup_failed", "none")),
+        ((Some(64), None), ("setup_failed", "none")),
+        ((Some(1), None), ("exit_other", "none")),
+        ((None, Some(libc::SIGPIPE)), ("signal", "pipe")),
+        ((None, Some(libc::SIGKILL)), ("signal", "kill")),
+        ((None, Some(libc::SIGTERM)), ("signal", "other")),
+    ];
+    for ((code, signal), expected) in cases {
+        assert_eq!(BridgeExit::of(code, signal).fields(), expected);
+    }
+}

@@ -257,6 +257,19 @@ bound ADR-0187 accepts for a live bridge while Lilly is down.
 - Audi: tests with a scripted control channel in
   [`http_authority_test.exs`](../../../audi/test/http_authority_test.exs);
   Audi's code is unchanged.
+- Diagnostics: hostd's reaper reports every detached bridge it reaps as one
+  fixed-grammar stderr line, `ingress.bridge_exited` with a closed `outcome`
+  (`ok`, `exit_io`, `setup_failed`, `exit_other`, `signal`) and `signal`
+  class (`none`, `pipe`, `kill`, `other`), with no pid, key, path or bytes
+  (`hostd-detached-bridge-exit-report` in
+  [`exec.rs`](../../../lilly/native/hostd/src/exec.rs), classification test
+  in [`ingress_tests.rs`](../../../lilly/native/hostd/src/ingress_tests.rs)).
+  A bridge that outlives hostd is reaped elsewhere and is not reported. The
+  report stays in hostd's journal; Lilly does not see it, because hostd has
+  no asynchronous notification to Lilly. The bridge ignores SIGPIPE through the
+  Rust runtime, so splicing into a closed peer exits `exit_io`
+  ([`bridge.rs`](../../../lilly/native/ingress-bridge/tests/bridge.rs),
+  `guest_loss_while_relaying_exits_with_io_failure_not_sigpipe`).
 - Machine test: the editor fleet subtest "live editor WebSockets survive
   lilly-hostd and Lilly restarts in detached bridges"
   ([`fleet.py`](../../../nix/verification/tests/machines/vscode-web/fleet.py),

@@ -106,6 +106,70 @@ fn reap_forever() {
     }
 }
 
+/// How a detached ingress bridge ended, as `lilly-ingress-bridge`'s exit codes
+/// and the kernel's signal report it.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum BridgeExit {
+    Ok,
+    ExitIo,
+    SetupFailed,
+    ExitOther,
+    SignalPipe,
+    SignalKill,
+    SignalOther,
+}
+
+impl BridgeExit {
+    /// Classify a detached bridge's exit code or terminating signal.
+    pub fn of(code: Option<i32>, signal: Option<i32>) -> Self {
+        match (code, signal) {
+            (Some(0), _) => Self::Ok,
+            (Some(74), _) => Self::ExitIo,
+            (Some(64 | 70), _) => Self::SetupFailed,
+            (Some(_), _) => Self::ExitOther,
+            (None, Some(signal)) if signal == libc::SIGPIPE => Self::SignalPipe,
+            (None, Some(signal)) if signal == libc::SIGKILL => Self::SignalKill,
+            _ => Self::SignalOther,
+        }
+    }
+
+    /// The closed (outcome, signal) pair the report names.
+    pub fn fields(self) -> (&'static str, &'static str) {
+        match self {
+            Self::Ok => ("ok", "none"),
+            Self::ExitIo => ("exit_io", "none"),
+            Self::SetupFailed => ("setup_failed", "none"),
+            Self::ExitOther => ("exit_other", "none"),
+            Self::SignalPipe => ("signal", "pipe"),
+            Self::SignalKill => ("signal", "kill"),
+            Self::SignalOther => ("signal", "other"),
+        }
+    }
+}
+
+/// @cc [owner:ghuntley,label:recovery;privacy] hostd-detached-bridge-exit-report
+/// Every detached ingress bridge hostd itself reaps MUST be reported once on
+/// hostd's stderr as one fixed-grammar line naming only the closed exit class
+/// and signal class: never its pid, key, unit, path, peer or any byte it moved.
+/// A bridge that outlives hostd is reaped elsewhere and is not reported.
+fn detached_reports() -> Sender<WaitStatus> {
+    static REPORTS: OnceLock<Mutex<Sender<WaitStatus>>> = OnceLock::new();
+    let sender = REPORTS.get_or_init(|| {
+        let (sender, receiver) = channel::<WaitStatus>();
+        std::thread::spawn(move || {
+            for status in receiver {
+                let (outcome, signal) =
+                    BridgeExit::of(status.exit_status(), status.terminating_signal()).fields();
+                eprintln!(
+                    "{{\"service\":\"lilly-hostd\",\"event\":\"ingress.bridge_exited\",\"outcome\":\"{outcome}\",\"signal\":\"{signal}\"}}"
+                );
+            }
+        });
+        Mutex::new(sender)
+    });
+    crate::lock(sender, "bridge exit reports").clone()
+}
+
 /// Make this process the subreaper for every descendant and start reaping.
 pub fn start_reaper() -> std::io::Result<()> {
     rustix::process::set_child_subreaper(Some(rustix::process::getpid()))?;
@@ -593,7 +657,7 @@ pub fn spawn_detached(
         Vec::new(),
         handoff.iter().map(AsRawFd::as_raw_fd).collect(),
     );
-    let (sender, _status) = channel::<WaitStatus>();
+    let sender = detached_reports();
     let reaper = reaper();
     let spawned = {
         let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
