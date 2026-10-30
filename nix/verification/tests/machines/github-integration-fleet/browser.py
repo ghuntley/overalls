@@ -20,6 +20,17 @@ SharedWriterStep = Literal[
 ]
 
 
+def machine_detail(url: str) -> bool:
+    """True only for /machines/<uuid>, not the form or provisioning receipt."""
+    parts = urlsplit(url).path.split("/")
+    if len(parts) != 3 or parts[1] != "machines":
+        return False
+    try:
+        return str(uuid.UUID(parts[2])) == parts[2]
+    except ValueError:
+        return False
+
+
 def observe_console(message: ConsoleMessage) -> None:
     if message.type == "error" and "form-action" in message.text:
         observations["form_action_refused"] = True
@@ -173,13 +184,9 @@ def run(*, create: bool = True) -> None:
                 expect(page.locator("#machine_profile")).to_have_value("oss")
                 expect(page.locator("#machine_image_id")).to_have_value(users["image_id"])
                 page.locator("#provision-submit").click()
-                page.wait_for_url(
-                    lambda url: (
-                        urlsplit(url).path.startswith("/machines/")
-                        and urlsplit(url).path != "/machines/new"
-                    ),
-                    timeout=120000,
-                )
+                # Submission lands on the thread-keyed provisioning receipt,
+                # which opens the machine detail once the thread binds it.
+                page.wait_for_url(machine_detail, timeout=120000)
                 identifier = urlsplit(page.url).path.split("/")[-1]
                 assert str(uuid.UUID(identifier)) == identifier
                 machines[role] = identifier

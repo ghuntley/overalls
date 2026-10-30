@@ -15,6 +15,17 @@ FRACTION = "5.000003814697265625"
 stage = "launch"
 
 
+def machine_detail(url: str) -> bool:
+    """True only for /machines/<uuid>, not the form or provisioning receipt."""
+    parts = urlsplit(url).path.split("/")
+    if len(parts) != 3 or parts[1] != "machines":
+        return False
+    try:
+        return str(uuid.UUID(parts[2])) == parts[2]
+    except ValueError:
+        return False
+
+
 def fields() -> dict[str, str]:
     value: object = json.loads((ROOT / "users.json").read_text())
     assert isinstance(value, dict)
@@ -78,12 +89,9 @@ def run() -> None:
             page.locator("#machine_memory_mib").fill("512")
             page.locator("#machine_disk_gib").fill("5")
             page.locator("#provision-submit").click()
-            page.wait_for_url(
-                lambda url: (
-                    urlsplit(url).path.startswith("/machines/")
-                    and urlsplit(url).path != "/machines/new"
-                )
-            )
+            # Submission lands on the thread-keyed provisioning receipt,
+            # which opens the machine detail once the thread binds it.
+            page.wait_for_url(machine_detail, timeout=120000)
             vm_id = urlsplit(page.url).path.split("/")[-1]
             assert str(uuid.UUID(vm_id)) == vm_id
             (ROOT / "vm-id").write_text(vm_id)
