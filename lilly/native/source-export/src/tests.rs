@@ -1,12 +1,13 @@
 use super::*;
 use hegel::generators as gs;
+use hegel::generators::Generator as _;
 use hegel::TestCase;
 
 /// @cc [owner:ghuntley,label:verification] hegel-source-export-selectors
 /// Generated leases and argv shapes MUST classify against the independent
 /// spec: positive decimal within 1..=300000, no leading zero, absolute paths,
 /// sender arity and total byte span as the C helper measured them.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn lease_and_selector_match_independent_spec(tc: TestCase) {
     let lease_candidates = [
         "0",
@@ -62,7 +63,7 @@ fn lease_and_selector_match_independent_spec(tc: TestCase) {
 
 /// @cc [owner:ghuntley,label:verification] hegel-source-export-renew-or-revoke
 /// Only a valid `L<millis>` line renews; every other byte shape revokes.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn control_frames_renew_or_revoke_exactly(tc: TestCase) {
     let candidates: Vec<Vec<u8>> = vec![
         b"L1".to_vec(),
@@ -88,4 +89,59 @@ fn control_frames_renew_or_revoke_exactly(tc: TestCase) {
         _ => None,
     };
     assert_eq!(parse_control(&frame), expected.map(Control::Renew));
+}
+
+/// The independent renewal specification: `L` then 1..=6 ASCII digits with
+/// no leading zero, whose decimal value lies in 1..=300000.
+fn renewal_oracle(frame: &[u8]) -> Option<u32> {
+    let (&first, digits) = frame.split_first()?;
+    if first != b'L'
+        || digits.is_empty()
+        || digits.len() > 6
+        || digits[0] == b'0'
+        || !digits.iter().all(u8::is_ascii_digit)
+    {
+        return None;
+    }
+    let value = digits
+        .iter()
+        .fold(0_u32, |acc, digit| acc * 10 + u32::from(digit - b'0'));
+    (value <= 300_000).then_some(value)
+}
+
+/// @cc [owner:ghuntley,label:verification;protocol] hegel-source-export-control-lattice
+/// Arbitrary control frames MUST renew exactly when the independent digit-wise
+/// oracle accepts them, with the oracle's value; every other byte shape
+/// (non-`L` heads, empty, leading zero, non-digits, non-UTF-8, out of range)
+/// revokes. Frames are bounded to CONTROL_FRAME_LIMIT bytes.
+#[hegel::test(test_cases = 300)]
+fn control_frame_lattice_matches_independent_oracle(tc: TestCase) {
+    let frame: Vec<u8> = match tc.draw(gs::integers::<u8>().min_value(0).max_value(3)) {
+        0 => tc.draw(gs::binary().max_size(CONTROL_FRAME_LIMIT)),
+        1 => {
+            let tail = tc.draw(gs::binary().max_size(8));
+            [b"L".as_slice(), tail.as_slice()].concat()
+        }
+        2 => {
+            let digits =
+                tc.draw(gs::vecs(gs::integers::<u8>().min_value(b'0').max_value(b'9')).max_size(8));
+            [b"L".as_slice(), digits.as_slice()].concat()
+        }
+        _ => {
+            let value = tc.draw(gs::one_of(vec![
+                gs::integers::<u32>()
+                    .min_value(0)
+                    .max_value(300_010)
+                    .boxed(),
+                gs::integers::<u32>().boxed(),
+            ]));
+            format!("L{value}").into_bytes()
+        }
+    };
+    assert_eq!(
+        parse_control(&frame),
+        renewal_oracle(&frame).map(Control::Renew),
+        "frame of {} bytes",
+        frame.len()
+    );
 }

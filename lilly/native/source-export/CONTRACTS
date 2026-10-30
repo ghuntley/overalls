@@ -8,7 +8,12 @@ renew a lease, bounded to 300 seconds; X revokes it. No utility diagnostics
 escape. Success requires a successful sender exit and confirmed reaping.
 
 @cc [owner:ghuntley,label:verification] source-export-hegel-properties
-Hegel properties MUST cover duration/refusal bounds, control-frame renewal
-semantics, reaping order and diagnostics bounds. Real transport behavior stays
-with the disposable NixOS transfer fixtures that drive a sender process on a
-real pool, and with differential wire sessions against the C helper.
+Hegel properties MUST cover duration/refusal bounds and the selector lattice
+against an independent spec, control-frame renewal semantics, and the full
+parse_control lattice over arbitrary bounded frames against an independent
+digit-wise oracle; process-level Hegel fixtures cover reaping of adopted
+descendants before exit and lock custody until actual reaping, while process
+fixtures cover diagnostics bounds, lease renewal and deadline kills. Real
+transport behavior stays with the disposable NixOS transfer fixtures that drive
+a sender process on a real pool, and with differential wire sessions against
+the C helper.
