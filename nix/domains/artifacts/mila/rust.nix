@@ -19,6 +19,7 @@ let
           "/protocol/test"
           "/protocol/test/fixtures"
           "/protocol/test/fixtures/app_routes.json"
+          "/protocol/test/fixtures/porsche_device_results.json"
           "/protocol/test/fixtures/ssh_command_lines.json"
           "/protocol/test/fixtures/ssh_host_certificates.json"
         ];

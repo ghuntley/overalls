@@ -269,6 +269,9 @@ pub extern "C" fn mila_session_read_machines(handle: u64, more: u8) -> SessionSt
 /// Execute a bounded authenticated machine mutation on an existing session.
 /// Inputs are UTF-8 and never interpreted by a shell; the session constructs a
 /// catalogued Porsche command and requires a caller supplied request id.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_machine_action(
     handle: u64,
@@ -302,6 +305,9 @@ pub unsafe extern "C" fn mila_session_machine_action(
 }
 
 /// Execute an authenticated bounded machine creation.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_machine_create(
     handle: u64,
@@ -332,6 +338,9 @@ pub unsafe extern "C" fn mila_session_machine_create(
 }
 
 /// Execute a bounded authenticated machine resize.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_machine_resize(
     handle: u64,
@@ -364,6 +373,9 @@ pub unsafe extern "C" fn mila_session_machine_resize(
 
 /// Execute an authenticated sharing mutation. `add` selects add/remove; role is
 /// required for add and must be null for remove. All strings are bounded UTF-8.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_share_mutation(
     handle: u64,
@@ -411,6 +423,9 @@ pub unsafe extern "C" fn mila_session_share_mutation(
 /// Execute a bounded authenticated thread action. `command` is one of the
 /// closed thread command names; identifiers and payloads are validated by the
 /// session before a single SSH channel is opened.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_thread_action(
     handle: u64,
@@ -477,6 +492,9 @@ pub unsafe extern "C" fn mila_session_thread_action(
     })
 }
 
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_ssh_keys(
     handle: u64,
@@ -499,6 +517,9 @@ pub unsafe extern "C" fn mila_session_ssh_keys(
 
 /// Return the bounded `whoami --json` envelope, including approval-required
 /// replies whose command exit status is non-zero.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_whoami(
     handle: u64,
@@ -519,6 +540,9 @@ pub unsafe extern "C" fn mila_session_whoami(
     })
 }
 
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_ssh_key_revoke(
     handle: u64,
@@ -545,6 +569,9 @@ pub unsafe extern "C" fn mila_session_ssh_key_revoke(
     })
 }
 
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_web_show(
     handle: u64,
@@ -571,6 +598,9 @@ pub unsafe extern "C" fn mila_session_web_show(
     })
 }
 
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_web_set(
     handle: u64,
@@ -604,6 +634,9 @@ pub unsafe extern "C" fn mila_session_web_set(
 }
 
 /// Read the authenticated caller's notification devices.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_device_ls(
     handle: u64,
@@ -690,6 +723,9 @@ pub unsafe extern "C" fn mila_session_device_register(
 }
 
 /// Revoke one authenticated caller-owned notification device.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_device_rm(
     handle: u64,
@@ -716,6 +752,9 @@ pub unsafe extern "C" fn mila_session_device_rm(
 }
 
 /// Enable or disable one authenticated caller-owned notification device.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_device_prefs(
     handle: u64,
@@ -998,6 +1037,7 @@ pub unsafe extern "C" fn mila_session_snapshot(
 }
 
 /// Open a bounded interactive terminal attached to an authenticated session.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub extern "C" fn mila_session_terminal_attach(
     session_handle: u64,
@@ -1049,6 +1089,9 @@ pub extern "C" fn mila_session_terminal_attach(
 }
 
 /// Poll one bounded output chunk. An empty chunk is a valid no-data/closed result.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_terminal_poll(
     terminal_handle: u64,
@@ -1165,6 +1208,9 @@ pub unsafe extern "C" fn mila_session_terminal_read_within(
 }
 
 /// Send bounded input bytes to a terminal.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared lengths and output
+/// pointers writable for the duration of the call.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_terminal_input(
     terminal_handle: u64,

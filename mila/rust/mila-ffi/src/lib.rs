@@ -862,6 +862,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 
 /// JNI trust enrollment bridge. Rust owns validation and pinned-authority
 /// reconciliation; only canonical JSON returns to the platform store.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTrustDocumentReconcile(
     mut env: jni::JNIEnv<'_>,
@@ -1379,7 +1380,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 }
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceList(
-    mut env: jni::JNIEnv<'_>,
+    env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
@@ -1456,6 +1457,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeAbiVers
 }
 
 /// Validate provider registration metadata without retaining the provider token.
+#[allow(clippy::not_unsafe_ptr_arg_deref)]
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativePushRegistrationValidate(
     mut env: jni::JNIEnv<'_>,
@@ -1612,7 +1614,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 /// an empty array is a valid no-data/EOF result.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalPoll(
-    mut env: jni::JNIEnv<'_>,
+    env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     terminal: jni::sys::jlong,
     capacity: jni::sys::jint,
@@ -1642,7 +1644,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 /// Write bounded UTF-8/input bytes to an authenticated PTY.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalInputBytes(
-    mut env: jni::JNIEnv<'_>,
+    env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     terminal: jni::sys::jlong,
     input: jni::objects::JByteArray<'_>,
@@ -1709,7 +1711,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
         from as u64,
         columns as u16,
         rows as u16,
-        read_write as u8,
+        read_write,
     ))
 }
 
@@ -1723,10 +1725,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
     if length < 0 || read_write > 1 {
         return -4;
     }
-    terminal_status(mila_terminal_input_validate(
-        length as usize,
-        read_write as u8,
-    ))
+    terminal_status(mila_terminal_input_validate(length as usize, read_write))
 }
 
 #[no_mangle]
@@ -1748,7 +1747,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
     terminal_status(mila_terminal_resize_validate(
         columns as u16,
         rows as u16,
-        read_write as u8,
+        read_write,
     ))
 }
 
@@ -1943,6 +1942,7 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::single_element_loop)]
     fn projects_machine_management_catalog_without_payloads() {
         for (line, expected) in [("ls", MilaMachineCommandKind::List)] {
             let line = std::ffi::CString::new(line).unwrap();
