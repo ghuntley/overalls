@@ -1,12 +1,12 @@
 use super::*;
-use hegel::generators as gs;
-use hegel::TestCase;
+use hegel::{generators as gs, TestCase};
 use std::ffi::OsString;
+use std::os::unix::ffi::OsStringExt as _;
 
 /// @cc [owner:ghuntley,label:verification] hegel-vm-watch-selectors
 /// Generated PID texts and cgroup paths MUST be accepted exactly when the
 /// independent canonical models accept them; nothing else selects a process.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn pid_selector_matches_model(tc: TestCase) {
     let candidates = [
         "0", "1", "01", "42", "4194304", "4194305", "99999999", "", "-1", " 7", "7 ", "x",
@@ -26,7 +26,10 @@ fn pid_selector_matches_model(tc: TestCase) {
     assert_eq!(pid_value(&text).is_some(), model, "{text:?}");
 }
 
-#[hegel::test]
+/// @cc [owner:ghuntley,label:verification;security] hegel-vm-watch-cgroup-selector
+/// Generated cgroup paths MUST be accepted exactly when they are strictly below
+/// /sys/fs/cgroup with nonempty, non-dot segments and no trailing slash.
+#[hegel::test(test_cases = 100)]
 fn cgroup_selector_matches_model(tc: TestCase) {
     let segments = [
         "lilly.slice",
@@ -56,7 +59,10 @@ fn cgroup_selector_matches_model(tc: TestCase) {
     assert!(cgroup_path("/tmp/a").is_none());
 }
 
-#[hegel::test]
+/// @cc [owner:ghuntley,label:verification] hegel-vm-watch-events-membership
+/// `populated` MUST read exactly the cgroup.events populated flag and `member`
+/// MUST match only a canonical line equal to the PID.
+#[hegel::test(test_cases = 100)]
 fn events_and_membership_parse_exactly(tc: TestCase) {
     let value = tc.draw(gs::booleans());
     let frozen = tc.draw(gs::booleans());
@@ -72,6 +78,67 @@ fn events_and_membership_parse_exactly(tc: TestCase) {
     assert!(member(&format!("{other}\n{pid}\n"), pid));
     assert!(!member(&format!("{other}\n"), pid));
     assert!(!member(&format!("0{pid}\n"), pid));
+}
+
+/// @cc [owner:ghuntley,label:verification;security] hegel-vm-watch-cli-lattice
+/// `parse_cli` MUST select a target exactly when there are two UTF-8 arguments
+/// and both `cgroup_path` and `pid_value` accept them, and the selected target
+/// MUST carry exactly those component results; any other vector selects nothing.
+#[hegel::test(test_cases = 200)]
+fn cli_is_the_meet_of_both_selectors(tc: TestCase) {
+    let cgroups = [
+        "/sys/fs/cgroup/lilly.slice/overalls-vm-1.service",
+        "/sys/fs/cgroup/a",
+        "/sys/fs/cgroup/",
+        "/sys/fs/cgroup/a/",
+        "/sys/fs/cgroup/a/../b",
+        "/sys/fs/cgroup/./a",
+        "/sys/fs/cgroupx/a",
+        "/tmp/a",
+        "relative",
+        "42",
+    ];
+    let pids = [
+        "1",
+        "42",
+        "4194304",
+        "4194305",
+        "0",
+        "01",
+        "",
+        "-1",
+        " 7",
+        "x",
+        "/sys/fs/cgroup/a",
+    ];
+    let count = tc.draw(gs::integers::<usize>().max_value(4));
+    let mut arguments: Vec<OsString> = Vec::with_capacity(count);
+    for index in 0..count {
+        let argument = match tc.draw(gs::integers::<u8>().max_value(3)) {
+            0 => OsString::from(tc.draw(gs::sampled_from(&cgroups))),
+            1 => OsString::from(tc.draw(gs::sampled_from(&pids))),
+            2 if index == 1 => OsString::from(
+                tc.draw(gs::integers::<u32>().max_value(PID_MAX + 2))
+                    .to_string(),
+            ),
+            2 => OsString::from(format!(
+                "/sys/fs/cgroup/{}",
+                tc.draw(gs::text().alphabet("ab./ ").max_size(12))
+            )),
+            // Non-UTF-8 bytes never select a target.
+            _ => OsString::from_vec(vec![b'/', 0xff, b'1']),
+        };
+        arguments.push(argument);
+    }
+    let expected = match arguments.as_slice() {
+        [cgroup, pid] => cgroup
+            .to_str()
+            .and_then(cgroup_path)
+            .zip(pid.to_str().and_then(pid_value))
+            .map(|(cgroup, pid)| Target { cgroup, pid }),
+        _ => None,
+    };
+    assert_eq!(parse_cli(&arguments), expected);
 }
 
 #[test]

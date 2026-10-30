@@ -5,7 +5,8 @@ write any cgroup or file, change namespace, or read guest data. No setuid or
 capabilities; stdout carries only the fixed lines armed, exited and error.
 
 @cc [owner:ghuntley,label:verification] vm-watch-hegel-and-native
-Hegel properties MUST cover the PID and cgroup argument grammar and the
-cgroup.events/procs parsers against independent models. Kernel exit timing is
-evidenced by the in-build child test where cgroup2 is readable and by the NixOS
-vm-watch machine test.
+Hegel properties MUST cover the PID and cgroup argument grammar, the
+`parse_cli` lattice (a target exactly when both selectors accept two UTF-8
+arguments) and the cgroup.events/procs parsers against independent models.
+Kernel exit timing is evidenced by the in-build child test where cgroup2 is
+readable and by the NixOS vm-watch machine test.
