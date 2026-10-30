@@ -3,6 +3,7 @@ use super::{AttachRequest, Attached, Config, Daemon, Session};
 use crate::{frame, pty};
 use hegel::{generators as gs, TestCase};
 use std::collections::BTreeMap;
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::os::unix::net::UnixStream;
@@ -51,6 +52,10 @@ fn mixed_stall_growth_and_admission_preserve_shared_backing(tc: TestCase) {
     verify_mixed(64, 8, 6, 32768, Config::default().viewer_hwm);
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one mixed-pressure scenario with its admission and backing checks"
+)]
 fn verify_mixed(
     total_units: usize,
     maximum_units: usize,
@@ -97,7 +102,7 @@ fn verify_mixed(
     expected.insert(healthy_id, unit);
     let viewers = filler_count + 2;
     verify_inventory(&daemon, &expected, viewers);
-    let pressure_bytes = watermark + 131072;
+    let pressure_bytes = watermark + 131_072;
     blocked
         .socket
         .write_all(format!("set +m; {head} -c {pressure_bytes} /dev/zero\n").as_bytes())
@@ -139,7 +144,10 @@ fn verify_mixed(
         healthy
     });
     barrier.wait();
-    let results: Vec<_> = workers.into_iter().map(|worker| worker.join()).collect();
+    let results: Vec<_> = workers
+        .into_iter()
+        .map(std::thread::JoinHandle::join)
+        .collect();
     let healthy_result = growth.join();
     let mut healthy = healthy_result.expect("healthy output worker joined");
     let mut admitted = Vec::new();
@@ -277,14 +285,18 @@ fn create_peer(daemon: &Arc<Daemon>, user: &str) -> Peer {
         .set_read_timeout(Some(Duration::from_millis(200)))
         .expect("growth read deadline");
     let send_bytes: libc::c_int = 1024;
+    #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
+    let send_length = size_of_val(&send_bytes) as libc::socklen_t;
     assert_eq!(
+        // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
+        // `send_bytes`, a live local.
         unsafe {
             libc::setsockopt(
                 server.as_raw_fd(),
                 libc::SOL_SOCKET,
                 libc::SO_SNDBUF,
-                &send_bytes as *const _ as *const libc::c_void,
-                std::mem::size_of_val(&send_bytes) as libc::socklen_t,
+                (&raw const send_bytes).cast::<libc::c_void>(),
+                send_length,
             )
         },
         0
@@ -318,7 +330,10 @@ fn create_peer(daemon: &Arc<Daemon>, user: &str) -> Peer {
 fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
     assert!(payload <= Config::default().ring_max + 32769 && round <= 3);
     let marker = format!("GROWTH_COMPLETE_{}_ROUND_{round}_DONE", peer.id).into_bytes();
-    let escaped: String = marker.iter().map(|byte| format!("\\{byte:03o}")).collect();
+    let escaped = marker.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "\\{byte:03o}");
+        text
+    });
     let command = format!("set +m; {head} -c {payload} /dev/zero; printf '{escaped}\\012'\n");
     assert!(!command
         .as_bytes()
@@ -356,7 +371,7 @@ fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
                     error.kind(),
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                 ) => {}
-            Err(_) => panic!("native growth read failed"),
+            Err(error) => panic!("native growth read failed: {:?}", error.kind()),
         }
     }
 }

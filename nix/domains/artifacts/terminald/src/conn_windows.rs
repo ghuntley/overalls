@@ -17,12 +17,13 @@ use windows_sys::Win32::Networking::WinSock::{
 };
 
 /// An accepted viosock connection handle.
-pub type Conn = SOCKET;
+pub(crate) type Conn = SOCKET;
 
 /// Extra holders per socket beyond the first.
 static HOLDERS: Mutex<Option<HashMap<SOCKET, usize>>> = Mutex::new(None);
 
 fn wsa_error() -> io::Error {
+    // SAFETY: WSAGetLastError only reads this thread's last Winsock error.
     io::Error::from_raw_os_error(unsafe { WSAGetLastError() })
 }
 
@@ -36,27 +37,32 @@ fn wait(conn: Conn, millis: i32, for_write: bool) {
         tv_sec: millis / 1000,
         tv_usec: (millis % 1000) * 1000,
     };
-    let set_pointer: *mut FD_SET = &mut set;
+    let set_pointer: *mut FD_SET = &raw mut set;
     let (reads, writes) = if for_write {
         (std::ptr::null_mut(), set_pointer)
     } else {
         (set_pointer, std::ptr::null_mut())
     };
     // SAFETY: one valid FD_SET and TIMEVAL live across the call; nfds is ignored.
-    unsafe { select(0, reads, writes, std::ptr::null_mut(), &timeout) };
+    unsafe { select(0, reads, writes, std::ptr::null_mut(), &raw const timeout) };
 }
 
 /// One receive; `Ok(0)` is end of stream. A non-blocking viewer socket waits
 /// in bounded slices instead of returning `WouldBlock`, so readers block as
 /// they do on Linux and still wake on shutdown.
-pub fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
+pub(crate) fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
     let len = i32::try_from(buf.len()).unwrap_or(i32::MAX);
     loop {
         // SAFETY: `buf` is writable for `len` bytes during the call.
         let received = unsafe { recv(conn, buf.as_mut_ptr(), len, 0) };
         if received != SOCKET_ERROR {
+            #[expect(
+                clippy::cast_sign_loss,
+                reason = "recv returns SOCKET_ERROR (handled above) or a non-negative count"
+            )]
             return Ok(received as usize);
         }
+        // SAFETY: WSAGetLastError only reads this thread's last Winsock error.
         if unsafe { WSAGetLastError() } == WSAEWOULDBLOCK {
             wait(conn, 100, false);
             continue;
@@ -66,7 +72,7 @@ pub fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
 }
 
 /// One send; a full non-blocking socket reports `WouldBlock`.
-pub fn write(conn: Conn, buf: &[u8]) -> io::Result<usize> {
+pub(crate) fn write(conn: Conn, buf: &[u8]) -> io::Result<usize> {
     let len = i32::try_from(buf.len()).unwrap_or(i32::MAX);
     // SAFETY: `buf` is readable for `len` bytes during the call.
     let sent = unsafe { send(conn, buf.as_ptr(), len, 0) };
@@ -76,18 +82,27 @@ pub fn write(conn: Conn, buf: &[u8]) -> io::Result<usize> {
     if sent == 0 {
         return Err(io::ErrorKind::WriteZero.into());
     }
+    #[expect(
+        clippy::cast_sign_loss,
+        reason = "send returns SOCKET_ERROR (handled above) or a non-negative count"
+    )]
     Ok(sent as usize)
 }
 
 /// Shut both directions down, waking any thread waiting on this socket.
-pub fn shutdown(conn: Conn) {
+pub(crate) fn shutdown(conn: Conn) {
     // SAFETY: shutting down an open or already shut socket has no memory effects.
     unsafe { wsa_shutdown(conn, SD_BOTH) };
 }
 
 /// Release one holder; the socket closes when the last holder releases it.
-pub fn close(conn: Conn) {
+pub(crate) fn close(conn: Conn) {
     let last = {
+        #[expect(
+            clippy::unwrap_used,
+            reason = "release builds use panic = abort, so a panicking holder ends the \
+                      process before any thread can observe poison"
+        )]
         let mut guard = HOLDERS.lock().unwrap();
         let holders = guard.get_or_insert_with(HashMap::new);
         match holders.get_mut(&conn) {
@@ -108,7 +123,16 @@ pub fn close(conn: Conn) {
 }
 
 /// Another holder of the same socket (see the module notes).
-pub fn duplicate(conn: Conn) -> io::Result<Conn> {
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "shares the platform-neutral signature of the fallible Unix duplicate"
+)]
+pub(crate) fn duplicate(conn: Conn) -> io::Result<Conn> {
+    #[expect(
+        clippy::unwrap_used,
+        reason = "release builds use panic = abort, so a panicking holder ends the \
+                  process before any thread can observe poison"
+    )]
     let mut guard = HOLDERS.lock().unwrap();
     *guard
         .get_or_insert_with(HashMap::new)
@@ -118,16 +142,16 @@ pub fn duplicate(conn: Conn) -> io::Result<Conn> {
 }
 
 /// Switch a viewer's socket to non-blocking mode for bounded writer waits.
-pub fn prepare_viewer(conn: Conn) -> io::Result<()> {
+pub(crate) fn prepare_viewer(conn: Conn) -> io::Result<()> {
     let mut enabled: u32 = 1;
     // SAFETY: FIONBIO takes a writable u32 flag.
-    if unsafe { ioctlsocket(conn, FIONBIO, &mut enabled) } == SOCKET_ERROR {
+    if unsafe { ioctlsocket(conn, FIONBIO, &raw mut enabled) } == SOCKET_ERROR {
         return Err(wsa_error());
     }
     Ok(())
 }
 
 /// Wait up to `millis` for send space.
-pub fn wait_writable(conn: Conn, millis: i32) {
+pub(crate) fn wait_writable(conn: Conn, millis: i32) {
     wait(conn, millis, true);
 }

@@ -13,7 +13,7 @@ let
       let name = builtins.baseNameOf path;
       in name != "target" && name != ".hegel" &&
         (type == "directory" || lib.hasSuffix ".rs" name ||
-          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
+          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
   vendor = pkgs.rustPlatform.fetchCargoVendor {
     name = "terminald-vendor";
@@ -43,6 +43,10 @@ pkgs.stdenv.mkDerivation {
     export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
     mkdir -p "$CARGO_HOME"
     substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
+    # ADR-0265: the cfg(windows) modules never compile on Linux, so the lint
+    # gate runs here with the toolchain's own clippy for the Windows target.
+    PATH="${toolchain}/bin:$PATH" cargo clippy --all-targets --locked --offline \
+      --target x86_64-pc-windows-gnu -- -D warnings
     cargo zigbuild --release --locked --offline --target x86_64-pc-windows-gnu --bin lilly-terminald
     runHook postBuild
   '';

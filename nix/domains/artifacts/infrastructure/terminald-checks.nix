@@ -8,7 +8,7 @@ pkgs.rustPlatform.buildRustPackage {
       let name = builtins.baseNameOf path;
       in name != "target" && name != ".hegel" &&
         (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
-          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
+          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
   cargoLock.lockFile = ../terminald/Cargo.lock;
   doCheck = false;

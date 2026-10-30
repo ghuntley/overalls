@@ -1,41 +1,47 @@
 //! Length-prefixed control frames: [magic u8][op u8][len u16 BE][payload].
-pub const MAGIC: u8 = 0x4c;
+pub(crate) const MAGIC: u8 = 0x4c;
 // A 64-session listing includes up to 64 bytes of username per entry.
-pub const MAX_PAYLOAD: usize = 8192;
+pub(crate) const MAX_PAYLOAD: usize = 8192;
 
-pub const OP_HELLO: u8 = 1;
-pub const OP_CREATE: u8 = 2;
-pub const OP_LIST: u8 = 3;
-pub const OP_KILL: u8 = 4;
-pub const OP_RESIZE: u8 = 5;
-pub const OP_PING: u8 = 6;
-pub const OP_ATTACH: u8 = 10;
-pub const OP_RECOVER_TOKEN: u8 = 11;
-pub const OP_CREATE_ONCE: u8 = 12;
-pub const OP_CREATION_STATUS: u8 = 13;
-pub const OP_CANCEL_CREATION: u8 = 14;
-pub const OP_USERS: u8 = 15;
-pub const OP_OK: u8 = 0x80;
-pub const OP_ERR: u8 = 0x81;
+pub(crate) const OP_HELLO: u8 = 1;
+pub(crate) const OP_CREATE: u8 = 2;
+pub(crate) const OP_LIST: u8 = 3;
+pub(crate) const OP_KILL: u8 = 4;
+pub(crate) const OP_RESIZE: u8 = 5;
+pub(crate) const OP_PING: u8 = 6;
+pub(crate) const OP_ATTACH: u8 = 10;
+pub(crate) const OP_RECOVER_TOKEN: u8 = 11;
+pub(crate) const OP_CREATE_ONCE: u8 = 12;
+pub(crate) const OP_CREATION_STATUS: u8 = 13;
+pub(crate) const OP_CANCEL_CREATION: u8 = 14;
+pub(crate) const OP_USERS: u8 = 15;
+pub(crate) const OP_OK: u8 = 0x80;
+pub(crate) const OP_ERR: u8 = 0x81;
 
-pub const ERR_AUTH: u8 = 1;
-pub const ERR_NOT_FOUND: u8 = 2;
-pub const ERR_BAD_TOKEN: u8 = 3;
-pub const ERR_LIMIT: u8 = 4;
-pub const ERR_BAD_REQUEST: u8 = 5;
-pub const ERR_DEAD: u8 = 6;
+pub(crate) const ERR_AUTH: u8 = 1;
+pub(crate) const ERR_NOT_FOUND: u8 = 2;
+pub(crate) const ERR_BAD_TOKEN: u8 = 3;
+pub(crate) const ERR_LIMIT: u8 = 4;
+pub(crate) const ERR_BAD_REQUEST: u8 = 5;
+pub(crate) const ERR_DEAD: u8 = 6;
 
 #[derive(Debug, PartialEq, Eq)]
-pub struct Frame {
+pub(crate) struct Frame {
     pub op: u8,
     pub payload: Vec<u8>,
 }
 
-pub fn encode(op: u8, payload: &[u8]) -> Vec<u8> {
+pub(crate) fn encode(op: u8, payload: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(payload.len() + 4);
     out.push(MAGIC);
     out.push(op);
-    out.extend_from_slice(&(payload.len() as u16).to_be_bytes());
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "callers frame control replies and probe snapshots far below 64 KiB: \
+                  at most 64 sessions or 64 users per reply"
+    )]
+    let length = payload.len() as u16;
+    out.extend_from_slice(&length.to_be_bytes());
     out.extend_from_slice(payload);
     out
 }
@@ -45,7 +51,7 @@ pub fn encode(op: u8, payload: &[u8]) -> Vec<u8> {
 /// complete header is available. Incomplete headers or payloads MUST yield
 /// `None`. A complete first frame MUST decode only its declared payload;
 /// following bytes belong to subsequent frames and remain for the caller.
-pub fn decode(buffer: &[u8]) -> Option<Result<Frame, ()>> {
+pub(crate) fn decode(buffer: &[u8]) -> Option<Result<Frame, ()>> {
     if buffer.len() < 4 {
         return None;
     }
@@ -65,28 +71,28 @@ pub fn decode(buffer: &[u8]) -> Option<Result<Frame, ()>> {
     }))
 }
 
-pub fn consumed(payload_len: usize) -> usize {
+pub(crate) fn consumed(payload_len: usize) -> usize {
     payload_len + 4
 }
 
-pub struct Reader<'a> {
+pub(crate) struct Reader<'a> {
     buffer: &'a [u8],
     offset: usize,
 }
 
 impl<'a> Reader<'a> {
-    pub fn new(payload: &'a [u8]) -> Self {
+    pub(crate) fn new(payload: &'a [u8]) -> Self {
         Reader {
             buffer: payload,
             offset: 0,
         }
     }
 
-    pub fn remaining(&self) -> usize {
+    pub(crate) fn remaining(&self) -> usize {
         self.buffer.len() - self.offset
     }
 
-    pub fn u8(&mut self) -> Option<u8> {
+    pub(crate) fn u8(&mut self) -> Option<u8> {
         if self.remaining() < 1 {
             return None;
         }
@@ -95,7 +101,7 @@ impl<'a> Reader<'a> {
         Some(value)
     }
 
-    pub fn u16(&mut self) -> Option<u16> {
+    pub(crate) fn u16(&mut self) -> Option<u16> {
         if self.remaining() < 2 {
             return None;
         }
@@ -104,7 +110,7 @@ impl<'a> Reader<'a> {
         Some(value)
     }
 
-    pub fn u64(&mut self) -> Option<u64> {
+    pub(crate) fn u64(&mut self) -> Option<u64> {
         if self.remaining() < 8 {
             return None;
         }
@@ -114,7 +120,7 @@ impl<'a> Reader<'a> {
         Some(u64::from_be_bytes(bytes))
     }
 
-    pub fn bytes(&mut self, len: usize) -> Option<&'a [u8]> {
+    pub(crate) fn bytes(&mut self, len: usize) -> Option<&'a [u8]> {
         if self.remaining() < len {
             return None;
         }
@@ -123,7 +129,7 @@ impl<'a> Reader<'a> {
         Some(value)
     }
 
-    pub fn string(&mut self, max: usize) -> Option<String> {
+    pub(crate) fn string(&mut self, max: usize) -> Option<String> {
         let raw = self.bytes(max)?;
         if raw.is_empty() || raw.contains(&0) {
             return None;
@@ -132,19 +138,19 @@ impl<'a> Reader<'a> {
     }
 }
 
-pub fn put_u16(out: &mut Vec<u8>, value: u16) {
+pub(crate) fn put_u16(out: &mut Vec<u8>, value: u16) {
     out.extend_from_slice(&value.to_be_bytes());
 }
 
-pub fn put_u32(out: &mut Vec<u8>, value: u32) {
+pub(crate) fn put_u32(out: &mut Vec<u8>, value: u32) {
     out.extend_from_slice(&value.to_be_bytes());
 }
 
-pub fn put_u64(out: &mut Vec<u8>, value: u64) {
+pub(crate) fn put_u64(out: &mut Vec<u8>, value: u64) {
     out.extend_from_slice(&value.to_be_bytes());
 }
 
-pub fn put_bytes(out: &mut Vec<u8>, value: &[u8]) {
+pub(crate) fn put_bytes(out: &mut Vec<u8>, value: &[u8]) {
     out.extend_from_slice(value);
 }
 
@@ -199,7 +205,7 @@ mod tests {
         assert_eq!(reader.u8(), Some(1));
         assert_eq!(reader.u16(), None);
         let mut reader = Reader::new(&[1, 2, 3, 4, 5, 6, 7, 8, 9]);
-        assert_eq!(reader.u64(), Some(0x0102030405060708));
+        assert_eq!(reader.u64(), Some(0x0102_0304_0506_0708));
         assert_eq!(reader.bytes(2), None);
         assert_eq!(reader.bytes(1), Some(&[9u8][..]));
         assert_eq!(reader.bytes(1), None);

@@ -120,7 +120,10 @@ fn competing_creates(daemon: &Arc<Daemon>, user: &str, count: usize) -> Vec<u64>
         .collect();
     // Join every contender before asserting, so failure cannot leave a late
     // successful worker outside the cleanup guard's observed session inventory.
-    let replies: Vec<_> = workers.into_iter().map(|worker| worker.join()).collect();
+    let replies: Vec<_> = workers
+        .into_iter()
+        .map(std::thread::JoinHandle::join)
+        .collect();
     let mut accepted: Vec<u64> = Vec::new();
     for reply in replies {
         match reply.expect("fixture create thread") {

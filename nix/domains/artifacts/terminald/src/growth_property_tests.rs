@@ -3,6 +3,7 @@ use super::{AttachRequest, Attached, Config, Daemon};
 use crate::{frame, pty};
 use hegel::{generators as gs, TestCase};
 use std::collections::BTreeSet;
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::os::fd::IntoRawFd;
 use std::os::unix::net::UnixStream;
@@ -119,7 +120,7 @@ fn verify_growth(target: usize, boundary: usize) {
         daemon.kill(*id).expect("owned final growth retirement");
     }
     await_quota(&daemon, 0, 0);
-    assert!(daemon.list().is_empty());
+    assert!(daemon.list().is_empty(), "no sessions remain");
     // All peer descriptors remain open through final retirement/quota assertions.
     drop((replacement, peers));
 }
@@ -228,7 +229,10 @@ fn create_peer(daemon: &Arc<Daemon>, user: &str) -> Peer {
 fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
     assert!(payload <= Config::default().ring_max + 32769 && round <= 1);
     let marker = format!("GROWTH_COMPLETE_{}_ROUND_{round}_DONE", peer.id).into_bytes();
-    let escaped: String = marker.iter().map(|byte| format!("\\{byte:03o}")).collect();
+    let escaped = marker.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "\\{byte:03o}");
+        text
+    });
     let command = format!("set +m; {head} -c {payload} /dev/zero; printf '{escaped}\\012'\n");
     assert!(!command
         .as_bytes()
@@ -266,7 +270,7 @@ fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
                     error.kind(),
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                 ) => {}
-            Err(_) => panic!("native growth read failed"),
+            Err(error) => panic!("native growth read failed: {:?}", error.kind()),
         }
     }
 }

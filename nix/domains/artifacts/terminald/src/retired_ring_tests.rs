@@ -29,9 +29,11 @@ fn natural_eof_releases_scrollback_before_stalled_tail_drains(tc: TestCase) {
         defaults.ring_default,
         defaults.ring_max,
     ]));
-    let tail = tc.draw(gs::sampled_from(&[8192_usize, 32767, 32768, 32769, 131072]));
+    let tail = tc.draw(gs::sampled_from(&[
+        8192_usize, 32767, 32768, 32769, 131_072,
+    ]));
     for (capacity, tail) in [
-        (defaults.ring_default, 131072),
+        (defaults.ring_default, 131_072),
         (defaults.ring_max, 8192),
         (capacity, tail),
     ] {
@@ -58,7 +60,7 @@ fn verify_retired_tail(capacity: usize, tail: usize) {
     let weak = Arc::downgrade(&session);
     drop(session);
     let mut viewer = attach(&daemon, id, token);
-    assert!([8192_usize, 32767, 32768, 32769, 131072].contains(&tail));
+    assert!([8192_usize, 32767, 32768, 32769, 131_072].contains(&tail));
     let command = format!("set +m; printf '\\000%.0s' {{1..{tail}}}; exit\n");
     viewer
         .write_all(command.as_bytes())
@@ -103,13 +105,17 @@ fn verify_retired_tail(capacity: usize, tail: usize) {
         );
         match viewer.read(&mut scratch) {
             Ok(0) => break,
+            #[expect(
+                clippy::naive_bytecount,
+                reason = "a test-only count does not warrant the bytecount dependency"
+            )]
             Ok(count) => nul_bytes += scratch[..count].iter().filter(|byte| **byte == 0).count(),
             Err(error)
                 if matches!(
                     error.kind(),
                     std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut
                 ) => {}
-            Err(_) => panic!("tail socket read failed"),
+            Err(error) => panic!("tail socket read failed: {:?}", error.kind()),
         }
     }
     assert_eq!(
@@ -129,14 +135,18 @@ fn attach(daemon: &Arc<Daemon>, id: u64, token: [u8; 16]) -> UnixStream {
         .set_read_timeout(Some(Duration::from_millis(200)))
         .expect("read deadline");
     let send_bytes: libc::c_int = 1024;
+    #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
+    let send_length = size_of_val(&send_bytes) as libc::socklen_t;
     assert_eq!(
+        // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
+        // `send_bytes`, a live local.
         unsafe {
             libc::setsockopt(
                 server.as_raw_fd(),
                 libc::SOL_SOCKET,
                 libc::SO_SNDBUF,
-                &send_bytes as *const _ as *const libc::c_void,
-                std::mem::size_of_val(&send_bytes) as libc::socklen_t,
+                (&raw const send_bytes).cast::<libc::c_void>(),
+                send_length,
             )
         },
         0

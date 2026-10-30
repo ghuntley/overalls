@@ -8,7 +8,8 @@ mod frame;
 #[cfg(any(windows, target_os = "freebsd", target_os = "illumos", test))]
 mod identity_mmds;
 mod log;
-#[cfg(all(test, target_os = "linux"))]
+#[cfg(test)]
+#[cfg(target_os = "linux")]
 #[path = "vsock_native.rs"]
 mod native_vsock_layout_tests;
 #[cfg(feature = "antithesis-observer")]
@@ -24,7 +25,8 @@ mod session;
 )]
 mod vsock;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod property_tests;
 
 use conn::Conn;
@@ -70,21 +72,24 @@ fn main() {
     let sweeper = daemon.clone();
     std::thread::Builder::new()
         .spawn(move || loop {
-            std::thread::sleep(std::time::Duration::from_secs(60));
+            std::thread::sleep(std::time::Duration::from_mins(1));
             sweeper.sweep_idle();
         })
         .ok();
-    handle_connections(daemon, listener);
+    handle_connections(&daemon, listener);
 }
 
 /// Unix guests reconcile personal accounts through the shared helper before
 /// a PTY opens (`terminal-account-before-passwd`).
 #[cfg(unix)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "shares the signature of the Windows variant, which has no helper"
+)]
 fn account_helper() -> Option<std::path::PathBuf> {
     Some(
-        std::env::var_os("LILLY_TERMINALD_ACCOUNT_HELPER")
-            .map(std::path::PathBuf::from)
-            .unwrap_or_else(|| {
+        std::env::var_os("LILLY_TERMINALD_ACCOUNT_HELPER").map_or_else(
+            || {
                 #[cfg(target_os = "freebsd")]
                 let path = "/usr/local/libexec/overalls-ssh-authorize";
                 #[cfg(target_os = "illumos")]
@@ -92,7 +97,9 @@ fn account_helper() -> Option<std::path::PathBuf> {
                 #[cfg(target_os = "linux")]
                 let path = "/usr/local/bin/overalls-ssh-authorize";
                 path.into()
-            }),
+            },
+            std::path::PathBuf::from,
+        ),
     )
 }
 
@@ -106,7 +113,7 @@ fn account_helper() -> Option<std::path::PathBuf> {
 /// @cc [owner:ghuntley,label:security] connections-host-peer-only
 /// Every accepted connection MUST come from vsock peer CID 2; any other peer
 /// is closed and logged without reading its bytes.
-pub fn handle_connections(daemon: Arc<Daemon>, listener: vsock::Listener) {
+pub fn handle_connections(daemon: &Arc<Daemon>, listener: vsock::Listener) {
     loop {
         match vsock::accept(listener) {
             Ok((fd, cid, _port)) => {
@@ -117,7 +124,7 @@ pub fn handle_connections(daemon: Arc<Daemon>, listener: vsock::Listener) {
                 }
                 let bound = daemon.clone();
                 std::thread::Builder::new()
-                    .spawn(move || handle_connection(bound, fd))
+                    .spawn(move || handle_connection(&bound, fd))
                     .ok();
             }
             Err(_) => std::thread::sleep(std::time::Duration::from_millis(50)),
@@ -125,7 +132,7 @@ pub fn handle_connections(daemon: Arc<Daemon>, listener: vsock::Listener) {
     }
 }
 
-fn handle_connection(daemon: Arc<Daemon>, fd: Conn) {
+fn handle_connection(daemon: &Arc<Daemon>, fd: Conn) {
     let mut buffer = Vec::new();
     let Some(first) = session::read_frame(fd, &mut buffer) else {
         conn::close(fd);
@@ -136,7 +143,7 @@ fn handle_connection(daemon: Arc<Daemon>, fd: Conn) {
         conn::close(fd);
         return;
     };
-    if first.op != frame::OP_HELLO || !hello(daemon.clone(), fd, &first.payload) {
+    if first.op != frame::OP_HELLO || !hello(daemon, fd, &first.payload) {
         conn::close(fd);
         return;
     }
@@ -149,31 +156,27 @@ fn handle_connection(daemon: Arc<Daemon>, fd: Conn) {
         conn::close(fd);
         return;
     };
-    match next.op {
-        frame::OP_ATTACH => {
-            let Some(request) = session::decode_attach(&next.payload) else {
-                let _ = session::write_frame(fd, frame::OP_ERR, &[frame::ERR_BAD_REQUEST]);
+    if next.op == frame::OP_ATTACH {
+        let Some(request) = session::decode_attach(&next.payload) else {
+            let _ = session::write_frame(fd, frame::OP_ERR, &[frame::ERR_BAD_REQUEST]);
+            conn::close(fd);
+            return;
+        };
+        match daemon.attach(&request, fd) {
+            Attached::Streams | Attached::Closed => {}
+            Attached::Failed(code) => {
+                let _ = session::write_frame(fd, frame::OP_ERR, &[code]);
                 conn::close(fd);
-                return;
-            };
-            match daemon.attach(&request, fd) {
-                Attached::Streams => {}
-                Attached::Failed(code) => {
-                    let _ = session::write_frame(fd, frame::OP_ERR, &[code]);
-                    conn::close(fd);
-                }
-                Attached::Closed => {}
             }
         }
-        _ => {
-            control_message(daemon.clone(), fd, next);
-            control_loop(daemon, fd, &mut buffer);
-            conn::close(fd);
-        }
+    } else {
+        control_message(daemon, fd, &next);
+        control_loop(daemon, fd, &mut buffer);
+        conn::close(fd);
     }
 }
 
-fn hello(daemon: Arc<Daemon>, fd: Conn, payload: &[u8]) -> bool {
+fn hello(daemon: &Daemon, fd: Conn, payload: &[u8]) -> bool {
     let Some((nonce, tag)) = session::decode_hello(payload) else {
         log::event(log::Event::AuthRejected);
         let _ = session::write_frame(fd, frame::OP_ERR, &[frame::ERR_AUTH]);
@@ -187,7 +190,7 @@ fn hello(daemon: Arc<Daemon>, fd: Conn, payload: &[u8]) -> bool {
     session::write_frame(fd, frame::OP_OK, &[]).is_ok()
 }
 
-fn control_loop(daemon: Arc<Daemon>, fd: Conn, buffer: &mut Vec<u8>) {
+fn control_loop(daemon: &Arc<Daemon>, fd: Conn, buffer: &mut Vec<u8>) {
     loop {
         let Some(next) = session::read_frame(fd, buffer) else {
             return;
@@ -196,13 +199,13 @@ fn control_loop(daemon: Arc<Daemon>, fd: Conn, buffer: &mut Vec<u8>) {
             log::event(log::Event::FrameRejected);
             return;
         };
-        if !control_message(daemon.clone(), fd, message) {
+        if !control_message(daemon, fd, &message) {
             return;
         }
     }
 }
 
-fn control_message(daemon: Arc<Daemon>, fd: Conn, message: frame::Frame) -> bool {
+fn control_message(daemon: &Arc<Daemon>, fd: Conn, message: &frame::Frame) -> bool {
     let outcome: Result<Vec<u8>, u8> = match message.op {
         frame::OP_CREATE => match session::decode_create(&message.payload) {
             Some((user, term, cols, rows)) => match daemon.create(&user, &term, cols, rows) {
@@ -220,31 +223,35 @@ fn control_message(daemon: Arc<Daemon>, fd: Conn, message: frame::Frame) -> bool
         frame::OP_USERS if message.payload.is_empty() => pty::users()
             .map(|users| {
                 let mut out = Vec::new();
+                #[expect(
+                    clippy::cast_possible_truncation,
+                    reason = "pty::users truncates the inventory to 64 names"
+                )]
                 frame::put_u16(&mut out, users.len() as u16);
                 for user in users {
+                    #[expect(
+                        clippy::cast_possible_truncation,
+                        reason = "pty::users keeps only names of at most 64 bytes"
+                    )]
                     out.push(user.len() as u8);
                     out.extend_from_slice(user.as_bytes());
                 }
                 out
             })
             .map_err(|_| frame::ERR_BAD_REQUEST),
-        frame::OP_CREATE_ONCE => {
-            if message.payload.len() < 16 {
-                Err(frame::ERR_BAD_REQUEST)
-            } else {
-                let request: [u8; 16] = message.payload[..16].try_into().unwrap();
-                match session::decode_create(&message.payload[16..]) {
-                    Some((user, term, cols, rows)) => daemon
-                        .create_once(request, &user, &term, cols, rows)
-                        .map(|(id, token)| {
-                            let mut out = id.to_be_bytes().to_vec();
-                            out.extend_from_slice(&token);
-                            out
-                        }),
-                    None => Err(frame::ERR_BAD_REQUEST),
-                }
-            }
-        }
+        frame::OP_CREATE_ONCE => match message.payload.split_first_chunk::<16>() {
+            None => Err(frame::ERR_BAD_REQUEST),
+            Some((request, rest)) => match session::decode_create(rest) {
+                Some((user, term, cols, rows)) => daemon
+                    .create_once(*request, &user, &term, cols, rows)
+                    .map(|(id, token)| {
+                        let mut out = id.to_be_bytes().to_vec();
+                        out.extend_from_slice(&token);
+                        out
+                    }),
+                None => Err(frame::ERR_BAD_REQUEST),
+            },
+        },
         frame::OP_CREATION_STATUS => match <[u8; 16]>::try_from(message.payload.as_slice()) {
             Ok(request) => match daemon.creation_status(&request) {
                 Some((id, alive)) => {
@@ -257,7 +264,7 @@ fn control_message(daemon: Arc<Daemon>, fd: Conn, message: frame::Frame) -> bool
             Err(_) => Err(frame::ERR_BAD_REQUEST),
         },
         frame::OP_CANCEL_CREATION => match <[u8; 16]>::try_from(message.payload.as_slice()) {
-            Ok(request) => daemon.cancel_creation(request).map(|_| Vec::new()),
+            Ok(request) => daemon.cancel_creation(request).map(|()| Vec::new()),
             Err(_) => Err(frame::ERR_BAD_REQUEST),
         },
         frame::OP_RECOVER_TOKEN => match session::decode_kill(&message.payload) {
@@ -265,11 +272,11 @@ fn control_message(daemon: Arc<Daemon>, fd: Conn, message: frame::Frame) -> bool
             None => Err(frame::ERR_BAD_REQUEST),
         },
         frame::OP_KILL => match session::decode_kill(&message.payload) {
-            Some(id) => daemon.kill(id).map(|_| Vec::new()),
+            Some(id) => daemon.kill(id).map(|()| Vec::new()),
             None => Err(frame::ERR_BAD_REQUEST),
         },
         frame::OP_RESIZE => match session::decode_resize(&message.payload) {
-            Some((id, cols, rows)) => daemon.resize(id, cols, rows).map(|_| Vec::new()),
+            Some((id, cols, rows)) => daemon.resize(id, cols, rows).map(|()| Vec::new()),
             None => Err(frame::ERR_BAD_REQUEST),
         },
         frame::OP_PING => Ok(Vec::new()),
@@ -327,7 +334,7 @@ fn validate_boot_identity(
 /// Firmware guests read the same identity from Firecracker's MMDS (ADR-0171, ADR-0190).
 #[cfg(any(windows, target_os = "freebsd", target_os = "illumos"))]
 fn boot_identity() -> Option<(String, String, String)> {
-    let (challenge, placement, epoch) = identity_mmds::fetch(std::time::Duration::from_secs(600))?;
+    let (challenge, placement, epoch) = identity_mmds::fetch(std::time::Duration::from_mins(10))?;
     validate_boot_identity(challenge, placement, epoch)
 }
 

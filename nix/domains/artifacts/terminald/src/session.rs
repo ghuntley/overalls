@@ -8,11 +8,52 @@ use std::collections::{HashMap, VecDeque};
 #[cfg(feature = "antithesis-observer")]
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::{Arc, Condvar, Mutex, MutexGuard, WaitTimeoutResult};
 
-pub const PORT_DEFAULT: u32 = 1075;
+/// Lock `mutex` exactly as `mutex.lock().unwrap()` did: a poisoned lock panics
+/// at the caller's location.
+#[track_caller]
+#[expect(
+    clippy::unwrap_used,
+    reason = "release builds use panic = abort, so a panicking holder ends the process \
+              before any thread can observe poison; unwinding builds keep the original \
+              panic on poison"
+)]
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap()
+}
 
-#[derive(Clone)]
+/// Wait on `cond` exactly as `cond.wait(guard).unwrap()` did.
+#[track_caller]
+#[expect(
+    clippy::unwrap_used,
+    reason = "release builds use panic = abort, so a panicking holder ends the process \
+              before any thread can observe poison; unwinding builds keep the original \
+              panic on poison"
+)]
+fn wait<'a, T>(cond: &Condvar, guard: MutexGuard<'a, T>) -> MutexGuard<'a, T> {
+    cond.wait(guard).unwrap()
+}
+
+/// Wait on `cond` with a timeout exactly as `wait_timeout(..).unwrap()` did.
+#[track_caller]
+#[expect(
+    clippy::unwrap_used,
+    reason = "release builds use panic = abort, so a panicking holder ends the process \
+              before any thread can observe poison; unwinding builds keep the original \
+              panic on poison"
+)]
+fn wait_timeout<'a, T>(
+    cond: &Condvar,
+    guard: MutexGuard<'a, T>,
+    timeout: std::time::Duration,
+) -> (MutexGuard<'a, T>, WaitTimeoutResult) {
+    cond.wait_timeout(guard, timeout).unwrap()
+}
+
+pub(crate) const PORT_DEFAULT: u32 = 1075;
+
+#[derive(Clone, Debug)]
 pub struct Config {
     pub account_helper: Option<std::path::PathBuf>,
     pub port: u32,
@@ -77,7 +118,7 @@ struct SessionInner {
     viewers: Vec<Viewer>,
 }
 
-pub struct Session {
+pub(crate) struct Session {
     pub id: u64,
     master: pty::Master,
     pid: i32,
@@ -86,8 +127,12 @@ pub struct Session {
     input_write_since_ms: AtomicU64,
 }
 
-pub type SessionEntry = (u64, String, u16, u16, usize, bool, u64, u64);
+pub(crate) type SessionEntry = (u64, String, u16, u16, usize, bool, u64, u64);
 
+#[expect(
+    missing_debug_implementations,
+    reason = "holds a session token, which must never be formatted"
+)]
 pub struct AttachRequest {
     pub id: u64,
     pub token: Vec<u8>,
@@ -102,6 +147,10 @@ struct Drain {
     cond: Condvar,
 }
 
+#[expect(
+    missing_debug_implementations,
+    reason = "holds the boot-derived HMAC key, which must never be formatted"
+)]
 pub struct Daemon {
     cfg: Config,
     key: [u8; 32],
@@ -249,7 +298,7 @@ impl Daemon {
         cols: u16,
         rows: u16,
     ) -> Result<(u64, [u8; 16]), u8> {
-        let mut creations = self.creations.lock().unwrap();
+        let mut creations = lock(&self.creations);
         self.prune_creations(&mut creations);
         if let Some(previous) = creations.get(&request) {
             if previous.cancelled {
@@ -287,14 +336,14 @@ impl Daemon {
     }
 
     pub fn creation_status(&self, request: &[u8; 16]) -> Option<(u64, bool)> {
-        let creations = self.creations.lock().unwrap();
+        let creations = lock(&self.creations);
         let previous = creations.get(request)?;
         let id = previous.session_id?;
         Some((id, !previous.cancelled && self.live_session(id).is_ok()))
     }
 
     pub fn cancel_creation(&self, request: [u8; 16]) -> Result<(), u8> {
-        let mut creations = self.creations.lock().unwrap();
+        let mut creations = lock(&self.creations);
         self.prune_creations(&mut creations);
         if let Some(previous) = creations.get_mut(&request) {
             previous.cancelled = true;
@@ -391,7 +440,7 @@ impl Daemon {
         if info.name.is_empty() || info.name.len() > 64 {
             return Err(frame::ERR_BAD_REQUEST);
         }
-        let mut guard = self.sessions.lock().unwrap();
+        let mut guard = lock(&self.sessions);
         if guard.len() >= self.cfg.sessions_max {
             return Err(frame::ERR_LIMIT);
         }
@@ -399,7 +448,8 @@ impl Daemon {
         // A daemon restart during the same guest boot must not restart the ID
         // sequence. IDs use independent entropy; exposing an ID reveals no token bits.
         let identity = random_token().map_err(|_| frame::ERR_LIMIT)?;
-        let id = u64::from_be_bytes(identity[..8].try_into().unwrap()) & ((1u64 << 63) - 1);
+        let [b0, b1, b2, b3, b4, b5, b6, b7, ..] = identity;
+        let id = u64::from_be_bytes([b0, b1, b2, b3, b4, b5, b6, b7]) & ((1u64 << 63) - 1);
         if id == 0 || guard.contains_key(&id) {
             return Err(frame::ERR_LIMIT);
         }
@@ -410,13 +460,10 @@ impl Daemon {
         ) {
             return Err(frame::ERR_LIMIT);
         }
-        let spawned = match pty::spawn(&info, term, cols, rows) {
-            Ok(spawned) => spawned,
-            Err(_) => {
-                self.ring_total
-                    .fetch_sub(self.cfg.ring_default, Ordering::SeqCst);
-                return Err(frame::ERR_LIMIT);
-            }
+        let Ok(spawned) = pty::spawn(&info, term, cols, rows) else {
+            self.ring_total
+                .fetch_sub(self.cfg.ring_default, Ordering::SeqCst);
+            return Err(frame::ERR_LIMIT);
         };
         let now = log::now_ms();
         let session = Arc::new(Session {
@@ -448,16 +495,16 @@ impl Daemon {
             cols,
             rows,
         });
-        self.start_pump(session)?;
+        self.start_pump(&session)?;
         Ok((id, token))
     }
 
     pub fn list(&self) -> Vec<SessionEntry> {
-        let guard = self.sessions.lock().unwrap();
+        let guard = lock(&self.sessions);
         let mut entries: Vec<_> = guard
             .values()
             .map(|session| {
-                let inner = session.inner.lock().unwrap();
+                let inner = lock(&session.inner);
                 (
                     session.id,
                     inner.user.clone(),
@@ -479,7 +526,7 @@ impl Daemon {
     /// connection, return authority for live sessions only, and never log the token.
     pub fn recover_token(&self, id: u64) -> Result<[u8; 16], u8> {
         let session = self.live_session(id)?;
-        let inner = session.inner.lock().unwrap();
+        let inner = lock(&session.inner);
         if !inner.alive {
             return Err(frame::ERR_NOT_FOUND);
         }
@@ -494,14 +541,14 @@ impl Daemon {
     pub fn kill(&self, id: u64) -> Result<(), u8> {
         let session = self.live_session(id)?;
         {
-            let mut inner = session.inner.lock().unwrap();
+            let mut inner = lock(&session.inner);
             if !inner.alive {
                 return Err(frame::ERR_NOT_FOUND);
             }
             inner.alive = false;
             for viewer in &inner.viewers {
                 let (mutex, cond) = &*viewer.queue;
-                let mut queue = mutex.lock().unwrap();
+                let mut queue = lock(mutex);
                 queue.aborted = true;
                 queue.closed = true;
                 cond.notify_all();
@@ -524,7 +571,7 @@ impl Daemon {
         let session = self.live_session(id)?;
         pty::set_winsize(&session.master, cols, rows).map_err(|_| frame::ERR_DEAD)?;
         {
-            let mut inner = session.inner.lock().unwrap();
+            let mut inner = lock(&session.inner);
             inner.cols = cols;
             inner.rows = rows;
         }
@@ -538,12 +585,10 @@ impl Daemon {
     }
 
     fn live_session(&self, id: u64) -> Result<Arc<Session>, u8> {
-        self.sessions
-            .lock()
-            .unwrap()
+        lock(&self.sessions)
             .get(&id)
             .cloned()
-            .filter(|session| session.inner.lock().unwrap().alive)
+            .filter(|session| lock(&session.inner).alive)
             .ok_or(frame::ERR_NOT_FOUND)
     }
 
@@ -553,6 +598,10 @@ impl Daemon {
     /// overlap nor loss, and MUST report the actual replay start cursor so
     /// scrollback truncation is explicit. On replay failure the connection is
     /// closed without a reply (`Attached::Closed`).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "token check, registration, replay and thread start form one ordered admission"
+    )]
     pub fn attach(self: &Arc<Self>, request: &AttachRequest, fd: Conn) -> Attached {
         let id = request.id;
         let mode = request.mode;
@@ -582,7 +631,7 @@ impl Daemon {
             Condvar::new(),
         ));
         let (replay_start, replay) = {
-            let mut inner = session.inner.lock().unwrap();
+            let mut inner = lock(&session.inner);
             if !inner.alive {
                 return Attached::Failed(frame::ERR_DEAD);
             }
@@ -610,9 +659,14 @@ impl Daemon {
         };
         let mut ok = Vec::with_capacity(20);
         frame::put_u64(&mut ok, replay_start);
-        frame::put_u32(&mut ok, replay.len() as u32);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "replay is a ring suffix, bounded by ring_max (8 MiB)"
+        )]
+        let replay_length = replay.len() as u32;
+        frame::put_u32(&mut ok, replay_length);
         if write_frame(fd, frame::OP_OK, &ok).is_err() || write_all(fd, &replay).is_err() {
-            self.remove_viewer(&session, fd);
+            Self::remove_viewer(&session, fd);
             conn::shutdown(fd);
             conn::close(fd);
             return Attached::Closed;
@@ -627,12 +681,12 @@ impl Daemon {
         // Reader and writer own distinct descriptors. Shutting down either socket
         // wakes both workers, but closing one cannot reuse the other's descriptor.
         let Ok(reader_fd) = conn::duplicate(fd) else {
-            self.remove_viewer(&session, fd);
+            Self::remove_viewer(&session, fd);
             conn::close(fd);
             return Attached::Closed;
         };
         if conn::prepare_viewer(fd).is_err() {
-            self.remove_viewer(&session, fd);
+            Self::remove_viewer(&session, fd);
             conn::close(reader_fd);
             conn::close(fd);
             return Attached::Closed;
@@ -646,7 +700,7 @@ impl Daemon {
             move || Self::writer_loop(fd, queue, drain, session, placement, epoch)
         });
         if writer.is_err() {
-            self.remove_viewer(&session, fd);
+            Self::remove_viewer(&session, fd);
             conn::shutdown(fd);
             conn::close(fd);
             conn::close(reader_fd);
@@ -660,7 +714,7 @@ impl Daemon {
                 conn::shutdown(reader_fd);
                 conn::close(reader_fd);
                 let (mutex, cond) = &*queue;
-                let mut guard = mutex.lock().unwrap();
+                let mut guard = lock(mutex);
                 guard.closed = true;
                 guard.aborted = true;
                 cond.notify_all();
@@ -668,7 +722,7 @@ impl Daemon {
         });
         if reader.is_err() {
             let (mutex, cond) = &*queue;
-            mutex.lock().unwrap().closed = true;
+            lock(mutex).closed = true;
             cond.notify_all();
             conn::shutdown(reader_fd);
             conn::close(reader_fd);
@@ -677,15 +731,16 @@ impl Daemon {
         Attached::Streams
     }
 
-    fn remove_viewer(&self, session: &Arc<Session>, fd: Conn) {
-        session
-            .inner
-            .lock()
-            .unwrap()
+    fn remove_viewer(session: &Arc<Session>, fd: Conn) {
+        lock(&session.inner)
             .viewers
             .retain(|viewer| viewer.fd != fd);
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "thread entry: the reader thread owns its session handle until it exits"
+    )]
     fn reader_loop(fd: Conn, mode: u8, session: Arc<Session>) {
         let mut scratch = vec![0u8; 16 << 10];
         loop {
@@ -696,7 +751,7 @@ impl Daemon {
                 Err(_) => break,
             };
             if mode == 1 {
-                let mut inner = session.inner.lock().unwrap();
+                let mut inner = lock(&session.inner);
                 if !inner.alive {
                     break;
                 }
@@ -719,6 +774,10 @@ impl Daemon {
     /// A writer MUST release its queue mutex before acquiring the drain counter
     /// mutex. The pump holds the drain counter while inspecting queues, so the
     /// reverse order can deadlock every reader and viewer on the guest.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "thread entry: the writer thread owns its handles until it exits"
+    )]
     fn writer_loop(
         fd: Conn,
         queue: SharedQueue,
@@ -730,7 +789,7 @@ impl Daemon {
         loop {
             let chunk = {
                 let (mutex, cond) = &*queue;
-                let mut guard = mutex.lock().unwrap();
+                let mut guard = lock(mutex);
                 loop {
                     if let Some(chunk) = guard.chunks.pop_front() {
                         guard.bytes -= chunk.len();
@@ -739,7 +798,7 @@ impl Daemon {
                     if guard.closed {
                         break None;
                     }
-                    guard = cond.wait(guard).unwrap();
+                    guard = wait(cond, guard);
                 }
             };
             let Some(chunk) = chunk else { break };
@@ -748,20 +807,20 @@ impl Daemon {
             }
             let drained = {
                 let (mutex, _) = &*queue;
-                let guard = mutex.lock().unwrap();
+                let guard = lock(mutex);
                 guard.bytes <= 256 << 10
             };
             // The pump takes the drain lock before inspecting viewer queues. Release
             // the queue lock before taking drain, including during viewer teardown.
             if drained {
-                let mut counter = drain.counter.lock().unwrap();
+                let mut counter = lock(&drain.counter);
                 *counter += 1;
                 drain.cond.notify_all();
             }
         }
         {
             let (mutex, cond) = &*queue;
-            let mut guard = mutex.lock().unwrap();
+            let mut guard = lock(mutex);
             guard.closed = true;
             guard.chunks.clear();
             guard.bytes = 0;
@@ -769,7 +828,7 @@ impl Daemon {
         }
         conn::shutdown(fd);
         let was_last = {
-            let mut inner = session.inner.lock().unwrap();
+            let mut inner = lock(&session.inner);
             inner.viewers.retain(|viewer| viewer.fd != fd);
             inner.viewers.is_empty()
         };
@@ -791,22 +850,22 @@ impl Daemon {
     /// wait; ordinary PTY EOF MUST still drain the queued suffix.
     fn write_viewer(fd: Conn, mut bytes: &[u8], queue: &SharedQueue) -> std::io::Result<()> {
         while !bytes.is_empty() {
-            if queue.0.lock().unwrap().aborted {
+            if lock(&queue.0).aborted {
                 return Err(std::io::ErrorKind::BrokenPipe.into());
             }
             match conn::write(fd, bytes) {
                 Ok(written) => {
                     #[cfg(feature = "antithesis-observer")]
                     {
-                        queue.0.lock().unwrap().blocked_write = false;
+                        lock(&queue.0).blocked_write = false;
                     }
                     bytes = &bytes[written..];
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+                Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
                 Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
                     #[cfg(feature = "antithesis-observer")]
                     {
-                        queue.0.lock().unwrap().blocked_write = true;
+                        lock(&queue.0).blocked_write = true;
                     }
                     conn::wait_writable(fd, 100);
                 }
@@ -816,12 +875,12 @@ impl Daemon {
         Ok(())
     }
 
-    fn start_pump(self: &Arc<Self>, session: Arc<Session>) -> Result<(), u8> {
+    fn start_pump(self: &Arc<Self>, session: &Arc<Session>) -> Result<(), u8> {
         let daemon = self.clone();
         let pumping = session.clone();
         let spawned = std::thread::Builder::new().spawn(move || daemon.pump_loop(pumping));
         if spawned.is_err() {
-            self.session_ended(&session, true);
+            self.session_ended(session, true);
             return Err(frame::ERR_LIMIT);
         }
         Ok(())
@@ -844,11 +903,15 @@ impl Daemon {
     /// but credit-induced stalls MUST wait without dropping bytes. EIO before
     /// the child has ever opened the slave is a startup race, not an exit: the
     /// pump MUST keep retrying within a bounded grace window.
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "thread entry: the pump thread owns its daemon and session handles"
+    )]
     fn pump_loop(self: Arc<Self>, session: Arc<Session>) {
         let mut scratch = vec![0u8; 32 << 10];
         let spawned_at = std::time::Instant::now();
         loop {
-            if !session.inner.lock().unwrap().alive {
+            if !lock(&session.inner).alive {
                 break;
             }
             // This pump is the master's only reader. A bounded readiness wait keeps
@@ -869,7 +932,7 @@ impl Daemon {
                 }
                 pty::Read::SlaveClosed => {
                     let (opened, alive) = {
-                        let inner = session.inner.lock().unwrap();
+                        let inner = lock(&session.inner);
                         (inner.slave_opened, inner.alive)
                     };
                     if !opened && alive && spawned_at.elapsed() < std::time::Duration::from_secs(10)
@@ -882,36 +945,37 @@ impl Daemon {
             };
             let bytes = scratch[..read].to_vec();
             {
-                let mut inner = session.inner.lock().unwrap();
+                let mut inner = lock(&session.inner);
                 inner.slave_opened = true;
                 inner.last_ms = log::now_ms();
                 self.grow_ring(&mut inner);
                 inner.ring.push(&bytes);
                 for viewer in &inner.viewers {
                     let (mutex, cond) = &*viewer.queue;
-                    let mut guard = mutex.lock().unwrap();
+                    let mut guard = lock(mutex);
                     guard.chunks.push_back(bytes.clone());
                     guard.bytes += bytes.len();
                     cond.notify_all();
                 }
             }
-            let mut counter = self.drain.counter.lock().unwrap();
+            let mut counter = lock(&self.drain.counter);
             loop {
                 let over = {
-                    let inner = session.inner.lock().unwrap();
+                    let inner = lock(&session.inner);
                     inner.alive
-                        && inner.viewers.iter().any(|viewer| {
-                            viewer.queue.0.lock().unwrap().bytes > self.cfg.viewer_hwm
-                        })
+                        && inner
+                            .viewers
+                            .iter()
+                            .any(|viewer| lock(&viewer.queue.0).bytes > self.cfg.viewer_hwm)
                 };
                 if !over {
                     break;
                 }
-                let (guard, _) = self
-                    .drain
-                    .cond
-                    .wait_timeout(counter, std::time::Duration::from_millis(100))
-                    .unwrap();
+                let (guard, _) = wait_timeout(
+                    &self.drain.cond,
+                    counter,
+                    std::time::Duration::from_millis(100),
+                );
                 counter = guard;
             }
             drop(counter);
@@ -941,13 +1005,13 @@ impl Daemon {
     fn session_ended(&self, session: &Arc<Session>, pump_spawn_failed: bool) {
         let capacity;
         {
-            let mut inner = session.inner.lock().unwrap();
+            let mut inner = lock(&session.inner);
             inner.alive = false;
             capacity = inner.ring.capacity();
             inner.ring = Ring::new(0);
             for viewer in &inner.viewers {
                 let (mutex, cond) = &*viewer.queue;
-                let mut guard = mutex.lock().unwrap();
+                let mut guard = lock(mutex);
                 guard.closed = true;
                 cond.notify_all();
             }
@@ -955,7 +1019,7 @@ impl Daemon {
         }
         pty::retire(&session.master, session.pid);
         self.ring_total.fetch_sub(capacity, Ordering::SeqCst);
-        self.sessions.lock().unwrap().remove(&session.id);
+        lock(&self.sessions).remove(&session.id);
         #[cfg(feature = "antithesis-observer")]
         self.deaths.fetch_add(1, Ordering::SeqCst);
         let event = if pump_spawn_failed {
@@ -975,11 +1039,11 @@ impl Daemon {
     pub fn sweep_idle(&self) {
         let now = log::now_ms();
         let candidates: Vec<u64> = {
-            let guard = self.sessions.lock().unwrap();
+            let guard = lock(&self.sessions);
             guard
                 .values()
                 .filter(|session| {
-                    let inner = session.inner.lock().unwrap();
+                    let inner = lock(&session.inner);
                     inner.alive
                         && inner.viewers.is_empty()
                         && now.saturating_sub(inner.last_ms) > self.cfg.idle_ttl_ms
@@ -1038,8 +1102,10 @@ fn ensure_account(helper: &std::path::Path, user: &str) -> std::io::Result<()> {
             Ok(Some(_)) => return Err(std::io::Error::other("account unavailable")),
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
             _ => {
+                // SAFETY: kill(2) touches no memory; the helper is unreaped,
+                // so its process group ID cannot have been reused.
                 unsafe {
-                    libc::kill(-(child.id() as i32), libc::SIGKILL);
+                    libc::kill(-child.id().cast_signed(), libc::SIGKILL);
                 }
                 let _ = child.wait();
                 return Err(std::io::Error::other("account unavailable"));
@@ -1063,8 +1129,10 @@ fn proc_start_ticks(pid: i32) -> u64 {
 
 #[cfg(feature = "antithesis-observer")]
 fn monotonic_ms() -> u64 {
+    // SAFETY: timespec is plain integer data; all-zero is valid.
     let mut time: libc::timespec = unsafe { std::mem::zeroed() };
-    if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) } != 0 {
+    // SAFETY: clock_gettime(2) writes one timespec to `time`, a live local.
+    if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &raw mut time) } != 0 {
         return 0;
     }
     u64::try_from(time.tv_sec)
@@ -1107,13 +1175,18 @@ fn random_token() -> std::io::Result<[u8; 16]> {
         BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
     };
     let mut token = [0u8; 16];
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the token is a 16-byte array"
+    )]
+    let token_length = token.len() as u32;
     // SAFETY: `token` is writable for its full length; no algorithm handle is
     // needed with the system-preferred RNG flag.
     let status = unsafe {
         BCryptGenRandom(
             std::ptr::null_mut(),
             token.as_mut_ptr(),
-            token.len() as u32,
+            token_length,
             BCRYPT_USE_SYSTEM_PREFERRED_RNG,
         )
     };
@@ -1123,20 +1196,20 @@ fn random_token() -> std::io::Result<[u8; 16]> {
     Ok(token)
 }
 
-pub fn write_frame(fd: Conn, op: u8, payload: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_frame(fd: Conn, op: u8, payload: &[u8]) -> std::io::Result<()> {
     write_all(fd, &frame::encode(op, payload))
 }
 
 /// Write every byte to a connection, retrying interrupted writes. A socket in
 /// non-blocking viewer mode (Windows) waits for send space instead of failing.
-pub fn write_all(fd: Conn, mut data: &[u8]) -> std::io::Result<()> {
+pub(crate) fn write_all(fd: Conn, mut data: &[u8]) -> std::io::Result<()> {
     while !data.is_empty() {
         match conn::write(fd, data) {
             Ok(written) => data = &data[written..],
-            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
             #[cfg(windows)]
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                conn::wait_writable(fd, 100)
+                conn::wait_writable(fd, 100);
             }
             Err(error) => return Err(error),
         }
@@ -1144,7 +1217,7 @@ pub fn write_all(fd: Conn, mut data: &[u8]) -> std::io::Result<()> {
     Ok(())
 }
 
-pub fn read_frame(fd: Conn, buffer: &mut Vec<u8>) -> Option<Result<frame::Frame, ()>> {
+pub(crate) fn read_frame(fd: Conn, buffer: &mut Vec<u8>) -> Option<Result<frame::Frame, ()>> {
     loop {
         if let Some(result) = frame::decode(buffer) {
             let consumed = frame::consumed(match &result {
@@ -1169,7 +1242,7 @@ pub fn read_frame(fd: Conn, buffer: &mut Vec<u8>) -> Option<Result<frame::Frame,
     }
 }
 
-pub fn decode_hello(payload: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
+pub(crate) fn decode_hello(payload: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
     let mut reader = Reader::new(payload);
     let nonce = reader.bytes(16)?.to_vec();
     let tag = reader.bytes(32)?.to_vec();
@@ -1179,7 +1252,7 @@ pub fn decode_hello(payload: &[u8]) -> Option<(Vec<u8>, Vec<u8>)> {
     Some((nonce, tag))
 }
 
-pub fn decode_create(payload: &[u8]) -> Option<(String, String, u16, u16)> {
+pub(crate) fn decode_create(payload: &[u8]) -> Option<(String, String, u16, u16)> {
     let mut reader = Reader::new(payload);
     let user_len = reader.u8()? as usize;
     let user = reader.string(user_len)?;
@@ -1193,7 +1266,7 @@ pub fn decode_create(payload: &[u8]) -> Option<(String, String, u16, u16)> {
     Some((user, term, cols, rows))
 }
 
-pub fn decode_kill(payload: &[u8]) -> Option<u64> {
+pub(crate) fn decode_kill(payload: &[u8]) -> Option<u64> {
     let mut reader = Reader::new(payload);
     let id = reader.u64()?;
     if reader.remaining() != 0 {
@@ -1202,7 +1275,7 @@ pub fn decode_kill(payload: &[u8]) -> Option<u64> {
     Some(id)
 }
 
-pub fn decode_resize(payload: &[u8]) -> Option<(u64, u16, u16)> {
+pub(crate) fn decode_resize(payload: &[u8]) -> Option<(u64, u16, u16)> {
     let mut reader = Reader::new(payload);
     let id = reader.u64()?;
     let cols = reader.u16()?;
@@ -1213,7 +1286,7 @@ pub fn decode_resize(payload: &[u8]) -> Option<(u64, u16, u16)> {
     Some((id, cols, rows))
 }
 
-pub fn decode_attach(payload: &[u8]) -> Option<AttachRequest> {
+pub(crate) fn decode_attach(payload: &[u8]) -> Option<AttachRequest> {
     let mut reader = Reader::new(payload);
     let id = reader.u64()?;
     let token = reader.bytes(16)?.to_vec();
@@ -1234,15 +1307,27 @@ pub fn decode_attach(payload: &[u8]) -> Option<AttachRequest> {
     })
 }
 
-pub fn encode_list(entries: &[SessionEntry]) -> Vec<u8> {
+pub(crate) fn encode_list(entries: &[SessionEntry]) -> Vec<u8> {
     let mut out = Vec::new();
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the daemon holds at most sessions_max (64) sessions"
+    )]
     frame::put_u16(&mut out, entries.len() as u16);
     for (id, user, cols, rows, viewers, alive, created_ms, last_ms) in entries {
         frame::put_u64(&mut out, *id);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "create refuses user names longer than 64 bytes"
+        )]
         out.push(user.len() as u8);
         frame::put_bytes(&mut out, user.as_bytes());
         frame::put_u16(&mut out, *cols);
         frame::put_u16(&mut out, *rows);
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "attach admits at most 8 viewers per session"
+        )]
         frame::put_u16(&mut out, *viewers as u16);
         out.push(u8::from(*alive));
         frame::put_u64(&mut out, *created_ms);
@@ -1251,42 +1336,46 @@ pub fn encode_list(entries: &[SessionEntry]) -> Vec<u8> {
     out
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 #[path = "retired_ring_tests.rs"]
 mod retired_ring_tests;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 #[path = "growth_property_tests.rs"]
 mod growth_property_tests;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 #[path = "mixed_growth_tests.rs"]
 mod mixed_growth_tests;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod tests {
     #[test]
     fn account_helper_failure_prevents_even_an_existing_passwd_user_from_opening() {
-        let cfg = super::Config {
+        let cfg = Config {
             account_helper: Some("/no-such-account-helper".into()),
-            ..super::Config::default()
+            ..Config::default()
         };
-        let daemon = super::Daemon::new(cfg, [3u8; 32], "p".into(), "1".into());
+        let daemon = Daemon::new(cfg, [3u8; 32], "p".into(), "1".into());
         assert_eq!(
             daemon.create("nobody", "xterm-256color", 80, 24),
-            Err(crate::frame::ERR_BAD_REQUEST)
+            Err(frame::ERR_BAD_REQUEST)
         );
-        assert!(daemon.list().is_empty());
-        assert!(super::ensure_account(std::path::Path::new("relative-helper"), "root").is_err());
+        assert!(daemon.list().is_empty(), "no sessions remain");
+        assert!(ensure_account(std::path::Path::new("relative-helper"), "root").is_err());
     }
 
     #[test]
     fn concurrent_reservations_never_exceed_budget() {
-        let total = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        let total = Arc::new(AtomicUsize::new(0));
         let workers: Vec<_> = (0..32)
             .map(|_| {
                 let total = total.clone();
-                std::thread::spawn(move || super::reserve(&total, 1, 8))
+                std::thread::spawn(move || reserve(&total, 1, 8))
             })
             .collect();
         let accepted = workers
@@ -1295,7 +1384,7 @@ mod tests {
             .filter(|ok| *ok)
             .count();
         assert_eq!(accepted, 8);
-        assert_eq!(total.load(std::sync::atomic::Ordering::SeqCst), 8);
+        assert_eq!(total.load(Ordering::SeqCst), 8);
     }
 
     use super::*;
@@ -1351,7 +1440,7 @@ mod tests {
         assert!(daemon
             .create_once(request, &pty::current_user_name(), "xterm-256color", 80, 24)
             .is_err());
-        assert!(daemon.list().is_empty());
+        assert!(daemon.list().is_empty(), "no sessions remain");
     }
 
     #[test]
@@ -1570,9 +1659,12 @@ mod tests {
         let session = daemon.live_session(id).unwrap();
         let mut name: [libc::c_char; 128] = [0; 128];
         assert_eq!(
+            // SAFETY: ptsname_r writes at most `name.len()` bytes into `name`,
+            // a live local array.
             unsafe { libc::ptsname_r(session.master, name.as_mut_ptr(), name.len()) },
             0
         );
+        // SAFETY: `name` holds the NUL-terminated slave path ptsname_r wrote.
         let slave = unsafe {
             libc::open(
                 name.as_ptr(),
@@ -1580,6 +1672,7 @@ mod tests {
             )
         };
         assert!(slave >= 0);
+        // SAFETY: `slave` is a freshly opened descriptor that nothing else owns.
         let slave = unsafe { OwnedFd::from_raw_fd(slave) };
         std::thread::sleep(Duration::from_millis(200));
         daemon.kill(id).unwrap();
@@ -1597,6 +1690,10 @@ mod tests {
         assert_eq!(remaining, 0);
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one end-to-end credit-stall scenario with its full set of checks"
+    )]
     fn verify_credit_stalled_kill(watermark: usize, descendant: bool) {
         use std::io::{Read, Write};
         use std::os::fd::{AsRawFd, IntoRawFd};
@@ -1616,14 +1713,18 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
         let send_bytes: libc::c_int = 1024;
+        #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
+        let send_length = size_of_val(&send_bytes) as libc::socklen_t;
         assert_eq!(
+            // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
+            // `send_bytes`, a live local.
             unsafe {
                 libc::setsockopt(
                     server.as_raw_fd(),
                     libc::SOL_SOCKET,
                     libc::SO_SNDBUF,
-                    &send_bytes as *const _ as *const libc::c_void,
-                    std::mem::size_of_val(&send_bytes) as libc::socklen_t,
+                    (&raw const send_bytes).cast::<libc::c_void>(),
+                    send_length,
                 )
             },
             0
@@ -1672,11 +1773,11 @@ mod tests {
                 "/proc/{}/task/{}/children",
                 session.pid, session.pid
             ))
-            .ok()
-            .is_some_and(|children| {
+            .is_ok_and(|children| {
                 children
                     .split_whitespace()
                     .filter_map(|id| id.parse::<libc::pid_t>().ok())
+                    // SAFETY: getpgid takes an integer and touches no memory.
                     .any(|pid| unsafe { libc::getpgid(pid) } == session.pid)
             })
         } else {
@@ -1784,7 +1885,14 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::print_stderr)]
+    #[allow(
+        clippy::print_stderr,
+        reason = "the skip notice explains why the test passed without its environment"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one end-to-end control and data round trip over real vsock"
+    )]
     fn end_to_end_vsock_session_round_trip() {
         if !crate::vsock::available() {
             eprintln!("skipping: AF_VSOCK unavailable in this environment");
@@ -1799,7 +1907,8 @@ mod tests {
         let listener = crate::vsock::listen(0).expect("bind vsock listener");
         let port = crate::vsock::bound_port(listener).expect("discover bound port");
         let acceptor = daemon.clone();
-        let server = std::thread::spawn(move || crate::handle_connections(acceptor, listener));
+        let server = std::thread::spawn(move || crate::handle_connections(&acceptor, listener));
+        // SAFETY: socket(2) takes integer arguments only and touches no memory.
         let client = unsafe {
             libc::socket(
                 crate::vsock::AF_VSOCK,
@@ -1810,7 +1919,9 @@ mod tests {
         assert!(client >= 0);
         let address = crate::vsock::address(crate::vsock::CID_LOCAL, port);
         assert_eq!(
-            unsafe { libc::connect(client, &address as *const _ as *const libc::sockaddr, 16) },
+            // SAFETY: connect(2) reads 16 bytes from `address`, a live
+            // sixteen-byte repr(C) sockaddr_vm.
+            unsafe { libc::connect(client, (&raw const address).cast::<libc::sockaddr>(), 16) },
             0,
             "vsock loopback connect"
         );
@@ -1827,7 +1938,7 @@ mod tests {
         }
         let mut create = Vec::new();
         let user = pty::current_user_name();
-        create.push(user.len() as u8);
+        create.push(u8::try_from(user.len()).expect("test user name fits a length byte"));
         create.extend_from_slice(user.as_bytes());
         create.push(14);
         create.extend_from_slice(b"xterm-256color");
@@ -1842,6 +1953,7 @@ mod tests {
             let mut reader = Reader::new(&reply.payload);
             (reader.u64().unwrap(), reader.bytes(16).unwrap().to_vec())
         };
+        // SAFETY: socket(2) takes integer arguments only and touches no memory.
         let data = unsafe {
             libc::socket(
                 crate::vsock::AF_VSOCK,
@@ -1850,7 +1962,9 @@ mod tests {
             )
         };
         assert_eq!(
-            unsafe { libc::connect(data, &address as *const _ as *const libc::sockaddr, 16) },
+            // SAFETY: connect(2) reads 16 bytes from `address`, a live
+            // sixteen-byte repr(C) sockaddr_vm.
+            unsafe { libc::connect(data, (&raw const address).cast::<libc::sockaddr>(), 16) },
             0
         );
         let mut attach = Vec::new();
@@ -1882,17 +1996,20 @@ mod tests {
                 events: libc::POLLIN,
                 revents: 0,
             };
-            unsafe { libc::poll(&mut poller, 1, 250) };
+            // SAFETY: poll(2) reads and updates one pollfd at `poller`, a live local.
+            unsafe { libc::poll(&raw mut poller, 1, 250) };
             let mut scratch = [0u8; 4096];
+            // SAFETY: read(2) stores at most `scratch.len()` bytes into
+            // `scratch`, a live local array.
             let read = unsafe {
                 libc::read(
                     data,
-                    scratch.as_mut_ptr() as *mut libc::c_void,
+                    scratch.as_mut_ptr().cast::<libc::c_void>(),
                     scratch.len(),
                 )
             };
             if read > 0 {
-                tail.extend_from_slice(&scratch[..read as usize]);
+                tail.extend_from_slice(&scratch[..read.cast_unsigned()]);
                 assert_eq!(tail[0], frame::MAGIC);
                 assert_eq!(tail[1], frame::OP_OK);
                 if tail.windows(marker.len()).any(|window| window == marker) {
@@ -1901,22 +2018,27 @@ mod tests {
             }
             assert!(
                 std::time::Instant::now() < deadline,
-                "marker never arrived, saw: {:?}",
-                String::from_utf8_lossy(&tail)
+                "marker never arrived ({} bytes received, contents withheld)",
+                tail.len()
             );
         }
         daemon.kill(session_id).ok();
+        // SAFETY: close(2) touches no memory; the test owns `data`.
         unsafe { libc::close(data) };
+        // SAFETY: close(2) touches no memory; the test owns `client`.
         unsafe { libc::close(client) };
+        // SAFETY: close(2) touches no memory; the test owns `listener`.
         unsafe { libc::close(listener) };
         server.join().ok();
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 #[path = "budget_property_tests.rs"]
 mod budget_property_tests;
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 #[path = "neighbor_property_tests.rs"]
 mod neighbor_property_tests;

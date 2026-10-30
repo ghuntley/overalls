@@ -2,6 +2,7 @@
 use super::{AttachRequest, Attached, Config, Daemon, Session};
 use crate::{frame, pty};
 use hegel::{generators as gs, TestCase};
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::os::unix::net::UnixStream;
@@ -109,7 +110,7 @@ fn verify_neighbor(watermark: usize, rounds: usize) {
     {
         std::thread::sleep(Duration::from_millis(10));
     }
-    assert!(daemon.list().is_empty());
+    assert!(daemon.list().is_empty(), "no sessions remain");
     assert_eq!(daemon.viewers.load(Ordering::SeqCst), 0);
     assert_eq!(daemon.ring_total.load(Ordering::SeqCst), 0);
     // Both clients remain owned/open through all retirement and permit assertions.
@@ -122,14 +123,18 @@ fn attach(daemon: &Arc<Daemon>, id: u64, token: [u8; 16]) -> UnixStream {
         .set_read_timeout(Some(Duration::from_millis(200)))
         .expect("read deadline");
     let send_bytes: libc::c_int = 1024;
+    #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
+    let send_length = size_of_val(&send_bytes) as libc::socklen_t;
     assert_eq!(
+        // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
+        // `send_bytes`, a live local.
         unsafe {
             libc::setsockopt(
                 server.as_raw_fd(),
                 libc::SOL_SOCKET,
                 libc::SO_SNDBUF,
-                &send_bytes as *const _ as *const libc::c_void,
-                std::mem::size_of_val(&send_bytes) as libc::socklen_t,
+                (&raw const send_bytes).cast::<libc::c_void>(),
+                send_length,
             )
         },
         0
@@ -169,7 +174,10 @@ fn stalled(session: &Session, watermark: usize) -> bool {
 
 fn execute_marker(viewer: &mut UnixStream, turn: usize) {
     let marker = format!("NEIGHBOR_{turn}_DONE").into_bytes();
-    let escaped: String = marker.iter().map(|byte| format!("\\{byte:03o}")).collect();
+    let escaped = marker.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "\\{byte:03o}");
+        text
+    });
     let command = format!("printf '{escaped}\\012'\n");
     assert!(
         !command

@@ -1,5 +1,9 @@
 //! SHA-256 and HMAC-SHA256 for boot-challenge bound authentication.
 const BLOCK: usize = 64;
+#[expect(
+    clippy::unreadable_literal,
+    reason = "the FIPS 180-4 round constants stay in the standard's 8-digit form"
+)]
 const ROUNDS: [u32; 64] = [
     0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
     0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
@@ -12,7 +16,7 @@ const ROUNDS: [u32; 64] = [
 ];
 
 /// Streaming SHA-256.
-pub struct Sha256 {
+pub(crate) struct Sha256 {
     state: [u32; 8],
     buffer: [u8; BLOCK],
     buffered: usize,
@@ -20,7 +24,11 @@ pub struct Sha256 {
 }
 
 impl Sha256 {
-    pub fn new() -> Self {
+    #[expect(
+        clippy::unreadable_literal,
+        reason = "the FIPS 180-4 initial hash values stay in the standard's 8-digit form"
+    )]
+    pub(crate) fn new() -> Self {
         Sha256 {
             state: [
                 0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab,
@@ -32,7 +40,7 @@ impl Sha256 {
         }
     }
 
-    pub fn update(&mut self, mut data: &[u8]) {
+    pub(crate) fn update(&mut self, mut data: &[u8]) {
         self.length = self.length.wrapping_add(data.len() as u64);
         if self.buffered > 0 {
             let need = BLOCK - self.buffered;
@@ -58,7 +66,7 @@ impl Sha256 {
         }
     }
 
-    pub fn finish(mut self) -> [u8; 32] {
+    pub(crate) fn finish(mut self) -> [u8; 32] {
         let bits = self.length.wrapping_mul(8);
         self.update(&[0x80]);
         while self.buffered != 56 {
@@ -118,13 +126,13 @@ impl Sha256 {
 /// @cc [owner:ghuntley,label:security] hmac-proof-binding
 /// `authenticate` MUST accept only the exact tag produced by this key over this
 /// message; it compares in constant time and never accepts a truncated tag.
-pub struct Hmac {
+pub(crate) struct Hmac {
     inner: Sha256,
     outer: Sha256,
 }
 
 impl Hmac {
-    pub fn new(key: &[u8]) -> Self {
+    pub(crate) fn new(key: &[u8]) -> Self {
         let mut block = [0u8; BLOCK];
         if key.len() > BLOCK {
             block[..32].copy_from_slice(&Sha256::new().chained_update(key).finish());
@@ -133,18 +141,18 @@ impl Hmac {
         }
         let mut inner = Sha256::new();
         let mut outer = Sha256::new();
-        for byte in block.iter() {
+        for byte in &block {
             inner.update(&[byte ^ 0x36]);
             outer.update(&[byte ^ 0x5c]);
         }
         Hmac { inner, outer }
     }
 
-    pub fn update(&mut self, data: &[u8]) {
+    pub(crate) fn update(&mut self, data: &[u8]) {
         self.inner.update(data);
     }
 
-    pub fn finish(self) -> [u8; 32] {
+    pub(crate) fn finish(self) -> [u8; 32] {
         let inner = self.inner.finish();
         let mut outer = self.outer;
         outer.update(&inner);
@@ -152,7 +160,7 @@ impl Hmac {
     }
 }
 
-pub fn digest(parts: &[&[u8]]) -> [u8; 32] {
+pub(crate) fn digest(parts: &[&[u8]]) -> [u8; 32] {
     let mut hash = Sha256::new();
     for part in parts {
         hash.update(part);
@@ -160,7 +168,7 @@ pub fn digest(parts: &[&[u8]]) -> [u8; 32] {
     hash.finish()
 }
 
-pub fn tag(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
+pub(crate) fn tag(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     let mut mac = Hmac::new(key);
     for part in parts {
         mac.update(part);
@@ -168,7 +176,7 @@ pub fn tag(key: &[u8], parts: &[&[u8]]) -> [u8; 32] {
     mac.finish()
 }
 
-pub fn constant_time_equal(a: &[u8], b: &[u8]) -> bool {
+pub(crate) fn constant_time_equal(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
@@ -195,7 +203,11 @@ mod tests {
     use super::*;
 
     fn hex(bytes: &[u8]) -> String {
-        bytes.iter().map(|b| format!("{b:02x}")).collect()
+        use std::fmt::Write as _;
+        bytes.iter().fold(String::new(), |mut text, b| {
+            let _ = write!(text, "{b:02x}");
+            text
+        })
     }
 
     #[test]

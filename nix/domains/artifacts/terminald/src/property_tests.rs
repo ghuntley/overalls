@@ -129,7 +129,7 @@ fn concatenated_frames_survive_arbitrary_chunk_boundaries(tc: TestCase) {
         }
     }
     assert_eq!(index, expected.len());
-    assert!(buffer.is_empty());
+    assert!(buffer.is_empty(), "no undecoded stream bytes remain");
 }
 
 /// @cc [owner:ghuntley,label:verification;capacity] terminal-ring-configured-boundaries
@@ -138,7 +138,7 @@ fn concatenated_frames_survive_arbitrary_chunk_boundaries(tc: TestCase) {
 /// append. These pure checks MUST NOT establish the shared session budget.
 #[hegel::test(test_cases = 4)]
 fn configured_ring_capacity_families(tc: TestCase) {
-    let config = crate::session::Config::default();
+    let config = session::Config::default();
     let seed = tc.draw(gs::integers::<u8>());
     for limit in [config.ring_default, config.ring_max] {
         for size in [limit - 1, limit, limit + 1] {
@@ -215,7 +215,7 @@ fn fixed_shrink_grow_preserves_only_surviving_bytes(tc: TestCase) {
 
 /// @cc [owner:ghuntley,label:verification;protocol] terminal-frame-header-refusals
 /// Partial headers MUST remain incomplete. Once a full header is present, bad
-/// magic or a declared payload above MAX_PAYLOAD MUST refuse without waiting
+/// magic or a declared payload above `MAX_PAYLOAD` MUST refuse without waiting
 /// for payload bytes, regardless of following data.
 #[hegel::test(test_cases = 100)]
 fn malformed_frame_headers_refuse_before_payload(tc: TestCase) {
@@ -296,7 +296,10 @@ fn control_payload_decoders_round_trip_and_refuse_extents(tc: TestCase) {
     frame::put_u16(&mut attach, cols);
     frame::put_u16(&mut attach, rows);
 
-    assert!(session::decode_hello(&hello) == Some((nonce.clone(), tag.clone())));
+    assert_eq!(
+        session::decode_hello(&hello),
+        Some((nonce.clone(), tag.clone()))
+    );
     assert_eq!(
         session::decode_create(&create),
         Some((user, term, cols, rows))
@@ -490,21 +493,19 @@ fn boot_identity_validation_matches_oracle(tc: TestCase) {
             .collect(),
     };
     let placement: String = if tc.draw(gs::booleans()) {
-        let hex: String = tc
-            .draw(
-                gs::vecs(gs::sampled_from(&noisy[..22]))
-                    .min_size(32)
-                    .max_size(32),
-            )
-            .into_iter()
-            .collect();
+        let hex: Vec<char> = tc.draw(
+            gs::vecs(gs::sampled_from(&noisy[..22]))
+                .min_size(32)
+                .max_size(32),
+        );
+        let part = |range: std::ops::Range<usize>| hex[range].iter().collect::<String>();
         format!(
             "{}-{}-{}-{}-{}",
-            &hex[..8],
-            &hex[8..12],
-            &hex[12..16],
-            &hex[16..20],
-            &hex[20..]
+            part(0..8),
+            part(8..12),
+            part(12..16),
+            part(16..20),
+            part(20..32)
         )
     } else {
         tc.draw(gs::vecs(gs::sampled_from(&noisy)).min_size(34).max_size(38))

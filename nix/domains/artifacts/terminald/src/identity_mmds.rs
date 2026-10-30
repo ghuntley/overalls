@@ -9,7 +9,11 @@
 //! Only std networking is used, so the decoder is unit tested on Linux too.
 #![cfg_attr(
     not(any(windows, target_os = "freebsd", target_os = "illumos")),
-    allow(dead_code)
+    expect(
+        dead_code,
+        reason = "Linux unit tests exercise only the decoder; the MMDS client runs on \
+                  firmware guests"
+    )
 )]
 use serde::Deserialize;
 use std::io::{self, Read, Write};
@@ -153,7 +157,7 @@ fn fetch_from(address: SocketAddrV4, budget: Duration) -> Option<(String, String
 
 /// Fetch `(challenge, placement, epoch)`, retrying within `budget` while the
 /// guest network and its MMDS route come up after boot.
-pub fn fetch(budget: Duration) -> Option<(String, String, String)> {
+pub(crate) fn fetch(budget: Duration) -> Option<(String, String, String)> {
     fetch_from(SocketAddrV4::new(ADDRESS, 80), budget)
 }
 
@@ -214,7 +218,7 @@ mod tests {
             for stream in listener.incoming().take(2) {
                 let mut stream = stream.unwrap();
                 std::thread::spawn(move || {
-                    let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+                    let mut reader = io::BufReader::new(stream.try_clone().unwrap());
                     let mut request = String::new();
                     let mut headers = Vec::new();
                     loop {

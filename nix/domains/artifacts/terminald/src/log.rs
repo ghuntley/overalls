@@ -1,17 +1,18 @@
 //! Closed structured JSON logging; terminal bytes cannot enter this API.
+use std::fmt::Write as _;
 use std::io::Write;
 use std::sync::Mutex;
 
 static SINK: Mutex<()> = Mutex::new(());
 
 #[derive(Clone, Copy)]
-pub struct Context<'a> {
+pub(crate) struct Context<'a> {
     pub placement_id: &'a str,
     pub execution_epoch: &'a str,
 }
 
 #[derive(Clone, Copy)]
-pub enum Event<'a> {
+pub(crate) enum Event<'a> {
     MissingBootIdentity,
     ListenFailed {
         errno: i32,
@@ -69,7 +70,7 @@ pub enum Event<'a> {
 /// Only this enum may define emitted names, levels, messages and field keys.
 /// Variants MUST accept identifiers, bounded numbers or closed values only;
 /// terminal bytes, user names, titles, commands and payloads have no log type.
-pub fn event(event: Event<'_>) {
+pub(crate) fn event(event: Event<'_>) {
     let line = encode(event, now_ms());
     let guard = SINK.lock();
     write_line(&line);
@@ -98,6 +99,10 @@ fn write_line(line: &str) {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one flat arm per catalogued event keeps the closed event vocabulary reviewable"
+)]
 fn encode(event: Event<'_>, timestamp_ms: u64) -> String {
     let mut fields = String::new();
     let (name, level, message) = match event {
@@ -254,10 +259,10 @@ fn context_fields(fields: &mut String, context: Context<'_>) {
 }
 
 fn number(fields: &mut String, key: &str, value: impl std::fmt::Display) {
-    fields.push_str(&format!(",\"{key}\":{value}"));
+    let _ = write!(fields, ",\"{key}\":{value}");
 }
 fn string(fields: &mut String, key: &str, value: &str) {
-    fields.push_str(&format!(",\"{key}\":\"{}\"", escape(value)));
+    let _ = write!(fields, ",\"{key}\":\"{}\"", escape(value));
 }
 fn escape(value: &str) -> String {
     let mut escaped = String::with_capacity(value.len());
@@ -266,7 +271,7 @@ fn escape(value: &str) -> String {
             '"' => escaped.push_str("\\\""),
             '\\' => escaped.push_str("\\\\"),
             control if (control as u32) < 0x20 => {
-                escaped.push_str(&format!("\\u{:04x}", control as u32))
+                let _ = write!(escaped, "\\u{:04x}", control as u32);
             }
             other => escaped.push(other),
         }
@@ -275,21 +280,23 @@ fn escape(value: &str) -> String {
 }
 
 #[cfg(windows)]
-pub fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
-        .map(|elapsed| u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX))
-        .unwrap_or(0)
+        .map_or(0, |elapsed| {
+            u64::try_from(elapsed.as_millis()).unwrap_or(u64::MAX)
+        })
 }
 
 #[cfg(unix)]
-pub fn now_ms() -> u64 {
+pub(crate) fn now_ms() -> u64 {
     let mut time = libc::timespec {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &mut time) };
-    (time.tv_sec as u64) * 1000 + (time.tv_nsec / 1_000_000) as u64
+    // SAFETY: clock_gettime(2) writes one timespec to `time`, a live local.
+    unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &raw mut time) };
+    time.tv_sec.cast_unsigned() * 1000 + (time.tv_nsec / 1_000_000).cast_unsigned()
 }
 
 #[cfg(test)]

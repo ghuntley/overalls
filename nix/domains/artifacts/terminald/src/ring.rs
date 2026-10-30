@@ -1,12 +1,12 @@
 //! Raw-byte scrollback ring with absolute cursors and explicit truncation.
-pub struct Ring {
+pub(crate) struct Ring {
     buffer: std::collections::VecDeque<u8>,
     base: u64,
     capacity: usize,
 }
 
 impl Ring {
-    pub fn new(capacity: usize) -> Self {
+    pub(crate) fn new(capacity: usize) -> Self {
         Ring {
             buffer: std::collections::VecDeque::with_capacity(capacity),
             base: 0,
@@ -14,7 +14,7 @@ impl Ring {
         }
     }
 
-    pub fn capacity(&self) -> usize {
+    pub(crate) fn capacity(&self) -> usize {
         self.capacity
     }
 
@@ -22,20 +22,20 @@ impl Ring {
     /// The test oracle MUST report the backing deque's allocated capacity,
     /// independently of the ring's logical retention limit.
     #[cfg(any(all(test, unix), feature = "antithesis-observer"))]
-    pub fn allocated_capacity(&self) -> usize {
+    pub(crate) fn allocated_capacity(&self) -> usize {
         self.buffer.capacity()
     }
 
-    pub fn set_capacity(&mut self, capacity: usize) {
+    pub(crate) fn set_capacity(&mut self, capacity: usize) {
         self.capacity = capacity.max(1);
         self.truncate_to_capacity();
     }
 
-    pub fn tail(&self) -> u64 {
+    pub(crate) fn tail(&self) -> u64 {
         self.base + self.buffer.len() as u64
     }
 
-    pub fn base(&self) -> u64 {
+    pub(crate) fn base(&self) -> u64 {
         self.base
     }
 
@@ -47,7 +47,7 @@ impl Ring {
      * If allocated backing is at least the logical limit, appends MUST NOT
      * grow that backing allocation, including while overwriting a full ring.
      */
-    pub fn push(&mut self, data: &[u8]) {
+    pub(crate) fn push(&mut self, data: &[u8]) {
         for byte in data {
             if self.buffer.len() == self.capacity {
                 self.buffer.pop_front();
@@ -70,11 +70,15 @@ impl Ring {
     /// Replay MUST return the retained suffix starting at or after the requested
     /// cursor; when older bytes were truncated it MUST report the actual start so
     /// callers can expose the skipped range explicitly.
-    pub fn replay_from(&self, cursor: u64) -> (u64, Vec<u8>) {
+    pub(crate) fn replay_from(&self, cursor: u64) -> (u64, Vec<u8>) {
         let start = cursor.max(self.base);
         if start >= self.tail() {
             return (self.tail(), Vec::new());
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "start < tail, so start - base is below the buffer length, a usize"
+        )]
         let offset = (start - self.base) as usize;
         (start, self.buffer.iter().skip(offset).copied().collect())
     }
@@ -98,7 +102,7 @@ mod tests {
             (cfg.ring_max, 32768),
             (capacity, chunk),
         ] {
-            let mut ring = super::Ring::new(capacity);
+            let mut ring = Ring::new(capacity);
             let original: Vec<u8> = (0..capacity)
                 .map(|index| u8::try_from(index % 251).expect("bounded original pattern"))
                 .collect();
@@ -171,13 +175,17 @@ mod tests {
 
     #[test]
     fn random_pushes_match_model() {
-        let mut state: u64 = 0x9e3779b97f4a7c15;
+        let mut state: u64 = 0x9e37_79b9_7f4a_7c15;
         let mut ring = Ring::new(37);
         let mut model: std::collections::VecDeque<u8> = std::collections::VecDeque::new();
         for step in 0..500 {
-            state = state.wrapping_mul(6364136223846793005).wrapping_add(step);
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(step);
             let len = 1 + (state >> 40) as usize % 9;
-            let chunk: Vec<u8> = (0..len).map(|i| (state >> (i % 32)) as u8).collect();
+            let chunk: Vec<u8> = (0..len)
+                .map(|i| (state >> (i % 32)).to_le_bytes()[0])
+                .collect();
             ring.push(&chunk);
             for byte in &chunk {
                 model.push_back(*byte);

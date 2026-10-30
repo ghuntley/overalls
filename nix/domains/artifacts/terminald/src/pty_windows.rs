@@ -1,14 +1,14 @@
-//! Terminal sessions on Windows guests through ConPTY (ADR-0171).
+//! Terminal sessions on Windows guests through `ConPTY` (ADR-0171).
 //!
 //! The session engine treats a `Master` like a Linux PTY master: a bounded
 //! readiness wait, reads of raw output, input writes, resize, kill and
-//! retirement. ConPTY renders through conhost, which re-encodes the screen as
+//! retirement. `ConPTY` renders through conhost, which re-encodes the screen as
 //! VT sequences; the engine still never drops, reorders or interprets the
 //! bytes it receives (`fidelity-passthrough`), but byte-for-byte fidelity with
 //! the program's own output is not possible on Windows and is recorded.
 //!
 //! Identities: `root` keeps its Linux meaning, the host-admin session, and
-//! runs as the daemon's own LocalSystem token. Any other name must be an
+//! runs as the daemon's own `LocalSystem` token. Any other name must be an
 //! enabled local account (the roster agent creates, enables and disables
 //! them) and runs under an S4U logon of that account, as Win32-OpenSSH does
 //! for key logins. Every session's processes live in a kill-on-close job.
@@ -60,7 +60,8 @@ const ROOT: &str = "root";
 const NAME_MAX: usize = 20;
 
 fn last_error() -> io::Error {
-    io::Error::from_raw_os_error(unsafe { GetLastError() } as i32)
+    // SAFETY: GetLastError only reads this thread's last error code.
+    io::Error::from_raw_os_error(unsafe { GetLastError() }.cast_signed())
 }
 
 fn wide(text: &str) -> Vec<u16> {
@@ -71,16 +72,26 @@ fn from_wide(pointer: *const u16) -> String {
     if pointer.is_null() {
         return String::new();
     }
-    // SAFETY: the caller passes a NUL-terminated UTF-16 string owned by a live
-    // NetApi buffer; we stop at the terminator.
+    #[expect(
+        clippy::maybe_infinite_iter,
+        reason = "the caller's string is NUL-terminated, so take_while stops at the terminator"
+    )]
     let length = (0..)
-        .take_while(|&index| unsafe { *pointer.add(index) } != 0)
+        .take_while(|&index| {
+            // SAFETY: the caller passes a NUL-terminated UTF-16 string owned by
+            // a live buffer, and no index past its terminator is reached.
+            let unit = unsafe { pointer.add(index) };
+            // SAFETY: `unit` lies within that string, at or before its terminator.
+            unsafe { *unit != 0 }
+        })
         .count();
+    // SAFETY: the `length` units before the terminator were just read through
+    // `pointer`, so they are initialized and live for this call.
     String::from_utf16_lossy(unsafe { std::slice::from_raw_parts(pointer, length) })
 }
 
 /// A resolved session identity.
-pub struct UserInfo {
+pub(crate) struct UserInfo {
     pub name: String,
     system: bool,
 }
@@ -99,12 +110,18 @@ fn enabled_local_account(name: &str) -> bool {
     let user = wide(name);
     let mut buffer: *mut u8 = null_mut();
     // SAFETY: level 1 fills one USER_INFO_1 that we free with NetApiBufferFree.
-    let status = unsafe { NetUserGetInfo(null(), user.as_ptr(), 1, &mut buffer) };
+    let status = unsafe { NetUserGetInfo(null(), user.as_ptr(), 1, &raw mut buffer) };
     if status != 0 || buffer.is_null() {
         return false;
     }
+    #[expect(
+        clippy::cast_ptr_alignment,
+        reason = "NetApiBufferAllocate returns allocator-aligned memory holding a USER_INFO_1"
+    )]
+    let info = buffer as *const USER_INFO_1;
     // SAFETY: a successful level-1 call returns a USER_INFO_1.
-    let flags = unsafe { (*(buffer as *const USER_INFO_1)).usri1_flags };
+    let flags = unsafe { (*info).usri1_flags };
+    // SAFETY: `buffer` came from NetUserGetInfo and is freed exactly once.
     unsafe { NetApiBufferFree(buffer.cast()) };
     flags & UF_ACCOUNTDISABLE == 0
 }
@@ -113,7 +130,7 @@ fn enabled_local_account(name: &str) -> bool {
 /// The inventory MUST list `root` first and then only enabled normal local
 /// accounts with valid roster names, at most 64 entries; it MUST NOT create
 /// accounts or expose any password field.
-pub fn users() -> io::Result<Vec<String>> {
+pub(crate) fn users() -> io::Result<Vec<String>> {
     let mut users = vec![ROOT.to_owned()];
     let mut buffer: *mut u8 = null_mut();
     let mut read = 0u32;
@@ -125,29 +142,37 @@ pub fn users() -> io::Result<Vec<String>> {
             null(),
             1,
             FILTER_NORMAL_ACCOUNT,
-            &mut buffer,
+            &raw mut buffer,
             MAX_PREFERRED_LENGTH,
-            &mut read,
-            &mut total,
+            &raw mut read,
+            &raw mut total,
             null_mut(),
         )
     };
     if status != 0 {
         if !buffer.is_null() {
+            // SAFETY: `buffer` came from NetUserEnum and is freed exactly once.
             unsafe { NetApiBufferFree(buffer.cast()) };
         }
         return Err(io::Error::other("account inventory unavailable"));
     }
     if !buffer.is_null() {
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "NetApiBufferAllocate returns allocator-aligned memory holding \
+                      USER_INFO_1 entries"
+        )]
+        let first = buffer as *const USER_INFO_1;
         // SAFETY: `read` entries of USER_INFO_1 follow `buffer`.
-        let entries =
-            unsafe { std::slice::from_raw_parts(buffer as *const USER_INFO_1, read as usize) };
+        let entries = unsafe { std::slice::from_raw_parts(first, read as usize) };
         for entry in entries {
             let name = from_wide(entry.usri1_name);
             if entry.usri1_flags & UF_ACCOUNTDISABLE == 0 && valid_name(&name) && name != ROOT {
                 users.push(name);
             }
         }
+        // SAFETY: `buffer` came from NetUserEnum and is freed exactly once,
+        // after the last read of `entries`.
         unsafe { NetApiBufferFree(buffer.cast()) };
     }
     users[1..].sort();
@@ -157,11 +182,11 @@ pub fn users() -> io::Result<Vec<String>> {
 }
 
 /// @cc [owner:ghuntley,label:security] windows-terminal-roster-accounts
-/// `resolve` MUST return the LocalSystem identity only for `root` and
+/// `resolve` MUST return the `LocalSystem` identity only for `root` and
 /// otherwise only an existing, enabled local account with a valid roster name;
 /// disabled, missing or malformed names MUST resolve to nothing, and no
 /// account is created or enabled here (the roster agent owns that).
-pub fn resolve(name: &str) -> Option<UserInfo> {
+pub(crate) fn resolve(name: &str) -> Option<UserInfo> {
     if name == ROOT {
         return Some(UserInfo {
             name: ROOT.to_owned(),
@@ -174,8 +199,8 @@ pub fn resolve(name: &str) -> Option<UserInfo> {
     })
 }
 
-/// Shared ConPTY state for one session.
-pub struct Console {
+/// Shared `ConPTY` state for one session.
+pub(crate) struct Console {
     /// The pseudo console until it is closed; resize and close serialize here.
     pseudo: Mutex<Option<HPCON>>,
     closing: AtomicBool,
@@ -192,6 +217,11 @@ impl Console {
         value as HANDLE
     }
 
+    #[expect(
+        clippy::unwrap_used,
+        reason = "release builds use panic = abort, so a panicking holder ends the process \
+                  before any thread can observe poison"
+    )]
     fn close_pseudo(&self) {
         if let Some(pseudo) = self.pseudo.lock().unwrap().take() {
             // SAFETY: the pseudo console is closed exactly once (taken from the slot).
@@ -217,17 +247,20 @@ impl Console {
     }
 }
 
-/// The session's ConPTY master.
-pub type Master = Arc<Console>;
+/// The session's `ConPTY` master.
+pub(crate) type Master = Arc<Console>;
 
-pub struct Spawned {
+pub(crate) struct Spawned {
     pub master: Master,
     pub pid: i32,
 }
 
 /// Outcome of a bounded master readiness wait.
-#[allow(dead_code)]
-pub enum Ready {
+#[expect(
+    dead_code,
+    reason = "shares the Unix variants; ConPTY never reports an interrupted wait"
+)]
+pub(crate) enum Ready {
     Data,
     Timeout,
     Interrupted,
@@ -235,8 +268,11 @@ pub enum Ready {
 }
 
 /// Outcome of one master read.
-#[allow(dead_code)]
-pub enum Read {
+#[expect(
+    dead_code,
+    reason = "shares the Unix variants; ConPTY reads never report these outcomes"
+)]
+pub(crate) enum Read {
     Data(usize),
     Eof,
     Interrupted,
@@ -245,8 +281,8 @@ pub enum Read {
     Failed,
 }
 
-/// Wait up to `millis` for ConPTY output, or for end of stream.
-pub fn wait_readable(master: &Master, millis: i32) -> Ready {
+/// Wait up to `millis` for `ConPTY` output, or for end of stream.
+pub(crate) fn wait_readable(master: &Master, millis: i32) -> Ready {
     let deadline = Instant::now() + Duration::from_millis(u64::try_from(millis).unwrap_or(0));
     loop {
         let mut available = 0u32;
@@ -257,11 +293,12 @@ pub fn wait_readable(master: &Master, millis: i32) -> Ready {
                 null_mut(),
                 0,
                 null_mut(),
-                &mut available,
+                &raw mut available,
                 null_mut(),
             )
         };
         if peeked == 0 {
+            // SAFETY: GetLastError only reads this thread's last error code.
             return if unsafe { GetLastError() } == ERROR_BROKEN_PIPE {
                 Ready::Data
             } else {
@@ -282,8 +319,8 @@ pub fn wait_readable(master: &Master, millis: i32) -> Ready {
     }
 }
 
-/// One read of ConPTY output; a closed pipe is end of stream.
-pub fn read(master: &Master, buf: &mut [u8]) -> Read {
+/// One read of `ConPTY` output; a closed pipe is end of stream.
+pub(crate) fn read(master: &Master, buf: &mut [u8]) -> Read {
     let mut read = 0u32;
     let length = u32::try_from(buf.len()).unwrap_or(u32::MAX);
     // SAFETY: `buf` is writable for `length` bytes; synchronous read.
@@ -292,11 +329,12 @@ pub fn read(master: &Master, buf: &mut [u8]) -> Read {
             Console::handle(master.output),
             buf.as_mut_ptr(),
             length,
-            &mut read,
+            &raw mut read,
             null_mut(),
         )
     };
     if ok == 0 {
+        // SAFETY: GetLastError only reads this thread's last error code.
         return if unsafe { GetLastError() } == ERROR_BROKEN_PIPE {
             Read::Eof
         } else {
@@ -311,7 +349,7 @@ pub fn read(master: &Master, buf: &mut [u8]) -> Read {
 }
 
 /// Write all input bytes to the pseudo console.
-pub fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
+pub(crate) fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
     while !data.is_empty() {
         let mut written = 0u32;
         let length = u32::try_from(data.len()).unwrap_or(u32::MAX);
@@ -321,7 +359,7 @@ pub fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
                 Console::handle(master.input),
                 data.as_ptr(),
                 length,
-                &mut written,
+                &raw mut written,
                 null_mut(),
             )
         } == 0
@@ -336,8 +374,13 @@ pub fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
     Ok(())
 }
 
-pub fn set_winsize(master: &Master, cols: u16, rows: u16) -> io::Result<()> {
+pub(crate) fn set_winsize(master: &Master, cols: u16, rows: u16) -> io::Result<()> {
     let size = coord(cols, rows)?;
+    #[expect(
+        clippy::unwrap_used,
+        reason = "release builds use panic = abort, so a panicking holder ends the process \
+                  before any thread can observe poison"
+    )]
     let guard = master.pseudo.lock().unwrap();
     let Some(pseudo) = *guard else {
         return Err(io::ErrorKind::BrokenPipe.into());
@@ -353,7 +396,7 @@ pub fn set_winsize(master: &Master, cols: u16, rows: u16) -> io::Result<()> {
 /// Explicit kill MUST terminate every process in the session's job, which
 /// also ends descendants that detached from the console, and MUST NOT wait
 /// for viewer credit.
-pub fn kill(master: &Master, _pid: i32) {
+pub(crate) fn kill(master: &Master, _pid: i32) {
     // SAFETY: terminating our own job handle.
     unsafe { TerminateJobObject(Console::handle(master.job), 1) };
 }
@@ -361,28 +404,40 @@ pub fn kill(master: &Master, _pid: i32) {
 /// Retirement: end the job, release conhost (closing our read end first so a
 /// blocked conhost write fails instead of deadlocking the close), and release
 /// every handle and the loaded profile exactly once.
-pub fn retire(master: &Master, _pid: i32) {
-    unsafe {
-        TerminateJobObject(Console::handle(master.job), 1);
-        WaitForSingleObject(Console::handle(master.process), 5000);
-        CloseHandle(Console::handle(master.output));
-    }
+pub(crate) fn retire(master: &Master, _pid: i32) {
+    // SAFETY: the session's job handle stays open until it is closed below.
+    unsafe { TerminateJobObject(Console::handle(master.job), 1) };
+    // SAFETY: the process handle stays open until it is closed below.
+    unsafe { WaitForSingleObject(Console::handle(master.process), 5000) };
+    // SAFETY: retirement runs once per session, so the output handle is
+    // closed exactly once.
+    unsafe { CloseHandle(Console::handle(master.output)) };
     if !master.closing.swap(true, Ordering::SeqCst) {
         master.close_pseudo();
     }
-    unsafe {
-        CloseHandle(Console::handle(master.input));
-        CloseHandle(Console::handle(master.process));
-        CloseHandle(Console::handle(master.job));
-        if master.token != 0 {
-            if master.profile != 0 {
+    // SAFETY: retirement runs once per session, so the input handle is closed
+    // exactly once.
+    unsafe { CloseHandle(Console::handle(master.input)) };
+    // SAFETY: retirement runs once per session, so the process handle is
+    // closed exactly once.
+    unsafe { CloseHandle(Console::handle(master.process)) };
+    // SAFETY: retirement runs once per session, so the job handle is closed
+    // exactly once.
+    unsafe { CloseHandle(Console::handle(master.job)) };
+    if master.token != 0 {
+        if master.profile != 0 {
+            // SAFETY: the profile was loaded for this token by spawn and is
+            // unloaded exactly once, before the token closes.
+            unsafe {
                 UnloadUserProfile(
                     Console::handle(master.token),
                     Console::handle(master.profile),
-                );
-            }
-            CloseHandle(Console::handle(master.token));
+                )
+            };
         }
+        // SAFETY: retirement runs once per session, so the token is closed
+        // exactly once.
+        unsafe { CloseHandle(Console::handle(master.token)) };
     }
 }
 
@@ -395,21 +450,25 @@ fn coord(cols: u16, rows: u16) -> io::Result<COORD> {
 
 fn enable_privilege(name: *const u16) -> io::Result<()> {
     let mut token: HANDLE = null_mut();
-    // SAFETY: opening our own process token for privilege adjustment.
+    // SAFETY: GetCurrentProcess returns a pseudo-handle and has no preconditions.
+    let process = unsafe { GetCurrentProcess() };
+    // SAFETY: opening our own process token for privilege adjustment; `token`
+    // is a live local the call writes.
     if unsafe {
         OpenProcessToken(
-            GetCurrentProcess(),
+            process,
             TOKEN_ADJUST_PRIVILEGES | TOKEN_QUERY,
-            &mut token,
+            &raw mut token,
         )
     } == 0
     {
         return Err(last_error());
     }
+    // SAFETY: LUID is plain integer data; all-zero is a valid value.
     let mut luid: LUID = unsafe { zeroed() };
     let result = (|| {
         // SAFETY: `name` is a static privilege name; `luid` is writable.
-        if unsafe { LookupPrivilegeValueW(null(), name, &mut luid) } == 0 {
+        if unsafe { LookupPrivilegeValueW(null(), name, &raw mut luid) } == 0 {
             return Err(last_error());
         }
         let privileges = TOKEN_PRIVILEGES {
@@ -420,41 +479,61 @@ fn enable_privilege(name: *const u16) -> io::Result<()> {
             }],
         };
         // SAFETY: one privilege entry; no previous state requested.
-        if unsafe { AdjustTokenPrivileges(token, 0, &privileges, 0, null_mut(), null_mut()) } == 0 {
+        if unsafe {
+            AdjustTokenPrivileges(token, 0, &raw const privileges, 0, null_mut(), null_mut())
+        } == 0
+        {
             return Err(last_error());
         }
         Ok(())
     })();
+    // SAFETY: `token` was opened above and is closed exactly once.
     unsafe { CloseHandle(token) };
     result
 }
 
 /// An S4U logon of an enabled local account, as Win32-OpenSSH performs for
-/// key logins: no password exists or is needed, and the daemon's LocalSystem
+/// key logins: no password exists or is needed, and the daemon's `LocalSystem`
 /// token supplies the trusted-computing-base privilege LSA requires.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the S4U request layout and its register-logon-deregister sequence stay together"
+)]
 fn s4u_token(name: &str) -> io::Result<HANDLE> {
     let mut process_name = *b"overalls-terminald";
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the logon process name is an 18-byte literal"
+    )]
+    let process_length = process_name.len() as u16;
     let process = LSA_STRING {
-        Length: process_name.len() as u16,
-        MaximumLength: process_name.len() as u16,
+        Length: process_length,
+        MaximumLength: process_length,
         Buffer: process_name.as_mut_ptr(),
     };
     let mut lsa: HANDLE = null_mut();
     let mut mode = 0u32;
     // SAFETY: registers this process as a logon process (requires SeTcbPrivilege).
-    if unsafe { LsaRegisterLogonProcess(&process, &mut lsa, &mut mode) } != 0 {
+    if unsafe { LsaRegisterLogonProcess(&raw const process, &raw mut lsa, &raw mut mode) } != 0 {
         return Err(io::Error::other("logon process registration refused"));
     }
     let result = (|| {
         let mut package_name = *b"MICROSOFT_AUTHENTICATION_PACKAGE_V1_0";
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the package name is a 37-byte literal"
+        )]
+        let package_length = package_name.len() as u16;
         let package = LSA_STRING {
-            Length: package_name.len() as u16,
-            MaximumLength: package_name.len() as u16,
+            Length: package_length,
+            MaximumLength: package_length,
             Buffer: package_name.as_mut_ptr(),
         };
         let mut package_id = 0u32;
         // SAFETY: `package` names the MSV1_0 package; the id is written.
-        if unsafe { LsaLookupAuthenticationPackage(lsa, &package, &mut package_id) } != 0 {
+        if unsafe { LsaLookupAuthenticationPackage(lsa, &raw const package, &raw mut package_id) }
+            != 0
+        {
             return Err(io::Error::other("authentication package unavailable"));
         }
         let user: Vec<u16> = name.encode_utf16().collect();
@@ -463,62 +542,102 @@ fn s4u_token(name: &str) -> io::Result<HANDLE> {
         let total = header + (user.len() + domain.len()) * 2;
         // u64 storage keeps the struct aligned; strings follow it in one buffer.
         let mut storage = vec![0u64; total.div_ceil(8)];
-        let base = storage.as_mut_ptr() as *mut u8;
-        // SAFETY: `storage` has `total` bytes; the struct is written at offset 0
-        // and the two UTF-16 strings after it, each within bounds.
+        let base = storage.as_mut_ptr().cast::<u8>();
+        // `storage` has `total` bytes; the struct is written at offset 0 and
+        // the two UTF-16 strings after it, each within bounds.
+        // SAFETY: `header` is at most `total` bytes into `storage`.
+        let after_header = unsafe { base.add(header) };
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "`storage` is u64-aligned and `header`, a struct size with 8-byte \
+                      alignment, keeps the offset u16-aligned"
+        )]
+        let user_at = after_header.cast::<u16>();
+        // SAFETY: `user.len()` UTF-16 units fit between `header` and `total`,
+        // and the local `user` vector does not overlap `storage`.
+        unsafe { std::ptr::copy_nonoverlapping(user.as_ptr(), user_at, user.len()) };
+        // SAFETY: the domain follows the user name inside the `total` bytes.
+        let domain_at = unsafe { user_at.add(user.len()) };
+        // SAFETY: `domain.len()` UTF-16 units end exactly at `total`, and the
+        // local `domain` vector does not overlap `storage`.
+        unsafe { std::ptr::copy_nonoverlapping(domain.as_ptr(), domain_at, domain.len()) };
+        // Roster names are at most NAME_MAX (20) units and the domain is ".",
+        // so both byte lengths fit u16.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "valid_name bounds the user to 20 UTF-16 units"
+        )]
+        let user_bytes = (user.len() * 2) as u16;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the domain is the one-unit string \".\""
+        )]
+        let domain_bytes = (domain.len() * 2) as u16;
+        #[expect(
+            clippy::cast_ptr_alignment,
+            reason = "`storage` is a Vec<u64>, so offset 0 is 8-byte aligned"
+        )]
+        let request = base.cast::<MSV1_0_S4U_LOGON>();
+        // SAFETY: `request` is the aligned start of `storage`, which holds at
+        // least `header` bytes for the struct.
         unsafe {
-            let user_at = base.add(header) as *mut u16;
-            std::ptr::copy_nonoverlapping(user.as_ptr(), user_at, user.len());
-            let domain_at = user_at.add(user.len());
-            std::ptr::copy_nonoverlapping(domain.as_ptr(), domain_at, domain.len());
-            *(base as *mut MSV1_0_S4U_LOGON) = MSV1_0_S4U_LOGON {
+            *request = MSV1_0_S4U_LOGON {
                 MessageType: MsV1_0S4ULogon,
                 Flags: 0,
                 UserPrincipalName: LSA_UNICODE_STRING {
-                    Length: (user.len() * 2) as u16,
-                    MaximumLength: (user.len() * 2) as u16,
+                    Length: user_bytes,
+                    MaximumLength: user_bytes,
                     Buffer: user_at,
                 },
                 DomainName: LSA_UNICODE_STRING {
-                    Length: (domain.len() * 2) as u16,
-                    MaximumLength: (domain.len() * 2) as u16,
+                    Length: domain_bytes,
+                    MaximumLength: domain_bytes,
                     Buffer: domain_at,
                 },
             };
         }
+        // SAFETY: TOKEN_SOURCE is plain integer data; all-zero is valid.
         let mut source: TOKEN_SOURCE = unsafe { zeroed() };
         for (slot, byte) in source.SourceName.iter_mut().zip(b"overalls\0") {
-            *slot = *byte as i8;
+            *slot = byte.cast_signed();
         }
         // SAFETY: writes one LUID.
-        unsafe { AllocateLocallyUniqueId(&mut source.SourceIdentifier) };
+        unsafe { AllocateLocallyUniqueId(&raw mut source.SourceIdentifier) };
         let mut profile: *mut core::ffi::c_void = null_mut();
         let mut profile_length = 0u32;
+        // SAFETY: LUID is plain integer data; all-zero is valid.
         let mut logon_id: LUID = unsafe { zeroed() };
         let mut token: HANDLE = null_mut();
+        // SAFETY: QUOTA_LIMITS is plain integer data; all-zero is valid.
         let mut quotas: QUOTA_LIMITS = unsafe { zeroed() };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the request is one struct plus at most 22 UTF-16 units"
+        )]
+        let total_length = total as u32;
         let mut substatus = 0i32;
         // SAFETY: every pointer is valid for the call; `storage` holds the
         // self-relative S4U request of `total` bytes.
         let status = unsafe {
             LsaLogonUser(
                 lsa,
-                &process,
+                &raw const process,
                 SECURITY_LOGON_TYPE::Network,
                 package_id,
                 storage.as_ptr().cast(),
-                total as u32,
+                total_length,
                 null(),
-                &source,
-                &mut profile,
-                &mut profile_length,
-                &mut logon_id,
-                &mut token,
-                &mut quotas,
-                &mut substatus,
+                &raw const source,
+                &raw mut profile,
+                &raw mut profile_length,
+                &raw mut logon_id,
+                &raw mut token,
+                &raw mut quotas,
+                &raw mut substatus,
             )
         };
         if !profile.is_null() {
+            // SAFETY: `profile` was returned by LsaLogonUser and is freed once.
             unsafe { LsaFreeReturnBuffer(profile) };
         }
         if status != 0 || token.is_null() {
@@ -526,6 +645,7 @@ fn s4u_token(name: &str) -> io::Result<HANDLE> {
         }
         Ok(token)
     })();
+    // SAFETY: `lsa` was registered above and is deregistered exactly once.
     unsafe { LsaDeregisterLogonProcess(lsa) };
     result
 }
@@ -539,7 +659,7 @@ fn environment(token: HANDLE, term: &str) -> io::Result<(Vec<u16>, String)> {
     } else {
         let mut block: *mut core::ffi::c_void = null_mut();
         // SAFETY: builds the account's environment; destroyed below.
-        if unsafe { CreateEnvironmentBlock(&mut block, token, 0) } == 0 {
+        if unsafe { CreateEnvironmentBlock(&raw mut block, token, 0) } == 0 {
             return Err(last_error());
         }
         let mut cursor = block as *const u16;
@@ -554,6 +674,8 @@ fn environment(token: HANDLE, term: &str) -> io::Result<(Vec<u16>, String)> {
                 pairs.push((key.to_owned(), value.to_owned()));
             }
         }
+        // SAFETY: `block` came from CreateEnvironmentBlock and is destroyed
+        // once, after the last read through `cursor`.
         unsafe { DestroyEnvironmentBlock(block) };
     }
     pairs.retain(|(key, _)| {
@@ -564,8 +686,7 @@ fn environment(token: HANDLE, term: &str) -> io::Result<(Vec<u16>, String)> {
     let home = pairs
         .iter()
         .find(|(key, _)| key.eq_ignore_ascii_case("USERPROFILE"))
-        .map(|(_, value)| value.clone())
-        .unwrap_or_else(|| r"C:\".to_owned());
+        .map_or_else(|| r"C:\".to_owned(), |(_, value)| value.clone());
     let mut block: Vec<u16> = Vec::new();
     for (key, value) in pairs {
         block.extend(format!("{key}={value}").encode_utf16());
@@ -581,6 +702,8 @@ impl Drop for Handles {
     fn drop(&mut self) {
         for handle in &self.0 {
             if !handle.is_null() {
+                // SAFETY: each recorded handle is owned by this guard alone and
+                // closed exactly once, here.
                 unsafe { CloseHandle(*handle) };
             }
         }
@@ -588,29 +711,35 @@ impl Drop for Handles {
 }
 
 /// @cc [owner:ghuntley,label:security] windows-terminal-session-identity
-/// A session MUST run its shell under the resolved identity only: LocalSystem
+/// A session MUST run its shell under the resolved identity only: `LocalSystem`
 /// for `root`, otherwise an S4U token of that enabled account with its profile
 /// loaded and its own window station; the shell MUST be attached to a fresh
 /// pseudo console, assigned to a kill-on-close job before it runs, and given
 /// TERM from the client and COLORTERM=truecolor. Any failed step MUST release
 /// what it created and return an error without starting the shell.
-pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Spawned> {
+#[expect(
+    clippy::too_many_lines,
+    reason = "the ordered acquire-and-release sequence of one ConPTY session stays in one place"
+)]
+pub(crate) fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Spawned> {
     let size = coord(cols, rows)?;
     let mut owned = Handles(Vec::new());
     let (mut input_read, mut input_write, mut output_read, mut output_write) =
         (null_mut(), null_mut(), null_mut(), null_mut());
     // SAFETY: anonymous pipes without inheritance; handles recorded for cleanup.
-    if unsafe { CreatePipe(&mut input_read, &mut input_write, null(), 0) } == 0 {
+    if unsafe { CreatePipe(&raw mut input_read, &raw mut input_write, null(), 0) } == 0 {
         return Err(last_error());
     }
     owned.0.extend([input_read, input_write]);
-    if unsafe { CreatePipe(&mut output_read, &mut output_write, null(), 0) } == 0 {
+    // SAFETY: anonymous pipes without inheritance; both ends are live locals
+    // the call writes, and they are recorded for cleanup.
+    if unsafe { CreatePipe(&raw mut output_read, &raw mut output_write, null(), 0) } == 0 {
         return Err(last_error());
     }
     owned.0.extend([output_read, output_write]);
     let mut pseudo: HPCON = 0;
     // SAFETY: conhost duplicates the pipe ends it needs.
-    if unsafe { CreatePseudoConsole(size, input_read, output_write, 0, &mut pseudo) } < 0 {
+    if unsafe { CreatePseudoConsole(size, input_read, output_write, 0, &raw mut pseudo) } < 0 {
         return Err(io::Error::other("pseudo console unavailable"));
     }
     let pseudo_guard = PseudoGuard(Some(pseudo));
@@ -629,18 +758,26 @@ pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Sp
     let mut profile: HANDLE = null_mut();
     if !token.is_null() {
         let mut name = wide(&user.name);
+        // SAFETY: PROFILEINFOW is plain data; all-zero (null pointers) is valid.
         let mut info: PROFILEINFOW = unsafe { zeroed() };
-        info.dwSize = size_of::<PROFILEINFOW>() as u32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "PROFILEINFOW is a few dozen bytes"
+        )]
+        let info_size = size_of::<PROFILEINFOW>() as u32;
+        info.dwSize = info_size;
         info.dwFlags = 1; // PI_NOUI
         info.lpUserName = name.as_mut_ptr();
         // SAFETY: `info` and `name` live across the call.
-        if unsafe { LoadUserProfileW(token, &mut info) } == 0 {
+        if unsafe { LoadUserProfileW(token, &raw mut info) } == 0 {
             return Err(last_error());
         }
         profile = info.hProfile;
     }
     let unload = |profile: HANDLE| {
         if !profile.is_null() {
+            // SAFETY: `profile` was loaded for `token` above, which is still
+            // open; each failure path unloads it once.
             unsafe { UnloadUserProfile(token, profile) };
         }
     };
@@ -651,12 +788,19 @@ pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Sp
             return Err(error);
         }
     };
+    // SAFETY: an anonymous job with default security; no pointers are read.
     let job = unsafe { CreateJobObjectW(null(), null()) };
     if job.is_null() {
         unload(profile);
         return Err(last_error());
     }
+    // SAFETY: the limit structure is plain integer data; all-zero is valid.
     let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { zeroed() };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "the extended limit structure is under 200 bytes"
+    )]
+    let limits_size = size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32;
     limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
     // SAFETY: the extended limit structure is passed with its exact size.
     if unsafe {
@@ -664,11 +808,12 @@ pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Sp
             job,
             JobObjectExtendedLimitInformation,
             (&raw const limits).cast(),
-            size_of::<JOBOBJECT_EXTENDED_LIMIT_INFORMATION>() as u32,
+            limits_size,
         )
     } == 0
     {
         let error = last_error();
+        // SAFETY: `job` was created above and is closed once on this path.
         unsafe { CloseHandle(job) };
         unload(profile);
         return Err(error);
@@ -677,6 +822,7 @@ pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Sp
     let (process, thread, pid) = match spawned {
         Ok(value) => value,
         Err(error) => {
+            // SAFETY: `job` was created above and is closed once on this path.
             unsafe { CloseHandle(job) };
             unload(profile);
             return Err(error);
@@ -684,26 +830,31 @@ pub fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Sp
     };
     // SAFETY: the suspended process joins the job before its first instruction.
     if unsafe { AssignProcessToJobObject(job, process) } == 0
+        // SAFETY: `thread` is the suspended primary thread created above.
         || unsafe { ResumeThread(thread) } == u32::MAX
     {
         let error = last_error();
-        unsafe {
-            TerminateJobObject(job, 1);
-            windows_sys::Win32::System::Threading::TerminateProcess(process, 1);
-            CloseHandle(thread);
-            CloseHandle(process);
-            CloseHandle(job);
-        }
+        // SAFETY: `job` stays open until it is closed below.
+        unsafe { TerminateJobObject(job, 1) };
+        // SAFETY: `process` stays open until it is closed below.
+        unsafe { windows_sys::Win32::System::Threading::TerminateProcess(process, 1) };
+        // SAFETY: the thread handle from launch is closed exactly once.
+        unsafe { CloseHandle(thread) };
+        // SAFETY: the process handle from launch is closed exactly once.
+        unsafe { CloseHandle(process) };
+        // SAFETY: `job` was created above and is closed exactly once.
+        unsafe { CloseHandle(job) };
         unload(profile);
         return Err(error);
     }
+    // SAFETY: the thread handle from launch is closed exactly once.
     unsafe { CloseHandle(thread) };
     // conhost holds its own copies of the console-side pipe ends.
     owned.0.clear();
-    unsafe {
-        CloseHandle(input_read);
-        CloseHandle(output_write);
-    }
+    // SAFETY: the guard no longer owns this pipe end, so it is closed once.
+    unsafe { CloseHandle(input_read) };
+    // SAFETY: the guard no longer owns this pipe end, so it is closed once.
+    unsafe { CloseHandle(output_write) };
     token_guard.0.clear();
     let console = Arc::new(Console {
         pseudo: Mutex::new(pseudo_guard.release()),
@@ -732,6 +883,7 @@ impl PseudoGuard {
 impl Drop for PseudoGuard {
     fn drop(&mut self) {
         if let Some(pseudo) = self.0.take() {
+            // SAFETY: taking the slot makes this the only close of `pseudo`.
             unsafe { ClosePseudoConsole(pseudo) };
         }
     }
@@ -746,11 +898,11 @@ fn launch(
 ) -> io::Result<(HANDLE, HANDLE, u32)> {
     let mut size = 0usize;
     // SAFETY: a null list asks for the required size (expected to "fail").
-    unsafe { InitializeProcThreadAttributeList(null_mut(), 1, 0, &mut size) };
+    unsafe { InitializeProcThreadAttributeList(null_mut(), 1, 0, &raw mut size) };
     let mut storage = vec![0u64; size.div_ceil(8)];
     let list = storage.as_mut_ptr() as LPPROC_THREAD_ATTRIBUTE_LIST;
     // SAFETY: `storage` holds `size` bytes for one attribute.
-    if unsafe { InitializeProcThreadAttributeList(list, 1, 0, &mut size) } == 0 {
+    if unsafe { InitializeProcThreadAttributeList(list, 1, 0, &raw mut size) } == 0 {
         return Err(last_error());
     }
     let result = (|| {
@@ -770,8 +922,14 @@ fn launch(
         {
             return Err(last_error());
         }
+        // SAFETY: STARTUPINFOEXW is plain data; all-zero (null pointers) is valid.
         let mut startup: STARTUPINFOEXW = unsafe { zeroed() };
-        startup.StartupInfo.cb = size_of::<STARTUPINFOEXW>() as u32;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "STARTUPINFOEXW is about a hundred bytes"
+        )]
+        let startup_size = size_of::<STARTUPINFOEXW>() as u32;
+        startup.StartupInfo.cb = startup_size;
         startup.lpAttributeList = list;
         // A different account gets the window station of its own logon session
         // (an empty desktop name); root keeps the daemon's.
@@ -781,11 +939,12 @@ fn launch(
         }
         let mut command = wide(&format!("\"{SHELL}\" -NoLogo"));
         let directory = wide(home);
+        // SAFETY: PROCESS_INFORMATION is plain data; all-zero is valid.
         let mut information: PROCESS_INFORMATION = unsafe { zeroed() };
         let flags = EXTENDED_STARTUPINFO_PRESENT | CREATE_UNICODE_ENVIRONMENT | CREATE_SUSPENDED;
-        // SAFETY: every buffer lives across the call; no handles are inherited.
-        let created = unsafe {
-            if system {
+        let created = if system {
+            // SAFETY: every buffer lives across the call; no handles are inherited.
+            unsafe {
                 CreateProcessW(
                     null(),
                     command.as_mut_ptr(),
@@ -795,10 +954,14 @@ fn launch(
                     flags,
                     environment.as_mut_ptr().cast(),
                     directory.as_ptr(),
-                    &startup.StartupInfo,
-                    &mut information,
+                    &raw const startup.StartupInfo,
+                    &raw mut information,
                 )
-            } else {
+            }
+        } else {
+            // SAFETY: every buffer lives across the call; no handles are
+            // inherited; `token` is the open S4U primary token.
+            unsafe {
                 CreateProcessAsUserW(
                     token,
                     null(),
@@ -809,8 +972,8 @@ fn launch(
                     flags,
                     environment.as_mut_ptr().cast(),
                     directory.as_ptr(),
-                    &startup.StartupInfo,
-                    &mut information,
+                    &raw const startup.StartupInfo,
+                    &raw mut information,
                 )
             }
         };
@@ -823,6 +986,8 @@ fn launch(
             information.dwProcessId,
         ))
     })();
+    // SAFETY: `list` was initialized above and is deleted exactly once, while
+    // `storage` is still alive.
     unsafe { DeleteProcThreadAttributeList(list) };
     result
 }
