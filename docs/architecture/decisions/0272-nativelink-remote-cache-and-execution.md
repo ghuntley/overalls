@@ -305,9 +305,9 @@ and Dungarees and CI has its secrets.
 
 Remaining gaps:
 - No deployment receipt on Panterloons or Dungarees yet; the hosts pick the
-  services up through their updater. The rollout is single-host: Dungarees'
-  worker is declared but disabled in its host configuration until
-  Panterloons' worker has run healthy beside its guests.
+  services up through their updater. The rollout was single-host: Dungarees'
+  worker was enabled only after Panterloons' worker ran healthy beside its
+  guests.
 - CI needs the operator to add `BUCK_RE_TAILSCALE_AUTHKEY` (ephemeral,
   pre-authorised, tagged `tag:buck-re-ci`, with a tailnet policy allowing it
   to reach only Panterloons' 50072) and `BUCK_RE_UPLOADER_IDENTITY`, set that
