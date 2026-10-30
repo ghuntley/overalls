@@ -28,8 +28,8 @@ Third-party inputs are pinned in exactly one place
    - `mix.lock`, verified against `fetchMixDeps`;
    - the guest domain locks.
 
-The `pins` check (`elixir scripts/check_pins.exs`; also a prek hook and a flake
-check) refuses all of these:
+The `pins` check (`elixir scripts/check_pins.exs`; also the Buck2 `//:pins`
+precommit check and a flake check) refuses all of these:
 
 - inline `hash`/`sha256` literals outside its reviewed exemptions;
 - registry keys that nothing reads;
@@ -52,7 +52,7 @@ check) refuses all of these:
   application's key. Refresh it with `scripts/dependency_pins.ex`.
 - **Python:** add wheels to the registry, or add packages to
   `nix/buck/python.nix`. That file is the one interpreter closure for Buck2's
-  `//:py-static`, the prek hooks and the `python-static` check.
+  `//:py-static`, the precommit hook's direct fallback and the `python-static` check.
 
 Never use `fetchTarball` or `builtins.fetchGit` without a pin. Never add a
 second nixpkgs except as a flake input.

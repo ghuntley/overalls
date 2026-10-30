@@ -14,7 +14,7 @@ key_inputs() {
     nix/domains/artifacts/infrastructure/toolchain.nix \
     nix/domains/artifacts/guest/github/default.nix \
     antithesis/nix/python-wheels.nix \
-    '**/Cargo.lock' '**/package-lock.json' marvin/package.json | sort -z | xargs -0 sha256sum
+    '**/Cargo.lock' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 sha256sum
 }
 key=$(key_inputs | sha256sum | cut -d' ' -f1)
 state=.buck-cells.key

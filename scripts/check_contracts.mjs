@@ -7,7 +7,15 @@ import {fileURLToPath} from "node:url"
 import {createRequire} from "node:module"
 
 const root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."))
-const cli = join(root, "tools/code-contracts/node_modules/@spolu/cc-check/dist/cc-check.js")
+/**
+ * @cc [owner:ghuntley,label:verification] contract-checker-node-modules
+ * The checker MUST load cc-check from OVERALLS_CODE_CONTRACTS_NODE_MODULES when
+ * set (the Buck2 check passes the importNpmLock tree of tools/code-contracts),
+ * otherwise from tools/code-contracts/node_modules; either way requireCLI
+ * still refuses a version that differs from the repository pin.
+ */
+const nodeModules = process.env.OVERALLS_CODE_CONTRACTS_NODE_MODULES || join(root, "tools/code-contracts/node_modules")
+const cli = join(nodeModules, "@spolu/cc-check/dist/cc-check.js")
 const require = createRequire(import.meta.url)
 const javascriptExtensions = new Set([".js", ".mjs", ".cjs", ".jsx"])
 const upstreamExtensions = new Set([".ts", ".tsx", ".mts", ".cts", ".py", ".pyi", ".rs", ".go"])
@@ -298,9 +306,36 @@ export function validateListTarget(directory, file) {
   directoryContracts(directory, file)
 }
 
+/** @param {string} directory @param {string[]} paths @returns {{contractFiles: number, nativeNotes: number, sourceDocuments: number, covered: number}} */
+/**
+ * @cc [owner:ghuntley,label:verification] contract-files-mode-ancestry
+ * checkNamed MUST check coverage and format for exactly the named source files
+ * together with each one's ancestor CONTRACTS, so a source file passes alone
+ * exactly when its part of the repository-wide format check passes. It MUST
+ * refuse CONTRACTS paths, whose ID uniqueness also depends on descendants, and
+ * paths that are not regular files inside the repository.
+ */
+export function checkNamed(directory, paths) {
+  for (const path of paths) {
+    if (basename(path) === "CONTRACTS") throw new Error(`${path}: directory contracts are checked with the whole repository (format)`)
+    if (!regularWithin(directory, path)) throw new Error(`${path}: not a regular repository file without symlink ancestors`)
+  }
+  const sources = paths.filter(path => sourceFile(path) && !excludedSource(path))
+  if (!sources.length) return {contractFiles: 0, nativeNotes: 0, sourceDocuments: 0, covered: 0}
+  const report = coverage(directory, sources)
+  if (report.missing.length) throw new Error(`Source files lack local or subtree contracts:\n${report.missing.join("\n")}`)
+  const ancestors = new Set(sources.flatMap(path => directoryContracts(directory, path).map(file => relative(directory, file))))
+  return {...checkFiles(directory, [...ancestors, ...sources]), covered: report.rows.length}
+}
+
 export function main(args) {
   const [command = "format", input, ...extra] = args
-  if (extra.length || !["format", "list", "coverage"].includes(command)) throw new Error("Usage: node scripts/check_contracts.mjs [format | coverage | list <file>]")
+  if (command === "files") {
+    const counts = checkNamed(root, args.slice(1))
+    console.log(`Code contracts passed for ${counts.covered} named source files (${counts.nativeNotes} native notes, ${counts.sourceDocuments} parsed source files, ${counts.contractFiles} ancestor CONTRACTS). Structural checks only.`)
+    return
+  }
+  if (extra.length || !["format", "list", "coverage"].includes(command)) throw new Error("Usage: node scripts/check_contracts.mjs [format | coverage | list <file> | files <path>...]")
   if (command === "list") {
     if (!input) throw new Error("list requires a repository source file")
     const file = relative(root, resolve(input))

@@ -34,6 +34,42 @@ def check_providers(ctx: AnalysisContext, stamp: Artifact, sub_targets: dict = {
         ),
     ]
 
+# Contract precommit-info-selection: see buck/CONTRACTS.
+# How buck/bxl/precommit.bxl selects the work of a `precommit`-labelled check
+# for a set of changed files. A check without this provider falls back to its
+# default output whenever an owner of a changed file is among its deps.
+#   inputs:    repository paths the whole check reads; a changed path outside
+#              it never selects the check.
+#   per_file:  path -> sub-targets that check that file alone. When every
+#              changed input has an entry, precommit builds only those (and
+#              `shared`) instead of the default output.
+#   shared:    sub-targets built once alongside per-file ones and for matching
+#              deletions: the cross-file part of the check (ty, for example).
+#   fix:       path -> sub-target whose single output is the fixed file;
+#              `tools/precommit --fix` copies it over the source.
+#   deletions: patterns (see path_matches) of deleted paths that select the
+#              check: per-file checks then build `shared`, others the default.
+PrecommitInfo = provider(fields = {
+    "deletions": list[str],
+    "fix": dict[str, str],
+    "inputs": dict[str, bool],
+    "per_file": dict[str, list[str]],
+    "shared": list[str],
+})
+
+# One `*` matches any characters, `/` included; a pattern without `*` is an
+# exact path. `docs/architecture/*`, `*.py`, `marshall/lib/*.ex`, `flake.lock`.
+def path_matches(path: str, patterns: list[str]) -> bool:
+    for pattern in patterns:
+        if "*" not in pattern:
+            if path == pattern:
+                return True
+            continue
+        head, tail = pattern.split("*", 1)
+        if len(path) >= len(head) + len(tail) and path.startswith(head) and path.endswith(tail):
+            return True
+    return False
+
 # Every file of a nix_owned package as individual source artifacts keyed by
 # repository-relative path, so checks can address one file (precommit) or all
 # of them (CI).
@@ -130,7 +166,16 @@ def _conflict_markers_impl(ctx: AnalysisContext) -> list[Provider]:
         category = "conflict_markers",
         identifier = "all",
     )
-    return check_providers(ctx, stamp, sub_targets)
+    # The checker itself is not a per-file input: changing it reruns the whole
+    # check. Deleted files cannot hold markers.
+    checker = [ctx.attrs.script, ctx.attrs.library]
+    return check_providers(ctx, stamp, sub_targets) + [PrecommitInfo(
+        deletions = [],
+        fix = {},
+        inputs = {path: True for path in files},
+        per_file = {path: [path] for path in files if path not in checker},
+        shared = [],
+    )]
 
 def first_artifact(written) -> Artifact:
     return written[0] if type(written) == "tuple" else written
@@ -150,5 +195,130 @@ conflict_markers = rule(
         "_elixir": tool_attr("elixir"),
         "_erlang": tool_attr("erlang"),
         "_findutils": tool_attr("findutils"),
+    },
+)
+
+_REPO_CHECK = [
+    "set -euo pipefail",
+    "stamp=$1; shift",
+    "scratch=$(mkdir -p \"$BUCK_SCRATCH_PATH\" && cd \"$BUCK_SCRATCH_PATH\" && pwd)",
+    "export HOME=\"$scratch/home\" TMPDIR=\"$scratch\" XDG_CACHE_HOME=\"$scratch/cache\" LC_ALL=C.UTF-8",
+    "mkdir -p \"$HOME\"",
+    # A daemon started from a Git hook would otherwise leak the hook's index
+    # and directory into the checks' own git calls.
+    "for v in $(compgen -e); do case $v in GIT_*) unset \"$v\" ;; esac; done",
+    "\"$@\"",
+    "touch \"$stamp\"",
+]
+
+# Contract repo-check-declared-inputs: see buck/CONTRACTS.
+def _repo_check_impl(ctx: AnalysisContext) -> list[Provider]:
+    owned = owned_paths(ctx.attrs.owned)
+    inputs = {path: f for path, f in owned.items() if path_matches(path, ctx.attrs.include)}
+    hidden = list(inputs.values())
+    if ctx.attrs.inventory:
+        # The owned path set, so adding or deleting any file changes the key of
+        # checks that test for a file's existence (ADR evidence links).
+        hidden.append(first_artifact(ctx.actions.write("inventory", sorted(owned.keys()))))
+    stamp = ctx.actions.declare_output("stamp")
+    ctx.actions.run(
+        cmd_args(tool(ctx.attrs._bash), ctx.actions.write("check.sh", _REPO_CHECK), stamp.as_output(), ctx.attrs.cmd, hidden = hidden),
+        env = dict({"PATH": search_path(ctx.attrs.path + [ctx.attrs._coreutils])}, **ctx.attrs.env),
+        category = "repo_check",
+        # Checks that list files through git read the checkout's .git.
+        local_only = ctx.attrs.local_only,
+        allow_cache_upload = not ctx.attrs.local_only,
+    )
+    return check_providers(ctx, stamp) + [PrecommitInfo(
+        deletions = ctx.attrs.deletions if ctx.attrs.deletions != None else ctx.attrs.include,
+        fix = {},
+        inputs = {path: True for path in inputs},
+        per_file = {},
+        shared = [],
+    )]
+
+# A repository-wide check: one command from the project root over the owned
+# files matching `include` (path_matches patterns). precommit runs it once,
+# and only when one of those files changes or a `deletions` path is deleted.
+repo_check = rule(
+    impl = _repo_check_impl,
+    attrs = {
+        "cmd": attrs.list(attrs.arg()),
+        # Deleted-path patterns; defaults to `include`.
+        "deletions": attrs.option(attrs.list(attrs.string()), default = None),
+        "env": attrs.dict(attrs.string(), attrs.arg(), default = {}),
+        "include": attrs.list(attrs.string()),
+        "inventory": attrs.bool(default = False),
+        "labels": attrs.list(attrs.string(), default = []),
+        "local_only": attrs.bool(default = False),
+        "owned": attrs.list(attrs.dep()),
+        "path": attrs.list(attrs.exec_dep(), default = []),
+        "_bash": tool_attr("bash"),
+        "_coreutils": tool_attr("coreutils"),
+    },
+)
+
+# Contract contract-check-per-file: see buck/CONTRACTS.
+def _contract_check_impl(ctx: AnalysisContext) -> list[Provider]:
+    owned = owned_paths(ctx.attrs.owned)
+    env = {
+        "LC_ALL": "C.UTF-8",
+        "NODE": tool(ctx.attrs._node) + "/node",
+        "OVERALLS_CODE_CONTRACTS_NODE_MODULES": tool(ctx.attrs._node_modules),
+        "PATH": search_path([ctx.attrs._node, ctx.attrs._git, ctx.attrs._coreutils]),
+    }
+    script = ctx.actions.write("contracts.sh", _REPO_CHECK)
+    checker = [owned[p] for p in ctx.attrs.checker]
+    sub_targets = {}
+    per_file = {}
+    for path, f in sorted(owned.items()):
+        if path.rsplit("/", 1)[-1] == "CONTRACTS" or path in ctx.attrs.checker:
+            continue
+        # The file's ancestor CONTRACTS are its only other inputs.
+        parts = path.split("/")
+        ancestors = [owned[c] for c in ["/".join(parts[:i] + ["CONTRACTS"]) for i in range(len(parts))] if c in owned]
+        stamp = ctx.actions.declare_output("contracts/" + path + ".ok")
+        ctx.actions.run(
+            cmd_args(tool(ctx.attrs._bash), script, stamp.as_output(), env["NODE"], ctx.attrs.checker[0], "files", path, hidden = checker + ancestors + [f]),
+            env = env,
+            category = "contracts",
+            identifier = path,
+        )
+        sub_targets["contracts/" + path] = [DefaultInfo(default_output = stamp)]
+        per_file[path] = ["contracts/" + path]
+    stamp = ctx.actions.declare_output("stamp")
+    ctx.actions.run(
+        cmd_args(tool(ctx.attrs._bash), script, stamp.as_output(), env["NODE"], ctx.attrs.checker[0], "format", hidden = list(owned.values())),
+        env = env,
+        category = "contracts",
+        identifier = "all",
+        # The repository inventory comes from git ls-files in the checkout.
+        local_only = True,
+        allow_cache_upload = False,
+    )
+    return check_providers(ctx, stamp, sub_targets) + [PrecommitInfo(
+        deletions = ["*CONTRACTS"],
+        fix = {},
+        inputs = {path: True for path in owned},
+        per_file = per_file,
+        shared = [],
+    )]
+
+# scripts/check_contracts.mjs over the repository: `format` (syntax, ID
+# uniqueness and coverage) as the default output, and `[contracts/<path>]`
+# checking one file with its ancestor CONTRACTS (`files <path>`). Changing a
+# CONTRACTS file or the checker reruns the whole check.
+contract_check = rule(
+    impl = _contract_check_impl,
+    attrs = {
+        # Repository-relative paths within `owned`; the first is the checker.
+        "checker": attrs.list(attrs.string(), default = ["scripts/check_contracts.mjs", "tools/code-contracts/package.json", "tools/code-contracts/package-lock.json"]),
+        "labels": attrs.list(attrs.string(), default = []),
+        "owned": attrs.list(attrs.dep()),
+        "_bash": tool_attr("bash"),
+        "_coreutils": tool_attr("coreutils"),
+        "_git": tool_attr("git"),
+        "_node": tool_attr("node"),
+        "_node_modules": tool_attr("code_contracts_node_modules"),
     },
 )

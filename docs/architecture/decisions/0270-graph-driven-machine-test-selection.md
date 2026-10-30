@@ -153,6 +153,10 @@ PR runs the affected machine-test set, and the approved migration plan.
   and passed; through `nix_assemble`, `sysctl` produced the same store path as
   the flake check, so the declared-only tree evaluates the same test.
 
+- Precommit uses the same ownership for its own selection:
+  [precommit.bxl](../../../buck/bxl/precommit.bxl) selects only
+  `precommit`-labelled checks, never machine tests or bootstrap targets.
+
 Remaining gaps:
 
 - Declared inputs are coarse (`NIX_INPUTS` covers all of `nix/`) until modules

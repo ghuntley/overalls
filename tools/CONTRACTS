@@ -2,3 +2,12 @@
 tools/buck2 MUST exec only the buck2 from the flake-pinned buckCells and MUST
 rebuild .buck-cells whenever an input of buckCells may have changed, killing
 the daemon only when the cells store path actually changed (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] precommit-wrapper-file-sets
+tools/precommit MUST pass buck/bxl/precommit.bxl every changed path of its
+scope (the named or staged files plus staged deletions; merge-base..working
+tree for --base; every check for --all), MUST unset GIT_* before starting
+Buck2, MUST rewrite files only under --fix, and MUST fail with the checks'
+findings. When Buck2 cannot start it MUST run the pre-M8 hook scripts
+directly over the same files, naming the checks it skipped, rather than pass
+silently (ADR-0269).

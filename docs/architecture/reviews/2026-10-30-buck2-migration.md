@@ -238,3 +238,107 @@ Verification performed for M4b:
   `prek run --all-files`, `//buck/...` tests and the ownership BXL.
 - `nix run .#secrets -- check` reports drift only for `fleet-tailscale`,
   which trunk already had before this change.
+
+## M8: precommit on Buck2 BXL
+
+This milestone implements the precommit part of ADR-0269 and shares
+ADR-0270's ownership graph. It makes no new decision.
+
+**Design.** `tools/precommit` computes the changed and deleted files (staged,
+`--base REV` or `--all`) and runs `buck/bxl/precommit.bxl`. The BXL treats the
+`precommit` label as an aspect: every labelled target is a candidate, a
+`PrecommitInfo` provider says which paths each reads and which sub-targets
+check a single file, and one `ctx.build` builds the selection. A build-graph or
+toolchain change selects every check, and unchanged ones are cache hits.
+`--fix` copies the `[fix/<path>]` outputs over the sources; it is the only mode
+that writes files.
+
+**Check to target mapping.** Every check the prek hooks ran before M8 now runs
+through Buck2 when its inputs change:
+
+| Check before M8 | Where it ran | Buck2 target precommit builds |
+| --- | --- | --- |
+| conflict markers | prek, pre-commit and pre-merge-commit, all files | `//:conflict-markers[<path>]` per changed file |
+| ruff format, ruff check | prek, changed `.py` | `//:py-static[ruff/<path>]` |
+| ty | prek, any `.py` change | `//:py-static[ty]` |
+| pins | prek, `.nix` or registry change | `//:pins` |
+| rust-lints | prek, Rust or lint-policy change | `//:rust-lints` |
+| logging (10 hooks) | prek, application `lib`/`config`/`mix.exs` | `//:logging-<app>` |
+| ADR check | CI gates, `mix architecture.check` ×11 | `//:adrs` (docs/architecture, any deletion) |
+| contract format and coverage | CI gates, `mix contracts.check` ×11 | `//:contracts[contracts/<path>]`; whole for `CONTRACTS` or checker changes |
+| contract checker tests | CI gates, `mix contracts.check` ×11 | `//:contracts-tests` |
+| toolchain versions | `mix toolchain.check` ×11 | `//:toolchain-versions` (cells Elixir/OTP vs `.tool-versions`) |
+| package-input-lock | flake check | `//:package-input-lock` |
+| overalls-install.ps1 | flake check | `//nix:overalls-install-ps1` |
+
+Not mapped yet, so it stays where it is: each project's `mix precommit`
+(compile, format, tests, Covenant, Dialyzer, gettext and Marshall's extra
+gates) and CI's precommit matrix, until M6 provides Mix sub-targets; rustfmt
+and clippy with M5. `mix precommit` is unchanged, so its repository-wide steps
+still run 11 times in CI.
+
+**Entry points.** devenv gains a `precommit` command. The 16 prek hooks become
+one `precommit` hook at pre-commit and pre-merge-commit. It receives the
+staged files, so `prek run --all-files` still runs every check. When
+`tools/buck2 server` fails, the hook runs the pre-M8 hook scripts directly
+with the pinned tools devenv passes. It fails on their findings, and it names
+the checks it skipped. `ci.yml` gains a `precommit` job that runs
+`tools/precommit` over the range `tools/affected` selected, and the `ci` job
+requires it. The `publish-cache.yml` gates job still runs
+`prek run --all-files`, which now goes through Buck2, plus its own ADR and
+contract steps; removing that duplication is left to that workflow's owner.
+
+**Timings** (2026-10-30, one workstation, local cache only; NativeLink is
+M4b/M10):
+
+| Run | Before (prek) | Buck2 precommit |
+| --- | --- | --- |
+| no-op (nothing staged) | — | 53 ms |
+| one `.py` file, warm | 5.2–5.3 s | 1.2–1.3 s (ruff, ty, markers, contracts) |
+| one Markdown file, warm | 4.5 s | 0.6–0.7 s |
+| one Marshall `.ex`, warm | 5.5 s | 1.8 s (adds `//:logging-marshall`) |
+| same file again (cache hit) | 5.2 s | 23–45 ms |
+| cold daemon and cache, no files | — | 1.6 s |
+| cold daemon and cache, one `.py` | — | 2.7 s |
+| every check (`--all` / `prek run --all-files`), cold | 15 s (prek hooks only) | 20 s (also ADRs, contracts and logging) |
+| every check, warm | 15 s | 0.03–0.3 s |
+| repository-wide steps of one `mix precommit` | ~21.8 s (ADRs 1.0, contracts 12.8, checker tests 6.1, logging 1.4, toolchain 0.4) ×11 projects | once, only when inputs change |
+
+The contract check was the largest cost: 12.8 s for the whole repository
+against 0.6–0.8 s for one file. `check_contracts.mjs files <path>` checks a
+file with its ancestor `CONTRACTS`, which is all that cc-check's uniqueness
+rules read for a source file, so per-file results agree with the whole run.
+
+**Findings:**
+
+- Bootstrap flake checks and machine tests carry the `check` label. Precommit
+  therefore selects on its own `precommit` label.
+- A Buck2 daemon started from a Git hook inherits `GIT_INDEX_FILE`. The wrapper
+  and `repo_check` unset `GIT_*` before git runs inside an action.
+- BXL `cli_args.bool` needs a value, so the BXL takes `--mode` and `--scope`
+  enums and the wrapper keeps the flag interface.
+- Failure output repeats each failed action's command line and log. It is
+  verbose, but it names the failing check and file.
+
+**Verification:**
+
+- `--mode plan` and real runs for (a) no changes, (b) a Python edit, (c) a
+  `docs/architecture` edit, (d) a planted conflict marker and (e) a lock
+  change. Each selected exactly the expected checks. A planted unknown ADR
+  reference, ruff violation, conflict marker and `nix-compact` lock mismatch
+  each failed only their own check.
+- Through the installed hook, `git commit` refused a conflict marker, an
+  unformatted `.py`, a ty `invalid-return-type` and a direct `Logger.info` in
+  Marshall, both through Buck2 and with `OVERALLS_PRECOMMIT_DIRECT=1`.
+  `prek run --hook-stage pre-merge-commit` refused a marker in both modes.
+- `tools/precommit --fix` on a file with an unused import and unformatted
+  code removed the import, formatted it and then passed. A first version
+  printed the fix output with `format()`, which renders an ensured artifact as
+  its description rather than its path, and truncated the file. The wrapper
+  now refuses a missing fix output.
+- `tools/precommit --base origin/trunk`, `--all` and `prek run --all-files`
+  passed; the ownership BXL, `elixir
+  scripts/check_adrs.exs`, `//:contracts` (format and coverage) and
+  `//:contracts-tests` passed.
+
+No NixOS machine test covers this change, because no deployed module changes.

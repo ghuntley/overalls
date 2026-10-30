@@ -169,6 +169,26 @@ the approved migration plan.
   - `tools/buck2 run //mila:journey-fixture` runs the same store path as
     `.#mila-journey-fixture` (`nix_store_run` over the bootstrap target).
 
+- **M8 (precommit).** [precommit.bxl](../../../buck/bxl/precommit.bxl) selects
+  the `precommit`-labelled checks that the changed files affect and builds
+  them in one `ctx.build`. [tools/precommit](../../../tools/precommit) computes
+  the files from git and is the devenv `precommit` command and the single prek
+  hook ([devenv.nix](../../../devenv.nix)), and the `precommit` job in
+  [ci.yml](../../../.github/workflows/ci.yml) runs it over the selected range.
+  - `PrecommitInfo`, `repo_check` and `contract_check` are in
+    [checks.bzl](../../../buck/checks.bzl). The root [BUCK](../../../BUCK) adds
+    `//:adrs`, `//:contracts` (with `[contracts/<path>]`), `//:contracts-tests`,
+    `//:pins`, `//:rust-lints`, `//:toolchain-versions` and ten
+    `//:logging-<app>` targets; `//:py-static` gains `[ty]` and `[fix/<path>]`.
+  - `buckCells` adds git and the `tools/code-contracts` `importNpmLock` tree,
+    which [check_contracts.mjs](../../../scripts/check_contracts.mjs) reads
+    through `OVERALLS_CODE_CONTRACTS_NODE_MODULES`; its `files <path>` mode
+    checks one file with its ancestor `CONTRACTS`
+    ([test](../../../scripts/test/check_contracts_test.mjs)).
+  - On 2026-10-30 a planted conflict marker, ruff violation, unknown ADR
+    reference and lock mismatch each failed exactly the expected check, and
+    the [migration review](../reviews/2026-10-30-buck2-migration.md) records
+    the selections and timings.
 - [nix/assemble](../../../nix/assemble/default.nix) is `lib.assemble`.
   - It holds the single package set and its parameterised variants. Today
     these are the default set and the host set with private service roots.
@@ -226,11 +246,15 @@ Remaining gaps, by milestone of the migration plan:
     `//:check-*` targets until `nix_assemble` (M3).
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
-  - The `tools/code-contracts` npm project and the repository-wide contract
-    check move with precommit (M8);
 - removal of the flake package, check and configuration outputs (M11);
 - Darwin cells and the Windows mode without Nix (M9);
-- CI and devenv using `tools/buck2` (M1 follow-up, M8).
+- the `publish-cache.yml` gates job, which reaches Buck2 through
+  `prek run --all-files` and still repeats the ADR and contract steps that the
+  `ci.yml` precommit job now runs;
+- M8 leftovers: each project's `mix precommit` (compile, format, tests,
+  Covenant, Dialyzer, gettext, Marshall's extra gates) stays, and CI keeps its
+  matrix, until the M6 Mix rules provide `precommit` sub-targets; the Rust
+  `rustfmt`/clippy sub-targets come with M5.
 
 ## Open questions
 

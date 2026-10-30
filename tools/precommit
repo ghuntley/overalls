@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+# Contract precommit-wrapper-file-sets: see tools/CONTRACTS.
+#
+# The repository precommit (ADR-0269 M8): computes the changed files from git
+# and runs buck/bxl/precommit.bxl, which builds every affected check in one
+# Buck2 build. The devenv `precommit` command, the prek hook and CI call it.
+#
+#   tools/precommit [--staged | --base REV | --all] [--fix] [--plan] [FILE...]
+#
+#   FILE...     check these files (the prek hook passes the staged files);
+#               staged deletions are added
+#   --staged    the staged changes (default without FILE arguments)
+#   --base REV  the changes from merge-base(REV, HEAD) to HEAD plus the working
+#               tree (CI and branch review)
+#   --all       every check's default output
+#   --fix       first rewrite the changed files from their fix sub-targets
+#               (ruff today, mix format once Mix rules expose them); the only
+#               mode that changes files
+#   --plan      print the selected checks as JSON and build nothing
+#
+# When Buck2 cannot start (no cells, no daemon) or OVERALLS_PRECOMMIT_DIRECT=1,
+# the hook-parity scripts run directly instead; see direct_checks.
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+
+usage() {
+  sed -n '8,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+}
+
+scope=staged base="" fix=false plan=false
+declare -a files=()
+while (($#)); do
+  case $1 in
+    --staged) scope=staged ;;
+    --all) scope=all ;;
+    --base)
+      (($# >= 2)) || usage
+      scope=base base=$2
+      shift
+      ;;
+    --fix) fix=true ;;
+    --plan) plan=true ;;
+    --help | -h) usage ;;
+    --) shift; files+=("$@"); break ;;
+    -*) echo "tools/precommit: unknown option $1" >&2; usage ;;
+    *) files+=("$1") ;;
+  esac
+  shift
+done
+if ((${#files[@]})) && [[ $scope != staged ]]; then
+  echo "tools/precommit: FILE arguments cannot be combined with --base or --all" >&2
+  exit 2
+fi
+
+# Changed (existing) and deleted repository paths for the selected scope.
+declare -a changed=() deleted=()
+lines() { mapfile -t "$1" < <("${@:2}" | sed '/^$/d' | sort -u); }
+case $scope in
+  staged)
+    if ((${#files[@]})); then
+      changed=("${files[@]}")
+    else
+      lines changed git diff --cached --name-only --no-renames --diff-filter=d
+    fi
+    lines deleted git diff --cached --name-only --no-renames --diff-filter=D
+    ;;
+  base)
+    since=$(git merge-base "$base" HEAD)
+    lines changed bash -c 'git diff --name-only --no-renames --diff-filter=d "$1"; git ls-files --others --exclude-standard' _ "$since"
+    lines deleted git diff --name-only --no-renames --diff-filter=D "$since"
+    ;;
+  all) ;;
+esac
+# Paths prek passes can be deleted in the working tree; treat those as deleted.
+declare -a present=()
+for f in "${changed[@]}"; do
+  if [[ -e $f || -L $f ]]; then present+=("$f"); else deleted+=("$f"); fi
+done
+changed=("${present[@]}")
+
+# The checks' own git calls must see the checkout, never a hook's index.
+for v in $(compgen -e); do case $v in GIT_*) unset "$v" ;; esac; done
+
+# Hook parity without Buck2: the scripts the prek hooks ran before M8, scoped
+# to the changed files the same way. Every Buck2-only check (ADRs, contracts,
+# package-input-lock, toolchain) is reported as skipped.
+direct_checks() {
+  local elixir=${OVERALLS_PRECOMMIT_ELIXIR:-elixir} ruff=${OVERALLS_PRECOMMIT_RUFF:-ruff}
+  local status=0 all=false
+  [[ $scope == all ]] && all=true
+  echo "tools/precommit: Buck2 is unavailable; running the hook scripts directly" >&2
+  matching() { local re=$1; $all && return 0; printf '%s\n' "${changed[@]}" "${deleted[@]}" | grep -Eq "$re"; }
+  "$elixir" scripts/check_conflict_markers.exs || status=1
+  if matching '(\.nix|dependency-hashes\.json)$'; then "$elixir" scripts/check_pins.exs || status=1; fi
+  if matching '(Cargo\.toml|clippy\.toml|\.rs|scripts/rust/.*)$'; then "$elixir" scripts/check_rust_lints.exs --strict || status=1; fi
+  local -a py=()
+  if $all; then mapfile -t py < <(git ls-files '*.py'); else mapfile -t py < <(printf '%s\n' "${changed[@]}" | grep -E '\.py$' || true); fi
+  if ((${#py[@]})); then
+    "$ruff" format --check --force-exclude "${py[@]}" || status=1
+    "$ruff" check --force-exclude "${py[@]}" || status=1
+  fi
+  if matching '\.py$'; then
+    [[ -n ${OVERALLS_PRECOMMIT_TY:-} ]] || { echo "tools/precommit: OVERALLS_PRECOMMIT_TY is unset; enter devenv shell" >&2; return 1; }
+    # shellcheck disable=SC2086 # the static-check arguments are store paths
+    bash antithesis/verification/static-check.sh $OVERALLS_PRECOMMIT_TY || status=1
+  fi
+  local app
+  for app in audi brady enrico galileo lilly marshall peach porsche susan ziggy; do
+    if matching "^(${app}/(lib|config)/.*\.exs?$|${app}/mix\.exs$|scripts/check_logging\.exs$)"; then
+      "$elixir" scripts/check_logging.exs "$app" || status=1
+    fi
+  done
+  echo "tools/precommit: skipped without Buck2: ADRs, contracts, package-input-lock, toolchain-versions" >&2
+  return "$status"
+}
+
+if [[ ${OVERALLS_PRECOMMIT_DIRECT:-} == 1 ]] || ! "$root/tools/buck2" server >/dev/null 2>&1; then
+  $plan && { echo "tools/precommit: --plan needs Buck2" >&2; exit 1; }
+  $fix && { echo "tools/precommit: --fix needs Buck2" >&2; exit 1; }
+  direct_checks
+  exit
+fi
+
+bxl() {
+  local -a args=(--scope "$([[ $scope == all ]] && echo all || echo changed)")
+  ((${#changed[@]})) && args+=(--files "${changed[@]}")
+  ((${#deleted[@]})) && args+=(--deleted "${deleted[@]}")
+  "$root/tools/buck2" bxl --console simple //buck/bxl/precommit.bxl:main -- "${args[@]}" "$@"
+}
+
+if [[ $scope != all ]] && ((${#changed[@]} + ${#deleted[@]} == 0)); then
+  echo "precommit: no changes"
+  exit 0
+fi
+if $plan; then
+  bxl --mode plan
+  exit
+fi
+if $fix; then
+  while IFS=$'\t' read -r kind path fixed; do
+    [[ $kind == fix ]] || continue
+    # Never truncate a source from a missing or unreadable fix output.
+    [[ -f $fixed && -f $path ]] || { echo "tools/precommit: no fixed file for $path ($fixed)" >&2; exit 1; }
+    if ! cmp -s "$fixed" "$path"; then
+      cat "$fixed" > "$path"
+      echo "precommit: fixed $path"
+    fi
+  done < <(bxl --mode fix)
+fi
+bxl --mode check

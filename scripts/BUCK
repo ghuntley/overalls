@@ -1,6 +1,3 @@
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
-
-# Scripts that repository-wide Buck2 checks run (root BUCK, M7).
-export_file(name = "check_package_input_lock.exs", visibility = ["PUBLIC"])

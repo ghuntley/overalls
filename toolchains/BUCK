@@ -25,14 +25,14 @@ overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"]
     "bash", "coreutils", "elixir", "erlang", "jq", "nix", "nix_store", "python",
     # Go, JavaScript, Python and script-check tools (M7).
     "chromium", "esbuild", "findutils", "fonts_conf", "gnugrep", "gnused",
-    "go", "node", "patch", "pwsh", "ruff", "strip", "ty", "unzip",
+    "git", "go", "node", "patch", "pwsh", "ruff", "strip", "ty", "unzip",
 ]]
 
 # Pinned third-party inputs: Nix-vendored Go modules, importNpmLock node_modules
 # and the Python static-check closures (the go/, npm/ and python/ cells).
 [nix_tool(name = input, visibility = ["PUBLIC"]) for input in [
     "gh_source", "gh_vendor", "git_lfs_source", "git_lfs_modules",
-    "marvin_node_modules",
+    "marvin_node_modules", "code_contracts_node_modules",
     "python_static", "python_harness", "antithesis_wheels",
 ]]
 

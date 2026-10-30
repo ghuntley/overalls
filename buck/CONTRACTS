@@ -43,10 +43,12 @@ esbuild_bundle MUST use the one esbuild from buckCells, the nixpkgs esbuild
 that release builds pin, and never an esbuild.install download (ADR-0269).
 
 @cc [owner:ghuntley,label:verification] py-static-prek-parity
-py_static MUST run the same pinned ruff and ty as the prek hooks, with the
-same flags over every owned Python file and pyproject.toml from the project
-root, and MUST report every gate's findings before failing. Its
-`[ruff/<path>]` sub-targets MUST run the same ruff checks on one file
+py_static MUST run the same pinned ruff and ty as the precommit hook's direct
+fallback, with the same flags over every owned Python file and pyproject.toml
+from the project root, and MUST report every gate's findings before failing.
+Its `[ruff/<path>]` sub-targets MUST run the same ruff checks on one file,
+`[ty]` MUST run ty alone over every tree, and `[fix/<path>]` MUST output the
+file after ruff's safe fixes and ruff format without touching the source
 (ADR-0269).
 
 @cc [owner:ghuntley,label:governance] conflict-markers-per-file
@@ -98,3 +100,33 @@ root's ~/.buckconfig.d file on a host, present only with its identity), so
 absent credentials mean plain local execution. Uploads MUST additionally
 require [buck2] default_allow_cache_upload = true; the server, not this flag,
 enforces that only the CI identity can write (ADR-0272).
+
+@cc [owner:ghuntley,label:verification] precommit-info-selection
+A precommit check's PrecommitInfo MUST list every repository path its default
+output reads in `inputs`, and its `per_file` and `shared` sub-targets
+together MUST find every violation the default output finds for the files
+they name; a path whose change can affect other files (a checker, a
+configuration file, a CONTRACTS file) MUST NOT have a `per_file` entry
+(ADR-0269).
+
+@cc [owner:ghuntley,label:verification] repo-check-declared-inputs
+repo_check MUST declare every owned file matching `include` as an input and,
+with `inventory`, the owned path list, so a change that can alter the result
+changes the action key; checks that run git ls-files MUST be local_only and
+never upload (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] contract-check-per-file
+contract_check MUST run scripts/check_contracts.mjs format over every owned
+file as its default output, and each `[contracts/<path>]` sub-target MUST run
+`files <path>` with exactly that file and its ancestor CONTRACTS as inputs.
+CONTRACTS files and the checker have no per-file sub-target, and deleting a
+CONTRACTS file selects the whole check (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] precommit-selects-affected-checks
+precommit.bxl MUST select only `precommit`-labelled targets, so bootstrap
+flake checks and machine tests never run in precommit. For the changed and
+deleted paths it MUST build every check whose result they can change (by
+PrecommitInfo, or by owner rdeps and package for checks without it), MUST
+select every check for a build-graph or toolchain change or --scope all, MUST
+build the selection in one ctx.build call, and MUST fail naming each failed
+check (ADR-0269).

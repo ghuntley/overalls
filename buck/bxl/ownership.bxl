@@ -1,10 +1,6 @@
 # Contract tracked-files-have-owners: see buck/CONTRACTS.
 
-_CELLS = ["toolchains", "none"]
-
-def _label(path: str) -> str:
-    cell, _, rest = path.partition("/")
-    return "{}//{}".format(cell, rest) if cell in _CELLS else "root//" + path
+load(":paths.bzl", _label = "file_label")
 
 def _main(ctx: bxl.Context) -> None:
     # BUCK files are covered by target hashes rather than ownership.

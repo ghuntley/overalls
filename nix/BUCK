@@ -8,7 +8,7 @@ script_check(
     name = "overalls-install-ps1",
     # Commands run from the project root.
     cmd = ["bash", "nix/verification/tests/overalls-install-ps1.sh", "$(location //marshall:overalls-install.ps1)"],
-    labels = ["check"],
+    labels = ["check", "precommit"],
     path = ["toolchains//:bash", "toolchains//:pwsh", "toolchains//:gnused", "toolchains//:gnugrep"],
     srcs = ["verification/tests/overalls-install-ps1.sh", "//marshall:overalls-install.ps1"],
 )

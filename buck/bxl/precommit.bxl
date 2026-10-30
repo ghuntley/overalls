@@ -1,0 +1,160 @@
+# Contract precommit-selects-affected-checks: see buck/CONTRACTS.
+#
+# The repository precommit (ADR-0269 M8). `tools/precommit` computes the
+# changed and deleted files from git and calls
+#
+#   tools/buck2 bxl //buck/bxl/precommit.bxl:main -- --files ... --deleted ...
+#
+# Selection, an aspect over the `precommit` label:
+#   1. The universe is every target labelled `precommit`.
+#   2. A check with PrecommitInfo (buck/checks.bzl) is selected when a changed
+#      path is in its `inputs` or a deleted path matches its `deletions`. If
+#      every changed input has a `per_file` entry, only those sub-targets and
+#      `shared` are built; otherwise its default output.
+#   3. A check without PrecommitInfo is selected when it is an rdep of an
+#      owner of a changed file, or for a deleted file below its package, and
+#      its default output is built.
+#   4. A build-graph or toolchain change (BUCK, .bzl, .bxl, .buckconfig,
+#      toolchains/, nix/buck/, flake.lock, the wrappers) and `--all` select
+#      every default output. Unchanged checks are then action-cache hits.
+# Everything selected is built by one ctx.build call, so Buck2 schedules and
+# caches all checks together. `--fix` builds the `fix` sub-targets of the
+# changed files instead and prints `fix<TAB>path<TAB>fixed file` lines for the
+# wrapper to copy.
+
+load("//buck:checks.bzl", "PrecommitInfo", "path_matches")
+load(":paths.bzl", "file_label")
+
+_GRAPH_FILES = [".buckconfig", "flake.lock", "tools/buck2", "tools/precommit"]
+_GRAPH_PREFIXES = ["toolchains/", "nix/buck/"]
+
+def _graph_change(path: str) -> bool:
+    name = path.rsplit("/", 1)[-1]
+    return (
+        path in _GRAPH_FILES or name == "BUCK" or
+        path.endswith(".bzl") or path.endswith(".bxl") or
+        any([path.startswith(p) for p in _GRAPH_PREFIXES])
+    )
+
+def _under(path: str, package: str) -> bool:
+    return package == "" or path.startswith(package + "/")
+
+# Returns (labels to build, report rows).
+def _plan(ctx: bxl.Context, files: list[str], deleted: list[str], everything: bool, limit: int, fix: bool) -> (list, list):
+    universe = ctx.uquery().attrfilter("labels", "precommit", "root//...")
+    configured = ctx.configured_targets(universe)
+    analyses = ctx.analysis([t.label for t in configured])
+    by_label = {}
+    for t in configured:
+        by_label[str(t.label.raw_target())] = t.label
+
+    builds = []
+    rows = []
+    if fix:
+        for label, analysis in analyses.items():
+            providers = analysis.providers()
+            if PrecommitInfo not in providers:
+                continue
+            fixes = providers[PrecommitInfo].fix
+            for f in files:
+                if f in fixes:
+                    sub = label.configured_target().with_sub_target(fixes[f])
+                    builds.append(sub)
+                    rows.append({"check": str(label.raw_target()), "fix": f, "label": str(sub)})
+        return builds, rows
+
+    if everything or any([_graph_change(f) for f in files + deleted]):
+        for label in analyses:
+            builds.append(label)
+            rows.append({"check": str(label.raw_target()), "mode": "all"})
+        return builds, rows
+
+    fallback = []
+    for label, analysis in analyses.items():
+        providers = analysis.providers()
+        if PrecommitInfo not in providers:
+            fallback.append(label)
+            continue
+        info = providers[PrecommitInfo]
+        changed = [f for f in files if f in info.inputs]
+        gone = [d for d in deleted if path_matches(d, info.deletions)]
+        if not changed and not gone:
+            continue
+        per_file = info.per_file and len(changed) <= limit and all([f in info.per_file for f in changed])
+        if per_file:
+            subs = {}
+            for f in changed:
+                for s in info.per_file[f]:
+                    subs[s] = True
+            for s in info.shared:
+                subs[s] = True
+            for s in sorted(subs.keys()):
+                builds.append(label.configured_target().with_sub_target(s))
+            if subs:
+                rows.append({"check": str(label.raw_target()), "mode": "per-file", "sub_targets": sorted(subs.keys())})
+        else:
+            builds.append(label)
+            rows.append({"check": str(label.raw_target()), "mode": "whole"})
+
+    if fallback:
+        hit = {}
+        if files:
+            owners = ctx.uquery().owner([file_label(f) for f in files])
+            candidates = ctx.uquery().eval(" + ".join([str(l.raw_target()) for l in fallback]))
+            for t in ctx.uquery().rdeps(candidates, owners):
+                hit[str(t.label)] = True
+        for label in fallback:
+            name = str(label.raw_target())
+            package = label.raw_target().package
+            if name in hit or any([_under(d, package) for d in deleted]):
+                builds.append(label)
+                rows.append({"check": name, "mode": "whole"})
+    return builds, rows
+
+def _main(ctx: bxl.Context) -> None:
+    args = ctx.cli_args
+    fix = args.mode == "fix"
+    builds, rows = _plan(ctx, args.files, args.deleted, args.scope == "all", args.per_file_limit, fix)
+    if args.mode == "plan":
+        ctx.output.print_json({"checks": rows})
+        return
+    if not builds:
+        ctx.output.print("precommit: no checks affected")
+        return
+
+    # One build of every selected check and sub-target.
+    results = ctx.build(builds)
+    failed = []
+    fixed = {}
+    fix_paths = {r["label"]: r["fix"] for r in rows if "fix" in r}
+    for label, result in results.items():
+        errors = [str(e) for e in result.failures()]
+        if errors:
+            failed.append(str(label.raw_target()))
+            for e in errors:
+                ctx.output.print("{}: {}".format(label.raw_target(), e))
+        elif str(label) in fix_paths:
+            for artifact in ctx.output.ensure_multiple(result.artifacts()):
+                fixed[fix_paths[str(label)]] = artifact.abs_path()
+    if fix:
+        # One `fix<TAB>path<TAB>fixed file` line each, for tools/precommit.
+        for path in sorted(fixed.keys()):
+            # print() renders an ensured artifact as its path; format() would not.
+            ctx.output.print("fix", path, fixed[path], sep = "\t")
+        if failed:
+            fail("precommit: {} fix sub-targets failed".format(len(failed)))
+        return
+    if failed:
+        fail("precommit: {} of {} checks failed:\n  {}".format(len(failed), len(builds), "\n  ".join(sorted(failed))))
+    ctx.output.print("precommit: {} checks passed".format(len(builds)))
+
+main = bxl_main(
+    impl = _main,
+    cli_args = {
+        "scope": cli_args.enum(["changed", "all"], default = "changed", doc = "`all` builds every precommit check's default output."),
+        "deleted": cli_args.list(cli_args.string(), default = [], doc = "Repository paths deleted relative to the base."),
+        "files": cli_args.list(cli_args.string(), default = [], doc = "Changed repository paths that exist."),
+        "mode": cli_args.enum(["check", "fix", "plan"], default = "check", doc = "check builds the checks; fix builds the fix sub-targets of the changed files and prints their paths; plan prints the selection as JSON."),
+        "per-file-limit": cli_args.int(64, doc = "Above this many changed inputs a check runs whole."),
+    },
+)

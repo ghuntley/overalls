@@ -199,159 +199,36 @@ in
     before = [ "devenv:git-hooks:install" ];
   };
 
+  # The repository precommit (ADR-0269 M8): tools/precommit runs
+  # buck/bxl/precommit.bxl, which builds only the checks the changed files
+  # affect. `precommit --fix` is the only mode that rewrites files.
+  scripts.precommit.exec = ''
+    exec "$DEVENV_ROOT/tools/precommit" "$@"
+  '';
+
   # https://devenv.sh/git-hooks/
-  # The Python gates run through prek with the pinned ruff and ty; the same
-  # checks run in CI as the python-static Nix check. The structured-event
-  # logging gate runs per application through the same pinned Elixir as the
-  # releases, matching each project's logging.check precommit alias.
+  # One hook runs tools/precommit over the staged files. It covers what the
+  # separate hooks did (conflict markers, pins, rust-lints, ruff format, ruff,
+  # ty, the ten per-application logging checks) plus the ADR, contract,
+  # package-input-lock and toolchain checks, each only when its inputs change.
+  # Merge commits skip ordinary pre-commit hooks, so it also runs at
+  # pre-merge-commit. The OVERALLS_PRECOMMIT_* paths are the pinned tools for
+  # the direct fallback when Buck2 cannot start.
   git-hooks = {
     enable = true;
     hooks = {
-      # Merge commits skip ordinary pre-commit hooks, so this guard also runs
-      # at pre-merge-commit; the conflict-markers Nix check covers CI.
-      conflict-markers = {
+      precommit = {
         enable = true;
-        name = "conflict-markers";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_conflict_markers.exs";
+        name = "precommit";
+        description = "Buck2 precommit checks for the staged files (tools/precommit)";
+        entry = "${pkgs.coreutils}/bin/env OVERALLS_PRECOMMIT_ELIXIR=${toolchain.elixir}/bin/elixir OVERALLS_PRECOMMIT_RUFF=${pythonStatic.ruff}/bin/ruff 'OVERALLS_PRECOMMIT_TY=${pythonStatic.ty}/bin/ty ${pythonStatic.tyPython}/bin/python3 ${pythonStatic.harnessPython}/bin/python3 ${pythonStatic.antithesisWheels}' tools/precommit --";
         language = "system";
         always_run = true;
-        pass_filenames = false;
+        pass_filenames = true;
+        require_serial = true;
+        # Every staged path, symlinks included, as the conflict-marker hook saw.
+        types = [ ];
         stages = [ "pre-commit" "pre-merge-commit" ];
-      };
-      # Third-party fixed-output hashes come only from dependency-hashes.json
-      # or lock files; the pins Nix check covers CI.
-      pins = {
-        enable = true;
-        name = "pins";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_pins.exs";
-        language = "system";
-        files = "(\\.nix|dependency-hashes\\.json)$";
-        pass_filenames = false;
-      };
-      # ADR-0265: adopted crates keep the canonical lint block, clippy.toml
-      # and a reason on every lint exception; the rust-lints Nix check covers CI.
-      rust-lints = {
-        enable = true;
-        name = "rust-lints";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_rust_lints.exs --strict";
-        language = "system";
-        files = "(Cargo\\.toml|clippy\\.toml|\\.rs|scripts/rust/.*)$";
-        pass_filenames = false;
-      };
-      python-ruff-format = {
-        enable = true;
-        name = "ruff-format";
-        description = "Check Python formatting with ruff";
-        entry = "${pythonStatic.ruff}/bin/ruff format --check --force-exclude";
-        language = "system";
-        files = "\\.py$";
-      };
-      python-ruff = {
-        enable = true;
-        name = "ruff";
-        description = "Lint Python with ruff";
-        entry = "${pythonStatic.ruff}/bin/ruff check --force-exclude";
-        language = "system";
-        files = "\\.py$";
-      };
-      python-ty = {
-        enable = true;
-        name = "ty";
-        description = "Type-check Python with ty";
-        entry = "${pkgs.bash}/bin/bash antithesis/verification/static-check.sh ${pythonStatic.ty}/bin/ty ${pythonStatic.tyPython}/bin/python3 ${pythonStatic.harnessPython}/bin/python3 ${pythonStatic.antithesisWheels}";
-        language = "system";
-        files = "\\.py$";
-        pass_filenames = false;
-      };
-      elixir-logging-marshall = {
-        enable = true;
-        name = "logging-check-marshall";
-        description = "Enforce the Marshall structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs marshall";
-        language = "system";
-        files = "^(marshall/(lib|config)/.*\\.exs?$|marshall/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-lilly = {
-        enable = true;
-        name = "logging-check-lilly";
-        description = "Enforce the Lilly structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs lilly";
-        language = "system";
-        files = "^(lilly/(lib|config)/.*\\.exs?$|lilly/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-audi = {
-        enable = true;
-        name = "logging-check-audi";
-        description = "Enforce the Audi structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs audi";
-        language = "system";
-        files = "^(audi/(lib|config)/.*\\.exs?$|audi/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-galileo = {
-        enable = true;
-        name = "logging-check-galileo";
-        description = "Enforce the Galileo structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs galileo";
-        language = "system";
-        files = "^(galileo/(lib|config)/.*\\.exs?$|galileo/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-peach = {
-        enable = true;
-        name = "logging-check-peach";
-        description = "Enforce the Peach structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs peach";
-        language = "system";
-        files = "^(peach/(lib|config)/.*\\.exs?$|peach/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-susan = {
-        enable = true;
-        name = "logging-check-susan";
-        description = "Enforce the Susan structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs susan";
-        language = "system";
-        files = "^(susan/(lib|config)/.*\\.exs?$|susan/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-enrico = {
-        enable = true;
-        name = "logging-check-enrico";
-        description = "Enforce the Enrico structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs enrico";
-        language = "system";
-        files = "^(enrico/(lib|config)/.*\\.exs?$|enrico/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-brady = {
-        enable = true;
-        name = "logging-check-brady";
-        description = "Enforce the Brady structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs brady";
-        language = "system";
-        files = "^(brady/(lib|config)/.*\\.exs?$|brady/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-ziggy = {
-        enable = true;
-        name = "logging-check-ziggy";
-        description = "Enforce the Ziggy structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs ziggy";
-        language = "system";
-        files = "^(ziggy/(lib|config)/.*\\.exs?$|ziggy/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
-      };
-      elixir-logging-porsche = {
-        enable = true;
-        name = "logging-check-porsche";
-        description = "Enforce the Porsche structured-event catalog";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_logging.exs porsche";
-        language = "system";
-        files = "^(porsche/(lib|config)/.*\\.exs?$|porsche/mix\\.exs$|scripts/check_logging\\.exs$)";
-        pass_filenames = false;
       };
     };
   };

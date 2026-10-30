@@ -86,7 +86,7 @@ it is empty.
   tokens, terminal bytes, command arguments or payloads; the catalogs have no
   string metadata type on purpose. Outcome events follow the outer transaction
   commit. The `logging.check` precommit gate enforces this structurally, and the
-  per-application prek commit hooks enforce it on changed Elixir files; see
+  commit hook's `//:logging-<app>` Buck2 checks enforce it on changed Elixir files; see
   the [fleet logging review](docs/architecture/reviews/2026-09-19-structured-logging-fleet.md).
 - Use types in every programming language, for production code, scripts and
   tests. Use the language's native type system, annotations or typespecs; define
@@ -98,9 +98,9 @@ it is empty.
   type checker when available; do not claim typing is verified from syntax alone.
 - Python targets Python 3.13 and is gated by the pinned Rust toolchain in
   `pyproject.toml`: ruff format and ruff check (including required annotations)
-  and ty type checking. Run all three with `prek run --all-files` inside
-  `devenv shell`; the hooks install automatically and CI enforces the same gate
-  as the `python-static` check. Machine-test driver fragments under
+  and ty type checking. Run all three with `tools/precommit --all` (or
+  `prek run --all-files`) inside `devenv shell`; the commit hook installs
+  automatically and CI enforces the same gate as the `python-static` check. Machine-test driver fragments under
   `nix/tests/machines` are formatted, linted and annotation-checked standalone;
   their type checking happens on the Nix-composed driver inside the NixOS test
   framework. Narrow parsed JSON through `object`-typed boundaries or TypedDict
@@ -112,9 +112,14 @@ it is empty.
   use a separate detached worktree (`git worktree add --detach <dir> <rev>`) or
   copy files aside instead.
 - Committed merge-conflict markers are refused by `elixir scripts/check_conflict_markers.exs`,
-  which runs as a prek hook at commit and merge-commit time (merge commits skip
-  ordinary pre-commit hooks) and as the `conflict-markers` Nix check. Resolve
+  which runs through the `tools/precommit` hook at commit and merge-commit time
+  (merge commits skip ordinary pre-commit hooks) and as the `conflict-markers` Nix check. Resolve
   every conflict before committing a merge; never commit with hooks bypassed.
+- `tools/precommit` (the devenv `precommit` command and the single prek hook)
+  runs `buck/bxl/precommit.bxl` over the staged files: it builds only the
+  `precommit`-labelled Buck2 checks whose inputs changed, per file where a check
+  allows it. `--base REV` checks a branch, `--all` everything, and `--fix` is the
+  only mode that rewrites files. See the [buck2 skill](.agents/skills/buck2/SKILL.md).
 - Run `elixir scripts/check_adrs.exs` from the repository root for architecture
   changes. From Marshall, use `elixir ../scripts/check_adrs.exs`. The checker
   validates structure and ADR references, not whether the design is sound or implemented.

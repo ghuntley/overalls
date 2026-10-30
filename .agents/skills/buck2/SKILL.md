@@ -104,8 +104,10 @@ match Nix byte for byte. Compare them with `diff -r`.
 **Python.** `//:py-static` covers every owned `.py` file and
 `pyproject.toml`:
 - It runs ruff format, ruff check and `antithesis/verification/static-check.sh`
-  (ty) with the closure from `nix/buck/python.nix`, the same one prek uses.
-- One file: `tools/buck2 build '//:py-static[ruff/<path>]'`.
+  (ty) with the closure from `nix/buck/python.nix`, the same one the
+  precommit hook's direct fallback uses.
+- One file: `tools/buck2 build '//:py-static[ruff/<path>]'`; ty alone:
+  `[ty]`; the fixed copy of a file: `[fix/<path>]`.
 - A new third-party import goes in `nix/buck/python.nix`.
 
 **Scripts:**
@@ -113,6 +115,14 @@ match Nix byte for byte. Compare them with `diff -r`.
   declared inputs. Reference a file in another package with an
   `export_file`.
 - `//:conflict-markers[<path>]` checks one file.
+- `repo_check(cmd, include, owned, deletions, inventory, local_only)` runs a
+  repository-wide command over the owned files matching `include` (one `*`
+  matches anything, `/` included). It carries `PrecommitInfo`, so precommit
+  runs it only when a matching file changes. `//:adrs`, `//:pins`,
+  `//:rust-lints`, `//:toolchain-versions`, `//:package-input-lock`,
+  `//:contracts-tests` and `//:logging-<app>` use it.
+- `//:contracts` (`contract_check`) is the contract format and coverage
+  check; `[contracts/<path>]` checks one file with its ancestor `CONTRACTS`.
 - `nix_store_run(package, program)` makes a Nix-built program runnable with
   `buck2 run`, for example `//mila:journey-fixture`.
 
@@ -186,6 +196,51 @@ Remote execution is not available yet (M10).
   the Nix daemon keep `allow_cache_upload = False` (rule 4).
 - **Checking hits.** The build summary prints
   `Commands: N (cached: C, remote: 0, local: L)`.
+
+## Precommit
+
+`tools/precommit` is the one precommit entry point: the devenv `precommit`
+command, the single prek hook and CI call it.
+
+- **Scopes:** the named files or the staged changes (default), `--base REV`
+  (merge-base to working tree), `--all`. `--plan` prints the selection as JSON;
+  `--fix` first copies each changed file's `fix` sub-target output over it
+  (the only mode that rewrites files).
+- **How it selects** (`buck/bxl/precommit.bxl`): the universe is every target
+  labelled `precommit`. A check's `PrecommitInfo` (`buck/checks.bzl`) says which
+  paths it reads, which sub-targets check one file, which run beside them
+  (`shared`) and which deleted paths matter. A check without the provider runs
+  whole when an owner of a changed file is among its deps, or a deleted file is
+  below its package. A `BUCK`, `.bzl`, `.bxl`, `.buckconfig`, `toolchains/`,
+  `nix/buck/`, `flake.lock` or wrapper change selects every check, and
+  unchanged ones are cache hits. Everything selected is one `ctx.build`.
+- **Fallback.** When `tools/buck2 server` fails, or with
+  `OVERALLS_PRECOMMIT_DIRECT=1`, the hook scripts run directly with the pinned
+  tools devenv passes in `OVERALLS_PRECOMMIT_*`. The ADR, contract,
+  package-input-lock and toolchain checks are then reported as skipped.
+- **Not yet covered:** `mix precommit` in each project (compile, format,
+  tests, Covenant, Dialyzer, gettext, Marshall's extra gates) until the Mix
+  rules land; CI's `mix precommit` matrix stays.
+
+### Adding a check to precommit (the convention)
+
+1. Label the target `precommit` (and `check`, so `buck2 test` reads it). Never
+   label bootstrap flake checks or machine tests `precommit`.
+2. The default output runs the whole check and fails on any violation.
+3. Name sub-targets `[<kind>/<repo path>]` for one file (`[ruff/<path>]`,
+   `[contracts/<path>]`, `[format/<path>]`), `[<kind>]` for one part of the
+   whole check (`[ty]`, `[format]`, `[dialyzer]`, `[logging]`, `[gettext]`,
+   `[test_result]`, `[covenant]`), and `[fix/<repo path>]` for a fixed copy of
+   one file. `//:conflict-markers[<path>]` predates the convention.
+4. Return `PrecommitInfo(inputs, per_file, shared, fix, deletions)` to get
+   per-file selection. Leave a checker, configuration or `CONTRACTS` path out
+   of `per_file`, so changing it runs the whole check. Without the provider,
+   put the check in the package that owns its sources: precommit then runs its
+   default output when those sources change.
+5. Mix rules: `mix_check` and `mix_test` carry `precommit`; a `PrecommitInfo`
+   with `shared = ["format", "logging", "gettext", "dialyzer"]` (or the
+   default output) and `fix = {path: "fix/" + path}` from `mix format` gives
+   `precommit --fix` Elixir formatting.
 
 ## Troubleshooting
 

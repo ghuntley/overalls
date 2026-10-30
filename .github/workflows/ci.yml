@@ -3,7 +3,8 @@ name: "ci"
 # Builds and tests what each trunk push changed, chosen from the Buck2 graph
 # (ADR-0270): affected -> build -> test -> one job per affected NixOS machine
 # test. tools/affected compares the pushed range's base and head target hashes;
-# it loads targets only and never builds a Nix derivation. The daily full run
+# it loads targets only and never builds a Nix derivation. The precommit job runs
+# tools/precommit over the same range. The daily full run
 # stays in nixos-machine-tests.yml.
 #
 # Contract ci-affected-workflow: see .github/CONTRACTS.
@@ -47,6 +48,7 @@ jobs:
       tests: ${{ steps.plan.outputs.tests }}
       builds: ${{ steps.plan.outputs.builds }}
       errors: ${{ steps.plan.outputs.errors }}
+      range: ${{ steps.select.outputs.range }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
@@ -56,6 +58,7 @@ jobs:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
       - name: Select affected targets
+        id: select
         env:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
@@ -92,6 +95,8 @@ jobs:
           else
             args=(--base "${BASE:-HEAD^}")
           fi
+          # The same range for tools/precommit in the precommit job.
+          echo "range=${args[*]}" >> "$GITHUB_OUTPUT"
           tools/affected "${args[@]}" --output affected.json
       - name: Plan jobs
         id: plan
@@ -204,8 +209,31 @@ jobs:
           TARGET: ${{ matrix.test.target }}
         run: cachix watch-exec overalls -- tools/buck2 test "$TARGET"
 
+  # The repository precommit over the same range (ADR-0269 M8): the commit
+  # hook's tools/precommit, so only the checks the range affects run, or every
+  # check when everything is selected.
+  precommit:
+    needs: affected
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 60
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Precommit
+        env:
+          RANGE: ${{ needs.affected.outputs.range }}
+        run: |
+          set -euo pipefail
+          read -ra range <<<"$RANGE"
+          tools/precommit "${range[@]}"
+
   ci:
-    needs: [affected, build, test, machine]
+    needs: [affected, build, test, machine, precommit]
     if: always()
     runs-on: namespace-profile-cached-amd64
     steps:
@@ -215,13 +243,14 @@ jobs:
           BUILD: ${{ needs.build.result }}
           TEST: ${{ needs.test.result }}
           MACHINE: ${{ needs.machine.result }}
+          PRECOMMIT: ${{ needs.precommit.result }}
           ERRORS: ${{ needs.affected.outputs.errors }}
         run: |
           status=0
           if [ "$AFFECTED" != success ]; then
             echo "::error::selection did not succeed ($AFFECTED)"; status=1
           fi
-          for job in "build:$BUILD" "test:$TEST" "machine:$MACHINE"; do
+          for job in "build:$BUILD" "test:$TEST" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
             case "${job#*:}" in
               success|skipped) ;;
               *) echo "::error::${job%%:*} did not succeed (${job#*:})"; status=1 ;;

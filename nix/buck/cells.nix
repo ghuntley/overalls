@@ -27,6 +27,8 @@ let
     };
     npm = {
       marvin_node_modules = "${nodeModules "marvin" ../../marvin}/node_modules";
+      # The pinned cc-check behind the repository contract check (M8).
+      code_contracts_node_modules = "${nodeModules "code-contracts" ../../tools/code-contracts}/node_modules";
     };
     python = {
       python_static = "${python.tyPython}/bin/python3";
@@ -61,6 +63,8 @@ let
     ruff = "${python.ruff}/bin/ruff";
     ty = "${python.ty}/bin/ty";
     findutils = "${pkgs.findutils}/bin";
+    # M8: repository checks that list files with git ls-files.
+    git = "${pkgs.git}/bin";
     gnugrep = "${pkgs.gnugrep}/bin";
     gnused = "${pkgs.gnused}/bin";
     pwsh = "${pkgs.powershell}/bin/pwsh";

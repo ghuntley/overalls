@@ -4,7 +4,7 @@ import {execFileSync} from "node:child_process"
 import {tmpdir} from "node:os"
 import {dirname, join} from "node:path"
 import {test} from "node:test"
-import {checkFiles, coverage, discoverFiles, extractNativeNotes, listNative, listJavaScript, validateListTarget} from "../check_contracts.mjs"
+import {checkFiles, checkNamed, coverage, discoverFiles, extractNativeNotes, listNative, listJavaScript, validateListTarget} from "../check_contracts.mjs"
 
 function fixture(files, run) {
   const root = mkdtempSync(join(tmpdir(), "overalls-contract-test-"))
@@ -174,5 +174,19 @@ test("every list route rejects internal directory links and linked ancestor cont
     assert.throws(() => validateListTarget(root, "real/a.py"), /must not be symlinks/)
     assert.throws(() => listJavaScript(root, "real/b.mjs"), /must not be symlinks/)
     assert.throws(() => listNative(root, "real/c.ex"), /must not be symlinks/)
+  })
+})
+
+test("named-file checks include ancestor CONTRACTS and refuse directory contracts", () => {
+  const other = hashNote.replace("unchanged", "other")
+  fixture({CONTRACTS: contract, "sub/CONTRACTS": contract, "sub/a.ex": other}, root => {
+    assert.throws(() => checkNamed(root, ["sub/a.ex"]), /not unique/)
+    assert.throws(() => checkNamed(root, ["sub/CONTRACTS"]), /checked with the whole repository/)
+  })
+  fixture({CONTRACTS: contract, "sub/a.ex": other, "b.ex": "defmodule B do\nend\n", "README.md": "text"}, root => {
+    assert.equal(checkNamed(root, ["sub/a.ex"]).covered, 1)
+    assert.equal(checkNamed(root, ["README.md"]).covered, 0)
+    assert.throws(() => checkNamed(root, ["b.ex"]), /lack local or subtree contracts/)
+    assert.throws(() => checkNamed(root, ["missing.ex"]), /not a regular repository file/)
   })
 })
