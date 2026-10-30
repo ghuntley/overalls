@@ -76,6 +76,10 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
             identifier = ctx.attrs.attr,
             local_only = True,
             allow_cache_upload = False,
+            # A NixOS system or fleet test evaluation takes several GB; at
+            # the default one-per-core, 20 concurrent evaluations were
+            # OOM-killed in CI (run 41130542439). At most four run at once.
+            weight_percentage = 25,
         )
 
     out = ctx.actions.declare_output("store-path")
