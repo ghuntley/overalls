@@ -50,6 +50,7 @@ jobs:
       evaluate: ${{ steps.plan.outputs.evaluate }}
       tests: ${{ steps.plan.outputs.tests }}
       builds: ${{ steps.plan.outputs.builds }}
+      host_builds: ${{ steps.plan.outputs.host_builds }}
       errors: ${{ steps.plan.outputs.errors }}
       range: ${{ steps.select.outputs.range }}
     steps:
@@ -132,13 +133,22 @@ jobs:
           tests=$(jq -c '[.tests[].target]' affected.json)
           # Bootstrap builds are flake outputs that publish-cache.yml builds.
           # expected_failure targets are soundness probes that must not build.
-          builds=$(jq -c '[.builds[] | select((.labels | index("bootstrap")) or (.labels | index("expected_failure")) | not) | .target]' affected.json)
+          all_builds=$(jq -c '[.builds[] | select((.labels | index("bootstrap")) or (.labels | index("expected_failure")) | not) | .target]' affected.json)
+          # Whole host systems (deployment, base, install) and the kexec image
+          # each fill most of a runner's store, so they build one host per
+          # runner; several in one job ran out of space (run 41090838856).
+          host_re='^root//(fleet/hosts/[^:]+|nix/platform):'
+          builds=$(jq -c --arg re "$host_re" '[.[] | select(test($re) | not)]' <<<"$all_builds")
+          host_builds=$(jq -c --arg re "$host_re" '[.[] | select(test($re))]
+            | group_by(sub(":.*"; ""))
+            | map({name: (.[0] | sub("^root//"; "") | sub(":.*"; "")), targets: .})' <<<"$all_builds")
           errors=$(jq '.errors | length' affected.json)
           {
             echo "machine_tests=$machine"
             echo "evaluate=$evaluate"
             echo "tests=$tests"
             echo "builds=$builds"
+            echo "host_builds=$host_builds"
             echo "errors=$errors"
           } >> "$GITHUB_OUTPUT"
           {
@@ -149,6 +159,7 @@ jobs:
             echo "- machine-test evaluations: $(jq length <<<"$evaluate")"
             echo "- tests: $(jq length <<<"$tests")"
             echo "- builds: $(jq length <<<"$builds")"
+            echo "- host system builds: $(jq length <<<"$host_builds") runners"
             echo "- selection errors: $errors"
           } >> "$GITHUB_STEP_SUMMARY"
           jq -r '.errors[] | "::error title=selection error in \(.package) (\(.side))::\(.error | split("\n") | first)"' affected.json
@@ -171,6 +182,30 @@ jobs:
       - name: Build affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.builds }}
+        run: |
+          set -euo pipefail
+          mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
+          cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}"
+
+  hosts:
+    needs: affected
+    if: needs.affected.outputs.host_builds != '[]'
+    name: build ${{ matrix.host.name }}
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        host: ${{ fromJSON(needs.affected.outputs.host_builds) }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Build ${{ matrix.host.name }}
+        env:
+          TARGETS: ${{ toJSON(matrix.host.targets) }}
         run: |
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
@@ -268,7 +303,7 @@ jobs:
           tools/precommit "${range[@]}"
 
   ci:
-    needs: [affected, build, test, evaluate, machine, precommit]
+    needs: [affected, build, hosts, test, evaluate, machine, precommit]
     if: always()
     runs-on: namespace-profile-cached-amd64
     steps:
@@ -276,6 +311,7 @@ jobs:
         env:
           AFFECTED: ${{ needs.affected.result }}
           BUILD: ${{ needs.build.result }}
+          HOSTS: ${{ needs.hosts.result }}
           TEST: ${{ needs.test.result }}
           MACHINE: ${{ needs.machine.result }}
           EVALUATE: ${{ needs.evaluate.result }}
@@ -286,7 +322,7 @@ jobs:
           if [ "$AFFECTED" != success ]; then
             echo "::error::selection did not succeed ($AFFECTED)"; status=1
           fi
-          for job in "build:$BUILD" "test:$TEST" "evaluate:$EVALUATE" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
+          for job in "build:$BUILD" "hosts:$HOSTS" "test:$TEST" "evaluate:$EVALUATE" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
             case "${job#*:}" in
               success|skipped) ;;
               *) echo "::error::${job%%:*} did not succeed (${job#*:})"; status=1 ;;
