@@ -42,7 +42,7 @@ fn command_and_environment_canary_never_enter_persistent_diagnostics() {
     let mock_ssh = fixture_bin.join("ssh");
     fs::write(
         &mock_ssh,
-        "#!/bin/sh\nif test \"$1\" = -F; then exit 1; fi\ntest \"$1\" = -T && test \"$2\" = -p && test \"$3\" = 22 && test \"$4\" = -o && test \"$5\" = StrictHostKeyChecking=yes && test \"$6\" = -o && test \"$7\" = HostKeyAlgorithms=ssh-ed25519-cert-v01@openssh.com && test \"$8\" = -l && test \"$9\" = local-alias && test \"${10}\" = -- && test \"${11}\" = 127.0.0.1 && test \"${12}\" = whoami && test \"${13}\" = --json || exit 1\nprintf '%s\\n' '{\"version\":1,\"status\":\"succeeded\",\"result\":{\"guest_username\":\"geoffrey.huntley\",\"public_key\":\"ssh-ed25519 AAAAB3NzaC1lZDI1NTE5AAAAIE10h2nLdSYgJPONwlhCys6F4ZgL1Qnc09ncBUr9NQnx\"}}'\n",
+        "#!/bin/sh\nif test \"$1\" = -F; then exit 1; fi\ntest \"$1\" = -T && test \"$2\" = -p && test \"$3\" = 22 && test \"$4\" = -o && test \"$5\" = \"UserKnownHostsFile=$HOME/.ssh/known_hosts\" && test \"$6\" = -o && test \"$7\" = GlobalKnownHostsFile=/dev/null && test \"$8\" = -o && test \"$9\" = StrictHostKeyChecking=yes && test \"${10}\" = -o && test \"${11}\" = HostKeyAlgorithms=ssh-ed25519-cert-v01@openssh.com && test \"${12}\" = -l && test \"${13}\" = local-alias && test \"${14}\" = -- && test \"${15}\" = 127.0.0.1 && test \"${16}\" = whoami && test \"${17}\" = --json || exit 1\nprintf '%s\\n' '{\"version\":1,\"status\":\"succeeded\",\"result\":{\"guest_username\":\"geoffrey.huntley\",\"public_key\":\"ssh-ed25519 AAAAB3NzaC1lZDI1NTE5AAAAIE10h2nLdSYgJPONwlhCys6F4ZgL1Qnc09ncBUr9NQnx\"}}'\n",
     )
     .unwrap();
     for path in [&mock_id, &mock_ssh] {
