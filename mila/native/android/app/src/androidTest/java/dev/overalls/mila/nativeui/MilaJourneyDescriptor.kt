@@ -182,7 +182,12 @@ suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONO
                 require(bytes.size <= 64 * 1024) { "fixture hook reply too large" }
                 JSONObject(bytes.toString(Charsets.UTF_8))
             }
-            else -> error("fixture ${action.wire} hook refused ($code)")
+            else -> {
+                // Only the fixture's closed error code is reported, never the response body.
+                val reason = runCatching { JSONObject(connection.errorStream.use { it.readBytes() }.toString(Charsets.UTF_8)).optString("error") }
+                    .getOrNull()?.takeIf { it.matches(Regex("^[a-z_]{1,64}$")) } ?: "unknown"
+                error("fixture ${action.wire} hook refused ($code, $reason)")
+            }
         }
     } finally {
         (connection as HttpURLConnection).disconnect()
