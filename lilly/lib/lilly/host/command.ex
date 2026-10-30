@@ -134,8 +134,10 @@ defmodule Lilly.Host.Command do
     end
   end
 
-  @spec run_durable(name(), [String.t()], pos_integer(), <<_::256>>) ::
-          {:ok, binary()} | {:error, error() | :job_running | :job_unknown}
+  @typedoc "The result of starting or attaching to a durable hostd job."
+  @type durable_result :: {:ok, binary()} | {:error, error() | :job_running | :job_unknown}
+
+  @spec run_durable(name(), [String.t()], pos_integer(), <<_::256>>) :: durable_result()
   def run_durable(name, arguments, timeout_ms, <<_::256>> = key)
       when is_map_key(@executables, name) and timeout_ms in 1000..14_400_000 do
     case Lilly.Host.Lock.current() do
@@ -155,8 +157,7 @@ defmodule Lilly.Host.Command do
     end
   end
 
-  @spec attach(<<_::256>>, 0..120_000) ::
-          {:ok, binary()} | {:error, error() | :job_running | :job_unknown}
+  @spec attach(<<_::256>>, 0..120_000) :: durable_result()
   def attach(<<_::256>> = key, wait_ms) do
     case Lilly.Host.Lock.current() do
       %Lilly.Host.Lease{} = lease -> Lilly.Host.Hostd.attach(lease.session, key, wait_ms)

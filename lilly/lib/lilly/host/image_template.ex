@@ -425,7 +425,8 @@ defmodule Lilly.Host.ImageTemplate do
   # copy_file/4 MUST run the image copy as a durable hostd job keyed by its
   # source, pending path and size, so a copy in flight survives a Lilly
   # restart. It MUST attach to such a job before touching the pending file,
-  # and remove a stale pending file only when no job is known for the key.
+  # and remove a stale pending file only when no job is known for the key or
+  # the known job finished with a utility failure (template-copy-failure-not-replayed).
   defp copy_file(source, target, size, timeout) do
     pending = target <> ".pending"
     arguments = ["copy", source, pending, Integer.to_string(size)]
@@ -438,18 +439,53 @@ defmodule Lilly.Host.ImageTemplate do
          do: flush(Path.dirname(target))
   end
 
+  @typep copy_ops :: %{
+           attach: (<<_::256>>, 0..120_000 -> Command.durable_result()),
+           run_durable: (Command.name(), [String.t()], pos_integer(), <<_::256>> ->
+                           Command.durable_result()),
+           remove_pending: (Path.t() -> :ok | {:error, atom()})
+         }
+
   # A copy started before a Lilly restart still runs, or has finished, under
   # its key: wait for it. Otherwise clear any stale pending file and start one.
-  defp durable_copy(pending, arguments, timeout, key) do
-    case Command.attach(key, min(timeout, 120_000)) do
-      {:error, :job_unknown} ->
-        with :ok <- remove_pending(pending),
-             do: Command.run_durable(:image_copy, arguments, timeout, key)
+
+  # @cc [owner:ghuntley,label:recovery] template-copy-failure-not-replayed
+  # durable_copy/5 MUST treat a finished copy job whose stored result is a
+  # utility failure (failed, timed out, output limit or utility unavailable)
+  # like an unknown job: clear the pending file and start one new copy under
+  # the same key, returning that copy's result. Hostd keeps a finished result
+  # attachable for ten minutes; replaying it MUST NOT fail later builds without
+  # a copy. A running job (from attach or from the re-run) MUST surface as
+  # :job_running and MUST NOT start a second copy; a stored success and every
+  # other error are returned unchanged.
+  @doc false
+  @spec durable_copy(Path.t(), [String.t()], pos_integer(), <<_::256>>, copy_ops()) ::
+          Command.durable_result()
+  def durable_copy(pending, arguments, timeout, key, ops \\ default_copy_ops()) do
+    case ops.attach.(key, min(timeout, 120_000)) do
+      {:error, reason}
+      when reason in [
+             :job_unknown,
+             :command_failed,
+             :command_timeout,
+             :command_output_limit,
+             :utility_unavailable
+           ] ->
+        with :ok <- ops.remove_pending.(pending),
+             do: ops.run_durable.(:image_copy, arguments, timeout, key)
 
       result ->
         result
     end
   end
+
+  @spec default_copy_ops() :: copy_ops()
+  defp default_copy_ops,
+    do: %{
+      attach: &Command.attach/2,
+      run_durable: &Command.run_durable/4,
+      remove_pending: &remove_pending/1
+    }
 
   defp remove_pending(path) do
     case Lilly.Host.Privilege.lstat(path) do

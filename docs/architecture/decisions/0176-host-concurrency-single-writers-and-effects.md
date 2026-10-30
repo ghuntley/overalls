@@ -626,7 +626,18 @@ Template file copies use it
 `template-copy-durable`): after a Lilly restart the rebuilt template attaches
 to the copy already in flight instead of killing and restarting it. The
 template's Ash journal stays the checkpoint across a hostd restart, which
-still kills running jobs with hostd's cgroup. Evidence: the hostd test
+still kills running jobs with hostd's cgroup. A finished copy whose stored
+result is a utility failure (timeout, failure, output limit, unavailable
+utility) is treated like an unknown job: the pending file is cleared and one
+new copy runs under the same key (`template-copy-failure-not-replayed`).
+Before this, a template copy that hit `image_io_timeout_ms` replayed
+`command_timeout` to every later build for the ten-minute retention, so VM
+creation failed in milliseconds without copying (fleet run 41111309494,
+coding-clis-nixos-fleet). Evidence: the BEAM test
+[`image_template_durable_copy_test.exs`](../../../lilly/test/host/image_template_durable_copy_test.exs)
+(`template-copy-replayed-failure-reruns`) drives `durable_copy/5` with a fake
+hostd, including a job reported running at the re-run, which surfaces as
+`job_running` without a second copy. Evidence: the hostd test
 `durable-job-survives-session` (13 hostd tests pass) and the Lilly suite
 (image template tests run through a private daemon). Clone file copies are
 durable jobs too ([`CloneCopy`](../../../lilly/lib/lilly/transfer/clone_copy.ex),
