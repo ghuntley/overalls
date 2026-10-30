@@ -125,11 +125,20 @@ fn parse_ticks(value: &str, pid: u32) -> Option<u64> {
 }
 
 fn pidfd(pid: u32) -> Result<OwnedFd, std::io::Error> {
+    // SAFETY: pidfd_open(2) takes a PID and zero flags by value and reads no
+    // caller memory.
     let descriptor = unsafe { libc::syscall(libc::SYS_pidfd_open, pid, 0) };
     if descriptor < 0 {
         Err(std::io::Error::last_os_error())
     } else {
-        Ok(unsafe { OwnedFd::from_raw_fd(descriptor as i32) })
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "pidfd_open returns a C int descriptor that syscall(2) widens to c_long"
+        )]
+        let descriptor = descriptor as i32;
+        // SAFETY: a non-negative pidfd_open result is a freshly opened
+        // descriptor that nothing else owns, so OwnedFd may take ownership.
+        Ok(unsafe { OwnedFd::from_raw_fd(descriptor) })
     }
 }
 
@@ -139,7 +148,9 @@ fn exited(descriptor: &OwnedFd) -> Result<bool, std::io::Error> {
         events: libc::POLLIN,
         revents: 0,
     };
-    if unsafe { libc::poll(&mut poll, 1, 0) } < 0 {
+    // SAFETY: `poll` is one initialised pollfd that outlives the call, matching
+    // nfds = 1; the borrowed descriptor stays open for the whole call.
+    if unsafe { libc::poll(&raw mut poll, 1, 0) } < 0 {
         return Err(std::io::Error::last_os_error());
     }
     if poll.revents & (libc::POLLERR | libc::POLLNVAL) != 0 {
@@ -189,10 +200,14 @@ pub fn liveness(producer: &Producer) -> Liveness {
 fn user_uid(name: &str) -> Result<u32, Refusal> {
     let name = CString::new(name).map_err(|_| Refusal::Producer)?;
     // The runtime is single-threaded: copy the NSS result before another lookup.
+    // SAFETY: `name` is a NUL-terminated CString that outlives the call.
     let entry = unsafe { libc::getpwnam(name.as_ptr()) };
     if entry.is_null() {
         Err(Refusal::Producer)
     } else {
+        // SAFETY: a non-null getpwnam result points to a valid passwd record
+        // until the next lookup; the single-threaded runtime makes none before
+        // this copy.
         Ok(unsafe { (*entry).pw_uid })
     }
 }
@@ -214,24 +229,30 @@ pub fn authenticate(stream: &UnixStream, policy: &Policy) -> Result<Producer, Re
         uid: 0,
         gid: 0,
     };
-    let mut size = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "ucred is three 32-bit fields, far below socklen_t::MAX"
+    )]
+    let mut size = size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: credentials points to a writable ucred of exactly size bytes and
+    // the stream's descriptor stays open for the call.
     let result = unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut size,
+            (&raw mut credentials).cast(),
+            &raw mut size,
         )
     };
     if result != 0
-        || size as usize != std::mem::size_of::<libc::ucred>()
+        || size as usize != size_of::<libc::ucred>()
         || credentials.pid <= 0
         || credentials.uid != user_uid(&policy.user)?
     {
         return Err(Refusal::Producer);
     }
-    let pid = credentials.pid as u32;
+    let pid = u32::try_from(credentials.pid).map_err(|_| Refusal::Producer)?;
     let producer = Producer {
         pid,
         start_ticks: process_ticks(pid).map_err(|_| Refusal::Producer)?,
@@ -272,11 +293,16 @@ pub fn write_frame(stream: &mut impl Write, reply: &Reply) -> Result<(), Refusal
         return Err(Refusal::Schema);
     }
     stream
-        .write_all(&(bytes.len() as u32).to_be_bytes())
+        .write_all(
+            &u32::try_from(bytes.len())
+                .map_err(|_| Refusal::Schema)?
+                .to_be_bytes(),
+        )
         .and_then(|()| stream.write_all(&bytes))
         .map_err(|_| Refusal::Schema)
 }
 
+#[derive(Debug)]
 pub struct Runtime {
     pub store: Store,
     pub policy: Policy,
@@ -321,6 +347,10 @@ impl Runtime {
         Ok(())
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "run hands over its per-connection producer, and the otel-request-recorder commit-reply fixture patches that exact call"
+    )]
     pub fn apply(&mut self, producer: Producer, command: Command, now_ns: u64) -> Reply {
         let result = match command {
             Command::Hello {} => self.store.state().map(|_| Reply::Ok {}),
@@ -329,13 +359,10 @@ impl Runtime {
                 .transition(|state| state.mark_gap(now_ns))
                 .map(|()| Reply::Ok {}),
             Command::Admit {} => {
-                let deadline = match now_ns.checked_add(self.deadline_ns) {
-                    Some(deadline) => deadline,
-                    None => {
-                        return Reply::Refused {
-                            reason: Refusal::Accounting,
-                        }
-                    }
+                let Some(deadline) = now_ns.checked_add(self.deadline_ns) else {
+                    return Reply::Refused {
+                        reason: Refusal::Accounting,
+                    };
                 };
                 self.store
                     .transition(|state| state.admit(producer.clone(), now_ns, deadline))
@@ -468,9 +495,15 @@ fn identity() -> Result<String, Refusal> {
     File::open("/dev/urandom")
         .and_then(|mut file| file.read_exact(&mut bytes))
         .map_err(|_| Refusal::Storage)?;
-    Ok(bytes.iter().map(|byte| format!("{byte:02x}")).collect())
+    #[expect(
+        clippy::format_collect,
+        reason = "sixteen bytes once per process start; the allocation cost is irrelevant"
+    )]
+    let hex = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
+    Ok(hex)
 }
 
+#[derive(Debug)]
 pub struct Config {
     pub source: Source,
     pub state: PathBuf,
@@ -499,8 +532,10 @@ fn publish(path: &Path, bytes: &[u8], mode: u32) -> Result<(), Refusal> {
 fn private_parent(path: &Path) -> Result<(), Refusal> {
     let metadata = std::fs::symlink_metadata(path.parent().ok_or(Refusal::Storage)?)
         .map_err(|_| Refusal::Storage)?;
+    // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
+    let euid = unsafe { libc::geteuid() };
     if !metadata.is_dir()
-        || metadata.uid() != unsafe { libc::geteuid() }
+        || metadata.uid() != euid
         || !matches!(metadata.mode() & 0o777, 0o700 | 0o750)
     {
         return Err(Refusal::Storage);
@@ -510,10 +545,12 @@ fn private_parent(path: &Path) -> Result<(), Refusal> {
 
 fn clear_snapshot_stage(path: &Path) -> Result<(), Refusal> {
     let stage = path.with_extension("new");
+    // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
+    let euid = unsafe { libc::geteuid() };
     match std::fs::symlink_metadata(&stage) {
         Ok(metadata)
             if metadata.is_file()
-                && metadata.uid() == unsafe { libc::geteuid() }
+                && metadata.uid() == euid
                 && metadata.nlink() == 1
                 && metadata.mode() & 0o022 == 0 =>
         {
@@ -551,7 +588,9 @@ pub fn run(config: Config) -> Result<(), Refusal> {
     clear_snapshot_stage(&config.snapshot)?;
     let mut runtime = Runtime::new(store, config.policy, config.deadline_ns)?;
     if let Ok(metadata) = std::fs::symlink_metadata(&config.socket) {
-        if !metadata.file_type().is_socket() || metadata.uid() != unsafe { libc::geteuid() } {
+        // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
+        let euid = unsafe { libc::geteuid() };
+        if !metadata.file_type().is_socket() || metadata.uid() != euid {
             return Err(Refusal::Storage);
         }
         std::fs::remove_file(&config.socket).map_err(|_| Refusal::Storage)?;
@@ -562,6 +601,10 @@ pub fn run(config: Config) -> Result<(), Refusal> {
     listener
         .set_nonblocking(true)
         .map_err(|_| Refusal::Storage)?;
+    #[expect(
+        clippy::unchecked_time_subtraction,
+        reason = "Linux Instant is a signed-seconds CLOCK_MONOTONIC timespec; subtracting one second cannot underflow"
+    )]
     let mut refreshed = Instant::now() - Duration::from_secs(1);
     loop {
         if refreshed.elapsed() >= Duration::from_secs(1) {
@@ -594,7 +637,7 @@ pub fn run(config: Config) -> Result<(), Refusal> {
                 let _ = write_frame(&mut stream, &reply);
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(5))
+                std::thread::sleep(Duration::from_millis(5));
             }
             Err(_) => return Err(Refusal::Storage),
         }
@@ -617,7 +660,11 @@ pub fn request(path: &Path, command: Command) -> Result<Reply, Refusal> {
     })
     .map_err(|_| Refusal::Schema)?;
     stream
-        .write_all(&(bytes.len() as u32).to_be_bytes())
+        .write_all(
+            &u32::try_from(bytes.len())
+                .map_err(|_| Refusal::Schema)?
+                .to_be_bytes(),
+        )
         .and_then(|()| stream.write_all(&bytes))
         .map_err(|_| Refusal::Storage)?;
     let mut header = [0_u8; 4];
@@ -639,7 +686,7 @@ mod tests {
     use hegel::{generators as gs, TestCase};
 
     fn frame(bytes: &[u8]) -> Vec<u8> {
-        let mut output = (bytes.len() as u32).to_be_bytes().to_vec();
+        let mut output = u32::try_from(bytes.len()).unwrap().to_be_bytes().to_vec();
         output.extend_from_slice(bytes);
         output
     }

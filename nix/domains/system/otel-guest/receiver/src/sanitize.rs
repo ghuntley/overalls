@@ -4,6 +4,7 @@ use crate::binding::Binding;
 use opentelemetry_proto::tonic::collector::metrics::v1::ExportMetricsServiceRequest;
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceRequest;
 use opentelemetry_proto::tonic::common::v1::{any_value::Value, AnyValue, KeyValue};
+use opentelemetry_proto::tonic::metrics::v1::metric::Data;
 use opentelemetry_proto::tonic::resource::v1::Resource;
 use prost::Message;
 
@@ -92,7 +93,7 @@ pub fn sanitize_metrics(body: &[u8], binding: &Binding) -> Result<Vec<u8>, &'sta
         for scope in &mut resource.scope_metrics {
             if let Some(instrumentation) = &mut scope.scope {
                 instrumentation.attributes.clear();
-                instrumentation.name = "overalls-guest".to_owned();
+                "overalls-guest".clone_into(&mut instrumentation.name);
                 instrumentation.version.clear();
                 instrumentation.dropped_attributes_count = 0;
             }
@@ -104,7 +105,6 @@ pub fn sanitize_metrics(body: &[u8], binding: &Binding) -> Result<Vec<u8>, &'sta
                 }
                 metric.description.clear();
                 metric.unit.clear();
-                use opentelemetry_proto::tonic::metrics::v1::metric::Data;
                 match metric.data.as_mut().ok_or("metric_kind")? {
                     Data::Gauge(data) => {
                         point_count += data.data_points.len();
@@ -155,7 +155,7 @@ pub fn sanitize_traces(body: &[u8], binding: &Binding) -> Result<Vec<u8>, &'stat
         for scope in &mut resource.scope_spans {
             if let Some(instrumentation) = &mut scope.scope {
                 instrumentation.attributes.clear();
-                instrumentation.name = "overalls-guest".to_owned();
+                "overalls-guest".clone_into(&mut instrumentation.name);
                 instrumentation.version.clear();
                 instrumentation.dropped_attributes_count = 0;
             }

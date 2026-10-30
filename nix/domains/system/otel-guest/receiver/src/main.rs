@@ -21,18 +21,23 @@ fn peer_uid(stream: &UnixStream) -> std::io::Result<u32> {
         uid: 0,
         gid: 0,
     };
-    let mut length = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    // SAFETY: credentials points to a writable ucred of exactly length bytes.
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "ucred is three 32-bit fields, far below socklen_t::MAX"
+    )]
+    let mut length = size_of::<libc::ucred>() as libc::socklen_t;
+    // SAFETY: credentials points to a writable ucred of exactly length bytes
+    // and the stream's descriptor stays open for the call.
     let result = unsafe {
         libc::getsockopt(
             stream.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut length,
+            (&raw mut credentials).cast(),
+            &raw mut length,
         )
     };
-    if result != 0 || length as usize != std::mem::size_of::<libc::ucred>() {
+    if result != 0 || length as usize != size_of::<libc::ucred>() {
         return Err(std::io::Error::last_os_error());
     }
     Ok(credentials.uid)
@@ -72,7 +77,9 @@ fn read_request(stream: &mut UnixStream) -> Result<(&'static str, String, Vec<u8
             break;
         }
         let header = std::str::from_utf8(&header).map_err(|_| "header_utf8")?;
-        let (name, value) = header[..header.len() - 2]
+        let (name, value) = header
+            .strip_suffix("\r\n")
+            .ok_or("header_shape")?
             .split_once(':')
             .ok_or("header_shape")?;
         let value = value.trim();
@@ -82,7 +89,7 @@ fn read_request(stream: &mut UnixStream) -> Result<(&'static str, String, Vec<u8
             "content-type" if content_type.is_none() => content_type = Some(value.to_owned()),
             "content-type" => return Err("duplicate_content_type"),
             "transfer-encoding" if transfer_encoding.is_none() => {
-                transfer_encoding = Some(value.to_owned())
+                transfer_encoding = Some(value.to_owned());
             }
             "transfer-encoding" => return Err("duplicate_transfer_encoding"),
             "content-length" => content_length = true,
@@ -171,9 +178,7 @@ fn forward(path: &str, body: &[u8]) -> Result<(), &'static str> {
 fn handle(mut stream: UnixStream, audi_uid: u32, limit: &Mutex<IntakeLimit>) {
     let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
     let _ = stream.set_write_timeout(Some(Duration::from_secs(3)));
-    let status = if peer_uid(&stream).ok() != Some(audi_uid) {
-        403
-    } else {
+    let status = if peer_uid(&stream).ok() == Some(audi_uid) {
         match read_request(&mut stream) {
             Ok((path, header, body)) => match parse_binding(&header) {
                 Ok(binding) => {
@@ -204,6 +209,8 @@ fn handle(mut stream: UnixStream, audi_uid: u32, limit: &Mutex<IntakeLimit>) {
             },
             Err(_) => 400,
         }
+    } else {
+        403
     };
     let reason = match status {
         200 => "OK",

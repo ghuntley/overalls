@@ -7,11 +7,11 @@ use std::process::{Command as ProcessCommand, Stdio};
 use std::sync::mpsc;
 use std::time::{Duration, Instant};
 
-const INTERVAL: Duration = Duration::from_secs(300);
-const DEADLINE: Duration = Duration::from_secs(60);
+const INTERVAL: Duration = Duration::from_mins(5);
+const DEADLINE: Duration = Duration::from_mins(1);
 const HEARTBEAT: Duration = Duration::from_secs(5);
 
-fn accepted(reply: Result<Reply, crate::request_recorder::Refusal>) -> bool {
+fn accepted(reply: &Result<Reply, crate::request_recorder::Refusal>) -> bool {
     matches!(reply, Ok(Reply::Ok {}))
 }
 
@@ -41,6 +41,8 @@ fn slot(next: Instant, now: Instant, covered: bool) -> (Instant, Slot) {
 }
 
 fn subreaper() -> bool {
+    // SAFETY: PR_SET_CHILD_SUBREAPER takes an integer flag and no pointers;
+    // the trailing arguments are unused zeros, so no memory is accessed.
     unsafe { libc::prctl(libc::PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) == 0 }
 }
 
@@ -77,6 +79,8 @@ fn owned_children() -> std::io::Result<Vec<i32>> {
 /// Kernel-owned child lists alone MUST select targets, never fixture data.
 fn reap_owned_children() -> bool {
     for _ in 0..100 {
+        // SAFETY: a null status pointer is permitted by waitpid(2) and means
+        // the exit status is discarded; WNOHANG keeps the call non-blocking.
         while unsafe { libc::waitpid(-1, std::ptr::null_mut(), libc::WNOHANG) } > 0 {}
         let Ok(children) = owned_children() else {
             return false;
@@ -85,8 +89,14 @@ fn reap_owned_children() -> bool {
             return true;
         }
         for pid in children {
+            // SAFETY: kill(2) takes plain integers and accesses no memory. The
+            // PID came from this process's kernel-owned child list and is > 1.
             unsafe {
                 libc::kill(-pid, libc::SIGKILL);
+            }
+            // SAFETY: as above; this targets the child itself rather than its
+            // process group.
+            unsafe {
                 libc::kill(pid, libc::SIGKILL);
             }
         }
@@ -99,6 +109,7 @@ fn kill_group(child: &mut std::process::Child) -> bool {
     if let Ok(pid) = i32::try_from(child.id()) {
         // Linux limits PIDs to positive signed integers. This is the process
         // group created for our owned browser, never a fixture-selected PID.
+        // SAFETY: kill(2) takes plain integers and accesses no memory.
         unsafe { libc::kill(-pid, libc::SIGKILL) };
     }
     let _ = child.wait();
@@ -142,7 +153,7 @@ fn heartbeat(socket: &Path, last: &mut Instant) -> bool {
         return true;
     }
     *last = Instant::now();
-    accepted(request(socket, Command::Hello {}))
+    accepted(&request(socket, Command::Hello {}))
 }
 
 /// @cc [owner:ghuntley,label:reliability;security] browser-single-terminal-settlement
@@ -179,8 +190,8 @@ fn journey(socket: &Path, driver: &Path, fixture: &Path, chromium: &Path) -> boo
     } else {
         Terminal::Exclude
     };
-    let duration_us = elapsed.as_micros().min(u128::from(u64::MAX)) as u64;
-    accepted(request(
+    let duration_us = u64::try_from(elapsed.as_micros()).unwrap_or(u64::MAX);
+    accepted(&request(
         socket,
         Command::Finish {
             id,
@@ -199,11 +210,15 @@ pub fn run(socket: &Path, driver: &Path, fixture: &Path, chromium: &Path) -> ! {
         std::process::exit(2);
     }
     let mut next = Instant::now();
+    #[expect(
+        clippy::unchecked_time_subtraction,
+        reason = "Linux Instant is a signed-seconds CLOCK_MONOTONIC timespec; subtracting five seconds cannot underflow"
+    )]
     let mut last_heartbeat = Instant::now() - HEARTBEAT;
     let mut gap = true;
     loop {
         if gap {
-            if accepted(request(socket, Command::Gap {})) {
+            if accepted(&request(socket, Command::Gap {})) {
                 gap = false;
             } else {
                 std::thread::sleep(Duration::from_secs(1));
@@ -269,7 +284,7 @@ mod tests {
             .unwrap();
         ready(&mut child, "BROWSER_CHILD_READY");
         assert!(kill_group(&mut child));
-        assert!(owned_children().unwrap().is_empty());
+        assert_eq!(owned_children().unwrap(), Vec::<i32>::new());
     }
 
     #[test]

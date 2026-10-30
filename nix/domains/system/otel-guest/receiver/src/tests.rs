@@ -161,11 +161,11 @@ fn draw_uuid(tc: &TestCase) -> String {
     let raw = format!("{:032x}", tc.draw(gs::integers::<u128>()));
     let mut uuid = format!(
         "{}-{}-{}-{}-{}",
-        &raw[0..8],
-        &raw[8..12],
-        &raw[12..16],
-        &raw[16..20],
-        &raw[20..32]
+        raw.get(0..8).unwrap(),
+        raw.get(8..12).unwrap(),
+        raw.get(12..16).unwrap(),
+        raw.get(16..20).unwrap(),
+        raw.get(20..32).unwrap()
     );
     if tc.draw(gs::booleans()) {
         let at = tc.draw(gs::integers::<usize>().max_value(35));
@@ -286,7 +286,7 @@ fn allowed_metric_vocabulary_is_closed(tc: TestCase) {
         ),
         3 => {
             let keep = tc.draw(gs::integers::<usize>().max_value(base.len() - 1));
-            base[..keep].to_owned()
+            base.get(..keep).unwrap().to_owned()
         }
         4 => base.to_uppercase(),
         _ => tc.draw(gs::text().alphabet("overalls.guestrqidnmkp_").max_size(32)),
@@ -337,7 +337,7 @@ fn service_name_is_total(tc: TestCase) {
     let expected = attributes
         .iter()
         .filter(|attribute| attribute.key == "service.name")
-        .filter_map(
+        .find_map(
             |attribute| match attribute.value.as_ref()?.value.as_ref()? {
                 Value::StringValue(value) => SERVICE_VOCABULARY
                     .iter()
@@ -346,7 +346,6 @@ fn service_name_is_total(tc: TestCase) {
                 _ => None,
             },
         )
-        .next()
         .unwrap_or("unknown");
     let resource = Resource {
         attributes,
@@ -405,11 +404,11 @@ fn guest_resource_and_dimensions_are_replaced(tc: TestCase) {
         Some(&Value::StringValue(binding().vm_id))
     );
     let metric = &resource.scope_metrics[0].metrics[0];
-    assert!(metric.unit.is_empty());
+    assert_eq!(metric.unit, "");
     let Some(Data::Gauge(gauge)) = &metric.data else {
         panic!("sanitized metric lost its gauge");
     };
-    assert!(gauge.data_points[0].attributes.is_empty());
+    assert_eq!(gauge.data_points[0].attributes, Vec::new());
 }
 
 /// @cc [owner:ghuntley,label:verification;security] otel-receiver-trace-detail-dropped
@@ -460,6 +459,6 @@ fn budgets_reopen_after_window_expires() {
     assert!(limiter.admit(
         &binding(),
         VM_BYTES_PER_MINUTE,
-        now + Duration::from_secs(60)
+        now + Duration::from_mins(1)
     ));
 }

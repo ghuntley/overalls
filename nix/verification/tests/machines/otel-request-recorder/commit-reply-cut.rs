@@ -26,6 +26,7 @@ Ok(envelope) => {
             .map_err(|_| Refusal::Storage)?;
         witness.write_all(operation.as_bytes()).map_err(|_| Refusal::Storage)?;
         witness.sync_all().map_err(|_| Refusal::Storage)?;
+        // SAFETY: raise(3) takes a signal number by value and reads no memory.
         if unsafe { libc::raise(libc::SIGSTOP) } != 0 {
             return Err(Refusal::Storage);
         }

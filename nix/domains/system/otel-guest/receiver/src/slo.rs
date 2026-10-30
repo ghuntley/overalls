@@ -258,6 +258,10 @@ fn sum(name: &str, value: u64, snapshot: &Snapshot) -> Metric {
             data_points: vec![NumberDataPoint {
                 start_time_unix_nano: snapshot.started_at_unix_nano,
                 time_unix_nano: snapshot.sampled_at_unix_nano,
+                #[expect(
+                    clippy::cast_possible_wrap,
+                    reason = "valid() bounds every exported counter to MAX_COUNTER = i64::MAX"
+                )]
                 value: Some(NumberValue::AsInt(value as i64)),
                 ..Default::default()
             }],
@@ -275,6 +279,10 @@ fn encode(snapshot: &Snapshot) -> Vec<u8> {
 /// @cc [owner:ghuntley,label:reliability] source-start-visibility
 /// Every trusted application snapshot MUST export its source start time as
 /// a fixed gauge so recording rules can reject windows after counter resets.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "OTLP exports seconds as f64; rounding counters above 2^53 is inherent to the format"
+)]
 fn encode_with_instance(snapshot: &Snapshot, instance: Option<&str>) -> Vec<u8> {
     let mut request = ExportMetricsServiceRequest::default();
     let mut attributes = vec![attribute("service.name", &snapshot.service)];
@@ -405,7 +413,8 @@ fn now_ns() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos()
-        .min(u128::from(u64::MAX)) as u64
+        .try_into()
+        .unwrap_or(u64::MAX)
 }
 
 /// Export only fixed, locally configured service identities.
@@ -443,7 +452,7 @@ pub enum SourceCustody {
 }
 
 /// @cc [owner:ghuntley,label:security] recorder-source-explicit-read-only-custody
-/// RecorderGroup MUST accept only the closed recorder request sources and an
+/// `RecorderGroup` MUST accept only the closed recorder request sources and an
 /// exact primary-group-owned, non-writable snapshot. Selecting this mode MUST
 /// NOT fall back to private files.
 
@@ -451,6 +460,10 @@ pub enum SourceCustody {
 /// Direct custody MUST accept only sources without a request recorder: Ziggy
 /// (exporter-owned private file), Underclass proxy and the lifecycle sources
 /// (group-custody files). Recorder-backed request sources MUST be refused.
+#[expect(
+    clippy::empty_line_after_doc_comments,
+    reason = "code-contracts requires a blank line between the two @cc notes on this function"
+)]
 pub fn run_with_custody(
     service: &str,
     source: &Path,
@@ -490,13 +503,16 @@ pub fn run_with_custody(
             return Err("instance");
         }
     }
+    // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
     let uid = unsafe { libc::geteuid() };
+    // SAFETY: getegid(2) takes no arguments, cannot fail and touches no memory.
+    let gid = unsafe { libc::getegid() };
     let mut previous: Option<Snapshot> = None;
     loop {
         let candidate = if custody == SourceCustody::Direct && service == "ziggy" {
             read_snapshot(source, uid)
         } else {
-            read_group_snapshot(source, unsafe { libc::getegid() })
+            read_group_snapshot(source, gid)
         };
         if let Ok(snapshot) = candidate {
             if valid(&snapshot, service, previous.as_ref(), now_ns()) {
@@ -631,11 +647,14 @@ mod tests {
         let Some(Data::Histogram(histogram)) = &histograms[0].data else {
             panic!("histogram missing");
         };
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the oracle mirrors the exporter's f64 seconds conversion"
+        )]
+        let expected = UNDERCLASS_BOUNDS_US.map(|bound| bound as f64 / 1_000_000.0);
         assert_eq!(
             &histogram.data_points[0].explicit_bounds,
-            &UNDERCLASS_BOUNDS_US
-                .map(|bound| bound as f64 / 1_000_000.0)
-                .to_vec()
+            &expected.to_vec()
         );
         assert_eq!(histogram.data_points[0].bucket_counts.len(), 16);
         let mut broken = snapshot.clone();
@@ -700,9 +719,14 @@ mod tests {
         let Some(Data::Gauge(gauge)) = &metric.data else {
             panic!("coverage clock missing");
         };
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the oracle mirrors the exporter's f64 seconds conversion"
+        )]
+        let expected = gap as f64 / 1_000_000_000.0;
         assert_eq!(
             gauge.data_points[0].value,
-            Some(NumberValue::AsDouble(gap as f64 / 1_000_000_000.0))
+            Some(NumberValue::AsDouble(expected))
         );
         let mut regression = newer.clone();
         regression.sampled_at_unix_nano += 1;
@@ -757,11 +781,14 @@ mod tests {
                     _ => None,
                 })
                 .unwrap();
+            #[expect(
+                clippy::cast_precision_loss,
+                reason = "the oracle mirrors the exporter's f64 seconds conversion"
+            )]
+            let expected = LIFECYCLE_BOUNDS_US.map(|bound| bound as f64 / 1_000_000.0);
             assert_eq!(
                 &histogram.data_points[0].explicit_bounds,
-                &LIFECYCLE_BOUNDS_US
-                    .map(|bound| bound as f64 / 1_000_000.0)
-                    .to_vec()
+                &expected.to_vec()
             );
             snapshot.duration.explicit_bounds_us = BOUNDS_US.to_vec();
             assert!(!valid(
@@ -806,11 +833,14 @@ mod tests {
         let Some(Data::Gauge(clock)) = &sampled.data else {
             panic!("source clock missing");
         };
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the oracle mirrors the exporter's f64 seconds conversion"
+        )]
+        let expected = first.sampled_at_unix_nano as f64 / 1_000_000_000.0;
         assert_eq!(
             clock.data_points[0].value,
-            Some(NumberValue::AsDouble(
-                first.sampled_at_unix_nano as f64 / 1_000_000_000.0
-            ))
+            Some(NumberValue::AsDouble(expected))
         );
         let Some(Data::Gauge(gauge)) = &start.data else {
             panic!("missing source start gauge");
@@ -1040,7 +1070,7 @@ mod tests {
     fn service_bounds_strictly_increase(tc: TestCase) {
         let service = draw_service(&tc);
         let bounds = service_bounds(&service);
-        assert!(!bounds.is_empty());
+        assert_ne!(bounds.len(), 0);
         assert!(bounds.windows(2).all(|pair| pair[0] < pair[1]));
         assert!(
             bounds == BOUNDS_US.as_slice()
@@ -1061,7 +1091,7 @@ mod tests {
                 0 => base.to_owned(),
                 1 => format!("{base}_"),
                 2 => base.to_uppercase(),
-                _ => base[1..].to_owned(),
+                _ => base.get(1..).unwrap().to_owned(),
             }
         } else {
             draw_service(&tc)
@@ -1082,6 +1112,7 @@ mod tests {
         let path = root.join("slo.json");
         std::fs::write(&path, serde_json::to_vec(&sample(2, 1)).unwrap()).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).unwrap();
+        // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
         let uid = unsafe { libc::geteuid() };
         assert!(read_snapshot(&path, uid).is_ok());
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o644)).unwrap();
@@ -1106,6 +1137,7 @@ mod tests {
         let path = root.join("slo.json");
         std::fs::write(&path, serde_json::to_vec(&sample(2, 1)).unwrap()).unwrap();
         std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o640)).unwrap();
+        // SAFETY: getegid(2) takes no arguments, cannot fail and touches no memory.
         let gid = unsafe { libc::getegid() };
         assert!(read_group_snapshot(&path, gid).is_ok());
         assert!(read_group_snapshot(&path, gid.saturating_add(1)).is_err());

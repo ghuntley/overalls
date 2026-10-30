@@ -31,6 +31,10 @@ fn serve(recorder: &Path, control: &Path) -> Result<(), ()> {
     }
     let listener = UnixListener::bind(control).map_err(|_| ())?;
     listener.set_nonblocking(true).map_err(|_| ())?;
+    #[expect(
+        clippy::unchecked_time_subtraction,
+        reason = "Linux Instant is a signed-seconds CLOCK_MONOTONIC timespec; subtracting one second cannot underflow"
+    )]
     let mut heartbeat = Instant::now() - Duration::from_secs(1);
     loop {
         if heartbeat.elapsed() >= Duration::from_secs(1) {
@@ -52,7 +56,7 @@ fn serve(recorder: &Path, control: &Path) -> Result<(), ()> {
                 request_recorder::write_frame(&mut stream, &reply).map_err(|_| ())?;
             }
             Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(10))
+                std::thread::sleep(Duration::from_millis(10));
             }
             Err(_) => return Err(()),
         }
@@ -82,7 +86,7 @@ fn run() -> Result<(), ()> {
                 })
                 .map_err(|_| ())?;
                 stream
-                    .write_all(&(bytes.len() as u32).to_be_bytes())
+                    .write_all(&u32::try_from(bytes.len()).map_err(|_| ())?.to_be_bytes())
                     .and_then(|()| stream.write_all(&bytes))
                     .map_err(|_| ())?;
                 let mut header = [0_u8; 4];

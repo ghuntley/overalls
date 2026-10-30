@@ -27,7 +27,7 @@ impl Window {
     }
 
     fn refresh(&mut self, now: Instant) {
-        if now.duration_since(self.since) >= Duration::from_secs(60) {
+        if now.duration_since(self.since) >= Duration::from_mins(1) {
             *self = Self::new(now);
         }
     }
@@ -69,7 +69,7 @@ impl IntakeLimit {
         }
         if !self.vms.contains_key(&binding.vm_id) && self.vms.len() >= MAX_ACTIVE_VMS {
             self.vms
-                .retain(|_, window| now.duration_since(window.since) < Duration::from_secs(60));
+                .retain(|_, window| now.duration_since(window.since) < Duration::from_mins(1));
             if self.vms.len() >= MAX_ACTIVE_VMS {
                 return false;
             }

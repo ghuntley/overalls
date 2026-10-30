@@ -89,7 +89,7 @@ pub struct Producer {
 impl Producer {
     fn valid(&self) -> bool {
         self.pid > 0
-            && self.pid <= i32::MAX as u32
+            && i32::try_from(self.pid).is_ok()
             && self.start_ticks > 0
             && self.boot_id.len() == 36
             && self.boot_id.bytes().enumerate().all(|(index, byte)| {
@@ -388,6 +388,7 @@ const STATE_LIMIT: u64 = 1_048_576;
 
 /// Exclusive private checkpoint owner. A failed durability operation poisons
 /// the instance until reopen; callers must never publish a fresh poisoned state.
+#[derive(Debug)]
 pub struct Store {
     directory: PathBuf,
     state: State,
@@ -402,6 +403,10 @@ impl Store {
     /// It MUST NOT silently start a new lifetime after losing acknowledged state.
     /// Only checkpoint `VERSION` is accepted; any other version refuses with
     /// `Error::Version` and leaves the file unchanged, with no upgrade path.
+    #[expect(
+        clippy::similar_names,
+        reason = "state and stage name the committed and staged checkpoint files"
+    )]
     pub fn open(
         directory: &Path,
         source: Source,
@@ -409,10 +414,9 @@ impl Store {
         incarnation: String,
     ) -> Result<Self, Error> {
         let metadata = std::fs::symlink_metadata(directory).map_err(|_| Error::Storage)?;
-        if !metadata.is_dir()
-            || metadata.uid() != unsafe { libc::geteuid() }
-            || metadata.mode() & 0o777 != 0o700
-        {
+        // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
+        let euid = unsafe { libc::geteuid() };
+        if !metadata.is_dir() || metadata.uid() != euid || metadata.mode() & 0o777 != 0o700 {
             return Err(Error::Storage);
         }
         let lock = OpenOptions::new()
@@ -425,6 +429,8 @@ impl Store {
             .open(directory.join("lock"))
             .map_err(|_| Error::Storage)?;
         private_file(&lock)?;
+        // SAFETY: the descriptor is owned by `lock`, which outlives the call;
+        // flock(2) reads no caller memory.
         if unsafe { libc::flock(lock.as_raw_fd(), libc::LOCK_EX | libc::LOCK_NB) } != 0 {
             return Err(Error::Storage);
         }
@@ -562,6 +568,10 @@ impl Store {
         Ok(result)
     }
 
+    #[expect(
+        clippy::similar_names,
+        reason = "state and stage name the committed and staged checkpoint files"
+    )]
     fn persist(&self, state: &State) -> Result<(), Error> {
         let bytes = serde_json::to_vec(state).map_err(|_| Error::Invalid)?;
         if bytes.len() as u64 > STATE_LIMIT {
@@ -587,8 +597,10 @@ impl Store {
 
 fn private_file(file: &File) -> Result<(), Error> {
     let metadata = file.metadata().map_err(|_| Error::Storage)?;
+    // SAFETY: geteuid(2) takes no arguments, cannot fail and touches no memory.
+    let euid = unsafe { libc::geteuid() };
     if metadata.is_file()
-        && metadata.uid() == unsafe { libc::geteuid() }
+        && metadata.uid() == euid
         && metadata.mode() & 0o777 == 0o600
         && metadata.nlink() == 1
     {
@@ -881,7 +893,7 @@ mod tests {
             match tc.draw(gs::integers::<u8>().max_value(2)) {
                 0 => format!("{name}_"),
                 1 => name.to_uppercase(),
-                _ => name[1..].to_owned(),
+                _ => name.get(1..).unwrap().to_owned(),
             }
         } else {
             tc.draw(gs::text().alphabet("abcdeghilnoprstuvwxyz_").max_size(24))
@@ -940,8 +952,8 @@ mod tests {
     }
 
     /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-transitions-preserve-validity
-    /// Every state reached from a new state through generated admit, finish,
-    /// mark_gap and reconcile calls MUST pass `validate`, and every refused
+    /// Every state reached from a new state through generated `admit`, `finish`,
+    /// `mark_gap` and `reconcile` calls MUST pass `validate`, and every refused
     /// transition MUST leave the state unchanged.
     #[hegel::test(test_cases = 256)]
     fn transitions_preserve_validity(tc: TestCase) {

@@ -63,7 +63,7 @@ fn valid_response(bytes: &[u8], now_ms: u64) -> bool {
         }
     }
     let body = &bytes[split + 4..];
-    if body.len() > MAX_RESPONSE as usize || content_length != Some(body.len()) {
+    if body.len() as u64 > MAX_RESPONSE || content_length != Some(body.len()) {
         return false;
     }
     let Ok(view) = serde_json::from_slice::<MonitorView>(body) else {
@@ -71,13 +71,13 @@ fn valid_response(bytes: &[u8], now_ms: u64) -> bool {
     };
     view.now_ms.abs_diff(now_ms) <= MAX_AGE_MS
         && view.last_minute.unknown <= view.last_minute.attempts
-        && view.last_minute.input_tokens <= i64::MAX as u64
-        && view.last_minute.output_tokens <= i64::MAX as u64
+        && i64::try_from(view.last_minute.input_tokens).is_ok()
+        && i64::try_from(view.last_minute.output_tokens).is_ok()
         && view.minute_bins.len() == 60
         && view
             .minute_bins
             .iter()
-            .all(|value| *value <= i64::MAX as u64)
+            .all(|value| i64::try_from(*value).is_ok())
 }
 
 fn probe(socket: &Path, now_ms: u64) -> bool {
@@ -124,6 +124,10 @@ fn attribute(key: &str, value: &str) -> KeyValue {
 /// @cc [owner:ghuntley,label:reliability] monitor-source-clock
 /// Every probe MUST publish its sampling clock alongside the fixed readiness bit;
 /// collector scrape timestamps MUST NOT substitute for this source observation.
+#[expect(
+    clippy::cast_precision_loss,
+    reason = "OTLP exports the sampling clock as f64 seconds; sub-microsecond rounding is inherent"
+)]
 fn encode(ready: bool, now_ns: u64) -> Vec<u8> {
     ExportMetricsServiceRequest {
         resource_metrics: vec![ResourceMetrics {
@@ -188,7 +192,8 @@ fn now_ns() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos()
-        .min(u128::from(u64::MAX)) as u64
+        .try_into()
+        .unwrap_or(u64::MAX)
 }
 
 /// A local probe publishes fixed 0/1 observations. Missing collector delivery
@@ -238,9 +243,14 @@ mod tests {
             panic!("clock gauge");
         };
         assert_eq!(clock.data_points[0].time_unix_nano, now);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "the oracle mirrors the exporter's f64 seconds conversion"
+        )]
+        let expected = now as f64 / 1_000_000_000.0;
         assert_eq!(
             clock.data_points[0].value,
-            Some(NumberValue::AsDouble(now as f64 / 1_000_000_000.0))
+            Some(NumberValue::AsDouble(expected))
         );
     }
 

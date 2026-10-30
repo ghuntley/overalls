@@ -1,5 +1,5 @@
 //! Fixed numeric storage diagnostics; no application files or names are exported.
-use std::ffi::CString;
+use std::fmt::Write as _;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 use std::process::Command;
@@ -21,23 +21,25 @@ fn measurements(du: &str) -> String {
                     .next()
                     .and_then(|s| s.parse::<u64>().ok())
                 {
-                    result.push_str(&format!(
-                        "overalls_telemetry_storage_used_bytes{{store=\"{store}\"}} {bytes}\n"
-                    ));
+                    // Writing to a String cannot fail.
+                    let _ = writeln!(
+                        result,
+                        "overalls_telemetry_storage_used_bytes{{store=\"{store}\"}} {bytes}"
+                    );
                 }
             }
         }
     }
-    let root = CString::new("/").expect("fixed path");
-    // SAFETY: statvfs receives a valid NUL-terminated path and writable storage;
-    // fields are read only after a successful system call initializes them.
+    let root = c"/";
     let mut info = std::mem::MaybeUninit::<libc::statvfs>::uninit();
+    // SAFETY: statvfs receives a static NUL-terminated path and writable
+    // storage for exactly one statvfs record.
     if unsafe { libc::statvfs(root.as_ptr(), info.as_mut_ptr()) } == 0 {
+        // SAFETY: statvfs returned 0, so the kernel initialized every field.
         let info = unsafe { info.assume_init() };
         if let Some(bytes) = info.f_bavail.checked_mul(info.f_frsize) {
-            result.push_str(&format!(
-                "overalls_telemetry_root_available_bytes {bytes}\n"
-            ));
+            // Writing to a String cannot fail.
+            let _ = writeln!(result, "overalls_telemetry_root_available_bytes {bytes}");
         }
     }
     result

@@ -39,8 +39,11 @@ let
         'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),' \
         ${pkgs.lib.escapeShellArg (builtins.readFile ./commit-reply-cut.rs)}
     '';
-    postCheck = (previous.postCheck or "") + ''
-      cargo clippy --offline --all-targets -- -D warnings
+    # The inserted fault expression is not rustfmt-formatted and lengthens
+    # run past too_many_lines, so this variant replaces the inherited gate with
+    # clippy alone and allows only that length lint for the patched function.
+    postCheck = ''
+      cargo clippy --offline --all-targets -- -D warnings -A clippy::too_many_lines
     '';
   });
 # @cc [owner:ghuntley,label:verification] recorder-cut-history-insertion-required
