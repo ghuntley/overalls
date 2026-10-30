@@ -69,7 +69,7 @@ The initial workspace and adapters are in [`mila/rust/Cargo.toml`](../../../mila
 Hegel fixtures and Nix checks pass on Linux. Transport, secure-storage,
 feature-complete screens, native-host builds and Flutter removal remain open.
 
-[`mila-session`](../../../mila/rust/mila-session/src/lib.rs) composes the pure
+[`mila-session`](../../../mila/rust/mila-session/src/listing.rs) composes the pure
 runtime with the certificate-pinned SSH transport for validated machine reads.
 It owns first-page refresh, bounded continuation, atomic failure preservation and
 complete-only offline projections. Its separate crate keeps network dependencies
