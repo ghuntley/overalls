@@ -16,6 +16,42 @@ done
 echo "$state" >> "$2"
 """
 
+# What an action can reach of the worker that runs it: its identity, store,
+# sandbox binary and secrets (files), the worker process (/proc), the worker's
+# environment, inherited descriptors and the network. Shell builtins only:
+# remote actions get no PATH.
+_SECRET_SCRIPT = """
+out="$2"
+r() { printf '%s\\n' "$1" >> "$out"; }
+read -r host < /proc/sys/kernel/hostname
+r "$host"
+while read -r key value _; do if [ "$key" = Uid: ]; then r "uid $value"; fi; done < /proc/self/status
+for path in /run/nativelink-worker/identity.pem /run/nativelink-worker /var/lib/nativelink-worker \\
+    /var/lib/nativelink-worker/cas/content /run/nativelink-worker-exec/action-sandbox \\
+    /run/overalls-secrets/buck-re-worker/worker.pem /run/credentials/nativelink-worker.service/worker.pem; do
+  if (exec 3< "$path") 2>/dev/null; then r "readable $path"; fi
+done
+if (: > /var/lib/nativelink-worker/cas/content/poison) 2>/dev/null; then r "store-writable"; fi
+procs=0
+for entry in /proc/[0-9]*; do procs=$((procs + 1)); done
+r "procs $procs"
+read -r init < /proc/1/comm
+r "pid1 $init"
+case "$(export -p)" in *CREDENTIALS_DIRECTORY*|*OVERALLS_CELLS_ID*|*INVOCATION_ID*|*/run/nativelink-worker*) r env-leak ;; esac
+fds=""
+# The glob's own descriptor is listed but closed by the time the loop runs.
+for fd in /proc/self/fd/*; do number=${fd##*/}; if [ "$number" -gt 2 ] && [ -e "$fd" ]; then fds="$fds $number"; fi; done
+r "fds$fds"
+if (exec 3<>/dev/tcp/192.168.1.4/50074) 2>/dev/null; then r "network-open"; fi
+"""
+
+def _secret_probe_impl(ctx: AnalysisContext) -> list[Provider]:
+    out = ctx.actions.declare_output("out.txt")
+    ctx.actions.run(cmd_args("/bin/sh", "-c", _SECRET_SCRIPT, "--", ctx.attrs.text, out.as_output()), category = "secret_probe")
+    return [DefaultInfo(default_output = out)]
+
+secret_probe = rule(impl = _secret_probe_impl, attrs = {"text": attrs.string()})
+
 def _probe_impl(ctx: AnalysisContext) -> list[Provider]:
     out = ctx.actions.declare_output("out.txt")
     ctx.actions.run(

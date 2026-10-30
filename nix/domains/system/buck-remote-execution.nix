@@ -91,6 +91,21 @@ let
   workerState = "/var/lib/nativelink-worker";
   cellsState = "/var/lib/nativelink-worker-cells";
   workerRuntime = "/run/nativelink-worker";
+  # Action directories: the worker creates them, the action user writes in
+  # them through the shared group, and neither reaches the other's state.
+  workRoot = "/var/lib/nativelink-worker-work";
+  workDirectory = "${workRoot}/work";
+  # A private tmpfs in the worker's namespace, not mounted nosuid, holding the
+  # one binary that carries capabilities there.
+  sandboxDirectory = "/run/nativelink-worker-exec";
+  sandboxBinary = "${sandboxDirectory}/action-sandbox";
+  actionSandbox = pkgs.runCommandCC "buck-re-action-sandbox" { } ''
+    mkdir -p $out/bin
+    $CC -std=c11 -O2 -Wall -Wextra -Werror \
+      -DWORK_ROOT='"${workDirectory}"' -DWORKER_USER='"nativelink-worker"' -DACTION_USER='"nativelink-action"' \
+      -DHIDDEN_PATHS='${lib.concatMapStringsSep "," (path: ''"${path}"'') [ workerState workerRuntime sandboxDirectory ]}' \
+      ${./buck-re-action-sandbox.c} -o $out/bin/buck-re-action-sandbox
+  '';
   workerIdentity = "${workerRuntime}/identity.pem";
   workerTls = { ca_file = "${worker.caCertificate}"; cert_file = workerIdentity; key_file = workerIdentity; };
   remoteStore = storeType: { grpc = {
@@ -102,8 +117,8 @@ let
     stores = [
       ({ name = "REMOTE_CAS"; } // remoteStore "cas")
       ({ name = "REMOTE_AC"; } // remoteStore "ac")
-      # Inputs are hardlinked from the fast store into each action directory,
-      # so both live under the worker's state directory.
+      # Inputs are hardlinked (0444/0555, owned by the worker) from the fast
+      # store into each action directory, so both live on /var/lib.
       { name = "WORKER_CAS"; fast_slow = {
           fast.filesystem = {
             content_path = "${workerState}/cas/content";
@@ -118,7 +133,10 @@ let
       worker_api_endpoint = { uri = "grpcs://${worker.schedulerAddress}:${toString worker.port}"; tls_config = workerTls; };
       cas_fast_slow_store = "WORKER_CAS";
       upload_action_result.ac_store = "REMOTE_AC";
-      work_directory = "${workerState}/work";
+      work_directory = workDirectory;
+      # Every action runs through the sandbox as the action user, never as
+      # the worker that holds the identity (ADR-0272).
+      entrypoint = sandboxBinary;
       max_inflight_tasks = worker.maxInflightTasks;
       # Set by the start script from the published cells id.
       platform_properties.${cellsProperty}.values = [ "$OVERALLS_CELLS_ID" ];
@@ -173,7 +191,7 @@ let
   ]);
   startWorker = pkgs.writeShellScript "nativelink-worker-start" ''
     set -eu
-    PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.util-linux pkgs.gnugrep pkgs.gawk ]}
+    PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.util-linux pkgs.gnugrep pkgs.gawk pkgs.libcap ]}
     # Stop host mount propagation first: a pool or guest dataset mounted
     # after the worker starts must never appear in its namespace.
     mount --make-rprivate /
@@ -194,12 +212,23 @@ let
       fi'') worker.excludedMounts}
     OVERALLS_CELLS_ID=$(cat ${cellsState}/id)
     export OVERALLS_CELLS_ID
-    # The runtime directory is root's until the identity is in place: root
-    # holds no DAC override here.
     install -m 0400 "$CREDENTIALS_DIRECTORY/worker.pem" ${workerIdentity}
     chown nativelink-worker:nativelink-worker ${workerIdentity} ${workerRuntime}
+    # An action killed mid-run can leave files the worker cannot remove.
+    rm -rf ${workDirectory}
+    # The sandbox is the only file here that grants capabilities, and only
+    # the worker's group may run it. The tmpfs lives in this namespace alone.
+    worker_gid=$(id -g nativelink-worker)
+    mount -t tmpfs -o "mode=0750,uid=0,gid=$worker_gid,nodev,size=4m" nativelink-worker-exec ${sandboxDirectory}
+    install -m 0750 -o root -g "$worker_gid" ${actionSandbox}/bin/buck-re-action-sandbox ${sandboxBinary}
+    setcap cap_setuid,cap_setgid,cap_sys_admin+ep ${sandboxBinary}
+    # Directories the worker creates are group-writable for the action user.
+    umask 0007
+    # No capabilities and no no_new_privs: the worker gains the bounding
+    # set's three only by running the sandbox, which drops to the action
+    # user. Setuid wrappers are not visible in this namespace.
     exec setpriv --reuid=nativelink-worker --regid=nativelink-worker --init-groups \
-      --inh-caps=-all --bounding-set=-all --no-new-privs \
+      --inh-caps=-all --bounding-set=-all,+setuid,+setgid,+sys_admin \
       -- ${lib.getExe packages.nativelink} ${workerConfig}
   '';
   # Buck2 reads root's ~/.buckconfig.d but ignores symlinks and includes
@@ -312,7 +341,9 @@ in {
   # reaching only loopback and the scheduler's tailnet address, with no
   # devices and no view of Lilly state, secret bundles or the SSH host
   # identity. Their cgroup MUST be capped (CPU quota, memory high and max, no
-  # swap, tasks) below guests and killed first under memory pressure. They
+  # swap, tasks) below guests and killed first under memory pressure. Actions
+  # MUST run through buck-re-action-sandbox, never as the worker user, so the
+  # worker identity and store reach only the worker process. They
   # MUST advertise only a buckCells id whose closure is valid and
   # rooted on the host. Unmatched actions MUST fail at the scheduler within
   # unmatchedTimeout so clients fall back to local execution (ADR-0272).
@@ -455,9 +486,16 @@ in {
       };
 
       users.groups.nativelink-worker = {};
-      users.users.nativelink-worker = { isSystemUser = true; group = "nativelink-worker"; home = workerState; };
+      users.groups.nativelink-build = {};
+      users.users.nativelink-worker = {
+        isSystemUser = true; group = "nativelink-worker"; extraGroups = [ "nativelink-build" ]; home = workerState;
+      };
+      # Remote actions run as this user: it cannot read the worker's identity,
+      # store or process, and writes only its own action directory.
+      users.users.nativelink-action = { isSystemUser = true; group = "nativelink-build"; home = "/var/empty"; };
       systemd.tmpfiles.rules = [
         "d ${workerState} 0700 nativelink-worker nativelink-worker -"
+        "d ${workRoot} 2770 nativelink-worker nativelink-build -"
         "d ${cellsState} 0755 root root -"
       ];
 
@@ -509,9 +547,9 @@ in {
           RestrictAddressFamilies = [ "AF_INET" "AF_INET6" "AF_UNIX" ];
           # No Lilly, guest, secret or host-identity state: its own identity
           # arrives through LoadCredential, read by systemd before this applies.
-          InaccessiblePaths = map (path: "-${path}") workerHiddenPaths;
-          ReadWritePaths = [ workerState ];
-          RuntimeDirectory = "nativelink-worker";
+          InaccessiblePaths = map (path: "-${path}") (workerHiddenPaths ++ [ "/run/wrappers" ]);
+          ReadWritePaths = [ workerState workRoot ];
+          RuntimeDirectory = [ "nativelink-worker" "nativelink-worker-exec" ];
           RuntimeDirectoryMode = "0700";
           PrivateTmp = true;
           PrivateDevices = true;
@@ -523,11 +561,16 @@ in {
           ProtectControlGroups = true;
           ProtectClock = true;
           ProtectHostname = true;
-          RestrictNamespaces = true;
+          # Only the action sandbox's own namespaces.
+          RestrictNamespaces = [ "mnt" "pid" "ipc" "uts" "net" ];
+          NoNewPrivileges = false;
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
           LockPersonality = true;
-          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" "CAP_SETUID" "CAP_SETGID" "CAP_SETPCAP" "CAP_CHOWN" ];
+          # The start script's; the worker keeps only SETUID, SETGID and
+          # SYS_ADMIN in its bounding set, for the sandbox.
+          CapabilityBoundingSet = [ "CAP_SYS_ADMIN" "CAP_SETUID" "CAP_SETGID" "CAP_SETPCAP" "CAP_CHOWN"
+            "CAP_SETFCAP" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
           SystemCallArchitectures = "native";
           UMask = "0077";
         };

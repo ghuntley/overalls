@@ -19,13 +19,15 @@ let
       cat $2.crt $2.key > $2.pem
       rm $2.csr $2.ext
     }
-    ca ca; ca uploader-ca; ca executor-ca; ca worker-ca
+    ca ca; ca uploader-ca; ca executor-ca; ca worker-ca; ca rogue-ca
     leaf ca server serverAuth IP:${tailnet.scheduler}
     leaf ca reader-host clientAuth
     leaf uploader-ca uploader-ci clientAuth
     leaf executor-ca executor-dev clientAuth
     leaf worker-ca worker-scheduler clientAuth
     leaf worker-ca worker-worker clientAuth
+    # A forged worker: the real worker's name, from a CA the scheduler does not trust.
+    leaf rogue-ca worker-forged clientAuth
   '';
   # A cells closure stand-in: the [nix] section with the id workers advertise.
   cellsConfig = "[nix]\n  cells_id = ${builtins.hashString "sha256" "buck-remote-execution fixture cells"}\n";

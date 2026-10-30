@@ -253,6 +253,58 @@ with subtest("the worker unit is sandboxed and capped below guests"):
             node.succeed(f"test -e {path}")
             node.fail(f"nsenter -t {pid} -m test -e {path}")
 
+with subtest("remote actions cannot reach the worker identity"):
+    fresh(ci, UPLOAD, "uploader-ci")
+    lines = build(ci, "//:identity_probe", "remote")
+    runs = scheduler if lines[0] == "scheduler" else worker
+    action_uid = runs.succeed("id -u nativelink-action").strip()
+    worker_uid = runs.succeed("id -u nativelink-worker").strip()
+    assert action_uid != worker_uid
+    # Its own user, no worker file, no worker process, environment or
+    # descriptor, and no network.
+    assert lines[1] == f"uid {action_uid}", lines
+    procs = int(next(line for line in lines if line.startswith("procs "))[6:])
+    assert procs <= 3, lines
+    assert lines[2:] == [f"procs {procs}", "pid1 action-sandbox", "fds"], lines
+    # The worker itself still holds the identity, and runs without capabilities.
+    pid = worker_pid(runs)
+    status = runs.succeed(f"cat /proc/{pid}/status")
+    assert f"Uid:\t{worker_uid}" in status and "CapEff:\t0000000000000000" in status, status
+    runs.succeed(f"nsenter -t {pid} -m test -s /run/nativelink-worker/identity.pem")
+    # The sandbox binary is the worker group's alone, and not on the host.
+    runs.succeed(
+        f"nsenter -t {pid} -m stat -c '%U %G %a' /run/nativelink-worker-exec/action-sandbox | grep -qx 'root nativelink-worker 750'"
+    )
+    runs.fail("test -e /run/nativelink-worker-exec/action-sandbox")
+    runs.fail("su -s /bin/sh nativelink-action -c 'cat /run/nativelink-worker/identity.pem'")
+
+with subtest("a forged worker cannot register or record results"):
+    digest = {"hash": "f" * 64, "sizeBytes": "10"}
+    forged = {"instanceName": INSTANCE, "actionDigest": digest, "actionResult": {"exitCode": 0}}
+    for identity in ["worker-forged", "uploader-ci", "executor-dev", "reader-host", None]:
+        answer = grpc(dev, WORKER, identity, "ActionCache/UpdateActionResult", forged)
+        assert "exitCode" not in answer and answer.strip() != "{}", (identity, answer)
+        blobs = {
+            "instanceName": INSTANCE,
+            "requests": [{"digest": digest, "data": "AAAAAAAAAAAAAA=="}],
+        }
+        answer = grpc(dev, WORKER, identity, "ContentAddressableStorage/BatchUpdateBlobs", blobs)
+        assert "responses" not in answer, (identity, answer)
+    # Registration is the worker API on the same listener: the forged
+    # identity fails the same TLS verification before any worker message.
+    answer = grpc(dev, WORKER, "worker-forged", "Capabilities/GetCapabilities", CAPABILITIES)
+    assert "Capabilities" not in answer, answer
+    # Nothing forged reached the action cache hosts read.
+    missing = grpc(
+        dev,
+        READ,
+        "reader-host",
+        "ActionCache/GetActionResult",
+        {"instanceName": INSTANCE, "actionDigest": digest},
+    )
+    assert "NotFound" in missing, missing
+
+
 with subtest("local_only actions never go remote"):
     fresh(ci, UPLOAD, "uploader-ci")
     lines = build(ci, "//:local_probe", "local")

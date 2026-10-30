@@ -68,16 +68,17 @@ remote execution, and the approved migration plan.
   the worker's memory cap; and the tailnet policy restricting
   `tag:buck-re-ci` to Panterloons' port 50072 is an operator action, so until
   it is set only mTLS separates CI from the other listeners.
-- **Open security gap: cache poisoning through worker-identity exposure.**
-  Remote actions run as the worker user and can read the worker's mTLS
-  identity. Anyone who gets an action executed can take that identity,
-  register a rogue worker or write the CAS and action cache directly on the
-  worker listener (50074), and so feed forged outputs to every host that
-  reads the cache. Until the identity is reachable only by the worker
-  process, and results from unregistered workers are rejected, the CI
-  variable `BUCK_RE` MUST stay unset and no further worker (Dungarees) is
-  enabled. Today only the recovery-only uploader and executor documents can
-  submit actions.
+- **Security gap, closed in code by M10b: cache poisoning through
+  worker-identity exposure.** In M10 remote actions ran as the worker user
+  and could read the worker's mTLS identity, which registers workers and
+  writes the CAS and action cache on the worker listener (50074), so anyone
+  who got an action executed could feed forged outputs to every host that
+  reads the cache. M10b runs every action through a sandbox as a separate
+  user that cannot reach the identity (see Implementation evidence).
+  NativeLink cannot tie action-cache writes to a registered worker: any
+  certificate from the worker CA may write, so the worker CA's only leaves
+  are the two worker identities and forged ones fail TLS. `BUCK_RE` and the
+  Dungarees worker stay off until Panterloons runs the fix.
 
 ## Invariants and verification
 
@@ -187,9 +188,24 @@ and Dungarees and CI has its secrets.
   `IOWeight` 20, `CPUQuota` 100% per in-flight task (half the host's threads
   in the fleet), `MemoryHigh` 20% and `MemoryMax` 25% of RAM, no swap,
   `TasksMax` 8192, `Nice` 10 and `OOMScoreAdjust` 1000, so the kernel kills
-  the worker before a guest or Lilly. Actions run as the worker user and can read its identity, so
-  executing is trusted like uploading: executor identities go only to
-  operators, and the CI identity was already an uploader.
+  the worker before a guest or Lilly.
+- **Action sandbox (M10b).** The worker's `entrypoint` is
+  [buck-re-action-sandbox.c](../../../nix/domains/system/buck-re-action-sandbox.c),
+  installed by the start script on a tmpfs private to the unit with
+  `cap_setuid,cap_setgid,cap_sys_admin` file capabilities, mode 0750 for
+  the worker's group. The worker keeps only those three in its bounding set
+  (no effective capabilities; `no_new_privs` is off so the file capabilities
+  apply, and `/run/wrappers` is hidden so no setuid binary is reachable). For
+  each action the sandbox enters fresh mount, PID, IPC, UTS and network
+  namespaces, masks every other action directory, the worker's state, runtime
+  and sandbox directories, gives the action a private `/tmp` and `/proc`,
+  drops to `nativelink-action` with no capabilities and `no_new_privs`,
+  closes inherited descriptors and runs the action under its own PID 1, so
+  nothing the action starts outlives it. The action user shares only the
+  `nativelink-build` group with the worker, for the action directory;
+  inputs are the worker's read-only hardlinks. Executing is still trusted
+  like uploading: executor identities go only to operators, and the CI
+  identity was already an uploader.
 - **Cells.** [cells.nix](../../../nix/buck/cells.nix) writes `[nix] cells_id`,
   a SHA-256 of every toolchain store path, the rust cell and buck2. The
   [execution platform](../../../buck/platforms.bzl) puts
@@ -270,6 +286,15 @@ and Dungarees and CI has its secrets.
   the scheduler stopped a developer build fell back and completed locally
   (subtest 71.0 s, including the stop and a fresh Buck2 daemon). This is test
   evidence only; the decision stays `partial` until a deployment receipt.
+  M10b adds two subtests, recorded passing on 2026-10-30 with the other 12:
+  a remote action runs as `nativelink-action` and cannot open the worker
+  identity, its runtime, state or sandbox directories, the secrets bundle or
+  the credential, cannot write the worker's store, sees only its own two
+  processes under the sandbox's PID 1, inherits no worker environment or
+  descriptor above stderr, and cannot connect to the scheduler; and a
+  forged worker (the worker's name from an untrusted CA) and every non-worker
+  identity are refused on 50074 for action-cache and CAS writes and worker
+  registration, with nothing reaching the action cache hosts read.
 
 Remaining gaps:
 - No deployment receipt on Panterloons or Dungarees yet; the hosts pick the
@@ -287,11 +312,11 @@ Remaining gaps:
   only) is an operator action.
 - Workers hold only the cells of their host's deployed revision, so remote
   execution helps only clients on that cells revision.
-- **Open security gap** (see Consequences): actions run as the worker user
-  and can read the worker identity, which can write the CAS and action cache
-  on 50074 and register workers, so remote execution can poison the cache
-  hosts read. `BUCK_RE` stays unset and the Dungarees worker stays disabled
-  until the identity reaches only the worker process.
+- The worker-identity gap is closed in code and in the machine test
+  (M10b), not yet on a host: `BUCK_RE` stays unset and the Dungarees worker
+  stays disabled until Panterloons has deployed it. Action-cache writes are
+  bounded by the worker CA, not by worker registration; NativeLink's
+  `client_crl_file` would revoke a leaked worker leaf but is not configured.
 - No precommit timing with remote execution has been recorded.
 
 ## Open questions

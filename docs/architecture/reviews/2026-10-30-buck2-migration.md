@@ -428,11 +428,14 @@ Dungarees, client and CI configuration, and the host updater reading the cache
   continues on error so the `ci` gate never waits on NativeLink.
 
 Residual risks:
-- Actions run as the worker user, which can read the worker identity and so
-  write the action cache through the worker listener. Executing remotely is
-  therefore as trusted as uploading: the CI identity was already an uploader,
-  and executor identities are recovery-only for operators. A per-action user
-  would need the worker to keep `CAP_SETUID`.
+- Closed by M10b: actions ran as the worker user and could read the worker
+  identity, and so write the action cache through the worker listener. They
+  now run through a sandbox as `nativelink-action` in their own namespaces,
+  so the identity reaches only the worker process. The worker keeps
+  `CAP_SETUID`, `CAP_SETGID` and `CAP_SYS_ADMIN` in its bounding set for the
+  sandbox's file capabilities and runs without `no_new_privs`; a compromised
+  NativeLink worker process could still write the cache. Executing remotely
+  stays as trusted as uploading.
 - A compromised CI runner or executor could poison the action cache (as in
   M4b); hosts trust it for updates.
 - Remote actions share a host with Lilly guests. The caps above bound the
@@ -460,6 +463,25 @@ repository gates):
 
 Not verified: a deployment on Panterloons or Dungarees, CI with the secrets
 set, the tailnet policy, and precommit timings with remote execution.
+
+### M10b: worker identity reaches only the worker
+
+The M10 residual risk was a security gap: an executed action could read the
+worker's identity and use it to write the cache hosts read. NativeLink's own
+action namespaces map the action to the worker's uid, so they hide neither
+the identity file nor the worker's store, and its `entrypoint` runs without
+privileges. M10b therefore adds an entrypoint with three file capabilities
+that builds the namespaces itself and drops to a separate action user (see
+ADR-0272 evidence). Alternatives considered: a TLS-terminating proxy holding
+the identity (actions could still use the proxy over loopback), and the
+worker keeping `CAP_SETUID` itself (a NativeLink compromise could then
+become any user). NativeLink cannot tie action-cache writes to registered
+workers, so the bound is the worker CA, whose only leaves are the two
+worker identities.
+
+Verification: `buck-remote-execution` passed all 14 subtests on 2026-10-30,
+including "remote actions cannot reach the worker identity" and "a forged
+worker cannot register or record results".
 
 ## M8: precommit on Buck2 BXL
 

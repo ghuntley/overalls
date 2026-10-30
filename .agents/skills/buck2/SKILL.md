@@ -325,8 +325,12 @@ service, every action runs locally.
   timeout; set `remote_execution = false` while working on cells changes.
 - **Workers** run in their own mount namespace with every Lilly pool mount
   removed first (ADR-0144), as `nativelink-worker` without capabilities,
-  reaching only loopback and the scheduler. Actions run as that user and can
-  read the worker identity, so execute rights are trusted like upload rights.
+  reaching only loopback and the scheduler. Actions run through
+  `buck-re-action-sandbox` as `nativelink-action` with no network, no view
+  of other actions or the worker, and a private `/tmp`; they cannot read the
+  worker identity. Execute rights are still trusted like upload rights.
+  Remote actions have no network: anything that needs it must be
+  `local_only`.
 - **What is never uploaded.** `local_only` actions keep
   `allow_cache_upload = False` (rule 4).
 - **Checking.** The build summary prints

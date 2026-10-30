@@ -1,5 +1,5 @@
 load("//:platforms.bzl", "overalls_execution_platform")
-load("//:rules.bzl", "probe")
+load("//:rules.bzl", "probe", "secret_probe")
 
 overalls_execution_platform(name = "platform")
 
@@ -18,3 +18,5 @@ probe(name = "unreachable_probe", text = "the scheduler is down")
 probe(name = "host_probe", text = "a host asks to execute")
 
 probe(name = "local_probe", text = "local only", local_only = True)
+
+secret_probe(name = "identity_probe", text = "reach for the worker identity")
