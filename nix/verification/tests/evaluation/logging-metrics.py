@@ -34,8 +34,16 @@ def emit(
     payload: dict[str, object],
     *,
     prometheus: bool = False,
+    ready: tuple[bytes, ...] = (b"observed_at_seconds",),
+    wait_seconds: float = 4.0,
 ) -> tuple[bytes, bytes, bytes]:
-    """Run the real Fluent Bit translation with trusted synthetic journal origin."""
+    """Run the real Fluent Bit translation with trusted synthetic journal origin.
+
+    Each catalogued gauge has its own log_to_metrics emitter, so one scrape can
+    expose some gauges before others. A positive caller names every gauge it
+    asserts in ``ready`` and the scrape is retried until all are present or the
+    deadline passes; refusal callers keep the short default observation window.
+    """
     configuration = copy.deepcopy(object_value(descriptor["configuration"]))
     configuration["service"] = {"flush": 1, "grace": 1, "log_level": "warn"}
     pipeline = object_value(configuration["pipeline"])
@@ -104,7 +112,7 @@ def emit(
         exposition = b""
         if prometheus:
             assert port > 0
-            until = time.monotonic() + 4
+            until = time.monotonic() + wait_seconds
             while time.monotonic() < until:
                 try:
                     with urllib.request.urlopen(
@@ -112,7 +120,7 @@ def emit(
                     ) as reply:
                         exposition = reply.read(65537)
                     assert len(exposition) <= 65536
-                    if b"observed_at_seconds" in exposition:
+                    if all(token in exposition for token in ready):
                         break
                 except (urllib.error.URLError, TimeoutError):
                     pass
@@ -146,7 +154,21 @@ def run(
             "runtime_observed_at_seconds": 1,
         },
     }
-    stdout, stderr, exposition = emit(descriptor, service, payload, prometheus=prometheus)
+    gauges = (
+        "ssh_count",
+        "ssh_duration_ms",
+        "terminal_authority_count",
+        "terminal_host_streams",
+        "runtime_observed_at_seconds",
+    )
+    stdout, stderr, exposition = emit(
+        descriptor,
+        service,
+        payload,
+        prometheus=prometheus,
+        ready=tuple(f"overalls_gauge_{name}{{".encode() for name in gauges),
+        wait_seconds=30.0,
+    )
     numeric = exposition if prometheus else stdout
     label = f'service="{service}"'.encode()
     assert label in numeric and b"123456" in numeric, "native metric was not exported"
@@ -237,6 +259,11 @@ def run_health(
             service,
             payload,
             prometheus=True,
+            ready=tuple(
+                f"overalls_gauge_{name}{{".encode()
+                for name in (*values, "trace_observed_at_seconds")
+            ),
+            wait_seconds=30.0,
         )
         for name, number in values.items():
             measurement = re.search(
