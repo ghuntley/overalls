@@ -71,12 +71,15 @@ pub fn normalize(input: &str) -> Option<String> {
     for (i, p) in parts.iter().enumerate().skip(1) {
         if !p.bytes().all(|b| b.is_ascii_alphanumeric()) {
             return None;
-        };
+        }
         out.push('-');
         out.push_str(
             if p.len() == 4 {
                 let mut q = p.to_ascii_lowercase();
-                q[..1].make_ascii_uppercase();
+                // `p` is ASCII (checked above), so byte 0 is a char boundary.
+                if let Some(first) = q.get_mut(..1) {
+                    first.make_ascii_uppercase();
+                }
                 q
             } else if i > 0 && p.len() == 2 {
                 p.to_ascii_uppercase()
@@ -89,12 +92,10 @@ pub fn normalize(input: &str) -> Option<String> {
     SUPPORTED_LOCALES
         .iter()
         .find(|x| x.eq_ignore_ascii_case(&out))
-        .map(|x| x.to_string())
+        .map(|x| (*x).to_owned())
 }
 pub fn direction(input: &str) -> Direction {
-    Locale::parse(input)
-        .map(|x| x.direction())
-        .unwrap_or(Direction::Ltr)
+    Locale::parse(input).map_or(Direction::Ltr, |x| x.direction())
 }
 pub fn choose(user: Option<&str>, session: Option<&str>, accept_language: Option<&str>) -> Locale {
     user.and_then(Locale::parse)
@@ -105,7 +106,7 @@ pub fn choose(user: Option<&str>, session: Option<&str>, accept_language: Option
 pub fn negotiate(header: &str) -> Option<Locale> {
     if header.len() > 8192 {
         return None;
-    };
+    }
     let mut vals = header
         .split(',')
         .filter_map(|part| {
@@ -132,7 +133,7 @@ impl CatalogEntry {
     pub fn validate(&self) -> Result<(), LocaleError> {
         if self.translations.is_empty() || self.translations.iter().any(|x| x.trim().is_empty()) {
             return Err(LocaleError::EmptyTranslation);
-        };
+        }
         Ok(())
     }
 }
