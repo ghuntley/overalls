@@ -1,14 +1,9 @@
 { pkgs, toolchain }:
 let
   inherit (pkgs) lib;
-  source = lib.cleanSourceWith {
-    src = ./.;
-    filter = path: type:
-      let name = builtins.baseNameOf path;
-      in name != "target" && name != ".hegel" && (type == "directory" || lib.hasSuffix ".rs" name ||
-        builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
-  };
-  vendor = pkgs.rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };
+  workspace = import ../infrastructure/cargo-workspace.nix { inherit pkgs; };
+  source = workspace.source { name = "overalls-vscode-web-broker-source"; crates = [ "nix/domains/artifacts/vscode-web-broker" ]; };
+  inherit (workspace) vendor;
 in
 # @cc [owner:ghuntley,label:build;security] windows-editor-broker-offline-build
 # The Windows broker MUST cross-link the maintained source for the reviewed
@@ -27,6 +22,7 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils rustfmt ];
   buildPhase = ''
     runHook preBuild
+    cd ${lib.escapeShellArg "nix/domains/artifacts/vscode-web-broker"}
     export CARGO_HOME="$TMPDIR/cargo-home"
     export RUSTC="${toolchain}/bin/rustc"
     export CARGO_ZIGBUILD_CACHE_DIR="$TMPDIR/cargo-zigbuild-cache"
@@ -34,9 +30,8 @@ pkgs.stdenv.mkDerivation {
     export CARGO_TARGET_DIR="$TMPDIR/target"
     export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
     mkdir -p "$CARGO_HOME"
-    substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" \
-      --replace-fail 'directory = "cargo-vendor-dir"' 'directory = "${vendor}"'
-    cargo zigbuild --release --locked --offline --target x86_64-pc-windows-gnu --bin overalls-vscode-web-broker
+    substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
+    cargo zigbuild --profile hardened --locked --offline --target x86_64-pc-windows-gnu --bin overalls-vscode-web-broker
     # Tests cannot run on the build host; rustfmt and a cross-target clippy
     # with the pinned toolchain gate the cfg(windows) modules instead.
     cargo fmt --check
@@ -46,7 +41,7 @@ pkgs.stdenv.mkDerivation {
   installPhase = ''
     runHook preInstall
     mkdir -p "$out/bin"
-    cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/overalls-vscode-web-broker.exe" "$out/bin/overalls-vscode-web-broker.exe"
+    cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/hardened/overalls-vscode-web-broker.exe" "$out/bin/overalls-vscode-web-broker.exe"
     test "$(stat -c %s "$out/bin/overalls-vscode-web-broker.exe")" -le 104857600
     digest="$(sha256sum "$out/bin/overalls-vscode-web-broker.exe" | cut -d' ' -f1)"
     bytes="$(stat -c %s "$out/bin/overalls-vscode-web-broker.exe")"

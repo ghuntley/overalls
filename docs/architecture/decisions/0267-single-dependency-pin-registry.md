@@ -116,7 +116,8 @@ plan (track T1).
 - Every registry key is read, and every `pins.nix` read names an existing key.
   Same checks.
 - Every tracked `Cargo.lock` has a `lib.dependencyPins.cargo` entry. Checked by
-  the refusal in `scripts/cargo_security_upgrades.exs`.
+  the refusal in `scripts/cargo_security_upgrades.exs`. Since ADR-0273 the
+  only tracked lock is the root one; the same script and `pins` refuse others.
 - `flake.lock` and `devenv.lock` agree on the application nixpkgs and
   `nix-compact`. Checked by `package-input-lock`.
 - **Failure case:** a new fetcher written with an attribute name the pattern
@@ -140,6 +141,15 @@ plan (track T1).
   [its build](../../../nix/domains/artifacts/marvin/default.nix).
 - [default.nix](../../../nix/domains/artifacts/default.nix) registers the `mila-linux-native` and
   `observability-runtimes` Cargo locks in `lib.dependencyPins.cargo`.
+- Track T2 ([ADR-0273](0273-single-rust-workspace-and-toolchain.md)) then
+  merged every first-party Cargo lock into the root
+  [`Cargo.lock`](../../../Cargo.lock). `lib.dependencyPins.cargo` has the
+  single `workspace` entry, whose build links every Rust consumer.
+  [cargo-workspace.nix](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
+  vendors that lock once with `importCargoLock`, which removes the
+  `cedarCargo` hash, the last separately hashed first-party Cargo vendor.
+  `pins` refuses any other tracked lock (`cargo_locks/1` in
+  [pins.ex](../../../scripts/pins.ex)).
 - The check is [pins.ex](../../../scripts/pins.ex) and [check_pins.exs](../../../scripts/check_pins.exs). It runs as the `pins` check in
   [flake.nix](../../../flake.nix) and as a prek hook in [devenv.nix](../../../devenv.nix). Its regression and
   repository tests are in [pins_test.exs](../../../marshall/test/architecture/pins_test.exs). `package-input-lock` in
@@ -169,3 +179,5 @@ None.
   substitution of the paths these pins produce.
 - [ADR-0265](0265-rust-code-quality.md) covers the Rust gates that build the
   lock-vendored crates.
+- [ADR-0273](0273-single-rust-workspace-and-toolchain.md) reduces the Cargo
+  locks to the one root workspace lock.

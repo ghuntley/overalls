@@ -88,6 +88,9 @@ android {
 val buildRustJni = tasks.register<Exec>("buildRustJni") {
     workingDir(rustRoot)
     inputs.files(fileTree(rustRoot) { exclude("target/**") })
+    // The Mila crates are members of the repository's root Cargo workspace,
+    // whose manifest and single lock pin their dependencies (ADR-0273).
+    inputs.files(rootProject.file("../../../Cargo.toml"), rootProject.file("../../../Cargo.lock"))
     outputs.dir(rustJniOutput)
     commandLine(
         listOf("cargo", "ndk", "--platform", "26") +

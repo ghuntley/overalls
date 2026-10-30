@@ -1,0 +1,93 @@
+{ pkgs }:
+# @cc [owner:ghuntley,label:build;security] cargo-workspace-source
+# Every Nix build of a first-party Rust crate MUST compile against the single
+# root Cargo workspace and its one Cargo.lock (ADR-0273), vendored with
+# importCargoLock and no separate hash (ADR-0267). A build's source MUST hold
+# the root manifest, lock and clippy.toml, every member manifest and the full
+# sources of only the crates it compiles; other members get empty target stubs
+# so Cargo can load the workspace and `--locked` sees the unchanged lock, while
+# their source edits cannot change the build's inputs.
+let
+  inherit (pkgs) lib;
+  root = ../../../..;
+  rootString = toString root;
+  lockFile = root + "/Cargo.lock";
+  workspace = (builtins.fromTOML (builtins.readFile (root + "/Cargo.toml"))).workspace;
+  members = workspace.members;
+
+  # Path dependencies the root manifest patches in for every member.
+  patches = [ "lyra/vendor/fs2" ];
+
+  manifestOf = member: builtins.fromTOML (builtins.readFile (root + "/${member}/Cargo.toml"));
+
+  # Files Cargo must find to load a member manifest: the default library root
+  # plus every explicitly declared target path and build script.
+  stubPaths = member:
+    let
+      manifest = manifestOf member;
+      asList = value: if builtins.isList value then value else [ value ];
+      declared = lib.concatMap (kind: asList (manifest.${kind} or [ ])) [ "lib" "bin" "test" "example" "bench" ];
+      build = manifest.package.build or null;
+    in
+    lib.unique ([ "src/lib.rs" ]
+      ++ map (target: target.path) (builtins.filter (target: target ? path) declared)
+      ++ lib.optional (builtins.isString build) build);
+
+  relative = path: lib.removePrefix (rootString + "/") (toString path);
+  within = prefix: rel: rel == prefix || lib.hasPrefix (prefix + "/") rel;
+  ancestorOf = rel: target: lib.hasPrefix (rel + "/") target;
+
+  defaultCrateFile = name: lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "CONTRACTS" ];
+
+  # name: store name of the source tree.
+  # crates: workspace members whose full sources the build compiles; their
+  #   first-party path dependencies MUST be listed too.
+  # extraFiles: additional repository-relative files or directories to keep
+  #   (fixtures, licences), included whole.
+  # crateFile: predicate on a file's base name and repository-relative path
+  #   selecting the files kept inside each listed crate.
+  source = { name, crates, extraFiles ? [ ], crateFile ? (fileName: _rel: defaultCrateFile fileName) }:
+    let
+      unknown = builtins.filter (crate: !(builtins.elem crate members)) crates;
+      kept = crates ++ patches ++ extraFiles;
+      anchors = kept ++ members;
+      filtered = lib.cleanSourceWith {
+        name = "${name}-filtered";
+        src = root;
+        filter = path: type:
+          let
+            rel = relative path;
+            fileName = builtins.baseNameOf path;
+          in
+          fileName != "target" && fileName != ".hegel" && (
+            builtins.elem rel [ "Cargo.toml" "Cargo.lock" "clippy.toml" ]
+            || lib.any (anchor: ancestorOf rel anchor) anchors
+            || lib.any (dir: within dir rel) (patches ++ extraFiles)
+            || lib.any (crate: within crate rel && (type == "directory" || crateFile fileName rel)) crates
+            || lib.any (member: rel == member || rel == "${member}/Cargo.toml") members
+          );
+      };
+      stubs = lib.concatMap (member: map (path: "${member}/${path}") (stubPaths member))
+        (builtins.filter (member: !(builtins.elem member crates)) members);
+    in
+    assert lib.assertMsg (unknown == [ ]) "cargo-workspace: not workspace members: ${toString unknown}";
+    pkgs.runCommand name { } ''
+      cp -r --no-preserve=mode ${filtered} "$out"
+      ${lib.concatMapStringsSep "\n" (stub: ''
+        mkdir -p "$out/${builtins.dirOf stub}"
+        test -e "$out/${stub}" || : > "$out/${stub}"
+      '') stubs}
+    '';
+in
+{
+  inherit lockFile members source;
+  # buildRustPackage attribute: the one vendored dependency set.
+  cargoLock = { inherit lockFile; };
+  # fetchCargoVendor layout (`@vendor@` placeholder) for hand-written builds.
+  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
+    name = "overalls-cargo-vendor";
+    inherit lockFile;
+  };
+  # SHA-256 of the root lock, for build manifests that record their inputs.
+  lockSha256 = builtins.hashFile "sha256" lockFile;
+}

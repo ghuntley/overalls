@@ -1,11 +1,13 @@
-# Applies RustSec security updates to every Cargo.lock and refreshes Nix hashes.
+# Applies RustSec security updates to the root Cargo.lock and refreshes Nix hashes.
 #
 # Usage: elixir scripts/cargo_security_upgrades.exs [--summary PATH] [--unresolved PATH]
 # Run from the repository root inside `devenv shell` with `cargo-audit` on PATH.
-# Every tracked Cargo.lock is audited with `cargo audit` from its own directory
-# (so a reviewed `.cargo/audit.toml` there can ignore an advisory); only crates
-# with a vulnerability are updated, with `cargo update --package NAME@VERSION`.
-# Every tracked Cargo.lock MUST belong to an entry of the flake's
+# The repository tracks exactly one Cargo.lock, the root workspace lock
+# (ADR-0273); any other tracked lock is refused before anything changes. It is
+# audited with `cargo audit` from the repository root (so a reviewed
+# `.cargo/audit.toml` there can ignore an advisory); only crates with a
+# vulnerability are updated, with `cargo update --package NAME@VERSION`.
+# The lock MUST belong to an entry of the flake's
 # `lib.dependencyPins.cargo`; each entry whose lock changed gets fresh
 # fixed-output hashes in nix/domains/artifacts/dependency-hashes.json and must
 # then build. The script never commits; it exits non-zero on any failure. The
@@ -31,6 +33,17 @@ defmodule Overalls.CargoSecurityUpgrades.CLI do
 
     {listing, _} = run!(root, "git", ["ls-files", "-z", "--", "*Cargo.lock"], echo: false)
     locks = CargoSecurityUpgrades.lock_paths(listing)
+
+    case CargoSecurityUpgrades.single_root_lock(locks) do
+      :ok ->
+        :ok
+
+      {:error, extra} ->
+        fail(
+          "ADR-0273 allows only the root Cargo.lock; merge these into the workspace: " <>
+            Enum.join(extra, ", ")
+        )
+    end
 
     # Refuse before updating anything: an unregistered lock could change
     # without any Nix build proving the software still compiles.

@@ -12,6 +12,15 @@ defmodule Overalls.CargoSecurityUpgrades do
     |> Enum.sort()
   end
 
+  # @cc [owner:ghuntley,label:build;security] cargo-single-root-lock
+  # The repository MUST track exactly one Cargo.lock, the root workspace lock
+  # (ADR-0273); a second lock root would let crates drift to other versions
+  # outside the one vendored set, so the upgrade run refuses it.
+  @doc "`:ok` for exactly the root `Cargo.lock`, otherwise the offending lock paths."
+  @spec single_root_lock([Path.t()]) :: :ok | {:error, [Path.t()]}
+  def single_root_lock(["Cargo.lock"]), do: :ok
+  def single_root_lock(locks), do: {:error, locks -- ["Cargo.lock"]}
+
   @doc """
   Vulnerabilities from `cargo audit --json`. Informational warnings
   (unmaintained, unsound, yanked) are not security advisories and are skipped.

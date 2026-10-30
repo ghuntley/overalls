@@ -72,6 +72,11 @@ in
     pkgs.gtk4
     pkgs.libadwaita
     pkgs.pkg-config
+    # Link inputs of the Lilly resume-token (libzfs, libnvpair) and flow-label
+    # (libnetfilter_conntrack) helpers, so `cargo build --workspace` over the
+    # root Cargo workspace (ADR-0273) links every member in the shell.
+    pkgs.zfs.dev
+    pkgs.libnetfilter_conntrack
     pkgs.iproute2
     pkgs.nftables
     pkgs.chromium

@@ -1,4 +1,4 @@
-{ pkgs, source, vendor, toolchain, nativeBinaries }:
+{ pkgs, source, vendor, lockSha256, toolchain, nativeBinaries }:
 let
   inherit (pkgs) lib;
   sdk = import ../guest/native-kernels/illumos/sdk.nix { inherit pkgs; };
@@ -6,7 +6,7 @@ let
   probeBinary = "overalls-native-transport-probe";
   builtBinaries = nativeBinaries ++ [ probeBinary ];
   buildMetadata = pkgs.writeText "lyra-native-build.json" (builtins.toJSON {
-    cargo_lock_sha256 = builtins.hashFile "sha256" (source + "/Cargo.lock");
+    cargo_lock_sha256 = lockSha256;
     illumos_sdk_nar_hash = sdk.sysroot.outputHash;
     clang_version = sdk.clang.version;
     clang_patch_sha256 = builtins.hashFile "sha256" ../guest/native-kernels/illumos/overalls-clang-solaris-linker-path.patch;
@@ -34,6 +34,7 @@ pkgs.stdenv.mkDerivation {
   doCheck = false;
   buildPhase = ''
     runHook preBuild
+    cd lyra
     export CARGO_HOME="$TMPDIR/cargo-home"
     export CARGO_TARGET_DIR="$TMPDIR/target"
     export CARGO_BUILD_JOBS="$NIX_BUILD_CORES"
@@ -43,12 +44,12 @@ pkgs.stdenv.mkDerivation {
     export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
     mkdir -p "$CARGO_HOME"
     substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
-    cargo zigbuild --release --locked --offline --target x86_64-unknown-freebsd \
+    cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-freebsd \
       ${lib.concatMapStringsSep " " (binary: "--bin ${binary}") builtBinaries}
     export CC_x86_64_unknown_illumos="${sdk.compiler}/bin/illumos-clang"
     export AR_x86_64_unknown_illumos="${sdk.binutils}/bin/x86_64-pc-solaris2.11-ar"
     export CARGO_TARGET_X86_64_UNKNOWN_ILLUMOS_LINKER="$CC_x86_64_unknown_illumos"
-    cargo build --release --locked --offline --target x86_64-unknown-illumos \
+    cargo build --profile hardened --locked --offline --target x86_64-unknown-illumos \
       ${lib.concatMapStringsSep " " (binary: "--bin ${binary}") builtBinaries}
     runHook postBuild
   '';
@@ -57,10 +58,10 @@ pkgs.stdenv.mkDerivation {
     mkdir -p "$out/bin" "$probes/bin"
     for target in ${lib.concatStringsSep " " targets}; do
       for binary in ${lib.concatStringsSep " " nativeBinaries}; do
-        install -m 0755 "$CARGO_TARGET_DIR/$target/release/$binary" "$out/bin/$target-$binary"
+        install -m 0755 "$CARGO_TARGET_DIR/$target/hardened/$binary" "$out/bin/$target-$binary"
         test "$(stat -c %s "$out/bin/$target-$binary")" -le 104857600
       done
-      install -m 0755 "$CARGO_TARGET_DIR/$target/release/${probeBinary}" "$probes/bin/$target-${probeBinary}"
+      install -m 0755 "$CARGO_TARGET_DIR/$target/hardened/${probeBinary}" "$probes/bin/$target-${probeBinary}"
     done
     python3.13 ${./native_manifest.py} "$out" ${buildMetadata} ${pkgs.binutils}/bin/readelf
     python3.13 ${./native_manifest.py} "$probes" ${buildMetadata} ${pkgs.binutils}/bin/readelf --probes

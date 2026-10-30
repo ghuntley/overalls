@@ -32,3 +32,6 @@ erl_crash.dump
 .buck-cells.gcroot
 buck-out/
 .buckconfig.local
+
+# Root Cargo workspace build output (ADR-0273)
+/target/

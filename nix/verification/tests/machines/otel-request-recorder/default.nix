@@ -20,11 +20,11 @@ let
   fixture = recorder.overrideAttrs (previous: {
     pname = "overalls-request-recorder-native-fixture";
     postPatch = (previous.postPatch or "") + pkgs.lib.optionalString commitReplyLoss ''
-      substituteInPlace examples/request_fixture.rs --replace-fail \
+      substituteInPlace nix/domains/system/otel-guest/receiver/examples/request_fixture.rs --replace-fail \
         'Duration::from_secs(3)' 'Duration::from_secs(8)'
     '';
     postBuild = (previous.postBuild or "") + ''
-      cargo build --offline --release --example request_fixture
+      cargo build --offline --release -p overalls-otel-guest-receiver --example request_fixture
     '';
     postInstall = (previous.postInstall or "") + ''
       install -m 0755 target/*/release/examples/request_fixture "$out/bin/request_fixture" 2>/dev/null \
@@ -35,7 +35,7 @@ let
     pname = "overalls-request-recorder-commit-reply-fixture";
     nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ pkgs.clippy ];
     postPatch = (previous.postPatch or "") + ''
-      substituteInPlace src/request_recorder.rs --replace-fail \
+      substituteInPlace nix/domains/system/otel-guest/receiver/src/request_recorder.rs --replace-fail \
         'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),' \
         ${pkgs.lib.escapeShellArg (builtins.readFile ./commit-reply-cut.rs)}
     '';
@@ -43,7 +43,9 @@ let
     # run past too_many_lines, so this variant replaces the inherited gate with
     # clippy alone and allows only that length lint for the patched function.
     postCheck = ''
+      pushd "$buildAndTestSubdir"
       cargo clippy --offline --all-targets -- -D warnings -A clippy::too_many_lines
+      popd
     '';
   });
 # @cc [owner:ghuntley,label:verification] recorder-cut-history-insertion-required

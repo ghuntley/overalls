@@ -24,6 +24,12 @@ case Overalls.Pins.check(root) do
 
           {:unknown, path, line, key} ->
             "#{path}:#{line}: registry has no key #{key}"
+
+          {:cargo_lock, path} ->
+            "#{path}: only the root Cargo.lock may exist (ADR-0273); join the workspace"
+
+          :no_root_cargo_lock ->
+            "Cargo.lock: the root workspace lock is missing (ADR-0273)"
         end
 
       IO.puts(:stderr, message)

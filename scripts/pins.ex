@@ -37,6 +37,8 @@ defmodule Overalls.Pins do
           {:inline, Path.t(), pos_integer(), String.t()}
           | {:unused, String.t()}
           | {:unknown, Path.t(), pos_integer(), String.t()}
+          | {:cargo_lock, Path.t()}
+          | :no_root_cargo_lock
 
   @spec registry() :: Path.t()
   def registry, do: @registry
@@ -88,16 +90,38 @@ defmodule Overalls.Pins do
       String.contains?(all, "\"#{key}\"")
   end
 
+  # @cc [owner:ghuntley,label:build;security] single-cargo-lock
+  # First-party Rust MUST resolve through exactly one Cargo.lock, the root
+  # workspace lock (ADR-0273). Vendored third-party trees and Mix dependency
+  # checkouts are out of scope; any other tracked lock is a violation.
+  @doc "Cargo lock roots other than the root workspace lock, or its absence."
+  @spec cargo_locks([Path.t()]) :: [violation()]
+  def cargo_locks(paths) do
+    locks =
+      paths
+      |> Enum.filter(&(Path.basename(&1) == "Cargo.lock"))
+      |> Enum.reject(fn path ->
+        segments = Path.split(path)
+        Enum.any?(["vendor", "deps", "target"], &(&1 in segments))
+      end)
+      |> Enum.sort()
+
+    extra = for lock <- locks, lock != "Cargo.lock", do: {:cargo_lock, lock}
+    if "Cargo.lock" in locks, do: extra, else: [:no_root_cargo_lock | extra]
+  end
+
   @spec check(Path.t()) :: [violation()]
   def check(root) do
+    paths = tracked(root)
+
     files =
-      tracked(root)
+      paths
       |> Enum.filter(&String.ends_with?(&1, ".nix"))
       |> Enum.reject(&String.contains?(&1, "/deps/"))
       |> Enum.map(fn path -> {path, File.read!(Path.join(root, path))} end)
 
     registry = root |> Path.join(@registry) |> File.read!() |> JSON.decode!()
-    inline(files) ++ registry_use(registry, files)
+    inline(files) ++ registry_use(registry, files) ++ cargo_locks(paths)
   end
 
   @spec tracked(Path.t()) :: [Path.t()]
@@ -110,7 +134,10 @@ defmodule Overalls.Pins do
       String.split(output, <<0>>, trim: true)
     else
       _ ->
-        root |> Path.join("**/*.nix") |> Path.wildcard() |> Enum.map(&Path.relative_to(&1, root))
+        root
+        |> Path.join("**/{*.nix,Cargo.lock}")
+        |> Path.wildcard()
+        |> Enum.map(&Path.relative_to(&1, root))
     end
   end
 end

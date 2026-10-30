@@ -47,8 +47,8 @@ team-signed build with a provisioning profile.
 ## Tests
 
 ```sh
-cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
-MILA_FFI_LIB_DIR=$PWD/mila/rust/target/release swift test --package-path mila/native/apple
+cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml -p mila-ffi --release
+MILA_FFI_LIB_DIR=$PWD/target/release swift test --package-path mila/native/apple
 ```
 
 Inside `devenv shell`, run `swift` with

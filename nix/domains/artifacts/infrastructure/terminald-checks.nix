@@ -1,16 +1,13 @@
 { pkgs }:
+let
+  workspace = import ./cargo-workspace.nix { inherit pkgs; };
+in
 pkgs.rustPlatform.buildRustPackage {
   pname = "lilly-terminald-native-checks";
   version = "0.1.0";
-  src = pkgs.lib.cleanSourceWith {
-    src = ../terminald;
-    filter = path: type:
-      let name = builtins.baseNameOf path;
-      in name != "target" && name != ".hegel" &&
-        (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
-          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
-  };
-  cargoLock.lockFile = ../terminald/Cargo.lock;
+  src = workspace.source { name = "lilly-terminald-source"; crates = [ "nix/domains/artifacts/terminald" ]; };
+  inherit (workspace) cargoLock;
+  buildAndTestSubdir = "nix/domains/artifacts/terminald";
   doCheck = false;
   strictDeps = true;
   nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
@@ -18,6 +15,7 @@ pkgs.rustPlatform.buildRustPackage {
   TERMINALD_TEST_HEAD = "${pkgs.coreutils}/bin/head";
   buildPhase = ''
     runHook preBuild
+    cd "$buildAndTestSubdir"
     cargo fmt --check
     cargo clippy --all-targets --locked --offline -- -D warnings
     # Each generated PTY history owns concurrent sessions and workers. Isolate

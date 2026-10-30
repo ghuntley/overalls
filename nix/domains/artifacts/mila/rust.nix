@@ -1,37 +1,29 @@
 { pkgs }:
 let
   inherit (pkgs) lib;
-  root = ../../../../mila/rust;
-  source = lib.cleanSourceWith {
+  workspace = import ../infrastructure/cargo-workspace.nix { inherit pkgs; };
+  # Mila's Rust core: every member under mila/rust of the root workspace
+  # (ADR-0273), named exactly as its directory.
+  crates = builtins.filter (lib.hasPrefix "mila/rust/") workspace.members;
+  packages = lib.concatMapStringsSep " " (crate: "-p ${builtins.baseNameOf crate}") crates;
+  source = workspace.source {
     name = "mila-rust-source";
-    # Keep the Rust workspace under the repository's `mila/rust` path so its
-    # protocol fixture test resolves `../../../protocol` exactly as it does in
-    # a checkout, while including only the two vectors that test needs.
-    src = ../../../../.;
-    filter = path: type:
-      let
-        name = builtins.baseNameOf path;
-        relative = lib.removePrefix (toString ../../../../.) (toString path);
-        rustPath = lib.hasPrefix "/mila/rust" relative;
-        rustParent = relative == "/mila";
-        fixture = builtins.elem relative [
-          "/protocol"
-          "/protocol/test"
-          "/protocol/test/fixtures"
-          "/protocol/test/fixtures/app_routes.json"
-          "/protocol/test/fixtures/porsche_device_results.json"
-          "/protocol/test/fixtures/ssh_command_lines.json"
-          "/protocol/test/fixtures/ssh_host_certificates.json"
-        ];
-      in
-        (rustPath && name != "target" && name != ".hegel") || rustParent || fixture;
+    inherit crates;
+    # Keep every file of the Mila crates (headers, fixtures) and only the
+    # protocol vectors their tests read at `../../../protocol`.
+    crateFile = _name: _rel: true;
+    extraFiles = [
+      "protocol/test/fixtures/app_routes.json"
+      "protocol/test/fixtures/porsche_device_results.json"
+      "protocol/test/fixtures/ssh_command_lines.json"
+      "protocol/test/fixtures/ssh_host_certificates.json"
+    ];
   };
   common = {
     version = "0.1.0";
     src = source;
-    sourceRoot = "mila-rust-source/mila/rust";
-    cargoLock.lockFile = root + "/Cargo.lock";
-    cargoBuildFlags = [ "--workspace" ];
+    inherit (workspace) cargoLock;
+    cargoBuildFlags = map (crate: "-p=${builtins.baseNameOf crate}") crates;
     strictDeps = true;
     nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
     meta.platforms = [ "x86_64-linux" ];
@@ -40,7 +32,7 @@ in
 {
   # @cc [owner:ghuntley,label:build] mila-rust-source-build
   # The Mila Rust workspace MUST compile every tracked workspace member from
-  # its committed Cargo.lock without reading build output or ambient sources.
+  # the root workspace Cargo.lock without reading build output or ambient sources.
   package = pkgs.rustPlatform.buildRustPackage (common // {
     pname = "mila-rust";
     doCheck = false;
@@ -62,9 +54,9 @@ in
     doCheck = false;
     buildPhase = ''
       runHook preBuild
-      cargo fmt --all -- --check
-      cargo test --workspace --locked --offline
-      cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+      cargo fmt ${packages} -- --check
+      cargo test ${packages} --locked --offline
+      cargo clippy ${packages} --all-targets --locked --offline -- -D warnings
       runHook postBuild
     '';
     installPhase = "touch $out";

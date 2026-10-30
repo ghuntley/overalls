@@ -1,5 +1,0 @@
-# ADR-0265 canonical clippy configuration; keep identical to scripts/rust/clippy.toml.
-allow-unwrap-in-tests = true
-allow-expect-in-tests = true
-allow-panic-in-tests = true
-allow-indexing-slicing-in-tests = true

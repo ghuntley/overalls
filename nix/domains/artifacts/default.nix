@@ -24,7 +24,23 @@ let
     inherit (plainBeam) rebar rebar3 hex;
   });
   hashes = builtins.fromJSON (builtins.readFile ./dependency-hashes.json);
-  source = application: import ./applications/source.nix { inherit lib application antithesisSdk; };
+  # The root Cargo workspace (ADR-0273): one lock, one vendored crate set.
+  cargoWorkspace = import ./infrastructure/cargo-workspace.nix { inherit pkgs; };
+  applicationSource = application: import ./applications/source.nix { inherit lib application antithesisSdk; };
+  # Rustler compiles Marshall's Cedar NIF inside the root Cargo workspace, so
+  # its release source also carries the workspace manifest, lock and member
+  # stubs (and the crate's own sources) from cargo-workspace.nix.
+  source = application:
+    if application == "marshall" then
+      pkgs.runCommand "source" { } ''
+        cp -r --no-preserve=mode ${applicationSource application} "$out"
+        cp -r --no-preserve=mode ${cedarSource}/. "$out/"
+      ''
+    else applicationSource application;
+  cedarSource = cargoWorkspace.source {
+    name = "marshall-cedar-source";
+    crates = [ "marshall/native/marshall_cedar" ];
+  };
   version = "0.1.0";
   hostLock = import ./hosts/host-tools.nix { inherit pkgs; };
   terminald = import ./infrastructure/terminald.nix { inherit pkgs; };
@@ -168,12 +184,7 @@ let
       '';
     });
 
-  cedarCargo = pkgs.rustPlatform.fetchCargoVendor {
-    name = "marshall-cedar";
-    src = ../../../marshall/native/marshall_cedar;
-    hash = hashes.cedarCargo;
-  };
-  cedarLints = import ./applications/marshall-cedar-lints.nix { inherit pkgs cedarCargo; };
+  cedarLints = import ./applications/marshall-cedar-lints.nix { inherit pkgs cargoWorkspace cedarSource; };
 
   # Every Mix application with fixed-output dependencies, keyed like
   # dependency-hashes.json; adding one to `dependencies` adds it here.
@@ -189,58 +200,32 @@ let
     mix = lib.mapAttrs (application: build: {
       locks = [ "${application}/mix.lock" ];
       inherit build;
-      hashes = { ${application} = dependencies.${application}; }
-        // lib.optionalAttrs (application == "marshall") { inherit cedarCargo; };
+      hashes = { ${application} = dependencies.${application}; };
     }) mixReleases;
-    cargo = let
-      nativeCrates = lib.attrNames (lib.filterAttrs (name: type:
-        type == "directory" && builtins.pathExists (../../../lilly/native + "/${name}/Cargo.lock"))
-        (builtins.readDir ../../../lilly/native));
-    in {
-      lyra = { locks = [ "lyra/Cargo.lock" ]; build = lyra; hashes = { }; };
-      terminald = {
-        locks = [ "nix/domains/artifacts/terminald/Cargo.lock" ];
-        build = pkgs.linkFarmFromDrvs "terminald-pins" [ terminald terminaldWindows ];
-        hashes = { };
-      };
-      lilly-native = {
-        locks = map (name: "lilly/native/${name}/Cargo.lock") nativeCrates;
-        build = hostLock;
-        hashes = { };
-      };
-      enrico-git-owner = {
-        locks = [ "enrico/native/git-owner/Cargo.lock" ];
-        build = import ./applications/enrico-git-owner.nix { inherit pkgs; };
-        hashes = { };
-      };
-      trace-spool = {
-        locks = [ "elixir/diagnostics/native/spool/Cargo.lock" ];
-        build = import ./infrastructure/trace-spool.nix { inherit pkgs; };
-        hashes = { };
-      };
-      vscode-web-broker = {
-        locks = [ "nix/domains/artifacts/vscode-web-broker/Cargo.lock" ];
-        build = import ./vscode-web-broker { inherit pkgs; };
-        hashes = { };
-      };
-      mila-rust = {
-        locks = [ "mila/rust/Cargo.lock" ];
-        build = (import ./mila/rust.nix { inherit pkgs; }).package;
-        hashes = { };
-      };
-      otel-guest-receiver = {
-        locks = [ "nix/domains/system/otel-guest/receiver/Cargo.lock" ];
-        build = pkgs.callPackage ../system/otel-guest/receiver.nix { };
-        hashes = { };
-      };
-      mila-linux-native = {
-        locks = [ "mila/native/linux/Cargo.lock" ];
-        build = (import ./mila { inherit pkgs; }).linuxNative;
-        hashes = { };
-      };
-      observability-runtimes = {
-        locks = [ "nix/domains/system/observability-runtimes/Cargo.lock" ];
-        build = import ../system/observability-runtimes.nix { inherit pkgs; };
+    # ADR-0273: the root workspace has the only Cargo.lock. Its build links
+    # every Nix output that compiles a first-party crate, so a lock refresh
+    # MUST rebuild them all.
+    cargo = {
+      workspace = {
+        locks = [ "Cargo.lock" ];
+        build = pkgs.linkFarmFromDrvs "cargo-workspace-pins" [
+          lyra
+          lyra.windows
+          lyra.native
+          terminald
+          terminaldWindows
+          terminald.native
+          hostLock
+          cedarLints
+          enricoGitOwner
+          (import ./infrastructure/trace-spool.nix { inherit pkgs; })
+          (import ./vscode-web-broker { inherit pkgs; })
+          windowsEditorBroker
+          (import ./mila/rust.nix { inherit pkgs; }).package
+          (import ./mila { inherit pkgs; }).linuxNative
+          otelReceiver
+          (import ../system/observability-runtimes.nix { inherit pkgs; })
+        ];
         hashes = { };
       };
     };
@@ -293,7 +278,7 @@ let
       };
 
       # @cc [owner:ghuntley,label:build] cedar-and-assets-prefetched
-      # Compilation MUST use the vendored Cedar lockfile and pinned Nix asset
+      # Compilation MUST use the vendored root Cargo.lock and pinned Nix asset
       # executables, with no Rustler precompiled or Mix asset downloads.
       preConfigure = ''
         # A fixed-output fetch can be reused from cache after inputs change.
@@ -301,9 +286,12 @@ let
         cmp mix.lock "$MIX_DEPS_PATH/.overalls-mix.lock"
       '' + lib.optionalString isMarshall ''
         export CARGO_HOME="$TMPDIR/cargo-home"
+        # Only the unpacked application directory is writable; keep Rustler's
+        # build output beside the crate instead of in the workspace root.
+        export CARGO_TARGET_DIR="$PWD/native/marshall_cedar/target"
         mkdir -p "$CARGO_HOME"
-        substitute ${cedarCargo}/.cargo/config.toml "$CARGO_HOME/config.toml" \
-          --subst-var-by vendor "${cedarCargo}"
+        substitute ${cargoWorkspace.vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" \
+          --subst-var-by vendor "${cargoWorkspace.vendor}"
         cat >> config/prod.exs <<'CONFIG'
         config :esbuild, path: "${lib.getExe pkgs.esbuild}", version: "${pkgs.esbuild.version}"
         CONFIG
@@ -336,7 +324,7 @@ let
 in
 rec {
   inherit otelReceiver enricoGitOwner;
-  inherit dependencies cedarCargo cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit dependencies cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;

@@ -2,23 +2,15 @@
 # @cc [owner:ghuntley,label:build;guest] terminald-windows-cross-build
 # The Windows terminal daemon MUST be cross-built from the same terminald
 # source as the Linux daemon, for `x86_64-pc-windows-gnu` with Lyra's pinned
-# toolchain and a hash-pinned vendored dependency set, without network access;
+# toolchain and the vendored dependency set the root Cargo.lock pins (its
+# per-crate checksums, ADR-0273), without network access;
 # the `.exe` MUST stay at or below 100 MiB and MUST be listed with its SHA-256
 # in the output manifest so the image builder pins what it ships (ADR-0171).
 let
   inherit (pkgs) lib;
-  source = lib.cleanSourceWith {
-    src = ../terminald;
-    filter = path: type:
-      let name = builtins.baseNameOf path;
-      in name != "target" && name != ".hegel" &&
-        (type == "directory" || lib.hasSuffix ".rs" name ||
-          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
-  };
-  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
-    name = "terminald-vendor";
-    lockFile = ../terminald/Cargo.lock;
-  };
+  workspace = import ./cargo-workspace.nix { inherit pkgs; };
+  source = workspace.source { name = "lilly-terminald-source"; crates = [ "nix/domains/artifacts/terminald" ]; };
+  inherit (workspace) vendor;
 in
 pkgs.stdenv.mkDerivation {
   pname = "lilly-terminald-windows";
@@ -33,6 +25,7 @@ pkgs.stdenv.mkDerivation {
   nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils ];
   buildPhase = ''
     runHook preBuild
+    cd ${lib.escapeShellArg "nix/domains/artifacts/terminald"}
     export CARGO_HOME="$TMPDIR/cargo-home"
     export RUSTC="${toolchain}/bin/rustc"
     export CARGO_ZIGBUILD_CACHE_DIR="$TMPDIR/cargo-zigbuild-cache"
@@ -46,13 +39,13 @@ pkgs.stdenv.mkDerivation {
     # gate runs here with the toolchain's own clippy for the Windows target.
     PATH="${toolchain}/bin:$PATH" cargo clippy --all-targets --locked --offline \
       --target x86_64-pc-windows-gnu -- -D warnings
-    cargo zigbuild --release --locked --offline --target x86_64-pc-windows-gnu --bin lilly-terminald
+    cargo zigbuild --profile hardened --locked --offline --target x86_64-pc-windows-gnu --bin lilly-terminald
     runHook postBuild
   '';
   installPhase = ''
     runHook preInstall
     mkdir -p "$out/bin"
-    cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/release/lilly-terminald.exe" "$out/bin/overalls-terminald.exe"
+    cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/hardened/lilly-terminald.exe" "$out/bin/overalls-terminald.exe"
     test "$(stat -c %s "$out/bin/overalls-terminald.exe")" -le 104857600
     digest="$(sha256sum "$out/bin/overalls-terminald.exe" | cut -d' ' -f1)"
     bytes="$(stat -c %s "$out/bin/overalls-terminald.exe")"

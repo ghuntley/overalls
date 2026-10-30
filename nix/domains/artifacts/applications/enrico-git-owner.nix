@@ -1,16 +1,13 @@
 { pkgs }:
+let
+  workspace = import ../infrastructure/cargo-workspace.nix { inherit pkgs; };
+in
 pkgs.rustPlatform.buildRustPackage {
   pname = "enrico-git-owner";
   version = "0.1.0";
-  src = pkgs.lib.cleanSourceWith {
-    src = ../../../../enrico/native/git-owner;
-    filter = path: type:
-      let name = builtins.baseNameOf path;
-      in name != "target" && name != ".hegel" &&
-        (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
-          builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
-  };
-  cargoLock.lockFile = ../../../../enrico/native/git-owner/Cargo.lock;
+  src = workspace.source { name = "enrico-git-owner-source"; crates = [ "enrico/native/git-owner" ]; };
+  inherit (workspace) cargoLock;
+  buildAndTestSubdir = "enrico/native/git-owner";
   strictDeps = true;
   doCheck = true;
   # Generated histories fork native owners and must not inherit another
@@ -21,8 +18,10 @@ pkgs.rustPlatform.buildRustPackage {
   ENRICO_TEST_SETSID = "${pkgs.util-linux}/bin/setsid";
   preCheck = ''export PATH=${pkgs.coreutils}/bin:$PATH'';
   postCheck = ''
+    pushd "$buildAndTestSubdir"
     cargo fmt --check
     cargo clippy --all-targets --locked --offline -- -D warnings
+    popd
   '';
   meta.platforms = [ "x86_64-linux" ];
 }

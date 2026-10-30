@@ -75,7 +75,7 @@ libdir=$("$rustc" --print target-libdir --target "$rust_target")
 compgen -G "$libdir/libcore-*.rlib" > /dev/null ||
   refuse "the Rust standard library for $rust_target is missing; use a rustup toolchain with 'rustup target add $rust_target'"
 RUSTC=$rustc "${CARGO:-cargo}" build --locked --release \
-  --manifest-path "$repo/mila/rust/Cargo.toml" --target-dir "$repo/mila/rust/target" \
+  --manifest-path "$repo/mila/rust/mila-ffi/Cargo.toml" --target-dir "$repo/mila/rust/target" \
   -p mila-ffi --target "$rust_target"
 export MILA_FFI_LIB_DIR="$repo/mila/rust/target/$rust_target/release"
 

@@ -135,4 +135,16 @@ defmodule Overalls.DependencyPinsTest do
     assert CargoSecurityUpgrades.lock_paths("lyra/Cargo.lock\0lilly/native/hostd/Cargo.lock\0") ==
              ["lilly/native/hostd/Cargo.lock", "lyra/Cargo.lock"]
   end
+
+  test "only the root workspace Cargo.lock is accepted (ADR-0273)" do
+    assert CargoSecurityUpgrades.single_root_lock(["Cargo.lock"]) == :ok
+
+    assert CargoSecurityUpgrades.single_root_lock(["Cargo.lock", "lyra/Cargo.lock"]) ==
+             {:error, ["lyra/Cargo.lock"]}
+
+    assert CargoSecurityUpgrades.single_root_lock(["lyra/Cargo.lock"]) ==
+             {:error, ["lyra/Cargo.lock"]}
+
+    assert CargoSecurityUpgrades.single_root_lock([]) == {:error, []}
+  end
 end

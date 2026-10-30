@@ -34,7 +34,7 @@ Run from the repository root inside `devenv shell` where the platform toolchain
 is available:
 
 ```sh
-cargo test --manifest-path mila/rust/Cargo.toml --workspace
+cargo test --locked -p mila-model -p mila-protocol -p mila-crypto -p mila-runtime -p mila-ffi -p mila-transport -p mila-session -p mila-localization -p mila-journey
 cargo test --manifest-path mila/native/linux/Cargo.toml --locked
 ./gradlew -p mila/native/android test
 swift test --package-path mila/native/apple

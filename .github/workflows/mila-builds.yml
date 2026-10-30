@@ -7,6 +7,9 @@ name: "mila builds"
 on:
   pull_request:
     paths:
+      # Root Cargo workspace manifest and its single lock (ADR-0273).
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "mila/**"
       - "mila/rust/**"
       - "protocol/test/fixtures/**"
@@ -17,6 +20,9 @@ on:
   push:
     branches: [trunk]
     paths:
+      # Root Cargo workspace manifest and its single lock (ADR-0273).
+      - "Cargo.toml"
+      - "Cargo.lock"
       - "mila/**"
       - "mila/rust/**"
       - "protocol/test/fixtures/**"
@@ -93,9 +99,9 @@ jobs:
           targets: aarch64-apple-ios-sim
           components: clippy
       - name: Build Rust FFI for Apple native tests
-        run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
       - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
+        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Generate bundled locale catalogs
         run: |
           python3 mila/localization/generate_catalogs.py \
@@ -177,9 +183,9 @@ jobs:
           toolchain: 1.97.1
           components: clippy
       - name: Build Rust Windows FFI
-        run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
       - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
+        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Build native WinUI client (.NET 10)
         working-directory: mila/windows-dotnet
         shell: pwsh
@@ -244,6 +250,10 @@ jobs:
   linux-native:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
+    env:
+      # mila/native/linux is a root Cargo workspace member (ADR-0273); keep its
+      # build output beside the crate, where the steps below read it.
+      CARGO_TARGET_DIR: ${{ github.workspace }}/mila/native/linux/target
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Install the pinned Rust toolchain
@@ -252,7 +262,7 @@ jobs:
           toolchain: 1.97.1
           components: clippy, rustfmt
       - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
+        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Install GTK4 and libadwaita development libraries
         run: |
           sudo apt-get update

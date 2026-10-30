@@ -54,6 +54,21 @@ defmodule Overalls.PinsTest do
            ]
   end
 
+  test "only the root workspace Cargo.lock may exist (ADR-0273)" do
+    assert Pins.cargo_locks([
+             "Cargo.lock",
+             "lyra/vendor/fs2/Cargo.lock",
+             "marshall/deps/x/Cargo.lock"
+           ]) ==
+             []
+
+    assert Pins.cargo_locks(["Cargo.lock", "lyra/Cargo.lock", "Cargo.toml"]) ==
+             [{:cargo_lock, "lyra/Cargo.lock"}]
+
+    assert Pins.cargo_locks(["mila/rust/Cargo.lock"]) ==
+             [:no_root_cargo_lock, {:cargo_lock, "mila/rust/Cargo.lock"}]
+  end
+
   test "the repository satisfies the registry rule" do
     assert Pins.check(Path.expand("../../..", __DIR__)) == []
   end

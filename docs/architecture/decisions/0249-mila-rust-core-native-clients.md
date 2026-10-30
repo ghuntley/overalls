@@ -61,7 +61,9 @@ behavior must be tested per OS.
 
 ## Implementation evidence
 
-The initial workspace and adapters are in [`mila/rust/Cargo.toml`](../../../mila/rust/Cargo.toml),
+The initial workspace and adapters are in [`mila/rust`](../../../mila/rust) (since
+[ADR-0273](0273-single-rust-workspace-and-toolchain.md), members of the root
+[`Cargo.toml`](../../../Cargo.toml) workspace),
 [`mila/native/apple`](../../../mila/native/apple),
 [`mila/native/android`](../../../mila/native/android),
 [`mila/native/linux`](../../../mila/native/linux) and

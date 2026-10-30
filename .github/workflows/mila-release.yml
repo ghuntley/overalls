@@ -167,7 +167,7 @@ jobs:
           toolchain: 1.97.1
           targets: aarch64-apple-ios
       - name: Compile typed Apple FFI seam
-        run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
       - name: Verify Apple native package is Flutter-free
         working-directory: mila/native/apple
         env:

@@ -6,7 +6,10 @@ let
   # Only application build inputs, the shared protocol (including its compile-time
   # priv data) and the explicit local
   # request-accounting and observability libraries MUST enter the source closure. Local builds, fetched
-  # deps and generated assets MUST remain excluded.
+  # deps and generated assets MUST remain excluded. Marshall's release source
+  # additionally carries the root Cargo workspace overlay from ../default.nix:
+  # the root manifest, lock and clippy.toml, member manifests with empty target
+  # stubs, the patched fs2 source and the Cedar crate's own sources only.
 
   # @cc [owner:ghuntley,label:build] harness-source-isolation
   # The fallback SDK source MUST enter only explicitly selected harness
@@ -40,10 +43,8 @@ let
   ] ++ lib.optionals (application == "marshall") [
     ../../../../marshall/assets
     ../../../../marshall/priv
-    # Marshall's own Cedar NIF crate, compiled by Rustler at build time.
-    ../../../../marshall/native/marshall_cedar/Cargo.toml
-    ../../../../marshall/native/marshall_cedar/Cargo.lock
-    ../../../../marshall/native/marshall_cedar/src
+    # Marshall's own Cedar NIF crate, compiled by Rustler at build time,
+    # enters with the root Cargo workspace overlay in ../default.nix.
     # Marshall's SCIM integration is vendored in-tree and referenced by path
     # from mix.exs; retain the source in release closures.
     ../../../../vendor/ash_scim

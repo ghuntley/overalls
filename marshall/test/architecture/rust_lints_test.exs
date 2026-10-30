@@ -99,4 +99,16 @@ defmodule Overalls.RustLintsTest do
     assert RustLints.kind("mila/rust/m/Cargo.toml", @package, ["mila/rust"]) == :member
     assert RustLints.kind("mila/rustacean/Cargo.toml", @package, ["mila/rust"]) == :standalone
   end
+
+  test "a workspace root at the repository root encloses every crate (ADR-0273)" do
+    root = "[workspace]\nmembers = [\"lyra\"]\n"
+    assert RustLints.kind("Cargo.toml", root, ["."]) == :root
+    assert RustLints.kind("lyra/Cargo.toml", @package, ["."]) == :member
+    assert RustLints.kind("mila/rust/m/Cargo.toml", @package, ["."]) == :member
+
+    adoption = %{"." => :adopted, "lyra" => :adopted, "held" => :pending}
+    assert RustLints.owning_adoption("lyra/src/lib.rs", adoption) == :adopted
+    assert RustLints.owning_adoption("held/src/lib.rs", adoption) == :pending
+    assert RustLints.owning_adoption("scripts/x.rs", adoption) == :adopted
+  end
 end

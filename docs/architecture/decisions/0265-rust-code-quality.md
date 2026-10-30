@@ -109,12 +109,34 @@ decision.
    Adoption ratchets: an adopted crate cannot drift, and `--strict` (enabled
    once every crate complies) refuses crates that have not adopted the policy.
 
+## Amendment 2026-10-30: one root workspace (ADR-0273)
+
+[ADR-0273](0273-single-rust-workspace-and-toolchain.md) replaces the
+distribution clauses of decision 1 and the first rejected alternative below.
+Every non-vendored crate is now a member of one root Cargo workspace, so the
+policy is no longer copied per crate:
+
+- The root [`Cargo.toml`](../../../Cargo.toml) carries
+  `scripts/rust/lints.toml` verbatim as `[workspace.lints]`, and every member
+  declares `[lints] workspace = true`.
+- One root [`clippy.toml`](../../../clippy.toml), byte-identical to
+  `scripts/rust/clippy.toml`, replaces the per-crate copies. Nix builds now
+  compile inside the workspace source, so clippy finds it in an ancestor.
+- The drift guard checks the root block, each member's opt-in and the root
+  `clippy.toml`; it treats the root at `.` as enclosing every crate.
+
+The lint set, the fatal `cargo clippy --all-targets --locked -- -D warnings`
+gates, the exception rules and the property engine are unchanged. The rationale
+below is kept as it was decided.
+
 ## Alternatives
 
 - **Inheriting lints through one Cargo workspace for every crate.** Rejected.
   The crates are deliberately independent builds with their own lockfiles and
   Nix derivations, and Cargo cannot inherit lints across workspaces.
   Verbatim copies plus a drift checker give the same single source.
+  (Amended: ADR-0273 merges the crates into one workspace, which removes the
+  premise; see the amendment above.)
 - **`RUSTFLAGS=-D warnings` or `[lints.rust] warnings = "deny"`.** Rejected. A
   toolchain bump would break release builds, including platform builds that
   are not linted on Linux, instead of failing a gate.
@@ -191,8 +213,9 @@ records the verification run and the known gaps.
   - [Lyra](../../../lyra/Cargo.toml), gated in
     [`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix) under the pinned
     1.97.1 toolchain, including FreeBSD and illumos targets
-  - the Mila workspace through `[workspace.lints]` in
-    [`mila/rust/Cargo.toml`](../../../mila/rust/Cargo.toml), with every member opted in.
+  - the Mila crates, first through `[workspace.lints]` in their own workspace
+    and, since ADR-0273, as members of the root [`Cargo.toml`](../../../Cargo.toml)
+    workspace, with every member opted in.
     mila-ffi, mila-runtime, mila-session, mila-protocol, mila-transport and mila-model are
     split; for example, the JNI exports live in
     [`mila-ffi/src/android/`](../../../mila/rust/mila-ffi/src/android/mod.rs), and the
@@ -217,8 +240,9 @@ records the verification run and the known gaps.
 
 - Resolved: the Windows broker runs cross-target clippy in Nix
   ([`windows.nix`](../../../nix/domains/artifacts/vscode-web-broker/windows.nix)).
-- A single root Cargo workspace (the Buck2 consolidation) would contradict the
-  rejected workspace-inheritance alternative and needs a superseding decision.
+- Resolved: the single root Cargo workspace is decided by
+  [ADR-0273](0273-single-rust-workspace-and-toolchain.md), which amends decision 1's
+  distribution clauses (see the amendment above).
 - When should Lyra and terminald unsafe confinement be scheduled, so that
   `unsafe_code = "deny"` can join the canonical block?
 
@@ -227,3 +251,6 @@ records the verification run and the known gaps.
 - [ADR-0191: Elixir Hegel property verification](0191-elixir-hegel-property-verification.md)
 - [ADR-0028: Colocated code contracts](0028-colocated-code-contracts.md)
 - [ADR-0249: Mila Rust core for native clients](0249-mila-rust-core-native-clients.md)
+- [ADR-0267: Single dependency pin registry](0267-single-dependency-pin-registry.md)
+- [ADR-0273: One Cargo workspace and one Rust toolchain](0273-single-rust-workspace-and-toolchain.md)
+  amends decision 1's lint distribution.

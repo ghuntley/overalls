@@ -1,0 +1,123 @@
+# One Cargo workspace for every first-party Rust crate (ADR-0273). The single
+# Cargo.lock beside this manifest pins every crate's third-party dependencies;
+# Nix vendors it with importCargoLock (locked-cargo-vendor.nix, ADR-0267).
+[workspace]
+resolver = "2"
+members = [
+  "elixir/diagnostics/native/spool",
+  "enrico/native/git-owner",
+  "lilly/native/boot-log",
+  "lilly/native/export-channel",
+  "lilly/native/flow-label",
+  "lilly/native/hostd",
+  "lilly/native/image-copy",
+  "lilly/native/ingress-bridge",
+  "lilly/native/kvm-probe",
+  "lilly/native/launch-guard",
+  "lilly/native/resume-token",
+  "lilly/native/source-export",
+  "lilly/native/transfer-stream",
+  "lilly/native/vm-watch",
+  "lilly/native/zfs-namespace-unmount",
+  "lyra",
+  "marshall/native/marshall_cedar",
+  "mila/native/linux",
+  "mila/rust/mila-crypto",
+  "mila/rust/mila-ffi",
+  "mila/rust/mila-journey",
+  "mila/rust/mila-localization",
+  "mila/rust/mila-model",
+  "mila/rust/mila-protocol",
+  "mila/rust/mila-runtime",
+  "mila/rust/mila-session",
+  "mila/rust/mila-transport",
+  "nix/domains/artifacts/terminald",
+  "nix/domains/artifacts/vscode-web-broker",
+  "nix/domains/system/observability-runtimes",
+  "nix/domains/system/otel-guest/receiver",
+]
+# Mix dependency checkouts build their own Rustler crates (hegel_ex, ex_cedar)
+# inside the tree, and vendored third-party sources are never members.
+exclude = [
+  "antithesis/sdk/deps",
+  "audi/deps",
+  "brady/deps",
+  "elixir/diagnostics/deps",
+  "elixir/request_accounting/deps",
+  "enrico/deps",
+  "galileo/deps",
+  "lilly/deps",
+  "lyra/vendor",
+  "marshall/deps",
+  "peach/deps",
+  "porsche/deps",
+  "protocol/deps",
+  "susan/deps",
+  "vendor",
+  "ziggy/deps",
+]
+
+[workspace.package]
+edition = "2021"
+version = "0.1.0"
+authors = ["Overalls contributors"]
+license = "MIT"
+
+[workspace.dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+uuid = { version = "1", features = ["serde", "v4"] }
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+sha2 = "0.10"
+hegeltest = "=0.28.8"
+
+# Cargo honours profiles only at the workspace root. `release` stays Cargo's
+# default so Rustler NIFs and Mila's FFI libraries keep unwinding panics.
+# `hardened` carries the release settings the Lilly helpers, Lyra, terminald
+# and the editor broker used per crate before the merge.
+[profile.hardened]
+inherits = "release"
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[patch.crates-io]
+# fs2 0.4.3 omits illumos from its Solaris allocation fallback. The vendored
+# patch adds that cfg only and preserves all upstream locking behavior.
+fs2 = { path = "lyra/vendor/fs2" }
+
+# ADR-0265 canonical Rust lint policy. Copied verbatim into every Overalls crate;
+# scripts/check_rust_lints.exs refuses drift. Gates run clippy with -D warnings.
+[workspace.lints.rust]
+unsafe_op_in_unsafe_fn = "deny"
+unused_must_use = "deny"
+rust_2018_idioms = { level = "warn", priority = -1 }
+unused_qualifications = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+unreachable_pub = "warn"
+missing_debug_implementations = "warn"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
+pedantic = { level = "warn", priority = -1 }
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+todo = "warn"
+unimplemented = "warn"
+dbg_macro = "warn"
+undocumented_unsafe_blocks = "warn"
+multiple_unsafe_ops_per_block = "warn"
+allow_attributes_without_reason = "warn"
+mem_forget = "warn"
+string_slice = "warn"
+as_underscore = "warn"
+lossy_float_literal = "warn"
+# Internal unpublished crates: these pedantic lints add noise without catching defects.
+module_name_repetitions = "allow"
+must_use_candidate = "allow"
+missing_errors_doc = "allow"
+missing_panics_doc = "allow"

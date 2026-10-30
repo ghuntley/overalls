@@ -2,9 +2,21 @@
 # legacy application, package sources and package cache; Windows builds the WinUI
 # host and Rust FFI directly.
 { pkgs, root, version }:
+let
+  workspace = import ../infrastructure/cargo-workspace.nix { inherit pkgs; };
+  milaRust = builtins.filter (pkgs.lib.hasPrefix "mila/rust/") workspace.members;
+  # The root Cargo workspace (ADR-0273): its manifest, single lock and the
+  # member stubs Cargo needs to load it, with full sources for the Mila Rust crates.
+  cargoWorkspace = workspace.source {
+    name = "mila-bundle-cargo-workspace";
+    crates = milaRust;
+    crateFile = _name: _rel: true;
+  };
+in
 pkgs.runCommand "mila-windows-source-bundle-${version}" {} ''
   name=mila-windows-source-bundle-${version}
   b="$PWD/$name"
+  cp -r --no-preserve=mode ${cargoWorkspace}/. "$b/"
   mkdir -p "$b/mila/windows-dotnet" "$b/mila/rust" "$b/mila/localization/catalogs"
   # `root` is the cleaned Mila source tree (not the repository root).
   cp -r ${root}/windows-dotnet/. "$b/mila/windows-dotnet/"

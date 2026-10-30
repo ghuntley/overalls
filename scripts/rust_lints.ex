@@ -108,7 +108,7 @@ defmodule Overalls.RustLints do
 
     cond do
       String.contains?(text, "[workspace]") -> :root
-      Enum.any?(workspace_roots, &(&1 != dir and String.starts_with?(dir, &1 <> "/"))) -> :member
+      Enum.any?(workspace_roots, &(&1 != dir and within?(dir, &1))) -> :member
       true -> :standalone
     end
   end
@@ -155,10 +155,18 @@ defmodule Overalls.RustLints do
   @spec owning_adoption(Path.t(), %{Path.t() => adoption()}) :: adoption() | nil
   def owning_adoption(rs, adoption) do
     adoption
-    |> Enum.filter(fn {dir, _} -> String.starts_with?(rs, dir <> "/") end)
+    |> Enum.filter(fn {dir, _} -> within?(rs, dir) end)
     |> Enum.max_by(fn {dir, _} -> byte_size(dir) end, fn -> {nil, nil} end)
     |> elem(1)
   end
+
+  @doc """
+  Whether repository-relative `path` lies below directory `dir`. The root
+  Cargo workspace (ADR-0273) sits at `.`, which encloses every path.
+  """
+  @spec within?(Path.t(), Path.t()) :: boolean()
+  def within?(_path, "."), do: true
+  def within?(path, dir), do: String.starts_with?(path, dir <> "/")
 
   @spec tracked() :: [Path.t()]
   def tracked do
