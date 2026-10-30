@@ -20,7 +20,7 @@ pkgs.testers.runNixOSTest {
       networking.hostId = "45454545";
       virtualisation.qemu.options = [ "-uuid 45454545-4545-4545-8545-454545454545" ];
       nix.settings.experimental-features = [ "nix-command" "flakes" ];
-      networking.extraHosts = "${nodes.control.networking.primaryIPAddress} control.example.test";
+      networking.extraHosts = "${nodes.control.networking.primaryIPAddress} control.example.test\n";
       virtualisation.memorySize = lib.mkForce 3072;
       virtualisation.emptyDiskImages = [{ size = 1024; driveConfig.deviceExtraOpts.serial = "enrollment-data"; }];
       boot.supportedFilesystems = [ "zfs" ];

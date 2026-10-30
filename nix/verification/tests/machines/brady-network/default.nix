@@ -39,7 +39,7 @@ in pkgs.testers.runNixOSTest {
     boot.kernelModules = [ "nf_tproxy_ipv4" "nft_tproxy" ];
     users.users.brady = { isSystemUser = true; group = "brady"; uid = 991; };
     users.groups.brady = {};
-    networking.extraHosts = "8.8.4.4 origin.brady.test tunnel.brady.test codeload.github.com";
+    networking.extraHosts = "8.8.4.4 origin.brady.test tunnel.brady.test codeload.github.com\n";
     environment.systemPackages = [ pkgs.git pkgs.iproute2 pkgs.nftables pkgs.curl python pkgs.util-linux pkgs.jq config.boot.zfs.package
       (pkgs.writeShellScriptBin "brady-network-prepare" ''
         ${lib.optionalString large "export BRADY_TEST_LARGE=1"}

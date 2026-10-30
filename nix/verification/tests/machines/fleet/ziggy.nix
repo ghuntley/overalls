@@ -23,7 +23,7 @@ in {
   # MUST use isolated TLS fixtures and synthetic provider keys. This fixture
   # MUST NOT provide synthetic control authority or claim live-provider acceptance.
   lilly = { nodes, ... }: {
-    networking.extraHosts = "${nodes.m1.networking.primaryIPAddress} api.openai.com api.anthropic.com";
+    networking.extraHosts = "${nodes.m1.networking.primaryIPAddress} api.openai.com api.anthropic.com\n";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     # @cc [owner:ghuntley,label:verification;capacity] fleet-ziggy-host-startup-budget
     # Every fleet variant MUST cap host-side Ziggy at 1024 MiB. Ziggy's first

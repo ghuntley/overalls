@@ -39,7 +39,7 @@ in {
   # and control credentials MUST travel through the runtime SOPS bundles. The
   # fixture-issued public Audi root MUST be trusted by Galileo before startup.
   lilly = { nodes, lib, ... }: {
-    networking.extraHosts = "11.0.0.1 origin.galileo.test";
+    networking.extraHosts = "11.0.0.1 origin.galileo.test\n";
     networking.nameservers = [ nodes.m2.networking.primaryIPAddress nodes.m3.networking.primaryIPAddress ];
     security.pki.certificateFiles = [ "${pki}/root.pem" ];
     services.galileo = {

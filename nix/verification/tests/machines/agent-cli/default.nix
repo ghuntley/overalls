@@ -20,11 +20,14 @@ in hegel.runTest {
   };
   nodes.client = { ... }: {
     system.stateVersion = "26.05";
-    networking.extraHosts = "127.0.0.1 control.test";
+    networking.extraHosts = "127.0.0.1 control.test\n";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     environment.systemPackages = [ packages.lyraLinux pkgs.curl pkgs.python3 ];
     systemd.services.agent-cli-fixture = {
       wantedBy = [ "multi-user.target" ];
+      # The paired-fixture state machine restarts this unit deliberately and
+      # repeatedly; systemd's default start rate limit would fail it.
+      startLimitIntervalSec = 0;
       serviceConfig = {
         ExecStart = "${pkgs.python3}/bin/python3 ${./fixture.py} ${tls}/server.pem ${tls}/server.key";
         RuntimeDirectory = "agent-cli-fixture";

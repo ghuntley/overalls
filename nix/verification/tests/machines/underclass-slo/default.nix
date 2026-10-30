@@ -35,7 +35,7 @@ in pkgs.testers.runNixOSTest {
       virtualisation.memorySize = 2048;
       virtualisation.cores = 2;
       networking.hostName = "overalls";
-      networking.extraHosts = "127.0.0.1 provider.test";
+      networking.extraHosts = "127.0.0.1 provider.test\n";
       security.pki.certificateFiles = [ "${tls}/ca.pem" ];
       users.groups.overalls-otel-underclass-proxy = {};
       users.groups.overalls-otel-underclass = {};

@@ -80,7 +80,7 @@ in pkgs.testers.runNixOSTest {
     systemd.services.ziggy.wantedBy = lib.mkForce [];
     services.galileo.secretsFile = "/run/ziggy-fixture/galileo.enc.json";
     systemd.services.galileo.wantedBy = lib.mkForce [];
-    networking.extraHosts = "127.0.0.1 control.test api.openai.com api.anthropic.com";
+    networking.extraHosts = "127.0.0.1 control.test api.openai.com api.anthropic.com\n";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     environment.systemPackages = [ pkgs.curl pkgs.jq pkgs.python3 pkgs.openssh packages.secretTools.sops packages.secretTools.ssh-to-age ];
     environment.etc."ziggy-seal.py".source = ./seal.py;

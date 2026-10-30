@@ -43,7 +43,7 @@ in hegel.runTest {
   nodes.web = { config, lib, ... }: {
     virtualisation.memorySize = lib.mkForce 4096;
     virtualisation.cores = lib.mkForce 4;
-    networking.extraHosts = "127.0.0.1 ${publicHost} ${contentHost} ${outsideHost}";
+    networking.extraHosts = "127.0.0.1 ${publicHost} ${contentHost} ${outsideHost}\n";
     services.marshall = {
       enable = true;
       poolSize = lib.mkForce 10;

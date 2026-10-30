@@ -22,7 +22,7 @@ in pkgs.testers.runNixOSTest {
     }) ];
     virtualisation.memorySize = 2048;
     virtualisation.cores = 2;
-    networking.extraHosts = "127.0.0.1 github.com enrico.fleet.internal";
+    networking.extraHosts = "127.0.0.1 github.com enrico.fleet.internal\n";
     environment.systemPackages = [ pkgs.git pkgs.curl pkgs.jq ];
     services.nginx.enable = true;
     services.nginx.virtualHosts."github.com" = {

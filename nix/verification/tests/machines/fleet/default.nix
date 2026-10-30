@@ -619,7 +619,7 @@ let
     virtualisation.cores = lib.mkDefault 2;
     virtualisation.qemu.forceAccel = lib.mkForce true;
     virtualisation.qemu.options = [ "-cpu host" ];
-    networking.extraHosts = "${nodes.proxy.networking.primaryIPAddress} control.example.test";
+    networking.extraHosts = "${nodes.proxy.networking.primaryIPAddress} control.example.test\n";
     environment.systemPackages = [ pkgs.curl pkgs.jq pkgs.iproute2 ]
       ++ [ pkgs.python3 pkgs.git pkgs.nix ];
     # @cc [owner:ghuntley,label:verification] fleet-local-clock-synchronization

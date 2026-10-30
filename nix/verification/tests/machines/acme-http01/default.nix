@@ -18,7 +18,7 @@ let
   });
   frontend = name: { config, nodes, ... }: {
     services.marshall.enable = true;
-    networking.extraHosts = "${nodes.validator.networking.primaryIPAddress} control.example.test";
+    networking.extraHosts = "${nodes.validator.networking.primaryIPAddress} control.example.test\n";
     services.marshallProxy = {
       enable = true;
       bindAddress = lib.mkForce "0.0.0.0";

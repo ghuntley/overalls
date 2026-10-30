@@ -29,7 +29,7 @@ let
     execution_epoch = 1;
   });
   clientNode = { nodes, ... }: {
-    networking.extraHosts = "169.254.254.1 ${if github then "com-github" else "esample"}.integration.internal";
+    networking.extraHosts = "169.254.254.1 ${if github then "com-github" else "esample"}.integration.internal\n";
     environment.systemPackages = [ pkgs.curl pkgs.dig pkgs.python3 pkgs.git ] ++ githubClients;
     environment.etc."galileo-client.py".source = ./client.py;
     environment.etc."galileo-ca.pem".source = "${tls}/ca.pem";
@@ -102,7 +102,7 @@ in pkgs.testers.runNixOSTest {
       RuntimeDirectoryMode = "0750";
       UMask = "0007";
     };
-    networking.extraHosts = "127.0.0.1 control.test origin.test ${pkgs.lib.optionalString github (pkgs.lib.concatStringsSep " " githubHosts)}";
+    networking.extraHosts = "127.0.0.1 control.test origin.test ${pkgs.lib.optionalString github (pkgs.lib.concatStringsSep " " githubHosts)}\n";
     networking.firewall.allowedTCPPorts = [ 443 ];
     networking.firewall.allowedUDPPorts = [ 53 ];
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];

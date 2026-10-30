@@ -18,7 +18,7 @@ in pkgs.testers.runNixOSTest {
     virtualisation.cores = 2;
     services.openssh.enable = true;
     networking.hostId = "12345678";
-    networking.extraHosts = "127.0.0.1 control.test";
+    networking.extraHosts = "127.0.0.1 control.test\n";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     services.lilly = {
       enable = true;

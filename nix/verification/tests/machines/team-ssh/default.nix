@@ -43,7 +43,7 @@ in pkgs.testers.runNixOSTest {
     virtualisation.cores = 1;
     virtualisation.qemu.forceAccel = lib.mkForce true;
     virtualisation.qemu.options = [ "-cpu host" ];
-    networking.extraHosts = "${nodes.control.networking.primaryIPAddress} control.example.test";
+    networking.extraHosts = "${nodes.control.networking.primaryIPAddress} control.example.test\n";
     users.users.tester = { isNormalUser = true; };
     environment.systemPackages = [ pkgs.openssh pkgs.curl pkgs.util-linux ];
   };

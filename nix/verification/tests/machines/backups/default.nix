@@ -25,7 +25,7 @@ in pkgs.testers.runNixOSTest {
       imports = [ module ];
       system.stateVersion = "26.05";
       networking.hostId = "aabbccdd";
-      networking.extraHosts = "127.0.0.1 s3.test\n192.168.1.1 db.test";
+      networking.extraHosts = "127.0.0.1 s3.test\n192.168.1.1 db.test\n";
       boot.supportedFilesystems = [ "zfs" ];
       boot.extraModprobeConfig = "options zfs zfs_arc_max=268435456";
       systemd.services.zfs-zed.enable = false;

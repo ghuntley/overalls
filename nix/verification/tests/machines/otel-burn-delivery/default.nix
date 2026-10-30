@@ -33,7 +33,7 @@ in hegel.runTest {
     };
     config = {
       virtualisation.memorySize = 1024;
-      networking.extraHosts = "127.0.0.1 notify.test";
+      networking.extraHosts = "127.0.0.1 notify.test\n";
       security.pki.certificateFiles = [ "${tls}/ca.pem" ];
       services.overallsOtelFleet.burnAlerts = {
         enable = true;

@@ -57,7 +57,7 @@ in
       openFirewall = true;
     };
     systemd.services.porsche.wantedBy = lib.mkForce [];
-    networking.extraHosts = "127.0.0.1 control.example.test";
+    networking.extraHosts = "127.0.0.1 control.example.test\n";
     environment.systemPackages = [ pkgs.python313 pkgs.chromium pkgs.nssTools pkgs.openssh bombadil ];
     systemd.services.localization-seed = {
       requires = [ "overalls-test-migrate.service" ];

@@ -41,7 +41,7 @@ in pkgs.testers.runNixOSTest {
   nodes.client = { ... }: {
     virtualisation.memorySize = 1536;
     networking.enableIPv6 = false;
-    networking.extraHosts = "127.0.0.1 ${workload} ${host} control.example.test control.${namespace}";
+    networking.extraHosts = "127.0.0.1 ${workload} ${host} control.example.test control.${namespace}\n";
     environment.systemPackages = [ pkgs.openssh pkgs.openssl pkgs.python3 packages.lyraLinux ];
     environment.etc."bounded-ssh.py".source = ./bounded_ssh.py;
     users.users.audi = { isNormalUser = true; password = "unused-fixture-password"; };

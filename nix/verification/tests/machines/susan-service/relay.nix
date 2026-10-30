@@ -27,7 +27,7 @@ in {
     virtualisation.memorySize = 2048;
     virtualisation.cores = 2;
     services.openssh.enable = true;
-    networking.extraHosts = "127.0.0.1 ${lib.concatStringsSep " " providerHosts}";
+    networking.extraHosts = "127.0.0.1 ${lib.concatStringsSep " " providerHosts}\n";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     services.susan = {
       enable = true;
