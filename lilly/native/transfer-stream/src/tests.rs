@@ -1,11 +1,12 @@
 use super::*;
 use hegel::generators as gs;
+use hegel::generators::Generator as _;
 use hegel::TestCase;
 
 /// @cc [owner:ghuntley,label:verification] hegel-side-classifier-lattice
 /// The outcome lattice is fully enumerable: five side pairs must terminate and
 /// only the jointly-observed pairings resolve.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn outcome_classifier_matches_the_closed_lattice(_tc: TestCase) {
     use Side::{Failed, Running, Succeeded};
     assert_eq!(Failed.classify(Failed), Some(7));
@@ -83,7 +84,7 @@ fn oracle(words: &[OsString]) -> Option<Selected> {
 /// Generated argv vectors MUST classify against the independent selector spec:
 /// bounded timeout, rate, progress descriptor and side uids (never root),
 /// absolute producer/consumer heads and bounded counts.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn cli_selector_matches_independent_oracle(tc: TestCase) {
     let base = ["1000", "0", "-", "-", "977", "1", "/prod/0", "/cons/0"];
     let argc = tc.draw(gs::integers::<usize>().min_value(0).max_value(12));
@@ -135,6 +136,50 @@ fn cli_selector_matches_independent_oracle(tc: TestCase) {
             );
         }
         (parsed, expected) => panic!("diverged: parsed={parsed:?} expected={expected:?}"),
+    }
+}
+
+/// The independent refill specification, in wide arithmetic.
+fn refill_oracle(credit: i64, elapsed_ms: i64, rate: u64) -> i64 {
+    if rate == 0 || elapsed_ms <= 0 {
+        return credit;
+    }
+    let grown = i128::from(credit) + i128::from(elapsed_ms.min(1000)) * i128::from(rate);
+    i64::try_from(grown.min(i128::from(CREDIT_CAP_MS))).expect("capped credit fits")
+}
+
+/// @cc [owner:ghuntley,label:verification] hegel-transfer-credit-throttle-bounds
+/// Generated refill/splice schedules MUST keep throttle credit within
+/// 0..=CREDIT_CAP_MS, match the independent wide-arithmetic refill oracle, and
+/// never open a splice window beyond credit/1000 bytes (or SPLICE_WINDOW).
+#[hegel::test(test_cases = 200)]
+fn credit_throttle_stays_bounded(tc: TestCase) {
+    let rate = tc.draw(gs::one_of(vec![
+        gs::just(0_u64).boxed(),
+        gs::integers::<u64>().min_value(1).max_value(4096).boxed(),
+        gs::integers::<u64>()
+            .min_value(1)
+            .max_value(u64::try_from(RATE_LIMIT).expect("rate limit fits"))
+            .boxed(),
+    ]));
+    let steps = tc.draw(gs::integers::<usize>().min_value(1).max_value(32));
+    let mut credit = CREDIT_CAP_MS;
+    for _ in 0..steps {
+        let elapsed = tc.draw(gs::integers::<i64>().min_value(-2).max_value(5000));
+        let refilled = refill(credit, elapsed, rate);
+        assert_eq!(refilled, refill_oracle(credit, elapsed, rate));
+        credit = refilled;
+        assert!((0..=CREDIT_CAP_MS).contains(&credit));
+        let available = window(credit, rate);
+        assert!(available <= SPLICE_WINDOW);
+        if rate != 0 {
+            assert!(available <= usize::try_from(credit / 1000).expect("credit is non-negative"));
+        } else {
+            assert_eq!(available, SPLICE_WINDOW);
+        }
+        let count = tc.draw(gs::integers::<usize>().min_value(0).max_value(available));
+        credit = debit(credit, count, rate);
+        assert!((0..=CREDIT_CAP_MS).contains(&credit));
     }
 }
 

@@ -406,6 +406,38 @@ fn transfer(
     )
 }
 
+/// Throttle credit after `elapsed_ms` of monotonic time at `rate` bytes per
+/// second; a zero rate is unthrottled and leaves the credit untouched.
+fn refill(credit: i64, elapsed_ms: i64, rate: u64) -> i64 {
+    if rate != 0 && elapsed_ms > 0 {
+        // Clamp elapsed before multiplication to bound arithmetic after suspension.
+        let refill = elapsed_ms.min(1000) * i64::try_from(rate).unwrap_or(CREDIT_CAP_MS);
+        credit.saturating_add(refill).min(CREDIT_CAP_MS)
+    } else {
+        credit
+    }
+}
+
+/// The splice window the current credit allows.
+fn window(credit: i64, rate: u64) -> usize {
+    if rate != 0 {
+        usize::try_from(credit / 1000)
+            .unwrap_or(usize::MAX)
+            .min(SPLICE_WINDOW)
+    } else {
+        SPLICE_WINDOW
+    }
+}
+
+/// Throttle credit after `count` bytes were spliced.
+fn debit(credit: i64, count: usize, rate: u64) -> i64 {
+    if rate != 0 {
+        credit - i64::try_from(count).unwrap_or(0) * 1000
+    } else {
+        credit
+    }
+}
+
 fn sweep(
     request: &Request,
     producer: &mut std::process::Child,
@@ -430,20 +462,10 @@ fn sweep(
         let now = Instant::now();
         let elapsed = now.duration_since(last).as_millis() as i64;
         last = now;
-        if request.rate != 0 && elapsed > 0 {
-            // Clamp elapsed before multiplication to bound arithmetic after suspension.
-            let refill = elapsed.min(1000) * i64::try_from(request.rate).unwrap_or(CREDIT_CAP_MS);
-            credit = credit.saturating_add(refill).min(CREDIT_CAP_MS);
-        }
+        credit = refill(credit, elapsed, request.rate);
         let mut delay = 1;
         if !eof {
-            let available = if request.rate != 0 {
-                usize::try_from(credit / 1000)
-                    .unwrap_or(usize::MAX)
-                    .min(SPLICE_WINDOW)
-            } else {
-                SPLICE_WINDOW
-            };
+            let available = window(credit, request.rate);
             if available > 0 {
                 match splice(
                     &data_reader,
@@ -463,9 +485,7 @@ fn sweep(
                             None => return finish(producer, Some(consumer), 1),
                             Some(total) => total,
                         };
-                        if request.rate != 0 {
-                            credit -= i64::try_from(count).unwrap_or(0) * 1000;
-                        }
+                        credit = debit(credit, count, request.rate);
                     }
                     Err(Errno::AGAIN) | Err(Errno::INTR) => {}
                     Err(_) => return finish(producer, Some(consumer), 8),

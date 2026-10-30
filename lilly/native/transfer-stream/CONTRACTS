@@ -14,7 +14,10 @@ regular file, at most once per second plus completion. Splice accounting is
 transport progress only. No setuid or capabilities.
 
 @cc [owner:ghuntley,label:verification] transfer-stream-hegel-properties
-Hegel properties MUST cover the argv selector lattice, the credit-throttle
-arithmetic and status mapping, while process-level fixtures cover exact byte
-custody, adopted-descendant reaping, deadline kills, diagnostics caps and the
-progress counter on an inherited descriptor.
+Hegel properties MUST cover the argv selector lattice against an independent
+oracle, the credit-throttle arithmetic (refill matches a wide-arithmetic oracle,
+credit stays within 0..=CREDIT_CAP_MS and the splice window never exceeds
+credit/1000 bytes or SPLICE_WINDOW) and the side status mapping, while
+process-level fixtures cover exact byte custody, adopted-descendant reaping,
+deadline kills, diagnostics caps and the progress counter on an inherited
+descriptor.
