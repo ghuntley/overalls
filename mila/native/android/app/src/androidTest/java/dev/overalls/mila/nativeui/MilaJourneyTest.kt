@@ -149,7 +149,7 @@ class MilaJourneyTest {
         assumeTrue("created machine from j03", id != null)
         val detail = MilaMachineDetailController(adapter)
         for (command in listOf(MilaMachineCommand.Stop, MilaMachineCommand.Start, MilaMachineCommand.Pause, MilaMachineCommand.Resume)) {
-            eventually(300_000, "$command applied") {
+            eventually<Boolean>(300_000, "$command applied") {
                 detail.setSession(true, listing())
                 detail.select(id!!)
                 if (detail.submit(command)) true else null
@@ -188,7 +188,7 @@ class MilaJourneyTest {
             val marker = "mila-journey-" + UUID.randomUUID().toString().take(8)
             assertTrue(adapter.terminalResizeHandle(handle, 100, 30).isSuccess)
             assertTrue(adapter.terminalInputBytes(handle, "echo $marker\n".toByteArray(Charsets.UTF_8)).isSuccess)
-            eventually(60_000, "terminal echoes marker") {
+            eventually<String>(60_000, "terminal echoes marker") {
                 adapter.terminalPoll(handle).getOrNull()?.let { renderer.append(it) }
                 renderer.text().lines().firstOrNull { it.trim() == marker }
             }
@@ -228,7 +228,7 @@ class MilaJourneyTest {
         val id = createdId ?: machineNamed(state.listing, createdName)?.id
         assumeTrue("created machine from j03", id != null)
         val detail = MilaMachineDetailController(adapter)
-        eventually(300_000, "delete applied") {
+        eventually<Boolean>(300_000, "delete applied") {
             detail.setSession(true, listing())
             detail.select(id!!)
             if (detail.submit(MilaMachineCommand.Delete)) true else null
