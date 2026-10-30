@@ -14,7 +14,9 @@
 # Build selection then
 # evaluates the derivation of every check not known to be a machine test in
 # isolation with nix-eval-jobs, so one check that fails to evaluate does not
-# hide the others from the build. Writes `checks` (JSON array of names) and `errors`
+# hide the others from the build. Writes `checks` (JSON array of names),
+# `isolated` (the selected checks whose meta.ci.isolated asks for their own
+# build runner) and `errors`
 # (count) to $GITHUB_OUTPUT and records evaluation errors in the job summary.
 # Exits non-zero only when no result can be produced.
 set -euo pipefail
@@ -92,12 +94,18 @@ checks=$(jq -c -s --argjson want "$want" '
   map(select(has("error") | not)
       | select(.meta.ci.enable == true and .meta.ci.machine == $want)
       | .attr) | sort' "$results")
+# Selected checks whose meta.ci asks for a build runner of their own.
+isolated=$(jq -c -s --argjson want "$want" '
+  map(select(has("error") | not)
+      | select(.meta.ci.enable == true and .meta.ci.machine == $want and .meta.ci.isolated == true)
+      | .attr) | sort' "$results")
 errors=$(jq -c -s 'map(select(has("error")) | {attr, error}) | sort_by(.attr)' "$results")
 error_count=$(jq length <<<"$errors")
 
 echo "Selected $(jq length <<<"$checks") $kind checks: $checks"
 {
   echo "checks=$checks"
+  echo "isolated=$isolated"
   echo "errors=$error_count"
 } >> "${GITHUB_OUTPUT:-/dev/null}"
 
