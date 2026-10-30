@@ -9,8 +9,9 @@
 # Both selections start from each check's meta.ci alone: forcing a machine
 # test's derivation runs its import-from-derivation guest builds, which belong
 # to the matrix job that tests it, and evaluating every fleet test at once
-# exhausts the runner's memory. All meta.ci values are evaluated together
-# first and, if that fails, each check in isolation. Build selection then
+# exhausts the runner's memory. Each check's meta.ci is evaluated in
+# isolation, so one check's errors and images do not affect the others.
+# Build selection then
 # evaluates the derivation of every check not known to be a machine test in
 # isolation with nix-eval-jobs, so one check that fails to evaluate does not
 # hide the others from the build. Writes `checks` (JSON array of names) and `errors`
@@ -31,26 +32,29 @@ case "$kind" in
 esac
 
 work=$(mktemp -d)
+# Evaluation realises import-from-derivation inputs into the store; record its
+# free space so a full store is visible in the log rather than only as ENOSPC.
+df -h /nix/store >&2 || true
 results="$work/results"
 flake_checks='.#checks.x86_64-linux'
 
 meta="$work/meta"
-if nix eval --json "$flake_checks" --apply 'builtins.mapAttrs (_: check: check.meta.ci)' \
-    > "$work/all.json" 2> "$work/all.err"; then
-  jq -c 'to_entries[] | {attr: .key, meta: {ci: .value}}' "$work/all.json" > "$meta"
-else
-  echo "Combined meta.ci evaluation failed; evaluating each check in isolation" >&2
-  tail -n 5 "$work/all.err" >&2
-  nix eval --json "$flake_checks" --apply builtins.attrNames > "$work/names.json"
-  jq -r '.[]' "$work/names.json" \
-    | xargs -P 8 -I{} bash -c '
-        attr=$1 work=$2 flake_checks=$3
-        if ci=$(nix eval --json "$flake_checks.\"$attr\".meta.ci" 2> "$work/$attr.err"); then
-          jq -c --arg attr "$attr" "{attr: \$attr, meta: {ci: .}}" <<<"$ci"
-        else
-          jq -cn --arg attr "$attr" --rawfile error "$work/$attr.err" "{attr: \$attr, error: \$error}"
-        fi' _ {} "$work" "$flake_checks" > "$meta"
-fi
+# Each check's meta.ci is evaluated in its own process. Forcing a check runs
+# its top-level assertions, and machine-test assertions read guest and
+# storage images through import-from-derivation: one combined evaluation
+# held temporary roots on every image at once (over 160 GB, more than the
+# runner's 116 GB cache volume) and failed with ENOSPC. Separate processes
+# release their roots on exit, so the daemon's min-free garbage collection
+# (.github/actions/devenv) can reclaim images that earlier checks needed.
+nix eval --json "$flake_checks" --apply builtins.attrNames > "$work/names.json"
+jq -r '.[]' "$work/names.json" \
+  | xargs -P 8 -I{} bash -c '
+      attr=$1 work=$2 flake_checks=$3
+      if ci=$(nix eval --json "$flake_checks.\"$attr\".meta.ci" 2> "$work/$attr.err"); then
+        jq -c --arg attr "$attr" "{attr: \$attr, meta: {ci: .}}" <<<"$ci"
+      else
+        jq -cn --arg attr "$attr" --rawfile error "$work/$attr.err" "{attr: \$attr, error: \$error}"
+      fi' _ {} "$work" "$flake_checks" > "$meta"
 
 if [ "$kind" = build ]; then
   # A check whose meta.ci failed to evaluate stays in, so its error is reported.
@@ -73,6 +77,8 @@ fi
 
 # Every line must be a JSON object naming its attribute.
 jq -e -s 'all(type == "object" and (.attr | type == "string"))' "$results" > /dev/null
+
+df -h /nix/store >&2 || true
 
 checks=$(jq -c -s --argjson want "$want" '
   map(select(has("error") | not)

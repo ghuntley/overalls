@@ -113,8 +113,16 @@ let
   # free) left the race waiting for two slots forever.
   GiB = 1024 * 1024 * 1024;
   ceilDiv = a: b: (a + b - 1) / b;
-  # Numeric minima only; the guest is already a closure input.
-  guestManifest = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile "${guest}/manifest.json"));
+  # @cc [owner:ghuntley,label:verification;build] fleet-guest-minima-from-pinned-manifest
+  # A published image (Windows Server 2025) carries its reviewed manifest as
+  # passthru, pinned with the image by its recursive NAR hash; its minima MUST
+  # come from that pin. Reading its manifest.json at evaluation would realise
+  # the 64 GiB disk during CI check selection (meta.ci forces these asserts)
+  # and filled the selection runner's store. Built images have no pin, so
+  # their manifest is read from the image (import-from-derivation). Numeric
+  # minima only; the guest is already a closure input.
+  guestManifest = guest.passthru.manifest or (builtins.fromJSON
+    (builtins.unsafeDiscardStringContext (builtins.readFile "${guest}/manifest.json")));
   # Marshall.Compute.Image.default_shape root (at least 2 GiB) plus
   # OverallsProtocol.WorkloadBundle's 1 GiB bundle: VMShape.reservation/1.
   raceReservation = (lib.max 2 (ceilDiv guestManifest.minimum_disk_bytes GiB) + 1) * GiB;
@@ -1436,7 +1444,7 @@ assert builtins.isInt guestManifest.minimum_disk_bytes
 assert !(resize || teamResources || maintenanceEvacuation || cloneCancellation) || (let
   # This predicate uses numeric minima only; the guest is already a closure
   # input, and boot_args store references must not become JSON parser context.
-  manifest = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile "${guest}/manifest.json"));
+  manifest = guestManifest;
   in builtins.isInt manifest.minimum_disk_bytes && builtins.isInt manifest.minimum_memory_bytes
     && manifest.minimum_disk_bytes <= 5368709120 && manifest.minimum_memory_bytes <= 536870912);
 # @cc [owner:ghuntley,label:verification] integration-renewal-real-stack

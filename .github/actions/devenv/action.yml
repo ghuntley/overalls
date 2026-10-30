@@ -73,6 +73,12 @@ runs:
     # container has no systemd, so install-nix-action would fall back to
     # single-user: install multi-user here and start the daemon directly.
     # The installer takes ownership of a /nix restored from the cache volume.
+    #
+    # The store MUST stay within the cache volume (116 GB). Evaluation
+    # realises multi-gigabyte guest and storage images through
+    # import-from-derivation, so min-free/max-free let the daemon collect
+    # unrooted paths (images of finished evaluations, outputs already pushed)
+    # before a build or substitution would exhaust it.
     - name: Install Nix
       shell: bash
       env:
@@ -91,6 +97,8 @@ runs:
         system-features = $SYSTEM_FEATURES
         max-jobs = auto
         cores = 0
+        min-free = 17179869184
+        max-free = 51539607552
         EOF
         curl -sSfL --retry 5 -o "$RUNNER_TEMP/install-nix" \
           "https://releases.nixos.org/nix/nix-$NIX_VERSION/install"
