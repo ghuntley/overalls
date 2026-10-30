@@ -10,11 +10,16 @@
 use crate::adapter::{decode_listing, new_request_id, RuntimeError};
 use crate::deep_link::{present, Page};
 use crate::deployments::{DeploymentHost, DeploymentStore};
+use crate::device_key::{load_or_create, write_private};
 use crate::machine_view::project_listing;
 use crate::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
 use crate::session::{
-    ApprovalInfo, DeviceSigner, FileDeviceSigner, LiveSession, SessionBinding,
-    SessionConnectConfig, TrustEnrollment, TrustFetcher, TrustStore, WhoamiOutcome,
+    ApprovalInfo, DeviceSigner, FileDeviceSigner, HttpsTrustFetcher, LiveSession, SessionBinding,
+    SessionConnectConfig, SignInFailure, SignInPhase, TrustEnrollment, TrustStore, WhoamiOutcome,
+};
+use crate::signin_driver::{
+    ApprovalBrowser, ConnectError, Connector, DriverEvent, Execution, SignInDriver, SignInPolicy,
+    SignInTarget,
 };
 use crate::ssh_keys_view::{RevokeOutcome, SshKeySource, SshKeysStatus, SshKeysView};
 use crate::terminal::HostPtyTransport;
@@ -222,7 +227,7 @@ pub struct JourneyReport {
 }
 
 impl JourneyReport {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             version: 1,
             ok: true,
@@ -230,11 +235,63 @@ impl JourneyReport {
         }
     }
 
-    fn record(&mut self, name: &'static str, ok: bool, outcome: &'static str) -> bool {
+    pub fn record(&mut self, name: &'static str, ok: bool, outcome: &'static str) -> bool {
         self.ok &= ok;
         self.steps.push(StepReport { name, ok, outcome });
         ok
     }
+}
+
+impl Default for JourneyReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Creates a new owner-only (0700) work directory: `requested`, or a fresh
+/// random directory under the system temporary directory.
+pub fn create_private_workdir(requested: Option<PathBuf>) -> std::io::Result<PathBuf> {
+    use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
+    let path = match requested {
+        Some(path) => path,
+        None => {
+            let mut suffix = [0_u8; 8];
+            std::io::Read::read_exact(&mut std::fs::File::open("/dev/urandom")?, &mut suffix)?;
+            std::env::temp_dir().join(format!(
+                "mila-linux-journey-{:016x}",
+                u64::from_le_bytes(suffix)
+            ))
+        }
+    };
+    std::fs::DirBuilder::new().mode(0o700).create(&path)?;
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
+    Ok(path)
+}
+
+/// Reads a descriptor file with the size bound applied before parsing.
+pub fn read_descriptor(path: &Path) -> Result<JourneyDescriptor, DescriptorError> {
+    let file = std::fs::File::open(path).map_err(|_| DescriptorError::Malformed)?;
+    let mut bytes = Vec::new();
+    std::io::Read::read_to_end(
+        &mut std::io::Read::take(file, MAX_DESCRIPTOR_BYTES as u64 + 1),
+        &mut bytes,
+    )
+    .map_err(|_| DescriptorError::Malformed)?;
+    JourneyDescriptor::parse(&bytes)
+}
+
+/// The connection profile file for the fixture deployment.
+pub fn fixture_connection_profile(descriptor: &JourneyDescriptor, ca_path: &Path) -> String {
+    serde_json::json!({
+        "version": 1,
+        "profiles": [{
+            "host": descriptor.deployment.host,
+            "ssh_port": descriptor.deployment.ssh_port,
+            "https_port": descriptor.deployment.https_port,
+            "ca_file": ca_path,
+        }]
+    })
+    .to_string()
 }
 
 /// In-memory trust pin for one journey run.
@@ -253,60 +310,7 @@ impl TrustStore for MemoryTrustStore {
 }
 
 /// HTTPS trust fetch against the fixture CA and port. Redirects are refused.
-pub struct FixtureTrustFetcher {
-    pub ca_path: PathBuf,
-    pub server_name: String,
-    pub host: String,
-    pub https_port: u16,
-}
-
-impl FixtureTrustFetcher {
-    /// curl arguments; contains no credential.
-    pub fn arguments(&self) -> Vec<String> {
-        let port = self.https_port;
-        let mut arguments = vec![
-            "--fail".to_owned(),
-            "--silent".to_owned(),
-            "--show-error".to_owned(),
-            "--proto".to_owned(),
-            "=https".to_owned(),
-            "--max-redirs".to_owned(),
-            "0".to_owned(),
-            "--max-time".to_owned(),
-            "20".to_owned(),
-            "--cacert".to_owned(),
-            self.ca_path.display().to_string(),
-        ];
-        if self.server_name != self.host {
-            arguments.push("--connect-to".to_owned());
-            arguments.push(format!("{}:{port}:{}:{port}", self.server_name, self.host));
-        }
-        arguments.push(format!(
-            "https://{}:{port}/bin/ssh-trust.json",
-            self.server_name
-        ));
-        arguments
-    }
-}
-
-impl TrustFetcher for FixtureTrustFetcher {
-    fn fetch(&self, host: &str) -> Result<Vec<u8>, RuntimeError> {
-        if host != self.host {
-            return Err(RuntimeError::InvalidInput);
-        }
-        let output = std::process::Command::new("curl")
-            .args(self.arguments())
-            .output()
-            .map_err(|_| RuntimeError::Unavailable)?;
-        if !output.status.success() {
-            return Err(RuntimeError::Unavailable);
-        }
-        if output.stdout.is_empty() || output.stdout.len() > 8192 {
-            return Err(RuntimeError::InvalidInput);
-        }
-        Ok(output.stdout)
-    }
-}
+pub type FixtureTrustFetcher = HttpsTrustFetcher;
 
 /// curl config carrying the approver credential. Written to an owner-only
 /// file so the token never appears in a process argument list.
@@ -319,58 +323,14 @@ pub fn approver_config(descriptor: &JourneyDescriptor, ca_path: &Path) -> String
     )
 }
 
-/// OpenSSH `ecdsa-sha2-nistp256` public key line and `SHA256:` fingerprint.
-pub fn openssh_identity(key: &p256::ecdsa::SigningKey) -> (String, String) {
-    use base64::Engine;
-    use sha2::Digest;
-    let point = key.verifying_key().to_encoded_point(false);
-    let mut blob = Vec::new();
-    for field in [
-        b"ecdsa-sha2-nistp256".as_slice(),
-        b"nistp256",
-        point.as_bytes(),
-    ] {
-        blob.extend_from_slice(&u32::try_from(field.len()).expect("small").to_be_bytes());
-        blob.extend_from_slice(field);
-    }
-    let public = format!(
-        "ecdsa-sha2-nistp256 {}",
-        base64::engine::general_purpose::STANDARD.encode(&blob)
-    );
-    let fingerprint = format!(
-        "SHA256:{}",
-        base64::engine::general_purpose::STANDARD_NO_PAD.encode(sha2::Sha256::digest(&blob))
-    );
-    (public, fingerprint)
-}
-
-fn write_private(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
-    use std::io::Write;
-    use std::os::unix::fs::OpenOptionsExt;
-    let mut file = std::fs::OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .mode(0o600)
-        .open(path)?;
-    file.write_all(bytes)?;
-    file.sync_all()
-}
-
+/// A fresh device key at `path` (which must not exist yet).
 fn generate_device_key(path: &Path) -> Option<(FileDeviceSigner, String)> {
-    use std::io::Read;
-    let mut source = std::fs::File::open("/dev/urandom").ok()?;
-    for _ in 0..8 {
-        let mut bytes = [0_u8; 32];
-        source.read_exact(&mut bytes).ok()?;
-        let Ok(key) = p256::ecdsa::SigningKey::from_slice(&bytes) else {
-            continue;
-        };
-        write_private(path, &bytes).ok()?;
-        let (public, fingerprint) = openssh_identity(&key);
-        let signer = FileDeviceSigner::load(path, public).ok()?;
-        return Some((signer, fingerprint));
+    if path.exists() {
+        return None;
     }
-    None
+    load_or_create(path)
+        .ok()
+        .map(|key| (key.signer, key.fingerprint))
 }
 
 fn now() -> u64 {
@@ -479,7 +439,7 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
     let enrollment = TrustEnrollment {
         store: MemoryTrustStore::default(),
         fetcher: FixtureTrustFetcher {
-            ca_path: ca_path.clone(),
+            ca_path: Some(ca_path.clone()),
             server_name: descriptor.tls.server_name.clone(),
             host: host.clone(),
             https_port: descriptor.deployment.https_port,
@@ -492,14 +452,15 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
     report.record("trust", true, "pinned");
 
     // 4. Owner-only device key.
-    let Some((signer, fingerprint)) = generate_device_key(&workdir.join("device-key")) else {
+    let key_path = workdir.join("device-key");
+    let Some((_signer, fingerprint)) = generate_device_key(&key_path) else {
         report.record("device_key", false, "unavailable");
         return report;
     };
     report.record("device_key", true, "generated");
 
     // 5. Certificate-authenticated session and browser-approval completion.
-    let (live, outcome) = sign_in(descriptor, workdir, &ca_path, &trust, &signer);
+    let (live, outcome) = sign_in(descriptor, workdir, &ca_path, &trust, &key_path);
     let Some(live) = live else {
         report.record("approval", false, outcome);
         return report;
@@ -638,9 +599,10 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
 
     // 11. A second device signs in; the first revokes it once, and the
     // revoked key must be approved again before it can sign in.
-    let second = generate_device_key(&workdir.join("second-device-key"));
+    let second_path = workdir.join("second-device-key");
+    let second = generate_device_key(&second_path);
     let (second_session, second_outcome) = match second.as_ref() {
-        Some((signer, _)) => sign_in(descriptor, workdir, &ca_path, &trust, signer),
+        Some(_) => sign_in(descriptor, workdir, &ca_path, &trust, &second_path),
         None => (None, "device_key_unavailable"),
     };
     if let (Some(mut second_session), Some((second_signer, second_fingerprint))) =
@@ -673,53 +635,139 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
     report
 }
 
-/// Connects and completes browser approval through the fixture approver.
-/// Returns the authenticated session or a fixed failure code.
-fn sign_in<S: DeviceSigner>(
+/// The fixture's stand-in for the user's browser: it posts the validated
+/// approval link and fingerprint to the descriptor's approver hook, which
+/// approves the device as a signed-in user would.
+pub struct FixtureApprover {
+    descriptor: JourneyDescriptor,
+    workdir: PathBuf,
+    ca_path: PathBuf,
+    opened: std::cell::Cell<u32>,
+    failed: std::cell::Cell<bool>,
+}
+
+impl FixtureApprover {
+    pub fn new(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) -> Self {
+        Self {
+            descriptor: descriptor.clone(),
+            workdir: workdir.to_owned(),
+            ca_path: ca_path.to_owned(),
+            opened: std::cell::Cell::new(0),
+            failed: std::cell::Cell::new(false),
+        }
+    }
+
+    /// How many approval links were opened.
+    pub fn opened(&self) -> u32 {
+        self.opened.get()
+    }
+
+    /// True once the approver hook refused or could not be reached.
+    pub fn failed(&self) -> bool {
+        self.failed.get()
+    }
+}
+
+impl ApprovalBrowser for FixtureApprover {
+    fn open(&self, approval: &ApprovalInfo) -> bool {
+        self.opened.set(self.opened.get().saturating_add(1));
+        let ok = approve(&self.descriptor, &self.workdir, &self.ca_path, approval);
+        if !ok {
+            self.failed.set(true);
+        }
+        ok
+    }
+}
+
+/// Connects with already reconciled trust and an owner-only device key.
+struct JourneyConnector {
+    trust: Vec<u8>,
+    key_path: PathBuf,
+}
+
+impl Connector for JourneyConnector {
+    type Session = LiveSession;
+
+    fn connect(&self, target: &SignInTarget) -> Result<LiveSession, ConnectError> {
+        let key = load_or_create(&self.key_path).map_err(|_| ConnectError::DeviceKey)?;
+        LiveSession::connect(
+            &SessionConnectConfig {
+                trust_document: self.trust.clone(),
+                host: target.host().to_owned(),
+                port: target.ssh_port(),
+                timeout_ms: SESSION_TIMEOUT_MS,
+            },
+            &key.signer,
+        )
+        .map_err(|_| ConnectError::Unreachable)
+    }
+}
+
+/// Fixed report code for a sign-in that ended without a session.
+pub fn sign_in_failure_code(phase: SignInPhase, failure: Option<SignInFailure>) -> &'static str {
+    match (phase, failure) {
+        (SignInPhase::Expired, _) => "approval_expired",
+        (_, Some(SignInFailure::DeviceKey)) => "device_key_unavailable",
+        (_, Some(SignInFailure::HostUntrusted)) => "host_untrusted",
+        (_, Some(SignInFailure::Refused)) => "refused",
+        (_, Some(SignInFailure::Protocol)) => "protocol",
+        (_, Some(SignInFailure::Unreachable)) => "unreachable",
+        (SignInPhase::Disconnected, _) => "disconnected",
+        _ => "approval_timeout",
+    }
+}
+
+/// Runs the shared [`SignInDriver`] (the same driver the GTK window uses)
+/// against the fixture, approving through the fixture approver. Returns the
+/// authenticated session or a fixed failure code.
+fn sign_in(
     descriptor: &JourneyDescriptor,
     workdir: &Path,
     ca_path: &Path,
     trust: &[u8],
-    signer: &S,
+    key_path: &Path,
 ) -> (Option<LiveSession>, &'static str) {
-    let Some(mut live) = connect(descriptor, trust, signer) else {
-        return (None, "connect_refused");
+    let Ok(target) = SignInTarget::new(
+        &descriptor.deployment.host,
+        descriptor.deployment.ssh_port,
+        descriptor.deployment.https_port,
+    ) else {
+        return (None, "target_invalid");
     };
-    let mut approval_sent = false;
-    for attempt in 0..APPROVAL_POLLS {
-        match live.whoami() {
-            Ok(WhoamiOutcome::Authenticated { .. }) => {
-                return (
-                    Some(live),
-                    if approval_sent { "approved" } else { "already" },
-                );
-            }
-            Ok(WhoamiOutcome::Approval { url, fingerprint }) => {
-                let Ok(info) = ApprovalInfo::validate_for_host(
-                    &url,
-                    &fingerprint,
-                    now(),
-                    &descriptor.https_authority(),
-                ) else {
-                    return (None, "approval_origin_refused");
+    let approver = FixtureApprover::new(descriptor, workdir, ca_path);
+    let mut driver = SignInDriver::new(
+        std::sync::Arc::new(JourneyConnector {
+            trust: trust.to_vec(),
+            key_path: key_path.to_owned(),
+        }),
+        SignInPolicy {
+            poll_interval: Duration::from_secs(1),
+            ..SignInPolicy::default()
+        },
+        Execution::Inline,
+    );
+    driver.start(target);
+    let started = Instant::now();
+    while started.elapsed() < Duration::from_secs(u64::from(APPROVAL_POLLS) + 30) {
+        let now = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
+        for event in driver.poll(now, &approver) {
+            if let DriverEvent::Established { session, .. } = event {
+                let code = if approver.opened() > 0 {
+                    "approved"
+                } else {
+                    "already"
                 };
-                if !approval_sent {
-                    if !approve(descriptor, workdir, ca_path, &info) {
-                        return (None, "approver_failed");
-                    }
-                    approval_sent = true;
-                } else if attempt % 15 == 0 {
-                    // A deployment may bind approval to a fresh connection.
-                    match connect(descriptor, trust, signer) {
-                        Some(fresh) => live = fresh,
-                        None => return (None, "reconnect_refused"),
-                    }
-                }
+                return (Some(session), code);
             }
-            Ok(_) => return (None, "refused"),
-            Err(_) => {}
         }
-        std::thread::sleep(Duration::from_secs(1));
+        if approver.failed() {
+            return (None, "approver_failed");
+        }
+        if !driver.is_active() {
+            let flow = driver.flow();
+            return (None, sign_in_failure_code(flow.phase, flow.failure));
+        }
+        std::thread::sleep(Duration::from_millis(100));
     }
     (None, "approval_timeout")
 }
@@ -836,7 +884,7 @@ mod tests {
     fn credentials_stay_out_of_process_arguments() {
         let parsed = parse(&descriptor()).unwrap();
         let fetcher = FixtureTrustFetcher {
-            ca_path: PathBuf::from("/private/ca.pem"),
+            ca_path: Some(PathBuf::from("/private/ca.pem")),
             server_name: "localhost".into(),
             host: "localhost".into(),
             https_port: 8443,
@@ -863,12 +911,18 @@ mod tests {
     }
 
     #[test]
-    fn openssh_identity_matches_wire_format() {
-        let key = p256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
-        let (public, fingerprint) = openssh_identity(&key);
-        assert!(public.starts_with("ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTY"));
-        assert!(fingerprint.starts_with("SHA256:"));
-        assert_eq!(fingerprint.len(), 7 + 43);
+    fn fixture_profile_is_accepted_by_the_gtk_profile_loader() {
+        let parsed = parse(&descriptor()).unwrap();
+        let profile = fixture_connection_profile(&parsed, Path::new("/private/ca.pem"));
+        assert!(!profile.contains("s3cr3t"));
+        let profiles =
+            crate::connection_profile::ConnectionProfiles::parse(profile.as_bytes()).unwrap();
+        let target = profiles
+            .resolve(&DeploymentHost::parse("localhost").unwrap())
+            .unwrap();
+        assert_eq!(target.ssh_port(), 2222);
+        assert_eq!(target.https_authority(), "localhost:8443");
+        assert_eq!(target.ca_file(), Some(Path::new("/private/ca.pem")));
     }
 
     #[test]

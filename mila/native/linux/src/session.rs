@@ -638,6 +638,13 @@ impl LiveSession {
         self.handle.is_some()
     }
 
+    /// A `Send` identity probe for this session's handle, used by the sign-in
+    /// driver's heartbeat off the GTK main thread. It carries no authority
+    /// beyond `whoami`: a closed or replaced session makes it fail stale.
+    pub fn probe(&self) -> Option<SessionProbe> {
+        self.handle.map(SessionProbe)
+    }
+
     /// Open one authenticated PTY owned by this deployment session.
     pub fn terminal_attach(&mut self, columns: u16, rows: u16) -> Result<u64, SessionError> {
         if !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) {
@@ -764,6 +771,31 @@ impl LiveSession {
 
     fn handle(&self) -> Result<u64, SessionError> {
         self.handle.ok_or(SessionError::StaleHandle)
+    }
+}
+
+/// @cc [owner:ghuntley,label:security;reliability] linux-session-probe-identity-only
+/// A probe MUST expose only the bounded `whoami` read of the handle it was
+/// taken from and MUST report a stale handle once that session closes; it
+/// MUST NOT open, mutate or extend the session it observes.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct SessionProbe(u64);
+
+impl SessionProbe {
+    pub fn whoami(&self) -> Result<WhoamiOutcome, SessionError> {
+        let handle = self.0;
+        let bytes = copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_whoami(handle, out, capacity, written)
+        })?;
+        parse_whoami(&bytes).ok_or(SessionError::InvalidInput)
+    }
+
+    /// Closes the observed FFI session as a transport loss would, leaving the
+    /// owning [`LiveSession`] to discover a stale handle. Used by recovery
+    /// tests and the GTK journey to exercise reconnect without a network
+    /// fault.
+    pub fn sever(self) {
+        let _ = mila_ffi::session::mila_session_close(self.0);
     }
 }
 
@@ -1093,6 +1125,70 @@ impl TrustFetcher for CurlTrustFetcher {
     }
 }
 
+/// HTTPS trust fetch for a deployment on an explicit port, optionally with a
+/// private CA bundle (connection profiles and the hermetic fixture).
+/// Redirects are refused and only `https` is allowed.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct HttpsTrustFetcher {
+    pub ca_path: Option<std::path::PathBuf>,
+    pub server_name: String,
+    pub host: String,
+    pub https_port: u16,
+}
+
+impl HttpsTrustFetcher {
+    /// curl arguments; contains no credential.
+    pub fn arguments(&self) -> Vec<String> {
+        let port = self.https_port;
+        let mut arguments = [
+            "--fail",
+            "--silent",
+            "--show-error",
+            "--proto",
+            "=https",
+            "--max-redirs",
+            "0",
+            "--max-time",
+            "20",
+        ]
+        .map(str::to_owned)
+        .to_vec();
+        if let Some(ca_path) = &self.ca_path {
+            arguments.push("--cacert".to_owned());
+            arguments.push(ca_path.display().to_string());
+        }
+        if self.server_name != self.host {
+            arguments.push("--connect-to".to_owned());
+            arguments.push(format!("{}:{port}:{}:{port}", self.server_name, self.host));
+        }
+        arguments.push(format!(
+            "https://{}:{port}/bin/ssh-trust.json",
+            self.server_name
+        ));
+        arguments
+    }
+}
+
+impl TrustFetcher for HttpsTrustFetcher {
+    fn fetch(&self, host: &str) -> Result<Vec<u8>, RuntimeError> {
+        if host != self.host || self.https_port == 0 {
+            return Err(RuntimeError::InvalidInput);
+        }
+        let output = std::process::Command::new("curl")
+            .args(self.arguments())
+            .stdin(std::process::Stdio::null())
+            .output()
+            .map_err(|_| RuntimeError::Unavailable)?;
+        if !output.status.success() {
+            return Err(RuntimeError::Unavailable);
+        }
+        if output.stdout.is_empty() || output.stdout.len() > MAX_TRUST_BYTES {
+            return Err(RuntimeError::InvalidInput);
+        }
+        Ok(output.stdout)
+    }
+}
+
 /// Rust-owned trust enrollment. Only canonical bytes selected by the FFI are persisted.
 pub struct TrustEnrollment<S, F> {
     pub store: S,
@@ -1221,6 +1317,7 @@ pub enum SignInPhase {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum SignInFailure {
+    DeviceKey,
     HostUntrusted,
     Refused,
     Protocol,
@@ -1345,6 +1442,7 @@ pub enum SignInEvent {
         at: u64,
     },
     Unreachable(u64),
+    DeviceKeyUnavailable(u64),
     Disconnected(u64),
     SignOut,
     Tick(u64),
@@ -1373,6 +1471,11 @@ impl SignInFlow {
                     ) =>
             {
                 self.fail(SignInFailure::Unreachable)
+            }
+            SignInEvent::DeviceKeyUnavailable(g)
+                if g == self.generation && self.phase == SignInPhase::Connecting =>
+            {
+                self.fail(SignInFailure::DeviceKey)
             }
             SignInEvent::Disconnected(g) if g == self.generation => match self.phase {
                 SignInPhase::AwaitingApproval | SignInPhase::Connecting => {
