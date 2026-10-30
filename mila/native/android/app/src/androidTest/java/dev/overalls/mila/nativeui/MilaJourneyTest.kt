@@ -42,7 +42,8 @@ private class JourneyStore : MilaDeploymentStore {
  *
  * No provisioner or guest runs in the fixture: lifecycle steps prove admission by Porsche, the
  * terminal step proves the closed `terminal_unavailable` refusal, and steps that need the
- * fixture's `observe` stand-in are skipped when the fixture does not expose it over HTTPS.
+ * fixture's `/fixture/<action>` hooks (observe, thread-*) are narrowed when this fixture build does
+ * not expose them (404).
  * Steps run in name order because later steps reuse the device key approved by the first one.
  */
 @RunWith(AndroidJUnit4::class)
@@ -192,15 +193,35 @@ class MilaJourneyTest {
         assertTrue("share remove: ${sharing.state} ${refusal()}", sharing.submit(principal, remove = true))
     }
 
-    @Test fun j06_threadListingDecodes() = runBlocking<Unit> {
+    @Test fun j06_threadPromptAnswerAndPlanApproval() = runBlocking<Unit> {
         signedIn()
-        val threads = adapter.threadListing().getOrThrow()
-        val detail = MilaThreadDetailController(adapter)
-        detail.setSession(true, threads)
-        threads.threads.firstOrNull()?.let { thread ->
-            assertTrue(detail.select(thread.id))
-            assertTrue("thread show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
+        val created = fixture.fixture(MilaFixtureAction.ThreadCreate)
+        if (created == null) {
+            // Narrowed until the fixture exposes its thread hooks: listing still decodes.
+            val threads = adapter.threadListing().getOrThrow()
+            val detail = MilaThreadDetailController(adapter)
+            detail.setSession(true, threads)
+            threads.threads.firstOrNull()?.let { assertTrue(detail.select(it.id)); assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show)) }
+            assumeTrue("fixture thread hooks", false)
         }
+        val thread = created!!.fixtureId("thread_id")
+        val ready = fixture.fixture(MilaFixtureAction.ThreadReady, JSONObject().put("thread_id", thread.toString()))
+        assertEquals("ready", ready?.optString("status"))
+        val listed = adapter.threadListing().getOrThrow()
+        assertTrue("thread $thread listed", listed.threads.any { it.id == thread })
+        val detail = MilaThreadDetailController(adapter)
+        detail.setSession(true, listed)
+        assertTrue(detail.select(thread))
+        assertTrue("prompt: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Prompt, "Report the hostname please"))
+        val question = fixture.fixture(MilaFixtureAction.ThreadQuestion, JSONObject().put("thread_id", thread.toString()))!!.fixtureId("question_id")
+        assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
+        val shown = (detail.state as MilaThreadActionState.Applied).thread
+        assertEquals("pending question reported by thread show", question, shown.questionId)
+        assertTrue("answer: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Answer, """{"approach":{"selected":"First","text":""}}"""))
+        val plan = fixture.fixture(MilaFixtureAction.ThreadProposal, JSONObject().put("thread_id", thread.toString()))!!.fixtureId("plan_id")
+        assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
+        assertEquals("latest plan reported by thread show", plan, (detail.state as MilaThreadActionState.Applied).thread.planId)
+        assertTrue("plan approve: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.PlanApprove))
     }
 
     @Test fun j07_terminalWithoutGuestIsRefusedClosed() = runBlocking<Unit> {

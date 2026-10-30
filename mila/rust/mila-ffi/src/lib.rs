@@ -1100,7 +1100,21 @@ fn jni_session_bytes(
     env: &mut jni::JNIEnv<'_>,
     call: impl FnOnce(*mut u8, usize, *mut usize) -> session::SessionStatus,
 ) -> jni::sys::jbyteArray {
-    let mut data = vec![0u8; 1 << 20];
+    jni_session_bytes_bounded(env, 1 << 20, call)
+}
+
+/// @cc [owner:ghuntley,label:protocol] jni-session-single-read
+/// Android session reads and mutations MUST invoke the session ABI exactly once
+/// into a caller-bounded buffer; a size probe followed by a read would run the
+/// Porsche command twice.
+///
+/// [jni_session_bytes] with an explicit output bound.
+fn jni_session_bytes_bounded(
+    env: &mut jni::JNIEnv<'_>,
+    bound: usize,
+    call: impl FnOnce(*mut u8, usize, *mut usize) -> session::SessionStatus,
+) -> jni::sys::jbyteArray {
+    let mut data = vec![0u8; bound];
     let mut size = 0usize;
     let status = call(data.as_mut_ptr(), data.len(), &mut size);
     if status != session::SessionStatus::Ok || size > data.len() {
@@ -1261,36 +1275,16 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return std::ptr::null_mut(),
     };
-    let mut size = 0usize;
-    let status = unsafe {
+    jni_session_bytes_bounded(&mut env, 1 << 20, |out, capacity, written| unsafe {
         session::mila_session_web_show(
             handle as u64,
             machine.as_ptr(),
             machine.len(),
-            std::ptr::null_mut(),
-            0,
-            &mut size,
+            out,
+            capacity,
+            written,
         )
-    };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 1 << 20 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0u8; size];
-    let status = unsafe {
-        session::mila_session_web_show(
-            handle as u64,
-            machine.as_ptr(),
-            machine.len(),
-            data.as_mut_ptr(),
-            size,
-            &mut size,
-        )
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |a| a.into_raw())
+    })
 }
 
 #[no_mangle]
@@ -1361,8 +1355,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     let secondary = optional(secondary);
     let input = optional(input);
     let request = optional(request_id);
-    let mut size = 0usize;
-    let status = unsafe {
+    jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
         session::mila_session_thread_action(
             handle as u64,
             thread.as_ptr(),
@@ -1375,89 +1368,38 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
             input.as_ref().map_or(0, Vec::len),
             request.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
             request.as_ref().map_or(0, Vec::len),
-            std::ptr::null_mut(),
-            0,
-            &mut size,
+            out,
+            capacity,
+            written,
         )
-    };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 256 * 1024 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0u8; size];
-    let status = unsafe {
-        session::mila_session_thread_action(
-            handle as u64,
-            thread.as_ptr(),
-            thread.len(),
-            command.as_ptr(),
-            command.len(),
-            secondary.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
-            secondary.as_ref().map_or(0, Vec::len),
-            input.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
-            input.as_ref().map_or(0, Vec::len),
-            request.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
-            request.as_ref().map_or(0, Vec::len),
-            data.as_mut_ptr(),
-            data.len(),
-            &mut size,
-        )
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |a| a.into_raw())
+    })
 }
 
 /// Copy the bounded authenticated SSH-key listing from an existing session.
 /// The listing is validated by `mila-session` before any bytes cross JNI.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionSshKeys(
-    env: jni::JNIEnv<'_>,
+    mut env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
-    let mut size = 0usize;
-    let status = unsafe {
-        session::mila_session_ssh_keys(handle as u64, std::ptr::null_mut(), 0, &mut size)
-    };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 256 * 1024 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0_u8; size];
-    let status = unsafe {
-        session::mila_session_ssh_keys(handle as u64, data.as_mut_ptr(), size, &mut size)
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |array| array.into_raw())
+    jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
+        session::mila_session_ssh_keys(handle as u64, out, capacity, written)
+    })
 }
 
 /// Copy the bounded `whoami --json` envelope from an existing session. Approval
 /// links cross JNI only after Rust has validated the JSON framing and bounds.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionWhoami(
-    env: jni::JNIEnv<'_>,
+    mut env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
-    let mut size = 0usize;
-    let status =
-        unsafe { session::mila_session_whoami(handle as u64, std::ptr::null_mut(), 0, &mut size) };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 64 * 1024 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0_u8; size];
-    let status = unsafe {
-        session::mila_session_whoami(handle as u64, data.as_mut_ptr(), data.len(), &mut size)
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |array| array.into_raw())
+    // `whoami` executes remotely, so it runs once into a bounded buffer.
+    jni_session_bytes_bounded(&mut env, 64 * 1024, |out, capacity, written| unsafe {
+        session::mila_session_whoami(handle as u64, out, capacity, written)
+    })
 }
 
 /// Revoke one opaque approved-key identity on the already authenticated session.
@@ -1491,32 +1433,15 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 }
 
 fn session_copy(env: &mut jni::JNIEnv<'_>, handle: u64, snapshot: bool) -> jni::sys::jbyteArray {
-    let mut size = 0usize;
-    let status = unsafe {
+    // One bounded call: a size probe followed by a read would execute the
+    // listing/snapshot twice and could return a different second result.
+    jni_session_bytes_bounded(env, 8 * 1024 * 1024, |out, capacity, written| unsafe {
         if snapshot {
-            session::mila_session_snapshot(handle, 0, std::ptr::null_mut(), 0, &mut size)
+            session::mila_session_snapshot(handle, 0, out, capacity, written)
         } else {
-            session::mila_session_listing(handle, std::ptr::null_mut(), 0, &mut size)
+            session::mila_session_listing(handle, out, capacity, written)
         }
-    };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 8 * 1024 * 1024 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0u8; size];
-    let status = unsafe {
-        if snapshot {
-            session::mila_session_snapshot(handle, 0, data.as_mut_ptr(), size, &mut size)
-        } else {
-            session::mila_session_listing(handle, data.as_mut_ptr(), size, &mut size)
-        }
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    match env.byte_array_from_slice(&data[..size]) {
-        Ok(v) => v.into_raw(),
-        Err(_) => std::ptr::null_mut(),
-    }
+    })
 }
 
 #[no_mangle]
@@ -1537,26 +1462,13 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 }
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceList(
-    env: jni::JNIEnv<'_>,
+    mut env: jni::JNIEnv<'_>,
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
-    let mut size = 0usize;
-    let status = unsafe {
-        session::mila_session_device_ls(handle as u64, std::ptr::null_mut(), 0, &mut size)
-    };
-    if status != session::SessionStatus::SmallBuffer || size == 0 || size > 256 * 1024 {
-        return std::ptr::null_mut();
-    }
-    let mut data = vec![0u8; size];
-    let status = unsafe {
-        session::mila_session_device_ls(handle as u64, data.as_mut_ptr(), size, &mut size)
-    };
-    if status != session::SessionStatus::Ok {
-        return std::ptr::null_mut();
-    }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |a| a.into_raw())
+    jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
+        session::mila_session_device_ls(handle as u64, out, capacity, written)
+    })
 }
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceRemove(

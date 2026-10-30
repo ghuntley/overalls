@@ -16,9 +16,66 @@ private class ThreadAdapter(private val accepted: Boolean = true) : MilaFfiAdapt
         if (accepted) Result.success(Unit) else Result.failure(IllegalStateException("rejected"))
 }
 
+private class ThreadControlsAdapter(private val shown: String) : MilaFfiAdapter {
+    val submitted = mutableListOf<Pair<MilaThreadCommand, UUID?>>()
+    var shows = 0
+    override suspend fun call(request: MilaFfiRequest) = MilaFfiResult.Failure(MilaFfiError.Unavailable)
+    override suspend fun threadShow(threadId: UUID): Result<ByteArray> { shows += 1; return Result.success(shown.toByteArray()) }
+    override suspend fun threadAction(threadId: UUID, command: MilaThreadCommand, input: String?, secondary: UUID?): Result<Unit> {
+        submitted += command to secondary
+        return Result.success(Unit)
+    }
+}
+
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35])
 class MilaThreadDetailTest {
+    private val thread = UUID.fromString("00000000-0000-0000-0000-00000000000a")
+    private val question = UUID.fromString("00000000-0000-0000-0000-00000000000b")
+    private val plan = UUID.fromString("00000000-0000-0000-0000-00000000000c")
+    private val bare = MilaThreadListing(listOf(MilaThreadRow(thread, "Build", "idle")), false)
+
+    @Test fun answerNamesTheQuestionReportedByThreadShow() = runBlocking {
+        val adapter = ThreadControlsAdapter("""{"version":1,"status":"succeeded","result":{"id":"$thread","pending_question":{"id":"$question"},"latest_plan":{"id":"$plan"}}}""")
+        val controller = MilaThreadDetailController(adapter)
+        controller.setSession(true, bare)
+        controller.select(thread)
+        assertFalse(controller.submit(MilaThreadCommand.Answer, "{}"))
+        assertFalse(controller.submit(MilaThreadCommand.PlanApprove))
+        assertTrue(adapter.submitted.isEmpty())
+        assertTrue(controller.submit(MilaThreadCommand.Show))
+        assertEquals(1, adapter.shows)
+        // A recomposition re-supplying the same listing keeps the observed controls.
+        controller.setSession(true, bare)
+        controller.select(thread)
+        assertTrue(controller.submit(MilaThreadCommand.Answer, "{}"))
+        assertTrue(controller.submit(MilaThreadCommand.PlanApprove))
+        assertEquals(listOf(MilaThreadCommand.Answer to question, MilaThreadCommand.PlanApprove to plan), adapter.submitted)
+        // The answered question is not resubmitted.
+        assertFalse(controller.submit(MilaThreadCommand.Answer, "{}"))
+    }
+
+    @Test fun signingOutDiscardsObservedThreadControls() = runBlocking {
+        val adapter = ThreadControlsAdapter("""{"result":{"pending_question":{"id":"$question"}}}""")
+        val controller = MilaThreadDetailController(adapter)
+        controller.setSession(true, bare)
+        controller.select(thread)
+        assertTrue(controller.submit(MilaThreadCommand.Show))
+        controller.setSession(false, null)
+        controller.setSession(true, bare)
+        controller.select(thread)
+        assertFalse(controller.submit(MilaThreadCommand.Answer, "{}"))
+        assertTrue(adapter.submitted.isEmpty())
+    }
+
+    @Test fun malformedThreadShowIsRefused() = runBlocking {
+        val controller = MilaThreadDetailController(ThreadControlsAdapter("""{"result":{"pending_question":{"id":"not-a-uuid"}}}"""))
+        controller.setSession(true, bare)
+        controller.select(thread)
+        assertFalse(controller.submit(MilaThreadCommand.Show))
+        assertTrue(controller.state is MilaThreadActionState.Failed)
+    }
+
     @Test fun decodesBoundedThreadListing() {
         val id = "00000000-0000-0000-0000-000000000001"
         val listing = MilaThreadListing.decode("""{"result":{"threads":[{"id":"$id","title":"Build","status":"open"}],"has_more":false}}""".toByteArray())

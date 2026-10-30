@@ -123,6 +123,9 @@ interface MilaFfiAdapter {
         }
     }
     suspend fun threadListing(): Result<MilaThreadListing> = Result.failure(IllegalStateException("thread listing unavailable"))
+    /** Authenticated `thread show`; adapters without a session payload report no pending controls. */
+    suspend fun threadShow(threadId: UUID): Result<ByteArray> =
+        threadAction(threadId, MilaThreadCommand.Show).map { "{}".toByteArray(Charsets.UTF_8) }
     /** Re-reads the first machine page on the authenticated session that produced the current listing. */
     suspend fun refreshListing(): Result<MilaSessionListing> = Result.failure(IllegalStateException("session listing unavailable"))
 
@@ -599,6 +602,10 @@ class LinkedMilaFfiAdapter(
             check(session.readMachines() == 0) { "machine refresh refused" }
             MilaSessionListing.decode(session.listing())
         }
+    }
+    override suspend fun threadShow(threadId: UUID): Result<ByteArray> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        return session.threadAction(threadId, MilaThreadCommand.Show)
     }
     override suspend fun threadListing(): Result<MilaThreadListing> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))

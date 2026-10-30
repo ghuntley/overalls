@@ -3,7 +3,21 @@ package dev.overalls.mila.nativeui
 import java.util.UUID
 import org.json.JSONObject
 
-data class MilaThreadRow(val id: UUID, val title: String, val status: String, val planId: UUID? = null)
+data class MilaThreadRow(val id: UUID, val title: String, val status: String, val planId: UUID? = null, val questionId: UUID? = null)
+
+/** Pending question and latest plan read from an authenticated `thread show`. */
+data class MilaThreadControls(val questionId: UUID?, val planId: UUID?) {
+    companion object {
+        fun decode(bytes: ByteArray): MilaThreadControls {
+            require(bytes.size <= 256 * 1024)
+            var view = JSONObject(bytes.toString(Charsets.UTF_8))
+            repeat(2) { if (!view.has("pending_question") && !view.has("latest_plan")) view = view.optJSONObject("result") ?: view }
+            fun id(key: String): UUID? = view.optJSONObject(key)?.optString("id")?.takeIf { it.isNotBlank() }?.let(UUID::fromString)
+                ?.also { require(it != UUID(0L, 0L)) }
+            return MilaThreadControls(id("pending_question"), id("latest_plan"))
+        }
+    }
+}
 data class MilaThreadListing(val threads: List<MilaThreadRow>, val hasMore: Boolean) {
  companion object {
   fun decode(bytes: ByteArray): MilaThreadListing {
@@ -38,22 +52,31 @@ sealed interface MilaThreadActionState {
     data class Failed(val thread: MilaThreadRow, val command: MilaThreadCommand, val reason: String) : MilaThreadActionState
 }
 
+/**
+ * @cc [owner:ghuntley,label:protocol] android-thread-answer-binding
+ * Android thread answers MUST name the pending question that an authenticated `thread show` on the
+ * same session reported, and plan approval/revision MUST name the latest reported plan; neither is
+ * submitted without one, and signing out discards the observed ids.
+ */
 class MilaThreadDetailController(private val adapter: MilaFfiAdapter) {
     var state: MilaThreadActionState = MilaThreadActionState.SignedOut
         private set
     private var listing: MilaThreadListing? = null
     private var authenticated = false
+    private val observed = mutableMapOf<UUID, MilaThreadControls>()
 
     fun setSession(signedIn: Boolean, current: MilaThreadListing?) {
         val active = signedIn && current != null
         if (active == authenticated && current == listing) return
+        if (!active) observed.clear()
         authenticated = active
         listing = if (active) current else null
         state = if (active) MilaThreadActionState.Idle else MilaThreadActionState.SignedOut
     }
 
     fun select(id: UUID): Boolean {
-        val thread = listing?.threads?.firstOrNull { it.id == id } ?: return false
+        val listed = listing?.threads?.firstOrNull { it.id == id } ?: return false
+        val thread = observed[id]?.let { listed.copy(questionId = it.questionId, planId = it.planId ?: listed.planId) } ?: listed
         state = MilaThreadActionState.Ready(thread)
         return true
     }
@@ -82,13 +105,37 @@ class MilaThreadDetailController(private val adapter: MilaFfiAdapter) {
             return false
         }
         state = MilaThreadActionState.Submitting(thread, command)
-        val planId = if (command == MilaThreadCommand.PlanApprove || command == MilaThreadCommand.PlanRevise) thread.planId else null
-        if ((command == MilaThreadCommand.PlanApprove || command == MilaThreadCommand.PlanRevise) && planId == null) {
-            state = MilaThreadActionState.Failed(thread, command, "plan is unavailable")
-            return false
+        if (command == MilaThreadCommand.Show) {
+            return adapter.threadShow(thread.id).mapCatching(MilaThreadControls::decode).fold(
+                { controls ->
+                    observed[thread.id] = controls
+                    val refreshed = thread.copy(questionId = controls.questionId, planId = controls.planId ?: thread.planId)
+                    state = MilaThreadActionState.Applied(refreshed, command)
+                    true
+                },
+                { error -> state = MilaThreadActionState.Failed(thread, command, error.message ?: "command rejected"); false },
+            )
         }
-        return adapter.threadAction(thread.id, command, input, planId).fold(
-            { state = MilaThreadActionState.Applied(thread, command); true },
+        val secondary = when (command) {
+            MilaThreadCommand.PlanApprove, MilaThreadCommand.PlanRevise -> thread.planId ?: run {
+                state = MilaThreadActionState.Failed(thread, command, "plan is unavailable")
+                return false
+            }
+            MilaThreadCommand.Answer -> thread.questionId ?: run {
+                state = MilaThreadActionState.Failed(thread, command, "question is unavailable")
+                return false
+            }
+            else -> null
+        }
+        return adapter.threadAction(thread.id, command, input, secondary).fold(
+            {
+                val answered = if (command == MilaThreadCommand.Answer) {
+                    observed[thread.id] = MilaThreadControls(null, thread.planId)
+                    thread.copy(questionId = null)
+                } else thread
+                state = MilaThreadActionState.Applied(answered, command)
+                true
+            },
             { error -> state = MilaThreadActionState.Failed(thread, command, error.message ?: "command rejected"); false },
         )
     }

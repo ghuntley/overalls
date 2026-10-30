@@ -35,6 +35,8 @@ data class MilaJourneyDescriptor(
     val serverName: String,
     val approverUrl: URI,
     val approverToken: String,
+    /** Base of the Bearer-protected `POST <fixtureUrl><action>` hooks; always ends with `/`. */
+    val fixtureUrl: URI,
     val seedMachineName: String?,
     val seedMachineId: java.util.UUID?,
     val sharePrincipal: String?,
@@ -46,6 +48,9 @@ data class MilaJourneyDescriptor(
         require(caPem.contains("BEGIN CERTIFICATE") && caPem.length <= 64 * 1024) { "invalid CA PEM" }
         require(serverName.isNotEmpty() && serverName.length <= 253) { "invalid TLS server name" }
         require(approverUrl.scheme == "https" && approverUrl.userInfo == null && approverUrl.host != null) { "approver hook must be HTTPS" }
+        require(fixtureUrl.scheme == "https" && fixtureUrl.userInfo == null && fixtureUrl.host == approverUrl.host && fixtureUrl.port == approverUrl.port) {
+            "fixture hook must share the approver origin"
+        }
         require(approverToken.isNotBlank() && approverToken.length <= 4096 && approverToken.none { it.isISOControl() }) { "invalid approver token" }
     }
 
@@ -99,6 +104,10 @@ data class MilaJourneyDescriptor(
                 serverName = tls.optString("server_name").ifBlank { host },
                 approverUrl = URI(approver.getString("url")),
                 approverToken = approver.getString("bearer_token"),
+                fixtureUrl = URI(
+                    approver.optString("fixture_url").ifBlank { URI(approver.getString("url")).resolve("/fixture/").toString() }
+                        .let { if (it.endsWith("/")) it else "$it/" },
+                ),
                 seedMachineName = seed?.optString("machine_name")?.takeIf { it.isNotBlank() },
                 seedMachineId = seed?.optString("machine_id")?.takeIf { it.isNotBlank() }?.let(java.util.UUID::fromString),
                 sharePrincipal = seed?.optString("share_principal")?.takeIf { it.isNotBlank() },
@@ -141,26 +150,45 @@ suspend fun MilaJourneyDescriptor.approve(approval: MilaApprovalInfo): Unit = wi
     }
 }
 
+/** Fixture hook actions agreed with `mila-journey-fixture` (ADR-0264). */
+enum class MilaFixtureAction(val wire: String) {
+    Observe("observe"), ThreadCreate("thread-create"), ThreadReady("thread-ready"),
+    ThreadQuestion("thread-question"), ThreadProposal("thread-proposal"),
+}
+
 /**
- * Asks the fixture to stand in for the absent provisioner for one machine (`observe`), so the next
- * lifecycle intent is admissible. Returns false when the fixture does not offer the hook (404).
+ * POSTs one fixture hook. Returns null only when this fixture build does not expose the hook (404);
+ * any other non-2xx answer fails the journey.
  */
-suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID): Boolean = withContext(Dispatchers.IO) {
-    val connection = open(approverUrl.resolve("/observe").toURL()).apply {
+suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONObject = JSONObject()): JSONObject? = withContext(Dispatchers.IO) {
+    val connection = open(fixtureUrl.resolve(action.wire).toURL()).apply {
         requestMethod = "POST"
         doOutput = true
         setRequestProperty("Content-Type", "application/json")
         setRequestProperty("Authorization", "Bearer $approverToken")
     }
     try {
-        connection.outputStream.use { it.write(JSONObject().put("machine_id", machine.toString()).toString().toByteArray(Charsets.UTF_8)) }
+        connection.outputStream.use { it.write(body.toString().toByteArray(Charsets.UTF_8)) }
         when (val code = connection.responseCode) {
-            in 200..299 -> true
-            404 -> false
-            else -> error("observe hook refused ($code)")
+            in 200..299 -> {
+                val bytes = connection.inputStream.use { it.readBytes() }
+                require(bytes.size <= 64 * 1024) { "fixture hook reply too large" }
+                JSONObject(bytes.toString(Charsets.UTF_8))
+            }
+            404 -> null
+            else -> error("fixture ${action.wire} hook refused ($code)")
         }
     } finally {
         (connection as HttpURLConnection).disconnect()
     }
 }
 
+/**
+ * Asks the fixture to stand in for the absent provisioner for one machine (`observe`), so the next
+ * lifecycle intent is admissible. Returns false when the fixture does not offer the hook (404).
+ */
+suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID): Boolean =
+    fixture(MilaFixtureAction.Observe, JSONObject().put("machine_id", machine.toString())) != null
+
+/** Reads one UUID field from a fixture hook reply. */
+fun JSONObject.fixtureId(key: String): java.util.UUID = java.util.UUID.fromString(getString(key))
