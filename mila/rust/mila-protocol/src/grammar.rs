@@ -86,7 +86,7 @@ pub(crate) fn allowed_option(command: &str, key: &str) -> bool {
         return true;
     }
     match command {
-        "ls" | "share show" => key == "after",
+        "ls" | "share show" | "thread turns" => key == "after",
         "start" => matches!(key, "timeout" | "no-wait" | "request-id"),
         "new" => matches!(
             key,
@@ -107,7 +107,6 @@ pub(crate) fn allowed_option(command: &str, key: &str) -> bool {
             "cpu" | "memory" | "disk" | "timeout" | "no-wait" | "request-id"
         ),
         "thread ls" => matches!(key, "machine" | "after"),
-        "thread turns" => key == "after",
         "watch" => matches!(key, "machine" | "thread" | "session"),
         "web set" => matches!(
             key,
@@ -166,11 +165,19 @@ pub(crate) fn insert_option(
     Ok(())
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one closed validation table mirroring Porsche's grammar; splitting it would scatter the rules"
+)]
 pub(crate) fn validate_command(
     command: &str,
     arguments: &[String],
     options: &BTreeMap<String, OptionValue>,
 ) -> Result<(), ProtocolError> {
+    #[expect(
+        clippy::match_same_arms,
+        reason = "the arity table is grouped by command family for review against Porsche"
+    )]
     let (min, max) = match command {
         "whoami" | "images" | "ls" | "team list" | "watch" | "ssh-key list" | "device ls"
         | "device register" => (0, 0),
@@ -329,14 +336,13 @@ pub(crate) fn validate_command(
             key.as_str(),
             "timeout" | "port" | "cpu" | "memory" | "disk" | "revision" | "after" | "cursor"
         ) {
-            let text = match value {
-                OptionValue::String(text) => text,
-                _ => return Err(ProtocolError::InvalidCommand),
+            let OptionValue::String(text) = value else {
+                return Err(ProtocolError::InvalidCommand);
             };
             let valid_cursor = matches!(command, "ls" | "thread ls" | "share show")
                 && Identifier::parse(text).is_ok();
             let valid_number = !text.is_empty()
-                && !(text.len() > 1 && text.starts_with('0'))
+                && (text.len() <= 1 || !text.starts_with('0'))
                 && text.bytes().all(|byte| byte.is_ascii_digit());
             if !valid_cursor && !valid_number {
                 return Err(ProtocolError::InvalidCommand);

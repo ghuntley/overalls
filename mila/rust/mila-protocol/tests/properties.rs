@@ -138,6 +138,10 @@ fn generated_line(tc: &TestCase) -> String {
 /// `format` emits no `--` separator, so an argument that itself begins with `--`
 /// (only reachable after a separator) re-lexes as an option and is refused on
 /// re-parse. The round-trip is asserted for every other accepted command.
+#[expect(
+    clippy::expect_used,
+    reason = "property helper outside #[test]; an accepted command that cannot format must fail the calling property"
+)]
 fn assert_canonical(command: &Command) {
     if command
         .arguments
@@ -280,7 +284,10 @@ fn device_public_key_matches_oracle(tc: TestCase) {
         format!("{BASE64URL}+/=é ").chars().collect::<Vec<_>>(),
     ));
     let mutated: String = mutated.into_iter().collect();
-    let truncated = encoded[..tc.draw(gs::integers::<usize>().max_value(42))].to_owned();
+    let truncated: String = encoded
+        .chars()
+        .take(tc.draw(gs::integers::<usize>().max_value(42)))
+        .collect();
     let extended = format!(
         "{encoded}{}",
         tc.draw(gs::text().alphabet("A=").min_size(1).max_size(3))

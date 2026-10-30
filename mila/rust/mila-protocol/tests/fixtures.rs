@@ -29,16 +29,28 @@ struct CommandAccepted {
     command: Value,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn fixture(name: &str) -> String {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../../protocol/test/fixtures")
         .join(name);
     std::fs::read_to_string(path).expect("shared fixture")
 }
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn routes() -> &'static Routes {
     static VALUE: OnceLock<Routes> = OnceLock::new();
     VALUE.get_or_init(|| serde_json::from_str(&fixture("app_routes.json")).expect("route fixture"))
 }
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn commands() -> &'static Commands {
     static VALUE: OnceLock<Commands> = OnceLock::new();
     VALUE.get_or_init(|| {

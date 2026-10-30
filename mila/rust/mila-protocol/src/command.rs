@@ -60,7 +60,7 @@ impl Command {
                 continue;
             }
             if !after_separator && token.starts_with("--") && token.len() > 2 {
-                let option = &token[2..];
+                let option = token.get(2..).ok_or(ProtocolError::InvalidCommand)?;
                 let (key, inline) = option
                     .split_once('=')
                     .map_or((option, None), |(key, value)| (key, Some(value)));
