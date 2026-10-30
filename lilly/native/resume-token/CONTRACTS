@@ -8,6 +8,8 @@ Lilly.Events catalog.
 Hegel properties MUST cover the bounded token envelope (version, sizes, even
 lowercase hex, declared-size bounds) and the lineage matrix (exact name/
 toguid/fromguid, key allowlist, duplicate/unknown rejection, boolean-only
-capability flags) via an independent spec. Typed FFI to libzfs MUST be the only
-unsafe surface; real-token acceptance evidence belongs to the disposable ZFS
-transfer fixtures.
+capability flags) via an independent spec, plus the canonical `decimal` to
+GUID grammar (no sign, padding or leading zero; fits in u64) and the
+`parse_cli` selector lattice against independent oracles. Typed FFI to libzfs
+MUST be the only unsafe surface; real-token acceptance evidence belongs to the
+disposable ZFS transfer fixtures.

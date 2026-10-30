@@ -1,12 +1,12 @@
 use super::*;
-use hegel::generators as gs;
-use hegel::TestCase;
+use hegel::{generators as gs, TestCase};
+use std::os::unix::ffi::OsStringExt;
 
 /// @cc [owner:ghuntley,label:verification] hegel-token-envelope-oracle
 /// Generated envelopes MUST match the independent spec exactly: `1-` prefix,
 /// ≤8192 bytes, two ≤16-digit lowercase hex fields (second within 1..16384),
 /// then an even lowercase-hex payload.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn bounded_matches_independent_spec(tc: TestCase) {
     let size_class = tc.draw(gs::sampled_from(&[0usize, 1, 2, 3, 15, 16, 17, 8190]));
     let fill = "0".repeat(size_class);
@@ -69,7 +69,7 @@ fn bounded_matches_independent_spec(tc: TestCase) {
 /// Generated nv-pair lists MUST be classified by the independent lineage
 /// spec: the five required keys once each, no unknowns, exact values, a
 /// zero-or-absent fromguid, and capability booleans only from the permit set.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn lineage_matches_the_spec_matrix(tc: TestCase) {
     let names = [
         "toname",
@@ -182,4 +182,110 @@ fn cli_accepts_only_the_parentless_form() {
     ] {
         assert_eq!(parse_cli(&rejected), None);
     }
+}
+
+/// The independent decimal specification: canonical ASCII digits (no sign,
+/// no padding, no leading zero except "0") whose value fits in u64.
+fn decimal_oracle(text: &[u8]) -> Option<u64> {
+    if text.is_empty() || !text.iter().all(u8::is_ascii_digit) {
+        return None;
+    }
+    if text.len() > 1 && text[0] == b'0' {
+        return None;
+    }
+    let mut value: u128 = 0;
+    for digit in text {
+        value = value * 10 + u128::from(digit - b'0');
+        if value > u128::from(u64::MAX) {
+            return None;
+        }
+    }
+    u64::try_from(value).ok()
+}
+
+/// A decimal-shaped argument: canonical numbers, edge values and near misses.
+fn decimal_word(tc: &TestCase) -> Vec<u8> {
+    match tc.draw(gs::integers::<u8>().max_value(4)) {
+        0 => tc.draw(gs::integers::<u64>()).to_string().into_bytes(),
+        1 => tc
+            .draw(gs::sampled_from(&[
+                "0",
+                "00",
+                "01",
+                "+1",
+                "-1",
+                " 1",
+                "1 ",
+                "18446744073709551615",
+                "18446744073709551616",
+                "99999999999999999999",
+                "",
+            ]))
+            .as_bytes()
+            .to_vec(),
+        2 => format!("0{}", tc.draw(gs::integers::<u64>())).into_bytes(),
+        3 => vec![0xff, b'1'],
+        _ => tc.draw(gs::vecs(gs::sampled_from(b"0123456789+- a".to_vec())).max_size(24)),
+    }
+}
+
+/// @cc [owner:ghuntley,label:verification;security] resume-token-decimal-oracle
+/// `decimal` MUST accept exactly canonical unsigned decimals without sign,
+/// padding or leading zero that fit in u64, and return their exact value.
+#[hegel::test(test_cases = 300)]
+fn decimal_matches_the_independent_oracle(tc: TestCase) {
+    let word = decimal_word(&tc);
+    let expected = decimal_oracle(&word);
+    assert_eq!(decimal(&OsString::from_vec(word)), expected);
+}
+
+/// @cc [owner:ghuntley,label:verification;security] resume-token-cli-oracle
+/// `parse_cli` MUST select exactly three arguments: a UTF-8 snapshot name of at
+/// most 255 bytes containing '@', a canonical nonzero decimal to GUID and an
+/// ASCII token inside the bounded envelope; everything else is a usage failure.
+#[hegel::test(test_cases = 300)]
+fn parse_cli_matches_the_independent_oracle(tc: TestCase) {
+    let names: Vec<Vec<u8>> = vec![
+        b"tank/vm@lilly-b".to_vec(),
+        b"tank/vm".to_vec(),
+        b"@".to_vec(),
+        [b"tank/".as_slice(), &[b'a'; 248], b"@s"].concat(),
+        [b"tank/".as_slice(), &[b'a'; 249], b"@s"].concat(),
+        vec![b't', 0xff, b'@', b's'],
+    ];
+    let tokens: Vec<Vec<u8>> = vec![
+        b"1-1-100-aabb".to_vec(),
+        b"1-1-4001-aabb".to_vec(),
+        b"2-1-100-aabb".to_vec(),
+        "1-1-100-aabb\u{e9}".as_bytes().to_vec(),
+        vec![b'1', b'-', 0xff],
+    ];
+    let count = tc.draw(gs::integers::<usize>().max_value(4));
+    let words: Vec<Vec<u8>> = (0..count)
+        .map(
+            |position| match (position, tc.draw(gs::integers::<u8>().max_value(2))) {
+                (0, 0) | (_, 2) => tc.draw(gs::sampled_from(names.clone())),
+                (2, 0) | (_, 1) => tc.draw(gs::sampled_from(tokens.clone())),
+                _ => decimal_word(&tc),
+            },
+        )
+        .collect();
+    let expected = match words.as_slice() {
+        [name, to, token] => (|| {
+            let name = std::str::from_utf8(name).ok()?;
+            let token = std::str::from_utf8(token).ok()?;
+            if name.len() > 255 || !name.contains('@') || !token.is_ascii() {
+                return None;
+            }
+            let to = decimal_oracle(to).filter(|to| *to != 0)?;
+            bounded(token).then(|| Request {
+                name: name.to_string(),
+                to,
+                token: token.to_string(),
+            })
+        })(),
+        _ => None,
+    };
+    let arguments: Vec<OsString> = words.into_iter().map(OsString::from_vec).collect();
+    assert_eq!(parse_cli(&arguments), expected);
 }
