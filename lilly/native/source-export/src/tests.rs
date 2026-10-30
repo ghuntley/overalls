@@ -2,6 +2,8 @@ use super::*;
 use hegel::generators as gs;
 use hegel::generators::Generator as _;
 use hegel::TestCase;
+use std::ffi::OsString;
+use std::os::unix::ffi::OsStrExt;
 
 /// @cc [owner:ghuntley,label:verification] hegel-source-export-selectors
 /// Generated leases and argv shapes MUST classify against the independent
