@@ -559,6 +559,9 @@ defmodule InceptionFixture do
         if not Enum.all?(results, &(&1 == :pass)),
           do: raise("Inception physical verification failed; terminal and credentials withheld")
 
+      "checkout" ->
+        checkout(config, pool, spec, options)
+
       "diagnose-core" ->
         # Capture only fixed status predicates before the production readiness
         # deadline stops an unsuccessful guest; never emit journal/console data.
@@ -725,6 +728,52 @@ defmodule InceptionFixture do
         :ok = retry(fn -> Driver.delete(config, pool, spec, options) end, deadline(90_000))
     end
 
+    :ok
+  end
+
+  # @cc [owner:ghuntley,label:verification;product] inception-native-checkout-receipt
+  # A newly admitted Inception workload MUST expose the canonical, writable
+  # development checkout after core readiness. This focused action deliberately
+  # stops before public ingress and ACME assertions so checkout acceptance is
+  # independently observable when those later services are unavailable.
+  @spec checkout(Config.t(), Lilly.Host.Pool.t(), Spec.t(), keyword()) :: :ok
+  defp checkout(config, pool, spec, options) do
+    case Driver.ready(config, pool, spec, Keyword.put(options, :timeout, 60_000)) do
+      :ok ->
+        :ok
+
+      {:error, reason} when is_atom(reason) ->
+        raise("Inception core readiness unavailable: #{reason}")
+
+      _ ->
+        raise("Inception core readiness unavailable")
+    end
+
+    :pass =
+      console(
+        config,
+        spec,
+        "resolvectl flush-caches && resolvectl reset-server-features && resolvectl dns eth0 1.1.1.1 9.9.9.9 && resolvectl default-route eth0 yes && systemctl restart inception-source.service",
+        5000
+      )
+
+    expected_source = "https://github.com/ghuntley/overalls"
+    source_https_check =
+      "GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git ls-remote " <>
+        expected_source <> " >/dev/null 2>&1"
+
+    source_origin_check =
+      "test -d /workspace/overalls/.git && test \"$(GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null git -C /workspace/overalls config --local --get remote.origin.url)\" = " <>
+        expected_source <>
+        " && runuser -u nobody -- test -w /workspace/overalls/README.md"
+
+    await(
+      fn -> console(config, spec, "test -d /workspace/overalls/.git", 5000) == :pass end,
+      deadline(600_000)
+    )
+
+    :pass = console(config, spec, source_origin_check, 5000)
+    :pass = console(config, spec, source_https_check, 5000)
     :ok
   end
 

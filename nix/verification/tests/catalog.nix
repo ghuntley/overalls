@@ -519,6 +519,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   lilly-native-actor-recovery = import ./machines/zfs-guest (storage // { actorRecovery = true; inherit hegel; });
   zfs-namespace-cleanup = import ./machines/zfs-guest (storage // { namespaceCleanup = true; });
   inception = import ./machines/inception storage;
+  inception-checkout = import ./machines/inception (storage // { checkoutOnly = true; });
   zfs-transfer = import ./machines/zfs-transfer (storage // { inherit hegel; });
   ssh-transfer = import ./machines/ssh-transfer storage;
   source-export = import ./machines/source-export storage;

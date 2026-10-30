@@ -58,25 +58,21 @@ edit preservation and malformed-path refusal.
   `nestedKvm = true`.
 - `nix build --no-link .#checks.x86_64-linux.inception-runtime`: passed after
   the shared-workspace, Git-configuration and network-ordering changes.
-- The 2026-10-25 native create subtest passed for both workloads and checked the exact origin, checkout publication, writability and 16-vCPU/32-GiB/64-GiB shape. The later DNS-01 replica subtest timed out; that
-  timeout occurred after the source-checkout assertions and does not establish
-  the restart/edit-retention assertions.
+- The 2026-10-25 native create subtest passed for both workloads and checked the exact origin, checkout publication, writability and 16-vCPU/32-GiB/64-GiB shape. The focused native checkout check passed on 2026-10-30: it created a real workload through outer Marshall and Lilly, checked the checkout, wrote a developer edit, stopped and started the workload, verified the edit remained, and deleted the workload.
 
 ## Remaining native gap
 
-The fixture gives the outer host an explicit eth1-to-eth0 NAT path and owns the
-guest's public resolver `/32`s on the isolated provider node. The source
-checkout assertions are now recorded in a real nested lifecycle run. The
-restart/edit-retention phase was not reached because the later DNS-01 replica
-subtest timed out, and the focused preparation test still uses an isolated
-local Git origin. ADR-0262 therefore remains **partial** until a native run
-records the restart/edit-retention assertions and the complete fixture reaches
-its remaining gateway checks.
+The focused native check now records the complete ADR-0262 lifecycle, including
+restart and edit retention. The full Inception fixture still has a separate
+public DNS-01/ACME readiness timeout after the checkout assertions; that later
+ingress scenario is outside ADR-0262's source-delivery boundary and does not
+invalidate the checkout evidence. The focused preparation test continues to use
+an isolated local Git origin for deterministic failure-path coverage.
 
 ## Follow-up
 
-Run the native check on a builder with the required nested-KVM feature and
-record the fixed clone-origin and restart/edit observations. If the declared
-NAT path is unavailable on that builder, add a test-only HTTPS Git fixture and
-an explicit source-setting seam; do not weaken production TLS verification or
-change the canonical origin contract.
+Keep the focused native checkout check in the catalog and rerun it on builders
+with the required nested-KVM feature. If the declared NAT path is unavailable
+on a builder, add a test-only HTTPS Git fixture and an explicit source-setting
+seam; do not weaken production TLS verification or change the canonical origin
+contract.

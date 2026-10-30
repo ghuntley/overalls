@@ -1089,7 +1089,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0249](0249-mila-rust-core-native-clients.md) | accepted | partial | Mila Rust core with native platform clients |
 | [ADR-0251](0251-thread-owned-durable-attachments.md) | accepted | partial | Thread-owned durable attachments |
 | [ADR-0252](0252-profile-boards-and-thread-subscriptions.md) | accepted | partial | Profile boards and authorized thread subscriptions |
-| [ADR-0262](0262-inception-development-checkout.md) | accepted | partial | Inception development checkout |
+| [ADR-0262](0262-inception-development-checkout.md) | accepted | implemented | Inception development checkout |
 | [ADR-0263](0263-retire-hldd.md) | accepted | implemented | Retire the HLDD handbook and its review gates |
 | [ADR-0253](0253-artifacts-domain.md) | accepted | partial | Artifacts domain for agent-published pages |
 | [ADR-0254](0254-isolated-artifact-content-origin.md) | accepted | partial | Isolated artifact content origin |

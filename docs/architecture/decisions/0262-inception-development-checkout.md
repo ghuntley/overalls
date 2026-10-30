@@ -3,7 +3,7 @@
 - ID: ADR-0262
 - Date: 2026-10-22
 - Status: accepted
-- Implementation: partial
+- Implementation: implemented
 - Components: Marshall Compute, Nix Inception guest, NixOS machine verification
 - Supersedes: none
 - Superseded by: none
@@ -77,9 +77,12 @@ update workflow after source edits.
 [machine defaults](../../../marshall/lib/marshall_web/live/machines_live.ex),
 and the [native Inception fixture](../../../nix/verification/tests/machines/inception/driver.py)
 implement and exercise the decision. The guest-owned `inception-source.service`
-retries independently of the boot-bound readiness path. Native GitHub egress
-remains dependent on the test environment; the focused preparation test avoids
-external services.
+retries independently of the boot-bound readiness path. The focused native
+checkout check (`.#checks.x86_64-linux.inception-checkout`, passed 2026-10-30)
+admits a real workload, verifies the exact GitHub origin and writable checkout,
+edits the checkout, stops and starts the workload, and verifies the edit remains.
+Native GitHub egress remains dependent on the test environment; the focused
+preparation test avoids external services.
 
 ## Open questions
 

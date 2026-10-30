@@ -1,4 +1,4 @@
-{ pkgs, packages }:
+{ pkgs, packages, checkoutOnly ? false }:
 let
   # @cc [owner:ghuntley,label:verification] inception-browser-subprocess-typing
   # The executed browser helper MUST pass its own type check against the same
@@ -408,6 +408,7 @@ in
       '';
     };
     environment.etc."inception-probe.exs".source = ./probe.exs;
+    environment.etc."inception-checkout-only" = lib.mkIf checkoutOnly { text = "1\n"; };
     environment.etc."inception-public-settings.json".source = publicSettings;
     environment.etc."inception-dns-probe.py".source = ./dns_probe.py;
     environment.etc."inception-wildcard-probe.py".source = ./wildcard_probe.py;

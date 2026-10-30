@@ -406,6 +406,18 @@ done
         )
         print(f"inception host diagnostics (status {status}):\n{diagnostics}")
         raise
+    checkout_only, _ = outer.execute("test -e /etc/inception-checkout-only")
+    if checkout_only == 0:
+        # Keep the focused acceptance independent from the later public ACME
+        # fixture. Exercise the lifecycle on the newly admitted workload and
+        # prove that its developer edit survives the real outer stop/start.
+        bounded_succeed("inception-probe checkout 1 1", timeout=960)
+        bounded_succeed("inception-probe remember 1 1", timeout=600)
+        outer.succeed("systemctl start inception-outer@stop.service", timeout=2700)
+        outer.succeed("systemctl start inception-outer@start.service", timeout=2700)
+        bounded_succeed("inception-probe retained 1 1", timeout=600)
+        outer.succeed("systemctl start inception-outer@delete.service", timeout=600)
+        raise SystemExit(0)
     bounded_succeed("inception-probe verify 1 1", timeout=960)
     outer.succeed("systemctl start inception-outer@create-two.service", timeout=2700)
     bounded_succeed("inception-probe verify 1 1 2", timeout=900)
