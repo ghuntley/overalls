@@ -26,7 +26,10 @@ pub enum ProbeError {
     CreateVm,
 }
 
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    reason = "the two KVM ioctls need libc's unsafe variadic ioctl; this shim is the only unsafe surface"
+)]
 mod kvm_ioctl {
     use std::os::fd::{OwnedFd, RawFd};
 
@@ -38,6 +41,9 @@ mod kvm_ioctl {
     use std::os::fd::FromRawFd;
 
     pub(super) fn api_version(kvm: RawFd) -> Result<i32, ()> {
+        // SAFETY: `kvm` is the caller's live, owned /dev/kvm descriptor for the
+        // whole call; KVM_GET_API_VERSION is an `_IO` request that reads no
+        // argument memory, so the zero argument is never dereferenced.
         match unsafe { libc::ioctl(kvm, super::KVM_GET_API_VERSION, 0) } {
             version if version >= 0 => Ok(version),
             _ => Err(()),
@@ -45,8 +51,13 @@ mod kvm_ioctl {
     }
 
     pub(super) fn create_vm(kvm: RawFd) -> Result<OwnedFd, ()> {
+        // SAFETY: `kvm` is the caller's live, owned /dev/kvm descriptor for the
+        // whole call; KVM_CREATE_VM is an `_IO` request whose zero argument is
+        // the default machine type and is never dereferenced.
         match unsafe { libc::ioctl(kvm, super::KVM_CREATE_VM, 0) } {
-            // The kernel hands the caller ownership of this descriptor.
+            // SAFETY: a nonnegative KVM_CREATE_VM result is a new descriptor
+            // the kernel hands to this process; nothing else owns or closes it,
+            // so wrapping it in OwnedFd transfers that sole ownership.
             fd if fd >= 0 => Ok(unsafe { <OwnedFd as FromRawFd>::from_raw_fd(fd) }),
             _ => Err(()),
         }

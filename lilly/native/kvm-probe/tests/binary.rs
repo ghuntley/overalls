@@ -6,6 +6,10 @@ use std::process::{Command, Stdio};
 
 const PROBE: &str = env!("CARGO_BIN_EXE_lilly-kvm-probe");
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper: failing to spawn the probe must abort the test"
+)]
 fn run_probe(arguments: &[String], envs: &[(String, String)]) -> (Option<i32>, Vec<u8>, Vec<u8>) {
     let output = Command::new(PROBE)
         .args(arguments)
@@ -40,7 +44,7 @@ fn probe_ignores_arguments_and_environment(tc: TestCase) {
         .collect();
     let (code, out, err) = run_probe(&argv, &envs);
     assert!(
-        matches!(code, Some(0) | Some(1)),
+        matches!(code, Some(0 | 1)),
         "verdict outside allowed codes: {code:?}"
     );
     assert!(out.is_empty(), "stdout leaked {out:?}");
