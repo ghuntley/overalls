@@ -151,8 +151,17 @@ polls `whoami`, opens approval once per generation, heartbeats the bound session
 and reconnects after a loss. The window binds only the session the driver
 establishes. The headless journey signs in through the same driver, and the
 `gtk-journey` build drives the real window
-([`gtk_journey.rs`](../../../mila/native/linux/src/gtk_journey.rs)). Neither
-journey has a recorded fixture run; see the
+([`gtk_journey.rs`](../../../mila/native/linux/src/gtk_journey.rs)). The
+Machines and Threads [pages](../../../mila/native/linux/src/pages.rs) take every
+string from the shared catalogs. Their actions report a transport failure to the
+driver at once. Both journeys press the lifecycle, sharing, web and thread
+controls and assert each effect through a session read
+([`journey_checks.rs`](../../../mila/native/linux/src/journey_checks.rs)). The
+Rust core gained grammar-checked `show` and `share show` reads for this. Local
+runs against the ADR-0264 fixture launcher pass sign-in, machines, sharing, web,
+create/stop/start/delete, the terminal's closed `terminal_unavailable` refusal,
+SSH keys and loss detection on a page action. Resize, pause and threads wait on
+the fixture's host-reachable action hook; see the
 [Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
 
 [ADR-0264](0264-hermetic-mila-journey-fixture.md) adds the hermetic journey

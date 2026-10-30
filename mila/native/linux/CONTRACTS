@@ -41,10 +41,12 @@ port matches the authenticated projection; private, stale, malformed, or
 non-matching destinations MUST be refused before invoking the desktop browser.
 
 @cc [owner:ghuntley,label:architecture;desktop] linux-gtk-views-thin
-GTK code in `src/main.rs` and `src/views.rs` MUST NOT parse routes, choose request identifiers,
-decode PTY bytes, or decide deployment, terminal, SSH-key or navigation state; it MUST delegate to
-the library modules (`deployments`, `terminal_surface`, `terminal_text`, `ssh_keys_view`,
-`deep_link`, `route`) so the headless journey driver exercises the same decisions.
+GTK code in `src/main.rs`, `src/views.rs` and `src/pages.rs` MUST NOT parse routes, choose request
+identifiers, decode PTY bytes or server results, or decide deployment, terminal, SSH-key or
+navigation state; it MUST delegate to the library modules (`deployments`, `terminal_surface`,
+`terminal_text`, `ssh_keys_view`, `deep_link`, `route`, `porsche_results`, `adapter`'s
+`RequestLedger`) so the headless journey driver exercises the same decisions. Every visible string
+on the Machines and Threads pages MUST come from the shared catalogs.
 
 @cc [owner:ghuntley,label:security;desktop] linux-authority-drop-on-switch
 Selecting a different deployment, removing the selected deployment, signing out or closing the
@@ -56,3 +58,13 @@ The GTK Sign in button MUST start the window's SignInDriver for the selected dep
 resolved connection; the window MUST bind only sessions the driver establishes and MUST release
 the bound session and every projection derived from it on loss or sign-out. The fixture approver
 hook MUST be compiled only with the `gtk-journey` feature.
+
+@cc [owner:ghuntley,label:security;desktop] linux-page-action-loss
+A page action that fails with a transport or stale-handle error MUST report the session lost to the
+window's SignInDriver before it returns, releasing the session and every projection derived from it
+and starting the next sign-in generation without waiting for the heartbeat.
+
+@cc [owner:ghuntley,label:verification] linux-journey-backend-effects
+Each lifecycle, sharing, web and thread step of both Linux journeys MUST assert its effect through an
+authenticated read on the same session (`ls`, `show`, `share show`, `web show`, `request show`,
+`thread show`, `thread turns`); a widget change alone MUST NOT pass a step.

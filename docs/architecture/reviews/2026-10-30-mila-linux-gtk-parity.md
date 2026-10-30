@@ -105,14 +105,67 @@ the real connector to a typed `HostUntrusted` failure and creates an
 owner-only key. A local Broadway run of `--gtk-journey` against an unreachable
 descriptor reported `host_untrusted`.
 
+## Follow-up: page controls, localization and loss detection
+
+- **Pages.** The Machines page covers list, detail (`show`), the lifecycle with
+  a confirmed delete, create and resize, sharing (`share show`, add, confirmed
+  remove) and web (show, public/private at the loaded revision, open). The
+  Threads page covers list, detail, events, prompt, answer and plan approve or
+  revise. They live in `src/pages.rs`, and every visible string comes from the
+  shared catalogs. Three new messages (`machineName`, `machinesFailed`,
+  `signInRequired`) cover all 30 locales; the rest reuse existing keys.
+  Decoders for Porsche's version-1 result envelope live in `porsche_results`.
+  A refresh projects the FFI snapshot through `machine_view::project_snapshot`.
+- **Loss detection.** `NativeState::with_live` runs every page action. A
+  transport or stale-handle error calls `report_loss`, which releases the
+  session and starts the next generation before the action returns; the
+  terminal frame timer does the same. `RequestLedger` keeps a mutation's
+  request id only while its outcome is unknown, so a retry after reconnect is
+  idempotent.
+- **Rust core.** `LiveSession::machine_show`, `share_show` and `request_show`
+  are new. The terminal now opens the account's session with `terminal new`
+  and attaches by name (`mila_session_terminal_attach_session`), because
+  Porsche refuses an unnamed attach. `last_refusal` exposes the closed refusal
+  code.
+- **Fixes found against the real fixture.** `whoami` now accepts Porsche's
+  `succeeded`/`result.email` and `approval_url` shape. A refresh was decoded
+  as a raw `ls` envelope instead of the FFI snapshot. SSH keys were not
+  unwrapped from the result envelope. `copy_output` probed the size and then
+  read, which ran every executing FFI command twice and sent thread mutations
+  twice. It now makes one call into a maximum-size buffer.
+- **Journeys.** Both journeys run the same steps and poll the same
+  `journey_checks`. The steps are sharing add/remove, web show/public/private,
+  and create, stop, resize, start, pause, resume and delete of a
+  `mila-journey-<hex>` machine. Then come threads list, prompt, answer and plan
+  approval, the terminal, and (GTK only) loss on a page action. The fixture's
+  provisioner and model stand-ins are requested from
+  `<approver>/fixture/<action>`, or `approver.fixture_url`.
+
+Architecture impact: this stays within ADR-0249. The FFI gains no new entry
+points beyond the `show`/`share show` reads; the rest already existed upstream.
+GTK still decides nothing: decoding, request ids, refusal codes and checks are
+library code that the headless journey shares.
+
+Verification: 136 library and 6 binary tests, with and without `gtk-journey`,
+on Broadway. Both journeys ran locally against `nix run .#mila-journey-fixture`
+(KVM). Sign-in, machines, sharing, web, create/stop/start/delete, the
+`terminal_unavailable` refusal, SSH keys and revoke passed in both, plus
+immediate loss detection and reconnect in the GTK journey. Resize
+(`temporarily_unavailable`) and pause (`workload_not_stable`) are refused
+until the fixture can observe the machine. Threads report `no_thread` until
+the action hook exists.
+
 ## Remaining gaps
 
-- Neither `mila-linux-journey` nor the GTK journey has a recorded passing run
-  against the fixture. The live PTY behaviour of `terminal attach --json`
-  (prompt, echo) is unverified.
+- Resize, pause and the thread steps need the fixture's host-reachable action
+  hook (`observe`, `thread-create`, `thread-ready`, `thread-question`,
+  `thread-proposal`). Without it they record `fixture_hook_unavailable`,
+  `temporarily_unavailable`, `workload_not_stable` or `no_thread`. No CI run
+  has passed yet.
+- The fixture runs no guest, so the terminal step passes on Porsche's closed
+  `terminal_unavailable` refusal. A live PTY echo is unverified.
+- Resume against a running machine is admitted as a wake request, and the
+  step passes on that receipt.
 - The GTK journey replaces the browser with the fixture approver, so the
   `gio::AppInfo::launch_default_for_uri` call itself is not exercised.
-- The heartbeat detects a lost session within 15 seconds. Page operations
-  that hit a transport error do not report the loss to the driver directly.
-- The twelve new catalog messages were translated without native-speaker
-  review. Five of them reuse reviewed translations of identical English verbs.
+- The new catalog messages were translated without native-speaker review.

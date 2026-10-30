@@ -10,8 +10,8 @@
 //! Outcome codes are fixed strings; no identifier, name, address or text
 //! reaches a report.
 
-use crate::adapter::{decode_listing, decode_share_listing, decode_web_endpoint, WebEndpoint};
-use crate::machine_view::project_listing;
+use crate::adapter::{decode_share_listing, decode_web_endpoint, WebEndpoint};
+use crate::machine_view::project_snapshot;
 use crate::porsche_results::{
     decode_machine_detail, decode_thread_detail, decode_thread_events, decode_thread_rows,
     MachineDetail, ThreadDetail, ThreadEvent,
@@ -30,8 +30,10 @@ pub enum Check {
 }
 
 /// Size the journey creates a machine with, then resizes it to.
-pub const CREATE_SIZE: (u32, u64, u64) = (1, 1024, 10);
-pub const RESIZE_SIZE: (u32, u64, u64) = (2, 2048, 10);
+/// CPU count, memory MiB and disk GiB; small enough for the fixture's
+/// synthetic host headroom.
+pub const CREATE_SIZE: (u32, u64, u64) = (1, 512, 2);
+pub const RESIZE_SIZE: (u32, u64, u64) = (2, 1024, 3);
 
 /// State carried between the steps of one journey run.
 #[derive(Clone, Debug, Default)]
@@ -68,8 +70,7 @@ impl PageContext {
 /// The id of the listed machine called `name`.
 pub fn machine_named(live: &mut LiveSession, name: &str) -> Result<Option<String>, SessionError> {
     let bytes = live.refresh()?;
-    let listing = decode_listing(&bytes).map_err(|_| SessionError::InvalidInput)?;
-    let rows = project_listing(&listing).map_err(|_| SessionError::InvalidInput)?;
+    let rows = project_snapshot(&bytes).map_err(|_| SessionError::InvalidInput)?;
     Ok(rows
         .into_iter()
         .find(|row| row.name == name)
@@ -163,8 +164,28 @@ pub fn check_desired(
     }
 }
 
-/// The created machine reports the requested CPU count and memory.
-pub fn check_resized(live: &mut LiveSession, context: &PageContext) -> Check {
+/// The receipt of mutation `request_id` is accepted or succeeded.
+pub fn receipt_admitted(live: &mut LiveSession, request_id: &str) -> Result<bool, SessionError> {
+    let bytes = live.request_show(request_id)?;
+    let value: serde_json::Value =
+        serde_json::from_slice(&bytes).map_err(|_| SessionError::InvalidInput)?;
+    let status = |value: &serde_json::Value| {
+        value
+            .get("status")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|status| matches!(status, "accepted" | "succeeded"))
+    };
+    Ok(status(&value) || value.get("result").is_some_and(status))
+}
+
+/// The created machine reports the requested size, or (when the deployment
+/// records resizes as pinned requests applied by the provisioner) the resize
+/// request `request_id` was admitted.
+pub fn check_resized(
+    live: &mut LiveSession,
+    context: &PageContext,
+    request_id: Option<&str>,
+) -> Check {
     let Some(machine) = context.machine.as_deref() else {
         return Check::Fail("machine_missing");
     };
@@ -172,11 +193,36 @@ pub fn check_resized(live: &mut LiveSession, context: &PageContext) -> Check {
         Ok(detail)
             if detail.vcpu == Some(RESIZE_SIZE.0) && detail.memory_mib() == Some(RESIZE_SIZE.1) =>
         {
-            Check::Pass("resized")
+            return Check::Pass("resized");
         }
-        Ok(_) => Check::Wait,
-        Err(error) => read_failed(error),
+        Ok(_) => {}
+        Err(error) => return read_failed(error),
     }
+    match request_id.map(|request| receipt_admitted(live, request)) {
+        Some(Ok(true)) => Check::Pass("resize_requested"),
+        Some(Ok(false)) | None => Check::Wait,
+        Some(Err(error)) => read_failed(error),
+    }
+}
+
+/// After resume: the wake request `request_id` was admitted, or (only when
+/// the pause step took effect) the machine is requested running again. A
+/// machine that was never paused cannot pass on its running state alone.
+pub fn check_resumed(
+    live: &mut LiveSession,
+    context: &PageContext,
+    request_id: Option<&str>,
+    paused: bool,
+) -> Check {
+    match request_id.map(|request| receipt_admitted(live, request)) {
+        Some(Ok(true)) => return Check::Pass("wake_requested"),
+        Some(Ok(false)) | None => {}
+        Some(Err(error)) => return read_failed(error),
+    }
+    if !paused {
+        return Check::Wait;
+    }
+    check_desired(live, context, "running", "running")
 }
 
 /// The created machine is gone from the listing or marked deleted.
@@ -308,6 +354,22 @@ pub fn check_plan_approved(live: &mut LiveSession, context: &PageContext) -> Che
     }
 }
 
+/// The outcome code for a closed Porsche refusal. Only codes listed here are
+/// reported; any other refusal is `refused`.
+pub fn refusal_code(code: Option<&str>) -> &'static str {
+    match code {
+        Some("temporarily_unavailable") => "temporarily_unavailable",
+        Some("workload_not_stable") => "workload_not_stable",
+        Some("terminal_unavailable") => "terminal_unavailable",
+        Some("not_found") => "not_found",
+        Some("forbidden") => "forbidden",
+        Some("conflict") => "conflict",
+        Some("insufficient_capacity") => "insufficient_capacity",
+        Some("invalid_state") => "invalid_state",
+        _ => "refused",
+    }
+}
+
 /// The outcome code for a refused or failed action press.
 pub fn action_failed(error: SessionError) -> &'static str {
     match error {
@@ -342,6 +404,12 @@ mod tests {
         let context = PageContext::default();
         assert_eq!(action_failed(SessionError::InvalidInput), "refused");
         assert_eq!(action_failed(SessionError::Transport), "session_lost");
+        assert_eq!(
+            refusal_code(Some("workload_not_stable")),
+            "workload_not_stable"
+        );
+        assert_eq!(refusal_code(Some("someone@example.test")), "refused");
+        assert_eq!(refusal_code(None), "refused");
         assert!(context.machine.is_none() && context.thread.is_none());
     }
 }

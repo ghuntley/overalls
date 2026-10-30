@@ -7,15 +7,22 @@
 //! fixture's descriptor. It prints a JSON report of typed step outcomes only:
 //! no credentials, tokens, terminal bytes or server payloads are reported.
 
-use crate::adapter::{decode_listing, new_request_id, RuntimeError};
+use crate::adapter::{new_request_id, RuntimeError};
 use crate::deep_link::{present, Page};
 use crate::deployments::{DeploymentHost, DeploymentStore};
 use crate::device_key::{load_or_create, write_private};
-use crate::machine_view::project_listing;
+use crate::journey_checks::{
+    action_failed, check_answered, check_created, check_deleted, check_desired,
+    check_plan_approved, check_prompted, check_resized, check_resumed, check_share, check_web,
+    first_thread, load_thread_controls, refusal_code, web_endpoint, Check, PageContext,
+    CREATE_SIZE, RESIZE_SIZE,
+};
+use crate::machine_view::project_snapshot;
 use crate::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
 use crate::session::{
     ApprovalInfo, DeviceSigner, FileDeviceSigner, HttpsTrustFetcher, LiveSession, SessionBinding,
-    SessionConnectConfig, SignInFailure, SignInPhase, TrustEnrollment, TrustStore, WhoamiOutcome,
+    SessionConnectConfig, SessionError, SignInFailure, SignInPhase, TrustEnrollment, TrustStore,
+    WhoamiOutcome,
 };
 use crate::signin_driver::{
     ApprovalBrowser, ConnectError, Connector, DriverEvent, Execution, SignInDriver, SignInPolicy,
@@ -66,12 +73,22 @@ pub struct TlsSpec {
 pub struct ApproverSpec {
     pub url: String,
     pub bearer_token: BearerToken,
+    /// Base of the fixture's action hook (`<fixture_url>/<action>`); derived
+    /// from `url` when absent.
+    #[serde(default)]
+    pub fixture_url: Option<String>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct SeedSpec {
     pub machine_name: String,
     pub share_principal: String,
+    /// The seeded machine's id, when the fixture publishes it.
+    #[serde(default)]
+    pub machine_id: Option<String>,
+    /// The signed-in account's email, when the fixture publishes it.
+    #[serde(default)]
+    pub account_email: Option<String>,
 }
 
 /// Fixture descriptor v1. Unknown fields are ignored so the fixture can add
@@ -139,6 +156,14 @@ impl JourneyDescriptor {
         if !valid_approver_url(&descriptor.approver.url) {
             return Err(DescriptorError::InvalidField("approver.url"));
         }
+        if descriptor
+            .approver
+            .fixture_url
+            .as_deref()
+            .is_some_and(|url| !valid_approver_url(url))
+        {
+            return Err(DescriptorError::InvalidField("approver.fixture_url"));
+        }
         let token = &descriptor.approver.bearer_token.0;
         if token.is_empty()
             || token.len() > 4_096
@@ -157,6 +182,22 @@ impl JourneyDescriptor {
         }
         if !valid_email(&seed.share_principal) {
             return Err(DescriptorError::InvalidField("seed.share_principal"));
+        }
+        if seed.machine_id.as_deref().is_some_and(|id| {
+            id.is_empty()
+                || id.len() > 128
+                || !id
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+        }) {
+            return Err(DescriptorError::InvalidField("seed.machine_id"));
+        }
+        if seed
+            .account_email
+            .as_deref()
+            .is_some_and(|email| !valid_email(email))
+        {
+            return Err(DescriptorError::InvalidField("seed.account_email"));
         }
         Ok(descriptor)
     }
@@ -315,12 +356,61 @@ pub type FixtureTrustFetcher = HttpsTrustFetcher;
 /// curl config carrying the approver credential. Written to an owner-only
 /// file so the token never appears in a process argument list.
 pub fn approver_config(descriptor: &JourneyDescriptor, ca_path: &Path) -> String {
+    hook_config(descriptor, &descriptor.approver.url, ca_path)
+}
+
+fn hook_config(descriptor: &JourneyDescriptor, url: &str, ca_path: &Path) -> String {
     format!(
-        "url = \"{}\"\nrequest = \"POST\"\nheader = \"Authorization: Bearer {}\"\nheader = \"Content-Type: application/json\"\ncacert = \"{}\"\nfail\nsilent\nmax-time = 20\nmax-redirs = 0\n",
-        descriptor.approver.url,
+        "url = \"{}\"\nrequest = \"POST\"\nheader = \"Authorization: Bearer {}\"\nheader = \"Content-Type: application/json\"\ncacert = \"{}\"\nfail\nsilent\nmax-time = 120\nmax-redirs = 0\n",
+        url,
         descriptor.approver.bearer_token.0,
         ca_path.display()
     )
+}
+
+/// Posts `body` to a bearer-protected fixture hook at `url` and returns the
+/// response body (at most 64 KiB) on success. The bearer travels only in an
+/// owner-only curl config file that is removed afterwards.
+fn post_hook(
+    descriptor: &JourneyDescriptor,
+    workdir: &Path,
+    ca: &Path,
+    url: &str,
+    body: &serde_json::Value,
+) -> Option<Vec<u8>> {
+    if !valid_approver_url(url) {
+        return None;
+    }
+    let config = workdir.join("hook.curlrc");
+    write_private(&config, hook_config(descriptor, url, ca).as_bytes()).ok()?;
+    let result = (|| {
+        use std::io::{Read, Write};
+        let mut child = std::process::Command::new("curl")
+            .arg("--config")
+            .arg(&config)
+            .arg("--data-binary")
+            .arg("@-")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::null())
+            .spawn()
+            .ok()?;
+        child
+            .stdin
+            .take()?
+            .write_all(body.to_string().as_bytes())
+            .ok()?;
+        let mut output = Vec::new();
+        child
+            .stdout
+            .take()?
+            .take(64 * 1024)
+            .read_to_end(&mut output)
+            .ok()?;
+        child.wait().ok()?.success().then_some(output)
+    })();
+    let _ = std::fs::remove_file(&config);
+    result
 }
 
 /// A fresh device key at `path` (which must not exist yet).
@@ -340,36 +430,99 @@ fn now() -> u64 {
 }
 
 fn approve(descriptor: &JourneyDescriptor, workdir: &Path, ca: &Path, info: &ApprovalInfo) -> bool {
-    let config = workdir.join("approver.curlrc");
-    if write_private(&config, approver_config(descriptor, ca).as_bytes()).is_err() {
-        return false;
-    }
     let body = serde_json::json!({
         "approval_url": info.url,
         "fingerprint": info.fingerprint,
     });
-    let result = (|| {
-        use std::io::Write;
-        let mut child = std::process::Command::new("curl")
-            .arg("--config")
-            .arg(&config)
-            .arg("--data-binary")
-            .arg("@-")
-            .stdin(std::process::Stdio::piped())
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .spawn()
-            .ok()?;
-        child
-            .stdin
-            .take()?
-            .write_all(body.to_string().as_bytes())
-            .ok()?;
-        child.wait().ok().map(|status| status.success())
-    })();
-    let _ = std::fs::remove_file(&config);
-    result.unwrap_or(false)
+    post_hook(descriptor, workdir, ca, &descriptor.approver.url, &body).is_some()
 }
+
+/// @cc [owner:ghuntley,label:verification;security] linux-journey-fixture-actions
+/// The fixture's stand-ins for the absent provisioner and model (`observe`,
+/// `thread-create`, `thread-ready`, `thread-question`, `thread-proposal`) MUST
+/// be requested only through the bearer-protected approver origin with the
+/// bearer in an owner-only config file; returned identifiers MUST NOT be
+/// reported. A missing hook is reported as `fixture_hook_unavailable`.
+pub struct FixtureHook {
+    descriptor: JourneyDescriptor,
+    workdir: PathBuf,
+    ca_path: PathBuf,
+}
+
+impl FixtureHook {
+    pub fn new(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) -> Self {
+        Self {
+            descriptor: descriptor.clone(),
+            workdir: workdir.to_owned(),
+            ca_path: ca_path.to_owned(),
+        }
+    }
+
+    fn action(&self, action: &str, body: serde_json::Value) -> Option<serde_json::Value> {
+        let approver = &self.descriptor.approver;
+        let url = match approver.fixture_url.as_deref() {
+            Some(base) => format!("{}/{action}", base.trim_end_matches('/')),
+            None => format!(
+                "{}/fixture/{action}",
+                approver.url.strip_suffix("/approve")?
+            ),
+        };
+        let bytes = post_hook(&self.descriptor, &self.workdir, &self.ca_path, &url, &body)?;
+        serde_json::from_slice(&bytes).ok()
+    }
+
+    fn identifier(value: &serde_json::Value, field: &str) -> Option<String> {
+        value
+            .get(field)
+            .and_then(serde_json::Value::as_str)
+            .filter(|id| {
+                !id.is_empty()
+                    && id.len() <= 128
+                    && id
+                        .bytes()
+                        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+            })
+            .map(str::to_owned)
+    }
+
+    /// Completes the machine's open operations and observes its requested
+    /// state, as the provisioner would.
+    pub fn observe(&self, machine: &str) -> bool {
+        self.action("observe", serde_json::json!({ "machine_id": machine }))
+            .is_some()
+    }
+
+    /// Creates a thread for the account and waits until it is ready.
+    pub fn create_thread(&self) -> Option<String> {
+        let created = self.action("thread-create", serde_json::json!({}))?;
+        let thread = Self::identifier(&created, "thread_id")?;
+        self.action("thread-ready", serde_json::json!({ "thread_id": thread }))?;
+        Some(thread)
+    }
+
+    /// Has the agent ask a question in `thread`; returns its id.
+    pub fn question(&self, thread: &str) -> Option<String> {
+        let asked = self.action(
+            "thread-question",
+            serde_json::json!({ "thread_id": thread }),
+        )?;
+        Self::identifier(&asked, "question_id")
+    }
+
+    /// Has the agent propose a plan in `thread`; returns its id.
+    pub fn proposal(&self, thread: &str) -> Option<String> {
+        let proposed = self.action(
+            "thread-proposal",
+            serde_json::json!({ "thread_id": thread }),
+        )?;
+        Self::identifier(&proposed, "plan_id")
+    }
+}
+
+/// The structured answer the fixture's question accepts.
+pub const FIXTURE_ANSWER: &str = r#"{"approach":{"selected":"First","text":""}}"#;
+/// The prompt the journeys send.
+pub const JOURNEY_PROMPT: &str = "Report the hostname please";
 
 fn connect<S: DeviceSigner>(
     descriptor: &JourneyDescriptor,
@@ -475,11 +628,13 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         session
             .session_mut()
             .and_then(|live| live.refresh().ok())
-            .and_then(|bytes| decode_listing(&bytes).ok())
-            .and_then(|listing| project_listing(&listing).ok())
+            .and_then(|bytes| project_snapshot(&bytes).ok())
             .and_then(|rows| {
                 rows.into_iter()
-                    .find(|row| row.name == descriptor.seed.machine_name)
+                    .find(|row| match descriptor.seed.machine_id.as_deref() {
+                        Some(id) => row.id == id,
+                        None => row.name == descriptor.seed.machine_name,
+                    })
                     .map(|row| row.id)
             })
     };
@@ -513,40 +668,23 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
             opened,
             if opened { "opened" } else { "refused" },
         );
-
-        // 8. Machine sharing with the seeded principal, added then removed.
-        let shared = {
-            let mut session = binding.borrow_mut();
-            session.session_mut().is_some_and(|live| {
-                let add = new_request_id().is_some_and(|request| {
-                    live.share_mutation(
-                        id,
-                        &descriptor.seed.share_principal,
-                        Some("viewer"),
-                        true,
-                        &request,
-                    )
-                    .is_ok()
-                });
-                let remove = new_request_id().is_some_and(|request| {
-                    live.share_mutation(id, &descriptor.seed.share_principal, None, false, &request)
-                        .is_ok()
-                });
-                add && remove
-            })
-        };
-        report.record(
-            "sharing",
-            shared,
-            if shared { "added_removed" } else { "refused" },
-        );
     }
 
+    // 8. Sharing, web, lifecycle and threads, each asserted through a read.
+    let hook = FixtureHook::new(descriptor, workdir, &ca_path);
+    run_pages(
+        &binding,
+        descriptor,
+        &hook,
+        machine_id.as_deref(),
+        &mut report,
+    );
+
     // 9. Terminal stream through HostPtyTransport and the GTK surface model.
-    let terminal_outcome = run_terminal(&binding);
+    let terminal_outcome = run_terminal(&binding, machine_id.as_deref());
     report.record(
         "terminal",
-        terminal_outcome == "marker_seen",
+        terminal_passed(terminal_outcome),
         terminal_outcome,
     );
 
@@ -772,15 +910,357 @@ fn sign_in(
     (None, "approval_timeout")
 }
 
-fn run_terminal(binding: &Rc<RefCell<SessionBinding>>) -> &'static str {
+const PAGE_STEP_DEADLINE: Duration = Duration::from_secs(60);
+const PAGE_POLL: Duration = Duration::from_millis(500);
+
+/// Polls `check` on the bound session until it passes, fails or times out.
+fn await_check(
+    binding: &Rc<RefCell<SessionBinding>>,
+    mut check: impl FnMut(&mut LiveSession) -> Check,
+) -> (bool, &'static str) {
+    let started = Instant::now();
+    loop {
+        let outcome = match binding.borrow_mut().session_mut() {
+            Some(live) => check(live),
+            None => Check::Fail("not_bound"),
+        };
+        match outcome {
+            Check::Pass(code) => return (true, code),
+            Check::Fail(code) => return (false, code),
+            Check::Wait if started.elapsed() > PAGE_STEP_DEADLINE => return (false, "timeout"),
+            Check::Wait => std::thread::sleep(PAGE_POLL),
+        }
+    }
+}
+
+/// Runs one mutation with a fresh request id; returns the id on success.
+fn submit(
+    binding: &Rc<RefCell<SessionBinding>>,
+    op: impl FnOnce(&mut LiveSession, &str) -> Result<(), SessionError>,
+) -> Result<String, &'static str> {
+    let request = new_request_id().ok_or("csprng_unavailable")?;
+    let mut session = binding.borrow_mut();
+    let live = session.session_mut().ok_or("not_bound")?;
+    op(live, &request).map_err(|error| match error {
+        SessionError::InvalidInput => refusal_code(live.last_refusal().as_deref()),
+        other => action_failed(other),
+    })?;
+    Ok(request)
+}
+
+/// One step: submit, then await its check; records the outcome.
+fn page_step(
+    report: &mut JourneyReport,
+    binding: &Rc<RefCell<SessionBinding>>,
+    name: &'static str,
+    op: impl FnOnce(&mut LiveSession, &str) -> Result<(), SessionError>,
+    mut check: impl FnMut(&mut LiveSession, Option<&str>) -> Check,
+) -> bool {
+    match submit(binding, op) {
+        Ok(request) => {
+            let (ok, code) = await_check(binding, |live| check(live, Some(&request)));
+            report.record(name, ok, code)
+        }
+        Err(code) => report.record(name, false, code),
+    }
+}
+
+/// Asks the fixture to observe the journey machine; records a missing hook
+/// once.
+fn observe(
+    hook: &FixtureHook,
+    context: &PageContext,
+    report: &mut JourneyReport,
+    hook_missing: &mut bool,
+) {
+    let Some(machine) = context.machine.as_deref() else {
+        return;
+    };
+    if !hook.observe(machine) && !*hook_missing {
+        *hook_missing = true;
+        report.record("fixture_observe", false, "fixture_hook_unavailable");
+    }
+}
+
+/// Sharing, web, lifecycle and threads against the deployment; every step
+/// asserts its effect through a session read.
+fn run_pages(
+    binding: &Rc<RefCell<SessionBinding>>,
+    descriptor: &JourneyDescriptor,
+    hook: &FixtureHook,
+    seed_machine: Option<&str>,
+    report: &mut JourneyReport,
+) {
+    let Some(mut context) = PageContext::new(&descriptor.seed.share_principal) else {
+        report.record("lifecycle_create", false, "csprng_unavailable");
+        return;
+    };
+    context.seed_machine = seed_machine.map(str::to_owned);
+    let seed = seed_machine.unwrap_or_default().to_owned();
+    let principal = descriptor.seed.share_principal.clone();
+
+    // Sharing: add a viewer grant, read it back, remove it, read it gone.
+    {
+        let context = &context;
+        page_step(
+            report,
+            binding,
+            "sharing_add",
+            |live, request| live.share_mutation(&seed, &principal, Some("viewer"), true, request),
+            |live, _| check_share(live, context, Some("viewer")),
+        );
+        page_step(
+            report,
+            binding,
+            "sharing_remove",
+            |live, request| live.share_mutation(&seed, &principal, None, false, request),
+            |live, _| check_share(live, context, None),
+        );
+    }
+
+    // Web: show, then public and back to private at the current revision.
+    let before = binding
+        .borrow_mut()
+        .session_mut()
+        .ok_or(SessionError::StaleHandle)
+        .and_then(|live| web_endpoint(live, &seed));
+    match before {
+        Ok(endpoint) => {
+            report.record("web_show", true, "loaded");
+            for (name, public) in [("web_public", true), ("web_private", false)] {
+                let current = binding
+                    .borrow_mut()
+                    .session_mut()
+                    .ok_or(SessionError::StaleHandle)
+                    .and_then(|live| web_endpoint(live, &seed));
+                let Ok(current) = current else {
+                    report.record(name, false, "read_refused");
+                    continue;
+                };
+                let revision = current.policy_revision;
+                let context = &context;
+                page_step(
+                    report,
+                    binding,
+                    name,
+                    |live, request| live.web_set(&seed, endpoint.port, public, revision, request),
+                    |live, _| check_web(live, context, public, revision),
+                );
+            }
+        }
+        Err(error) => {
+            report.record("web_show", false, action_failed(error));
+        }
+    }
+
+    // Lifecycle on a machine this run creates. The fixture observes each
+    // accepted physical intent, standing in for the provisioner.
+    let mut hook_missing = false;
+    let (cpu, memory, disk) = CREATE_SIZE;
+    let name = context.machine_name.clone();
+    let created = match submit(binding, |live, request| {
+        live.machine_create(&name, cpu, memory, disk, request)
+    }) {
+        Ok(_) => await_check(binding, |live| check_created(live, &mut context)),
+        Err(code) => (false, code),
+    };
+    report.record("lifecycle_create", created.0, created.1);
+    observe(hook, &context, report, &mut hook_missing);
+    let machine = context.machine.clone().unwrap_or_default();
+    let steps: [(&'static str, &'static str, &'static str); 2] = [
+        ("lifecycle_stop", "stop", "stopped"),
+        ("lifecycle_start", "start", "running"),
+    ];
+    for (index, (step, action, desired)) in steps.into_iter().enumerate() {
+        if index == 1 {
+            // Resize while stopped, between stop and start.
+            let (cpu, memory, disk) = RESIZE_SIZE;
+            let context = &context;
+            page_step(
+                report,
+                binding,
+                "lifecycle_resize",
+                |live, request| live.machine_resize(&machine, cpu, memory, disk, request),
+                |live, request| check_resized(live, context, request),
+            );
+            observe(hook, context, report, &mut hook_missing);
+        }
+        let context_ref = &context;
+        page_step(
+            report,
+            binding,
+            step,
+            |live, request| live.machine_action(&machine, action, request),
+            |live, _| check_desired(live, context_ref, desired, desired),
+        );
+        observe(hook, &context, report, &mut hook_missing);
+    }
+    {
+        let context = &context;
+        let paused = page_step(
+            report,
+            binding,
+            "lifecycle_pause",
+            |live, request| live.machine_action(&machine, "pause", request),
+            |live, _| check_desired(live, context, "paused", "paused"),
+        );
+        page_step(
+            report,
+            binding,
+            "lifecycle_resume",
+            |live, request| live.machine_action(&machine, "resume", request),
+            |live, request| check_resumed(live, context, request, paused),
+        );
+        page_step(
+            report,
+            binding,
+            "lifecycle_delete",
+            |live, request| live.machine_action(&machine, "rm", request),
+            |live, _| check_deleted(live, context),
+        );
+    }
+
+    // Threads: list, prompt, answer and plan approval.
+    context.thread = hook.create_thread();
+    if context.thread.is_none() {
+        context.thread = binding
+            .borrow_mut()
+            .session_mut()
+            .and_then(|live| first_thread(live, seed_machine).ok().flatten());
+    }
+    let listed = match context.thread.as_deref() {
+        Some(thread) => binding
+            .borrow_mut()
+            .session_mut()
+            .and_then(|live| live.thread_action(None, "thread ls", None, None, None).ok())
+            .and_then(|bytes| crate::porsche_results::decode_thread_rows(&bytes).ok())
+            .is_some_and(|rows| rows.iter().any(|row| row.id == thread)),
+        None => false,
+    };
+    report.record(
+        "threads_list",
+        listed,
+        match (listed, context.thread.is_some()) {
+            (true, _) => "listed",
+            (false, true) => "thread_missing",
+            (false, false) => "no_thread",
+        },
+    );
+    let Some(thread) = context.thread.clone() else {
+        for step in ["threads_prompt", "threads_answer", "threads_plan_approve"] {
+            report.record(step, false, "no_thread");
+        }
+        return;
+    };
+    let _ = await_check(binding, |live| load_thread_controls(live, &mut context));
+    {
+        let context = &context;
+        page_step(
+            report,
+            binding,
+            "threads_prompt",
+            |live, request| {
+                live.thread_action(
+                    Some(&thread),
+                    "thread prompt",
+                    None,
+                    Some(JOURNEY_PROMPT),
+                    Some(request),
+                )
+                .map(|_| ())
+            },
+            |live, _| check_prompted(live, context),
+        );
+    }
+    let asked = hook.question(&thread);
+    let _ = await_check(binding, |live| load_thread_controls(live, &mut context));
+    if asked.is_some() && context.question.is_none() {
+        context.question = asked;
+    }
+    match context.question.clone() {
+        Some(question) => {
+            let context = &context;
+            page_step(
+                report,
+                binding,
+                "threads_answer",
+                |live, request| {
+                    live.thread_action(
+                        Some(&thread),
+                        "thread answer",
+                        Some(&question),
+                        Some(FIXTURE_ANSWER),
+                        Some(request),
+                    )
+                    .map(|_| ())
+                },
+                |live, _| check_answered(live, context),
+            );
+        }
+        None => {
+            report.record("threads_answer", false, "no_pending_question");
+        }
+    }
+    let proposed = hook.proposal(&thread);
+    let _ = await_check(binding, |live| load_thread_controls(live, &mut context));
+    if proposed.is_some() && context.plan.is_none() {
+        context.plan = proposed;
+    }
+    match context.plan.clone() {
+        Some(plan) => {
+            let context = &context;
+            page_step(
+                report,
+                binding,
+                "threads_plan_approve",
+                |live, request| {
+                    live.thread_action(
+                        Some(&thread),
+                        "thread plan approve",
+                        Some(&plan),
+                        None,
+                        Some(request),
+                    )
+                    .map(|_| ())
+                },
+                |live, _| check_plan_approved(live, context),
+            );
+        }
+        None => {
+            report.record("threads_plan_approve", false, "no_pending_plan");
+        }
+    }
+}
+
+/// The terminal step passes when the marker echoes back, or when Porsche
+/// refuses the attach with the closed `terminal_unavailable` reason (the
+/// hermetic fixture runs no guest; ADR-0264): the attach then went through
+/// `terminal new` and the named attach on the live session and the
+/// deployment answered.
+pub fn terminal_passed(outcome: &str) -> bool {
+    matches!(outcome, "marker_seen" | "terminal_unavailable")
+}
+
+fn run_terminal(binding: &Rc<RefCell<SessionBinding>>, machine: Option<&str>) -> &'static str {
+    let Some(machine) = machine else {
+        return "seed_missing";
+    };
     let backend = crate::session::SessionPtyBackend::new(binding.clone(), 100);
     let Ok(mut surface) =
         TerminalSurface::new(binding.clone(), HostPtyTransport::new(backend), 80, 24)
     else {
         return "renderer_refused";
     };
-    if surface.attach("mila-linux-journey", 80, 24).is_err() {
-        return "attach_refused";
+    if surface.attach(machine, "", 80, 24).is_err() {
+        let refusal = binding
+            .borrow()
+            .session()
+            .and_then(LiveSession::last_refusal);
+        return match refusal.as_deref() {
+            Some("terminal_unavailable") => "terminal_unavailable",
+            Some(_) => "attach_refused",
+            None => "attach_failed",
+        };
     }
     let Some(marker) = new_request_id().map(|id| format!("mila-journey-{}", &id[8..20])) else {
         return "marker_unavailable";
@@ -834,6 +1314,32 @@ mod tests {
         assert_eq!(parsed.deployment.ssh_port, 2222);
         assert_eq!(parsed.https_authority(), "localhost:8443");
         assert!(!format!("{parsed:?}").contains("s3cr3t"));
+        assert!(parsed.seed.machine_id.is_none());
+
+        // The launcher's descriptor adds the seeded ids and a launcher block.
+        let mut launched = descriptor();
+        launched["seed"]["machine_id"] = serde_json::json!("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a");
+        launched["seed"]["account_email"] = serde_json::json!("mila-owner@example.test");
+        launched["launcher"] = serde_json::json!({"bind": "127.0.0.1"});
+        let parsed = parse(&launched).unwrap();
+        assert_eq!(
+            parsed.seed.machine_id.as_deref(),
+            Some("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a")
+        );
+    }
+
+    #[test]
+    fn terminal_step_accepts_only_echo_or_the_closed_no_guest_refusal() {
+        assert!(terminal_passed("marker_seen"));
+        assert!(terminal_passed("terminal_unavailable"));
+        for code in [
+            "attach_refused",
+            "attach_failed",
+            "marker_timeout",
+            "seed_missing",
+        ] {
+            assert!(!terminal_passed(code));
+        }
     }
 
     #[test]
@@ -860,10 +1366,18 @@ mod tests {
             ("/approver/bearer_token", serde_json::json!("")),
             ("/seed/machine_name", serde_json::json!("bad\nname")),
             ("/seed/share_principal", serde_json::json!("not-an-email")),
+            ("/seed/machine_id", serde_json::json!("bad id")),
+            ("/seed/account_email", serde_json::json!("nobody")),
         ];
         for (pointer, value) in cases {
             let mut candidate = descriptor();
-            *candidate.pointer_mut(pointer).unwrap() = value.clone();
+            match candidate.pointer_mut(pointer) {
+                Some(slot) => *slot = value.clone(),
+                None => {
+                    let (parent, key) = pointer.rsplit_once('/').unwrap();
+                    candidate.pointer_mut(parent).unwrap()[key] = value.clone();
+                }
+            }
             assert!(parse(&candidate).is_err(), "{pointer} = {value}");
         }
         let mut loopback = descriptor();
