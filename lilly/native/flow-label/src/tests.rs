@@ -1,5 +1,6 @@
 use super::*;
 use hegel::{generators as gs, TestCase};
+use std::ffi::{OsStr, OsString};
 
 /// @cc [owner:ghuntley,label:verification] hegel-flow-selectors
 /// Generated address/port inputs MUST match the independent canonical models:
