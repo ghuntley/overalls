@@ -149,4 +149,12 @@ if $fix; then
     fi
   done < <(bxl --mode fix)
 fi
+# Contract precommit-unconfigured-graph: see tools/CONTRACTS. The checks below
+# build the configured graph, where an unselected branch (the prelude's
+# `config//:none` toolchain default) never resolves; tools/affected hashes
+# every branch, so a dangling one breaks CI target selection.
+if ! "$root/tools/buck2" uquery --console simple 'deps(//...)' >/dev/null; then
+  echo "tools/precommit: buck2 uquery 'deps(//...)' failed; the unconfigured graph must resolve for tools/affected" >&2
+  exit 1
+fi
 bxl --mode check

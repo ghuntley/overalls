@@ -11,3 +11,10 @@ Buck2, MUST rewrite files only under --fix, and MUST fail with the checks'
 findings. When Buck2 cannot start it MUST run the pre-M8 hook scripts
 directly over the same files, naming the checks it skipped, rather than pass
 silently (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] precommit-unconfigured-graph
+tools/precommit MUST fail before its checks when `uquery 'deps(//...)'` does
+not resolve. Unconfigured traversal follows every select branch, as the target
+hashes of tools/affected do, so a dependency that only an unselected branch
+names (toolchains//:cxx_no_default_deps) is caught locally rather than by CI
+target selection (ADR-0270).
