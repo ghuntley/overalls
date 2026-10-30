@@ -22,6 +22,8 @@ defmodule Porsche.Client do
                        :clone_in_progress,
                        :idempotency_conflict,
                        :workload_not_stable,
+                       :checkpoint_unavailable,
+                       :vm_busy,
                        :source_unavailable,
                        :transfer_busy,
                        :source_cleanup_pending,
@@ -80,6 +82,8 @@ defmodule Porsche.Client do
           | :clone_in_progress
           | :idempotency_conflict
           | :workload_not_stable
+          | :checkpoint_unavailable
+          | :vm_busy
           | :source_unavailable
           | :transfer_busy
           | :source_cleanup_pending
@@ -237,7 +241,8 @@ defmodule Porsche.Client do
   end
 
   # @cc [owner:ghuntley,label:security;recovery] porsche-closed-conflict-reasons
-  # Only predefined host/capacity/clone/name-custody, machine-pin reasons
+  # Only predefined host/capacity/clone/name-custody, checkpoint and busy-machine
+  # reasons (`checkpoint_unavailable`, `vm_busy`), machine-pin reasons
   # (`machine_pinned`, `machine_failed`, `pin_limit`), push-device reasons
   # (`push_disabled`, `device_limit`) and the thread, terminal and web reasons
   # of ADR-0222 and ADR-0223 may refine a conflict; other conflict names

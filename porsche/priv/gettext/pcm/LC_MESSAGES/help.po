@@ -229,17 +229,17 @@ msgstr "Approve di latest plan for thread and start to do am."
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Ask for new version of di plan, read di feedback from standard input."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Join dis SSH terminal to one shared terminal session; e need ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Change di web port or visibility of machine, and if you want, for one expected revision."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Close one of your terminal session dem for machine."
@@ -249,7 +249,7 @@ msgstr "Close one of your terminal session dem for machine."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Check thread, di question wey still dey wait for am, and di latest plan."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "List di terminal session dem for machine wey you fit open."
@@ -264,27 +264,27 @@ msgstr "List di transcript event dem for thread after one sequence number."
 msgid "List agent threads you can read, with unread counts."
 msgstr "List agent thread dem wey you fit read, plus how many never read."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Show all your push notification devices."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Mark thread as read reach one transcript sequence number."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Open your own personal terminal session for machine."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Register dis device for push notification. Na from stdin we go read di push key."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Cancel one push notification device."
@@ -294,22 +294,22 @@ msgstr "Cancel one push notification device."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Send prompt wey you read from standard input go thread."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Show di web endpoint, port and visibility of machine."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Stream JSON change notice dem for machine, thread and dis session."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Change thread between plan and work collaboration."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Turn push notification on or off for one device."

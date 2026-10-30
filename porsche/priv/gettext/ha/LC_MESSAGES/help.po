@@ -230,17 +230,17 @@ msgstr "Amince da sabon shirin zare kuma fara aiwatar da shi."
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Nemi shirin da aka gyara, ana karanta ra'ayi daga daidaitaccen shigarwa."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Haɗa wannan tashar SSH zuwa zaman tasha da aka raba; yana buƙatar ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Canja port na yanar gizo ko ganuwar inji, idan ana so a bitar da ake tsammani."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Rufe ɗaya daga cikin zaman tasharka a kan inji."
@@ -250,7 +250,7 @@ msgstr "Rufe ɗaya daga cikin zaman tasharka a kan inji."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Duba zare, tambayarsa da ke jira da sabon shirinsa."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Jera zaman tasha na inji da za ka iya buɗewa."
@@ -265,27 +265,27 @@ msgstr "Jera abubuwan rubutun zare bayan lambar jeri."
 msgid "List agent threads you can read, with unread counts."
 msgstr "Jera zaren wakili da za ka iya karantawa, tare da adadin waɗanda ba a karanta ba."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Jera na'urorin sanarwar turawa naka."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Yi wa zare alamar an karanta har zuwa lambar jerin rubutu."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Buɗe zaman tasharka na kanka a kan inji."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Yi rijistar wannan na'ura don sanarwar turawa. Ana karanta maɓallin turawa daga stdin."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Soke na'urar sanarwar turawa."
@@ -295,22 +295,22 @@ msgstr "Soke na'urar sanarwar turawa."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Aika buƙatar da aka karanta daga daidaitaccen shigarwa zuwa zare."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Nuna wurin haɗin yanar gizo, port da ganuwar inji."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Watsa sanarwar canji ta JSON don injina, zare da wannan zaman."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Canja zare tsakanin haɗin gwiwar plan da work."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Kunna ko kashe sanarwar turawa ga na'ura ɗaya."

@@ -235,17 +235,17 @@ msgstr "थ्रेड की नवीनतम योजना स्वी�
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "संशोधित योजना माँगें, प्रतिक्रिया मानक इनपुट से पढ़ते हुए।"
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "इस SSH टर्मिनल को साझा टर्मिनल सत्र से जोड़ता है; ssh -t आवश्यक है।"
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "मशीन का वेब पोर्ट या दृश्यता बदलें, वैकल्पिक रूप से अपेक्षित संशोधन पर।"
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "मशीन पर अपने टर्मिनल सत्रों में से एक बंद करें।"
@@ -255,7 +255,7 @@ msgstr "मशीन पर अपने टर्मिनल सत्रो�
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "थ्रेड, उसके लंबित प्रश्न और नवीनतम योजना की जाँच करें।"
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "मशीन के वे टर्मिनल सत्र सूचीबद्ध करें जिन्हें आप खोल सकते हैं।"
@@ -270,27 +270,27 @@ msgstr "किसी अनुक्रम संख्या के बाद �
 msgid "List agent threads you can read, with unread counts."
 msgstr "वे एजेंट थ्रेड सूचीबद्ध करें जिन्हें आप पढ़ सकते हैं, अपठित संख्या के साथ।"
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "अपने पुश सूचना डिवाइस सूचीबद्ध करें।"
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "किसी ट्रांसक्रिप्ट अनुक्रम संख्या तक थ्रेड को पढ़ा हुआ चिह्नित करें।"
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "मशीन पर अपना व्यक्तिगत टर्मिनल सत्र खोलें।"
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "पुश सूचनाओं के लिए इस डिवाइस को पंजीकृत करें। पुश कुंजी stdin से पढ़ी जाती है।"
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "किसी पुश सूचना डिवाइस को रद्द करें।"
@@ -300,22 +300,22 @@ msgstr "किसी पुश सूचना डिवाइस को रद�
 msgid "Send a prompt read from standard input to a thread."
 msgstr "मानक इनपुट से पढ़ा गया प्रॉम्प्ट थ्रेड को भेजें।"
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "मशीन का वेब एंडपॉइंट, पोर्ट और दृश्यता दिखाएँ।"
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "मशीनों, थ्रेड और इस सत्र के लिए JSON परिवर्तन सूचनाएँ स्ट्रीम करें।"
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "थ्रेड को plan और work सहयोग के बीच बदलें।"
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "किसी एक डिवाइस के लिए पुश सूचनाएँ चालू या बंद करें।"

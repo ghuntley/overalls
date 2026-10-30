@@ -241,17 +241,17 @@ msgstr "Aprobar el plan más reciente de un hilo y empezar a implementarlo."
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Pedir un plan revisado, leyendo los comentarios de la entrada estándar."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Conecta este terminal SSH a una sesión de terminal compartida; requiere ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Cambiar el puerto web o la visibilidad de una máquina, opcionalmente en una revisión esperada."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Cerrar una de sus sesiones de terminal en una máquina."
@@ -261,7 +261,7 @@ msgstr "Cerrar una de sus sesiones de terminal en una máquina."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Inspeccionar un hilo, su pregunta pendiente y su plan más reciente."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Listar las sesiones de terminal de una máquina que puede abrir."
@@ -276,27 +276,27 @@ msgstr "Listar los eventos de la transcripción de un hilo posteriores a un núm
 msgid "List agent threads you can read, with unread counts."
 msgstr "Listar los hilos de agente que puede leer, con el número de no leídos."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Lista tus dispositivos de notificaciones push."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Marcar un hilo como leído hasta un número de secuencia de la transcripción."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Abrir su sesión de terminal personal en una máquina."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Registra este dispositivo para notificaciones push. La clave push se lee desde stdin."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Revoca un dispositivo de notificaciones push."
@@ -306,22 +306,22 @@ msgstr "Revoca un dispositivo de notificaciones push."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Enviar a un hilo una instrucción leída de la entrada estándar."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Mostrar el punto de acceso web, el puerto y la visibilidad de una máquina."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Transmitir avisos de cambios en JSON sobre máquinas, hilos y esta sesión."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Cambiar un hilo entre la colaboración plan y work."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Activa o desactiva las notificaciones push de un dispositivo."

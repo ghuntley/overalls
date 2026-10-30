@@ -234,17 +234,17 @@ msgstr "اعتماد أحدث خطة لسلسلة والبدء في تنفيذه
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "طلب خطة معدّلة، مع قراءة الملاحظات من الإدخال القياسي."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "يربط طرفية SSH هذه بجلسة طرفية مشتركة؛ يتطلب ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "تغيير منفذ الويب أو مستوى الظهور لجهاز، اختياريًا عند مراجعة متوقعة."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "إغلاق إحدى جلسات الطرفية الخاصة بك على جهاز."
@@ -254,7 +254,7 @@ msgstr "إغلاق إحدى جلسات الطرفية الخاصة بك على �
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "فحص سلسلة وسؤالها المعلّق وأحدث خطة لها."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "سرد جلسات الطرفية لجهاز التي يمكنك فتحها."
@@ -269,27 +269,27 @@ msgstr "سرد أحداث نص سلسلة بعد رقم تسلسلي."
 msgid "List agent threads you can read, with unread counts."
 msgstr "سرد سلاسل الوكيل التي يمكنك قراءتها، مع أعداد غير المقروء."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "اعرض أجهزة الإشعارات الفورية الخاصة بك."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "تعليم سلسلة كمقروءة حتى رقم تسلسلي في النص."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "فتح جلسة الطرفية الشخصية الخاصة بك على جهاز."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "سجّل هذا الجهاز لتلقي الإشعارات الفورية. يُقرأ مفتاح الإشعارات من stdin."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "ألغِ جهاز إشعارات فورية."
@@ -299,22 +299,22 @@ msgstr "ألغِ جهاز إشعارات فورية."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "إرسال طلب مقروء من الإدخال القياسي إلى سلسلة."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "عرض نقطة نهاية الويب والمنفذ ومستوى الظهور لجهاز."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "بث إشعارات التغيير بتنسيق JSON للأجهزة والسلاسل وهذه الجلسة."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "تبديل سلسلة بين وضعي التعاون plan و work."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "شغّل الإشعارات الفورية أو أوقفها لجهاز واحد."

@@ -14,27 +14,27 @@ msgstr "Tälle koneelle on jo käynnissä kloonauspyyntö."
 msgid "A failed machine cannot be pinned; an existing pin can still be removed."
 msgstr "Epäonnistunutta konetta ei voi kiinnittää; olemassa olevan kiinnityksen voi silti poistaa."
 
-#: lib/porsche/ssh/output.ex:136
+#: lib/porsche/ssh/output.ex:148
 #, elixir-autogen, elixir-format
 msgid "A relocation is already in progress for this machine."
 msgstr "Tämän koneen siirto on jo käynnissä."
 
-#: lib/porsche/ssh/output.ex:238
+#: lib/porsche/ssh/output.ex:250
 #, elixir-autogen, elixir-format
 msgid "A repository source is not allowed for this machine profile."
 msgstr "Tietovarastolähdettä ei sallita tälle koneprofiilille."
 
-#: lib/porsche/ssh/output.ex:133
+#: lib/porsche/ssh/output.ex:145
 #, elixir-autogen, elixir-format
 msgid "A resize request is already in progress for this machine."
 msgstr "Tälle koneelle on jo käynnissä koonmuutospyyntö."
 
-#: lib/porsche/ssh/output.ex:121
+#: lib/porsche/ssh/output.ex:133
 #, elixir-autogen, elixir-format
 msgid "A transfer is already using this host's transfer slot. Please try again after it finishes."
 msgstr "Siirto käyttää jo tämän isännän siirtopaikkaa. Yritä uudelleen sen valmistuttua."
 
-#: lib/porsche/ssh/output.ex:373
+#: lib/porsche/ssh/output.ex:406
 #, elixir-autogen, elixir-format
 msgid "Accepted"
 msgstr "Hyväksytty"
@@ -44,7 +44,7 @@ msgstr "Hyväksytty"
 msgid "Approve this SSH key in your browser, then retry the command."
 msgstr "Hyväksy tämä SSH-avain selaimessa ja yritä sitten komentoa uudelleen."
 
-#: lib/porsche/ssh/output.ex:375
+#: lib/porsche/ssh/output.ex:408
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "Epäonnistui"
@@ -54,97 +54,97 @@ msgstr "Epäonnistui"
 msgid "Invalid command. Type help to see available commands."
 msgstr "Virheellinen komento. Näet käytettävissä olevat komennot kirjoittamalla help."
 
-#: lib/porsche/ssh/output.ex:368
+#: lib/porsche/ssh/output.ex:401
 #, elixir-autogen, elixir-format
 msgid "Operation ID"
 msgstr "Toiminnon tunnus"
 
-#: lib/porsche/ssh/output.ex:365
+#: lib/porsche/ssh/output.ex:398
 #, elixir-autogen, elixir-format
 msgid "Protocol version"
 msgstr "Protokollaversio"
 
-#: lib/porsche/ssh/output.ex:400
+#: lib/porsche/ssh/output.ex:433
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: submitting"
 msgstr "Pyyntö %{id}: lähetetään"
 
-#: lib/porsche/ssh/output.ex:403
+#: lib/porsche/ssh/output.ex:436
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: waiting for completion"
 msgstr "Pyyntö %{id}: odottaa valmistumista"
 
-#: lib/porsche/ssh/output.ex:367
+#: lib/porsche/ssh/output.ex:400
 #, elixir-autogen, elixir-format
 msgid "Request ID"
 msgstr "Pyynnön tunnus"
 
-#: lib/porsche/ssh/output.ex:369
+#: lib/porsche/ssh/output.ex:402
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "Tulos"
 
-#: lib/porsche/ssh/output.ex:127
+#: lib/porsche/ssh/output.ex:139
 #, elixir-autogen, elixir-format
 msgid "Source cleanup is still pending. Wait for cleanup before retrying."
 msgstr "Lähteen siivous on yhä kesken. Odota siivouksen valmistumista ennen uutta yritystä."
 
-#: lib/porsche/ssh/output.ex:366
+#: lib/porsche/ssh/output.ex:399
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Tila"
 
-#: lib/porsche/ssh/output.ex:374
+#: lib/porsche/ssh/output.ex:407
 #, elixir-autogen, elixir-format
 msgid "Succeeded"
 msgstr "Onnistui"
 
-#: lib/porsche/ssh/output.ex:376
+#: lib/porsche/ssh/output.ex:409
 #, elixir-autogen, elixir-format
 msgid "Superseded"
 msgstr "Korvattu"
 
-#: lib/porsche/ssh/output.ex:289
+#: lib/porsche/ssh/output.ex:301
 #, elixir-autogen, elixir-format
 msgid "The SSH public key is invalid. Check the key and try again."
 msgstr "Julkinen SSH-avain on virheellinen. Tarkista avain ja yritä uudelleen."
 
-#: lib/porsche/ssh/output.ex:283
+#: lib/porsche/ssh/output.ex:295
 #, elixir-autogen, elixir-format
 msgid "The approval request limit has been reached. Close an unused connection and try again."
 msgstr "Hyväksyntäpyyntöjen enimmäismäärä on saavutettu. Sulje käyttämätön yhteys ja yritä uudelleen."
 
-#: lib/porsche/ssh/output.ex:211
+#: lib/porsche/ssh/output.ex:223
 #, elixir-autogen, elixir-format
 msgid "The available host does not meet the machine image's requirements."
 msgstr "Käytettävissä oleva isäntä ei täytä koneen levykuvan vaatimuksia."
 
-#: lib/porsche/ssh/output.ex:346
+#: lib/porsche/ssh/output.ex:379
 #, elixir-autogen, elixir-format
 msgid "The command could not be completed: %{reason}"
 msgstr "Komentoa ei voitu suorittaa loppuun: %{reason}"
 
-#: lib/porsche/ssh/output.ex:184
+#: lib/porsche/ssh/output.ex:196
 #, elixir-autogen, elixir-format
 msgid "The connection to the control service was interrupted. Check the request status before submitting it again."
 msgstr "Yhteys ohjauspalveluun katkesi. Tarkista pyynnön tila ennen sen lähettämistä uudelleen."
 
-#: lib/porsche/ssh/output.ex:196
+#: lib/porsche/ssh/output.ex:208
 #, elixir-autogen, elixir-format
 msgid "The control service refused the request. Check the request status before submitting it again."
 msgstr "Ohjauspalvelu hylkäsi pyynnön. Tarkista pyynnön tila ennen sen lähettämistä uudelleen."
 
-#: lib/porsche/ssh/output.ex:190
+#: lib/porsche/ssh/output.ex:202
 #, elixir-autogen, elixir-format
 msgid "The control service returned an invalid response. Check the request status before submitting it again."
 msgstr "Ohjauspalvelu palautti virheellisen vastauksen. Tarkista pyynnön tila ennen sen lähettämistä uudelleen."
 
-#: lib/porsche/ssh/output.ex:223
+#: lib/porsche/ssh/output.ex:235
 #, elixir-autogen, elixir-format
 msgid "The machine's disk is not reserved for this operation."
 msgstr "Koneen levyä ei ole varattu tälle toiminnolle."
 
-#: lib/porsche/ssh/output.ex:262
+#: lib/porsche/ssh/output.ex:274
 #, elixir-autogen, elixir-format
 msgid "The machine's execution generation has changed. Inspect its current state before retrying."
 msgstr "Koneen suoritussukupolvi on muuttunut. Tarkista sen nykytila ennen uutta yritystä."
@@ -154,12 +154,12 @@ msgstr "Koneen suoritussukupolvi on muuttunut. Tarkista sen nykytila ennen uutta
 msgid "The machine's host is unavailable. Please try again shortly."
 msgstr "Koneen isäntä ei ole käytettävissä. Yritä hetken kuluttua uudelleen."
 
-#: lib/porsche/ssh/output.ex:151
+#: lib/porsche/ssh/output.ex:163
 #, elixir-autogen, elixir-format
 msgid "The machine's placement has changed. Inspect its current state before retrying."
 msgstr "Koneen sijoitus on muuttunut. Tarkista sen nykytila ennen uutta yritystä."
 
-#: lib/porsche/ssh/output.ex:256
+#: lib/porsche/ssh/output.ex:268
 #, elixir-autogen, elixir-format
 msgid "The machine's stop has not been confirmed. Inspect its state before retrying."
 msgstr "Koneen pysähtymistä ei ole vahvistettu. Tarkista sen tila ennen uutta yritystä."
@@ -174,52 +174,52 @@ msgstr "Koneen työkuorma ei ole riittävän vakaa tälle toiminnolle. Tarkista 
 msgid "The owner has this machine pinned; unpin it first: unpin MACHINE"
 msgstr "Omistaja on kiinnittänyt tämän koneen; poista kiinnitys ensin: unpin MACHINE"
 
-#: lib/porsche/ssh/output.ex:235
+#: lib/porsche/ssh/output.ex:247
 #, elixir-autogen, elixir-format
 msgid "The recipient does not have a registered account."
 msgstr "Vastaanottajalla ei ole rekisteröityä tiliä."
 
-#: lib/porsche/ssh/output.ex:244
+#: lib/porsche/ssh/output.ex:256
 #, elixir-autogen, elixir-format
 msgid "The repository source is invalid. Use a supported public repository URL."
 msgstr "Tietovarastolähde on virheellinen. Käytä tuettua julkisen tietovaraston URL-osoitetta."
 
-#: lib/porsche/ssh/output.ex:241
+#: lib/porsche/ssh/output.ex:253
 #, elixir-autogen, elixir-format
 msgid "The repository source is unavailable."
 msgstr "Tietovarastolähde ei ole käytettävissä."
 
-#: lib/porsche/ssh/output.ex:163
+#: lib/porsche/ssh/output.ex:175
 #, elixir-autogen, elixir-format
 msgid "The request conflicts with the current state. Inspect the machine or request before retrying."
 msgstr "Pyyntö on ristiriidassa nykytilan kanssa. Tarkista kone tai pyyntö ennen uutta yritystä."
 
-#: lib/porsche/ssh/output.ex:160
+#: lib/porsche/ssh/output.ex:172
 #, elixir-autogen, elixir-format
 msgid "The request is invalid. Check the command and its arguments."
 msgstr "Pyyntö on virheellinen. Tarkista komento ja sen argumentit."
 
-#: lib/porsche/ssh/output.ex:169
+#: lib/porsche/ssh/output.ex:181
 #, elixir-autogen, elixir-format
 msgid "The request or response exceeds the permitted size."
 msgstr "Pyyntö tai vastaus ylittää sallitun koon."
 
-#: lib/porsche/ssh/output.ex:271
+#: lib/porsche/ssh/output.ex:283
 #, elixir-autogen, elixir-format
 msgid "The requested SSH key could not be found."
 msgstr "Pyydettyä SSH-avainta ei löytynyt."
 
-#: lib/porsche/ssh/output.ex:268
+#: lib/porsche/ssh/output.ex:280
 #, elixir-autogen, elixir-format
 msgid "The requested command receipt could not be found."
 msgstr "Pyydettyä komentokuittia ei löytynyt."
 
-#: lib/porsche/ssh/output.ex:208
+#: lib/porsche/ssh/output.ex:220
 #, elixir-autogen, elixir-format
 msgid "The requested machine image is unavailable."
 msgstr "Pyydetty koneen levykuva ei ole käytettävissä."
 
-#: lib/porsche/ssh/output.ex:217
+#: lib/porsche/ssh/output.ex:229
 #, elixir-autogen, elixir-format
 msgid "The requested machine size is invalid. Check the CPU, memory and disk limits."
 msgstr "Pyydetty koneen koko on virheellinen. Tarkista suorittimen, muistin ja levyn rajat."
@@ -229,12 +229,12 @@ msgstr "Pyydetty koneen koko on virheellinen. Tarkista suorittimen, muistin ja l
 msgid "The requested resource could not be found."
 msgstr "Pyydettyä resurssia ei löytynyt."
 
-#: lib/porsche/ssh/output.ex:202
+#: lib/porsche/ssh/output.ex:214
 #, elixir-autogen, elixir-format
 msgid "The service configuration is invalid. Contact your operator."
 msgstr "Palvelun määritys on virheellinen. Ota yhteyttä operaattoriisi."
 
-#: lib/porsche/ssh/output.ex:178
+#: lib/porsche/ssh/output.ex:190
 #, elixir-autogen, elixir-format
 msgid "The service does not support this protocol version. Ask your operator to update the compatible services."
 msgstr "Palvelu ei tue tätä protokollaversiota. Pyydä operaattoriasi päivittämään yhteensopivat palvelut."
@@ -244,12 +244,12 @@ msgstr "Palvelu ei tue tätä protokollaversiota. Pyydä operaattoriasi päivitt
 msgid "The service is temporarily unavailable. Please try again shortly."
 msgstr "Palvelu ei ole tilapäisesti käytettävissä. Yritä pian uudelleen."
 
-#: lib/porsche/ssh/output.ex:277
+#: lib/porsche/ssh/output.ex:289
 #, elixir-autogen, elixir-format
 msgid "The session limit has been reached. Close an unused connection and try again."
 msgstr "Istuntojen enimmäismäärä on saavutettu. Sulje käyttämätön yhteys ja yritä uudelleen."
 
-#: lib/porsche/ssh/output.ex:118
+#: lib/porsche/ssh/output.ex:130
 #, elixir-autogen, elixir-format
 msgid "The source machine is unavailable for this operation."
 msgstr "Lähdekone ei ole käytettävissä tätä toimintoa varten."
@@ -259,7 +259,7 @@ msgstr "Lähdekone ei ole käytettävissä tätä toimintoa varten."
 msgid "There is not enough available capacity for this request."
 msgstr "Tälle pyynnölle ei ole riittävästi vapaata kapasiteettia."
 
-#: lib/porsche/ssh/output.ex:232
+#: lib/porsche/ssh/output.ex:244
 #, elixir-autogen, elixir-format
 msgid "This action cannot remove the owner's protected access."
 msgstr "Tämä toiminto ei voi poistaa omistajan suojattua käyttöoikeutta."
@@ -279,37 +279,37 @@ msgstr "Tätä kloonauspyyntöä ei voi yrittää uudelleen sen nykytilassa."
 msgid "This connection is not authorized. Please sign in and try again."
 msgstr "Tätä yhteyttä ei ole valtuutettu. Kirjaudu sisään ja yritä uudelleen."
 
-#: lib/porsche/ssh/output.ex:274
+#: lib/porsche/ssh/output.ex:286
 #, elixir-autogen, elixir-format
 msgid "This connection requires verified HTTPS. Contact your operator."
 msgstr "Tämä yhteys edellyttää varmennettua HTTPS:ää. Ota yhteyttä operaattoriisi."
 
-#: lib/porsche/ssh/output.ex:205
+#: lib/porsche/ssh/output.ex:217
 #, elixir-autogen, elixir-format
 msgid "This machine has been deleted."
 msgstr "Tämä kone on poistettu."
 
-#: lib/porsche/ssh/output.ex:226
+#: lib/porsche/ssh/output.ex:238
 #, elixir-autogen, elixir-format
 msgid "This machine has reached its execution generation limit. Contact your operator."
 msgstr "Tämä kone on saavuttanut suoritussukupolvensa rajan. Ota yhteyttä operaattoriisi."
 
-#: lib/porsche/ssh/output.ex:157
+#: lib/porsche/ssh/output.ex:169
 #, elixir-autogen, elixir-format
 msgid "This machine name is unavailable. Choose another name."
 msgstr "Tämä koneen nimi ei ole käytettävissä. Valitse toinen nimi."
 
-#: lib/porsche/ssh/output.ex:148
+#: lib/porsche/ssh/output.ex:160
 #, elixir-autogen, elixir-format
 msgid "This relocation cannot be retried in its current state."
 msgstr "Tätä siirtoa ei voi yrittää uudelleen sen nykytilassa."
 
-#: lib/porsche/ssh/output.ex:145
+#: lib/porsche/ssh/output.ex:157
 #, elixir-autogen, elixir-format
 msgid "This relocation has already finished."
 msgstr "Tämä siirto on jo valmistunut."
 
-#: lib/porsche/ssh/output.ex:139
+#: lib/porsche/ssh/output.ex:151
 #, elixir-autogen, elixir-format
 msgid "This relocation has committed its handoff and can no longer be cancelled."
 msgstr "Tämän siirron vastuunvaihto on vahvistettu, eikä sitä voi enää peruuttaa."
@@ -319,17 +319,17 @@ msgstr "Tämän siirron vastuunvaihto on vahvistettu, eikä sitä voi enää per
 msgid "This request ID was already used for a different command. Use the original command or a new request ID."
 msgstr "Tätä pyynnön tunnusta on jo käytetty eri komennolle. Käytä alkuperäistä komentoa tai uutta pyynnön tunnusta."
 
-#: lib/porsche/ssh/output.ex:253
+#: lib/porsche/ssh/output.ex:265
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be cancelled in its current state."
 msgstr "Tätä koonmuutospyyntöä ei voi peruuttaa sen nykytilassa."
 
-#: lib/porsche/ssh/output.ex:250
+#: lib/porsche/ssh/output.ex:262
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be retried in its current state."
 msgstr "Tätä koonmuutospyyntöä ei voi yrittää uudelleen sen nykytilassa."
 
-#: lib/porsche/ssh/output.ex:172
+#: lib/porsche/ssh/output.ex:184
 #, elixir-autogen, elixir-format
 msgid "Too many sessions or approval requests are active. Close an unused connection and try again."
 msgstr "Liian monta istuntoa tai hyväksyntäpyyntöä on aktiivisena. Sulje käyttämätön yhteys ja yritä uudelleen."
@@ -349,90 +349,102 @@ msgstr "Sinulla on jo enimmäismäärä kiinnityksiä; poista ensin yksi."
 msgid "You do not have permission to perform this action."
 msgstr "Sinulla ei ole oikeutta suorittaa tätä toimintoa."
 
-#: lib/porsche/ssh/output.ex:316
+#: lib/porsche/ssh/output.ex:331
 #, elixir-autogen, elixir-format
 msgid "Answer the pending question before sending another prompt."
 msgstr "Vastaa avoimeen kysymykseen ennen kuin lähetät uuden kehotteen."
 
-#: lib/porsche/ssh/output.ex:322
+#: lib/porsche/ssh/output.ex:340
 #, elixir-autogen, elixir-format
 msgid "Port 4444 is reserved for the editor."
 msgstr "Portti 4444 on varattu editorille."
 
-#: lib/porsche/ssh/output.ex:328
+#: lib/porsche/ssh/output.ex:346
 #, elixir-autogen, elixir-format
 msgid "Terminals are unavailable on this machine right now."
 msgstr "Päätteet eivät ole juuri nyt käytettävissä tällä koneella."
 
-#: lib/porsche/ssh/output.ex:304
+#: lib/porsche/ssh/output.ex:316
 #, elixir-autogen, elixir-format
 msgid "That plan is no longer the latest proposal. Show the thread again."
 msgstr "Tämä suunnitelma ei ole enää uusin ehdotus. Näytä ketju uudelleen."
 
-#: lib/porsche/ssh/output.ex:310
+#: lib/porsche/ssh/output.ex:325
 #, elixir-autogen, elixir-format
 msgid "That question has already been answered."
 msgstr "Tähän kysymykseen on jo vastattu."
 
-#: lib/porsche/ssh/output.ex:307
+#: lib/porsche/ssh/output.ex:322
 #, elixir-autogen, elixir-format
 msgid "That question is no longer pending."
 msgstr "Tämä kysymys ei ole enää avoinna."
 
-#: lib/porsche/ssh/output.ex:334
+#: lib/porsche/ssh/output.ex:352
 #, elixir-autogen, elixir-format
 msgid "That terminal session no longer exists."
 msgstr "Tätä pääteistuntoa ei ole enää olemassa."
 
-#: lib/porsche/ssh/output.ex:313
+#: lib/porsche/ssh/output.ex:328
 #, elixir-autogen, elixir-format
 msgid "The answers do not match the pending question."
 msgstr "Vastaukset eivät vastaa avointa kysymystä."
 
-#: lib/porsche/ssh/output.ex:331
+#: lib/porsche/ssh/output.ex:349
 #, elixir-autogen, elixir-format
 msgid "The machine is waking. Retry the terminal shortly."
 msgstr "Konetta herätetään. Yritä päätettä uudelleen hetken kuluttua."
 
-#: lib/porsche/ssh/output.ex:343
+#: lib/porsche/ssh/output.ex:373
 #, elixir-autogen, elixir-format
 msgid "The standard input is empty or exceeds this command's size limit."
 msgstr "Vakiosyöte on tyhjä tai ylittää tämän komennon kokorajan."
 
-#: lib/porsche/ssh/output.ex:319
+#: lib/porsche/ssh/output.ex:334
 #, elixir-autogen, elixir-format
 msgid "The web settings changed since you read them. Show them again and retry."
 msgstr "Verkkoasetukset ovat muuttuneet sen jälkeen, kun luit ne. Näytä ne uudelleen ja yritä uudelleen."
 
-#: lib/porsche/ssh/output.ex:337
+#: lib/porsche/ssh/output.ex:367
 #, elixir-autogen, elixir-format
 msgid "This command reads its input from standard input. Pipe it in and end the command with -."
 msgstr "Tämä komento lukee syötteensä vakiosyötteestä. Ohjaa se putkella ja päätä komento merkkiin -."
 
-#: lib/porsche/ssh/output.ex:325
+#: lib/porsche/ssh/output.ex:343
 #, elixir-autogen, elixir-format
 msgid "This machine's profile does not allow web publishing."
 msgstr "Tämän koneen profiili ei salli verkkojulkaisua."
 
-#: lib/porsche/ssh/output.ex:301
+#: lib/porsche/ssh/output.ex:313
 #, elixir-autogen, elixir-format
 msgid "This thread is busy with a turn. Try again when it finishes."
 msgstr "Tämä ketju on varattu vuoron käsittelyyn. Yritä uudelleen, kun se päättyy."
 
-#: lib/porsche/ssh/output.ex:298
+#: lib/porsche/ssh/output.ex:310
 #, elixir-autogen, elixir-format
 msgid "This thread is not ready for prompts yet."
 msgstr "Tämä ketju ei ole vielä valmis kehotteille."
 
-#: lib/porsche/ssh/output.ex:292
+#: lib/porsche/ssh/output.ex:304
 #, elixir-autogen, elixir-format
 msgid "terminal attach needs a terminal. Connect with ssh -t and run it as the command."
 msgstr "terminal attach tarvitsee päätteen. Yhdistä ssh -t -valitsimella ja suorita se komentona."
 
+#: lib/porsche/ssh/output.ex:355
 #, elixir-autogen, elixir-format
 msgid "This deployment has push notifications turned off; ask its operator."
 msgstr "Push-ilmoitukset on poistettu käytöstä tässä asennuksessa; ota yhteyttä sen ylläpitäjään."
 
+#: lib/porsche/ssh/output.ex:361
 #, elixir-autogen, elixir-format
 msgid "You already have the maximum number of devices; remove one first: device rm DEVICE_ID"
 msgstr "Laitteiden enimmäismäärä on saavutettu; poista ensin yksi: device rm DEVICE_ID"
+
+#: lib/porsche/ssh/output.ex:118
+#, elixir-autogen, elixir-format
+msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+msgstr "Tarkistuspisteet eivät ole käytettävissä tälle koneelle sen isännässä. Pysäytä kone sen sijaan, että keskeyttäisit sen."
+
+#: lib/porsche/ssh/output.ex:124
+#, elixir-autogen, elixir-format
+msgid "The machine is busy with another operation. Try again after it finishes."
+msgstr "Kone on varattu toiselle toiminnolle. Yritä uudelleen, kun se on valmis."

@@ -229,17 +229,17 @@ msgstr "Hyväksy ketjun uusin suunnitelma ja aloita sen toteutus."
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Pyydä tarkistettua suunnitelmaa ja lue palaute vakiosyötteestä."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Liittää tämän SSH-päätteen jaettuun pääteistuntoon; vaatii ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Muuta koneen verkkoporttia tai näkyvyyttä, valinnaisesti odotetussa revisiossa."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Sulje yksi pääteistunnoistasi koneella."
@@ -249,7 +249,7 @@ msgstr "Sulje yksi pääteistunnoistasi koneella."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Tarkastele ketjua, sen avointa kysymystä ja uusinta suunnitelmaa."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Luettele koneen pääteistunnot, jotka voit avata."
@@ -264,27 +264,27 @@ msgstr "Luettele ketjun transkriptin tapahtumat järjestysnumeron jälkeen."
 msgid "List agent threads you can read, with unread counts."
 msgstr "Luettele agenttiketjut, joita voit lukea, lukemattomien määrineen."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Luettele push-ilmoituslaitteesi."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Merkitse ketju luetuksi transkriptin järjestysnumeroon asti."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Avaa henkilökohtainen pääteistuntosi koneella."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Rekisteröi tämä laite push-ilmoituksia varten. Push-avain luetaan stdinistä."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Peru push-ilmoituslaite."
@@ -294,22 +294,22 @@ msgstr "Peru push-ilmoituslaite."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Lähetä vakiosyötteestä luettu kehote ketjuun."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Näytä koneen verkkopäätepiste, portti ja näkyvyys."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Suoratoista JSON-muutosilmoituksia koneista, ketjuista ja tästä istunnosta."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Vaihda ketju plan- ja work-yhteistyötilan välillä."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Ota yhden laitteen push-ilmoitukset käyttöön tai pois käytöstä."

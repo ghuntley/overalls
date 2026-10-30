@@ -15,27 +15,27 @@ msgstr "此机器已有克隆请求正在进行。"
 msgid "A failed machine cannot be pinned; an existing pin can still be removed."
 msgstr "无法固定失败的机器；仍可取消现有固定。"
 
-#: lib/porsche/ssh/output.ex:136
+#: lib/porsche/ssh/output.ex:148
 #, elixir-autogen, elixir-format
 msgid "A relocation is already in progress for this machine."
 msgstr "此机器已有迁移正在进行。"
 
-#: lib/porsche/ssh/output.ex:238
+#: lib/porsche/ssh/output.ex:250
 #, elixir-autogen, elixir-format
 msgid "A repository source is not allowed for this machine profile."
 msgstr "此机器配置不允许使用仓库源。"
 
-#: lib/porsche/ssh/output.ex:133
+#: lib/porsche/ssh/output.ex:145
 #, elixir-autogen, elixir-format
 msgid "A resize request is already in progress for this machine."
 msgstr "此机器已有规格调整请求正在进行。"
 
-#: lib/porsche/ssh/output.ex:121
+#: lib/porsche/ssh/output.ex:133
 #, elixir-autogen, elixir-format
 msgid "A transfer is already using this host's transfer slot. Please try again after it finishes."
 msgstr "某个传输正在占用此主机的传输槽位。请在其完成后重试。"
 
-#: lib/porsche/ssh/output.ex:373
+#: lib/porsche/ssh/output.ex:406
 #, elixir-autogen, elixir-format
 msgid "Accepted"
 msgstr "已接受"
@@ -45,7 +45,7 @@ msgstr "已接受"
 msgid "Approve this SSH key in your browser, then retry the command."
 msgstr "在浏览器中核准此 SSH 密钥，然后重试命令。"
 
-#: lib/porsche/ssh/output.ex:375
+#: lib/porsche/ssh/output.ex:408
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "失败"
@@ -55,97 +55,97 @@ msgstr "失败"
 msgid "Invalid command. Type help to see available commands."
 msgstr "无效命令。输入 help 查看可用命令。"
 
-#: lib/porsche/ssh/output.ex:368
+#: lib/porsche/ssh/output.ex:401
 #, elixir-autogen, elixir-format
 msgid "Operation ID"
 msgstr "操作ID"
 
-#: lib/porsche/ssh/output.ex:365
+#: lib/porsche/ssh/output.ex:398
 #, elixir-autogen, elixir-format
 msgid "Protocol version"
 msgstr "协议版本"
 
-#: lib/porsche/ssh/output.ex:400
+#: lib/porsche/ssh/output.ex:433
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: submitting"
 msgstr "请求 %{id}：正在提交"
 
-#: lib/porsche/ssh/output.ex:403
+#: lib/porsche/ssh/output.ex:436
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: waiting for completion"
 msgstr "请求 %{id}：等待完成"
 
-#: lib/porsche/ssh/output.ex:367
+#: lib/porsche/ssh/output.ex:400
 #, elixir-autogen, elixir-format
 msgid "Request ID"
 msgstr "请求ID"
 
-#: lib/porsche/ssh/output.ex:369
+#: lib/porsche/ssh/output.ex:402
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "结果"
 
-#: lib/porsche/ssh/output.ex:127
+#: lib/porsche/ssh/output.ex:139
 #, elixir-autogen, elixir-format
 msgid "Source cleanup is still pending. Wait for cleanup before retrying."
 msgstr "源端清理仍未完成。请等待清理完成后重试。"
 
-#: lib/porsche/ssh/output.ex:366
+#: lib/porsche/ssh/output.ex:399
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "状态"
 
-#: lib/porsche/ssh/output.ex:374
+#: lib/porsche/ssh/output.ex:407
 #, elixir-autogen, elixir-format
 msgid "Succeeded"
 msgstr "成功"
 
-#: lib/porsche/ssh/output.ex:376
+#: lib/porsche/ssh/output.ex:409
 #, elixir-autogen, elixir-format
 msgid "Superseded"
 msgstr "已被取代"
 
-#: lib/porsche/ssh/output.ex:289
+#: lib/porsche/ssh/output.ex:301
 #, elixir-autogen, elixir-format
 msgid "The SSH public key is invalid. Check the key and try again."
 msgstr "SSH公钥无效。请检查密钥后重试。"
 
-#: lib/porsche/ssh/output.ex:283
+#: lib/porsche/ssh/output.ex:295
 #, elixir-autogen, elixir-format
 msgid "The approval request limit has been reached. Close an unused connection and try again."
 msgstr "已达到审批请求上限。请关闭未使用的连接后重试。"
 
-#: lib/porsche/ssh/output.ex:211
+#: lib/porsche/ssh/output.ex:223
 #, elixir-autogen, elixir-format
 msgid "The available host does not meet the machine image's requirements."
 msgstr "可用主机不满足机器镜像的要求。"
 
-#: lib/porsche/ssh/output.ex:346
+#: lib/porsche/ssh/output.ex:379
 #, elixir-autogen, elixir-format
 msgid "The command could not be completed: %{reason}"
 msgstr "无法完成命令：%{reason}"
 
-#: lib/porsche/ssh/output.ex:184
+#: lib/porsche/ssh/output.ex:196
 #, elixir-autogen, elixir-format
 msgid "The connection to the control service was interrupted. Check the request status before submitting it again."
 msgstr "与控制服务的连接已中断。请先检查请求状态，再决定是否重新提交。"
 
-#: lib/porsche/ssh/output.ex:196
+#: lib/porsche/ssh/output.ex:208
 #, elixir-autogen, elixir-format
 msgid "The control service refused the request. Check the request status before submitting it again."
 msgstr "控制服务拒绝了请求。请先检查请求状态，再决定是否重新提交。"
 
-#: lib/porsche/ssh/output.ex:190
+#: lib/porsche/ssh/output.ex:202
 #, elixir-autogen, elixir-format
 msgid "The control service returned an invalid response. Check the request status before submitting it again."
 msgstr "控制服务返回了无效响应。请先检查请求状态，再决定是否重新提交。"
 
-#: lib/porsche/ssh/output.ex:223
+#: lib/porsche/ssh/output.ex:235
 #, elixir-autogen, elixir-format
 msgid "The machine's disk is not reserved for this operation."
 msgstr "尚未为此操作预留机器的磁盘。"
 
-#: lib/porsche/ssh/output.ex:262
+#: lib/porsche/ssh/output.ex:274
 #, elixir-autogen, elixir-format
 msgid "The machine's execution generation has changed. Inspect its current state before retrying."
 msgstr "机器的执行代次已更改。请检查其当前状态后重试。"
@@ -155,12 +155,12 @@ msgstr "机器的执行代次已更改。请检查其当前状态后重试。"
 msgid "The machine's host is unavailable. Please try again shortly."
 msgstr "机器所在的主机不可用。请稍后重试。"
 
-#: lib/porsche/ssh/output.ex:151
+#: lib/porsche/ssh/output.ex:163
 #, elixir-autogen, elixir-format
 msgid "The machine's placement has changed. Inspect its current state before retrying."
 msgstr "机器的位置已更改。请检查其当前状态后重试。"
 
-#: lib/porsche/ssh/output.ex:256
+#: lib/porsche/ssh/output.ex:268
 #, elixir-autogen, elixir-format
 msgid "The machine's stop has not been confirmed. Inspect its state before retrying."
 msgstr "尚未确认机器已停止。请检查其状态后重试。"
@@ -175,52 +175,52 @@ msgstr "机器的工作负载尚不足以稳定执行此操作。请检查其状
 msgid "The owner has this machine pinned; unpin it first: unpin MACHINE"
 msgstr "所有者已固定此机器；请先取消固定：unpin MACHINE"
 
-#: lib/porsche/ssh/output.ex:235
+#: lib/porsche/ssh/output.ex:247
 #, elixir-autogen, elixir-format
 msgid "The recipient does not have a registered account."
 msgstr "接收者没有已注册的账户。"
 
-#: lib/porsche/ssh/output.ex:244
+#: lib/porsche/ssh/output.ex:256
 #, elixir-autogen, elixir-format
 msgid "The repository source is invalid. Use a supported public repository URL."
 msgstr "仓库源无效。请使用受支持的公共仓库URL。"
 
-#: lib/porsche/ssh/output.ex:241
+#: lib/porsche/ssh/output.ex:253
 #, elixir-autogen, elixir-format
 msgid "The repository source is unavailable."
 msgstr "仓库源不可用。"
 
-#: lib/porsche/ssh/output.ex:163
+#: lib/porsche/ssh/output.ex:175
 #, elixir-autogen, elixir-format
 msgid "The request conflicts with the current state. Inspect the machine or request before retrying."
 msgstr "请求与当前状态冲突。请检查机器或请求后重试。"
 
-#: lib/porsche/ssh/output.ex:160
+#: lib/porsche/ssh/output.ex:172
 #, elixir-autogen, elixir-format
 msgid "The request is invalid. Check the command and its arguments."
 msgstr "请求无效。请检查命令及其参数。"
 
-#: lib/porsche/ssh/output.ex:169
+#: lib/porsche/ssh/output.ex:181
 #, elixir-autogen, elixir-format
 msgid "The request or response exceeds the permitted size."
 msgstr "请求或响应超出了允许的大小。"
 
-#: lib/porsche/ssh/output.ex:271
+#: lib/porsche/ssh/output.ex:283
 #, elixir-autogen, elixir-format
 msgid "The requested SSH key could not be found."
 msgstr "找不到所请求的SSH密钥。"
 
-#: lib/porsche/ssh/output.ex:268
+#: lib/porsche/ssh/output.ex:280
 #, elixir-autogen, elixir-format
 msgid "The requested command receipt could not be found."
 msgstr "找不到所请求的命令回执。"
 
-#: lib/porsche/ssh/output.ex:208
+#: lib/porsche/ssh/output.ex:220
 #, elixir-autogen, elixir-format
 msgid "The requested machine image is unavailable."
 msgstr "所请求的机器镜像不可用。"
 
-#: lib/porsche/ssh/output.ex:217
+#: lib/porsche/ssh/output.ex:229
 #, elixir-autogen, elixir-format
 msgid "The requested machine size is invalid. Check the CPU, memory and disk limits."
 msgstr "所请求的机器规格无效。请检查CPU、内存和磁盘限制。"
@@ -230,12 +230,12 @@ msgstr "所请求的机器规格无效。请检查CPU、内存和磁盘限制。
 msgid "The requested resource could not be found."
 msgstr "找不到请求的资源。"
 
-#: lib/porsche/ssh/output.ex:202
+#: lib/porsche/ssh/output.ex:214
 #, elixir-autogen, elixir-format
 msgid "The service configuration is invalid. Contact your operator."
 msgstr "服务配置无效。请联系运维人员。"
 
-#: lib/porsche/ssh/output.ex:178
+#: lib/porsche/ssh/output.ex:190
 #, elixir-autogen, elixir-format
 msgid "The service does not support this protocol version. Ask your operator to update the compatible services."
 msgstr "服务不支持此协议版本。请让运维人员更新相应的兼容服务。"
@@ -245,12 +245,12 @@ msgstr "服务不支持此协议版本。请让运维人员更新相应的兼容
 msgid "The service is temporarily unavailable. Please try again shortly."
 msgstr "服务暂时不可用。请稍后重试。"
 
-#: lib/porsche/ssh/output.ex:277
+#: lib/porsche/ssh/output.ex:289
 #, elixir-autogen, elixir-format
 msgid "The session limit has been reached. Close an unused connection and try again."
 msgstr "已达到会话上限。请关闭未使用的连接后重试。"
 
-#: lib/porsche/ssh/output.ex:118
+#: lib/porsche/ssh/output.ex:130
 #, elixir-autogen, elixir-format
 msgid "The source machine is unavailable for this operation."
 msgstr "源机器无法用于此操作。"
@@ -260,7 +260,7 @@ msgstr "源机器无法用于此操作。"
 msgid "There is not enough available capacity for this request."
 msgstr "没有足够的可用容量来处理此请求。"
 
-#: lib/porsche/ssh/output.ex:232
+#: lib/porsche/ssh/output.ex:244
 #, elixir-autogen, elixir-format
 msgid "This action cannot remove the owner's protected access."
 msgstr "此操作无法移除所有者受保护的访问权限。"
@@ -280,37 +280,37 @@ msgstr "无法在当前状态下重试此克隆请求。"
 msgid "This connection is not authorized. Please sign in and try again."
 msgstr "此连接未经授权。请登录后重试。"
 
-#: lib/porsche/ssh/output.ex:274
+#: lib/porsche/ssh/output.ex:286
 #, elixir-autogen, elixir-format
 msgid "This connection requires verified HTTPS. Contact your operator."
 msgstr "此连接要求经过验证的HTTPS。请联系运维人员。"
 
-#: lib/porsche/ssh/output.ex:205
+#: lib/porsche/ssh/output.ex:217
 #, elixir-autogen, elixir-format
 msgid "This machine has been deleted."
 msgstr "此机器已被删除。"
 
-#: lib/porsche/ssh/output.ex:226
+#: lib/porsche/ssh/output.ex:238
 #, elixir-autogen, elixir-format
 msgid "This machine has reached its execution generation limit. Contact your operator."
 msgstr "此机器已达到执行代次上限。请联系运维人员。"
 
-#: lib/porsche/ssh/output.ex:157
+#: lib/porsche/ssh/output.ex:169
 #, elixir-autogen, elixir-format
 msgid "This machine name is unavailable. Choose another name."
 msgstr "此机器名称不可用。请选择其他名称。"
 
-#: lib/porsche/ssh/output.ex:148
+#: lib/porsche/ssh/output.ex:160
 #, elixir-autogen, elixir-format
 msgid "This relocation cannot be retried in its current state."
 msgstr "无法在当前状态下重试此迁移。"
 
-#: lib/porsche/ssh/output.ex:145
+#: lib/porsche/ssh/output.ex:157
 #, elixir-autogen, elixir-format
 msgid "This relocation has already finished."
 msgstr "此迁移已完成。"
 
-#: lib/porsche/ssh/output.ex:139
+#: lib/porsche/ssh/output.ex:151
 #, elixir-autogen, elixir-format
 msgid "This relocation has committed its handoff and can no longer be cancelled."
 msgstr "此迁移的交接已确认，无法再取消。"
@@ -320,17 +320,17 @@ msgstr "此迁移的交接已确认，无法再取消。"
 msgid "This request ID was already used for a different command. Use the original command or a new request ID."
 msgstr "此请求ID已用于其他命令。请使用原始命令或新的请求ID。"
 
-#: lib/porsche/ssh/output.ex:253
+#: lib/porsche/ssh/output.ex:265
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be cancelled in its current state."
 msgstr "无法在当前状态下取消此规格调整请求。"
 
-#: lib/porsche/ssh/output.ex:250
+#: lib/porsche/ssh/output.ex:262
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be retried in its current state."
 msgstr "无法在当前状态下重试此规格调整请求。"
 
-#: lib/porsche/ssh/output.ex:172
+#: lib/porsche/ssh/output.ex:184
 #, elixir-autogen, elixir-format
 msgid "Too many sessions or approval requests are active. Close an unused connection and try again."
 msgstr "活动会话或审批请求过多。请关闭未使用的连接后重试。"
@@ -350,90 +350,102 @@ msgstr "固定项数量已达上限；请先取消一个固定项。"
 msgid "You do not have permission to perform this action."
 msgstr "您无权执行此操作。"
 
-#: lib/porsche/ssh/output.ex:316
+#: lib/porsche/ssh/output.ex:331
 #, elixir-autogen, elixir-format
 msgid "Answer the pending question before sending another prompt."
 msgstr "请先回答待回答的问题，再发送新的提示。"
 
-#: lib/porsche/ssh/output.ex:322
+#: lib/porsche/ssh/output.ex:340
 #, elixir-autogen, elixir-format
 msgid "Port 4444 is reserved for the editor."
 msgstr "端口 4444 保留给编辑器使用。"
 
-#: lib/porsche/ssh/output.ex:328
+#: lib/porsche/ssh/output.ex:346
 #, elixir-autogen, elixir-format
 msgid "Terminals are unavailable on this machine right now."
 msgstr "此机器上的终端当前不可用。"
 
-#: lib/porsche/ssh/output.ex:304
+#: lib/porsche/ssh/output.ex:316
 #, elixir-autogen, elixir-format
 msgid "That plan is no longer the latest proposal. Show the thread again."
 msgstr "该计划已不再是最新提案。请重新查看线程。"
 
-#: lib/porsche/ssh/output.ex:310
+#: lib/porsche/ssh/output.ex:325
 #, elixir-autogen, elixir-format
 msgid "That question has already been answered."
 msgstr "该问题已被回答。"
 
-#: lib/porsche/ssh/output.ex:307
+#: lib/porsche/ssh/output.ex:322
 #, elixir-autogen, elixir-format
 msgid "That question is no longer pending."
 msgstr "该问题已不再待回答。"
 
-#: lib/porsche/ssh/output.ex:334
+#: lib/porsche/ssh/output.ex:352
 #, elixir-autogen, elixir-format
 msgid "That terminal session no longer exists."
 msgstr "该终端会话已不存在。"
 
-#: lib/porsche/ssh/output.ex:313
+#: lib/porsche/ssh/output.ex:328
 #, elixir-autogen, elixir-format
 msgid "The answers do not match the pending question."
 msgstr "答案与待回答的问题不匹配。"
 
-#: lib/porsche/ssh/output.ex:331
+#: lib/porsche/ssh/output.ex:349
 #, elixir-autogen, elixir-format
 msgid "The machine is waking. Retry the terminal shortly."
 msgstr "机器正在唤醒。请稍后重试终端。"
 
-#: lib/porsche/ssh/output.ex:343
+#: lib/porsche/ssh/output.ex:373
 #, elixir-autogen, elixir-format
 msgid "The standard input is empty or exceeds this command's size limit."
 msgstr "标准输入为空或超出此命令的大小限制。"
 
-#: lib/porsche/ssh/output.ex:319
+#: lib/porsche/ssh/output.ex:334
 #, elixir-autogen, elixir-format
 msgid "The web settings changed since you read them. Show them again and retry."
 msgstr "Web 设置在您读取后已更改。请重新查看并重试。"
 
-#: lib/porsche/ssh/output.ex:337
+#: lib/porsche/ssh/output.ex:367
 #, elixir-autogen, elixir-format
 msgid "This command reads its input from standard input. Pipe it in and end the command with -."
 msgstr "此命令从标准输入读取输入。请通过管道传入，并以 - 结束命令。"
 
-#: lib/porsche/ssh/output.ex:325
+#: lib/porsche/ssh/output.ex:343
 #, elixir-autogen, elixir-format
 msgid "This machine's profile does not allow web publishing."
 msgstr "此机器的配置文件不允许 Web 发布。"
 
-#: lib/porsche/ssh/output.ex:301
+#: lib/porsche/ssh/output.ex:313
 #, elixir-autogen, elixir-format
 msgid "This thread is busy with a turn. Try again when it finishes."
 msgstr "此线程正在处理一轮对话。请在完成后重试。"
 
-#: lib/porsche/ssh/output.ex:298
+#: lib/porsche/ssh/output.ex:310
 #, elixir-autogen, elixir-format
 msgid "This thread is not ready for prompts yet."
 msgstr "此线程尚未准备好接收提示。"
 
-#: lib/porsche/ssh/output.ex:292
+#: lib/porsche/ssh/output.ex:304
 #, elixir-autogen, elixir-format
 msgid "terminal attach needs a terminal. Connect with ssh -t and run it as the command."
 msgstr "terminal attach 需要终端。请使用 ssh -t 连接并将其作为命令运行。"
 
+#: lib/porsche/ssh/output.ex:355
 #, elixir-autogen, elixir-format
 msgid "This deployment has push notifications turned off; ask its operator."
 msgstr "此部署已关闭推送通知；请咨询其管理员。"
 
+#: lib/porsche/ssh/output.ex:361
 #, elixir-autogen, elixir-format
 msgid "You already have the maximum number of devices; remove one first: device rm DEVICE_ID"
 msgstr "你的设备数量已达上限；请先移除一个：device rm DEVICE_ID"
+
+#: lib/porsche/ssh/output.ex:118
+#, elixir-autogen, elixir-format
+msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+msgstr "此机器的主机上不提供检查点。请停止机器，而不是暂停它。"
+
+#: lib/porsche/ssh/output.ex:124
+#, elixir-autogen, elixir-format
+msgid "The machine is busy with another operation. Try again after it finishes."
+msgstr "机器正忙于另一项操作。请在其完成后重试。"

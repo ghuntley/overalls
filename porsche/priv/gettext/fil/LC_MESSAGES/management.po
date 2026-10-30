@@ -14,27 +14,27 @@ msgstr "May kasalukuyang kahilingan sa pag-clone para sa makinang ito."
 msgid "A failed machine cannot be pinned; an existing pin can still be removed."
 msgstr "Hindi maaaring i-pin ang nabigong makina; maaari pa ring alisin ang kasalukuyang pin."
 
-#: lib/porsche/ssh/output.ex:136
+#: lib/porsche/ssh/output.ex:148
 #, elixir-autogen, elixir-format
 msgid "A relocation is already in progress for this machine."
 msgstr "May kasalukuyang paglilipat ng lokasyon para sa makinang ito."
 
-#: lib/porsche/ssh/output.ex:238
+#: lib/porsche/ssh/output.ex:250
 #, elixir-autogen, elixir-format
 msgid "A repository source is not allowed for this machine profile."
 msgstr "Hindi pinapayagan ang pinagmumulang repositoryo para sa profile ng makinang ito."
 
-#: lib/porsche/ssh/output.ex:133
+#: lib/porsche/ssh/output.ex:145
 #, elixir-autogen, elixir-format
 msgid "A resize request is already in progress for this machine."
 msgstr "May kasalukuyang kahilingan sa pagbabago ng laki para sa makinang ito."
 
-#: lib/porsche/ssh/output.ex:121
+#: lib/porsche/ssh/output.ex:133
 #, elixir-autogen, elixir-format
 msgid "A transfer is already using this host's transfer slot. Please try again after it finishes."
 msgstr "May paglilipat na gumagamit ng puwesto sa paglilipat ng host na ito. Subukan muli kapag natapos ito."
 
-#: lib/porsche/ssh/output.ex:373
+#: lib/porsche/ssh/output.ex:406
 #, elixir-autogen, elixir-format
 msgid "Accepted"
 msgstr "Tinanggap"
@@ -44,7 +44,7 @@ msgstr "Tinanggap"
 msgid "Approve this SSH key in your browser, then retry the command."
 msgstr "Aprubahan ang SSH key na ito sa iyong browser, pagkatapos subukang muli ang command."
 
-#: lib/porsche/ssh/output.ex:375
+#: lib/porsche/ssh/output.ex:408
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "Nabigo"
@@ -54,97 +54,97 @@ msgstr "Nabigo"
 msgid "Invalid command. Type help to see available commands."
 msgstr "Hindi wastong command. I-type ang help upang makita ang mga available na command."
 
-#: lib/porsche/ssh/output.ex:368
+#: lib/porsche/ssh/output.ex:401
 #, elixir-autogen, elixir-format
 msgid "Operation ID"
 msgstr "ID ng operasyon"
 
-#: lib/porsche/ssh/output.ex:365
+#: lib/porsche/ssh/output.ex:398
 #, elixir-autogen, elixir-format
 msgid "Protocol version"
 msgstr "Bersyon ng protocol"
 
-#: lib/porsche/ssh/output.ex:400
+#: lib/porsche/ssh/output.ex:433
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: submitting"
 msgstr "Kahilingang %{id}: isinusumite"
 
-#: lib/porsche/ssh/output.ex:403
+#: lib/porsche/ssh/output.ex:436
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: waiting for completion"
 msgstr "Kahilingang %{id}: hinihintay ang pagkumpleto"
 
-#: lib/porsche/ssh/output.ex:367
+#: lib/porsche/ssh/output.ex:400
 #, elixir-autogen, elixir-format
 msgid "Request ID"
 msgstr "ID ng kahilingan"
 
-#: lib/porsche/ssh/output.ex:369
+#: lib/porsche/ssh/output.ex:402
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "Resulta"
 
-#: lib/porsche/ssh/output.ex:127
+#: lib/porsche/ssh/output.ex:139
 #, elixir-autogen, elixir-format
 msgid "Source cleanup is still pending. Wait for cleanup before retrying."
 msgstr "Nakabinbin pa ang paglilinis sa pinagmulan. Hintaying matapos ang paglilinis bago subukan muli."
 
-#: lib/porsche/ssh/output.ex:366
+#: lib/porsche/ssh/output.ex:399
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Kalagayan"
 
-#: lib/porsche/ssh/output.ex:374
+#: lib/porsche/ssh/output.ex:407
 #, elixir-autogen, elixir-format
 msgid "Succeeded"
 msgstr "Nagtagumpay"
 
-#: lib/porsche/ssh/output.ex:376
+#: lib/porsche/ssh/output.ex:409
 #, elixir-autogen, elixir-format
 msgid "Superseded"
 msgstr "Napalitan"
 
-#: lib/porsche/ssh/output.ex:289
+#: lib/porsche/ssh/output.ex:301
 #, elixir-autogen, elixir-format
 msgid "The SSH public key is invalid. Check the key and try again."
 msgstr "Hindi wasto ang pampublikong SSH key. Suriin ang key at subukan muli."
 
-#: lib/porsche/ssh/output.ex:283
+#: lib/porsche/ssh/output.ex:295
 #, elixir-autogen, elixir-format
 msgid "The approval request limit has been reached. Close an unused connection and try again."
 msgstr "Naabot na ang limitasyon sa mga kahilingan sa pag-apruba. Isara ang hindi ginagamit na koneksyon at subukan muli."
 
-#: lib/porsche/ssh/output.ex:211
+#: lib/porsche/ssh/output.ex:223
 #, elixir-autogen, elixir-format
 msgid "The available host does not meet the machine image's requirements."
 msgstr "Hindi natutugunan ng magagamit na host ang mga kinakailangan ng image ng makina."
 
-#: lib/porsche/ssh/output.ex:346
+#: lib/porsche/ssh/output.ex:379
 #, elixir-autogen, elixir-format
 msgid "The command could not be completed: %{reason}"
 msgstr "Hindi makumpleto ang utos: %{reason}"
 
-#: lib/porsche/ssh/output.ex:184
+#: lib/porsche/ssh/output.ex:196
 #, elixir-autogen, elixir-format
 msgid "The connection to the control service was interrupted. Check the request status before submitting it again."
 msgstr "Naputol ang koneksyon sa serbisyong pangkontrol. Suriin ang kalagayan ng kahilingan bago ito isumite muli."
 
-#: lib/porsche/ssh/output.ex:196
+#: lib/porsche/ssh/output.ex:208
 #, elixir-autogen, elixir-format
 msgid "The control service refused the request. Check the request status before submitting it again."
 msgstr "Tinanggihan ng serbisyong pangkontrol ang kahilingan. Suriin ang kalagayan ng kahilingan bago ito isumite muli."
 
-#: lib/porsche/ssh/output.ex:190
+#: lib/porsche/ssh/output.ex:202
 #, elixir-autogen, elixir-format
 msgid "The control service returned an invalid response. Check the request status before submitting it again."
 msgstr "Nagbalik ang serbisyong pangkontrol ng hindi wastong tugon. Suriin ang kalagayan ng kahilingan bago ito isumite muli."
 
-#: lib/porsche/ssh/output.ex:223
+#: lib/porsche/ssh/output.ex:235
 #, elixir-autogen, elixir-format
 msgid "The machine's disk is not reserved for this operation."
 msgstr "Hindi nakalaan ang disk ng makina para sa operasyong ito."
 
-#: lib/porsche/ssh/output.ex:262
+#: lib/porsche/ssh/output.ex:274
 #, elixir-autogen, elixir-format
 msgid "The machine's execution generation has changed. Inspect its current state before retrying."
 msgstr "Nagbago ang henerasyon ng pagpapatakbo ng makina. Suriin ang kasalukuyang kalagayan nito bago subukan muli."
@@ -154,12 +154,12 @@ msgstr "Nagbago ang henerasyon ng pagpapatakbo ng makina. Suriin ang kasalukuyan
 msgid "The machine's host is unavailable. Please try again shortly."
 msgstr "Hindi magagamit ang host ng makina. Subukan muli pagkalipas ng ilang sandali."
 
-#: lib/porsche/ssh/output.ex:151
+#: lib/porsche/ssh/output.ex:163
 #, elixir-autogen, elixir-format
 msgid "The machine's placement has changed. Inspect its current state before retrying."
 msgstr "Nagbago ang paglalagyan ng makina. Suriin ang kasalukuyang kalagayan nito bago subukan muli."
 
-#: lib/porsche/ssh/output.ex:256
+#: lib/porsche/ssh/output.ex:268
 #, elixir-autogen, elixir-format
 msgid "The machine's stop has not been confirmed. Inspect its state before retrying."
 msgstr "Hindi pa nakukumpirma ang paghinto ng makina. Suriin ang kalagayan nito bago subukan muli."
@@ -174,52 +174,52 @@ msgstr "Hindi sapat ang katatagan ng workload ng makina para sa operasyong ito. 
 msgid "The owner has this machine pinned; unpin it first: unpin MACHINE"
 msgstr "Naka-pin ang makinang ito para sa may-ari; alisin muna ang pin: unpin MACHINE"
 
-#: lib/porsche/ssh/output.ex:235
+#: lib/porsche/ssh/output.ex:247
 #, elixir-autogen, elixir-format
 msgid "The recipient does not have a registered account."
 msgstr "Walang nakarehistrong account ang tatanggap."
 
-#: lib/porsche/ssh/output.ex:244
+#: lib/porsche/ssh/output.ex:256
 #, elixir-autogen, elixir-format
 msgid "The repository source is invalid. Use a supported public repository URL."
 msgstr "Hindi wasto ang pinagmumulang repositoryo. Gumamit ng sinusuportahang URL ng pampublikong repositoryo."
 
-#: lib/porsche/ssh/output.ex:241
+#: lib/porsche/ssh/output.ex:253
 #, elixir-autogen, elixir-format
 msgid "The repository source is unavailable."
 msgstr "Hindi magagamit ang pinagmumulang repositoryo."
 
-#: lib/porsche/ssh/output.ex:163
+#: lib/porsche/ssh/output.ex:175
 #, elixir-autogen, elixir-format
 msgid "The request conflicts with the current state. Inspect the machine or request before retrying."
 msgstr "Salungat ang kahilingan sa kasalukuyang kalagayan. Suriin ang makina o kahilingan bago subukan muli."
 
-#: lib/porsche/ssh/output.ex:160
+#: lib/porsche/ssh/output.ex:172
 #, elixir-autogen, elixir-format
 msgid "The request is invalid. Check the command and its arguments."
 msgstr "Hindi wasto ang kahilingan. Suriin ang command at ang mga argumento nito."
 
-#: lib/porsche/ssh/output.ex:169
+#: lib/porsche/ssh/output.ex:181
 #, elixir-autogen, elixir-format
 msgid "The request or response exceeds the permitted size."
 msgstr "Lumampas ang kahilingan o tugon sa pinapayagang laki."
 
-#: lib/porsche/ssh/output.ex:271
+#: lib/porsche/ssh/output.ex:283
 #, elixir-autogen, elixir-format
 msgid "The requested SSH key could not be found."
 msgstr "Hindi nahanap ang hiniling na SSH key."
 
-#: lib/porsche/ssh/output.ex:268
+#: lib/porsche/ssh/output.ex:280
 #, elixir-autogen, elixir-format
 msgid "The requested command receipt could not be found."
 msgstr "Hindi nahanap ang hiniling na tala ng command."
 
-#: lib/porsche/ssh/output.ex:208
+#: lib/porsche/ssh/output.ex:220
 #, elixir-autogen, elixir-format
 msgid "The requested machine image is unavailable."
 msgstr "Hindi magagamit ang hiniling na image ng makina."
 
-#: lib/porsche/ssh/output.ex:217
+#: lib/porsche/ssh/output.ex:229
 #, elixir-autogen, elixir-format
 msgid "The requested machine size is invalid. Check the CPU, memory and disk limits."
 msgstr "Hindi wasto ang hiniling na laki ng makina. Suriin ang mga limitasyon sa CPU, memory, at disk."
@@ -229,12 +229,12 @@ msgstr "Hindi wasto ang hiniling na laki ng makina. Suriin ang mga limitasyon sa
 msgid "The requested resource could not be found."
 msgstr "Hindi mahanap ang hiniling na resource."
 
-#: lib/porsche/ssh/output.ex:202
+#: lib/porsche/ssh/output.ex:214
 #, elixir-autogen, elixir-format
 msgid "The service configuration is invalid. Contact your operator."
 msgstr "Hindi wasto ang pagsasaayos ng serbisyo. Makipag-ugnayan sa iyong operator."
 
-#: lib/porsche/ssh/output.ex:178
+#: lib/porsche/ssh/output.ex:190
 #, elixir-autogen, elixir-format
 msgid "The service does not support this protocol version. Ask your operator to update the compatible services."
 msgstr "Hindi sinusuportahan ng serbisyo ang bersyong ito ng protocol. Hilingin sa iyong operator na i-update ang mga tugmang serbisyo."
@@ -244,12 +244,12 @@ msgstr "Hindi sinusuportahan ng serbisyo ang bersyong ito ng protocol. Hilingin 
 msgid "The service is temporarily unavailable. Please try again shortly."
 msgstr "Pansamantalang hindi magagamit ang serbisyo. Pakisubukang muli sa ilang sandali."
 
-#: lib/porsche/ssh/output.ex:277
+#: lib/porsche/ssh/output.ex:289
 #, elixir-autogen, elixir-format
 msgid "The session limit has been reached. Close an unused connection and try again."
 msgstr "Naabot na ang limitasyon sa mga session. Isara ang hindi ginagamit na koneksyon at subukan muli."
 
-#: lib/porsche/ssh/output.ex:118
+#: lib/porsche/ssh/output.ex:130
 #, elixir-autogen, elixir-format
 msgid "The source machine is unavailable for this operation."
 msgstr "Hindi magagamit ang pinagmulang makina para sa operasyong ito."
@@ -259,7 +259,7 @@ msgstr "Hindi magagamit ang pinagmulang makina para sa operasyong ito."
 msgid "There is not enough available capacity for this request."
 msgstr "Hindi sapat ang magagamit na kapasidad para sa kahilingang ito."
 
-#: lib/porsche/ssh/output.ex:232
+#: lib/porsche/ssh/output.ex:244
 #, elixir-autogen, elixir-format
 msgid "This action cannot remove the owner's protected access."
 msgstr "Hindi maaalis ng aksyong ito ang protektadong access ng may-ari."
@@ -279,37 +279,37 @@ msgstr "Hindi maaaring subukan muli ang kahilingan sa pag-clone na ito sa kasalu
 msgid "This connection is not authorized. Please sign in and try again."
 msgstr "Hindi awtorisado ang koneksiyong ito. Mangyaring mag-sign in at subukang muli."
 
-#: lib/porsche/ssh/output.ex:274
+#: lib/porsche/ssh/output.ex:286
 #, elixir-autogen, elixir-format
 msgid "This connection requires verified HTTPS. Contact your operator."
 msgstr "Nangangailangan ang koneksyong ito ng napatunayang HTTPS. Makipag-ugnayan sa iyong operator."
 
-#: lib/porsche/ssh/output.ex:205
+#: lib/porsche/ssh/output.ex:217
 #, elixir-autogen, elixir-format
 msgid "This machine has been deleted."
 msgstr "Nabura na ang makinang ito."
 
-#: lib/porsche/ssh/output.ex:226
+#: lib/porsche/ssh/output.ex:238
 #, elixir-autogen, elixir-format
 msgid "This machine has reached its execution generation limit. Contact your operator."
 msgstr "Naabot na ng makinang ito ang limitasyon sa henerasyon ng pagpapatakbo. Makipag-ugnayan sa iyong operator."
 
-#: lib/porsche/ssh/output.ex:157
+#: lib/porsche/ssh/output.ex:169
 #, elixir-autogen, elixir-format
 msgid "This machine name is unavailable. Choose another name."
 msgstr "Hindi magagamit ang pangalang ito ng makina. Pumili ng ibang pangalan."
 
-#: lib/porsche/ssh/output.ex:148
+#: lib/porsche/ssh/output.ex:160
 #, elixir-autogen, elixir-format
 msgid "This relocation cannot be retried in its current state."
 msgstr "Hindi maaaring subukan muli ang paglilipat ng lokasyong ito sa kasalukuyang kalagayan nito."
 
-#: lib/porsche/ssh/output.ex:145
+#: lib/porsche/ssh/output.ex:157
 #, elixir-autogen, elixir-format
 msgid "This relocation has already finished."
 msgstr "Natapos na ang paglilipat ng lokasyong ito."
 
-#: lib/porsche/ssh/output.ex:139
+#: lib/porsche/ssh/output.ex:151
 #, elixir-autogen, elixir-format
 msgid "This relocation has committed its handoff and can no longer be cancelled."
 msgstr "Naisapinal na ang paglilipat ng kontrol para sa paglilipat ng lokasyong ito at hindi na ito maaaring kanselahin."
@@ -319,17 +319,17 @@ msgstr "Naisapinal na ang paglilipat ng kontrol para sa paglilipat ng lokasyong 
 msgid "This request ID was already used for a different command. Use the original command or a new request ID."
 msgstr "Nagamit na ang ID ng kahilingang ito para sa ibang command. Gamitin ang orihinal na command o bagong ID ng kahilingan."
 
-#: lib/porsche/ssh/output.ex:253
+#: lib/porsche/ssh/output.ex:265
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be cancelled in its current state."
 msgstr "Hindi maaaring kanselahin ang kahilingan sa pagbabago ng laking ito sa kasalukuyang kalagayan nito."
 
-#: lib/porsche/ssh/output.ex:250
+#: lib/porsche/ssh/output.ex:262
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be retried in its current state."
 msgstr "Hindi maaaring subukan muli ang kahilingan sa pagbabago ng laking ito sa kasalukuyang kalagayan nito."
 
-#: lib/porsche/ssh/output.ex:172
+#: lib/porsche/ssh/output.ex:184
 #, elixir-autogen, elixir-format
 msgid "Too many sessions or approval requests are active. Close an unused connection and try again."
 msgstr "Masyadong maraming aktibong session o kahilingan sa pag-apruba. Isara ang hindi ginagamit na koneksyon at subukan muli."
@@ -349,90 +349,102 @@ msgstr "Hawak mo na ang pinakamataas na bilang ng mga pin; alisin muna ang isa."
 msgid "You do not have permission to perform this action."
 msgstr "Wala kang pahintulot na isagawa ang aksiyong ito."
 
-#: lib/porsche/ssh/output.ex:316
+#: lib/porsche/ssh/output.ex:331
 #, elixir-autogen, elixir-format
 msgid "Answer the pending question before sending another prompt."
 msgstr "Sagutin muna ang nakabinbing tanong bago magpadala ng isa pang prompt."
 
-#: lib/porsche/ssh/output.ex:322
+#: lib/porsche/ssh/output.ex:340
 #, elixir-autogen, elixir-format
 msgid "Port 4444 is reserved for the editor."
 msgstr "Nakalaan ang port 4444 para sa editor."
 
-#: lib/porsche/ssh/output.ex:328
+#: lib/porsche/ssh/output.ex:346
 #, elixir-autogen, elixir-format
 msgid "Terminals are unavailable on this machine right now."
 msgstr "Hindi available ang mga terminal sa machine na ito ngayon."
 
-#: lib/porsche/ssh/output.ex:304
+#: lib/porsche/ssh/output.ex:316
 #, elixir-autogen, elixir-format
 msgid "That plan is no longer the latest proposal. Show the thread again."
 msgstr "Hindi na pinakabagong mungkahi ang planong iyon. Ipakitang muli ang thread."
 
-#: lib/porsche/ssh/output.ex:310
+#: lib/porsche/ssh/output.ex:325
 #, elixir-autogen, elixir-format
 msgid "That question has already been answered."
 msgstr "Nasagot na ang tanong na iyon."
 
-#: lib/porsche/ssh/output.ex:307
+#: lib/porsche/ssh/output.ex:322
 #, elixir-autogen, elixir-format
 msgid "That question is no longer pending."
 msgstr "Hindi na nakabinbin ang tanong na iyon."
 
-#: lib/porsche/ssh/output.ex:334
+#: lib/porsche/ssh/output.ex:352
 #, elixir-autogen, elixir-format
 msgid "That terminal session no longer exists."
 msgstr "Wala na ang terminal session na iyon."
 
-#: lib/porsche/ssh/output.ex:313
+#: lib/porsche/ssh/output.ex:328
 #, elixir-autogen, elixir-format
 msgid "The answers do not match the pending question."
 msgstr "Hindi tugma ang mga sagot sa nakabinbing tanong."
 
-#: lib/porsche/ssh/output.ex:331
+#: lib/porsche/ssh/output.ex:349
 #, elixir-autogen, elixir-format
 msgid "The machine is waking. Retry the terminal shortly."
 msgstr "Ginigising ang machine. Subukang muli ang terminal maya-maya."
 
-#: lib/porsche/ssh/output.ex:343
+#: lib/porsche/ssh/output.ex:373
 #, elixir-autogen, elixir-format
 msgid "The standard input is empty or exceeds this command's size limit."
 msgstr "Walang laman ang standard input o lumampas ito sa limitasyon ng laki ng command na ito."
 
-#: lib/porsche/ssh/output.ex:319
+#: lib/porsche/ssh/output.ex:334
 #, elixir-autogen, elixir-format
 msgid "The web settings changed since you read them. Show them again and retry."
 msgstr "Nagbago ang mga web setting mula nang basahin mo ang mga ito. Ipakita muli at subukang muli."
 
-#: lib/porsche/ssh/output.ex:337
+#: lib/porsche/ssh/output.ex:367
 #, elixir-autogen, elixir-format
 msgid "This command reads its input from standard input. Pipe it in and end the command with -."
 msgstr "Binabasa ng command na ito ang input nito mula sa standard input. I-pipe ito at tapusin ang command gamit ang -."
 
-#: lib/porsche/ssh/output.ex:325
+#: lib/porsche/ssh/output.ex:343
 #, elixir-autogen, elixir-format
 msgid "This machine's profile does not allow web publishing."
 msgstr "Hindi pinapayagan ng profile ng machine na ito ang web publishing."
 
-#: lib/porsche/ssh/output.ex:301
+#: lib/porsche/ssh/output.ex:313
 #, elixir-autogen, elixir-format
 msgid "This thread is busy with a turn. Try again when it finishes."
 msgstr "Abala ang thread na ito sa isang turn. Subukang muli kapag natapos ito."
 
-#: lib/porsche/ssh/output.ex:298
+#: lib/porsche/ssh/output.ex:310
 #, elixir-autogen, elixir-format
 msgid "This thread is not ready for prompts yet."
 msgstr "Hindi pa handa ang thread na ito para sa mga prompt."
 
-#: lib/porsche/ssh/output.ex:292
+#: lib/porsche/ssh/output.ex:304
 #, elixir-autogen, elixir-format
 msgid "terminal attach needs a terminal. Connect with ssh -t and run it as the command."
 msgstr "Kailangan ng terminal attach ang isang terminal. Kumonekta gamit ang ssh -t at patakbuhin ito bilang command."
 
+#: lib/porsche/ssh/output.ex:355
 #, elixir-autogen, elixir-format
 msgid "This deployment has push notifications turned off; ask its operator."
 msgstr "Naka-off ang mga push notification sa deployment na ito; makipag-ugnayan sa operator nito."
 
+#: lib/porsche/ssh/output.ex:361
 #, elixir-autogen, elixir-format
 msgid "You already have the maximum number of devices; remove one first: device rm DEVICE_ID"
 msgstr "Naabot mo na ang pinakamataas na bilang ng device; mag-alis muna ng isa: device rm DEVICE_ID"
+
+#: lib/porsche/ssh/output.ex:118
+#, elixir-autogen, elixir-format
+msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+msgstr "Hindi available ang mga checkpoint para sa makinang ito sa host nito. Ihinto ang makina sa halip na i-pause ito."
+
+#: lib/porsche/ssh/output.ex:124
+#, elixir-autogen, elixir-format
+msgid "The machine is busy with another operation. Try again after it finishes."
+msgstr "Abala ang makina sa ibang operasyon. Subukan muli pagkatapos nito."

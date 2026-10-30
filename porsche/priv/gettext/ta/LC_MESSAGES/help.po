@@ -229,17 +229,17 @@ msgstr "இழையின் சமீபத்திய திட்டத்�
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "நிலையான உள்ளீட்டிலிருந்து கருத்தைப் படித்து, திருத்திய திட்டத்தைக் கோரு."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "இந்த SSH முனையத்தை பகிரப்பட்ட முனைய அமர்வுடன் இணைக்கிறது; ssh -t தேவை."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "இயந்திரத்தின் வலை போர்ட் அல்லது தெரிவுநிலையை மாற்று, விருப்பமாக எதிர்பார்க்கப்படும் திருத்தத்தில்."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "இயந்திரத்தில் உள்ள உங்கள் முனைய அமர்வுகளில் ஒன்றை மூடு."
@@ -249,7 +249,7 @@ msgstr "இயந்திரத்தில் உள்ள உங்கள் 
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "இழையையும், அதன் நிலுவையிலுள்ள கேள்வியையும், சமீபத்திய திட்டத்தையும் ஆய்வு செய்."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "நீங்கள் திறக்கக்கூடிய இயந்திரத்தின் முனைய அமர்வுகளைப் பட்டியலிடு."
@@ -264,27 +264,27 @@ msgstr "ஒரு வரிசை எண்ணுக்குப் பிறக
 msgid "List agent threads you can read, with unread counts."
 msgstr "நீங்கள் படிக்கக்கூடிய முகவர் இழைகளைப் படிக்காத எண்ணிக்கையுடன் பட்டியலிடு."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "உங்கள் புஷ் அறிவிப்புச் சாதனங்களைப் பட்டியலிடவும்."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "உரைப்பதிவு வரிசை எண் வரை இழையைப் படித்ததாகக் குறி."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "இயந்திரத்தில் உங்கள் தனிப்பட்ட முனைய அமர்வைத் திற."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "புஷ் அறிவிப்புகளுக்காக இந்தச் சாதனத்தைப் பதிவுசெய்யவும். புஷ் விசை stdin இலிருந்து படிக்கப்படும்."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "ஒரு புஷ் அறிவிப்புச் சாதனத்தைத் திரும்பப் பெறவும்."
@@ -294,22 +294,22 @@ msgstr "ஒரு புஷ் அறிவிப்புச் சாதனத
 msgid "Send a prompt read from standard input to a thread."
 msgstr "நிலையான உள்ளீட்டிலிருந்து படித்த தூண்டுதலை இழைக்கு அனுப்பு."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "இயந்திரத்தின் வலை முனைப்புள்ளி, போர்ட் மற்றும் தெரிவுநிலையைக் காட்டு."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "இயந்திரங்கள், இழைகள் மற்றும் இந்த அமர்வுக்கான JSON மாற்ற அறிவிப்புகளை ஓடையாக அனுப்பு."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "இழையை plan மற்றும் work கூட்டுப்பணிக்கு இடையே மாற்று."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "ஒரு சாதனத்திற்கான புஷ் அறிவிப்புகளை இயக்கவும் அல்லது முடக்கவும்."

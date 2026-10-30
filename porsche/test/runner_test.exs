@@ -80,6 +80,8 @@ defmodule Porsche.RunnerTest do
           :clone_not_retryable,
           :clone_in_progress,
           :workload_not_stable,
+          :checkpoint_unavailable,
+          :vm_busy,
           :source_unavailable,
           :transfer_busy,
           :resize_in_progress,

@@ -232,17 +232,17 @@ msgstr "批准线程的最新计划并开始实施。"
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "请求修订计划，从标准输入读取反馈。"
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "将此 SSH 终端连接到共享终端会话；需要 ssh -t。"
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "更改机器的 Web 端口或可见性，可选择在预期修订版本上进行。"
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "关闭您在机器上的某个终端会话。"
@@ -252,7 +252,7 @@ msgstr "关闭您在机器上的某个终端会话。"
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "查看线程、其待回答的问题和最新计划。"
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "列出您可以打开的机器终端会话。"
@@ -267,27 +267,27 @@ msgstr "列出线程在某个序列号之后的记录事件。"
 msgid "List agent threads you can read, with unread counts."
 msgstr "列出您可以读取的代理线程及其未读数量。"
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "列出你的推送通知设备。"
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "将线程标记为已读，直到某个记录序列号。"
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "在机器上打开您的个人终端会话。"
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "为推送通知注册此设备。推送密钥从 stdin 读取。"
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "撤销一个推送通知设备。"
@@ -297,22 +297,22 @@ msgstr "撤销一个推送通知设备。"
 msgid "Send a prompt read from standard input to a thread."
 msgstr "将从标准输入读取的提示发送到线程。"
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "显示机器的 Web 端点、端口和可见性。"
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "以流的形式输出机器、线程和此会话的 JSON 变更通知。"
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "在 plan 和 work 协作模式之间切换线程。"
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "为单个设备开启或关闭推送通知。"

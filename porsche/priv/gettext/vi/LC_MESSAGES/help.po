@@ -229,17 +229,17 @@ msgstr "Phê duyệt kế hoạch mới nhất của một luồng và bắt đ�
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Yêu cầu kế hoạch đã sửa đổi, đọc phản hồi từ đầu vào chuẩn."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Gắn terminal SSH này vào một phiên terminal dùng chung; cần ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Thay đổi cổng web hoặc chế độ hiển thị của máy, tùy chọn tại một bản sửa đổi dự kiến."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Đóng một trong các phiên terminal của bạn trên một máy."
@@ -249,7 +249,7 @@ msgstr "Đóng một trong các phiên terminal của bạn trên một máy."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Kiểm tra một luồng, câu hỏi đang chờ và kế hoạch mới nhất của luồng."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Liệt kê các phiên terminal của máy mà bạn có thể mở."
@@ -264,27 +264,27 @@ msgstr "Liệt kê các sự kiện bản ghi của một luồng sau một số
 msgid "List agent threads you can read, with unread counts."
 msgstr "Liệt kê các luồng tác tử bạn có thể đọc, kèm số mục chưa đọc."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Liệt kê các thiết bị nhận thông báo đẩy của bạn."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Đánh dấu một luồng là đã đọc đến một số thứ tự bản ghi."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Mở phiên terminal cá nhân của bạn trên một máy."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Đăng ký thiết bị này để nhận thông báo đẩy. Khóa đẩy được đọc từ stdin."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Thu hồi một thiết bị nhận thông báo đẩy."
@@ -294,22 +294,22 @@ msgstr "Thu hồi một thiết bị nhận thông báo đẩy."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Gửi một lời nhắc đọc từ đầu vào chuẩn đến một luồng."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Hiển thị điểm cuối web, cổng và chế độ hiển thị của máy."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Truyền liên tục thông báo thay đổi dạng JSON cho các máy, luồng và phiên này."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Chuyển một luồng giữa chế độ cộng tác plan và work."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Bật hoặc tắt thông báo đẩy cho một thiết bị."

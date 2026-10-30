@@ -15,27 +15,27 @@ msgstr "Für diese Maschine läuft bereits eine Klonanfrage."
 msgid "A failed machine cannot be pinned; an existing pin can still be removed."
 msgstr "Eine fehlgeschlagene Maschine kann nicht angeheftet werden; ein vorhandener Pin kann weiterhin entfernt werden."
 
-#: lib/porsche/ssh/output.ex:136
+#: lib/porsche/ssh/output.ex:148
 #, elixir-autogen, elixir-format
 msgid "A relocation is already in progress for this machine."
 msgstr "Für diese Maschine läuft bereits eine Verlagerung."
 
-#: lib/porsche/ssh/output.ex:238
+#: lib/porsche/ssh/output.ex:250
 #, elixir-autogen, elixir-format
 msgid "A repository source is not allowed for this machine profile."
 msgstr "Für dieses Maschinenprofil ist keine Repository-Quelle zulässig."
 
-#: lib/porsche/ssh/output.ex:133
+#: lib/porsche/ssh/output.ex:145
 #, elixir-autogen, elixir-format
 msgid "A resize request is already in progress for this machine."
 msgstr "Für diese Maschine läuft bereits eine Größenänderung."
 
-#: lib/porsche/ssh/output.ex:121
+#: lib/porsche/ssh/output.ex:133
 #, elixir-autogen, elixir-format
 msgid "A transfer is already using this host's transfer slot. Please try again after it finishes."
 msgstr "Ein Transfer belegt bereits den Transferplatz dieses Hosts. Versuchen Sie es nach dessen Abschluss erneut."
 
-#: lib/porsche/ssh/output.ex:373
+#: lib/porsche/ssh/output.ex:406
 #, elixir-autogen, elixir-format
 msgid "Accepted"
 msgstr "Angenommen"
@@ -47,7 +47,7 @@ msgstr ""
 "Bestätigen Sie diesen SSH-Schlüssel im Browser und versuchen Sie den Befehl "
 "erneut."
 
-#: lib/porsche/ssh/output.ex:375
+#: lib/porsche/ssh/output.ex:408
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "Fehlgeschlagen"
@@ -59,97 +59,97 @@ msgstr ""
 "Ungültiger Befehl. Geben Sie help ein, um die verfügbaren Befehle "
 "anzuzeigen."
 
-#: lib/porsche/ssh/output.ex:368
+#: lib/porsche/ssh/output.ex:401
 #, elixir-autogen, elixir-format
 msgid "Operation ID"
 msgstr "Vorgangs-ID"
 
-#: lib/porsche/ssh/output.ex:365
+#: lib/porsche/ssh/output.ex:398
 #, elixir-autogen, elixir-format
 msgid "Protocol version"
 msgstr "Protokollversion"
 
-#: lib/porsche/ssh/output.ex:400
+#: lib/porsche/ssh/output.ex:433
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: submitting"
 msgstr "Anfrage %{id}: wird übermittelt"
 
-#: lib/porsche/ssh/output.ex:403
+#: lib/porsche/ssh/output.ex:436
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: waiting for completion"
 msgstr "Anfrage %{id}: wartet auf Abschluss"
 
-#: lib/porsche/ssh/output.ex:367
+#: lib/porsche/ssh/output.ex:400
 #, elixir-autogen, elixir-format
 msgid "Request ID"
 msgstr "Anfrage-ID"
 
-#: lib/porsche/ssh/output.ex:369
+#: lib/porsche/ssh/output.ex:402
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "Ergebnis"
 
-#: lib/porsche/ssh/output.ex:127
+#: lib/porsche/ssh/output.ex:139
 #, elixir-autogen, elixir-format
 msgid "Source cleanup is still pending. Wait for cleanup before retrying."
 msgstr "Die Bereinigung der Quelle steht noch aus. Warten Sie vor einem erneuten Versuch auf die Bereinigung."
 
-#: lib/porsche/ssh/output.ex:366
+#: lib/porsche/ssh/output.ex:399
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Status"
 
-#: lib/porsche/ssh/output.ex:374
+#: lib/porsche/ssh/output.ex:407
 #, elixir-autogen, elixir-format
 msgid "Succeeded"
 msgstr "Erfolgreich"
 
-#: lib/porsche/ssh/output.ex:376
+#: lib/porsche/ssh/output.ex:409
 #, elixir-autogen, elixir-format
 msgid "Superseded"
 msgstr "Ersetzt"
 
-#: lib/porsche/ssh/output.ex:289
+#: lib/porsche/ssh/output.ex:301
 #, elixir-autogen, elixir-format
 msgid "The SSH public key is invalid. Check the key and try again."
 msgstr "Der öffentliche SSH-Schlüssel ist ungültig. Prüfen Sie den Schlüssel und versuchen Sie es erneut."
 
-#: lib/porsche/ssh/output.ex:283
+#: lib/porsche/ssh/output.ex:295
 #, elixir-autogen, elixir-format
 msgid "The approval request limit has been reached. Close an unused connection and try again."
 msgstr "Die Grenze für Genehmigungsanfragen wurde erreicht. Schließen Sie eine ungenutzte Verbindung und versuchen Sie es erneut."
 
-#: lib/porsche/ssh/output.ex:211
+#: lib/porsche/ssh/output.ex:223
 #, elixir-autogen, elixir-format
 msgid "The available host does not meet the machine image's requirements."
 msgstr "Der verfügbare Host erfüllt die Anforderungen des Maschinenabbilds nicht."
 
-#: lib/porsche/ssh/output.ex:346
+#: lib/porsche/ssh/output.ex:379
 #, elixir-autogen, elixir-format
 msgid "The command could not be completed: %{reason}"
 msgstr "Der Befehl konnte nicht abgeschlossen werden: %{reason}"
 
-#: lib/porsche/ssh/output.ex:184
+#: lib/porsche/ssh/output.ex:196
 #, elixir-autogen, elixir-format
 msgid "The connection to the control service was interrupted. Check the request status before submitting it again."
 msgstr "Die Verbindung zum Steuerungsdienst wurde unterbrochen. Prüfen Sie den Anfragestatus, bevor Sie die Anfrage erneut senden."
 
-#: lib/porsche/ssh/output.ex:196
+#: lib/porsche/ssh/output.ex:208
 #, elixir-autogen, elixir-format
 msgid "The control service refused the request. Check the request status before submitting it again."
 msgstr "Der Steuerungsdienst hat die Anfrage abgelehnt. Prüfen Sie den Anfragestatus, bevor Sie die Anfrage erneut senden."
 
-#: lib/porsche/ssh/output.ex:190
+#: lib/porsche/ssh/output.ex:202
 #, elixir-autogen, elixir-format
 msgid "The control service returned an invalid response. Check the request status before submitting it again."
 msgstr "Der Steuerungsdienst hat eine ungültige Antwort zurückgegeben. Prüfen Sie den Anfragestatus, bevor Sie die Anfrage erneut senden."
 
-#: lib/porsche/ssh/output.ex:223
+#: lib/porsche/ssh/output.ex:235
 #, elixir-autogen, elixir-format
 msgid "The machine's disk is not reserved for this operation."
 msgstr "Der Datenträger der Maschine ist nicht für diesen Vorgang reserviert."
 
-#: lib/porsche/ssh/output.ex:262
+#: lib/porsche/ssh/output.ex:274
 #, elixir-autogen, elixir-format
 msgid "The machine's execution generation has changed. Inspect its current state before retrying."
 msgstr "Die Ausführungsgeneration der Maschine hat sich geändert. Prüfen Sie vor einem erneuten Versuch ihren aktuellen Zustand."
@@ -159,12 +159,12 @@ msgstr "Die Ausführungsgeneration der Maschine hat sich geändert. Prüfen Sie 
 msgid "The machine's host is unavailable. Please try again shortly."
 msgstr "Der Host der Maschine ist nicht verfügbar. Versuchen Sie es in Kürze erneut."
 
-#: lib/porsche/ssh/output.ex:151
+#: lib/porsche/ssh/output.ex:163
 #, elixir-autogen, elixir-format
 msgid "The machine's placement has changed. Inspect its current state before retrying."
 msgstr "Die Platzierung der Maschine hat sich geändert. Prüfen Sie vor einem erneuten Versuch ihren aktuellen Zustand."
 
-#: lib/porsche/ssh/output.ex:256
+#: lib/porsche/ssh/output.ex:268
 #, elixir-autogen, elixir-format
 msgid "The machine's stop has not been confirmed. Inspect its state before retrying."
 msgstr "Der Stopp der Maschine wurde nicht bestätigt. Prüfen Sie vor einem erneuten Versuch ihren Zustand."
@@ -179,52 +179,52 @@ msgstr "Die Arbeitslast der Maschine ist für diesen Vorgang nicht stabil genug.
 msgid "The owner has this machine pinned; unpin it first: unpin MACHINE"
 msgstr "Der Eigentümer hat diese Maschine angeheftet; lösen Sie sie zuerst: unpin MACHINE"
 
-#: lib/porsche/ssh/output.ex:235
+#: lib/porsche/ssh/output.ex:247
 #, elixir-autogen, elixir-format
 msgid "The recipient does not have a registered account."
 msgstr "Der Empfänger hat kein registriertes Konto."
 
-#: lib/porsche/ssh/output.ex:244
+#: lib/porsche/ssh/output.ex:256
 #, elixir-autogen, elixir-format
 msgid "The repository source is invalid. Use a supported public repository URL."
 msgstr "Die Repository-Quelle ist ungültig. Verwenden Sie eine unterstützte öffentliche Repository-URL."
 
-#: lib/porsche/ssh/output.ex:241
+#: lib/porsche/ssh/output.ex:253
 #, elixir-autogen, elixir-format
 msgid "The repository source is unavailable."
 msgstr "Die Repository-Quelle ist nicht verfügbar."
 
-#: lib/porsche/ssh/output.ex:163
+#: lib/porsche/ssh/output.ex:175
 #, elixir-autogen, elixir-format
 msgid "The request conflicts with the current state. Inspect the machine or request before retrying."
 msgstr "Die Anfrage widerspricht dem aktuellen Zustand. Prüfen Sie vor einem erneuten Versuch die Maschine oder Anfrage."
 
-#: lib/porsche/ssh/output.ex:160
+#: lib/porsche/ssh/output.ex:172
 #, elixir-autogen, elixir-format
 msgid "The request is invalid. Check the command and its arguments."
 msgstr "Die Anfrage ist ungültig. Prüfen Sie den Befehl und seine Argumente."
 
-#: lib/porsche/ssh/output.ex:169
+#: lib/porsche/ssh/output.ex:181
 #, elixir-autogen, elixir-format
 msgid "The request or response exceeds the permitted size."
 msgstr "Die Anfrage oder Antwort überschreitet die zulässige Größe."
 
-#: lib/porsche/ssh/output.ex:271
+#: lib/porsche/ssh/output.ex:283
 #, elixir-autogen, elixir-format
 msgid "The requested SSH key could not be found."
 msgstr "Der angeforderte SSH-Schlüssel wurde nicht gefunden."
 
-#: lib/porsche/ssh/output.ex:268
+#: lib/porsche/ssh/output.ex:280
 #, elixir-autogen, elixir-format
 msgid "The requested command receipt could not be found."
 msgstr "Der angeforderte Befehlsbeleg wurde nicht gefunden."
 
-#: lib/porsche/ssh/output.ex:208
+#: lib/porsche/ssh/output.ex:220
 #, elixir-autogen, elixir-format
 msgid "The requested machine image is unavailable."
 msgstr "Das angeforderte Maschinenabbild ist nicht verfügbar."
 
-#: lib/porsche/ssh/output.ex:217
+#: lib/porsche/ssh/output.ex:229
 #, elixir-autogen, elixir-format
 msgid "The requested machine size is invalid. Check the CPU, memory and disk limits."
 msgstr "Die angeforderte Maschinengröße ist ungültig. Prüfen Sie die Grenzen für CPU, Arbeitsspeicher und Datenträger."
@@ -234,12 +234,12 @@ msgstr "Die angeforderte Maschinengröße ist ungültig. Prüfen Sie die Grenzen
 msgid "The requested resource could not be found."
 msgstr "Die angeforderte Ressource wurde nicht gefunden."
 
-#: lib/porsche/ssh/output.ex:202
+#: lib/porsche/ssh/output.ex:214
 #, elixir-autogen, elixir-format
 msgid "The service configuration is invalid. Contact your operator."
 msgstr "Die Dienstkonfiguration ist ungültig. Wenden Sie sich an Ihren Betreiber."
 
-#: lib/porsche/ssh/output.ex:178
+#: lib/porsche/ssh/output.ex:190
 #, elixir-autogen, elixir-format
 msgid "The service does not support this protocol version. Ask your operator to update the compatible services."
 msgstr "Der Dienst unterstützt diese Protokollversion nicht. Bitten Sie Ihren Betreiber, die kompatiblen Dienste zu aktualisieren."
@@ -249,12 +249,12 @@ msgstr "Der Dienst unterstützt diese Protokollversion nicht. Bitten Sie Ihren B
 msgid "The service is temporarily unavailable. Please try again shortly."
 msgstr "Der Dienst ist vorübergehend nicht verfügbar. Bitte versuche es in Kürze erneut."
 
-#: lib/porsche/ssh/output.ex:277
+#: lib/porsche/ssh/output.ex:289
 #, elixir-autogen, elixir-format
 msgid "The session limit has been reached. Close an unused connection and try again."
 msgstr "Die Sitzungsgrenze wurde erreicht. Schließen Sie eine ungenutzte Verbindung und versuchen Sie es erneut."
 
-#: lib/porsche/ssh/output.ex:118
+#: lib/porsche/ssh/output.ex:130
 #, elixir-autogen, elixir-format
 msgid "The source machine is unavailable for this operation."
 msgstr "Die Quellmaschine ist für diesen Vorgang nicht verfügbar."
@@ -264,7 +264,7 @@ msgstr "Die Quellmaschine ist für diesen Vorgang nicht verfügbar."
 msgid "There is not enough available capacity for this request."
 msgstr "Für diese Anfrage ist nicht genügend Kapazität verfügbar."
 
-#: lib/porsche/ssh/output.ex:232
+#: lib/porsche/ssh/output.ex:244
 #, elixir-autogen, elixir-format
 msgid "This action cannot remove the owner's protected access."
 msgstr "Diese Aktion kann den geschützten Zugriff des Eigentümers nicht entfernen."
@@ -284,37 +284,37 @@ msgstr "Diese Klonanfrage kann in ihrem aktuellen Zustand nicht erneut versucht 
 msgid "This connection is not authorized. Please sign in and try again."
 msgstr "Diese Verbindung ist nicht autorisiert. Bitte melde dich an und versuche es erneut."
 
-#: lib/porsche/ssh/output.ex:274
+#: lib/porsche/ssh/output.ex:286
 #, elixir-autogen, elixir-format
 msgid "This connection requires verified HTTPS. Contact your operator."
 msgstr "Diese Verbindung erfordert verifiziertes HTTPS. Wenden Sie sich an Ihren Betreiber."
 
-#: lib/porsche/ssh/output.ex:205
+#: lib/porsche/ssh/output.ex:217
 #, elixir-autogen, elixir-format
 msgid "This machine has been deleted."
 msgstr "Diese Maschine wurde gelöscht."
 
-#: lib/porsche/ssh/output.ex:226
+#: lib/porsche/ssh/output.ex:238
 #, elixir-autogen, elixir-format
 msgid "This machine has reached its execution generation limit. Contact your operator."
 msgstr "Diese Maschine hat die Grenze ihrer Ausführungsgeneration erreicht. Wenden Sie sich an Ihren Betreiber."
 
-#: lib/porsche/ssh/output.ex:157
+#: lib/porsche/ssh/output.ex:169
 #, elixir-autogen, elixir-format
 msgid "This machine name is unavailable. Choose another name."
 msgstr "Dieser Maschinenname ist nicht verfügbar. Wählen Sie einen anderen Namen."
 
-#: lib/porsche/ssh/output.ex:148
+#: lib/porsche/ssh/output.ex:160
 #, elixir-autogen, elixir-format
 msgid "This relocation cannot be retried in its current state."
 msgstr "Diese Verlagerung kann in ihrem aktuellen Zustand nicht erneut versucht werden."
 
-#: lib/porsche/ssh/output.ex:145
+#: lib/porsche/ssh/output.ex:157
 #, elixir-autogen, elixir-format
 msgid "This relocation has already finished."
 msgstr "Diese Verlagerung ist bereits abgeschlossen."
 
-#: lib/porsche/ssh/output.ex:139
+#: lib/porsche/ssh/output.ex:151
 #, elixir-autogen, elixir-format
 msgid "This relocation has committed its handoff and can no longer be cancelled."
 msgstr "Diese Verlagerung hat die Übergabe festgeschrieben und kann nicht mehr abgebrochen werden."
@@ -324,17 +324,17 @@ msgstr "Diese Verlagerung hat die Übergabe festgeschrieben und kann nicht mehr 
 msgid "This request ID was already used for a different command. Use the original command or a new request ID."
 msgstr "Diese Anfrage-ID wurde bereits für einen anderen Befehl verwendet. Verwenden Sie den ursprünglichen Befehl oder eine neue Anfrage-ID."
 
-#: lib/porsche/ssh/output.ex:253
+#: lib/porsche/ssh/output.ex:265
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be cancelled in its current state."
 msgstr "Diese Größenänderung kann in ihrem aktuellen Zustand nicht abgebrochen werden."
 
-#: lib/porsche/ssh/output.ex:250
+#: lib/porsche/ssh/output.ex:262
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be retried in its current state."
 msgstr "Diese Größenänderung kann in ihrem aktuellen Zustand nicht erneut versucht werden."
 
-#: lib/porsche/ssh/output.ex:172
+#: lib/porsche/ssh/output.ex:184
 #, elixir-autogen, elixir-format
 msgid "Too many sessions or approval requests are active. Close an unused connection and try again."
 msgstr "Zu viele Sitzungen oder Genehmigungsanfragen sind aktiv. Schließen Sie eine ungenutzte Verbindung und versuchen Sie es erneut."
@@ -354,90 +354,102 @@ msgstr "Sie haben bereits die maximale Anzahl an Pins; lösen Sie zuerst einen."
 msgid "You do not have permission to perform this action."
 msgstr "Du hast keine Berechtigung, diese Aktion auszuführen."
 
-#: lib/porsche/ssh/output.ex:316
+#: lib/porsche/ssh/output.ex:331
 #, elixir-autogen, elixir-format
 msgid "Answer the pending question before sending another prompt."
 msgstr "Beantworte die offene Frage, bevor du einen weiteren Prompt sendest."
 
-#: lib/porsche/ssh/output.ex:322
+#: lib/porsche/ssh/output.ex:340
 #, elixir-autogen, elixir-format
 msgid "Port 4444 is reserved for the editor."
 msgstr "Port 4444 ist für den Editor reserviert."
 
-#: lib/porsche/ssh/output.ex:328
+#: lib/porsche/ssh/output.ex:346
 #, elixir-autogen, elixir-format
 msgid "Terminals are unavailable on this machine right now."
 msgstr "Terminals sind auf dieser Maschine derzeit nicht verfügbar."
 
-#: lib/porsche/ssh/output.ex:304
+#: lib/porsche/ssh/output.ex:316
 #, elixir-autogen, elixir-format
 msgid "That plan is no longer the latest proposal. Show the thread again."
 msgstr "Dieser Plan ist nicht mehr der neueste Vorschlag. Zeige den Thread erneut an."
 
-#: lib/porsche/ssh/output.ex:310
+#: lib/porsche/ssh/output.ex:325
 #, elixir-autogen, elixir-format
 msgid "That question has already been answered."
 msgstr "Diese Frage wurde bereits beantwortet."
 
-#: lib/porsche/ssh/output.ex:307
+#: lib/porsche/ssh/output.ex:322
 #, elixir-autogen, elixir-format
 msgid "That question is no longer pending."
 msgstr "Diese Frage ist nicht mehr offen."
 
-#: lib/porsche/ssh/output.ex:334
+#: lib/porsche/ssh/output.ex:352
 #, elixir-autogen, elixir-format
 msgid "That terminal session no longer exists."
 msgstr "Diese Terminalsitzung existiert nicht mehr."
 
-#: lib/porsche/ssh/output.ex:313
+#: lib/porsche/ssh/output.ex:328
 #, elixir-autogen, elixir-format
 msgid "The answers do not match the pending question."
 msgstr "Die Antworten passen nicht zur offenen Frage."
 
-#: lib/porsche/ssh/output.ex:331
+#: lib/porsche/ssh/output.ex:349
 #, elixir-autogen, elixir-format
 msgid "The machine is waking. Retry the terminal shortly."
 msgstr "Die Maschine wird aufgeweckt. Versuche das Terminal in Kürze erneut."
 
-#: lib/porsche/ssh/output.ex:343
+#: lib/porsche/ssh/output.ex:373
 #, elixir-autogen, elixir-format
 msgid "The standard input is empty or exceeds this command's size limit."
 msgstr "Die Standardeingabe ist leer oder überschreitet die Größenbegrenzung dieses Befehls."
 
-#: lib/porsche/ssh/output.ex:319
+#: lib/porsche/ssh/output.ex:334
 #, elixir-autogen, elixir-format
 msgid "The web settings changed since you read them. Show them again and retry."
 msgstr "Die Web-Einstellungen haben sich geändert, seit du sie gelesen hast. Zeige sie erneut an und versuche es noch einmal."
 
-#: lib/porsche/ssh/output.ex:337
+#: lib/porsche/ssh/output.ex:367
 #, elixir-autogen, elixir-format
 msgid "This command reads its input from standard input. Pipe it in and end the command with -."
 msgstr "Dieser Befehl liest seine Eingabe von der Standardeingabe. Leite sie per Pipe weiter und beende den Befehl mit -."
 
-#: lib/porsche/ssh/output.ex:325
+#: lib/porsche/ssh/output.ex:343
 #, elixir-autogen, elixir-format
 msgid "This machine's profile does not allow web publishing."
 msgstr "Das Profil dieser Maschine erlaubt keine Web-Veröffentlichung."
 
-#: lib/porsche/ssh/output.ex:301
+#: lib/porsche/ssh/output.ex:313
 #, elixir-autogen, elixir-format
 msgid "This thread is busy with a turn. Try again when it finishes."
 msgstr "Dieser Thread ist mit einem Durchgang beschäftigt. Versuche es erneut, wenn er abgeschlossen ist."
 
-#: lib/porsche/ssh/output.ex:298
+#: lib/porsche/ssh/output.ex:310
 #, elixir-autogen, elixir-format
 msgid "This thread is not ready for prompts yet."
 msgstr "Dieser Thread ist noch nicht bereit für Prompts."
 
-#: lib/porsche/ssh/output.ex:292
+#: lib/porsche/ssh/output.ex:304
 #, elixir-autogen, elixir-format
 msgid "terminal attach needs a terminal. Connect with ssh -t and run it as the command."
 msgstr "terminal attach benötigt ein Terminal. Verbinde dich mit ssh -t und führe es als Befehl aus."
 
+#: lib/porsche/ssh/output.ex:355
 #, elixir-autogen, elixir-format
 msgid "This deployment has push notifications turned off; ask its operator."
 msgstr "Push-Benachrichtigungen sind in dieser Bereitstellung deaktiviert; wenden Sie sich an den Betreiber."
 
+#: lib/porsche/ssh/output.ex:361
 #, elixir-autogen, elixir-format
 msgid "You already have the maximum number of devices; remove one first: device rm DEVICE_ID"
 msgstr "Sie haben die maximale Anzahl an Geräten erreicht; entfernen Sie zuerst eines: device rm DEVICE_ID"
+
+#: lib/porsche/ssh/output.ex:118
+#, elixir-autogen, elixir-format
+msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+msgstr "Für diese Maschine sind auf ihrem Host keine Checkpoints verfügbar. Stoppen Sie die Maschine, statt sie anzuhalten."
+
+#: lib/porsche/ssh/output.ex:124
+#, elixir-autogen, elixir-format
+msgid "The machine is busy with another operation. Try again after it finishes."
+msgstr "Die Maschine ist mit einem anderen Vorgang beschäftigt. Versuchen Sie es erneut, wenn er abgeschlossen ist."

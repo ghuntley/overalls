@@ -230,17 +230,17 @@ msgstr "Idhinisha mpango wa hivi punde wa mazungumzo na uanze kuutekeleza."
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Omba mpango uliorekebishwa, ukisoma maoni kutoka kwa ingizo la kawaida."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Unganisha terminali hii ya SSH na kipindi cha terminali kinachoshirikiwa; inahitaji ssh -t."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Badilisha mlango wa wavuti au mwonekano wa mashine, kwa hiari katika toleo linalotarajiwa."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Funga mojawapo ya vipindi vyako vya terminali kwenye mashine."
@@ -250,7 +250,7 @@ msgstr "Funga mojawapo ya vipindi vyako vya terminali kwenye mashine."
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Kagua mazungumzo, swali lake linalosubiri na mpango wa hivi punde."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Orodhesha vipindi vya terminali vya mashine unavyoweza kufungua."
@@ -265,27 +265,27 @@ msgstr "Orodhesha matukio ya nakala ya mazungumzo baada ya nambari ya mfuatano."
 msgid "List agent threads you can read, with unread counts."
 msgstr "Orodhesha mazungumzo ya mawakala unayoweza kusoma, pamoja na idadi ambayo haijasomwa."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Orodhesha vifaa vyako vya arifa za kushinikiza."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Weka alama kuwa mazungumzo yamesomwa hadi nambari ya mfuatano wa nakala."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Fungua kipindi chako binafsi cha terminali kwenye mashine."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Sajili kifaa hiki kwa arifa za kushinikiza. Ufunguo wa arifa husomwa kutoka stdin."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Batilisha kifaa cha arifa za kushinikiza."
@@ -295,22 +295,22 @@ msgstr "Batilisha kifaa cha arifa za kushinikiza."
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Tuma agizo lililosomwa kutoka kwa ingizo la kawaida kwenye mazungumzo."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Onyesha sehemu ya kufikia wavuti, mlango na mwonekano wa mashine."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Tiririsha taarifa za mabadiliko za JSON kwa mashine, mazungumzo na kipindi hiki."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Badili mazungumzo kati ya ushirikiano wa plan na work."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Washa au zima arifa za kushinikiza kwa kifaa kimoja."

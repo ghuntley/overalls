@@ -114,6 +114,8 @@ defmodule Marshall.SSH.ControlRequests do
              :machine_failed,
              :pin_limit,
              :workload_not_stable,
+             :checkpoint_unavailable,
+             :vm_busy,
              :source_unavailable,
              :transfer_busy,
              :source_cleanup_pending,

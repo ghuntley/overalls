@@ -229,17 +229,17 @@ msgstr "থ্রেডের সর্বশেষ পরিকল্পনা 
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "সংশোধিত পরিকল্পনা চান, স্ট্যান্ডার্ড ইনপুট থেকে মতামত পড়ে।"
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "এই SSH টার্মিনালকে একটি শেয়ার করা টার্মিনাল সেশনে যুক্ত করে; ssh -t প্রয়োজন।"
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "মেশিনের ওয়েব পোর্ট বা দৃশ্যমানতা পরিবর্তন করুন, ঐচ্ছিকভাবে প্রত্যাশিত সংশোধনে।"
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "মেশিনে আপনার টার্মিনাল সেশনগুলোর একটি বন্ধ করুন।"
@@ -249,7 +249,7 @@ msgstr "মেশিনে আপনার টার্মিনাল সেশ
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "থ্রেড, তার অপেক্ষমাণ প্রশ্ন এবং সর্বশেষ পরিকল্পনা পরীক্ষা করুন।"
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "মেশিনের যে টার্মিনাল সেশনগুলো আপনি খুলতে পারেন তার তালিকা দেখান।"
@@ -264,27 +264,27 @@ msgstr "একটি ক্রম সংখ্যার পরে থ্রে�
 msgid "List agent threads you can read, with unread counts."
 msgstr "আপনি পড়তে পারেন এমন এজেন্ট থ্রেডগুলোর তালিকা দেখান, অপঠিত সংখ্যাসহ।"
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "আপনার পুশ বিজ্ঞপ্তি ডিভাইসগুলি তালিকাভুক্ত করুন।"
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "একটি ট্রান্সক্রিপ্ট ক্রম সংখ্যা পর্যন্ত থ্রেডকে পঠিত হিসেবে চিহ্নিত করুন।"
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "মেশিনে আপনার ব্যক্তিগত টার্মিনাল সেশন খুলুন।"
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "পুশ বিজ্ঞপ্তির জন্য এই ডিভাইসটি নিবন্ধন করুন। পুশ কী stdin থেকে পড়া হয়।"
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "একটি পুশ বিজ্ঞপ্তি ডিভাইস প্রত্যাহার করুন।"
@@ -294,22 +294,22 @@ msgstr "একটি পুশ বিজ্ঞপ্তি ডিভাইস �
 msgid "Send a prompt read from standard input to a thread."
 msgstr "স্ট্যান্ডার্ড ইনপুট থেকে পড়া প্রম্পট থ্রেডে পাঠান।"
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "মেশিনের ওয়েব এন্ডপয়েন্ট, পোর্ট এবং দৃশ্যমানতা দেখান।"
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "মেশিন, থ্রেড এবং এই সেশনের JSON পরিবর্তন বিজ্ঞপ্তি স্ট্রিম করুন।"
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "থ্রেডকে plan এবং work সহযোগিতার মধ্যে পরিবর্তন করুন।"
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "একটি ডিভাইসের জন্য পুশ বিজ্ঞপ্তি চালু বা বন্ধ করুন।"

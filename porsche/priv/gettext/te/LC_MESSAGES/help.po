@@ -239,17 +239,17 @@ msgstr "థ్రెడ్ తాజా ప్రణాళికను ఆమో
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "సవరించిన ప్రణాళికను అడగండి, అభిప్రాయాన్ని ప్రామాణిక ఇన్‌పుట్ నుండి చదువుతూ."
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "ఈ SSH టెర్మినల్‌ను భాగస్వామ్య టెర్మినల్ సెషన్‌కు జోడిస్తుంది; ssh -t అవసరం."
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "యంత్రం వెబ్ పోర్ట్ లేదా దృశ్యమానతను మార్చండి, ఐచ్ఛికంగా ఆశించిన సవరణ వద్ద."
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "యంత్రంపై మీ టెర్మినల్ సెషన్‌లలో ఒకదాన్ని మూసివేయండి."
@@ -259,7 +259,7 @@ msgstr "యంత్రంపై మీ టెర్మినల్ సెషన
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "థ్రెడ్‌ను, దాని పెండింగ్ ప్రశ్నను మరియు తాజా ప్రణాళికను పరిశీలించండి."
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "మీరు తెరవగల యంత్రం టెర్మినల్ సెషన్‌లను జాబితా చేయండి."
@@ -274,27 +274,27 @@ msgstr "ఒక క్రమ సంఖ్య తర్వాత థ్రెడ�
 msgid "List agent threads you can read, with unread counts."
 msgstr "మీరు చదవగల ఏజెంట్ థ్రెడ్‌లను చదవని సంఖ్యలతో జాబితా చేయండి."
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "మీ పుష్ నోటిఫికేషన్ పరికరాలను జాబితా చేయండి."
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "ట్రాన్స్‌క్రిప్ట్ క్రమ సంఖ్య వరకు థ్రెడ్‌ను చదివినట్లు గుర్తించండి."
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "యంత్రంపై మీ వ్యక్తిగత టెర్మినల్ సెషన్‌ను తెరవండి."
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "పుష్ నోటిఫికేషన్ల కోసం ఈ పరికరాన్ని నమోదు చేయండి. పుష్ కీ stdin నుండి చదవబడుతుంది."
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "ఒక పుష్ నోటిఫికేషన్ పరికరాన్ని రద్దు చేయండి."
@@ -304,22 +304,22 @@ msgstr "ఒక పుష్ నోటిఫికేషన్ పరికరా
 msgid "Send a prompt read from standard input to a thread."
 msgstr "ప్రామాణిక ఇన్‌పుట్ నుండి చదివిన ప్రాంప్ట్‌ను థ్రెడ్‌కు పంపండి."
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "యంత్రం వెబ్ ఎండ్‌పాయింట్, పోర్ట్ మరియు దృశ్యమానతను చూపండి."
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "యంత్రాలు, థ్రెడ్‌లు మరియు ఈ సెషన్ కోసం JSON మార్పు నోటీసులను స్ట్రీమ్ చేయండి."
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "థ్రెడ్‌ను plan మరియు work సహకారం మధ్య మార్చండి."
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "ఒక పరికరం కోసం పుష్ నోటిఫికేషన్లను ఆన్ లేదా ఆఫ్ చేయండి."

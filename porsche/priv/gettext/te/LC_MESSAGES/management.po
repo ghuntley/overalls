@@ -15,29 +15,29 @@ msgstr "ఈ మెషీన్‌కు క్లోన్ అభ్యర్థ
 msgid "A failed machine cannot be pinned; an existing pin can still be removed."
 msgstr "విఫలమైన మెషీన్‌ను పిన్ చేయలేరు; ఇప్పటికే ఉన్న పిన్‌ను తీసివేయవచ్చు."
 
-#: lib/porsche/ssh/output.ex:136
+#: lib/porsche/ssh/output.ex:148
 #, elixir-autogen, elixir-format
 msgid "A relocation is already in progress for this machine."
 msgstr "ఈ మెషీన్ స్థాన మార్పు ఇప్పటికే జరుగుతోంది."
 
-#: lib/porsche/ssh/output.ex:238
+#: lib/porsche/ssh/output.ex:250
 #, elixir-autogen, elixir-format
 msgid "A repository source is not allowed for this machine profile."
 msgstr "ఈ మెషీన్ ప్రొఫైల్‌లో రిపాజిటరీ మూలానికి అనుమతి లేదు."
 
-#: lib/porsche/ssh/output.ex:133
+#: lib/porsche/ssh/output.ex:145
 #, elixir-autogen, elixir-format
 msgid "A resize request is already in progress for this machine."
 msgstr "ఈ మెషీన్ పరిమాణ మార్పు అభ్యర్థన ఇప్పటికే జరుగుతోంది."
 
-#: lib/porsche/ssh/output.ex:121
+#: lib/porsche/ssh/output.ex:133
 #, elixir-autogen, elixir-format
 msgid "A transfer is already using this host's transfer slot. Please try again after it finishes."
 msgstr ""
 "ఈ హోస్ట్ బదిలీ స్లాట్‌ను మరో బదిలీ ఉపయోగిస్తోంది. అది పూర్తయిన తర్వాత మళ్లీ "
 "ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:373
+#: lib/porsche/ssh/output.ex:406
 #, elixir-autogen, elixir-format
 msgid "Accepted"
 msgstr "ఆమోదించబడింది"
@@ -47,7 +47,7 @@ msgstr "ఆమోదించబడింది"
 msgid "Approve this SSH key in your browser, then retry the command."
 msgstr "బ్రౌజర్‌లో ఈ SSH కీని ఆమోదించి, తర్వాత ఆదేశాన్ని మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:375
+#: lib/porsche/ssh/output.ex:408
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "విఫలమైంది"
@@ -57,107 +57,107 @@ msgstr "విఫలమైంది"
 msgid "Invalid command. Type help to see available commands."
 msgstr "చెల్లని ఆదేశం. అందుబాటులో ఉన్న ఆదేశాల కోసం help టైప్ చేయండి."
 
-#: lib/porsche/ssh/output.ex:368
+#: lib/porsche/ssh/output.ex:401
 #, elixir-autogen, elixir-format
 msgid "Operation ID"
 msgstr "చర్య ID"
 
-#: lib/porsche/ssh/output.ex:365
+#: lib/porsche/ssh/output.ex:398
 #, elixir-autogen, elixir-format
 msgid "Protocol version"
 msgstr "ప్రోటోకాల్ సంస్కరణ"
 
-#: lib/porsche/ssh/output.ex:400
+#: lib/porsche/ssh/output.ex:433
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: submitting"
 msgstr "అభ్యర్థన %{id}: సమర్పిస్తోంది"
 
-#: lib/porsche/ssh/output.ex:403
+#: lib/porsche/ssh/output.ex:436
 #, elixir-autogen, elixir-format
 msgid "Request %{id}: waiting for completion"
 msgstr "అభ్యర్థన %{id}: పూర్తయ్యే వరకు వేచి ఉంది"
 
-#: lib/porsche/ssh/output.ex:367
+#: lib/porsche/ssh/output.ex:400
 #, elixir-autogen, elixir-format
 msgid "Request ID"
 msgstr "అభ్యర్థన ID"
 
-#: lib/porsche/ssh/output.ex:369
+#: lib/porsche/ssh/output.ex:402
 #, elixir-autogen, elixir-format
 msgid "Result"
 msgstr "ఫలితం"
 
-#: lib/porsche/ssh/output.ex:127
+#: lib/porsche/ssh/output.ex:139
 #, elixir-autogen, elixir-format
 msgid "Source cleanup is still pending. Wait for cleanup before retrying."
 msgstr ""
 "మూలాన్ని శుభ్రపరచడం ఇంకా పెండింగ్‌లో ఉంది. మళ్లీ ప్రయత్నించే ముందు అది "
 "పూర్తయ్యే వరకు వేచి ఉండండి."
 
-#: lib/porsche/ssh/output.ex:366
+#: lib/porsche/ssh/output.ex:399
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "స్థితి"
 
-#: lib/porsche/ssh/output.ex:374
+#: lib/porsche/ssh/output.ex:407
 #, elixir-autogen, elixir-format
 msgid "Succeeded"
 msgstr "విజయవంతమైంది"
 
-#: lib/porsche/ssh/output.ex:376
+#: lib/porsche/ssh/output.ex:409
 #, elixir-autogen, elixir-format
 msgid "Superseded"
 msgstr "భర్తీ చేయబడింది"
 
-#: lib/porsche/ssh/output.ex:289
+#: lib/porsche/ssh/output.ex:301
 #, elixir-autogen, elixir-format
 msgid "The SSH public key is invalid. Check the key and try again."
 msgstr "SSH పబ్లిక్ కీ చెల్లదు. కీని తనిఖీ చేసి మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:283
+#: lib/porsche/ssh/output.ex:295
 #, elixir-autogen, elixir-format
 msgid "The approval request limit has been reached. Close an unused connection and try again."
 msgstr ""
 "ఆమోద అభ్యర్థనల పరిమితి చేరుకుంది. ఉపయోగించని కనెక్షన్‌ను మూసి మళ్లీ "
 "ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:211
+#: lib/porsche/ssh/output.ex:223
 #, elixir-autogen, elixir-format
 msgid "The available host does not meet the machine image's requirements."
 msgstr "అందుబాటులో ఉన్న హోస్ట్ మెషీన్ ఇమేజ్ అవసరాలను తీర్చదు."
 
-#: lib/porsche/ssh/output.ex:346
+#: lib/porsche/ssh/output.ex:379
 #, elixir-autogen, elixir-format
 msgid "The command could not be completed: %{reason}"
 msgstr "కమాండ్‌ను పూర్తి చేయలేకపోయాము: %{reason}"
 
-#: lib/porsche/ssh/output.ex:184
+#: lib/porsche/ssh/output.ex:196
 #, elixir-autogen, elixir-format
 msgid "The connection to the control service was interrupted. Check the request status before submitting it again."
 msgstr ""
 "నియంత్రణ సేవతో కనెక్షన్‌కు అంతరాయం కలిగింది. మళ్లీ పంపే ముందు అభ్యర్థన "
 "స్థితిని తనిఖీ చేయండి."
 
-#: lib/porsche/ssh/output.ex:196
+#: lib/porsche/ssh/output.ex:208
 #, elixir-autogen, elixir-format
 msgid "The control service refused the request. Check the request status before submitting it again."
 msgstr ""
 "నియంత్రణ సేవ అభ్యర్థనను తిరస్కరించింది. మళ్లీ పంపే ముందు అభ్యర్థన స్థితిని "
 "తనిఖీ చేయండి."
 
-#: lib/porsche/ssh/output.ex:190
+#: lib/porsche/ssh/output.ex:202
 #, elixir-autogen, elixir-format
 msgid "The control service returned an invalid response. Check the request status before submitting it again."
 msgstr ""
 "నియంత్రణ సేవ చెల్లని ప్రతిస్పందన ఇచ్చింది. మళ్లీ పంపే ముందు అభ్యర్థన "
 "స్థితిని తనిఖీ చేయండి."
 
-#: lib/porsche/ssh/output.ex:223
+#: lib/porsche/ssh/output.ex:235
 #, elixir-autogen, elixir-format
 msgid "The machine's disk is not reserved for this operation."
 msgstr "ఈ చర్య కోసం మెషీన్ డిస్క్ రిజర్వ్ చేయబడలేదు."
 
-#: lib/porsche/ssh/output.ex:262
+#: lib/porsche/ssh/output.ex:274
 #, elixir-autogen, elixir-format
 msgid "The machine's execution generation has changed. Inspect its current state before retrying."
 msgstr ""
@@ -169,14 +169,14 @@ msgstr ""
 msgid "The machine's host is unavailable. Please try again shortly."
 msgstr "మెషీన్ హోస్ట్ అందుబాటులో లేదు. కొంతసేపటి తర్వాత మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:151
+#: lib/porsche/ssh/output.ex:163
 #, elixir-autogen, elixir-format
 msgid "The machine's placement has changed. Inspect its current state before retrying."
 msgstr ""
 "మెషీన్ అమరిక స్థానం మారింది. మళ్లీ ప్రయత్నించే ముందు ప్రస్తుత స్థితిని తనిఖీ"
 " చేయండి."
 
-#: lib/porsche/ssh/output.ex:256
+#: lib/porsche/ssh/output.ex:268
 #, elixir-autogen, elixir-format
 msgid "The machine's stop has not been confirmed. Inspect its state before retrying."
 msgstr ""
@@ -196,55 +196,55 @@ msgid "The owner has this machine pinned; unpin it first: unpin MACHINE"
 msgstr ""
 "యజమాని ఈ మెషీన్‌ను పిన్ చేశారు; ముందుగా పిన్ తీసివేయండి: unpin MACHINE"
 
-#: lib/porsche/ssh/output.ex:235
+#: lib/porsche/ssh/output.ex:247
 #, elixir-autogen, elixir-format
 msgid "The recipient does not have a registered account."
 msgstr "గ్రహీతకు నమోదైన ఖాతా లేదు."
 
-#: lib/porsche/ssh/output.ex:244
+#: lib/porsche/ssh/output.ex:256
 #, elixir-autogen, elixir-format
 msgid "The repository source is invalid. Use a supported public repository URL."
 msgstr ""
 "రిపాజిటరీ మూలం చెల్లదు. మద్దతు ఉన్న పబ్లిక్ రిపాజిటరీ URL ఉపయోగించండి."
 
-#: lib/porsche/ssh/output.ex:241
+#: lib/porsche/ssh/output.ex:253
 #, elixir-autogen, elixir-format
 msgid "The repository source is unavailable."
 msgstr "రిపాజిటరీ మూలం అందుబాటులో లేదు."
 
-#: lib/porsche/ssh/output.ex:163
+#: lib/porsche/ssh/output.ex:175
 #, elixir-autogen, elixir-format
 msgid "The request conflicts with the current state. Inspect the machine or request before retrying."
 msgstr ""
 "అభ్యర్థన ప్రస్తుత స్థితితో విరుద్ధంగా ఉంది. మళ్లీ ప్రయత్నించే ముందు మెషీన్ "
 "లేదా అభ్యర్థనను తనిఖీ చేయండి."
 
-#: lib/porsche/ssh/output.ex:160
+#: lib/porsche/ssh/output.ex:172
 #, elixir-autogen, elixir-format
 msgid "The request is invalid. Check the command and its arguments."
 msgstr "అభ్యర్థన చెల్లదు. కమాండ్ మరియు దాని ఆర్గ్యుమెంట్‌లను తనిఖీ చేయండి."
 
-#: lib/porsche/ssh/output.ex:169
+#: lib/porsche/ssh/output.ex:181
 #, elixir-autogen, elixir-format
 msgid "The request or response exceeds the permitted size."
 msgstr "అభ్యర్థన లేదా ప్రతిస్పందన అనుమతించిన పరిమాణాన్ని మించింది."
 
-#: lib/porsche/ssh/output.ex:271
+#: lib/porsche/ssh/output.ex:283
 #, elixir-autogen, elixir-format
 msgid "The requested SSH key could not be found."
 msgstr "అభ్యర్థించిన SSH కీ కనుగొనబడలేదు."
 
-#: lib/porsche/ssh/output.ex:268
+#: lib/porsche/ssh/output.ex:280
 #, elixir-autogen, elixir-format
 msgid "The requested command receipt could not be found."
 msgstr "అభ్యర్థించిన కమాండ్ రసీదు కనుగొనబడలేదు."
 
-#: lib/porsche/ssh/output.ex:208
+#: lib/porsche/ssh/output.ex:220
 #, elixir-autogen, elixir-format
 msgid "The requested machine image is unavailable."
 msgstr "అభ్యర్థించిన మెషీన్ ఇమేజ్ అందుబాటులో లేదు."
 
-#: lib/porsche/ssh/output.ex:217
+#: lib/porsche/ssh/output.ex:229
 #, elixir-autogen, elixir-format
 msgid "The requested machine size is invalid. Check the CPU, memory and disk limits."
 msgstr ""
@@ -256,12 +256,12 @@ msgstr ""
 msgid "The requested resource could not be found."
 msgstr "అభ్యర్థించిన వనరు కనుగొనబడలేదు."
 
-#: lib/porsche/ssh/output.ex:202
+#: lib/porsche/ssh/output.ex:214
 #, elixir-autogen, elixir-format
 msgid "The service configuration is invalid. Contact your operator."
 msgstr "సేవ కాన్ఫిగరేషన్ చెల్లదు. మీ ఆపరేటర్‌ను సంప్రదించండి."
 
-#: lib/porsche/ssh/output.ex:178
+#: lib/porsche/ssh/output.ex:190
 #, elixir-autogen, elixir-format
 msgid "The service does not support this protocol version. Ask your operator to update the compatible services."
 msgstr ""
@@ -275,13 +275,13 @@ msgstr ""
 "సేవ తాత్కాలికంగా అందుబాటులో లేదు. దయచేసి కొద్దిసేపటి తర్వాత మళ్లీ "
 "ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:277
+#: lib/porsche/ssh/output.ex:289
 #, elixir-autogen, elixir-format
 msgid "The session limit has been reached. Close an unused connection and try again."
 msgstr ""
 "సెషన్ పరిమితి చేరుకుంది. ఉపయోగించని కనెక్షన్‌ను మూసి మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:118
+#: lib/porsche/ssh/output.ex:130
 #, elixir-autogen, elixir-format
 msgid "The source machine is unavailable for this operation."
 msgstr "ఈ చర్యకు మూల మెషీన్ అందుబాటులో లేదు."
@@ -291,7 +291,7 @@ msgstr "ఈ చర్యకు మూల మెషీన్ అందుబా�
 msgid "There is not enough available capacity for this request."
 msgstr "ఈ అభ్యర్థనకు తగిన అందుబాటు సామర్థ్యం లేదు."
 
-#: lib/porsche/ssh/output.ex:232
+#: lib/porsche/ssh/output.ex:244
 #, elixir-autogen, elixir-format
 msgid "This action cannot remove the owner's protected access."
 msgstr "ఈ చర్య యజమాని రక్షిత ప్రవేశాన్ని తొలగించలేదు."
@@ -313,38 +313,38 @@ msgstr "ప్రస్తుత స్థితిలో ఈ క్లోన్
 msgid "This connection is not authorized. Please sign in and try again."
 msgstr "ఈ కనెక్షన్‌కు అధికారం లేదు. దయచేసి సైన్ ఇన్ చేసి మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:274
+#: lib/porsche/ssh/output.ex:286
 #, elixir-autogen, elixir-format
 msgid "This connection requires verified HTTPS. Contact your operator."
 msgstr "ఈ కనెక్షన్‌కు ధృవీకరించిన HTTPS అవసరం. మీ ఆపరేటర్‌ను సంప్రదించండి."
 
-#: lib/porsche/ssh/output.ex:205
+#: lib/porsche/ssh/output.ex:217
 #, elixir-autogen, elixir-format
 msgid "This machine has been deleted."
 msgstr "ఈ మెషీన్ తొలగించబడింది."
 
-#: lib/porsche/ssh/output.ex:226
+#: lib/porsche/ssh/output.ex:238
 #, elixir-autogen, elixir-format
 msgid "This machine has reached its execution generation limit. Contact your operator."
 msgstr ""
 "ఈ మెషీన్ అమలు జనరేషన్ పరిమితిని చేరుకుంది. మీ ఆపరేటర్‌ను సంప్రదించండి."
 
-#: lib/porsche/ssh/output.ex:157
+#: lib/porsche/ssh/output.ex:169
 #, elixir-autogen, elixir-format
 msgid "This machine name is unavailable. Choose another name."
 msgstr "ఈ మెషీన్ పేరు అందుబాటులో లేదు. మరో పేరు ఎంచుకోండి."
 
-#: lib/porsche/ssh/output.ex:148
+#: lib/porsche/ssh/output.ex:160
 #, elixir-autogen, elixir-format
 msgid "This relocation cannot be retried in its current state."
 msgstr "ప్రస్తుత స్థితిలో ఈ స్థాన మార్పును మళ్లీ ప్రయత్నించలేరు."
 
-#: lib/porsche/ssh/output.ex:145
+#: lib/porsche/ssh/output.ex:157
 #, elixir-autogen, elixir-format
 msgid "This relocation has already finished."
 msgstr "ఈ స్థాన మార్పు ఇప్పటికే పూర్తయింది."
 
-#: lib/porsche/ssh/output.ex:139
+#: lib/porsche/ssh/output.ex:151
 #, elixir-autogen, elixir-format
 msgid "This relocation has committed its handoff and can no longer be cancelled."
 msgstr "ఈ స్థాన మార్పు అప్పగింత ఖరారైంది; ఇక రద్దు చేయలేరు."
@@ -356,17 +356,17 @@ msgstr ""
 "ఈ అభ్యర్థన ID వేరే కమాండ్‌కు ఉపయోగించబడింది. అసలు కమాండ్ లేదా కొత్త అభ్యర్థన"
 " ID ఉపయోగించండి."
 
-#: lib/porsche/ssh/output.ex:253
+#: lib/porsche/ssh/output.ex:265
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be cancelled in its current state."
 msgstr "ప్రస్తుత స్థితిలో ఈ పరిమాణ మార్పు అభ్యర్థనను రద్దు చేయలేరు."
 
-#: lib/porsche/ssh/output.ex:250
+#: lib/porsche/ssh/output.ex:262
 #, elixir-autogen, elixir-format
 msgid "This resize request cannot be retried in its current state."
 msgstr "ప్రస్తుత స్థితిలో ఈ పరిమాణ మార్పు అభ్యర్థనను మళ్లీ ప్రయత్నించలేరు."
 
-#: lib/porsche/ssh/output.ex:172
+#: lib/porsche/ssh/output.ex:184
 #, elixir-autogen, elixir-format
 msgid "Too many sessions or approval requests are active. Close an unused connection and try again."
 msgstr ""
@@ -388,90 +388,102 @@ msgstr "మీ పిన్‌ల గరిష్ఠ పరిమితి చ�
 msgid "You do not have permission to perform this action."
 msgstr "ఈ చర్యను చేయడానికి మీకు అనుమతి లేదు."
 
-#: lib/porsche/ssh/output.ex:316
+#: lib/porsche/ssh/output.ex:331
 #, elixir-autogen, elixir-format
 msgid "Answer the pending question before sending another prompt."
 msgstr "మరో ప్రాంప్ట్ పంపే ముందు పెండింగ్ ప్రశ్నకు సమాధానం ఇవ్వండి."
 
-#: lib/porsche/ssh/output.ex:322
+#: lib/porsche/ssh/output.ex:340
 #, elixir-autogen, elixir-format
 msgid "Port 4444 is reserved for the editor."
 msgstr "పోర్ట్ 4444 ఎడిటర్ కోసం రిజర్వ్ చేయబడింది."
 
-#: lib/porsche/ssh/output.ex:328
+#: lib/porsche/ssh/output.ex:346
 #, elixir-autogen, elixir-format
 msgid "Terminals are unavailable on this machine right now."
 msgstr "ఈ యంత్రంలో ప్రస్తుతం టెర్మినల్‌లు అందుబాటులో లేవు."
 
-#: lib/porsche/ssh/output.ex:304
+#: lib/porsche/ssh/output.ex:316
 #, elixir-autogen, elixir-format
 msgid "That plan is no longer the latest proposal. Show the thread again."
 msgstr "ఆ ప్రణాళిక ఇకపై తాజా ప్రతిపాదన కాదు. థ్రెడ్‌ను మళ్లీ చూపండి."
 
-#: lib/porsche/ssh/output.ex:310
+#: lib/porsche/ssh/output.ex:325
 #, elixir-autogen, elixir-format
 msgid "That question has already been answered."
 msgstr "ఆ ప్రశ్నకు ఇప్పటికే సమాధానం ఇవ్వబడింది."
 
-#: lib/porsche/ssh/output.ex:307
+#: lib/porsche/ssh/output.ex:322
 #, elixir-autogen, elixir-format
 msgid "That question is no longer pending."
 msgstr "ఆ ప్రశ్న ఇకపై పెండింగ్‌లో లేదు."
 
-#: lib/porsche/ssh/output.ex:334
+#: lib/porsche/ssh/output.ex:352
 #, elixir-autogen, elixir-format
 msgid "That terminal session no longer exists."
 msgstr "ఆ టెర్మినల్ సెషన్ ఇకపై ఉనికిలో లేదు."
 
-#: lib/porsche/ssh/output.ex:313
+#: lib/porsche/ssh/output.ex:328
 #, elixir-autogen, elixir-format
 msgid "The answers do not match the pending question."
 msgstr "సమాధానాలు పెండింగ్ ప్రశ్నతో సరిపోలడం లేదు."
 
-#: lib/porsche/ssh/output.ex:331
+#: lib/porsche/ssh/output.ex:349
 #, elixir-autogen, elixir-format
 msgid "The machine is waking. Retry the terminal shortly."
 msgstr "యంత్రం మేల్కొంటోంది. కొద్దిసేపట్లో టెర్మినల్‌ను మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:343
+#: lib/porsche/ssh/output.ex:373
 #, elixir-autogen, elixir-format
 msgid "The standard input is empty or exceeds this command's size limit."
 msgstr "ప్రామాణిక ఇన్‌పుట్ ఖాళీగా ఉంది లేదా ఈ ఆదేశం పరిమాణ పరిమితిని మించింది."
 
-#: lib/porsche/ssh/output.ex:319
+#: lib/porsche/ssh/output.ex:334
 #, elixir-autogen, elixir-format
 msgid "The web settings changed since you read them. Show them again and retry."
 msgstr "మీరు చదివిన తర్వాత వెబ్ సెట్టింగ్‌లు మారాయి. వాటిని మళ్లీ చూపించి మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:337
+#: lib/porsche/ssh/output.ex:367
 #, elixir-autogen, elixir-format
 msgid "This command reads its input from standard input. Pipe it in and end the command with -."
 msgstr "ఈ ఆదేశం తన ఇన్‌పుట్‌ను ప్రామాణిక ఇన్‌పుట్ నుండి చదువుతుంది. దాన్ని పైప్ చేసి ఆదేశాన్ని - తో ముగించండి."
 
-#: lib/porsche/ssh/output.ex:325
+#: lib/porsche/ssh/output.ex:343
 #, elixir-autogen, elixir-format
 msgid "This machine's profile does not allow web publishing."
 msgstr "ఈ యంత్రం ప్రొఫైల్ వెబ్ ప్రచురణను అనుమతించదు."
 
-#: lib/porsche/ssh/output.ex:301
+#: lib/porsche/ssh/output.ex:313
 #, elixir-autogen, elixir-format
 msgid "This thread is busy with a turn. Try again when it finishes."
 msgstr "ఈ థ్రెడ్ ఒక టర్న్‌తో బిజీగా ఉంది. అది పూర్తయిన తర్వాత మళ్లీ ప్రయత్నించండి."
 
-#: lib/porsche/ssh/output.ex:298
+#: lib/porsche/ssh/output.ex:310
 #, elixir-autogen, elixir-format
 msgid "This thread is not ready for prompts yet."
 msgstr "ఈ థ్రెడ్ ఇంకా ప్రాంప్ట్‌లకు సిద్ధంగా లేదు."
 
-#: lib/porsche/ssh/output.ex:292
+#: lib/porsche/ssh/output.ex:304
 #, elixir-autogen, elixir-format
 msgid "terminal attach needs a terminal. Connect with ssh -t and run it as the command."
 msgstr "terminal attach కు టెర్మినల్ అవసరం. ssh -t తో కనెక్ట్ అయి దాన్ని కమాండ్‌గా అమలు చేయండి."
 
+#: lib/porsche/ssh/output.ex:355
 #, elixir-autogen, elixir-format
 msgid "This deployment has push notifications turned off; ask its operator."
 msgstr "ఈ అమలులో పుష్ నోటిఫికేషన్‌లు నిలిపివేయబడ్డాయి; నిర్వాహకుడిని సంప్రదించండి."
 
+#: lib/porsche/ssh/output.ex:361
 #, elixir-autogen, elixir-format
 msgid "You already have the maximum number of devices; remove one first: device rm DEVICE_ID"
 msgstr "మీ పరికరాల సంఖ్య గరిష్ఠ పరిమితికి చేరుకుంది; ముందుగా ఒకదాన్ని తీసివేయండి: device rm DEVICE_ID"
+
+#: lib/porsche/ssh/output.ex:118
+#, elixir-autogen, elixir-format
+msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+msgstr "ఈ మెషిన్ హోస్ట్‌లో చెక్‌పాయింట్‌లు అందుబాటులో లేవు. మెషిన్‌ను పాజ్ చేయడానికి బదులుగా ఆపండి."
+
+#: lib/porsche/ssh/output.ex:124
+#, elixir-autogen, elixir-format
+msgid "The machine is busy with another operation. Try again after it finishes."
+msgstr "మెషిన్ మరొక ఆపరేషన్‌తో బిజీగా ఉంది. అది పూర్తయిన తర్వాత మళ్లీ ప్రయత్నించండి."

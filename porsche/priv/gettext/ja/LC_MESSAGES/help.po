@@ -232,17 +232,17 @@ msgstr "スレッドの最新の計画を承認し、実装を開始します。
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "標準入力からフィードバックを読み取り、計画の修正を依頼します。"
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "この SSH 端末を共有ターミナルセッションに接続します。ssh -t が必要です。"
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "マシンの Web ポートまたは公開範囲を変更します。必要に応じて想定リビジョンを指定できます。"
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "マシン上の自分のターミナルセッションを 1 つ閉じます。"
@@ -252,7 +252,7 @@ msgstr "マシン上の自分のターミナルセッションを 1 つ閉じま
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "スレッドと、その保留中の質問および最新の計画を調べます。"
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "開くことができるマシンのターミナルセッションを一覧表示します。"
@@ -267,27 +267,27 @@ msgstr "シーケンス番号以降のスレッドのトランスクリプトイ
 msgid "List agent threads you can read, with unread counts."
 msgstr "読み取れるエージェントスレッドを未読数とともに一覧表示します。"
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "プッシュ通知デバイスを一覧表示します。"
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "トランスクリプトのシーケンス番号までスレッドを既読にします。"
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "マシン上で個人用ターミナルセッションを開きます。"
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "このデバイスをプッシュ通知用に登録します。プッシュキーは stdin から読み取ります。"
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "プッシュ通知デバイスを取り消します。"
@@ -297,22 +297,22 @@ msgstr "プッシュ通知デバイスを取り消します。"
 msgid "Send a prompt read from standard input to a thread."
 msgstr "標準入力から読み取ったプロンプトをスレッドに送信します。"
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "マシンの Web エンドポイント、ポート、公開範囲を表示します。"
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "マシン、スレッド、このセッションの JSON 変更通知をストリーム配信します。"
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "スレッドを plan と work の共同作業モード間で切り替えます。"
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "1 台のデバイスのプッシュ通知をオンまたはオフにします。"

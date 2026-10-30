@@ -114,6 +114,18 @@ defmodule Porsche.SSH.Output do
           "The machine's workload is not stable enough for this operation. Check its state before retrying."
         )
 
+      "checkpoint_unavailable" ->
+        dgettext(
+          "management",
+          "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
+        )
+
+      "vm_busy" ->
+        dgettext(
+          "management",
+          "The machine is busy with another operation. Try again after it finishes."
+        )
+
       "source_unavailable" ->
         dgettext("management", "The source machine is unavailable for this operation.")
 

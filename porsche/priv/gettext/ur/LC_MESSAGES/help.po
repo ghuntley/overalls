@@ -229,17 +229,17 @@ msgstr "تھریڈ کا تازہ ترین منصوبہ منظور کریں او�
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "نظرثانی شدہ منصوبہ طلب کریں، رائے معیاری ان پٹ سے پڑھتے ہوئے۔"
 
-#: lib/porsche/ssh/command_messages.ex:98
+#: lib/porsche/ssh/command_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "اس SSH ٹرمینل کو مشترکہ ٹرمینل سیشن سے جوڑتا ہے؛ ssh -t درکار ہے۔"
 
-#: lib/porsche/ssh/command_messages.ex:86
+#: lib/porsche/ssh/command_messages.ex:89
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "مشین کا ویب پورٹ یا مرئیت تبدیل کریں، اختیاری طور پر متوقع نظرثانی پر۔"
 
-#: lib/porsche/ssh/command_messages.ex:84
+#: lib/porsche/ssh/command_messages.ex:87
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "مشین پر اپنے ٹرمینل سیشنز میں سے ایک بند کریں۔"
@@ -249,7 +249,7 @@ msgstr "مشین پر اپنے ٹرمینل سیشنز میں سے ایک بند
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "تھریڈ، اس کے زیرِ التوا سوال اور تازہ ترین منصوبے کا معائنہ کریں۔"
 
-#: lib/porsche/ssh/command_messages.ex:82
+#: lib/porsche/ssh/command_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "مشین کے وہ ٹرمینل سیشنز کی فہرست دکھائیں جنہیں آپ کھول سکتے ہیں۔"
@@ -264,27 +264,27 @@ msgstr "کسی ترتیبی نمبر کے بعد تھریڈ کے ٹرانسکر�
 msgid "List agent threads you can read, with unread counts."
 msgstr "وہ ایجنٹ تھریڈز کی فہرست دکھائیں جنہیں آپ پڑھ سکتے ہیں، بغیر پڑھی تعداد کے ساتھ۔"
 
-#: lib/porsche/ssh/command_messages.ex:95
+#: lib/porsche/ssh/command_messages.ex:101
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "اپنے پش اطلاعات کے آلات کی فہرست دیکھیں۔"
 
-#: lib/porsche/ssh/command_messages.ex:81
+#: lib/porsche/ssh/command_messages.ex:84
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "کسی ٹرانسکرپٹ ترتیبی نمبر تک تھریڈ کو پڑھا ہوا نشان زد کریں۔"
 
-#: lib/porsche/ssh/command_messages.ex:83
+#: lib/porsche/ssh/command_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "مشین پر اپنا ذاتی ٹرمینل سیشن کھولیں۔"
 
-#: lib/porsche/ssh/command_messages.ex:91
+#: lib/porsche/ssh/command_messages.ex:97
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "پش اطلاعات کے لیے اس آلے کو رجسٹر کریں۔ پش کلید stdin سے پڑھی جاتی ہے۔"
 
-#: lib/porsche/ssh/command_messages.ex:96
+#: lib/porsche/ssh/command_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "پش اطلاعات کا ایک آلہ منسوخ کریں۔"
@@ -294,22 +294,22 @@ msgstr "پش اطلاعات کا ایک آلہ منسوخ کریں۔"
 msgid "Send a prompt read from standard input to a thread."
 msgstr "معیاری ان پٹ سے پڑھا گیا پرامپٹ تھریڈ کو بھیجیں۔"
 
-#: lib/porsche/ssh/command_messages.ex:85
+#: lib/porsche/ssh/command_messages.ex:88
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "مشین کا ویب اینڈ پوائنٹ، پورٹ اور مرئیت دکھائیں۔"
 
-#: lib/porsche/ssh/command_messages.ex:90
+#: lib/porsche/ssh/command_messages.ex:93
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "مشینوں، تھریڈز اور اس سیشن کے لیے JSON تبدیلی کی اطلاعات اسٹریم کریں۔"
 
-#: lib/porsche/ssh/command_messages.ex:80
+#: lib/porsche/ssh/command_messages.ex:83
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "تھریڈ کو plan اور work تعاون کے درمیان تبدیل کریں۔"
 
-#: lib/porsche/ssh/command_messages.ex:97
+#: lib/porsche/ssh/command_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "کسی ایک آلے کے لیے پش اطلاعات آن یا آف کریں۔"
