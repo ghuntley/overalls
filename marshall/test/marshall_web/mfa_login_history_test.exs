@@ -7,10 +7,12 @@ defmodule MarshallWeb.MFALoginHistoryTest do
   alias Marshall.Accounts.{Login, Security, User, Verification}
   alias Marshall.Compute.Ledger
   alias Marshall.PasskeyFixture, as: Fixture
-  # One hundred histories repeatedly mount real LiveViews. The aggregate budget
-  # includes load margin above the recorded 91.7-second twenty-history run;
-  # each history retains the default finite SQL ownership timeout.
-  @moduletag timeout: 600_000
+  # One hundred histories repeatedly mount real LiveViews: each history takes
+  # 6-11 s (recorded 2026-10-30 at 8 schedulers; the /admin/users mount alone
+  # is about 120 ms), and the full run took 975 s. The aggregate budget keeps
+  # load margin above that for an 8-vCPU CI runner; each history retains the
+  # default finite SQL ownership timeout.
+  @moduletag timeout: 1_800_000
 
   @typep state :: %{live: boolean(), completed: boolean(), elevated: boolean()}
   @typep operation :: :verify | :uv | :expired | :wrong_session | :expire | :lock | :revoke

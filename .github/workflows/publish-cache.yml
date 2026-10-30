@@ -44,15 +44,26 @@ jobs:
           devenv shell -- node --test scripts/test/check_contracts_test.mjs
 
   # Each Elixir project's `mix precommit` gate against the devenv PostgreSQL.
+  #
+  # Marshall's suite is mostly synchronous modules, which ExUnit runs one at a
+  # time, so a single runner needs well over the 240-minute limit (run
+  # 41008589168 was cancelled at 240 minutes with the real-deadline terminal
+  # properties still running). It runs as four `mix test --partitions` slices;
+  # each slice job still runs every other precommit gate and the complete
+  # Covenant contract suite.
   precommit:
+    name: precommit (${{ matrix.project }}${{ matrix.partition && format(' {0}/4', matrix.partition) || '' }})
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    # Marshall's full suite alone runs about two hours; the others finish well
-    # inside this limit.
     timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
-        project: [protocol, marshall, lilly, audi, brady, ziggy, porsche, galileo, enrico, peach, susan]
+        project: [protocol, lilly, audi, brady, ziggy, porsche, galileo, enrico, peach, susan]
+        include:
+          - {project: marshall, partition: 1}
+          - {project: marshall, partition: 2}
+          - {project: marshall, partition: 3}
+          - {project: marshall, partition: 4}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
@@ -86,6 +97,9 @@ jobs:
         working-directory: ${{ matrix.project }}
         env:
           TMPDIR: /tmp
+          # Only Marshall reads these; other projects see them empty.
+          MARSHALL_TEST_PARTITIONS: ${{ matrix.partition && '4' || '' }}
+          MIX_TEST_PARTITION: ${{ matrix.partition }}
         run: devenv shell -- bash -euo pipefail -c 'mix deps.get && mix precommit'
       - name: Verify precommit left no changes
         run: git diff --exit-code

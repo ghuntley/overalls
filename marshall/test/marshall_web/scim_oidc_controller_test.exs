@@ -102,8 +102,11 @@ defmodule MarshallWeb.ScimOidcControllerTest do
   for {name, override} <- [
         {"wrong audience", %{"aud" => "another-client"}},
         {"wrong issuer", %{"iss" => "https://evil.example.test"}},
-        {"expired token", %{"exp" => System.system_time(:second) - 3600}},
-        {"future issue time", %{"iat" => System.system_time(:second) + 3600}},
+        # Times are offsets resolved when the token is minted: a module-body
+        # System.system_time/1 is fixed at compile time, and a suite running
+        # past the hour would carry a stale "future" iat inside the skew.
+        {"expired token", %{"exp" => {:from_now, -3600}}},
+        {"future issue time", %{"iat" => {:from_now, 3600}}},
         {"mismatched nonce", %{"nonce" => "not-the-session-nonce"}},
         {"missing nonce", %{"nonce" => :drop}},
         {"unknown subject", %{"sub" => "someone-else"}},
@@ -286,7 +289,10 @@ defmodule MarshallWeb.ScimOidcControllerTest do
       }
       |> Map.merge(Keyword.get(opts, :claims, %{}))
       |> Enum.reject(fn {_, value} -> value == :drop end)
-      |> Map.new()
+      |> Map.new(fn
+        {claim, {:from_now, offset}} -> {claim, now + offset}
+        claim -> claim
+      end)
 
     if Keyword.get(opts, :unsigned, false) do
       encode = &Base.url_encode64(Jason.encode!(&1), padding: false)

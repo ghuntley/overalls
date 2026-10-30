@@ -17,14 +17,25 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
   # actual domain actions and mounted browser event guards. Rejected mutations
   # MUST preserve the target role and audit count, even with a stale forged actor.
 
+  # @cc [owner:ghuntley,label:verification] control-room-history-case-isolation
+  # Every generated history and replay MUST begin with a fresh SQL sandbox, and
+  # each mounted view MUST stop before the next transition and before its case's
+  # SQL owner stops. Retained views and rows otherwise make every later mount
+  # and role broadcast pay for all earlier histories.
+
   # Enrollment and initial verification consume two of the ten retained challenge
   # slots; eight transitions keep every generated verify within that separate limit.
+  # The 100 isolated histories took 67 s locally (2026-10-30), above ExUnit's
+  # 60 s default; the aggregate budget leaves CI load margin.
   @tag :hegel
+  @tag :hegel_case_sandbox
+  @tag timeout: 300_000
   test "current role and login histories govern Control room reads and audited writes", %{
     conn: conn
   } do
     Hegel.check(
       fn ->
+        Marshall.DataCase.isolate_property_case()
         administrator = draw("administrator", boolean())
         forged_role = draw("forged_role", boolean())
 
@@ -46,7 +57,7 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
             )
           )
 
-        assert_history(conn, administrator, forged_role, events)
+        assert_history(conn, administrator, forged_role, events, &Hegel.on_cleanup/1)
       end,
       test_cases: 100
     )
@@ -58,12 +69,19 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
           {true, [:demote, :promote, :lock, :verify, :expire_elevation, :verify, :revoke]},
           {false, [:promote, :demote, :verify, :promote, :expire_login, :verify]}
         ] do
-      assert %{live: false} = assert_history(conn, administrator, not administrator, events)
+      assert %{live: false} =
+               assert_history(conn, administrator, not administrator, events, fn _ -> :ok end)
     end
   end
 
-  @spec assert_history(Plug.Conn.t(), boolean(), boolean(), [event()]) :: authority()
-  defp assert_history(conn, administrator, forged_role, events) do
+  @spec assert_history(
+          Plug.Conn.t(),
+          boolean(),
+          boolean(),
+          [event()],
+          ((-> :ok) -> term())
+        ) :: authority()
+  defp assert_history(conn, administrator, forged_role, events, register_cleanup) do
     actor = Fixture.elevate(Fixture.user(administrator))
     target = Fixture.user()
     conn = signed_in(conn, actor)
@@ -71,7 +89,7 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
 
     Enum.reduce(events, %{live: true, administrator: administrator, elevated: true}, fn event,
                                                                                         before ->
-      mounted = if before.live, do: live(conn, ~p"/admin/users"), else: nil
+      mounted = if before.live, do: mount(conn, register_cleanup), else: nil
       after_event = transition(event, actor, before)
       allowed = after_event.live and after_event.administrator and after_event.elevated
       target_before = Security.current(target.id).administrator
@@ -94,6 +112,8 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
           true ->
             render_click(view, "set-role", payload)
         end
+
+        stop_view(view.pid)
       end
 
       assert Security.current(target.id).administrator ==
@@ -131,6 +151,24 @@ defmodule MarshallWeb.ControlRoomHistoryTest do
       assert length(Ledger.read!(AdminEvent)) == audit_before + if(allowed, do: 1, else: 0)
       after_event
     end)
+  end
+
+  @spec mount(Plug.Conn.t(), ((-> :ok) -> term())) ::
+          {:ok, %Phoenix.LiveViewTest.View{}, String.t()}
+  defp mount(conn, register_cleanup) do
+    {:ok, view, _html} = result = live(conn, ~p"/admin/users")
+    register_cleanup.(fn -> stop_view(view.pid) end)
+    result
+  end
+
+  # A view that already redirected may be stopped or still shutting down; every
+  # other stop failure, including the finite deadline, still fails the history.
+  @spec stop_view(pid()) :: :ok
+  defp stop_view(pid) do
+    GenServer.stop(pid, :normal, 5_000)
+  catch
+    :exit, {:noproc, _} -> :ok
+    :exit, {{:shutdown, _}, _} -> :ok
   end
 
   @spec transition(event(), User.t(), authority()) :: authority()

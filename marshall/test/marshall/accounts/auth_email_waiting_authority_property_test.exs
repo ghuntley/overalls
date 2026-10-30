@@ -8,7 +8,11 @@ defmodule Marshall.Accounts.AuthEmailWaitingAuthorityPropertyTest do
   alias Marshall.Repo
   @fixtures Path.expand("../../fixtures/tls", __DIR__)
   @moduletag :distributed
-  @moduletag timeout: 180_000
+  # Each generated case boots three fresh Marshall peers: 100 cases measured
+  # 594 s per property (about 6 s each, 2026-10-30, 8 schedulers), far above the
+  # old 180 s aggregate. Every boot, RPC and SMTP deadline below is unchanged;
+  # the CI profile only suppresses Hegel's TooSlow health check.
+  @moduletag timeout: 1_800_000
   @type peer :: %{controller: pid(), database_name: String.t(), node: node()}
   @type call_result ::
           {:ok, :delivered | :expired | :pending} | {:error, :delivery_failed} | :peer_interrupted
@@ -34,7 +38,7 @@ defmodule Marshall.Accounts.AuthEmailWaitingAuthorityPropertyTest do
     # outbox lock. If stored token authority changes before the first attempt
     # fails, the waiter MUST expire and erase the still-time-valid outbox without
     # another SMTP connection. Independent peers MUST observe terminal refusal.
-    property name, test_cases: 100 do
+    property name, profile: :ci, test_cases: 100 do
       kind = unquote(kind)
 
       replays = draw("replays", integer(1..3))
