@@ -44,9 +44,17 @@ defmodule Marshall.Accounts.TimeZoneTest do
     before = stored(actor.id)
 
     case set(actor, zone) do
+      # The action stores the trimmed zone, and Ash casts blank input to nil,
+      # which clears the zone like an explicit nil. Validity is therefore
+      # judged on the trimmed text, never on the raw draw.
+      {:ok, %{user_id: id, time_zone: nil}} ->
+        assert id == actor.id
+        assert String.trim(zone) == ""
+        assert stored(actor.id) == nil
+
       {:ok, %{user_id: id, time_zone: saved}} ->
         assert id == actor.id
-        assert TimeZones.valid?(zone)
+        assert TimeZones.valid?(String.trim(zone))
         assert saved == String.trim(zone)
         assert stored(actor.id) == saved
 
