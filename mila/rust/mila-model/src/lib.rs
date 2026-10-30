@@ -27,8 +27,8 @@ fn decode_component(value: &str) -> Option<String> {
             if index + 2 >= raw.len() {
                 return None;
             }
-            let high = (raw[index + 1] as char).to_digit(16)? as u8;
-            let low = (raw[index + 2] as char).to_digit(16)? as u8;
+            let high = u8::try_from((raw[index + 1] as char).to_digit(16)?).ok()?;
+            let low = u8::try_from((raw[index + 2] as char).to_digit(16)?).ok()?;
             bytes.push(high * 16 + low);
             index += 3;
         } else {

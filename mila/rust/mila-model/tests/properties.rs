@@ -115,7 +115,12 @@ fn workspace_source_parse_to_url_round_trip(tc: TestCase) {
     };
     let url = source.to_url();
     let reparsed = WorkspaceSource::parse(&url);
-    if source.pull_request.is_none() && source.repository.ends_with(".git") {
+    #[expect(
+        clippy::case_sensitive_file_extension_comparisons,
+        reason = "mirrors parse's case-sensitive `.git` trim on a URL path, not a file name"
+    )]
+    let trimmed_by_parse = source.pull_request.is_none() && source.repository.ends_with(".git");
+    if trimmed_by_parse {
         if let Ok(trimmed) = &reparsed {
             assert_eq!(trimmed.owner, source.owner);
             assert!(source.repository.starts_with(&trimmed.repository));

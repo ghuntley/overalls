@@ -64,11 +64,11 @@ fn valid_label(value: &str) -> bool {
         && value
             .as_bytes()
             .first()
-            .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            .is_some_and(u8::is_ascii_alphanumeric)
         && value
             .as_bytes()
             .last()
-            .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            .is_some_and(u8::is_ascii_alphanumeric)
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' || byte == b'.'
         })
