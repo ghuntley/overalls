@@ -13,8 +13,9 @@ between those two sockets through kernel pipes, never to stdout, stderr or a
 diagnostic.
 
 @cc [owner:ghuntley,label:verification] ingress-bridge-hegel-properties
-Hegel properties MUST cover the command line against an independent oracle
-and the per-direction byte accounting, while process fixtures cover exact
-byte custody both ways, half-close ordering, the client's close ending the
-bridge, guest loss, refusals, the detached start handshake and the privilege
-drop.
+Hegel properties MUST cover the command line against an independent oracle,
+the per-direction byte accounting and the `moved` errno lattice (counts pass
+through, only EAGAIN and EINTR retry, every other errno ends the bridge),
+while process fixtures cover exact byte custody both ways, half-close
+ordering, the client's close ending the bridge, guest loss, refusals, the
+detached start handshake and the privilege drop.

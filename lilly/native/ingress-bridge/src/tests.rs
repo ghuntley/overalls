@@ -1,6 +1,5 @@
 use super::*;
-use hegel::generators as gs;
-use hegel::TestCase;
+use hegel::{generators as gs, TestCase};
 
 /// The independent command-line specification.
 fn oracle(words: &[String]) -> Option<(Option<i32>, i32, i32, Option<u32>)> {
@@ -47,7 +46,7 @@ fn word(tc: &TestCase) -> String {
 /// @cc [owner:ghuntley,label:verification] bridge-cli-oracle
 /// parse_cli MUST agree with an independent specification of the command line
 /// on arbitrary word lists, including leading zeros, padding and bounds.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn command_line_matches_the_independent_oracle(tc: TestCase) {
     let count = tc.draw(gs::integers::<usize>().max_value(6));
     let words: Vec<String> = (0..count).map(|_| word(&tc)).collect();
@@ -62,7 +61,7 @@ fn command_line_matches_the_independent_oracle(tc: TestCase) {
 /// a direction MUST hold exactly the bytes read minus the bytes written,
 /// never exceed its window, stop reading after end of stream, and report
 /// drained exactly when end of stream was seen with nothing pending.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn direction_accounts_for_every_byte(tc: TestCase) {
     let mut direction = Direction::default();
     let (mut read, mut written, mut eof) = (0_usize, 0_usize, false);
@@ -93,4 +92,26 @@ fn direction_accounts_for_every_byte(tc: TestCase) {
     }
     assert_eq!(finished(&direction), direction.drained());
     assert_eq!(half_close_due(&direction), direction.drained());
+}
+
+/// @cc [owner:ghuntley,label:verification;recovery] bridge-moved-lattice
+/// `moved` MUST pass every successful count through unchanged, turn exactly
+/// EAGAIN and EINTR into a retry, and end the bridge on every other errno.
+#[hegel::test(test_cases = 200)]
+fn moved_classifies_results_against_the_errno_lattice(tc: TestCase) {
+    if tc.draw(gs::booleans()) {
+        let count = tc.draw(gs::integers::<usize>().max_value(2 * WINDOW));
+        assert_eq!(moved(Ok(count)), Some(Some(count)));
+    } else {
+        let raw = tc.draw(gs::integers::<i32>().min_value(1).max_value(4095));
+        let expected = match raw {
+            libc::EAGAIN | libc::EINTR => Some(None),
+            _ => None,
+        };
+        assert_eq!(
+            moved(Err(Errno::from_raw_os_error(raw))),
+            expected,
+            "errno {raw}"
+        );
+    }
 }
