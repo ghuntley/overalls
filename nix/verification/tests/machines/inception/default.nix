@@ -128,13 +128,14 @@ in
     '';
     # Clamp TCP MSS across the nested TAP/NAT path so larger ACME certificate
     # responses do not depend on fragmented packets surviving the provider VLAN.
+    networking.interfaces.eth1.mtu = 1200;
     networking.nftables.tables.inception-mss = {
       family = "ip";
       content = ''
         chain forward {
           type filter hook forward priority mangle; policy accept;
-          iifname "lu*" oifname "eth1" tcp flags syn tcp option maxseg size set 1200
-          iifname "eth1" oifname "lu*" tcp flags syn tcp option maxseg size set 1200
+          iifname "lu*" oifname "eth1" tcp flags syn tcp option maxseg size set 1160
+          iifname "eth1" oifname "lu*" tcp flags syn tcp option maxseg size set 1160
         }
       '';
     };
@@ -156,6 +157,7 @@ in
           while :; do
             for device in eth1 lu*; do
               test -e "/sys/class/net/$device" || continue
+              ${pkgs.iproute2}/bin/ip link set dev "$device" mtu 1200 >/dev/null 2>&1 || true
               ${pkgs.ethtool}/bin/ethtool -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
             done
             for namespace in $(${pkgs.iproute2}/bin/ip netns list | ${pkgs.coreutils}/bin/cut -d' ' -f1); do
@@ -164,9 +166,14 @@ in
                   ${pkgs.iproute2}/bin/ip netns exec "$namespace" \
                     ${pkgs.runtimeShell} -c '
                       ethtool="$1"
+                      for device in uplink; do
+                        ${pkgs.iproute2}/bin/ip link set dev "$device" mtu 1200 >/dev/null 2>&1 || true
+                        ${pkgs.ethtool}/bin/ethtool -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
+                      done
                       for device_path in /sys/class/net/lv*; do
                         test -e "$device_path" || continue
                         device="''${device_path##*/}"
+                        ${pkgs.iproute2}/bin/ip link set dev "$device" mtu 1200 >/dev/null 2>&1 || true
                         "$ethtool" -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
                       done
                     ' -- ${pkgs.ethtool}/bin/ethtool || true
@@ -458,6 +465,7 @@ in
       { address = "1.1.1.1"; prefixLength = 32; }
       { address = "9.9.9.9"; prefixLength = 32; }
     ];
+    networking.interfaces.eth1.mtu = 1200;
     # The fixture's resolver redirection is declared as an nftables table;
     # enabling the backend also makes the matching firewall and NAT modules
     # use the same ruleset.
@@ -533,6 +541,7 @@ in
         ExecStart = pkgs.writeShellScript "inception-disable-provider-offloads" ''
           set -eu
           for device in eth0 eth1; do
+            ${pkgs.iproute2}/bin/ip link set dev "$device" mtu 1200 >/dev/null 2>&1 || true
             ${pkgs.ethtool}/bin/ethtool -K "$device" tso off gso off gro off tx off rx off >/dev/null 2>&1 || true
           done
         '';

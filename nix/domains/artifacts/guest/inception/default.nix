@@ -74,6 +74,12 @@ in
     ./control.nix
   ];
   networking.hostName = lib.mkForce "inception";
+  # @cc [owner:ghuntley,label=recovery;network] inception-guest-path-mtu
+  # The nested profile MUST advertise the reviewed 1200-byte path MTU on its
+  # public uplink. This makes the guest TCP MSS safe before Lilly's host-side
+  # forwarding policy and prevents fragmented ACME responses from being
+  # dropped at the isolated TAP boundary.
+  networking.interfaces.eth0.mtu = 1200;
   boot.kernelModules = [ "kvm" ];
   boot.extraModulePackages = [ config.boot.zfs.modulePackage ];
   boot.extraModprobeConfig = "options zfs zfs_arc_max=536870912";

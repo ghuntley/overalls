@@ -1,11 +1,42 @@
 { pkgs, ... }:
 let
   python = pkgs.python3.withPackages (p: [ p.cryptography ]);
+  # @cc [owner:ghuntley,label=recovery;network] inception-acme-no-keepalive
+  # The nested ACME client MUST use a fresh HTTP connection for each signed
+  # exchange. Reusing the issuer connection across the directory/order flow
+  # can leave the final POST-as-GET certificate body unread at the TAP boundary.
+  lego = pkgs.lego.overrideAttrs (old: {
+    postPatch = (old.postPatch or "") + ''
+      substituteInPlace lego/client_config.go \
+        --replace-fail 'TLSHandshakeTimeout:   30 * time.Second,' \
+          'TLSHandshakeTimeout:   30 * time.Second, DisableKeepAlives: true,'
+      ${pkgs.python3}/bin/python3 - <<'PY'
+from pathlib import Path
+
+path = Path("acme/api/certificate.go")
+source = path.read_text()
+if "defer resp.Body.Close()" not in source:
+    needles = [
+        "\tresp, err := c.core.postAsGet(ctx, certURL, nil)\n",
+        "\tresp, err := c.core.postAsGet(certURL, nil)\n",
+    ]
+    needle = next((candidate for candidate in needles if candidate in source), None)
+    if needle is None:
+        raise SystemExit("certificate response close patch did not match exactly")
+    source = source.replace(
+        needle,
+        needle + "\tif resp != nil {\n\t\tdefer resp.Body.Close()\n\t}\n",
+        1,
+    )
+path.write_text(source)
+PY
+    '';
+  });
   hook = pkgs.writeShellScript "inception-control-dns-proof" ''
     exec ${python}/bin/python3 ${./.}/control_proofs.py ${../.} "$@"
   '';
   image = pkgs.writeText "inception-control-tools.json" (builtins.toJSON {
-    lego = "${pkgs.lego}/bin/lego";
+    lego = "${lego}/bin/lego";
     inherit hook;
     guest_root = "${../.}";
     openssl = "${pkgs.openssl}/bin/openssl";

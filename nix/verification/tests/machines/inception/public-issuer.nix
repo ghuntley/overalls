@@ -1,6 +1,25 @@
 { pkgs, ... }:
 let
   root = "/var/lib/inception-fixture-issuer";
+  # @cc [owner:ghuntley,label=verification;network] inception-fixture-acme-length
+  # The fixture must delimit its certificate-chain response explicitly. This
+  # keeps the nested client from waiting for a connection close after certZ;
+  # production issuers are unaffected.
+  pebble = pkgs.pebble.overrideAttrs (old: {
+    postPatch = (old.postPatch or "") + ''
+${pkgs.python3}/bin/python3 - <<'PY'
+from pathlib import Path
+
+path = Path("wfe/wfe.go")
+source = path.read_text()
+needle = "\tresponse.Header().Set(\"Content-Type\", \"application/pem-certificate-chain; charset=utf-8\")\n\tresponse.WriteHeader(http.StatusOK)\n\t_, _ = response.Write(cert.Chain(no))\n"
+replacement = "\tresponse.Header().Set(\"Content-Type\", \"application/pem-certificate-chain; charset=utf-8\")\n\tchain := cert.Chain(no)\n\tresponse.Header().Set(\"Content-Length\", strconv.Itoa(len(chain)))\n\tresponse.WriteHeader(http.StatusOK)\n\t_, _ = response.Write(chain)\n"
+if needle not in source or replacement in source:
+    raise SystemExit("Pebble certificate response patch did not match exactly")
+path.write_text(source.replace(needle, replacement, 1))
+PY
+    '';
+  });
   tlsExtensions = pkgs.writeText "inception-issuer-tls.extensions" ''
     basicConstraints=critical,CA:FALSE
     keyUsage=critical,digitalSignature,keyEncipherment
@@ -68,7 +87,7 @@ in
     '';
     serviceConfig = {
       Type = "exec";
-      ExecStart = "${pkgs.pebble}/bin/pebble -config ${configuration} -dnsserver 11.0.0.3:53";
+      ExecStart = "${pebble}/bin/pebble -config ${configuration} -dnsserver 11.0.0.3:53";
       StateDirectory = "inception-fixture-issuer";
       StateDirectoryMode = "0700";
       UMask = "0077";
