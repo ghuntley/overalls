@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "유형",
   "sshKeyThisDevice": "이 기기",
   "sshKeyRevoke": "취소",
-  "sshKeyRevokeConfirm": "{fingerprint} 키를 취소할까요? 이 키를 사용하는 기기는 로그인하려면 다시 승인받아야 합니다."
+  "sshKeyRevokeConfirm": "{fingerprint} 키를 취소할까요? 이 키를 사용하는 기기는 로그인하려면 다시 승인받아야 합니다.",
+  "deploymentOpen": "열기",
+  "deploymentRemove": "제거",
+  "deploymentSelected": "선택됨",
+  "deploymentsEmpty": "아직 배포가 없습니다.",
+  "linkCopied": "링크를 복사했습니다.",
+  "linkCopy": "링크 복사",
+  "linkSignInRequired": "이 링크를 열려면 {host}에 로그인하세요.",
+  "terminalReconnect": "다시 연결",
+  "terminalResize": "크기 조정",
+  "terminalSend": "보내기"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "種類",
   "sshKeyThisDevice": "このデバイス",
   "sshKeyRevoke": "取り消す",
-  "sshKeyRevokeConfirm": "キー {fingerprint} を取り消しますか?このキーを使うデバイスは、サインインするためにもう一度承認が必要です。"
+  "sshKeyRevokeConfirm": "キー {fingerprint} を取り消しますか?このキーを使うデバイスは、サインインするためにもう一度承認が必要です。",
+  "deploymentOpen": "開く",
+  "deploymentRemove": "削除",
+  "deploymentSelected": "選択中",
+  "deploymentsEmpty": "デプロイメントはまだありません。",
+  "linkCopied": "リンクをコピーしました。",
+  "linkCopy": "リンクをコピー",
+  "linkSignInRequired": "このリンクを開くには {host} にサインインしてください。",
+  "terminalReconnect": "再接続",
+  "terminalResize": "サイズ変更",
+  "terminalSend": "送信"
 }

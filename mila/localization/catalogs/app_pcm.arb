@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Type",
   "sshKeyThisDevice": "Dis device",
   "sshKeyRevoke": "Revoke",
-  "sshKeyRevokeConfirm": "You wan revoke di key {fingerprint}? Di device wey dey use am go need approval again before e fit sign in."
+  "sshKeyRevokeConfirm": "You wan revoke di key {fingerprint}? Di device wey dey use am go need approval again before e fit sign in.",
+  "deploymentOpen": "Open",
+  "deploymentRemove": "Comot am",
+  "deploymentSelected": "Don select",
+  "deploymentsEmpty": "No deployment dey yet.",
+  "linkCopied": "Link don copy.",
+  "linkCopy": "Copy link",
+  "linkSignInRequired": "Sign in for {host} make you fit open dis link.",
+  "terminalReconnect": "Connect again",
+  "terminalResize": "Change size",
+  "terminalSend": "Send"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Typ",
   "sshKeyThisDevice": "Dieses Gerät",
   "sshKeyRevoke": "Widerrufen",
-  "sshKeyRevokeConfirm": "Schlüssel {fingerprint} widerrufen? Ein Gerät, das ihn verwendet, muss zum Anmelden erneut genehmigt werden."
+  "sshKeyRevokeConfirm": "Schlüssel {fingerprint} widerrufen? Ein Gerät, das ihn verwendet, muss zum Anmelden erneut genehmigt werden.",
+  "deploymentOpen": "Öffnen",
+  "deploymentRemove": "Entfernen",
+  "deploymentSelected": "Ausgewählt",
+  "deploymentsEmpty": "Noch keine Deployments.",
+  "linkCopied": "Link kopiert.",
+  "linkCopy": "Link kopieren",
+  "linkSignInRequired": "Melde dich bei {host} an, um diesen Link zu öffnen.",
+  "terminalReconnect": "Neu verbinden",
+  "terminalResize": "Größe ändern",
+  "terminalSend": "Senden"
 }

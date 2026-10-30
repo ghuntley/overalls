@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "النوع",
   "sshKeyThisDevice": "الجهاز ده",
   "sshKeyRevoke": "الغي",
-  "sshKeyRevokeConfirm": "تلغي المفتاح {fingerprint}؟ الجهاز اللي بيستخدمه لازم يتعتمد تاني علشان يدخل."
+  "sshKeyRevokeConfirm": "تلغي المفتاح {fingerprint}؟ الجهاز اللي بيستخدمه لازم يتعتمد تاني علشان يدخل.",
+  "deploymentOpen": "افتح",
+  "deploymentRemove": "شيل",
+  "deploymentSelected": "متحدد",
+  "deploymentsEmpty": "مفيش عمليات نشر لسه.",
+  "linkCopied": "اتنسخ اللينك.",
+  "linkCopy": "انسخ اللينك",
+  "linkSignInRequired": "سجّل دخولك على {host} علشان تفتح اللينك ده.",
+  "terminalReconnect": "اتصل تاني",
+  "terminalResize": "غيّر الحجم",
+  "terminalSend": "ابعت"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Typ",
   "sshKeyThisDevice": "Den här enheten",
   "sshKeyRevoke": "Återkalla",
-  "sshKeyRevokeConfirm": "Återkalla nyckeln {fingerprint}? En enhet som använder den måste godkännas igen för att logga in."
+  "sshKeyRevokeConfirm": "Återkalla nyckeln {fingerprint}? En enhet som använder den måste godkännas igen för att logga in.",
+  "deploymentOpen": "Öppna",
+  "deploymentRemove": "Ta bort",
+  "deploymentSelected": "Vald",
+  "deploymentsEmpty": "Inga driftsättningar ännu.",
+  "linkCopied": "Länken kopierades.",
+  "linkCopy": "Kopiera länk",
+  "linkSignInRequired": "Logga in på {host} för att öppna den här länken.",
+  "terminalReconnect": "Anslut igen",
+  "terminalResize": "Ändra storlek",
+  "terminalSend": "Skicka"
 }

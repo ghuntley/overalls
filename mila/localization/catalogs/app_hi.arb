@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "प्रकार",
   "sshKeyThisDevice": "यह डिवाइस",
   "sshKeyRevoke": "रद्द करें",
-  "sshKeyRevokeConfirm": "कुंजी {fingerprint} रद्द करें? इसका उपयोग करने वाले डिवाइस को साइन इन करने के लिए फिर से स्वीकृत करना होगा।"
+  "sshKeyRevokeConfirm": "कुंजी {fingerprint} रद्द करें? इसका उपयोग करने वाले डिवाइस को साइन इन करने के लिए फिर से स्वीकृत करना होगा।",
+  "deploymentOpen": "खोलें",
+  "deploymentRemove": "हटाएँ",
+  "deploymentSelected": "चयनित",
+  "deploymentsEmpty": "अभी तक कोई डिप्लॉयमेंट नहीं है।",
+  "linkCopied": "लिंक कॉपी हो गया।",
+  "linkCopy": "लिंक कॉपी करें",
+  "linkSignInRequired": "यह लिंक खोलने के लिए {host} में साइन इन करें।",
+  "terminalReconnect": "फिर से कनेक्ट करें",
+  "terminalResize": "आकार बदलें",
+  "terminalSend": "भेजें"
 }

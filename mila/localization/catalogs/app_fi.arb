@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Tyyppi",
   "sshKeyThisDevice": "Tämä laite",
   "sshKeyRevoke": "Peru",
-  "sshKeyRevokeConfirm": "Perutaanko avain {fingerprint}? Sitä käyttävä laite on hyväksyttävä uudelleen kirjautumista varten."
+  "sshKeyRevokeConfirm": "Perutaanko avain {fingerprint}? Sitä käyttävä laite on hyväksyttävä uudelleen kirjautumista varten.",
+  "deploymentOpen": "Avaa",
+  "deploymentRemove": "Poista",
+  "deploymentSelected": "Valittu",
+  "deploymentsEmpty": "Ei vielä käyttöönottoja.",
+  "linkCopied": "Linkki kopioitu.",
+  "linkCopy": "Kopioi linkki",
+  "linkSignInRequired": "Kirjaudu palveluun {host} avataksesi tämän linkin.",
+  "terminalReconnect": "Yhdistä uudelleen",
+  "terminalResize": "Muuta kokoa",
+  "terminalSend": "Lähetä"
 }

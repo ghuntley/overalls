@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Tüüp",
   "sshKeyThisDevice": "See seade",
   "sshKeyRevoke": "Tühista",
-  "sshKeyRevokeConfirm": "Kas tühistada võti {fingerprint}? Seda kasutav seade tuleb sisselogimiseks uuesti kinnitada."
+  "sshKeyRevokeConfirm": "Kas tühistada võti {fingerprint}? Seda kasutav seade tuleb sisselogimiseks uuesti kinnitada.",
+  "deploymentOpen": "Ava",
+  "deploymentRemove": "Eemalda",
+  "deploymentSelected": "Valitud",
+  "deploymentsEmpty": "Juurutusi veel pole.",
+  "linkCopied": "Link kopeeritud.",
+  "linkCopy": "Kopeeri link",
+  "linkSignInRequired": "Selle lingi avamiseks logi sisse teenusesse {host}.",
+  "terminalReconnect": "Ühenda uuesti",
+  "terminalResize": "Muuda suurust",
+  "terminalSend": "Saada"
 }

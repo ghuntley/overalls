@@ -176,13 +176,21 @@ jobs:
       - name: Install GTK4 and libadwaita development libraries
         run: |
           sudo apt-get update
-          sudo apt-get install --yes libgtk-4-dev libadwaita-1-dev pkg-config
+          sudo apt-get install --yes libgtk-4-dev libgtk-4-bin libadwaita-1-dev pkg-config
       - name: Build and test native GTK client
         working-directory: mila/native/linux
         run: |
           cargo build --locked --release
           test -x target/release/mila-native-linux
-          cargo test --locked
+          test -x target/release/mila-linux-journey
+          # GTK widget-lifecycle tests run against a headless Broadway display
+          # and must not skip in CI.
+          gtk4-broadwayd :5 &
+          broadway=$!
+          sleep 1
+          GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
+            MILA_GTK_TESTS_REQUIRED=1 cargo test --locked
+          kill "$broadway"
       - name: Check formatting
         working-directory: mila/native/linux
         run: cargo fmt --all -- --check

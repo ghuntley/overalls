@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "ধরন",
   "sshKeyThisDevice": "এই ডিভাইস",
   "sshKeyRevoke": "প্রত্যাহার করুন",
-  "sshKeyRevokeConfirm": "{fingerprint} কী প্রত্যাহার করবেন? এটি ব্যবহারকারী ডিভাইসকে সাইন ইন করতে আবার অনুমোদন করতে হবে।"
+  "sshKeyRevokeConfirm": "{fingerprint} কী প্রত্যাহার করবেন? এটি ব্যবহারকারী ডিভাইসকে সাইন ইন করতে আবার অনুমোদন করতে হবে।",
+  "deploymentOpen": "খুলুন",
+  "deploymentRemove": "সরান",
+  "deploymentSelected": "নির্বাচিত",
+  "deploymentsEmpty": "এখনও কোনো ডিপ্লয়মেন্ট নেই।",
+  "linkCopied": "লিংক কপি হয়েছে।",
+  "linkCopy": "লিংক কপি করুন",
+  "linkSignInRequired": "এই লিংকটি খুলতে {host}-এ সাইন ইন করুন।",
+  "terminalReconnect": "আবার সংযোগ করুন",
+  "terminalResize": "আকার বদলান",
+  "terminalSend": "পাঠান"
 }

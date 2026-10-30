@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "قسم",
   "sshKeyThisDevice": "یہ آلہ",
   "sshKeyRevoke": "منسوخ کریں",
-  "sshKeyRevokeConfirm": "کلید {fingerprint} منسوخ کریں؟ اسے استعمال کرنے والے آلے کو سائن ان کے لیے دوبارہ منظور کرنا ہوگا۔"
+  "sshKeyRevokeConfirm": "کلید {fingerprint} منسوخ کریں؟ اسے استعمال کرنے والے آلے کو سائن ان کے لیے دوبارہ منظور کرنا ہوگا۔",
+  "deploymentOpen": "کھولیں",
+  "deploymentRemove": "ہٹائیں",
+  "deploymentSelected": "منتخب",
+  "deploymentsEmpty": "ابھی تک کوئی ڈیپلائمنٹ نہیں۔",
+  "linkCopied": "لنک کاپی ہو گیا۔",
+  "linkCopy": "لنک کاپی کریں",
+  "linkSignInRequired": "یہ لنک کھولنے کے لیے {host} میں سائن ان کریں۔",
+  "terminalReconnect": "دوبارہ جوڑیں",
+  "terminalResize": "سائز تبدیل کریں",
+  "terminalSend": "بھیجیں"
 }

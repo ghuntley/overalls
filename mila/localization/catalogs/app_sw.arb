@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Aina",
   "sshKeyThisDevice": "Kifaa hiki",
   "sshKeyRevoke": "Batilisha",
-  "sshKeyRevokeConfirm": "Ungependa kubatilisha ufunguo {fingerprint}? Kifaa kinachoutumia kitahitaji kuidhinishwa tena ili kuingia."
+  "sshKeyRevokeConfirm": "Ungependa kubatilisha ufunguo {fingerprint}? Kifaa kinachoutumia kitahitaji kuidhinishwa tena ili kuingia.",
+  "deploymentOpen": "Fungua",
+  "deploymentRemove": "Ondoa",
+  "deploymentSelected": "Imechaguliwa",
+  "deploymentsEmpty": "Bado hakuna usambazaji.",
+  "linkCopied": "Kiungo kimenakiliwa.",
+  "linkCopy": "Nakili kiungo",
+  "linkSignInRequired": "Ingia kwenye {host} ili kufungua kiungo hiki.",
+  "terminalReconnect": "Unganisha tena",
+  "terminalResize": "Badilisha ukubwa",
+  "terminalSend": "Tuma"
 }

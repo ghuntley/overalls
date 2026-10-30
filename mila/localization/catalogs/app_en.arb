@@ -1108,5 +1108,50 @@
         "type": "String"
       }
     }
+  },
+  "deploymentOpen": "Open",
+  "@deploymentOpen": {
+    "description": "Button on a deployment row that selects it and opens its machines."
+  },
+  "deploymentRemove": "Remove",
+  "@deploymentRemove": {
+    "description": "Button on a deployment row that removes it from Mila after confirmation."
+  },
+  "deploymentSelected": "Selected",
+  "@deploymentSelected": {
+    "description": "Marks the currently selected deployment in the list."
+  },
+  "deploymentsEmpty": "No deployments yet.",
+  "@deploymentsEmpty": {
+    "description": "Shown when no deployment has been added."
+  },
+  "linkCopied": "Link copied.",
+  "@linkCopied": {
+    "description": "Shown after an overalls:// link was copied."
+  },
+  "linkCopy": "Copy link",
+  "@linkCopy": {
+    "description": "Button that copies an overalls:// link to the current page."
+  },
+  "linkSignInRequired": "Sign in to {host} to open this link.",
+  "@linkSignInRequired": {
+    "description": "Shown for a link to a known deployment while signed out. {host} is a DNS host name.",
+    "placeholders": {
+      "host": {
+        "type": "String"
+      }
+    }
+  },
+  "terminalReconnect": "Reconnect",
+  "@terminalReconnect": {
+    "description": "Terminal control that reattaches after the stream ended."
+  },
+  "terminalResize": "Resize",
+  "@terminalResize": {
+    "description": "Terminal control that applies new column and row counts."
+  },
+  "terminalSend": "Send",
+  "@terminalSend": {
+    "description": "Terminal control that sends the typed input line."
   }
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Tür",
   "sshKeyThisDevice": "Bu cihaz",
   "sshKeyRevoke": "İptal et",
-  "sshKeyRevokeConfirm": "{fingerprint} anahtarı iptal edilsin mi? Onu kullanan cihazın giriş yapmak için yeniden onaylanması gerekir."
+  "sshKeyRevokeConfirm": "{fingerprint} anahtarı iptal edilsin mi? Onu kullanan cihazın giriş yapmak için yeniden onaylanması gerekir.",
+  "deploymentOpen": "Aç",
+  "deploymentRemove": "Kaldır",
+  "deploymentSelected": "Seçili",
+  "deploymentsEmpty": "Henüz dağıtım yok.",
+  "linkCopied": "Bağlantı kopyalandı.",
+  "linkCopy": "Bağlantıyı kopyala",
+  "linkSignInRequired": "Bu bağlantıyı açmak için {host} hizmetinde oturum açın.",
+  "terminalReconnect": "Yeniden bağlan",
+  "terminalResize": "Yeniden boyutlandır",
+  "terminalSend": "Gönder"
 }

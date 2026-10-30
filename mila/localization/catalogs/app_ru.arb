@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Тип",
   "sshKeyThisDevice": "Это устройство",
   "sshKeyRevoke": "Отозвать",
-  "sshKeyRevokeConfirm": "Отозвать ключ {fingerprint}? Устройство, которое его использует, нужно будет снова одобрить для входа."
+  "sshKeyRevokeConfirm": "Отозвать ключ {fingerprint}? Устройство, которое его использует, нужно будет снова одобрить для входа.",
+  "deploymentOpen": "Открыть",
+  "deploymentRemove": "Удалить",
+  "deploymentSelected": "Выбрано",
+  "deploymentsEmpty": "Развёртываний пока нет.",
+  "linkCopied": "Ссылка скопирована.",
+  "linkCopy": "Копировать ссылку",
+  "linkSignInRequired": "Войдите в {host}, чтобы открыть эту ссылку.",
+  "terminalReconnect": "Переподключиться",
+  "terminalResize": "Изменить размер",
+  "terminalSend": "Отправить"
 }

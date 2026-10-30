@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Loại",
   "sshKeyThisDevice": "Thiết bị này",
   "sshKeyRevoke": "Thu hồi",
-  "sshKeyRevokeConfirm": "Thu hồi khóa {fingerprint}? Thiết bị dùng khóa này phải được phê duyệt lại để đăng nhập."
+  "sshKeyRevokeConfirm": "Thu hồi khóa {fingerprint}? Thiết bị dùng khóa này phải được phê duyệt lại để đăng nhập.",
+  "deploymentOpen": "Mở",
+  "deploymentRemove": "Xóa",
+  "deploymentSelected": "Đã chọn",
+  "deploymentsEmpty": "Chưa có bản triển khai nào.",
+  "linkCopied": "Đã sao chép liên kết.",
+  "linkCopy": "Sao chép liên kết",
+  "linkSignInRequired": "Đăng nhập vào {host} để mở liên kết này.",
+  "terminalReconnect": "Kết nối lại",
+  "terminalResize": "Đổi kích thước",
+  "terminalSend": "Gửi"
 }

@@ -39,3 +39,14 @@ current generation, validate input and resize permissions, and keep PTY bytes ou
 The GTK web action MUST launch only a Rust-validated public HTTPS endpoint whose
 port matches the authenticated projection; private, stale, malformed, or
 non-matching destinations MUST be refused before invoking the desktop browser.
+
+@cc [owner:ghuntley,label:architecture;desktop] linux-gtk-views-thin
+GTK code in `src/main.rs` and `src/views.rs` MUST NOT parse routes, choose request identifiers,
+decode PTY bytes, or decide deployment, terminal, SSH-key or navigation state; it MUST delegate to
+the library modules (`deployments`, `terminal_surface`, `terminal_text`, `ssh_keys_view`,
+`deep_link`, `route`) so the headless journey driver exercises the same decisions.
+
+@cc [owner:ghuntley,label:security;desktop] linux-authority-drop-on-switch
+Selecting a different deployment, removing the selected deployment, signing out or closing the
+window MUST clear the authenticated session, sign-in generation, machine listing, terminal
+generation and SSH-key rows before any later action can use them.

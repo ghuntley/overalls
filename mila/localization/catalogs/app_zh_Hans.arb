@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "类型",
   "sshKeyThisDevice": "此设备",
   "sshKeyRevoke": "撤销",
-  "sshKeyRevokeConfirm": "撤销密钥 {fingerprint}?使用它的设备需要重新获得批准才能登录。"
+  "sshKeyRevokeConfirm": "撤销密钥 {fingerprint}?使用它的设备需要重新获得批准才能登录。",
+  "deploymentOpen": "打开",
+  "deploymentRemove": "移除",
+  "deploymentSelected": "已选择",
+  "deploymentsEmpty": "还没有部署。",
+  "linkCopied": "链接已复制。",
+  "linkCopy": "复制链接",
+  "linkSignInRequired": "请登录 {host} 以打开此链接。",
+  "terminalReconnect": "重新连接",
+  "terminalResize": "调整大小",
+  "terminalSend": "发送"
 }

@@ -2,19 +2,25 @@ use adw::prelude::*;
 use adw::{Application, ApplicationWindow};
 use gtk::{gio, glib, Align, Box, Button, Entry, Label, Orientation, TextDirection};
 use mila_native_linux::adapter::{
-    browser_endpoint_url, decode_listing, decode_notification_devices, decode_ssh_keys,
-    decode_web_endpoint, format_machine_action, format_ssh_key_revoke, format_thread_response,
-    format_web_command, TerminalStream,
+    browser_endpoint_url, decode_listing, decode_notification_devices, decode_web_endpoint,
+    format_machine_action, format_thread_response, format_web_command,
 };
+use mila_native_linux::deep_link::Page;
+use mila_native_linux::deployments::{DeploymentError, DeploymentList, DeploymentStore};
 use mila_native_linux::machine_view::{project_detail, project_listing};
 use mila_native_linux::notifications::NotificationState;
-use mila_native_linux::route::{ActivationBatch, ActivationRoute, NavigationDecision};
+use mila_native_linux::route::ActivationBatch;
 use mila_native_linux::session::{
     ApprovalInfo, SessionBinding, SignInEvent, SignInFlow, SignInPhase, WhoamiOutcome,
 };
-use std::{cell::RefCell, rc::Rc};
+use mila_native_linux::ssh_keys_view::SshKeysView;
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+};
 mod persistence;
 mod strings;
+mod views;
 const APPLICATION_ID: &str = "dev.overalls.Mila.Linux";
 #[derive(Clone)]
 struct NativeState {
@@ -22,6 +28,12 @@ struct NativeState {
     sign_in: Rc<RefCell<SignInFlow>>,
     session: Rc<RefCell<SessionBinding>>,
     machine_listing: Rc<RefCell<Option<mila_session::MachineListing>>>,
+    deployment_store: Option<DeploymentStore>,
+    terminal: Rc<RefCell<Option<views::GtkTerminal>>>,
+    terminal_polling: Rc<Cell<bool>>,
+    ssh_keys: Rc<RefCell<SshKeysView>>,
+    links: Rc<RefCell<Option<views::LinkTargets>>>,
+    rerender: Rc<RefCell<Vec<Rc<dyn Fn()>>>>,
 }
 impl NativeState {
     fn new() -> Self {
@@ -30,6 +42,54 @@ impl NativeState {
             sign_in: Rc::new(RefCell::new(SignInFlow::default())),
             session: Rc::new(RefCell::new(SessionBinding::default())),
             machine_listing: Rc::new(RefCell::new(None)),
+            deployment_store: DeploymentStore::from_environment(),
+            terminal: Rc::new(RefCell::new(None)),
+            terminal_polling: Rc::new(Cell::new(false)),
+            ssh_keys: Rc::new(RefCell::new(SshKeysView::default())),
+            links: Rc::new(RefCell::new(None)),
+            rerender: Rc::new(RefCell::new(Vec::new())),
+        }
+    }
+
+    fn deployment_list(&self) -> Result<DeploymentList, DeploymentError> {
+        self.deployment_store
+            .as_ref()
+            .map_or(Ok(DeploymentList::default()), DeploymentStore::load)
+    }
+
+    fn update_deployments<R>(
+        &self,
+        change: impl FnOnce(&mut DeploymentList) -> Result<R, DeploymentError>,
+    ) -> Result<R, DeploymentError> {
+        let store = self
+            .deployment_store
+            .as_ref()
+            .ok_or(DeploymentError::InvalidData)?;
+        store.update(change).map(|(_, result)| result)
+    }
+
+    /// A deployment switch, removal or sign-out invalidates every
+    /// authenticated handle and projection: session, approval generation,
+    /// machine listing, terminal generation and SSH-key rows.
+    fn drop_authority(&self) {
+        if let Some(surface) = self.terminal.borrow_mut().as_mut() {
+            surface.sign_out();
+        }
+        *self.terminal.borrow_mut() = None;
+        self.session.borrow_mut().clear();
+        *self.machine_listing.borrow_mut() = None;
+        self.ssh_keys.borrow_mut().sign_out();
+        let mut flow = self.sign_in.borrow_mut();
+        *flow = flow.clone().apply(SignInEvent::SignOut);
+        drop(flow);
+        for render in self.rerender.borrow().iter() {
+            render();
+        }
+    }
+
+    fn show_page(&self, page: Page) {
+        if let Some(targets) = self.links.borrow().as_ref() {
+            targets.stack.set_visible_child_name(page.name());
         }
     }
     fn ensure_window(&self, app: &adw::Application) -> ApplicationWindow {
@@ -48,27 +108,68 @@ impl NativeState {
         title.set_halign(Align::Start);
         title.add_css_class("title-1");
         root.append(&title);
-        let nav = Box::new(Orientation::Horizontal, 8);
+        let stack = gtk::Stack::new();
+        stack.set_vexpand(true);
+        let switcher = gtk::StackSwitcher::new();
+        switcher.set_stack(Some(&stack));
+        root.append(&switcher);
+        let page = || {
+            let page = Box::new(Orientation::Vertical, 8);
+            page.set_margin_top(12);
+            page
+        };
+        let machines_page = page();
+        let threads_page = page();
+        let terminal_page = page();
+        let deployments_page = page();
+        let sign_in_page = page();
+        let settings_page = page();
+        for (child, page_id, title) in [
+            (
+                &machines_page,
+                Page::Machines,
+                strings::text(strings::Message::Machines),
+            ),
+            (
+                &threads_page,
+                Page::Threads,
+                strings::text(strings::Message::Threads),
+            ),
+            (
+                &terminal_page,
+                Page::Terminal,
+                strings::text(strings::Message::TerminalsTitle),
+            ),
+            (
+                &deployments_page,
+                Page::Deployments,
+                strings::text(strings::Message::DeploymentsTitle),
+            ),
+            (
+                &sign_in_page,
+                Page::SignIn,
+                strings::text(strings::Message::SignInTitle),
+            ),
+            (
+                &settings_page,
+                Page::Settings,
+                strings::text(strings::Message::Settings),
+            ),
+        ] {
+            let scroller = gtk::ScrolledWindow::builder()
+                .child(child)
+                .vexpand(true)
+                .hscrollbar_policy(gtk::PolicyType::Never)
+                .build();
+            stack.add_titled(&scroller, Some(page_id.name()), &title);
+        }
+        root.append(&stack);
         let ready_text = strings::text(strings::Message::Ready);
         let content = Label::new(Some(&ready_text));
         content.set_wrap(true);
         content.set_halign(Align::Start);
+        content.set_selectable(true);
         *self.status.borrow_mut() = Some(content.clone());
-        for (name, text) in [
-            ("Machines", "Machines\nSelect a machine to view its status."),
-            ("Threads", "Threads\nRecent conversations appear here."),
-            (
-                "Settings",
-                "Settings\nRuntime settings are managed by the core library.",
-            ),
-        ] {
-            let button = Button::with_label(name);
-            let label = content.clone();
-            let text = text.to_string();
-            button.connect_clicked(move |_| label.set_label(&text));
-            nav.append(&button);
-        }
-        root.append(&nav);
 
         let settings = persistence::load_settings().unwrap_or_default();
         root.set_direction(match settings.direction() {
@@ -77,7 +178,7 @@ impl NativeState {
         });
         let appearance_label = Label::new(Some(&strings::text(strings::Message::Appearance)));
         appearance_label.set_halign(Align::Start);
-        root.append(&appearance_label);
+        settings_page.append(&appearance_label);
         let settings_actions = Box::new(Orientation::Horizontal, 8);
         for (label, appearance) in [
             (
@@ -112,7 +213,7 @@ impl NativeState {
             });
             settings_actions.append(&button);
         }
-        root.append(&settings_actions);
+        settings_page.append(&settings_actions);
         let locale = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::Locale))
             .text(&settings.locale)
@@ -133,112 +234,28 @@ impl NativeState {
                 Err(_) => settings_status.set_label("Settings locale rejected by Rust policy."),
             }
         });
-        root.append(&locale);
-        root.append(&save_settings);
+        settings_page.append(&locale);
+        settings_page.append(&save_settings);
 
         let deployment = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::DeploymentSelect))
             .hexpand(true)
             .build();
-        if let Ok(Some(selection)) = persistence::load() {
-            deployment.set_text(&selection.host);
+        if let Some(selected) = self
+            .deployment_list()
+            .ok()
+            .and_then(|list| list.selected().cloned())
+        {
+            deployment.set_text(selected.as_str());
         }
-        let select = Button::with_label(&strings::text(strings::Message::SelectDeployment));
-        let deployment_status = content.clone();
-        let deployment_input = deployment.clone();
-        let deployment_session = self.session.clone();
-        let deployment_sign_in = self.sign_in.clone();
-        select.connect_clicked(move |_| {
-            let host = deployment_input.text().trim().to_owned();
-            match persistence::DeploymentSelection::validate(&host) {
-                Ok(selection) => {
-                    let route = selection.route();
-                    let _ = persistence::save(&selection);
-                    // A deployment switch invalidates every authenticated handle and
-                    // approval generation. Keep the GTK shell from accidentally
-                    // presenting authority from the previous host.
-                    deployment_session.borrow_mut().clear();
-                    let mut flow = deployment_sign_in.borrow_mut();
-                    *flow = flow.clone().apply(SignInEvent::SignOut);
-                    let parsed = ActivationRoute::parse(&route).expect("validated route");
-                    deployment_status.set_label(&format!(
-                        "Deployment selected\n{}\nSign in required.",
-                        parsed.canonical()
-                    ))
-                }
-                Err(_) => deployment_status.set_label("Deployment host rejected by Rust policy."),
-            }
-        });
-        root.append(&deployment);
-        root.append(&select);
-        let reload = Button::with_label(&strings::text(strings::Message::ReloadDeployment));
-        let reload_status = content.clone();
-        let reload_input = deployment.clone();
-        reload.connect_clicked(move |_| match persistence::load() {
-            Ok(Some(selection)) => {
-                reload_input.set_text(&selection.host);
-                reload_status.set_label(&format!("Deployment loaded\n{}", selection.host));
-            }
-            Ok(None) => {
-                reload_input.set_text("");
-                reload_status.set_label("No deployment is selected.");
-            }
-            Err(_) => reload_status.set_label("Deployment could not be loaded."),
-        });
-        root.append(&reload);
-        let forget = Button::with_label(&strings::text(strings::Message::ForgetDeployment));
-        let forget_status = content.clone();
-        let forget_input = deployment.clone();
-        let forget_session = self.session.clone();
-        let forget_sign_in = self.sign_in.clone();
-        forget.connect_clicked(move |_| match persistence::forget() {
-            Ok(()) => {
-                forget_input.set_text("");
-                forget_session.borrow_mut().clear();
-                let mut flow = forget_sign_in.borrow_mut();
-                *flow = flow.clone().apply(SignInEvent::SignOut);
-                forget_status.set_label(&strings::text(strings::Message::DeploymentForgotten));
-            }
-            Err(_) => {
-                forget_status.set_label(&strings::text(strings::Message::DeploymentForgetFailed));
-            }
-        });
-        root.append(&forget);
+        let render_deployments =
+            views::build_deployments(self, &deployments_page, &deployment, &content);
+        self.rerender.borrow_mut().push(render_deployments);
 
-        // Deep links can also be entered from assistive launchers and clipboard
-        // integrations. Keep the same typed activation classifier as desktop
-        // `open` events so the UI never navigates on untrusted text directly.
-        let route_input = Entry::builder()
-            .placeholder_text("Open Mila link (overalls://...)")
-            .hexpand(true)
-            .build();
-        let route_button = Button::with_label("Open link");
-        let route_status = content.clone();
-        let route_entry = route_input.clone();
-        let route_session = self.session.clone();
-        let route_button_deployment = deployment.clone();
-        route_button.connect_clicked(move |_| {
-            let batch = ActivationBatch::parse([route_entry.text().as_str()]);
-            let selected = route_button_deployment.text().trim().to_owned();
-            let authenticated = route_session.borrow().is_authenticated();
-            let decisions = batch.decisions(Some(selected.as_str()), authenticated);
-            let message = decisions.first().map(|decision| match decision {
-                NavigationDecision::UnknownDeployment { .. } => {
-                    format!("Add deployment before opening {}", decision.canonical())
-                }
-                NavigationDecision::SignInRequired { .. } => {
-                    format!("Sign in before opening {}", decision.canonical())
-                }
-                NavigationDecision::Open { .. } => format!("Open {}", decision.canonical()),
-            });
-            route_status.set_label(
-                message
-                    .as_deref()
-                    .unwrap_or("Link rejected by Rust policy."),
-            );
-        });
-        root.append(&route_input);
-        root.append(&route_button);
+        // Deep links can also be entered, pasted or dropped. Every path uses
+        // the same bounded activation batch and navigation-only presentation
+        // as desktop `open` events.
+        views::build_link_controls(self, &deployments_page, &content);
 
         let machine_detail_id = Entry::builder()
             .placeholder_text("Machine UUID for detail")
@@ -307,9 +324,9 @@ impl NativeState {
                 Err(_) => detail_status.set_label("Machine detail unavailable."),
             }
         });
-        root.append(&machine_detail_id);
-        root.append(&refresh_machines);
-        root.append(&show_machine);
+        machines_page.append(&machine_detail_id);
+        machines_page.append(&refresh_machines);
+        machines_page.append(&show_machine);
 
         // The lifecycle controls are deliberately state-only until the host
         // supplies its owner-only Linux device signer and HTTPS trust fetcher.
@@ -320,14 +337,18 @@ impl NativeState {
         let sign_in_status = content.clone();
         let deployment_input = deployment.clone();
         let sign_in_button = Button::with_label(&strings::text(strings::Message::SignInStart));
+        let sign_in_state = self.clone();
         sign_in_button.connect_clicked(move |_| {
             let host = deployment_input.text().trim().to_owned();
-            let Ok(selection) = persistence::DeploymentSelection::validate(&host) else {
+            let Ok(changed) = sign_in_state.update_deployments(|list| list.add_and_select(&host))
+            else {
                 sign_in_status
                     .set_label(&strings::text(strings::Message::SignInDeploymentRequired));
                 return;
             };
-            let _ = persistence::save(&selection);
+            if changed {
+                sign_in_state.drop_authority();
+            }
             let mut flow = sign_in.borrow_mut();
             *flow = flow.clone().apply(SignInEvent::Start);
             sign_in_status.set_label(&strings::text(strings::Message::SignInConnecting));
@@ -428,24 +449,20 @@ impl NativeState {
         });
         sign_in_controls.append(&open_approval);
 
-        let sign_in = self.sign_in.clone();
         let sign_in_status = content.clone();
-        let session = self.session.clone();
-        let machine_listing_on_sign_out = self.machine_listing.clone();
+        let sign_out_state = self.clone();
         let sign_out_button = Button::with_label(&strings::text(strings::Message::SignInSignOut));
         sign_out_button.connect_clicked(move |_| {
-            session.borrow_mut().clear();
-            // Never retain authenticated machine projections after sign-out.
-            // A subsequent session must refresh from the server before detail/actions.
-            *machine_listing_on_sign_out.borrow_mut() = None;
-            let mut flow = sign_in.borrow_mut();
-            *flow = flow.clone().apply(SignInEvent::SignOut);
+            // Never retain authenticated projections after sign-out: machine
+            // listing, terminal generation and SSH-key rows are all dropped.
+            // A subsequent session must refresh from the server.
+            sign_out_state.drop_authority();
             sign_in_status.set_label("Signed out; deployment trust and approval remain pinned.");
         });
         sign_in_controls.append(&sign_out_button);
-        root.append(&sign_in_controls);
-        root.append(&approval_url);
-        root.append(&approval_fingerprint);
+        sign_in_page.append(&sign_in_controls);
+        sign_in_page.append(&approval_url);
+        sign_in_page.append(&approval_fingerprint);
 
         let sign_in = self.sign_in.clone();
         let sign_in_status = content.clone();
@@ -460,7 +477,7 @@ impl NativeState {
                 "Reconnect requires a disconnected authenticated session."
             });
         });
-        root.append(&reconnect);
+        sign_in_page.append(&reconnect);
 
         // Linux intentionally reports lock capability explicitly. The shared retired client
         // policy marks Linux as unavailable; keeping this state visible prevents
@@ -476,7 +493,7 @@ impl NativeState {
             let unavailable = strings::text(strings::Message::LockUnavailable);
             lock_status.set_label(&format!("{unavailable}\n{explanation}"));
         });
-        root.append(&lock_button);
+        settings_page.append(&lock_button);
         // Linux can show local desktop notifications through the desktop
         // environment, while Susan push registration remains unavailable.
         let notification_state = Rc::new(RefCell::new(NotificationState::desktop()));
@@ -492,7 +509,7 @@ impl NativeState {
                     .set_label(&strings::text(strings::Message::NotificationsExplain)),
             }
         });
-        root.append(&notification_button);
+        settings_page.append(&notification_button);
         let notification_id = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::NotificationDeviceId))
             .hexpand(true)
@@ -540,8 +557,8 @@ impl NativeState {
             });
             notification_actions.append(&button);
         }
-        root.append(&notification_id);
-        root.append(&notification_actions);
+        settings_page.append(&notification_id);
+        settings_page.append(&notification_actions);
         let machine_id = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::MachineUuid))
             .hexpand(true)
@@ -604,9 +621,9 @@ impl NativeState {
             });
             actions.append(&button);
         }
-        root.append(&machine_id);
-        root.append(&request_id);
-        root.append(&actions);
+        machines_page.append(&machine_id);
+        machines_page.append(&request_id);
+        machines_page.append(&actions);
         let create_name = Entry::builder()
             .placeholder_text("New machine name")
             .hexpand(true)
@@ -633,8 +650,8 @@ impl NativeState {
                 Err(_) => create_status.set_label("Machine creation rejected by Rust policy."),
             }
         });
-        root.append(&create_name);
-        root.append(&create_button);
+        machines_page.append(&create_name);
+        machines_page.append(&create_button);
         let resize_button = Button::with_label("Resize machine");
         let resize_status = content.clone();
         let resize_session = self.session.clone();
@@ -657,7 +674,7 @@ impl NativeState {
                 Err(_) => resize_status.set_label("Machine resize rejected by Rust policy."),
             }
         });
-        root.append(&resize_button);
+        machines_page.append(&resize_button);
         let share_email = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::ShareEmail))
             .hexpand(true)
@@ -701,9 +718,9 @@ impl NativeState {
             });
             share_actions.append(&button);
         }
-        root.append(&share_email);
-        root.append(&share_role);
-        root.append(&share_actions);
+        machines_page.append(&share_email);
+        machines_page.append(&share_role);
+        machines_page.append(&share_actions);
         let share_response = Entry::builder()
             .placeholder_text("share show JSON (paste response)")
             .hexpand(true)
@@ -720,256 +737,17 @@ impl NativeState {
                 Err(_) => share_status.set_label("Sharing listing rejected by Rust policy."),
             },
         );
-        root.append(&share_response);
-        root.append(&share_load);
-        // Terminal controls keep only typed lifecycle state. PTY bytes remain in
-        // the transport and never enter GTK labels or application state.
-        let terminal = Entry::builder()
-            .placeholder_text("Terminal session ID")
-            .hexpand(true)
-            .build();
-        let terminal_input = Entry::builder()
-            .placeholder_text("Terminal input")
-            .hexpand(true)
-            .build();
-        let terminal_columns = Entry::builder()
-            .placeholder_text("Columns")
-            .text("80")
-            .hexpand(true)
-            .build();
-        let terminal_rows = Entry::builder()
-            .placeholder_text("Rows")
-            .text("24")
-            .hexpand(true)
-            .build();
-        let terminal_actions = Box::new(Orientation::Horizontal, 8);
-        let terminal_stream = Rc::new(RefCell::new(TerminalStream::new()));
-        let terminal_handle: Rc<RefCell<Option<u64>>> = Rc::new(RefCell::new(None));
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let handle = terminal_handle.clone();
-        let session_input = terminal.clone();
-        let session_binding = self.session.clone();
-        let attach = Button::with_label(&strings::text(strings::Message::AttachTerminal));
-        attach.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let session = session_input.text().trim().to_owned();
-            if session.is_empty() || session.len() > 128 {
-                terminal_status.set_label("Terminal session rejected by Rust policy.");
-                return;
-            }
-            let mut stream = stream.borrow_mut();
-            let generation = match stream.attach() {
-                Ok(generation) => generation,
-                Err(_) => {
-                    terminal_status.set_label("Terminal attach unavailable.");
-                    return;
-                }
-            };
-            let parsed_columns = 80_u16;
-            let parsed_rows = 24_u16;
-            let mut binding = session_binding.borrow_mut();
-            let Some(live) = binding.session_mut() else {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            };
-            match live.terminal_attach(parsed_columns, parsed_rows) {
-                Ok(terminal) => {
-                    *handle.borrow_mut() = Some(terminal);
-                    let cursor = stream.state().resume_cursor().unwrap_or(0);
-                    match stream.connected(generation, cursor, true) {
-                        Ok(()) => terminal_status.set_label(&format!(
-                            "Terminal attached\\nSession {session}\\nGeneration {generation}"
-                        )),
-                        Err(_) => terminal_status.set_label("Terminal connection rejected."),
-                    }
-                }
-                Err(_) => {
-                    let _ = stream.kill(generation);
-                    terminal_status.set_label("Terminal attach unavailable.");
-                }
-            }
-        });
-        terminal_actions.append(&attach);
-
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let session_binding = self.session.clone();
-        let connect = Button::with_label("Connect");
-        connect.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let mut stream = stream.borrow_mut();
-            let generation = stream.state().generation();
-            let cursor = stream.state().resume_cursor().unwrap_or(0);
-            match stream.connected(generation, cursor, true) {
-                Ok(()) => terminal_status.set_label(&format!(
-                    "Terminal attached\nGeneration {generation}\nRead-write"
-                )),
-                Err(_) => terminal_status.set_label("Terminal connection rejected."),
-            }
-        });
-        terminal_actions.append(&connect);
-
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let session_binding = self.session.clone();
-        let reconnect = Button::with_label("Reconnect");
-        reconnect.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let mut stream = stream.borrow_mut();
-            match stream.reconnect() {
-                Ok(generation) => terminal_status
-                    .set_label(&format!("Terminal reconnecting\nGeneration {generation}")),
-                Err(_) => terminal_status.set_label("Terminal reconnect unavailable."),
-            }
-        });
-        terminal_actions.append(&reconnect);
-
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let handle = terminal_handle.clone();
-        let input = terminal_input.clone();
-        let session_binding = self.session.clone();
-        let input_button = Button::with_label("Send input");
-        input_button.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let text = input.text().to_string();
-            let bytes = text.as_bytes();
-            let length = bytes.len();
-            if length == 0 {
-                terminal_status.set_label("Terminal input length rejected.");
-                return;
-            }
-            match stream.borrow().validate_input(length) {
-                Ok(()) => {
-                    let result = session_binding
-                        .borrow_mut()
-                        .session_mut()
-                        .and_then(|live| live.terminal_input(bytes).ok());
-                    if result.is_some() && handle.borrow().is_some() {
-                        terminal_status.set_label(&format!("Terminal input sent ({length} bytes)"))
-                    } else {
-                        terminal_status.set_label("Terminal input rejected by transport.")
-                    }
-                }
-                Err(_) => terminal_status.set_label("Terminal input rejected by Rust policy."),
-            }
-        });
-        terminal_actions.append(&input_button);
-
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let handle = terminal_handle.clone();
-        let columns = terminal_columns.clone();
-        let rows = terminal_rows.clone();
-        let session_binding = self.session.clone();
-        let resize = Button::with_label("Resize");
-        resize.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let parsed = columns
-                .text()
-                .trim()
-                .parse::<u16>()
-                .ok()
-                .zip(rows.text().trim().parse::<u16>().ok());
-            let Some((columns, rows)) = parsed else {
-                terminal_status.set_label("Terminal size rejected.");
-                return;
-            };
-            match stream.borrow().validate_resize(columns, rows) {
-                Ok(()) => {
-                    let result = session_binding
-                        .borrow_mut()
-                        .session_mut()
-                        .and_then(|live| live.terminal_resize(columns, rows).ok());
-                    if result.is_some() && handle.borrow().is_some() {
-                        terminal_status.set_label(&format!("Terminal resized ({columns}x{rows})"))
-                    } else {
-                        terminal_status.set_label("Terminal resize rejected by transport.")
-                    }
-                }
-                Err(_) => terminal_status.set_label("Terminal resize rejected by Rust policy."),
-            }
-        });
-        terminal_actions.append(&resize);
-
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let handle = terminal_handle.clone();
-        let session_binding = self.session.clone();
-        let kill = Button::with_label("Kill");
-        kill.connect_clicked(move |_| {
-            if session_binding.borrow().session().is_none() {
-                terminal_status.set_label("Terminal controls require sign-in.");
-                return;
-            }
-            let generation = stream.borrow().state().generation();
-            let _ = session_binding
-                .borrow_mut()
-                .session_mut()
-                .map(|live| live.terminal_kill());
-            *handle.borrow_mut() = None;
-            match stream.borrow_mut().kill(generation) {
-                Ok(()) => {
-                    terminal_status.set_label(&format!("Terminal ended\nGeneration {generation}"))
-                }
-                Err(_) => terminal_status.set_label("Terminal kill rejected."),
-            }
-        });
-        terminal_actions.append(&kill);
-        let terminal_status = content.clone();
-        let stream = terminal_stream.clone();
-        let handle = terminal_handle.clone();
-        let session_binding = self.session.clone();
-        let poll = Button::with_label("Poll output");
-        poll.connect_clicked(move |_| {
-            let Some(_terminal) = *handle.borrow() else {
-                terminal_status.set_label("Terminal is not attached.");
-                return;
-            };
-            let generation = stream.borrow().state().generation();
-            let output = session_binding
-                .borrow_mut()
-                .session_mut()
-                .and_then(|live| live.terminal_poll().ok());
-            let Some(output) = output else {
-                terminal_status.set_label("Terminal output unavailable.");
-                return;
-            };
-            if output.is_empty() {
-                terminal_status.set_label("Terminal output closed.");
-                *handle.borrow_mut() = None;
-                let _ = stream.borrow_mut().kill(generation);
-                return;
-            }
-            let text = String::from_utf8_lossy(&output).into_owned();
-            let rendered = stream.borrow_mut().render_output(generation, &text);
-            match rendered {
-                Ok(()) => terminal_status.set_label(&stream.borrow().rendered_text()),
-                Err(_) => terminal_status.set_label("Terminal output rejected by renderer."),
-            }
-        });
-        terminal_actions.append(&poll);
-        root.append(&terminal);
-        root.append(&terminal_input);
-        root.append(&terminal_columns);
-        root.append(&terminal_rows);
-        root.append(&terminal_actions);
+        machines_page.append(&share_response);
+        machines_page.append(&share_load);
+        // The terminal page binds the authenticated PTY (HostPtyTransport over
+        // the session FFI) to a GTK text view through the library surface.
+        // PTY bytes are decoded in the transport; GTK receives viewport text.
+        let terminal_session = views::build_terminal(self, &terminal_page, &content);
+        let terminal_link_machine = machine_id.clone();
+        let terminal_link_session = terminal_session.clone();
+        terminal_page.append(&views::copy_link_button(self, &content, move || {
+            views::terminal_target(&terminal_link_machine, &terminal_link_session)
+        }));
         let thread_id = Entry::builder()
             .placeholder_text(&strings::text(strings::Message::ThreadId))
             .max_length(128)
@@ -1041,7 +819,10 @@ impl NativeState {
             .build();
         let thread_input = Entry::builder()
             .placeholder_text("Thread input (stdin)")
-            .max_length(64 * 1024)
+            // GtkEntry:max-length is bounded by G_MAXUINT16; 65536 aborts
+            // window construction. The Rust thread action enforces its own
+            // stdin bound.
+            .max_length(i32::from(u16::MAX))
             .hexpand(true)
             .build();
         for (message, command, needs_secondary) in [
@@ -1124,10 +905,14 @@ impl NativeState {
             });
             thread_actions.append(&button);
         }
-        root.append(&thread_id);
-        root.append(&thread_secondary);
-        root.append(&thread_input);
-        root.append(&thread_actions);
+        threads_page.append(&thread_id);
+        threads_page.append(&thread_secondary);
+        threads_page.append(&thread_input);
+        threads_page.append(&thread_actions);
+        let thread_link_entry = thread_id.clone();
+        threads_page.append(&views::copy_link_button(self, &content, move || {
+            views::thread_target(&thread_link_entry)
+        }));
         let web_port = Entry::builder()
             .placeholder_text("Web port (1-65535)")
             .hexpand(true)
@@ -1229,10 +1014,10 @@ impl NativeState {
             });
             web_actions.append(&button);
         }
-        root.append(&web_port);
-        root.append(&web_request);
-        root.append(&web_revision);
-        root.append(&web_actions);
+        machines_page.append(&web_port);
+        machines_page.append(&web_request);
+        machines_page.append(&web_revision);
+        machines_page.append(&web_actions);
         let open_web = Button::with_label("Open web endpoint");
         let open_web_status = content.clone();
         let endpoint_state = web_endpoint.clone();
@@ -1259,63 +1044,35 @@ impl NativeState {
                 Err(_) => open_web_status.set_label("The browser could not open the endpoint."),
             }
         });
-        root.append(&open_web);
-        let key_id = Entry::builder()
-            .placeholder_text("SSH key ID")
-            .hexpand(true)
-            .build();
-        let key_request = Entry::builder()
-            .placeholder_text("Request UUID (porsche-…)")
-            .hexpand(true)
-            .build();
-        let revoke = Button::with_label(&strings::text(strings::Message::RevokeKey));
-        let list_keys = Button::with_label("List SSH keys");
-        let key_id_for_action = key_id.clone();
-        let key_request_for_action = key_request.clone();
-        let label_for_action = content.clone();
-        let revoke_session = self.session.clone();
-        revoke.connect_clicked(move |_| {
-            if revoke_session.borrow().session().is_none() {
-                label_for_action.set_label("SSH key controls require sign-in.");
-                return;
-            }
-            match format_ssh_key_revoke(
-                key_id_for_action.text().as_str(),
-                key_request_for_action.text().as_str(),
-            ) {
-                Ok(command) => label_for_action.set_label(&format!("SSH key command\n{command}")),
-                Err(_) => label_for_action.set_label("SSH key request rejected by Rust policy."),
-            }
+        machines_page.append(&open_web);
+        let machine_link_entry = machine_id.clone();
+        machines_page.append(&views::copy_link_button(self, &content, move || {
+            views::machine_target(&machine_link_entry)
+        }));
+        let render_ssh_keys = views::build_ssh_keys(self, &settings_page, &content);
+        self.rerender.borrow_mut().push(render_ssh_keys);
+        *self.links.borrow_mut() = Some(views::LinkTargets {
+            stack: stack.clone(),
+            deployment: deployment.clone(),
+            machine: machine_id.clone(),
+            terminal_session: terminal_session.clone(),
+            thread: thread_id.clone(),
         });
-        let list_keys_status = content.clone();
-        let list_keys_session = self.session.clone();
-        list_keys.connect_clicked(move |_| {
-            let mut binding = list_keys_session.borrow_mut();
-            let Some(live) = binding.session_mut() else {
-                list_keys_status.set_label("SSH key controls require sign-in.");
-                return;
-            };
-            match live.ssh_keys().and_then(|bytes| {
-                decode_ssh_keys(&bytes)
-                    .map(|keys| format!("{} SSH keys", keys.len()))
-                    .map_err(|_| mila_native_linux::session::SessionError::InvalidInput)
-            }) {
-                Ok(summary) => list_keys_status.set_label(&summary),
-                Err(_) => list_keys_status.set_label("SSH key listing rejected."),
-            }
-        });
-        root.append(&key_id);
-        root.append(&key_request);
-        root.append(&revoke);
-        root.append(&list_keys);
         root.append(&content);
-        ApplicationWindow::builder()
+        let window = ApplicationWindow::builder()
             .application(app)
-            .title("Mila")
-            .default_width(720)
-            .default_height(420)
+            .title(strings::text(strings::Message::AppName))
+            .default_width(900)
+            .default_height(720)
             .content(&root)
-            .build()
+            .build();
+        views::install_drop_target(self, &window, &content);
+        let close_state = self.clone();
+        window.connect_close_request(move |_| {
+            close_state.drop_authority();
+            glib::Propagation::Proceed
+        });
+        window
     }
     fn activate(&self, app: &adw::Application) {
         self.ensure_window(app).present();
@@ -1324,42 +1081,10 @@ impl NativeState {
         let window = self.ensure_window(app);
         let uris = files.iter().map(|file| file.uri()).collect::<Vec<_>>();
         let batch = ActivationBatch::parse(uris.iter().map(|uri| uri.as_str()));
-        let selected_authority = persistence::load()
-            .ok()
-            .flatten()
-            .map(|selection| selection.host);
-        let authenticated = self.sign_in.borrow().phase == SignInPhase::SignedIn
-            && self.session.borrow().is_authenticated();
-        let decisions = batch.decisions(selected_authority.as_deref(), authenticated);
-        let rejected = batch.rejected();
-        if decisions.is_empty() {
-            self.set_status("Mila\nNo supported link could be opened.");
-        } else {
-            let routes = decisions
-                .iter()
-                .map(|decision| match decision {
-                    NavigationDecision::UnknownDeployment { .. } => {
-                        format!("Add deployment before opening {}", decision.canonical())
-                    }
-                    NavigationDecision::SignInRequired { .. } => {
-                        format!("Sign in before opening {}", decision.canonical())
-                    }
-                    NavigationDecision::Open { .. } => {
-                        format!("Open {}", decision.canonical())
-                    }
-                })
-                .collect::<Vec<_>>();
-            self.set_status(&format!(
-                "Mila\nRoutes:\n{}\nRejected links: {rejected}",
-                routes.join("\n")
-            ));
+        if let Some(status) = self.status.borrow().clone() {
+            views::handle_batch(self, &batch, &status);
         }
         window.present();
-    }
-    fn set_status(&self, value: &str) {
-        if let Some(label) = self.status.borrow().as_ref() {
-            label.set_label(value);
-        }
     }
 }
 fn main() -> glib::ExitCode {
@@ -1381,4 +1106,216 @@ fn main() -> glib::ExitCode {
     let o = state.clone();
     application.connect_open(move |app, files, _| o.open(app, files));
     application.run()
+}
+
+/// GTK widget-lifecycle tests. They need a display; CI runs them against a
+/// Broadway server and sets `MILA_GTK_TESTS_REQUIRED=1` so a missing display
+/// fails instead of skipping. Everything runs in one test function because
+/// GTK binds to the first thread that initializes it.
+#[cfg(test)]
+mod gtk_tests {
+    use super::*;
+    use mila_native_linux::route::share_inbound;
+
+    fn buttons(widget: &gtk::Widget, label: &str, found: &mut Vec<Button>) {
+        if let Some(button) = widget.downcast_ref::<Button>() {
+            if button.label().as_deref() == Some(label) {
+                found.push(button.clone());
+            }
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            buttons(&current, label, found);
+            child = current.next_sibling();
+        }
+    }
+
+    fn find(widget: &impl IsA<gtk::Widget>, label: &str) -> Vec<Button> {
+        let mut found = Vec::new();
+        buttons(widget.upcast_ref(), label, &mut found);
+        found
+    }
+
+    fn labels(widget: &gtk::Widget, found: &mut Vec<String>) {
+        if let Some(label) = widget.downcast_ref::<Label>() {
+            if label.is_visible() || label.parent().is_some() {
+                found.push(label.label().to_string());
+            }
+        }
+        let mut child = widget.first_child();
+        while let Some(current) = child {
+            labels(&current, found);
+            child = current.next_sibling();
+        }
+    }
+
+    fn texts(widget: &impl IsA<gtk::Widget>) -> Vec<String> {
+        let mut found = Vec::new();
+        labels(widget.upcast_ref(), &mut found);
+        found
+    }
+
+    #[test]
+    fn gtk_pages_bind_deployments_links_terminal_and_ssh_keys() {
+        if adw::init().is_err() {
+            assert!(
+                std::env::var_os("MILA_GTK_TESTS_REQUIRED").is_none(),
+                "GTK display required but unavailable"
+            );
+            eprintln!("skipping GTK widget tests: no display");
+            return;
+        }
+        let directory = std::env::temp_dir().join(format!("mila-gtk-test-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&directory);
+        std::env::set_var("MILA_DEPLOYMENT_PATH", directory.join("deployment.json"));
+        let state = NativeState::new();
+        std::env::remove_var("MILA_DEPLOYMENT_PATH");
+        let status = Label::new(None);
+        let stack = gtk::Stack::new();
+        let page = |name: Page| {
+            let page = Box::new(Orientation::Vertical, 8);
+            stack.add_named(&page, Some(name.name()));
+            page
+        };
+        let deployments_page = page(Page::Deployments);
+        let terminal_page = page(Page::Terminal);
+        let settings_page = page(Page::Settings);
+        let _machines = page(Page::Machines);
+        let _threads = page(Page::Threads);
+        let _sign_in = page(Page::SignIn);
+        let deployment = Entry::new();
+        let machine = Entry::new();
+        let thread = Entry::new();
+        let render = views::build_deployments(&state, &deployments_page, &deployment, &status);
+        state.rerender.borrow_mut().push(render);
+        let terminal_session = views::build_terminal(&state, &terminal_page, &status);
+        let render_keys = views::build_ssh_keys(&state, &settings_page, &status);
+        state.rerender.borrow_mut().push(render_keys);
+        *state.links.borrow_mut() = Some(views::LinkTargets {
+            stack: stack.clone(),
+            deployment: deployment.clone(),
+            machine: machine.clone(),
+            terminal_session: terminal_session.clone(),
+            thread: thread.clone(),
+        });
+
+        // Deployment list: add+select, then confirmed remove.
+        let empty = strings::text(strings::Message::DeploymentsEmpty);
+        assert!(texts(&deployments_page).contains(&empty));
+        deployment.set_text("Mila.Example");
+        find(
+            &deployments_page,
+            &strings::text(strings::Message::DeploymentAddAndSelect),
+        )[0]
+        .emit_clicked();
+        assert_eq!(deployment.text(), "mila.example");
+        let shown = texts(&deployments_page);
+        assert!(shown.contains(&"mila.example".to_owned()));
+        assert!(shown.contains(&strings::text(strings::Message::DeploymentSelected)));
+        deployment.set_text("second.example");
+        find(
+            &deployments_page,
+            &strings::text(strings::Message::DeploymentAddAndSelect),
+        )[0]
+        .emit_clicked();
+        find(
+            &deployments_page,
+            &strings::text(strings::Message::DeploymentOpen),
+        )[0]
+        .emit_clicked();
+        assert_eq!(
+            state
+                .deployment_list()
+                .unwrap()
+                .selected()
+                .unwrap()
+                .as_str(),
+            "mila.example"
+        );
+        assert_eq!(stack.visible_child_name().as_deref(), Some("machines"));
+
+        // Links: unknown deployment lands on the list, signed-out on sign-in.
+        views::handle_batch(
+            &state,
+            &share_inbound("overalls://other.example/machines"),
+            &status,
+        );
+        assert_eq!(stack.visible_child_name().as_deref(), Some("deployments"));
+        assert_eq!(deployment.text(), "other.example");
+        assert!(status.label().contains("other.example"));
+        let machine_id = "01234567-89ab-cdef-0123-456789abcdef";
+        views::handle_batch(
+            &state,
+            &share_inbound(&format!(
+                "overalls://mila.example/machines/{machine_id}/terminals"
+            )),
+            &status,
+        );
+        assert_eq!(stack.visible_child_name().as_deref(), Some("sign-in"));
+        assert_eq!(
+            machine.text(),
+            "",
+            "signed-out links never pre-fill targets"
+        );
+        views::handle_batch(&state, &share_inbound("not a link"), &status);
+        assert_eq!(status.label(), strings::text(strings::Message::LinkRefused));
+
+        // Copy link uses the selected deployment and canonical route.
+        machine.set_text(machine_id);
+        let entry = machine.clone();
+        let copy = views::copy_link_button(&state, &status, move || views::machine_target(&entry));
+        copy.emit_clicked();
+        assert_eq!(status.label(), strings::text(strings::Message::LinkCopied));
+        machine.set_text("../etc");
+        copy.emit_clicked();
+        assert_eq!(status.label(), strings::text(strings::Message::LinkRefused));
+
+        // Terminal: attach without a session is refused before any transport.
+        find(
+            &terminal_page,
+            &strings::text(strings::Message::AttachTerminal),
+        )[0]
+        .emit_clicked();
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::TerminalSignedOut)
+        );
+        assert!(!state.terminal_polling.get());
+        find(
+            &terminal_page,
+            &strings::text(strings::Message::TerminalSend),
+        )[0]
+        .emit_clicked();
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::TerminalInvalid)
+        );
+
+        // SSH keys: signed out shows the sign-in prompt and no rows.
+        find(&settings_page, &strings::text(strings::Message::Refresh))[0].emit_clicked();
+        assert!(
+            texts(&settings_page).contains(&strings::text(strings::Message::SshKeysSignInFirst))
+        );
+        assert!(find(
+            &settings_page,
+            &strings::text(strings::Message::SshKeyRevoke)
+        )
+        .is_empty());
+
+        // Removing the selected deployment drops its selection and authority.
+        let remove = strings::text(strings::Message::DeploymentRemove);
+        let rows = find(&deployments_page, &remove);
+        rows[0].emit_clicked();
+        let confirm = find(&deployments_page, &remove);
+        confirm.last().unwrap().emit_clicked();
+        let list = state.deployment_list().unwrap();
+        assert_eq!(list.hosts().len(), 1);
+        assert!(list.selected().is_none());
+        assert_eq!(deployment.text(), "");
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::DeploymentForgotten)
+        );
+        let _ = std::fs::remove_dir_all(&directory);
+    }
 }

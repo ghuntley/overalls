@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Iri",
   "sshKeyThisDevice": "Wannan na'ura",
   "sshKeyRevoke": "Soke",
-  "sshKeyRevokeConfirm": "Soke makullin {fingerprint}? Dole a sake amincewa da na'urar da ke amfani da shi kafin ta shiga."
+  "sshKeyRevokeConfirm": "Soke makullin {fingerprint}? Dole a sake amincewa da na'urar da ke amfani da shi kafin ta shiga.",
+  "deploymentOpen": "Buɗe",
+  "deploymentRemove": "Cire",
+  "deploymentSelected": "An zaɓa",
+  "deploymentsEmpty": "Babu tura-tura tukuna.",
+  "linkCopied": "An kwafi hanyar haɗi.",
+  "linkCopy": "Kwafi hanyar haɗi",
+  "linkSignInRequired": "Shiga {host} don buɗe wannan hanyar haɗi.",
+  "terminalReconnect": "Sake haɗawa",
+  "terminalResize": "Canza girma",
+  "terminalSend": "Aika"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Uri",
   "sshKeyThisDevice": "Ang device na ito",
   "sshKeyRevoke": "Bawiin",
-  "sshKeyRevokeConfirm": "Bawiin ang key na {fingerprint}? Kailangang aprubahan muli ang device na gumagamit nito para makapag-sign in."
+  "sshKeyRevokeConfirm": "Bawiin ang key na {fingerprint}? Kailangang aprubahan muli ang device na gumagamit nito para makapag-sign in.",
+  "deploymentOpen": "Buksan",
+  "deploymentRemove": "Alisin",
+  "deploymentSelected": "Napili",
+  "deploymentsEmpty": "Wala pang mga deployment.",
+  "linkCopied": "Nakopya ang link.",
+  "linkCopy": "Kopyahin ang link",
+  "linkSignInRequired": "Mag-sign in sa {host} para buksan ang link na ito.",
+  "terminalReconnect": "Kumonekta muli",
+  "terminalResize": "Baguhin ang laki",
+  "terminalSend": "Ipadala"
 }

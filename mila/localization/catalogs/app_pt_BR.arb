@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Tipo",
   "sshKeyThisDevice": "Este dispositivo",
   "sshKeyRevoke": "Revogar",
-  "sshKeyRevokeConfirm": "Revogar a chave {fingerprint}? O dispositivo que a usa precisará ser aprovado de novo para entrar."
+  "sshKeyRevokeConfirm": "Revogar a chave {fingerprint}? O dispositivo que a usa precisará ser aprovado de novo para entrar.",
+  "deploymentOpen": "Abrir",
+  "deploymentRemove": "Remover",
+  "deploymentSelected": "Selecionada",
+  "deploymentsEmpty": "Nenhuma implantação ainda.",
+  "linkCopied": "Link copiado.",
+  "linkCopy": "Copiar link",
+  "linkSignInRequired": "Entre em {host} para abrir este link.",
+  "terminalReconnect": "Reconectar",
+  "terminalResize": "Redimensionar",
+  "terminalSend": "Enviar"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "రకం",
   "sshKeyThisDevice": "ఈ పరికరం",
   "sshKeyRevoke": "రద్దు చేయండి",
-  "sshKeyRevokeConfirm": "{fingerprint} కీని రద్దు చేయాలా? దాన్ని ఉపయోగించే పరికరం సైన్ ఇన్ చేయడానికి మళ్లీ ఆమోదం పొందాలి."
+  "sshKeyRevokeConfirm": "{fingerprint} కీని రద్దు చేయాలా? దాన్ని ఉపయోగించే పరికరం సైన్ ఇన్ చేయడానికి మళ్లీ ఆమోదం పొందాలి.",
+  "deploymentOpen": "తెరువు",
+  "deploymentRemove": "తీసివేయండి",
+  "deploymentSelected": "ఎంచుకోబడింది",
+  "deploymentsEmpty": "ఇంకా డిప్లాయ్‌మెంట్‌లు లేవు.",
+  "linkCopied": "లింక్ కాపీ అయింది.",
+  "linkCopy": "లింక్‌ను కాపీ చేయండి",
+  "linkSignInRequired": "ఈ లింక్‌ను తెరవడానికి {host}‌కు సైన్ ఇన్ చేయండి.",
+  "terminalReconnect": "మళ్లీ కనెక్ట్ చేయండి",
+  "terminalResize": "పరిమాణం మార్చు",
+  "terminalSend": "పంపు"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "Jenis",
   "sshKeyThisDevice": "Perangkat ini",
   "sshKeyRevoke": "Cabut",
-  "sshKeyRevokeConfirm": "Cabut kunci {fingerprint}? Perangkat yang menggunakannya harus disetujui lagi untuk masuk."
+  "sshKeyRevokeConfirm": "Cabut kunci {fingerprint}? Perangkat yang menggunakannya harus disetujui lagi untuk masuk.",
+  "deploymentOpen": "Buka",
+  "deploymentRemove": "Hapus",
+  "deploymentSelected": "Dipilih",
+  "deploymentsEmpty": "Belum ada deployment.",
+  "linkCopied": "Tautan disalin.",
+  "linkCopy": "Salin tautan",
+  "linkSignInRequired": "Masuk ke {host} untuk membuka tautan ini.",
+  "terminalReconnect": "Hubungkan ulang",
+  "terminalResize": "Ubah ukuran",
+  "terminalSend": "Kirim"
 }

@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "النوع",
   "sshKeyThisDevice": "هذا الجهاز",
   "sshKeyRevoke": "إلغاء",
-  "sshKeyRevokeConfirm": "هل تريد إلغاء المفتاح {fingerprint}؟ يجب اعتماد الجهاز الذي يستخدمه مرة أخرى لتسجيل الدخول."
+  "sshKeyRevokeConfirm": "هل تريد إلغاء المفتاح {fingerprint}؟ يجب اعتماد الجهاز الذي يستخدمه مرة أخرى لتسجيل الدخول.",
+  "deploymentOpen": "فتح",
+  "deploymentRemove": "إزالة",
+  "deploymentSelected": "محدد",
+  "deploymentsEmpty": "لا توجد عمليات نشر بعد.",
+  "linkCopied": "تم نسخ الرابط.",
+  "linkCopy": "نسخ الرابط",
+  "linkSignInRequired": "سجّل الدخول إلى {host} لفتح هذا الرابط.",
+  "terminalReconnect": "إعادة الاتصال",
+  "terminalResize": "تغيير الحجم",
+  "terminalSend": "إرسال"
 }

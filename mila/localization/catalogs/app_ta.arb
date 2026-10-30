@@ -257,5 +257,15 @@
   "sshKeyAlgorithm": "வகை",
   "sshKeyThisDevice": "இந்தச் சாதனம்",
   "sshKeyRevoke": "திரும்பப்பெறு",
-  "sshKeyRevokeConfirm": "{fingerprint} விசையைத் திரும்பப்பெறவா? அதைப் பயன்படுத்தும் சாதனம் உள்நுழைய மீண்டும் அனுமதிக்கப்பட வேண்டும்."
+  "sshKeyRevokeConfirm": "{fingerprint} விசையைத் திரும்பப்பெறவா? அதைப் பயன்படுத்தும் சாதனம் உள்நுழைய மீண்டும் அனுமதிக்கப்பட வேண்டும்.",
+  "deploymentOpen": "திற",
+  "deploymentRemove": "அகற்று",
+  "deploymentSelected": "தேர்ந்தெடுக்கப்பட்டது",
+  "deploymentsEmpty": "இன்னும் டிப்ளாய்மென்ட்கள் இல்லை.",
+  "linkCopied": "இணைப்பு நகலெடுக்கப்பட்டது.",
+  "linkCopy": "இணைப்பை நகலெடு",
+  "linkSignInRequired": "இந்த இணைப்பைத் திறக்க {host}-இல் உள்நுழையவும்.",
+  "terminalReconnect": "மீண்டும் இணை",
+  "terminalResize": "அளவை மாற்று",
+  "terminalSend": "அனுப்பு"
 }
