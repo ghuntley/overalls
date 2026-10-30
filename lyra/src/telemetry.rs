@@ -305,7 +305,7 @@ mod tests {
         drop(sender);
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_tool_outcomes_keep_bounded_cumulative_points(tc: TestCase) {
         let duration_ms = tc.draw(gs::integers::<u32>());
         let outcomes = tc.draw(gs::integers::<u8>());
@@ -343,7 +343,7 @@ mod tests {
         );
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_trace_ids_keep_only_fixed_span_data(tc: TestCase) {
         let id = tc.draw(gs::integers::<u128>());
         let command_id = format!("{id:032x}");

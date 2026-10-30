@@ -653,7 +653,7 @@ mod tests {
     }
     use hegel::{generators as gs, TestCase};
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_payload_requires_its_exact_digest(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let digest = Sha256::digest(&bytes);
@@ -665,7 +665,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn artifact_path_and_hex_digest_are_closed(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let digest = hex::encode(Sha256::digest(&bytes));
@@ -721,7 +721,7 @@ mod tests {
         assert!(delay <= Duration::from_secs(150));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn installer_replacement_cannot_be_downgraded_by_staged_update(tc: TestCase) {
         let mut fresh = tc.draw(gs::vecs(gs::integers::<u8>()));
         if fresh.is_empty() {
@@ -776,7 +776,7 @@ mod tests {
         assert!(read_status(dir.path()).staged.is_none());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn staged_bytes_switch_once_and_restore_prior_binary(tc: TestCase) {
         let mut bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         if bytes.is_empty() {
@@ -818,7 +818,7 @@ mod tests {
         assert_eq!(read_status(dir.path()).rejected, Some(digest));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn failed_checks_never_poison_cooldown_staging_or_identity(tc: TestCase) {
         let raw = tc.draw(gs::vecs(gs::integers::<u8>()));
         let bits = tc.draw(gs::integers::<u8>());
@@ -911,7 +911,7 @@ mod tests {
         assert_eq!(after.applied, before.applied);
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn corrupt_staged_bytes_never_replace_installed_binary(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let dir = tempfile::tempdir().expect("test directory");

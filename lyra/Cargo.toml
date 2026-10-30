@@ -100,7 +100,7 @@ codegen-units = 1
 panic = "abort"
 
 [dev-dependencies]
-hegeltest = "0.28.6"
+hegeltest = "=0.28.8"
 
 [patch.crates-io]
 # fs2 0.4.3 omits illumos from its Solaris allocation fallback. The vendored

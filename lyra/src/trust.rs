@@ -234,7 +234,7 @@ mod tests {
     /// Generated revocations MUST dominate matching CA trust in every ordering,
     /// including hashed host selectors. Conflicting managed blocks MUST fail
     /// without producing replacement trust.
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_denials_dominate_matching_ca_trust(tc: TestCase) {
         let leading = tc.draw(gs::integers::<u8>());
         let trailing = tc.draw(gs::integers::<u8>());
@@ -256,7 +256,7 @@ mod tests {
         assert!(merge(&format!("{conflict}{matching}"), &trust).is_err());
         assert!(merge(&format!("{matching}{conflict}"), &trust).is_err());
     }
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn repeated_installation_preserves_unrelated_lines(tc: TestCase) {
         let number = tc.draw(gs::integers::<u64>());
         let prior = format!("other-{number}.test ssh-ed25519 test\n");

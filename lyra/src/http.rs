@@ -376,7 +376,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_url_acceptance_preserves_https_and_no_credentials(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let value = String::from_utf8_lossy(&bytes);
@@ -389,7 +389,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_control_urls_reject_scheme_credential_and_fragment_mutations(tc: TestCase) {
         let path = tc.draw(gs::integers::<u128>());
         let url = format!("https://ghuntley.dev/api/{path:x}");
@@ -403,7 +403,7 @@ mod tests {
         assert!(!valid_https(&format!("{url}#fragment")));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_response_is_accepted_exactly_within_limit(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         assert_eq!(bounded_body(bytes.as_slice(), bytes.len()).unwrap(), bytes);
@@ -416,7 +416,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_statuses_only_match_the_required_success_code(tc: TestCase) {
         let code = tc.draw(gs::integers::<u16>());
         if let Ok(status) = StatusCode::from_u16(code) {

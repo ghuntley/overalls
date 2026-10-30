@@ -36,3 +36,21 @@ on one bounded observer worker; executor admission MUST remain nonblocking even
 when the receiver is unavailable or the fixed queue is full. Trace identifiers may be derived
 from a one-way hash of the command ID, but the ID itself MUST NOT enter OTLP.
 Guest telemetry MUST remain diagnostic and MUST NOT determine outer fleet SLO compliance.
+
+@cc [owner:ghuntley,label:verification] lyra-hegel-properties
+Lyra's Hegel properties (pinned `hegeltest`, explicit case counts) cover:
+configuration input validation (hosts, VM identities, origins, hostnames and
+SSH identity names); HTTPS control URL, bounded response and exact status
+acceptance; SSH configuration remote names, public-key lines and unmanaged-byte
+preservation or marker-ambiguity refusal; known-hosts denial precedence, line
+preservation and marker refusal; certificate principal patterns; proxy agent
+settings and gateway host-key line binding; update digest, artifact path,
+downgrade, staging switch/rollback, cooldown and corrupt-stage refusal;
+telemetry bounded metric points and fixed trace data; maintenance history and
+artifact origin; git identity round-trip and injection refusal; SSH authorize
+roster membership, bounded responses, HTTP 200, duplicate identity, offered-key
+proof and home-component names; the guest supervisor candidate recovery and
+replacement wait; the `overalls open` stage machine; and workspace receiver
+vector agreement, hostile URLs, envelope refusal and the receiver state machine.
+Native vsock, kernel attestation and platform services are not covered by
+properties.

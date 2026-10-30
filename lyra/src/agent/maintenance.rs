@@ -1373,7 +1373,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_maintenance_histories_preserve_last_healthy_generation(tc: TestCase) {
         let operations = tc.draw(gs::vecs(gs::integers::<u8>()));
         let root = tempfile::tempdir().unwrap();
@@ -1409,7 +1409,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn artifact_url_never_admits_a_foreign_origin_or_query(tc: TestCase) {
         let value = tc.draw(gs::integers::<u64>());
         let url = format!("https://llm.internal/agent/v1/maintenance/artifacts/{}?executor_id=11111111-1111-4111-8111-111111111111&maintenance_id=22222222-2222-4222-8222-222222222222&fence_epoch={}", "a".repeat(64), value.max(1));

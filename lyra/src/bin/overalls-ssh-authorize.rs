@@ -800,7 +800,7 @@ mod tests {
         assert_eq!(guest_shell(root.path()).unwrap(), bash);
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn on_demand_accounts_require_exact_roster_membership(tc: TestCase) {
         let suffix = tc.draw(gs::integers::<u16>());
         let name = format!("guest.{suffix}");
@@ -925,7 +925,7 @@ mod tests {
         assert!(private_request(Route::Login, None, 64).is_err());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn bounded_responses_preserve_exact_bytes_and_reject_overflow(tc: TestCase) {
         let bytes: Vec<u8> = tc
             .draw(gs::vecs(gs::integers::<u8>()))
@@ -941,7 +941,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn only_http_200_is_authorized(tc: TestCase) {
         let code = tc.draw(gs::integers::<u16>());
         if let Ok(status) = reqwest::StatusCode::from_u16(code) {
@@ -949,7 +949,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn duplicate_guest_identity_is_always_rejected(tc: TestCase) {
         let uid = 200_000 + u32::from(tc.draw(gs::integers::<u16>()));
         let suffix = tc.draw(gs::integers::<u16>());
@@ -969,7 +969,7 @@ mod tests {
         .is_err());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn publickey_proof_preserves_only_the_offered_key(tc: TestCase) {
         let bytes: Vec<u8> = tc
             .draw(gs::vecs(gs::integers::<u8>()))
@@ -992,7 +992,7 @@ mod tests {
         assert!(pam_key(&format!("publickey ssh-ed25519 {encoded};inject")).is_err());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn any_accepted_name_stays_within_one_home_component(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let suffix: String = bytes

@@ -229,7 +229,7 @@ mod tests {
         assert!(!valid_origin("https://example.com:"));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_host_never_escapes_validated_label(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let host = String::from_utf8_lossy(&bytes);
@@ -239,7 +239,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_vm_identity_round_trips_and_rejects_suffixes(tc: TestCase) {
         let id = tc.draw(gs::integers::<u128>());
         let label = format!("vm-{id:032x}");
@@ -249,7 +249,7 @@ mod tests {
         assert_eq!(label_for(&host, "other.example"), None);
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_origin_cannot_contain_url_metacharacters(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let origin = String::from_utf8_lossy(&bytes);
@@ -260,7 +260,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_hostnames_keep_dns_labels_and_a_fixed_length_bound(tc: TestCase) {
         let value = tc.draw(gs::integers::<u128>());
         let host = format!("vm-{value:032x}.apps.example.test");
@@ -270,7 +270,7 @@ mod tests {
         assert!(!valid_host(&"a".repeat(254)));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_identity_names_cannot_escape_ssh_directory(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let name = String::from_utf8_lossy(&bytes);

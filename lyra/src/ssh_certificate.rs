@@ -196,7 +196,7 @@ mod tests {
         assert!(verify(&line, &ca, &key, "vm.example.test", cert.valid_after() - 1).is_err());
         assert!(verify(&line, &ca, &key, "vm.example.test", cert.valid_before()).is_err());
     }
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_names_cannot_add_trust_patterns(tc: TestCase) {
         let name = tc.draw(gs::vecs(gs::integers::<u8>()));
         if let Ok(name) = std::str::from_utf8(&name) {

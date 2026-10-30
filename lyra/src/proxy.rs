@@ -646,7 +646,7 @@ mod tests {
         );
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_agent_setting_cannot_add_ssh_options(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         if let Ok(agent) = parse_identity_agent(&bytes) {
@@ -674,7 +674,7 @@ mod tests {
         assert!(valid_host_key(host, format!("{line}extra\n").as_bytes()).is_err());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_host_key_bytes_cannot_add_lines_or_hosts(tc: TestCase) {
         let host = "vm-0123456789abcdef0123456789abcdef.apps.ghuntley.dev";
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
@@ -686,7 +686,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_key_lines_bind_one_exact_host(tc: TestCase) {
         let host = "vm-0123456789abcdef0123456789abcdef.apps.ghuntley.dev";
         let key = tc.draw(gs::integers::<u128>());
@@ -697,7 +697,7 @@ mod tests {
         assert!(valid_host_key(host, line.replace("ssh-ed25519", "ssh-rsa").as_bytes()).is_err());
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_gateway_key_sets_reject_extra_hosts_and_duplicates(tc: TestCase) {
         let host = "gateway.vm-0123456789abcdef0123456789abcdef.inception.apps.ghuntley.dev";
         let first = tc.draw(gs::integers::<u128>());

@@ -455,7 +455,7 @@ mod tests {
         );
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn arbitrary_remote_name_cannot_escape_one_user_token(tc: TestCase) {
         let bytes = tc.draw(gs::vecs(gs::integers::<u8>()));
         let name = String::from_utf8_lossy(&bytes);
@@ -465,7 +465,7 @@ mod tests {
         }
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_remote_names_accept_local_parts_and_reject_account_escape(tc: TestCase) {
         let suffix = tc.draw(gs::integers::<u64>());
         let name = format!("user.{suffix:x}");
@@ -475,7 +475,7 @@ mod tests {
         assert!(!valid_guest_username(&format!("{name}\nroot")));
     }
 
-    #[hegel::test]
+    #[hegel::test(test_cases = 100)]
     fn generated_public_keys_require_exact_type_and_blob(tc: TestCase) {
         let key = tc.draw(gs::integers::<u128>());
         let registered = format!("ssh-ed25519 {key:032x} account-comment");
