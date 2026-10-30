@@ -10,11 +10,11 @@ serde_json.workspace = true
 uuid.workspace = true
 base64 = "0.22"
 ed25519-dalek = { version = "2", features = ["std"] }
-hegeltest.workspace = true
 russh = { version = "=0.64.1", default-features = false, features = ["ring"] }
 tokio = { version = "1", features = ["rt", "net", "time", "io-util", "macros"] }
 p256.workspace = true
 mila-protocol = { path = "../mila-protocol" }
 
 [dev-dependencies]
+hegeltest.workspace = true
 rand = "0.10"

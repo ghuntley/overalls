@@ -1,0 +1,10 @@
+@cc [owner:ghuntley,label:verification] mila-transport-hegel-properties
+Hegel properties MUST cover host certificate blob and line parsing and trust
+document decoding as total over arbitrary bytes, `reconcile_trust` authority
+preservation, latest retirement and idempotence, `WatchRequest` dedup and
+filter bounds, `TerminalAttachRequest` dimension bounds, `decode_watch_line`
+totality, its byte cap and exact decoding of generated events, and the PTY
+policy's refusal of stale generations and closed sessions against an
+independent state model. Certificate verification, certificate-only key
+exchange, external device signing and PTY channel behaviour stay with the
+real-TCP russh tests and the shared Elixir certificate fixtures.
