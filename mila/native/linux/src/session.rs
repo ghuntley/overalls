@@ -813,8 +813,10 @@ impl LiveSession {
         Ok(terminal)
     }
 
-    /// `terminal new MACHINE`: the id of the caller's personal session.
-    fn terminal_new(&mut self, machine_id: &str) -> Result<String, SessionError> {
+    /// `terminal new MACHINE`: the id of the caller's personal session,
+    /// opened or rejoined.
+    pub fn terminal_new(&mut self, machine_id: &str) -> Result<String, SessionError> {
+        validate_session_identifier(machine_id)?;
         let request_id = crate::adapter::new_request_id().ok_or(SessionError::Unavailable)?;
         let handle = self.handle()?;
         // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
@@ -840,6 +842,47 @@ impl LiveSession {
             .ok_or(SessionError::InvalidInput)?;
         validate_session_identifier(session_id)?;
         Ok(session_id.to_owned())
+    }
+
+    /// @cc [owner:ghuntley,label:security;protocol] linux-session-terminal-end
+    /// `terminal kill MACHINE SESSION`: Marshall closes the named server
+    /// session for everyone attached and ends its programs. Returns `true`
+    /// only when Marshall reports that exact session closed. Any local PTY
+    /// on this session is closed first, so no stale channel outlives it.
+    pub fn terminal_end(
+        &mut self,
+        machine_id: &str,
+        session_id: &str,
+        request_id: &str,
+    ) -> Result<bool, SessionError> {
+        validate_session_identifier(machine_id)?;
+        validate_session_identifier(session_id)?;
+        if !valid_request_id(request_id) {
+            return Err(SessionError::InvalidInput);
+        }
+        if !self.submitted_mutations.insert(request_id.to_owned()) {
+            return Err(SessionError::Busy);
+        }
+        let _ = self.terminal_kill();
+        let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
+        let bytes = copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_terminal_end(
+                handle,
+                machine_id.as_bytes().as_ptr(),
+                machine_id.len(),
+                session_id.as_bytes().as_ptr(),
+                session_id.len(),
+                request_id.as_bytes().as_ptr(),
+                request_id.len(),
+                out,
+                capacity,
+                written,
+            )
+        })?;
+        Ok(terminal_closed(&bytes, session_id))
     }
 
     /// @cc [owner:ghuntley,label:security;protocol] linux-session-last-refusal
@@ -1068,6 +1111,14 @@ fn copy_output(
     }
     bytes.truncate(size);
     Ok(bytes)
+}
+
+/// Whether a `terminal kill` result reports `session_id` closed.
+fn terminal_closed(bytes: &[u8], session_id: &str) -> bool {
+    crate::porsche_results::result_value(bytes).is_ok_and(|result| {
+        result.get("closed") == Some(&serde_json::Value::Bool(true))
+            && result.get("session_id").and_then(serde_json::Value::as_str) == Some(session_id)
+    })
 }
 
 fn validate_session_identifier(value: &str) -> Result<(), SessionError> {
@@ -1803,6 +1854,20 @@ impl SignInFlow {
 
 #[cfg(test)]
 mod tests {
+    // See the `linux-session-terminal-end` contract.
+    #[test]
+    fn terminal_end_requires_marshall_to_close_that_exact_session() {
+        let closed = br#"{"version":1,"status":"succeeded","result":{"machine_id":"m","session_id":"s-1","closed":true}}"#;
+        assert!(terminal_closed(closed, "s-1"));
+        assert!(!terminal_closed(closed, "s-2"));
+        let open =
+            br#"{"version":1,"status":"succeeded","result":{"session_id":"s-1","closed":false}}"#;
+        assert!(!terminal_closed(open, "s-1"));
+        let refused = br#"{"version":1,"status":"refused","error":"forbidden"}"#;
+        assert!(!terminal_closed(refused, "s-1"));
+        assert!(!terminal_closed(b"", "s-1"));
+    }
+
     #[test]
     fn output_is_copied_with_exactly_one_ffi_call() {
         use mila_ffi::session::SessionStatus;

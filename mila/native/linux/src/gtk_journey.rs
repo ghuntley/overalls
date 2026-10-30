@@ -19,9 +19,10 @@ use gtk::{glib, Box, Button, Entry, TextView};
 use mila_native_linux::deep_link::Page;
 use mila_native_linux::device_key::write_private;
 use mila_native_linux::journey::{
-    create_private_workdir, fixture_connection_profile, read_descriptor, remove_journey_machine,
-    sign_in_failure_code, terminal_passed, FixtureApprover, FixtureHook, JourneyDescriptor,
-    JourneyReport, FIXTURE_ANSWER, JOURNEY_PROMPT,
+    create_private_workdir, fixture_connection_profile, guest_echo, guest_size_answer,
+    read_descriptor, remove_journey_machine, shows_line, sign_in_failure_code, terminal_passed,
+    FixtureApprover, FixtureHook, JourneyDescriptor, JourneyReport, FIXTURE_ANSWER,
+    GUEST_BOOT_DEADLINE, GUEST_RESIZE, HOOK_MAX_SECONDS, JOURNEY_PROMPT,
 };
 use mila_native_linux::journey_checks::{
     check_answered, check_created, check_deleted, check_desired, check_plan_approved,
@@ -41,7 +42,8 @@ use std::time::{Duration, Instant};
 const TICK: Duration = Duration::from_millis(200);
 /// Attach presses to retry, one per tick, when no server answer arrived.
 const TERMINAL_ATTEMPTS: u32 = 50;
-const SIGN_IN_DEADLINE: Duration = Duration::from_secs(120);
+/// Covers one approver call (up to `HOOK_MAX_SECONDS`) plus polling.
+const SIGN_IN_DEADLINE: Duration = Duration::from_secs(HOOK_MAX_SECONDS + 90);
 const STEP_DEADLINE: Duration = Duration::from_secs(30);
 const RECONNECT_DEADLINE: Duration = Duration::from_secs(90);
 const PAGE_STEP_DEADLINE: Duration = Duration::from_secs(60);
@@ -810,12 +812,117 @@ enum Stage {
     Pages,
     Terminal,
     AwaitMarker(Instant, String),
+    /// The guest-backed PTY steps on the fixture's terminal machine.
+    Guest(Guest, Instant),
     LoseOnAction,
     AwaitReconnect(Instant, u64),
     /// Opens `host` in the deployment list, then signs in to it.
     Switch(Switch),
     AwaitSwitched(Switch, Instant, u32),
     SignOut,
+}
+
+/// One guest-backed terminal step; each carries the echo marker after open.
+#[derive(Clone)]
+enum Guest {
+    Open,
+    Echo(String),
+    Resize(String),
+    Replay(String),
+    Kill,
+    /// Marshall confirms a kill asynchronously: a named Attach must come to
+    /// be refused, or its stream must end within a few seconds of opening.
+    Closing(Option<Instant>),
+}
+
+impl Guest {
+    const STEPS: [&'static str; 5] = [
+        "gtk_terminal_guest_open",
+        "gtk_terminal_guest_echo",
+        "gtk_terminal_guest_resize",
+        "gtk_terminal_guest_replay",
+        "gtk_terminal_guest_kill",
+    ];
+
+    const fn index(&self) -> usize {
+        match self {
+            Self::Open => 0,
+            Self::Echo(_) => 1,
+            Self::Resize(_) => 2,
+            Self::Replay(_) => 3,
+            Self::Kill | Self::Closing(_) => 4,
+        }
+    }
+}
+
+/// The terminal page's session, columns, rows and input fields.
+struct TerminalFields {
+    session: Entry,
+    columns: Entry,
+    rows: Entry,
+    input: Entry,
+}
+
+fn terminal_fields(state: &NativeState) -> Option<TerminalFields> {
+    let root = page(state, Page::Terminal)?;
+    let entries = widgets::<Entry>(&root);
+    let by_hint = |message| {
+        let hint = strings::text(message);
+        entries
+            .iter()
+            .find(|entry| entry.placeholder_text().as_deref() == Some(hint.as_str()))
+            .cloned()
+    };
+    let session = by_hint(strings::Message::TerminalSessionHint)?;
+    let columns = session.next_sibling()?.downcast::<Entry>().ok()?;
+    let rows = columns.next_sibling()?.downcast::<Entry>().ok()?;
+    let input = by_hint(strings::Message::TerminalInputHint)?;
+    Some(TerminalFields {
+        session,
+        columns,
+        rows,
+        input,
+    })
+}
+
+/// The terminal page's rendered text.
+fn terminal_text(state: &NativeState) -> String {
+    page(state, Page::Terminal)
+        .map(|root| widgets::<TextView>(&root))
+        .unwrap_or_default()
+        .iter()
+        .map(|view| {
+            let buffer = view.buffer();
+            buffer
+                .text(&buffer.start_iter(), &buffer.end_iter(), false)
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+fn terminal_live(state: &NativeState) -> bool {
+    state
+        .terminal
+        .borrow()
+        .as_ref()
+        .and_then(mila_native_linux::terminal_surface::TerminalSurface::live_generation)
+        .is_some()
+}
+
+/// Presses the last button labelled `message` on the terminal page: the
+/// confirmation bar's button follows the action row's.
+fn click_last(state: &NativeState, message: strings::Message) -> bool {
+    let label = strings::text(message);
+    page(state, Page::Terminal)
+        .and_then(|root| {
+            widgets::<Button>(&root)
+                .into_iter()
+                .filter(|button| button.label().as_deref() == Some(label.as_str()))
+                .last()
+        })
+        .map(|button| button.emit_clicked())
+        .is_some()
 }
 
 /// One deployment switch step.
@@ -862,6 +969,204 @@ const SWITCH_AWAY: Switch = Switch {
 };
 
 impl Script {
+    /// After the guestless refusal check: the guest PTY steps when the
+    /// fixture runs its terminal machine, then loss detection.
+    fn after_terminal(&self) -> Stage {
+        if self.descriptor.seed.terminal_machine_id.is_some() {
+            Stage::Guest(Guest::Open, Instant::now())
+        } else {
+            Stage::LoseOnAction
+        }
+    }
+
+    /// Records `code` for `step` and every guest step after it.
+    fn guest_failed(&mut self, step: &Guest, code: &'static str) -> Stage {
+        for name in &Guest::STEPS[step.index()..] {
+            self.report.record(name, false, code);
+        }
+        Stage::LoseOnAction
+    }
+
+    // See the `linux-journey-guest-terminal` contract in CONTRACTS.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one match arm per guest terminal step keeps the five steps in report order"
+    )]
+    fn guest_tick(&mut self, state: &NativeState, step: Guest, started: Instant) -> Option<Stage> {
+        let machine = self
+            .descriptor
+            .seed
+            .terminal_machine_id
+            .clone()
+            .unwrap_or_default();
+        let Some(fields) = terminal_fields(state) else {
+            return Some(self.guest_failed(&step, "fields_missing"));
+        };
+        let attach = || {
+            click(
+                state,
+                Page::Terminal,
+                &strings::text(strings::Message::AttachTerminal),
+            )
+        };
+        let send = |line: &str| {
+            fields.input.set_text(line.trim_end_matches('\r'));
+            click(
+                state,
+                Page::Terminal,
+                &strings::text(strings::Message::TerminalSend),
+            )
+        };
+        let refusal = || {
+            state
+                .session
+                .borrow()
+                .session()
+                .and_then(LiveSession::last_refusal)
+        };
+        match step {
+            Guest::Open => {
+                // Only terminal operations run on this machine. An empty
+                // session field makes Attach open the account's session.
+                if select_machine(state, &machine).is_err() {
+                    return Some(self.guest_failed(&step, "machine_field_missing"));
+                }
+                fields.session.set_text("");
+                fields.columns.set_text("100");
+                fields.rows.set_text("30");
+                if attach() && terminal_live(state) && !fields.session.text().is_empty() {
+                    let Some(marker) = mila_native_linux::adapter::new_request_id()
+                        .and_then(|id| id.get(8..20).map(|suffix| format!("mila-gtk-{suffix}")))
+                    else {
+                        return Some(self.guest_failed(&step, "marker_unavailable"));
+                    };
+                    self.report.record(Guest::STEPS[0], true, "attached");
+                    let (typed, _) = guest_echo(&marker);
+                    if !send(&typed) {
+                        return Some(self.guest_failed(&Guest::Echo(marker), "send_missing"));
+                    }
+                    return Some(Stage::Guest(Guest::Echo(marker), Instant::now()));
+                }
+                // A just-booted guest answers temporarily_unavailable.
+                match refusal().as_deref() {
+                    Some("temporarily_unavailable") | None
+                        if started.elapsed() < GUEST_BOOT_DEADLINE =>
+                    {
+                        Some(Stage::Guest(Guest::Open, started))
+                    }
+                    other => Some(self.guest_failed(&step, refusal_code(other))),
+                }
+            }
+            Guest::Echo(marker) => {
+                let (_, echoed) = guest_echo(&marker);
+                if shows_line(&terminal_text(state), &echoed) {
+                    self.report.record(Guest::STEPS[1], true, "output_seen");
+                    let (columns, rows) = GUEST_RESIZE;
+                    fields.columns.set_text(&columns.to_string());
+                    fields.rows.set_text(&rows.to_string());
+                    let resized = click(
+                        state,
+                        Page::Terminal,
+                        &strings::text(strings::Message::TerminalResize),
+                    );
+                    if !resized || !send("stty size") {
+                        return Some(self.guest_failed(&Guest::Resize(marker), "resize_missing"));
+                    }
+                    return Some(Stage::Guest(Guest::Resize(marker), Instant::now()));
+                }
+                Some(self.guest_wait(Guest::Echo(marker), started))
+            }
+            Guest::Resize(marker) => {
+                if shows_line(&terminal_text(state), &guest_size_answer()) {
+                    self.report.record(Guest::STEPS[2], true, "resized");
+                    // Detach drops this device's channel and viewport; the
+                    // named Attach must bring the earlier output back.
+                    let detached = click(
+                        state,
+                        Page::Terminal,
+                        &strings::text(strings::Message::TerminalDetach),
+                    ) && state.terminal.borrow().is_none()
+                        && !shows_line(&terminal_text(state), &guest_echo(&marker).1);
+                    if !detached || fields.session.text().is_empty() || !attach() {
+                        return Some(self.guest_failed(&Guest::Replay(marker), "detach_failed"));
+                    }
+                    return Some(Stage::Guest(Guest::Replay(marker), Instant::now()));
+                }
+                Some(self.guest_wait(Guest::Resize(marker), started))
+            }
+            Guest::Replay(marker) => {
+                if shows_line(&terminal_text(state), &guest_echo(&marker).1) {
+                    self.report.record(Guest::STEPS[3], true, "replayed");
+                    return Some(Stage::Guest(Guest::Kill, Instant::now()));
+                }
+                Some(self.guest_wait(Guest::Replay(marker), started))
+            }
+            Guest::Closing(opened) => self.guest_closing(state, opened, started),
+            Guest::Kill => {
+                // Close, confirm, then a named Attach must be refused.
+                let closed = click(
+                    state,
+                    Page::Terminal,
+                    &strings::text(strings::Message::TerminalClose),
+                ) && click_last(state, strings::Message::TerminalClose)
+                    && status_text(state) == strings::text(strings::Message::TerminalEnded);
+                if !closed {
+                    return Some(self.guest_failed(&step, "not_closed"));
+                }
+                Some(Stage::Guest(Guest::Closing(None), Instant::now()))
+            }
+        }
+    }
+
+    /// One poll of [`Guest::Closing`]; `opened` is when the current probe
+    /// attach opened, if it did.
+    fn guest_closing(
+        &mut self,
+        state: &NativeState,
+        opened: Option<Instant>,
+        started: Instant,
+    ) -> Option<Stage> {
+        let closed = |report: &mut JourneyReport| {
+            report.record(Guest::STEPS[4], true, "closed");
+            Some(Stage::LoseOnAction)
+        };
+        match opened {
+            Some(_) if !terminal_live(state) => closed(&mut self.report),
+            Some(at) if at.elapsed() < Duration::from_secs(3) => {
+                Some(Stage::Guest(Guest::Closing(opened), started))
+            }
+            _ if started.elapsed() > PAGE_STEP_DEADLINE => {
+                Some(self.guest_failed(&Guest::Kill, "still_attachable"))
+            }
+            _ => {
+                if terminal_live(state) {
+                    let _ = click(
+                        state,
+                        Page::Terminal,
+                        &strings::text(strings::Message::TerminalDetach),
+                    );
+                }
+                let attached = click(
+                    state,
+                    Page::Terminal,
+                    &strings::text(strings::Message::AttachTerminal),
+                ) && terminal_live(state);
+                if attached {
+                    Some(Stage::Guest(Guest::Closing(Some(Instant::now())), started))
+                } else {
+                    closed(&mut self.report)
+                }
+            }
+        }
+    }
+
+    fn guest_wait(&mut self, step: Guest, started: Instant) -> Stage {
+        if started.elapsed() > STEP_DEADLINE {
+            return self.guest_failed(&step, "output_timeout");
+        }
+        Stage::Guest(step, started)
+    }
+
     fn host(&self, target: Target) -> String {
         match target {
             Target::Fixture => self.descriptor.deployment.host.clone(),
@@ -1092,7 +1397,7 @@ impl Script {
                         return Some(Stage::Terminal);
                     }
                     report.record("gtk_terminal", terminal_passed(code), code);
-                    return Some(Stage::LoseOnAction);
+                    return Some(self.after_terminal());
                 }
                 let Some(marker) = mila_native_linux::adapter::new_request_id().and_then(|id| {
                     id.get(8..20)
@@ -1101,9 +1406,10 @@ impl Script {
                     report.record("gtk_terminal", false, "marker_unavailable");
                     return Some(Stage::LoseOnAction);
                 };
-                let input = widgets::<Entry>(&root)
-                    .into_iter()
-                    .find(|entry| entry.placeholder_text().as_deref() == Some("Terminal input"));
+                let input = widgets::<Entry>(&root).into_iter().find(|entry| {
+                    entry.placeholder_text().as_deref()
+                        == Some(strings::text(strings::Message::TerminalInputHint).as_str())
+                });
                 let Some(input) = input else {
                     report.record("gtk_terminal", false, "input_missing");
                     return Some(Stage::LoseOnAction);
@@ -1133,14 +1439,15 @@ impl Script {
                     });
                 if shown {
                     self.report.record("gtk_terminal", true, "marker_seen");
-                    return Some(Stage::LoseOnAction);
+                    return Some(self.after_terminal());
                 }
                 if started.elapsed() > STEP_DEADLINE {
                     self.report.record("gtk_terminal", false, "marker_timeout");
-                    return Some(Stage::LoseOnAction);
+                    return Some(self.after_terminal());
                 }
                 Some(Stage::AwaitMarker(started, marker))
             }
+            Stage::Guest(step, started) => self.guest_tick(state, step, started),
             Stage::LoseOnAction => {
                 // Sever the bound session, then press a page action: the
                 // transport error must release the session and start a new

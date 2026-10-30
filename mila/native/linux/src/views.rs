@@ -46,6 +46,7 @@ pub(super) enum Pending {
     RevokeKey(String),
     DeleteMachine(String),
     RemoveShare { machine: String, email: String },
+    CloseTerminal { machine: String, session: String },
 }
 
 /// One confirmation bar shared by the settings pages.
@@ -369,14 +370,14 @@ pub(super) fn build_terminal(
 ) -> Entry {
     page.append(&heading(&strings::text(strings::Message::TerminalsTitle)));
     let session = Entry::builder()
-        .placeholder_text("Terminal session ID")
+        .placeholder_text(strings::text(strings::Message::TerminalSessionHint))
         .max_length(128)
         .hexpand(true)
         .build();
     let columns = Entry::builder().text("80").max_length(4).build();
     let rows = Entry::builder().text("24").max_length(3).build();
     let input = Entry::builder()
-        .placeholder_text("Terminal input")
+        .placeholder_text(strings::text(strings::Message::TerminalInputHint))
         .hexpand(true)
         .build();
     let view = TextView::builder()
@@ -435,8 +436,35 @@ pub(super) fn build_terminal(
                 status.set_label(&strings::text(strings::Message::MachineFieldInvalid));
                 return;
             }
-            // An empty session id opens or rejoins this account's own session.
-            let id = session.text().trim().to_owned();
+            // An empty session id opens or rejoins this account's own
+            // session; its id is shown so Detach and Close name it.
+            let mut id = session.text().trim().to_owned();
+            if id.is_empty() {
+                match state.with_live(|live| live.terminal_new(&machine_id)) {
+                    Some(Ok(opened)) => {
+                        session.set_text(&opened);
+                        id = opened;
+                    }
+                    Some(Err(_)) => {
+                        let refused = state
+                            .session
+                            .borrow()
+                            .session()
+                            .and_then(LiveSession::last_refusal)
+                            .is_some();
+                        status.set_label(&strings::text(if refused {
+                            strings::Message::TerminalRefused
+                        } else {
+                            strings::Message::TerminalInvalid
+                        }));
+                        return;
+                    }
+                    None => {
+                        status.set_label(&strings::text(strings::Message::TerminalSignedOut));
+                        return;
+                    }
+                }
+            }
             let result = {
                 let mut terminal = state.terminal.borrow_mut();
                 if terminal
@@ -549,24 +577,86 @@ pub(super) fn build_terminal(
             }
         });
     }
-    let close = Button::with_label(&strings::text(strings::Message::TerminalClose));
+    // See the `linux-terminal-close-detach` contract in CONTRACTS.
+    // Detach closes only this device's channel: the session and its
+    // programs keep running, and a later Attach replays its output into a
+    // fresh viewport.
+    let detach = Button::with_label(&strings::text(strings::Message::TerminalDetach));
     {
         let state = state.clone();
+        let view = view.clone();
         let status = status.clone();
-        close.connect_clicked(move |_| {
+        detach.connect_clicked(move |_| {
             let result = state
                 .terminal
                 .borrow_mut()
-                .as_mut()
+                .take()
                 .ok_or(PtyError::InvalidRequest)
-                .and_then(TerminalSurface::kill);
-            match result {
-                Ok(()) => status.set_label(&strings::text(strings::Message::TerminalEnded)),
-                Err(error) => status.set_label(&strings::text(terminal_error(error))),
-            }
+                .and_then(|mut surface| match surface.live_generation() {
+                    Some(_) => surface.kill(),
+                    None => Ok(()),
+                });
+            view.buffer().set_text("");
+            status.set_label(&match result {
+                Ok(()) => String::new(),
+                Err(error) => strings::text(terminal_error(error)),
+            });
         });
     }
-    for button in [&attach, &send, &reconnect, &resize, &close] {
+    // Close asks Marshall to end the named session for everyone attached
+    // (`terminal kill`), after confirmation.
+    let (confirm_bar, confirm_button) = ConfirmBar::new();
+    let close = Button::with_label(&strings::text(strings::Message::TerminalClose));
+    {
+        let machine = machine.clone();
+        let session = session.clone();
+        let status = status.clone();
+        let confirm_bar = confirm_bar.clone();
+        let confirm_button = confirm_button.clone();
+        close.connect_clicked(move |_| {
+            let machine = machine.text().trim().to_owned();
+            let session = session.text().trim().to_owned();
+            if machine.is_empty() || session.is_empty() {
+                status.set_label(&strings::text(strings::Message::TerminalInvalid));
+                return;
+            }
+            confirm_bar.ask(
+                &confirm_button,
+                Pending::CloseTerminal { machine, session },
+                &strings::text(strings::Message::TerminalCloseConfirm),
+                &strings::text(strings::Message::TerminalClose),
+            );
+        });
+    }
+    {
+        let state = state.clone();
+        let view = view.clone();
+        let status = status.clone();
+        let confirm_bar = confirm_bar.clone();
+        confirm_button.connect_clicked(move |_| {
+            let Some(Pending::CloseTerminal { machine, session }) = confirm_bar.take() else {
+                return;
+            };
+            // Close this device's channel first so no stale stream outlives
+            // the session.
+            if let Some(mut surface) = state.terminal.borrow_mut().take() {
+                if surface.live_generation().is_some() {
+                    let _ = surface.kill();
+                }
+            }
+            let key = format!("terminal-kill:{machine}:{session}");
+            let result = state.mutate(&key, |live, request| {
+                live.terminal_end(&machine, &session, request)
+            });
+            view.buffer().set_text("");
+            status.set_label(&strings::text(match result {
+                Some(Ok(true)) => strings::Message::TerminalEnded,
+                Some(Ok(false)) => strings::Message::RequestRefused,
+                other => super::pages::outcome_message(other.as_ref()),
+            }));
+        });
+    }
+    for button in [&attach, &send, &reconnect, &resize, &detach, &close] {
         actions.append(button);
     }
     let dimensions = Box::new(Orientation::Horizontal, 8);
@@ -577,6 +667,7 @@ pub(super) fn build_terminal(
     page.append(&scroller);
     page.append(&input);
     page.append(&actions);
+    page.append(&confirm_bar.container);
     session
 }
 

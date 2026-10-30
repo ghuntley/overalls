@@ -407,7 +407,8 @@ jobs:
           tail -n 200 "$dir/state/console.log" || true
       - name: Linux journeys against the hermetic fixture
         if: env.MILA_JOURNEY_DESCRIPTOR != ''
-        timeout-minutes: 15
+        # Fixture hooks may each take up to 330 s under host load.
+        timeout-minutes: 30
         run: |
           set -euo pipefail
           # Run both journeys even when the first fails, so each prints its report.

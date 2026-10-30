@@ -41,6 +41,11 @@ const MAX_DESCRIPTOR_BYTES: usize = 256 * 1024;
 const MAX_CA_PEM_BYTES: usize = 64 * 1024;
 const SESSION_TIMEOUT_MS: u32 = 20_000;
 const APPROVAL_POLLS: u32 = 60;
+/// One approver or `/fixture/<action>` call runs a fixture action that the
+/// fixture bounds at 300 s behind a global lock; under host load it can take
+/// minutes. Hook calls get that bound plus margin and are never retried.
+/// The HTTPS trust fetch keeps its own short timeout.
+pub const HOOK_MAX_SECONDS: u64 = 330;
 const TERMINAL_DEADLINE: Duration = Duration::from_secs(30);
 
 /// A bearer credential from the descriptor. It is passed to curl only through
@@ -89,6 +94,13 @@ pub struct SeedSpec {
     /// The signed-in account's email, when the fixture publishes it.
     #[serde(default)]
     pub account_email: Option<String>,
+    /// A running machine whose guest serves real PTYs, when the fixture
+    /// runs its guest-backed terminal mode. Only terminal operations run on
+    /// it.
+    #[serde(default)]
+    pub terminal_machine_id: Option<String>,
+    #[serde(default)]
+    pub terminal_machine_name: Option<String>,
 }
 
 /// Fixture descriptor v1. Unknown fields are ignored so the fixture can add
@@ -182,14 +194,23 @@ impl JourneyDescriptor {
         if !valid_email(&seed.share_principal) {
             return Err(DescriptorError::InvalidField("seed.share_principal"));
         }
-        if seed.machine_id.as_deref().is_some_and(|id| {
+        let bad_id = |id: &str| {
             id.is_empty()
                 || id.len() > 128
                 || !id
                     .bytes()
                     .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
-        }) {
+        };
+        if seed.machine_id.as_deref().is_some_and(bad_id) {
             return Err(DescriptorError::InvalidField("seed.machine_id"));
+        }
+        if seed.terminal_machine_id.as_deref().is_some_and(bad_id) {
+            return Err(DescriptorError::InvalidField("seed.terminal_machine_id"));
+        }
+        if seed.terminal_machine_name.as_deref().is_some_and(|name| {
+            name.is_empty() || name.len() > 128 || name.chars().any(char::is_control)
+        }) {
+            return Err(DescriptorError::InvalidField("seed.terminal_machine_name"));
         }
         if seed
             .account_email
@@ -368,10 +389,11 @@ pub fn approver_config(descriptor: &JourneyDescriptor, ca_path: &Path) -> String
 
 fn hook_config(descriptor: &JourneyDescriptor, url: &str, ca_path: &Path) -> String {
     format!(
-        "url = \"{}\"\nrequest = \"POST\"\nheader = \"Authorization: Bearer {}\"\nheader = \"Content-Type: application/json\"\ncacert = \"{}\"\nfail\nsilent\nmax-time = 120\nmax-redirs = 0\n",
+        "url = \"{}\"\nrequest = \"POST\"\nheader = \"Authorization: Bearer {}\"\nheader = \"Content-Type: application/json\"\ncacert = \"{}\"\nfail\nsilent\nmax-time = {}\nmax-redirs = 0\n",
         url,
         descriptor.approver.bearer_token.0,
-        ca_path.display()
+        ca_path.display(),
+        HOOK_MAX_SECONDS
     )
 }
 
@@ -708,6 +730,11 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         terminal_outcome,
     );
 
+    // 9b. Guest-backed terminal: echo, resize, replay and kill on a real PTY.
+    if let Some(terminal_machine) = descriptor.seed.terminal_machine_id.as_deref() {
+        run_guest_terminal(&binding, terminal_machine, &mut report);
+    }
+
     // 10. SSH keys: this device's key is listed, marked and protected.
     let mut keys = SshKeysView::default();
     keys.set_device_fingerprint(Some(fingerprint.clone()));
@@ -916,7 +943,8 @@ fn sign_in(
     );
     driver.start(target);
     let started = Instant::now();
-    while started.elapsed() < Duration::from_secs(u64::from(APPROVAL_POLLS) + 30) {
+    // The approver call itself may take up to HOOK_MAX_SECONDS.
+    while started.elapsed() < Duration::from_secs(u64::from(APPROVAL_POLLS) + HOOK_MAX_SECONDS) {
         let now = u64::try_from(started.elapsed().as_millis()).unwrap_or(u64::MAX);
         for event in driver.poll(now, &approver) {
             if let DriverEvent::Established { session, .. } = event {
@@ -1364,6 +1392,218 @@ fn run_terminal(binding: &Rc<RefCell<SessionBinding>>, machine: Option<&str>) ->
     outcome
 }
 
+/// The guest terminal's size after the journey resizes it.
+pub const GUEST_RESIZE: (u16, u16) = (132, 40);
+/// How long a just-booted guest may answer `temporarily_unavailable`.
+pub const GUEST_BOOT_DEADLINE: Duration = Duration::from_secs(180);
+const GUEST_OUTPUT_DEADLINE: Duration = Duration::from_secs(60);
+
+/// The line the echo step types, and the line it expects back. The shell
+/// computes the suffix, so the typed command line never matches.
+pub fn guest_echo(marker: &str) -> (String, String) {
+    (format!("echo {marker}-$((6*7))\r"), format!("{marker}-42"))
+}
+
+/// The `stty size` answer for [`GUEST_RESIZE`].
+pub fn guest_size_answer() -> String {
+    format!("{} {}", GUEST_RESIZE.1, GUEST_RESIZE.0)
+}
+
+/// Whether the rendered terminal text has a line that is exactly `wanted`.
+pub fn shows_line(text: &str, wanted: &str) -> bool {
+    text.lines().any(|line| line.trim() == wanted)
+}
+
+type GuestSurface = TerminalSurface<
+    Rc<RefCell<SessionBinding>>,
+    HostPtyTransport<crate::session::SessionPtyBackend>,
+>;
+
+fn guest_surface(binding: &Rc<RefCell<SessionBinding>>) -> Option<GuestSurface> {
+    let backend = crate::session::SessionPtyBackend::new(binding.clone(), 100);
+    TerminalSurface::new(binding.clone(), HostPtyTransport::new(backend), 100, 30).ok()
+}
+
+/// Ticks `surface` until a line equals `wanted`.
+fn await_line(surface: &mut GuestSurface, wanted: &str) -> Result<(), &'static str> {
+    let started = Instant::now();
+    loop {
+        match surface.tick() {
+            TickOutcome::Ended => return Err("ended"),
+            TickOutcome::Failed(_) | TickOutcome::Detached => return Err("stream_failed"),
+            _ if shows_line(&surface.text(), wanted) => return Ok(()),
+            _ if started.elapsed() > GUEST_OUTPUT_DEADLINE => return Err("output_timeout"),
+            _ => std::thread::sleep(Duration::from_millis(20)),
+        }
+    }
+}
+
+fn last_refusal(binding: &Rc<RefCell<SessionBinding>>) -> Option<String> {
+    binding
+        .borrow()
+        .session()
+        .and_then(LiveSession::last_refusal)
+}
+
+/// `terminal new` on the guest machine, retrying while the just-booted guest
+/// answers `temporarily_unavailable`.
+fn open_guest_session(
+    binding: &Rc<RefCell<SessionBinding>>,
+    machine: &str,
+) -> Result<String, &'static str> {
+    let started = Instant::now();
+    loop {
+        let opened = binding
+            .borrow_mut()
+            .session_mut()
+            .ok_or("not_bound")?
+            .terminal_new(machine);
+        match opened {
+            Ok(id) => return Ok(id),
+            Err(SessionError::Transport | SessionError::StaleHandle) => return Err("session_lost"),
+            Err(_) => match last_refusal(binding).as_deref() {
+                Some("temporarily_unavailable") if started.elapsed() < GUEST_BOOT_DEADLINE => {
+                    std::thread::sleep(Duration::from_secs(2));
+                }
+                other => return Err(refusal_code(other)),
+            },
+        }
+    }
+}
+
+/// Echo, resize, detach/replay and kill on the fixture's guest-backed PTY,
+/// each recorded as its own step.
+// See the `linux-journey-guest-terminal` contract in CONTRACTS.
+fn run_guest_terminal(
+    binding: &Rc<RefCell<SessionBinding>>,
+    machine: &str,
+    report: &mut JourneyReport,
+) {
+    const STEPS: [&str; 5] = [
+        "terminal_guest_open",
+        "terminal_guest_echo",
+        "terminal_guest_resize",
+        "terminal_guest_replay",
+        "terminal_guest_kill",
+    ];
+    // Records `code` for the step that failed and every step after it.
+    fn fail(report: &mut JourneyReport, done: usize, code: &'static str) {
+        for name in &STEPS[done..] {
+            report.record(name, false, code);
+        }
+    }
+    let mut done = 0;
+    let Some(marker) =
+        new_request_id().and_then(|id| id.get(8..20).map(|suffix| format!("mila-{suffix}")))
+    else {
+        return fail(report, done, "marker_unavailable");
+    };
+    let session = match open_guest_session(binding, machine) {
+        Ok(session) => session,
+        Err(code) => return fail(report, done, code),
+    };
+    let Some(mut surface) = guest_surface(binding) else {
+        return fail(report, done, "renderer_refused");
+    };
+    if surface.attach(machine, &session, 100, 30).is_err() {
+        return fail(report, done, refusal_code(last_refusal(binding).as_deref()));
+    }
+    report.record(STEPS[done], true, "attached");
+    done += 1;
+
+    let (typed, echoed) = guest_echo(&marker);
+    if surface.send(typed.as_bytes()).is_err() {
+        return fail(report, done, "input_refused");
+    }
+    if let Err(code) = await_line(&mut surface, &echoed) {
+        return fail(report, done, code);
+    }
+    report.record(STEPS[done], true, "output_seen");
+    done += 1;
+
+    let (columns, rows) = GUEST_RESIZE;
+    if surface.resize(columns, rows).is_err() || surface.send(b"stty size\r").is_err() {
+        return fail(report, done, "resize_refused");
+    }
+    if let Err(code) = await_line(&mut surface, &guest_size_answer()) {
+        return fail(report, done, code);
+    }
+    report.record(STEPS[done], true, "resized");
+    done += 1;
+
+    // Detach this channel only, then attach a fresh viewport by name: the
+    // earlier output must come back from the server's replay.
+    if surface.kill().is_err() {
+        return fail(report, done, "detach_failed");
+    }
+    drop(surface);
+    let Some(mut surface) = guest_surface(binding) else {
+        return fail(report, done, "renderer_refused");
+    };
+    if surface.attach(machine, &session, columns, rows).is_err() {
+        return fail(report, done, refusal_code(last_refusal(binding).as_deref()));
+    }
+    if let Err(code) = await_line(&mut surface, &echoed) {
+        return fail(report, done, code);
+    }
+    report.record(STEPS[done], true, "replayed");
+    done += 1;
+
+    // Marshall ends the session for everyone; attaching to it again must
+    // then be refused.
+    let _ = surface.kill();
+    drop(surface);
+    let Some(request) = new_request_id() else {
+        return fail(report, done, "csprng_unavailable");
+    };
+    let closed = binding
+        .borrow_mut()
+        .session_mut()
+        .ok_or(SessionError::StaleHandle)
+        .and_then(|live| live.terminal_end(machine, &session, &request));
+    match closed {
+        Ok(true) => {}
+        Ok(false) => return fail(report, done, "not_closed"),
+        Err(SessionError::InvalidInput) => {
+            return fail(report, done, refusal_code(last_refusal(binding).as_deref()))
+        }
+        Err(error) => return fail(report, done, action_failed(error)),
+    }
+    let outcome = await_closed(binding, machine, &session);
+    report.record(STEPS[done], outcome == "closed", outcome);
+}
+
+/// After `terminal kill`, Marshall confirms the close asynchronously: a
+/// named attach must come to be refused, or its stream must end at once.
+fn await_closed(
+    binding: &Rc<RefCell<SessionBinding>>,
+    machine: &str,
+    session: &str,
+) -> &'static str {
+    let (columns, rows) = GUEST_RESIZE;
+    let started = Instant::now();
+    while started.elapsed() < GUEST_OUTPUT_DEADLINE {
+        let Some(mut surface) = guest_surface(binding) else {
+            return "renderer_refused";
+        };
+        if surface.attach(machine, session, columns, rows).is_err() {
+            return "closed";
+        }
+        let opened = Instant::now();
+        while opened.elapsed() < Duration::from_secs(3) {
+            match surface.tick() {
+                TickOutcome::Ended | TickOutcome::Failed(_) | TickOutcome::Detached => {
+                    return "closed";
+                }
+                _ => std::thread::sleep(Duration::from_millis(50)),
+            }
+        }
+        let _ = surface.kill();
+        std::thread::sleep(Duration::from_secs(2));
+    }
+    "still_attachable"
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1406,6 +1646,36 @@ mod tests {
     }
 
     #[test]
+    fn guest_terminal_expects_shell_computed_output_not_the_typed_line() {
+        let (typed, echoed) = guest_echo("mila-0123456789ab");
+        assert_eq!(typed, "echo mila-0123456789ab-$((6*7))\r");
+        assert_eq!(echoed, "mila-0123456789ab-42");
+        // The echoed command line itself must not satisfy the check.
+        assert!(!shows_line("$ echo mila-0123456789ab-$((6*7))", &echoed));
+        assert!(shows_line(
+            "$ echo mila-0123456789ab-$((6*7))\nmila-0123456789ab-42 \n$",
+            &echoed
+        ));
+        assert_eq!(guest_size_answer(), "40 132");
+        assert!(!shows_line("$ stty size", &guest_size_answer()));
+
+        let mut guest = descriptor();
+        guest["seed"]["terminal_machine_id"] =
+            serde_json::json!("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9b");
+        guest["seed"]["terminal_machine_name"] = serde_json::json!("mila-terminal");
+        let parsed = parse(&guest).unwrap();
+        assert_eq!(
+            parsed.seed.terminal_machine_id.as_deref(),
+            Some("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9b")
+        );
+        assert!(parse(&descriptor())
+            .unwrap()
+            .seed
+            .terminal_machine_id
+            .is_none());
+    }
+
+    #[test]
     fn terminal_step_accepts_only_echo_or_the_closed_no_guest_refusal() {
         assert!(terminal_passed("marker_seen"));
         assert!(terminal_passed("terminal_unavailable"));
@@ -1445,6 +1715,11 @@ mod tests {
             ("/seed/share_principal", serde_json::json!("not-an-email")),
             ("/seed/machine_id", serde_json::json!("bad id")),
             ("/seed/account_email", serde_json::json!("nobody")),
+            ("/seed/terminal_machine_id", serde_json::json!("bad id")),
+            (
+                "/seed/terminal_machine_name",
+                serde_json::json!("bad\nname"),
+            ),
         ];
         for (pointer, value) in cases {
             let mut candidate = descriptor();
@@ -1498,6 +1773,8 @@ mod tests {
         let config = approver_config(&parsed, Path::new("/private/ca.pem"));
         assert!(config.contains("Authorization: Bearer s3cr3t-token"));
         assert!(config.contains("max-redirs = 0"));
+        // A fixture action may take its full 300 s bound behind the lock.
+        assert!(config.contains("max-time = 330\n"));
     }
 
     #[test]

@@ -192,14 +192,44 @@ instead of an English literal. A second fixture identity would be needed to
 show a live session on two different deployments; the fixture has one
 management host.
 
+## Guest-backed terminal journey
+
+ADR-0264's guest-backed terminal mode adds `seed.terminal_machine_id`, a
+running machine whose PTY is real. Both journeys gained five steps that run
+only terminal operations on it: open, echo, resize, replay and kill. Each
+asserts the rendered output of the Linux `TerminalSurface` and
+`HostPtyTransport` stack (`linux-journey-guest-terminal`). The guestless
+refusal check stays on the seeded machine.
+
+The GTK terminal page changed to match the shared catalog's meaning
+(`linux-terminal-close-detach`):
+
+- `terminalClose` / `terminalCloseConfirm` mean "close this session for
+  everyone; programs stop". Close only dropped the local channel. It now
+  confirms and calls `LiveSession::terminal_end` (Marshall `terminal kill`
+  through the existing `mila_session_terminal_end`).
+- A new Detach (`terminalDetach`) drops only this device's channel and
+  viewport.
+- Attach with an empty session field runs `terminal new` and shows the
+  session id, so Detach then Attach is a named rejoin.
+- The session and input placeholders now come from the catalogs
+  (`terminalSessionHint`, `terminalInputHint`).
+
+The new keys were translated in all 30 locales (`pt` equals `pt_BR`)
+without native-speaker review.
+
 ## Remaining gaps
 
 - Resize, pause and the thread steps depend on the fixture's action hook
   (`observe`, `thread-create`, `thread-ready`, `thread-question`,
   `thread-proposal`). Without it they record `fixture_hook_unavailable`,
   `temporarily_unavailable`, `workload_not_stable` or `no_thread`.
-- The fixture runs no guest, so the terminal step passes on Porsche's closed
-  `terminal_unavailable` refusal. A live PTY echo is unverified.
+- The guest-backed terminal steps run against the fixture's PTY stand-in
+  (`terminal_host.py`) over Marshall's production terminal protocol, not a
+  guest VM. Real guest evidence stays with the fleet `mila-journey-terminal`
+  scenario. The journey cannot read Marshall's `kill_status` directly. It
+  takes Marshall's `closed: true` reply, and then requires a named reattach
+  to be refused or to end at once.
 - Resume against a running machine is admitted as a wake request, and the
   step passes on that receipt.
 - The GTK journey replaces the browser with the fixture approver, so the

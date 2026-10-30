@@ -172,7 +172,12 @@ machines, sharing, web, create/stop/start/pause/resume/delete, resize, threads
 The GTK journey also adds two deployments through the picker and switches
 between them. Each switch releases all authority, and the alias's sign-in
 fails closed because the fixture's trust document names one management host.
-A live PTY echo stays unverified because the fixture runs no guest; see the
+With the fixture's guest-backed terminal mode, both journeys also run a real
+PTY through the Linux terminal stack: shell-computed echo, `stty size` after
+a resize, replay after detach and a named reattach, and Marshall's
+`terminal kill`. The PTY is served by the fixture's terminal stand-in over
+Marshall's terminal protocol. Evidence from a real guest VM stays with the
+fleet `mila-journey-terminal` scenario; see the
 [Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
 
 [ADR-0264](0264-hermetic-mila-journey-fixture.md) adds the hermetic journey

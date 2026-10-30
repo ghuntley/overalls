@@ -69,3 +69,17 @@ Each lifecycle, sharing, web and thread step of both Linux journeys MUST assert 
 authenticated read on the same session (`ls`, `show`, `share show`, `web show`, `request show`,
 `thread show`, `thread turns`); a widget change alone MUST NOT pass a step. A check that finds the
 session `Busy` (the heartbeat probe holds it) MUST poll again rather than fail.
+
+@cc [owner:ghuntley,label:security;desktop] linux-terminal-close-detach
+The GTK terminal page's Close MUST ask for confirmation and then end the named server session through
+`LiveSession::terminal_end` (Marshall `terminal kill`), closing this device's channel first. Detach
+MUST close only this device's channel and viewport, leaving the server session and its programs
+running. An empty session field makes Attach open or rejoin the account's own session and show its id.
+
+@cc [owner:ghuntley,label:verification] linux-journey-guest-terminal
+When the fixture descriptor names `seed.terminal_machine_id`, both Linux journeys MUST run only
+terminal operations on that machine. They MUST open its session (retrying `temporarily_unavailable`
+while the guest boots), see the shell-computed echo line, see `stty size` answer the resized
+dimensions, see the earlier output replay on a fresh viewport after detach and a named reattach, and
+end it with `terminal kill`. That step passes only after a named reattach is refused or its stream
+ends. The guestless refusal check stays on the seeded machine, which is never observed running.

@@ -826,6 +826,39 @@ mod gtk_tests {
             status.label(),
             strings::text(strings::Message::TerminalInvalid)
         );
+        // Close names a session and asks before Marshall ends it for
+        // everyone; confirming while signed out reaches no session.
+        let close = strings::text(strings::Message::TerminalClose);
+        terminal_session.set_text("");
+        find(&terminal_page, &close)[0].emit_clicked();
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::TerminalInvalid)
+        );
+        assert!(
+            !texts(&terminal_page).contains(&strings::text(strings::Message::TerminalCloseConfirm))
+        );
+        machine.set_text("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a");
+        terminal_session.set_text("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9b");
+        find(&terminal_page, &close)[0].emit_clicked();
+        assert!(
+            texts(&terminal_page).contains(&strings::text(strings::Message::TerminalCloseConfirm))
+        );
+        let confirm = find(&terminal_page, &close);
+        assert_eq!(confirm.len(), 2);
+        confirm[1].emit_clicked();
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::SignInRequired)
+        );
+        // Detach without a channel changes nothing.
+        find(
+            &terminal_page,
+            &strings::text(strings::Message::TerminalDetach),
+        )[0]
+        .emit_clicked();
+        assert!(state.terminal.borrow().is_none());
+        terminal_session.set_text("");
 
         // SSH keys: signed out shows the sign-in prompt and no rows.
         find(&settings_page, &strings::text(strings::Message::Refresh))[0].emit_clicked();

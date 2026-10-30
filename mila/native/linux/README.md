@@ -59,7 +59,15 @@ effect. The fixture's stand-ins for the absent provisioner and model (`observe`,
 `<approver origin>/fixture/<action>` with the same bearer; when that hook is missing the journey
 reports `fixture_hook_unavailable`. The terminal opens the account's session with `terminal new`
 and attaches to it by name. Against the guestless fixture the step passes on Porsche's closed
-`terminal_unavailable` refusal, and otherwise only when an echoed marker appears. It prints a JSON report of step names and fixed outcome codes
+`terminal_unavailable` refusal, and otherwise only when an echoed marker appears; it runs on the
+seeded machine, which is never observed running. When the descriptor names
+`seed.terminal_machine_id` (the fixture's guest-backed terminal mode), five more steps run only
+terminal operations on that machine. They open its session, retrying `temporarily_unavailable`
+while the guest boots. They type `echo <marker>-$((6*7))` and require the shell-computed
+`<marker>-42` line, then resize to 132x40 and require `stty size` to answer `40 132`. They detach
+and attach a fresh viewport by name, requiring the earlier output to replay. Finally they end the
+session with Marshall's `terminal kill`, passing only once a named reattach is refused or its stream
+ends. It prints a JSON report of step names and fixed outcome codes
 only, and exits 0 only when every step passed. The approver token reaches curl through an
 owner-only config file, never a process argument.
 
@@ -79,7 +87,9 @@ deployment for the fixture and for its IP-literal alias `127.0.0.1` (which the f
 also names, with its own connection profile), then Open on the fixture. It presses Sign in, the SSH-key Refresh, then
 the Machines and Threads page controls in the same order as the headless journey. After each press
 it polls the same backend-effect check through the window's session. Then it uses Attach terminal
-and Send. It severs the bound session and presses Refresh: the page action's transport error must
+and Send. With the guest-backed terminal mode it repeats the five terminal steps through the
+terminal page: Attach with an empty session field, Send, Resize, Detach then Attach by name, and
+Close with its confirmation. It severs the bound session and presses Refresh: the page action's transport error must
 release the session and start a new generation at once, before the reconnect completes. It then
 presses Open on the alias, which must release every authority at once, and signs in there. The
 fixture's trust document names one management host, so that sign-in must fail closed with

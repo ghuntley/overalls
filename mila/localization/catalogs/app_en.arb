@@ -1158,6 +1158,18 @@
   "@terminalReconnect": {
     "description": "Terminal control that reattaches after the stream ended."
   },
+  "terminalDetach": "Detach",
+  "@terminalDetach": {
+    "description": "Terminal control that disconnects this device and leaves the session and its programs running."
+  },
+  "terminalSessionHint": "Terminal session",
+  "@terminalSessionHint": {
+    "description": "Placeholder for the terminal session field; empty opens or rejoins your own session."
+  },
+  "terminalInputHint": "Type a command",
+  "@terminalInputHint": {
+    "description": "Placeholder for the line sent to the terminal with Send."
+  },
   "terminalResize": "Resize",
   "@terminalResize": {
     "description": "Terminal control that applies new column and row counts."
