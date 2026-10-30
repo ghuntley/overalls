@@ -704,7 +704,10 @@ pub unsafe extern "C" fn mila_session_device_rm(
         let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
         let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
         runtime
-            .block_on(session.device_rm(device))
+            .block_on(session.device_rm(
+                device,
+                &format!("porsche-{}", uuid::Uuid::new_v4().simple()),
+            ))
             .map_err(|e| match e {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
@@ -731,13 +734,198 @@ pub unsafe extern "C" fn mila_session_device_prefs(
         let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
         let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
         runtime
-            .block_on(session.device_prefs(device, enabled == 1))
+            .block_on(session.device_prefs(
+                device,
+                enabled == 1,
+                &format!("porsche-{}", uuid::Uuid::new_v4().simple()),
+            ))
             .map_err(|e| match e {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })
     })
 }
+/// Decode one bounded UTF-8 argument.
+unsafe fn text<'a>(ptr: *const u8, len: usize, max: usize) -> Result<&'a str, SessionStatus> {
+    std::str::from_utf8(bytes(ptr, len, max)?).map_err(|_| SessionStatus::Invalid)
+}
+
+/// Run one JSON-returning session operation and copy its validated output.
+unsafe fn json_operation<F>(
+    handle: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+    operation: F,
+) -> Result<(), SessionStatus>
+where
+    F: for<'s> FnOnce(
+        &'s mut ApplicationSession,
+    ) -> std::pin::Pin<
+        Box<dyn std::future::Future<Output = Result<Vec<u8>, mila_session::SessionError>> + 's>,
+    >,
+{
+    let runtime = runtime()?;
+    let entry = entry(handle)?;
+    let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+    let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+    let data = runtime
+        .block_on(operation(session))
+        .map_err(|error| match error {
+            mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+            _ => SessionStatus::Invalid,
+        })?;
+    output(&data, out, capacity, written)
+}
+
+/// Read one mutation receipt by its client request id (`request show`).
+/// # Safety
+/// Inputs reference their declared readable lengths; out/written follow `output`.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_request_show(
+    handle: u64,
+    request_id: *const u8,
+    request_id_len: usize,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let request_id = text(request_id, request_id_len, 64)?;
+        json_operation(handle, out, capacity, written, |session| {
+            Box::pin(session.request_show(request_id))
+        })
+    })
+}
+
+/// Open or rejoin the caller's personal terminal session (`terminal new`).
+/// # Safety
+/// Inputs reference their declared readable lengths; out/written follow `output`.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_new(
+    handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    request_id: *const u8,
+    request_id_len: usize,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let machine = text(machine, machine_len, 128)?;
+        let request_id = text(request_id, request_id_len, 64)?;
+        json_operation(handle, out, capacity, written, |session| {
+            Box::pin(session.terminal_new(machine, request_id))
+        })
+    })
+}
+
+/// Close one of the caller's server terminal sessions (`terminal kill`).
+/// # Safety
+/// Inputs reference their declared readable lengths; out/written follow `output`.
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mila_session_terminal_end(
+    handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    terminal: *const u8,
+    terminal_len: usize,
+    request_id: *const u8,
+    request_id_len: usize,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let machine = text(machine, machine_len, 128)?;
+        let terminal = text(terminal, terminal_len, 64)?;
+        let request_id = text(request_id, request_id_len, 64)?;
+        json_operation(handle, out, capacity, written, |session| {
+            Box::pin(session.terminal_kill(machine, terminal, request_id))
+        })
+    })
+}
+
+/// Attach a bounded PTY to one named terminal session of one machine. The
+/// returned terminal handle is owned by the parent session and is fenced when
+/// that session closes, exactly like `mila_session_terminal_attach`.
+/// # Safety
+/// Inputs reference their declared readable lengths; out_terminal_handle is writable.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_attach_session(
+    session_handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    terminal: *const u8,
+    terminal_len: usize,
+    columns: u32,
+    rows: u32,
+    out_terminal_handle: *mut u64,
+) -> SessionStatus {
+    guarded(|| {
+        if out_terminal_handle.is_null()
+            || !(1..=4096).contains(&columns)
+            || !(1..=512).contains(&rows)
+        {
+            return Err(SessionStatus::Invalid);
+        }
+        let machine = text(machine, machine_len, 128)?;
+        let terminal_id = text(terminal, terminal_len, 64)?;
+        let parent = entry(session_handle)?;
+        let runtime = runtime()?;
+        let mut parent_guard = parent.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut parent_guard
+            .as_mut()
+            .ok_or(SessionStatus::InvalidHandle)?
+            .session;
+        let terminal = runtime
+            .block_on(session.attach_terminal(machine, terminal_id, columns, rows))
+            .map_err(|error| match error {
+                mila_session::SessionError::Transport(SshError::Bounds) => SessionStatus::Invalid,
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })?;
+        let mut table = terminals().lock().map_err(|_| SessionStatus::Internal)?;
+        if table.entries.len() >= 64 {
+            return Err(SessionStatus::Busy);
+        }
+        let id = table.next.checked_add(1).ok_or(SessionStatus::Internal)?;
+        table.next = id;
+        table.entries.insert(
+            id,
+            Arc::new(Mutex::new(Some(TerminalEntry {
+                owner: session_handle,
+                terminal,
+            }))),
+        );
+        *out_terminal_handle = id;
+        Ok(())
+    })
+}
+
+/// Copy `{"error": CODE}` for the most recent refused command on this session,
+/// or `{"error": null}`. Codes are closed server refusal identifiers only.
+/// # Safety
+/// out/written follow `output`.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_last_refusal(
+    handle: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let entry = entry(handle)?;
+        let locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &locked.as_ref().ok_or(SessionStatus::InvalidHandle)?.session;
+        let data = serde_json::to_vec(&serde_json::json!({ "error": session.last_refusal() }))
+            .map_err(|_| SessionStatus::Internal)?;
+        output(&data, out, capacity, written)
+    })
+}
+
 /// Copy validated display JSON: {"machines":[snapshot rows],"has_more":bool}.
 /// # Safety
 /// out references capacity writable bytes; written is writable. Null out with zero

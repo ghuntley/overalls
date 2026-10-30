@@ -4,7 +4,7 @@
 use mila_model::Identifier;
 use mila_runtime::{MachineSnapshot, SnapshotMachine, MAX_SNAPSHOT_BYTES, MAX_SNAPSHOT_MACHINES};
 use mila_transport::{
-    ssh::{DeviceSigner, PtySession, SshError, SshSession},
+    ssh::{DeviceSigner, ExecOutput, PtySession, SshError, SshSession},
     TrustDocument,
 };
 use serde::Deserialize;
@@ -56,6 +56,25 @@ pub struct ApplicationSession {
     port: u16,
     listing: Option<MachineListing>,
     seen_cursors: HashSet<Identifier>,
+    last_refusal: std::sync::Mutex<Option<String>>,
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] mila-session-closed-refusal
+/// Only a closed server refusal code (`[a-z][a-z0-9_]{0,63}` from a v1
+/// `status: error` envelope) may be retained for presentation; server
+/// messages, command text and payloads MUST NOT be retained.
+fn refusal_code(stdout: &[u8]) -> Option<String> {
+    let value: serde_json::Value = serde_json::from_slice(stdout).ok()?;
+    if value.get("status")?.as_str()? != "error" {
+        return None;
+    }
+    let code = value.get("error")?.as_str()?;
+    let mut bytes = code.bytes();
+    let first = bytes.next()?;
+    (code.len() <= 64
+        && first.is_ascii_lowercase()
+        && bytes.all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'_'))
+    .then(|| code.to_owned())
 }
 
 /// @cc [owner:ghuntley,label:protocol;security] mila-session-ssh-key-envelope
@@ -103,11 +122,108 @@ fn validate_ssh_keys(bytes: &[u8]) -> Result<(), SessionError> {
 }
 
 impl ApplicationSession {
+    /// Submit one command once and remember a closed refusal code, if any.
+    async fn exec(&self, line: &str, stdin: &[u8]) -> Result<ExecOutput, SshError> {
+        let output = self.ssh.exec(line, stdin).await?;
+        let code = (output.exit_status != 0)
+            .then(|| refusal_code(&output.stdout))
+            .flatten();
+        if let Ok(mut last) = self.last_refusal.lock() {
+            *last = code;
+        }
+        Ok(output)
+    }
+
+    /// The closed refusal code of this session's most recent command, if it was refused.
+    pub fn last_refusal(&self) -> Option<String> {
+        self.last_refusal.lock().ok().and_then(|last| last.clone())
+    }
+
     /// Opens a bounded interactive terminal on this authenticated deployment.
     /// The returned channel remains owned by the caller while the underlying
     /// certificate-pinned session is borrowed by the transport.
     pub async fn open_pty(&self, columns: u32, rows: u32) -> Result<PtySession, SessionError> {
         Ok(PtySession::open(&self.ssh, columns, rows).await?)
+    }
+
+    /// Attaches a bounded PTY to one named terminal session of one machine.
+    pub async fn attach_terminal(
+        &self,
+        machine: &str,
+        terminal: &str,
+        columns: u32,
+        rows: u32,
+    ) -> Result<PtySession, SessionError> {
+        let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
+        let terminal = Identifier::parse(terminal).map_err(|_| SessionError::MutationRefused)?;
+        Ok(PtySession::attach(
+            &self.ssh,
+            &machine.to_string(),
+            &terminal.to_string(),
+            columns,
+            rows,
+        )
+        .await?)
+    }
+
+    /// Opens (or rejoins) the caller's personal terminal session on a machine and
+    /// returns Porsche's bounded JSON receipt naming the session.
+    pub async fn terminal_new(
+        &mut self,
+        machine: &str,
+        request_id: &str,
+    ) -> Result<Vec<u8>, SessionError> {
+        let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
+        self.json_mutation(&format!(
+            "terminal new {machine} --json --request-id={request_id}"
+        ))
+        .await
+    }
+
+    /// Closes one of the caller's terminal sessions on the server.
+    pub async fn terminal_kill(
+        &mut self,
+        machine: &str,
+        terminal: &str,
+        request_id: &str,
+    ) -> Result<Vec<u8>, SessionError> {
+        let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
+        let terminal = Identifier::parse(terminal).map_err(|_| SessionError::MutationRefused)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
+        self.json_mutation(&format!(
+            "terminal kill {machine} {terminal} --json --request-id={request_id}"
+        ))
+        .await
+    }
+
+    /// @cc [owner:ghuntley,label:protocol] mila-session-request-show-resolves
+    /// Uncertain or accepted mutations MUST be resolved by reading their receipt
+    /// with `request show`, never by resubmitting the mutation.
+    pub async fn request_show(&mut self, request_id: &str) -> Result<Vec<u8>, SessionError> {
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
+        let output = self
+            .exec(&format!("request show {request_id} --json"), &[])
+            .await?;
+        if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
+            return Err(SessionError::Refused);
+        }
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .map_err(|_| SessionError::Refused)?;
+        Ok(output.stdout)
+    }
+
+    async fn json_mutation(&mut self, line: &str) -> Result<Vec<u8>, SessionError> {
+        let output = self.exec(line, &[]).await?;
+        if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
+            return Err(SessionError::MutationRefused);
+        }
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .map_err(|_| SessionError::Refused)?;
+        Ok(output.stdout)
     }
     /// Execute one closed-vocabulary thread operation. Response JSON is bounded and
     /// parsed before crossing a native boundary; stdin is accepted only for commands
@@ -201,7 +317,7 @@ impl ApplicationSession {
         } else {
             line
         };
-        let output = self.ssh.exec(&line, &stdin).await?;
+        let output = self.exec(&line, &stdin).await?;
         if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
             return Err(SessionError::MutationRefused);
         }
@@ -225,8 +341,10 @@ impl ApplicationSession {
             "start" | "stop" | "pause" | "resume" | "rm" => action,
             _ => return Err(SessionError::MutationRefused),
         };
-        let line = format!("{action} {machine} --json --request-id={request_id}");
-        let output = self.ssh.exec(&line, &[]).await?;
+        // Physical receipts are resolved with `request show`, never by waiting on
+        // or resubmitting the mutation (mila-mutation-once).
+        let line = format!("{action} {machine} --json --no-wait --request-id={request_id}");
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())
         } else {
@@ -257,7 +375,7 @@ impl ApplicationSession {
             return Err(SessionError::MutationRefused);
         }
         let line = format!("new --name={name} --cpu={cpu} --memory={memory} --disk={disk} --no-wait --json --request-id={request_id}");
-        let output = self.ssh.exec(&line, &[]).await?;
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())
         } else {
@@ -279,14 +397,14 @@ impl ApplicationSession {
             mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
         if !(1..=256).contains(&cpu)
             || !(256..=4_194_304).contains(&memory)
-            || !(1..=16_777_216).contains(&disk)
+            || !(1..=500).contains(&disk)
         {
             return Err(SessionError::MutationRefused);
         }
         let line = format!(
-            "resize {machine} --cpu={cpu} --memory={memory} --disk={disk} --json --request-id={request_id}"
+            "resize {machine} --cpu={cpu} --memory={memory} --disk={disk} --json --no-wait --request-id={request_id}"
         );
-        let output = self.ssh.exec(&line, &[]).await?;
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())
         } else {
@@ -296,7 +414,7 @@ impl ApplicationSession {
 
     /// Execute authenticated approved-key listing and return bounded validated JSON.
     pub async fn ssh_keys(&mut self) -> Result<Vec<u8>, SessionError> {
-        let output = self.ssh.exec("ssh-key list --json", &[]).await?;
+        let output = self.exec("ssh-key list --json", &[]).await?;
         if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
             return Err(SessionError::Refused);
         }
@@ -309,7 +427,7 @@ impl ApplicationSession {
     /// pending; callers must be able to inspect that envelope even on a non-zero
     /// command exit status.
     pub async fn whoami(&self) -> Result<Vec<u8>, SessionError> {
-        let output = self.ssh.exec("whoami --json", &[]).await?;
+        let output = self.exec("whoami --json", &[]).await?;
         if output.stdout.len() > 64 * 1024 {
             return Err(SessionError::Bounds);
         }
@@ -337,7 +455,6 @@ impl ApplicationSession {
         let request_id =
             mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
         let output = self
-            .ssh
             .exec(
                 &format!("ssh-key remove --json --request-id={request_id} {key_id}"),
                 &[],
@@ -354,7 +471,7 @@ impl ApplicationSession {
     pub async fn web_show(&mut self, machine: &str) -> Result<Vec<u8>, SessionError> {
         let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
         let line = format!("web show {machine} --json");
-        let output = self.ssh.exec(&line, &[]).await?;
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
             Err(SessionError::MutationRefused)
         } else {
@@ -378,7 +495,7 @@ impl ApplicationSession {
             mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
         let visibility = if public { "--public" } else { "--private" };
         let line = format!("web set {machine} --json --port={port} {visibility} --revision={revision} --request-id={request_id}");
-        let output = self.ssh.exec(&line, &[]).await?;
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())
         } else {
@@ -388,7 +505,7 @@ impl ApplicationSession {
 
     /// Read the caller's push notification devices through Porsche.
     pub async fn device_ls(&mut self) -> Result<Vec<u8>, SessionError> {
-        let output = self.ssh.exec("device ls --json", &[]).await?;
+        let output = self.exec("device ls --json", &[]).await?;
         if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
             Err(SessionError::MutationRefused)
         } else {
@@ -446,7 +563,7 @@ impl ApplicationSession {
         }
         .format()
         .map_err(|_| SessionError::MutationRefused)?;
-        let output = self.ssh.exec(&line, push_key.as_bytes()).await?;
+        let output = self.exec(&line, push_key.as_bytes()).await?;
         if output.exit_status != 0 || output.stdout.len() > 64 * 1024 {
             return Err(SessionError::MutationRefused);
         }
@@ -456,11 +573,19 @@ impl ApplicationSession {
     }
 
     /// Revoke one caller-owned push notification device.
-    pub async fn device_rm(&mut self, device_id: &str) -> Result<(), SessionError> {
+    pub async fn device_rm(
+        &mut self,
+        device_id: &str,
+        request_id: &str,
+    ) -> Result<(), SessionError> {
         let device_id = Identifier::parse(device_id).map_err(|_| SessionError::MutationRefused)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
         let output = self
-            .ssh
-            .exec(&format!("device rm {device_id} --json"), &[])
+            .exec(
+                &format!("device rm {device_id} --json --request-id={request_id}"),
+                &[],
+            )
             .await?;
         if output.exit_status == 0 {
             Ok(())
@@ -474,12 +599,16 @@ impl ApplicationSession {
         &mut self,
         device_id: &str,
         enabled: bool,
+        request_id: &str,
     ) -> Result<(), SessionError> {
         let device_id = Identifier::parse(device_id).map_err(|_| SessionError::MutationRefused)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
         let output = self
-            .ssh
             .exec(
-                &format!("device prefs {device_id} --enabled {enabled} --json"),
+                &format!(
+                    "device prefs {device_id} --enabled={enabled} --json --request-id={request_id}"
+                ),
                 &[],
             )
             .await?;
@@ -526,7 +655,7 @@ impl ApplicationSession {
         let line = mila_protocol::Command::parse(&line)
             .and_then(|command| command.format())
             .map_err(|_| SessionError::MutationRefused)?;
-        let output = self.ssh.exec(&line, &[]).await?;
+        let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())
         } else {
@@ -549,6 +678,7 @@ impl ApplicationSession {
             port,
             listing: None,
             seen_cursors: HashSet::new(),
+            last_refusal: std::sync::Mutex::new(None),
         })
     }
 
@@ -630,7 +760,7 @@ impl ApplicationSession {
             || "ls --json".to_owned(),
             |cursor| format!("ls --json --after {cursor}"),
         );
-        let output = self.ssh.exec(&command, &[]).await?;
+        let output = self.exec(&command, &[]).await?;
         if output.exit_status != 0 {
             return Err(SessionError::Refused);
         }
@@ -775,5 +905,29 @@ mod ssh_key_envelope_tests {
         assert!(validate_ssh_keys(bad_id.as_bytes()).is_err());
         let control = "{\"keys\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"algorithm\":\"a\",\"fingerprint\":\"f\\u0001\"}]}";
         assert!(validate_ssh_keys(control.as_bytes()).is_err());
+    }
+}
+
+#[cfg(test)]
+mod refusal_tests {
+    use super::refusal_code;
+
+    #[test]
+    fn refusal_code_keeps_only_closed_error_names() {
+        assert_eq!(
+            refusal_code(br#"{"version":1,"status":"error","error":"vm_busy"}"#).as_deref(),
+            Some("vm_busy")
+        );
+        for refused in [
+            &br#"{"version":1,"status":"succeeded","error":"vm_busy"}"#[..],
+            br#"{"version":1,"status":"error","error":"Token abc"}"#,
+            br#"{"version":1,"status":"error","error":"9lives"}"#,
+            br#"{"version":1,"status":"error","error":7}"#,
+            b"not json",
+        ] {
+            assert_eq!(refusal_code(refused), None);
+        }
+        let long = format!(r#"{{"status":"error","error":"{}"}}"#, "a".repeat(65));
+        assert_eq!(refusal_code(long.as_bytes()), None);
     }
 }

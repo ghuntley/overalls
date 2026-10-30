@@ -64,7 +64,7 @@ impl<S: DeviceSigner> russh::Signer for ExternalSigner<S> {
             .verify(&data, &parsed)
             .map_err(|_| SshError::Signature)?;
         let mut integers = Vec::new();
-        for integer in signature.chunks_exact(32) {
+        for integer in signature.as_chunks::<32>().0 {
             let first = integer.iter().position(|b| *b != 0).unwrap_or(31);
             let integer = &integer[first..];
             let padding = usize::from(integer[0] & 128 != 0);
@@ -255,20 +255,51 @@ pub struct PtySession {
 
 impl PtySession {
     /// Opens a Porsche terminal with a server-side PTY and bounded dimensions.
+    ///
+    /// This legacy entry point names no machine or terminal session; Porsche's
+    /// grammar requires both, so the server refuses it. Use [`Self::attach`].
     pub async fn open(session: &SshSession, columns: u32, rows: u32) -> Result<Self, SshError> {
-        if !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) {
+        Self::open_line(session, "terminal attach --json", columns, rows).await
+    }
+
+    /// @cc [owner:ghuntley,label:protocol;security] rust-pty-attach-named-session
+    /// Attachment MUST name one machine and one canonical terminal session id,
+    /// be parsed by the shared command grammar before a channel opens, and
+    /// request a PTY with bounded dimensions before the attach exec.
+    pub async fn attach(
+        session: &SshSession,
+        machine: &str,
+        terminal: &str,
+        columns: u32,
+        rows: u32,
+    ) -> Result<Self, SshError> {
+        let line = mila_protocol::Command::parse(&format!(
+            "terminal attach --json -- {machine} {terminal}"
+        ))
+        .and_then(|command| command.format())
+        .map_err(|_| SshError::Bounds)?;
+        Self::open_line(session, &line, columns, rows).await
+    }
+
+    async fn open_line(
+        session: &SshSession,
+        line: &str,
+        columns: u32,
+        rows: u32,
+    ) -> Result<Self, SshError> {
+        if !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) || line.len() > 8192 {
             return Err(SshError::Bounds);
         }
         let channel =
             tokio::time::timeout(session.timeout, session.connection.channel_open_session())
                 .await
                 .map_err(|_| SshError::Timeout)??;
-        let (mut reader, mut writer) = channel.split();
+        let (reader, writer) = channel.split();
         let result = tokio::time::timeout(session.timeout, async {
             writer
                 .request_pty(true, "xterm-256color", columns, rows, 0, 0, &[])
                 .await?;
-            writer.exec(true, b"terminal attach --json").await?;
+            writer.exec(true, line.as_bytes()).await?;
             Ok::<_, SshError>(())
         })
         .await

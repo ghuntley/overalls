@@ -280,10 +280,11 @@ fn command_known(command: &str) -> bool {
             | "request show"
             | "ssh-key list"
             | "ssh-key remove"
-            | "device register"
+            | "share show"
             | "device ls"
             | "device rm"
             | "device prefs"
+            | "device register"
             | "team list"
             | "thread ls"
             | "thread show"
@@ -297,6 +298,7 @@ fn command_known(command: &str) -> bool {
             | "terminal ls"
             | "terminal new"
             | "terminal kill"
+            | "terminal attach"
             | "web show"
             | "web set"
             | "watch"
@@ -336,9 +338,26 @@ fn allowed_option(command: &str, key: &str) -> bool {
             "port" | "public" | "private" | "revision" | "request-id"
         ),
         "terminal attach" => matches!(key, "cursor" | "read-only"),
-        "device register" => matches!(key, "platform" | "push-key" | "enc-pubkey" | "label"),
-        "device prefs" => key == "enabled",
-        _ if mutation(command) => matches!(key, "request-id" | "no-wait"),
+        "device prefs" => matches!(key, "enabled" | "request-id"),
+        "device register" => matches!(
+            key,
+            "platform" | "push-key" | "enc-pubkey" | "label" | "request-id"
+        ),
+        "device rm"
+        | "ssh-key remove"
+        | "share add"
+        | "share remove"
+        | "terminal new"
+        | "terminal kill"
+        | "thread prompt"
+        | "thread answer"
+        | "thread plan approve"
+        | "thread plan revise"
+        | "thread mode"
+        | "thread read"
+        | "pin"
+        | "unpin" => key == "request-id",
+        _ if mutation(command) => matches!(key, "request-id" | "no-wait" | "timeout"),
         _ => false,
     }
 }
@@ -377,9 +396,10 @@ fn validate_command(
     options: &BTreeMap<String, OptionValue>,
 ) -> Result<(), ProtocolError> {
     let (min, max) = match command {
-        "whoami" | "images" | "ls" | "team list" | "watch" => (0, 0),
-        "ssh-key list" | "device ls" | "device register" => (0, 0),
-        "device rm" | "device prefs" => (1, 1),
+        "whoami" | "images" | "ls" | "team list" | "watch" | "ssh-key list" | "device ls"
+        | "device register" => (0, 0),
+        "device rm" | "device prefs" | "share show" => (1, 1),
+        "terminal attach" => (2, 2),
         "show" | "start" | "resize" | "request show" | "ssh-key remove" | "thread show"
         | "thread turns" | "terminal ls" | "terminal new" | "web show" => (1, 1),
         "pause" | "resume" | "unpause" | "stop" | "rm" | "pin" | "unpin" => (1, 1),
@@ -504,6 +524,13 @@ fn validate_command(
     {
         return Err(ProtocolError::InvalidCommand);
     }
+    if command == "terminal attach"
+        && arguments
+            .get(1)
+            .is_none_or(|value| Identifier::parse(value).is_err())
+    {
+        return Err(ProtocolError::InvalidCommand);
+    }
     if command == "thread mode"
         && arguments
             .get(1)
@@ -609,6 +636,9 @@ fn mutation(command: &str) -> bool {
             | "share add"
             | "share remove"
             | "ssh-key remove"
+            | "device rm"
+            | "device prefs"
+            | "device register"
             | "thread prompt"
             | "thread answer"
             | "thread plan approve"
