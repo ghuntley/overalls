@@ -156,11 +156,8 @@ enum class MilaFixtureAction(val wire: String) {
     ThreadQuestion("thread-question"), ThreadProposal("thread-proposal"),
 }
 
-/**
- * POSTs one fixture hook. Returns null only when this fixture build does not expose the hook (404);
- * any other non-2xx answer fails the journey.
- */
-suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONObject = JSONObject()): JSONObject? = withContext(Dispatchers.IO) {
+/** POSTs one fixture hook; any non-2xx answer (including 404) fails the journey. */
+suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) {
     val connection = open(fixtureUrl.resolve(action.wire).toURL()).apply {
         requestMethod = "POST"
         doOutput = true
@@ -175,7 +172,6 @@ suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONO
                 require(bytes.size <= 64 * 1024) { "fixture hook reply too large" }
                 JSONObject(bytes.toString(Charsets.UTF_8))
             }
-            404 -> null
             else -> error("fixture ${action.wire} hook refused ($code)")
         }
     } finally {
@@ -185,10 +181,12 @@ suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONO
 
 /**
  * Asks the fixture to stand in for the absent provisioner for one machine (`observe`), so the next
- * lifecycle intent is admissible. Returns false when the fixture does not offer the hook (404).
+ * lifecycle intent is admissible.
  */
-suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID): Boolean =
-    fixture(MilaFixtureAction.Observe, JSONObject().put("machine_id", machine.toString())) != null
+suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID) {
+    val reply = fixture(MilaFixtureAction.Observe, JSONObject().put("machine_id", machine.toString()))
+    check(reply.optString("observed_state").isNotBlank()) { "observe hook returned no observed_state" }
+}
 
 /** Reads one UUID field from a fixture hook reply. */
 fun JSONObject.fixtureId(key: String): java.util.UUID = java.util.UUID.fromString(getString(key))

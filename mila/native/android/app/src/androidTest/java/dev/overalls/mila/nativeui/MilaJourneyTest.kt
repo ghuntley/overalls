@@ -42,8 +42,8 @@ private class JourneyStore : MilaDeploymentStore {
  *
  * No provisioner or guest runs in the fixture: lifecycle steps prove admission by Porsche, the
  * terminal step proves the closed `terminal_unavailable` refusal, and steps that need the
- * fixture's `/fixture/<action>` hooks (observe, thread-*) are narrowed when this fixture build does
- * not expose them (404).
+ * fixture's `/fixture/<action>` hooks (observe, thread-*) stand in for the provisioner and agent and
+ * are required.
  * Steps run in name order because later steps reuse the device key approved by the first one.
  */
 @RunWith(AndroidJUnit4::class)
@@ -167,17 +167,21 @@ class MilaJourneyTest {
 
     @Test fun j04_lifecycleAdmission() = runBlocking<Unit> {
         val seed = seed(signedIn().listing)
-        val observed = fixture.observe(seed.id)
-        lifecycle(seed.id, MilaMachineCommand.Stop)
-        // Without the provisioner, each further intent needs the fixture's observe stand-in.
-        assumeTrue("fixture observe hook", observed)
-        assertTrue(fixture.observe(seed.id))
-        lifecycle(seed.id, MilaMachineCommand.Start)
-        assertTrue(fixture.observe(seed.id))
-        val made = createdId
-        assumeTrue("created machine from j03", made != null)
-        assertTrue(fixture.observe(made!!))
+        // Without the provisioner, each intent needs the fixture's observe stand-in first.
+        for (command in listOf(MilaMachineCommand.Stop, MilaMachineCommand.Start)) {
+            fixture.observe(seed.id)
+            lifecycle(seed.id, command)
+        }
+        fixture.observe(seed.id)
+        val made = checkNotNull(createdId) { "created machine from j03" }
+        fixture.observe(made)
         lifecycle(made, MilaMachineCommand.Pause)
+        // The unobserved pause keeps an operation open, so Marshall refuses a resize with its
+        // closed vm_busy reason and the form reports it rather than retrying.
+        val form = MilaMachineFormController(adapter)
+        form.setSession(true, listing())
+        assertFalse("resize while paused is refused", form.resize(made, "2", "1024", "3"))
+        assertEquals("vm_busy", adapter.lastRefusal())
         // Resume is a durable wake request; with no checkpoint it is asserted as admitted only.
         lifecycle(made, MilaMachineCommand.Resume)
     }
@@ -195,30 +199,21 @@ class MilaJourneyTest {
 
     @Test fun j06_threadPromptAnswerAndPlanApproval() = runBlocking<Unit> {
         signedIn()
-        val created = fixture.fixture(MilaFixtureAction.ThreadCreate)
-        if (created == null) {
-            // Narrowed until the fixture exposes its thread hooks: listing still decodes.
-            val threads = adapter.threadListing().getOrThrow()
-            val detail = MilaThreadDetailController(adapter)
-            detail.setSession(true, threads)
-            threads.threads.firstOrNull()?.let { assertTrue(detail.select(it.id)); assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show)) }
-            assumeTrue("fixture thread hooks", false)
-        }
-        val thread = created!!.fixtureId("thread_id")
+        val thread = fixture.fixture(MilaFixtureAction.ThreadCreate).fixtureId("thread_id")
         val ready = fixture.fixture(MilaFixtureAction.ThreadReady, JSONObject().put("thread_id", thread.toString()))
-        assertEquals("ready", ready?.optString("status"))
+        assertEquals("ready", ready.optString("status"))
         val listed = adapter.threadListing().getOrThrow()
         assertTrue("thread $thread listed", listed.threads.any { it.id == thread })
         val detail = MilaThreadDetailController(adapter)
         detail.setSession(true, listed)
         assertTrue(detail.select(thread))
         assertTrue("prompt: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Prompt, "Report the hostname please"))
-        val question = fixture.fixture(MilaFixtureAction.ThreadQuestion, JSONObject().put("thread_id", thread.toString()))!!.fixtureId("question_id")
+        val question = fixture.fixture(MilaFixtureAction.ThreadQuestion, JSONObject().put("thread_id", thread.toString())).fixtureId("question_id")
         assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
         val shown = (detail.state as MilaThreadActionState.Applied).thread
         assertEquals("pending question reported by thread show", question, shown.questionId)
         assertTrue("answer: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Answer, """{"approach":{"selected":"First","text":""}}"""))
-        val plan = fixture.fixture(MilaFixtureAction.ThreadProposal, JSONObject().put("thread_id", thread.toString()))!!.fixtureId("plan_id")
+        val plan = fixture.fixture(MilaFixtureAction.ThreadProposal, JSONObject().put("thread_id", thread.toString())).fixtureId("plan_id")
         assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
         assertEquals("latest plan reported by thread show", plan, (detail.state as MilaThreadActionState.Applied).thread.planId)
         assertTrue("plan approve: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.PlanApprove))

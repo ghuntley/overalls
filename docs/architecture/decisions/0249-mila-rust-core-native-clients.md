@@ -107,9 +107,12 @@ completes VIEW/share-provider targets only for an authenticated session. JVM
 tests cover these controllers; emulator instrumentation covers the packaged JNI
 exports and BiometricPrompt unavailable/enrolled states. The
 [`MilaJourneyTest`](../../../mila/native/android/app/src/androidTest/java/dev/overalls/mila/nativeui/MilaJourneyTest.kt)
-suite against the hermetic Marshall+Porsche fixture is wired into CI but has no
-recorded passing execution until the fixture lands; FCM delivery is not
-hermetic and remains outside it.
+suite against the hermetic Marshall+Porsche fixture runs in the `android-native`
+CI job and requires the fixture's `observe` and thread hooks; it has no recorded
+passing execution yet. FCM delivery is not hermetic and remains outside it.
+Session JNI reads call the session ABI once into a bounded buffer
+(`jni-session-single-read`), and thread answers name the question reported by an
+authenticated `thread show` (`android-thread-answer-binding`).
 
 The Windows adapter's lifecycle layer keeps protocol authority in Rust:
 [`SignInCoordinator.cs`](../../../mila/windows-dotnet/Interop/SignInCoordinator.cs)

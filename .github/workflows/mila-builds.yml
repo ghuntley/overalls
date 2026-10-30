@@ -407,9 +407,9 @@ jobs:
           if ! test -r /dev/kvm -a -w /dev/kvm; then
             echo 'KVM unavailable; emulator runner will use software acceleration'
           fi
-      # The hermetic Marshall+Porsche journey fixture (ADR-0264) builds and boots in the
-      # background beside the APK build, then runs beside the emulator on this runner.
-      # Every fixture step is gated on the flake exposing `apps.<system>.mila-journey-fixture`.
+      # The hermetic Marshall+Porsche journey fixture (ADR-0264) is substituted from
+      # Cachix and built before the APK, then boots beside the emulator on this runner.
+      # Every fixture step is gated on the flake exposing `packages.<system>.mila-journey-fixture`.
       - name: Detect hermetic journey fixture
         id: journey
         run: |
@@ -422,15 +422,27 @@ jobs:
       - name: Install Nix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
-      - name: Start hermetic journey fixture
+      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
+      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      - name: Configure Cachix for the journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
+      # Building first keeps substitution/build time apart from VM startup; the
+      # VM boots only after the APK is assembled, just before the emulator.
+      - name: Build hermetic journey fixture
         id: fixture
         if: steps.journey.outputs.declared == 'true'
-        timeout-minutes: 10
+        timeout-minutes: 40
         run: |
           set -euo pipefail
           system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-          if ! nix eval --raw ".#apps.${system}.mila-journey-fixture.program" >/dev/null; then
-            echo "flake has no apps.${system}.mila-journey-fixture; journey skipped"
+          if ! nix eval --raw ".#packages.${system}.mila-journey-fixture.drvPath" >/dev/null 2>&1; then
+            echo "flake has no packages.${system}.mila-journey-fixture; journey skipped"
             exit 0
           fi
           if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
@@ -439,15 +451,8 @@ jobs:
           fi
           # The VM closure and the Android SDK do not both fit the runner's default free space.
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
-          dir="$RUNNER_TEMP/mila-journey"
-          mkdir -p "$dir/state"
-          chmod 700 "$dir" "$dir/state"
-          # --detach returns once the backend is ready. Its stdout repeats the descriptor,
-          # which carries the approver bearer, so it stays in the owner-only directory.
-          nohup nix run ".#mila-journey-fixture" -- --descriptor "$dir/descriptor.json" \
-            --state "$dir/state" --detach > "$dir/launcher.log" 2>&1 &
-          echo "$!" > "$dir/launcher.pid"
-          echo "started=true" >> "$GITHUB_OUTPUT"
+          nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
+          echo "built=true" >> "$GITHUB_OUTPUT"
       - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
         continue-on-error: true
         timeout-minutes: 10
@@ -493,19 +498,30 @@ jobs:
         run: |
           gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest testDebugUnitTest
           test -f app/build/outputs/apk/debug/app-debug.apk
-      - name: Await hermetic journey fixture
-        if: steps.fixture.outputs.started == 'true'
-        timeout-minutes: 60
+      - name: Start hermetic journey fixture
+        if: steps.fixture.outputs.built == 'true'
+        timeout-minutes: 25
         run: |
           set -euo pipefail
           dir="$RUNNER_TEMP/mila-journey"
-          while kill -0 "$(cat "$dir/launcher.pid")" 2>/dev/null; do sleep 10; done
-          if ! python3 -I -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$dir/descriptor.json"; then
-            echo "mila-journey-fixture did not publish a descriptor" >&2
-            tail -n 50 "$dir/launcher.log" >&2 || true
-            tail -n 100 "$dir/state/console.log" >&2 || true
-            exit 1
-          fi
+          mkdir -p "$dir/state"
+          chmod 700 "$dir" "$dir/state"
+          # The launcher keeps the VM up for the rest of the job. Its output can repeat the
+          # descriptor, which carries the approver bearer, so it stays in the owner-only directory.
+          nohup "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture" \
+            --descriptor "$dir/descriptor.json" --state "$dir/state" \
+            > "$dir/fixture.log" 2>&1 &
+          echo "$!" > "$dir/fixture.pid"
+          for _ in $(seq 1 1500); do
+            if python3 -I -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$dir/descriptor.json" 2>/dev/null; then
+              break
+            fi
+            if ! kill -0 "$(cat "$dir/fixture.pid")" 2>/dev/null; then
+              echo "mila-journey-fixture exited before publishing a descriptor" >&2
+              exit 1
+            fi
+            sleep 1
+          done
           python3 -I - "$dir/descriptor.json" <<'PY'
           import json
           import sys
@@ -536,6 +552,13 @@ jobs:
           disable-animations: true
           # Runs the packaged suite, then the fixture journey when MILA_JOURNEY_DESCRIPTOR is set.
           script: bash scripts/run-instrumentation.sh
+      # The fixture logs carry no credentials: the bearer is only in descriptor.json.
+      - name: Show journey fixture logs
+        if: failure() && steps.fixture.outputs.built == 'true'
+        run: |
+          dir="$RUNNER_TEMP/mila-journey"
+          tail -n 200 "$dir/fixture.log" || true
+          tail -n 200 "$dir/state/console.log" || true
 
   # Tunnelled fixture host (ADR-0264). Boots the hermetic backend bound to
   # this runner's tailnet address and serves only the descriptor beside it

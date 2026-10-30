@@ -51,8 +51,12 @@ credential-free device.
 
 `MilaJourneyTest` drives the production controllers over the packaged Rust session against the
 `mila-journey-fixture` Marshall+Porsche backend: sign-in with browser approval and reconnect,
-machine listing, session-bound create/resize, lifecycle, sharing, threads, terminal, web, SSH keys
-and notification-device listing. It is skipped unless the `milaJourneyDescriptor` instrumentation
+machine listing, session-bound create/resize, lifecycle admission (including the closed `vm_busy`
+resize refusal while a pause is unobserved), sharing, thread prompt/answer/plan approval, the
+terminal's closed refusal without a guest, web, SSH keys and notification-device CRUD. The fixture's
+Bearer-protected `POST <approver.fixture_url><action>` hooks (`observe`, `thread-create`,
+`thread-ready`, `thread-question`, `thread-proposal`) stand in for the absent provisioner and agent
+and are required. It is skipped unless the `milaJourneyDescriptor` instrumentation
 argument carries the base64 fixture descriptor (version 1):
 
 ```json
@@ -60,13 +64,13 @@ argument carries the base64 fixture descriptor (version 1):
   "version": 1,
   "deployment": { "host": "localhost", "ssh_port": 2222, "https_port": 8443 },
   "tls": { "ca_pem": "-----BEGIN CERTIFICATE-----…", "server_name": "localhost" },
-  "approver": { "url": "https://localhost:8443/…", "bearer_token": "…" },
-  "seed": { "machine_name": "…", "share_principal": "…" }
+  "approver": { "url": "https://localhost:8444/approve", "fixture_url": "https://localhost:8444/fixture/", "bearer_token": "…" },
+  "seed": { "machine_name": "…", "machine_id": "…", "share_principal": "…", "account_email": "…" }
 }
 ```
 
-CI starts the fixture beside the emulator only when the flake exposes
-`apps.<system>.mila-journey-fixture`, then `adb reverse`s its unprivileged ports so the emulator
+CI substitutes the fixture from the `overalls` Cachix cache and builds it only when the flake exposes
+`packages.<system>.mila-journey-fixture`, boots it after the APK is assembled, then `adb reverse`s its unprivileged ports so the emulator
 dials `deployment.host` exactly as written. `localhost` deployments are accepted only while an
 instrumentation test sets `MilaInstrumentationLoopback.allowed`; production input still requires a
 dotted DNS name. FCM delivery and server-side device registration need a real push token and are
