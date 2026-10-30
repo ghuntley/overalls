@@ -44,12 +44,15 @@ check) refuses all of these:
 - **Cargo:** register the lock in `lib.dependencyPins.cargo` in
   `nix/domains/artifacts/default.nix`. `scripts/cargo_security_upgrades.exs`
   refuses unregistered locks.
-- **Go:** put `vendorHash` in the registry.
-- **npm:** use `importNpmLock` from the committed lock.
+- **Go:** put `vendorHash` in the registry. Expose the source and modules
+  for Buck2 in `inputs.go` in `nix/buck/cells.nix`.
+- **npm:** use `importNpmLock` from the committed lock. Buck2 takes the
+  `buildNodeModules` tree from `inputs.npm`.
 - **Mix:** the `fetchMixDeps` hash lives in the registry under the
   application's key. Refresh it with `scripts/dependency_pins.ex`.
-- **Python:** add wheels to the registry, or put packages in the cells'
-  `python3.withPackages` environment.
+- **Python:** add wheels to the registry, or add packages to
+  `nix/buck/python.nix`. That file is the one interpreter closure for Buck2's
+  `//:py-static`, the prek hooks and the `python-static` check.
 
 Never use `fetchTarball` or `builtins.fetchGit` without a pin. Never add a
 second nixpkgs except as a flake input.

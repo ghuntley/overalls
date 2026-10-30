@@ -139,6 +139,35 @@ the approved migration plan.
   targets from [bootstrap_attrs.bzl](../../../nix/buck/bootstrap_attrs.bzl),
   which [bootstrap-attrs.sh](../../../nix/buck/bootstrap-attrs.sh) regenerates.
 - [ownership.bxl](../../../buck/bxl/ownership.bxl) checks file ownership.
+- **M7 (Go, JavaScript, Python, scripts).** `buckCells` adds the go, node,
+  esbuild, ruff, ty, pwsh and Chromium tools, plus pinned inputs: the
+  Nix-vendored gh and git-lfs sources and modules (`go/`), the marvin
+  `importNpmLock` tree (`npm/`) and one Python closure
+  ([python.nix](../../../nix/buck/python.nix), `python/`) that devenv's prek
+  hooks and the `python-static` Nix check now share.
+  - [go.bzl](../../../buck/go.bzl) and [github.bzl](../../../buck/github.bzl)
+    build gh and git-lfs for Linux, Windows, FreeBSD and illumos
+    ([BUCK](../../../nix/domains/artifacts/guest/github/BUCK)). On 2026-10-30
+    all eight binaries and `manifest.json` of `:release` were byte-identical
+    to `.#tool-github-managed`, and both transport `go_test` targets passed.
+  - [npm.bzl](../../../buck/npm.bzl) defines `npm_package` and
+    `esbuild_bundle`. `//marvin:marvin` was byte-identical to the Nix marvin
+    package, and `//marvin:check` (typecheck, tests, Firefox lint, Chromium
+    smoke) passed. `//buck/probes:esbuild_bundle` exercises the single
+    esbuild; Marshall's assets switch to it in M6.
+  - [python.bzl](../../../buck/python.bzl) defines `//:py-static`, with one
+    `[ruff/<path>]` sub-target per file. On a clean tree it and the prek
+    `ruff-format`, `ruff` and `ty` hooks both passed. With a planted file,
+    both reported the same three findings (F401, a format diff and
+    `invalid-return-type`).
+  - [checks.bzl](../../../buck/checks.bzl) defines `//:conflict-markers`
+    (with per-file sub-targets), `//:package-input-lock`
+    ([script](../../../scripts/check_package_input_lock.exs)) and
+    `//nix:overalls-install-ps1`, which shares
+    [its script](../../../nix/verification/tests/overalls-install-ps1.sh) with
+    the Nix check. Planted markers and lock mismatches failed.
+  - `tools/buck2 run //mila:journey-fixture` runs the same store path as
+    `.#mila-journey-fixture` (`nix_store_run` over the bootstrap target).
 
 - [nix/assemble](../../../nix/assemble/default.nix) is `lib.assemble`.
   - It holds the single package set and its parameterised variants. Today
@@ -164,13 +193,28 @@ the approved migration plan.
 
 Remaining gaps, by milestone of the migration plan:
 
-- rust-overlay toolchain and per-language rules (M5–M7);
+- rust-overlay toolchain and Rust and Elixir rules (M5, M6);
 - the remaining M3 items:
   - moving the in-module builds into the package set;
   - per-host parameter targets;
   - antithesis hub consolidation;
   - Inception store-name filters;
   - deployment and machine-test targets on `nix_assemble`;
+- M7 leftovers:
+  - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
+    the module-configuration test consume `githubTools` and `marvin`
+    through Nix until assembly takes Buck2 artifacts (M3).
+  - The `marvin`, `python-static`, `conflict-markers`, `package-input-lock`
+    and `overalls-install-ps1` checks stay in the flake until M11, and
+    `mila-builds.yml` still runs `nix build .#mila-journey-fixture`. CI calls
+    the Buck2 targets once the `ci.yml` from M4a exists.
+  - `nix-compact-*` and `fleet-builds-configuration` evaluate NixOS
+    configurations rather than run scripts. They stay bootstrap
+    `//:check-*` targets until `nix_assemble` (M3).
+  - Buck2 globs see untracked files, while prek and the Nix checks see only
+    tracked files. `py-static` therefore also checks untracked Python.
+  - The `tools/code-contracts` npm project and the repository-wide contract
+    check move with precommit (M8);
 - removal of the flake package, check and configuration outputs (M11);
 - Darwin cells and the Windows mode without Nix (M9);
 - CI and devenv using `tools/buck2` (M1 follow-up, M8).

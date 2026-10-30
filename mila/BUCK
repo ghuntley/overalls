@@ -1,3 +1,14 @@
-load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:nix.bzl", "nix_owned", "nix_store_run")
 
 nix_owned()
+
+# Hermetic Mila journey backend (ADR-0264):
+#   tools/buck2 run //mila:journey-fixture -- --bind <address> ...
+# replaces `nix run .#mila-journey-fixture`. The launcher is a NixOS VM, so it
+# is still built by Nix, through the bootstrap target until assembly (M3).
+nix_store_run(
+    name = "journey-fixture",
+    package = "//:package-mila-journey-fixture",
+    program = "bin/mila-journey-fixture",
+    visibility = ["PUBLIC"],
+)

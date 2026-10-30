@@ -12,7 +12,9 @@ key_inputs() {
   git ls-files -z -- flake.nix flake.lock nix/buck \
     nix/domains/artifacts/dependency-hashes.json \
     nix/domains/artifacts/infrastructure/toolchain.nix \
-    '**/Cargo.lock' '**/package-lock.json' | sort -z | xargs -0 sha256sum
+    nix/domains/artifacts/guest/github/default.nix \
+    antithesis/nix/python-wheels.nix \
+    '**/Cargo.lock' '**/package-lock.json' marvin/package.json | sort -z | xargs -0 sha256sum
 }
 key=$(key_inputs | sha256sum | cut -d' ' -f1)
 state=.buck-cells.key

@@ -1,3 +1,49 @@
 load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:npm.bzl", "npm_package")
 
 nix_owned()
+
+# The maintained Marvin inputs, matching the source filter of
+# nix/domains/artifacts/marvin/default.nix.
+SRCS = glob(
+    ["**/*.mjs", "**/*.json", "**/*.d.ts", "**/*.html", "**/*.css", "CONTRACTS", "README.md"],
+    exclude = ["dist/**", "node_modules/**"],
+)
+
+COMMON = {
+    "env": {"SOURCE_DATE_EPOCH": "315532800"},
+    "node_modules": "toolchains//:marvin_node_modules",
+    "srcs": SRCS,
+}
+
+# Contract marvin-reproducible-release: see nix/domains/artifacts/marvin/default.nix.
+npm_package(
+    name = "marvin",
+    commands = ["npm run typecheck", "npm run build", "npm run package"],
+    install = {
+        "bin/chrome.zip": "dist/bin/chrome.zip",
+        "bin/firefox.xpi": "dist/bin/firefox.xpi",
+        "manifest.json": "dist/manifest.json",
+        "share/overalls-marvin/chrome": "dist/chrome",
+        "share/overalls-marvin/firefox": "dist/firefox",
+    },
+    visibility = ["PUBLIC"],
+    **COMMON
+)
+
+# The same checks as the `marvin` flake check: typecheck, unit tests, build,
+# package, the Firefox linter and the pinned-Chromium smoke test.
+npm_package(
+    name = "check",
+    commands = [
+        "export FONTCONFIG_FILE=\"$FONTS_CONF\"",
+        "npm run check",
+        "npm run smoke:chrome",
+        "unzip -t dist/bin/chrome.zip",
+        "unzip -t dist/bin/firefox.xpi",
+    ],
+    labels = ["check"],
+    path = ["toolchains//:unzip"],
+    tools = {"CHROME": "toolchains//:chromium", "FONTS_CONF": "toolchains//:fonts_conf"},
+    **COMMON
+)

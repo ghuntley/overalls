@@ -1,3 +1,14 @@
+load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# Contract overalls-install-ps1-check: see nix/verification/tests/overalls-install-ps1.nix.
+script_check(
+    name = "overalls-install-ps1",
+    # Commands run from the project root.
+    cmd = ["bash", "nix/verification/tests/overalls-install-ps1.sh", "$(location //marshall:overalls-install.ps1)"],
+    labels = ["check"],
+    path = ["toolchains//:bash", "toolchains//:pwsh", "toolchains//:gnused", "toolchains//:gnugrep"],
+    srcs = ["verification/tests/overalls-install-ps1.sh", "//marshall:overalls-install.ps1"],
+)

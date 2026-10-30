@@ -59,7 +59,67 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
 7. **Default globs skip dotfiles.** `nix_owned` adds `**/.*` patterns; do the
    same anywhere hidden files matter.
 
+## Adding targets by language
+
+Shared helpers live in `buck/checks.bzl`:
+
+- `tool(dep)` reads a `nix_tool` path, and `search_path` builds `PATH` from
+  tools only.
+- A **check** is a cached build action that writes a stamp. `buck2 test`
+  only reads the stamp (`check_providers`), so an unchanged check is a cache
+  hit.
+- `nix_owned()` also defines `srcs_files`. It maps each owned file's
+  repository path to its artifact, for checks that run per file.
+
+**Go** (`buck/go.bzl`). Third-party source and modules come from Nix:
+1. Keep the `fetch*` hash and `vendorHash` in the pin registry.
+2. Expose the source and modules in `inputs.go` in `nix/buck/cells.nix`, and
+   list them in `toolchains/BUCK`.
+3. Use `go_binary(source, modules, vendor_mode = "vendor"|"proxy", patches,
+   vendor_patches, overlay, package, ldflags, goos)` and
+   `go_test(packages)`. Cross-compile by setting `goos`.
+
+The rule reproduces buildGoModule and stdenv's strip, so outputs should
+match Nix byte for byte. Compare them with `diff -r`.
+
+**JavaScript** (`buck/npm.bzl`):
+- **Packages.** Add the project's `importNpmLock` tree to `inputs.npm` in
+  `cells.nix`. The wrapper already hashes every `package-lock.json`. Then use
+  `npm_package(srcs, node_modules, commands, install)`:
+  - with `install` (dest to package path), the output is a directory;
+  - without it, the target is a check.
+  - Tools such as Chromium come in through `tools = {"CHROME": …}`.
+- **Bundles.** Use `esbuild_bundle(srcs, entry, out, args)`. It runs the one
+  pinned esbuild. Never use `esbuild.install`.
+
+**Python.** `//:py-static` covers every owned `.py` file and
+`pyproject.toml`:
+- It runs ruff format, ruff check and `antithesis/verification/static-check.sh`
+  (ty) with the closure from `nix/buck/python.nix`, the same one prek uses.
+- One file: `tools/buck2 build '//:py-static[ruff/<path>]'`.
+- A new third-party import goes in `nix/buck/python.nix`.
+
+**Scripts:**
+- `script_check(cmd, srcs, path)` runs a command from the project root over
+  declared inputs. Reference a file in another package with an
+  `export_file`.
+- `//:conflict-markers[<path>]` checks one file.
+- `nix_store_run(package, program)` makes a Nix-built program runnable with
+  `buck2 run`, for example `//mila:journey-fixture`.
+
+**Not yet Buck2.** Checks that evaluate NixOS (`nix-compact-*`,
+`fleet-builds-configuration`) stay bootstrap targets until `nix_assemble`
+(M3).
+
 ## Troubleshooting
+
+- **Socket path too long** (Chromium, Postgres). `buck-out` paths are deep.
+  Point `TMPDIR` at a short `mktemp -d /tmp/…` directory.
+- **Go stamps VCS data or reads `.git`.** Build outside the checkout, as
+  `go.bzl` does.
+- **`cmd` paths in `script_check`.** They are relative to the project root,
+  not to the package.
+
 
 - **"function is unavailable during analysis".** Move the
   `read_root_config` call into a macro (rule 2).

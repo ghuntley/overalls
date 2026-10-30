@@ -1,25 +1,14 @@
 { pkgs }:
 let
-  # Third-party imports MUST resolve against pinned packages so the type check
-  # rejects real interface drift instead of missing modules.
-  tyPython = pkgs.python313.withPackages (p: [
-    p.aiohttp
-    p.boto3
-    p.cryptography
-    p.dnslib
-    p.hypothesis
-    p.playwright
-    p.pyyaml
-    p.websockets
-  ]);
-  harnessPython = pkgs.python313.withPackages (p: [ p.cryptography ]);
-  antithesisWheels = import ../../../../antithesis/nix/python-wheels.nix { inherit pkgs; };
+  # Contract python-static-toolchain: see nix/buck/python.nix.
+  python = import ../../../buck/python.nix { inherit pkgs; };
 in
 # @cc [owner:ghuntley,label:verification] python-static-repository-root
 # Formatting, lint and type checks MUST run from the repository root with its
-# reviewed pyproject.toml and all maintained Python trees in scope.
+# reviewed pyproject.toml and all maintained Python trees in scope. The Buck2
+# //:py-static target is the canonical gate; this Nix check stays until M11.
 pkgs.runCommand "overalls-python-static" {
-  nativeBuildInputs = [ pkgs.ruff pkgs.ty ];
+  nativeBuildInputs = [ python.ruff python.ty ];
 } ''
   export RUFF_CACHE_DIR="$TMPDIR/ruff"
   export XDG_CACHE_HOME="$TMPDIR/cache"
@@ -27,6 +16,6 @@ pkgs.runCommand "overalls-python-static" {
   ruff format --check .
   ruff check .
   ${pkgs.bash}/bin/bash antithesis/verification/static-check.sh \
-    ${pkgs.ty}/bin/ty ${tyPython}/bin/python3 ${harnessPython}/bin/python3 ${antithesisWheels}
+    ${python.ty}/bin/ty ${python.tyPython}/bin/python3 ${python.harnessPython}/bin/python3 ${python.antithesisWheels}
   touch $out
 ''

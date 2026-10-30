@@ -10,22 +10,8 @@ let
   # The same patched Firecracker the release metadata points Lilly at.
   inherit (import ./nix/domains/artifacts/infrastructure/firecracker.nix { inherit pkgs; }) vmm;
 
-  # @cc [owner:ghuntley,label:build] python-static-toolchain
-  # The Python gate MUST use the same pinned ruff and ty as the python-static
-  # Nix check, and third-party imports MUST resolve against this pinned
-  # interpreter closure instead of any ambient Python environment.
-  tyPython = pkgs.python313.withPackages (p: [
-    p.aiohttp
-    p.boto3
-    p.cryptography
-    p.dnslib
-    p.hypothesis
-    p.playwright
-    p.pyyaml
-    p.websockets
-  ]);
-  harnessPython = pkgs.python313.withPackages (p: [ p.cryptography ]);
-  antithesisWheels = import ./antithesis/nix/python-wheels.nix { inherit pkgs; };
+  # Contract python-static-toolchain: see nix/buck/python.nix.
+  pythonStatic = import ./nix/buck/python.nix { inherit pkgs; };
   # Firecracker, Lilly host helpers, network tools and Chromium are Linux-only; a
   # darwin shell omits them instead of refusing to evaluate.
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
@@ -69,8 +55,8 @@ in
     # Regenerates Mila's pubspec.lock.json files (`yq -o=json pubspec.lock`).
     pkgs.yq-go
     pkgs.python3
-    pkgs.ruff
-    pkgs.ty
+    pythonStatic.ruff
+    pythonStatic.ty
     toolchain.erlang
   ] ++ lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
     # Mila's macOS and iOS Xcode projects are edited with the xcodeproj gem
@@ -247,7 +233,7 @@ in
         enable = true;
         name = "ruff-format";
         description = "Check Python formatting with ruff";
-        entry = "${pkgs.ruff}/bin/ruff format --check --force-exclude";
+        entry = "${pythonStatic.ruff}/bin/ruff format --check --force-exclude";
         language = "system";
         files = "\\.py$";
       };
@@ -255,7 +241,7 @@ in
         enable = true;
         name = "ruff";
         description = "Lint Python with ruff";
-        entry = "${pkgs.ruff}/bin/ruff check --force-exclude";
+        entry = "${pythonStatic.ruff}/bin/ruff check --force-exclude";
         language = "system";
         files = "\\.py$";
       };
@@ -263,7 +249,7 @@ in
         enable = true;
         name = "ty";
         description = "Type-check Python with ty";
-        entry = "${pkgs.bash}/bin/bash antithesis/verification/static-check.sh ${pkgs.ty}/bin/ty ${tyPython}/bin/python3 ${harnessPython}/bin/python3 ${antithesisWheels}";
+        entry = "${pkgs.bash}/bin/bash antithesis/verification/static-check.sh ${pythonStatic.ty}/bin/ty ${pythonStatic.tyPython}/bin/python3 ${pythonStatic.harnessPython}/bin/python3 ${pythonStatic.antithesisWheels}";
         language = "system";
         files = "\\.py$";
         pass_filenames = false;

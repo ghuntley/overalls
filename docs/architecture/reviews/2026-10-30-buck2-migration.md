@@ -93,3 +93,47 @@ draft plan:
 
 No NixOS machine test covers M1, because it changes no deployed module. Host
 and selection coverage is planned for M2 and M4a.
+
+## M7: Go, JavaScript, Python and script checks
+
+This milestone adds Buck2 rules within ADR-0269. It makes no new decision.
+
+**Pinned inputs.** Third-party inputs stay in Nix: the gh and git-lfs sources
+and vendored modules, the marvin `importNpmLock` tree, and one Python closure.
+`buckCells` exposes their store paths through `[nix]`, so each path is part
+of the action key.
+
+**Parity.** On 2026-10-30:
+
+- The Buck2 gh and git-lfs builds for four platforms, and the release
+  manifest, were byte-identical to `.#tool-github-managed`. Matching needed
+  stdenv's `strip -S -p`, and building outside the checkout so Go does not
+  stamp VCS data.
+- `//marvin:marvin` was byte-identical to the Nix marvin package.
+- `//:py-static` reported the same findings as the prek Python hooks.
+- `//mila:journey-fixture` runs the same store path as
+  `.#mila-journey-fixture`.
+
+**Findings:**
+
+- The flake leaves cannot be deleted yet. Guest images and the Marshall and
+  Ziggy modules read `githubTools` and `marvin` from the Nix package set. M3
+  moves them to Buck2 artifacts.
+- `nix-compact-*` and `fleet-builds-configuration` evaluate NixOS, so they
+  need `nix_assemble`. They are not pure scripts.
+- Buck2 globs include untracked files, but prek and Nix see only tracked ones.
+  This is stricter, but a dirty tree can fail `py-static` where prek passes.
+- A local action's cwd is the project root, so the checks read sources in
+  place. Remote execution sees only declared inputs, so every check declares
+  all of its files.
+
+**Verification:**
+
+- `tools/buck2 build` and `test` of every new target.
+- Planted-failure runs for ruff, ty, the conflict-marker check and the
+  package-input-lock check.
+- The `overalls-install-ps1` Nix check with the shared script.
+- The ownership BXL, `check_pins`, `check_adrs` and the contract format and
+  coverage checks.
+
+No NixOS machine test covers this change, because no deployed module changes.

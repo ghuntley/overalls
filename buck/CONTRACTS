@@ -24,3 +24,32 @@ nix_assemble MUST evaluate lib.assemble over a copied tree of declared
 sources only, under restrict-eval, so an undeclared Nix input is an
 evaluation error rather than a silent read of the checkout. The
 assemble_soundness BXL keeps an undeclared-tree probe failing (ADR-0269).
+
+@cc [owner:ghuntley,label:build] go-binary-nix-parity
+go_binary and go_test MUST build from the Nix-vendored source and modules in
+buckCells with buildGoModule's environment (GOTOOLCHAIN=local, GOPROXY=off or
+the file proxy, -mod=vendor, -trimpath, CGO_ENABLED=0) outside the checkout,
+and MUST apply stdenv's `strip -S -p`, so each binary and the GitHub tools
+release are byte-identical to the Nix outputs from the same pins (ADR-0269).
+
+@cc [owner:ghuntley,label:build;security] npm-lock-node-modules
+npm_package MUST take node_modules only from the buckCells importNpmLock tree
+built from the committed package-lock.json with install scripts disabled, and
+MUST run npm offline over declared sources; it never resolves packages from
+the network or an ambient node_modules (ADR-0267, ADR-0269).
+
+@cc [owner:ghuntley,label:build] esbuild-single-pinned
+esbuild_bundle MUST use the one esbuild from buckCells, the nixpkgs esbuild
+that release builds pin, and never an esbuild.install download (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] py-static-prek-parity
+py_static MUST run the same pinned ruff and ty as the prek hooks, with the
+same flags over every owned Python file and pyproject.toml from the project
+root, and MUST report every gate's findings before failing. Its
+`[ruff/<path>]` sub-targets MUST run the same ruff checks on one file
+(ADR-0269).
+
+@cc [owner:ghuntley,label:governance] conflict-markers-per-file
+conflict_markers MUST run scripts/check_conflict_markers.exs over every
+owned file, including the toolchains cell, and MUST expose one sub-target per
+file so precommit checks only changed files (ADR-0269).

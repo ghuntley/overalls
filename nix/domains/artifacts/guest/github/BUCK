@@ -1,0 +1,65 @@
+# Managed gh and git-lfs (M7, ADR-0269): Buck2 builds of the same patched
+# releases as default.nix, from the Nix-vendored modules in buckCells' go/.
+# default.nix stays the Nix definition consumed by guest images and the
+# Marshall/Ziggy modules until assembly takes Buck2 artifacts (M3).
+load("@root//buck:go.bzl", "go_binary", "go_test")
+load("@root//buck:github.bzl", "github_tools_release")
+load("@root//buck:nix.bzl", "nix_owned")
+
+nix_owned()
+
+PLATFORMS = {
+    "freebsd-amd64": "freebsd",
+    "illumos-amd64": "illumos",
+    "linux-amd64": "linux",
+    "windows-amd64": "windows",
+}
+
+TRANSPORT = glob(["transport/*.go"])
+
+GH = {
+    "modules": "toolchains//:gh_vendor",
+    "overlay": TRANSPORT,
+    "patches": ["gh.patch"],
+    "source": "toolchains//:gh_source",
+    "vendor_patches": ["survey-illumos.patch"],
+}
+
+LFS = {
+    "modules": "toolchains//:git_lfs_modules",
+    "overlay": TRANSPORT,
+    "patches": ["git-lfs.patch"],
+    "source": "toolchains//:git_lfs_source",
+    "vendor_mode": "proxy",
+}
+
+[go_binary(
+    name = "gh-" + platform,
+    goos = goos,
+    ldflags = "-s -w -X github.com/cli/cli/v2/internal/build.Version=2.102.0 -X github.com/cli/cli/v2/internal/build.Date=overalls",
+    out = "gh",
+    package = "./cmd/gh",
+    visibility = ["PUBLIC"],
+    **GH
+) for platform, goos in PLATFORMS.items()]
+
+[go_binary(
+    name = "git-lfs-" + platform,
+    goos = goos,
+    ldflags = "-s -w -X github.com/git-lfs/git-lfs/v3/config.Vendor=3.7.1-overalls",
+    out = "git-lfs",
+    package = ".",
+    visibility = ["PUBLIC"],
+    **LFS
+) for platform, goos in PLATFORMS.items()]
+
+go_test(name = "gh-transport-test", packages = ["./internal/overalls"], **GH)
+
+go_test(name = "git-lfs-transport-test", packages = ["./internal/overalls"], **LFS)
+
+github_tools_release(
+    name = "release",
+    configuration = "github.gitconfig",
+    platforms = {platform: (":gh-" + platform, ":git-lfs-" + platform) for platform in PLATFORMS},
+    visibility = ["PUBLIC"],
+)

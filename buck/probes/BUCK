@@ -1,3 +1,8 @@
+load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:npm.bzl", "esbuild_bundle")
+
+nix_owned()
+
 # Runs the pinned Elixir through toolchains//:elixir; a toolchain path change
 # changes this target's recursive hash (ADR-0269).
 genrule(
@@ -44,4 +49,13 @@ nix_assemble(
     attr = "packages.hostTools",
     srcs = [":root_files_only"],
     labels = ["expected_failure"],
+)
+
+# Bundles a two-module fixture with the single pinned esbuild (M7).
+esbuild_bundle(
+    name = "esbuild_bundle",
+    srcs = glob(["esbuild/*.mjs"]),
+    entry = "esbuild/entry.mjs",
+    out = "bundle.js",
+    args = ["--format=esm", "--platform=node"],
 )
