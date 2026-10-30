@@ -14,9 +14,7 @@ def start_sdk_producer() -> None:
     machine.succeed("systemctl reset-failed sdk-producer.service")
     machine.succeed("rm -f /var/lib/request-sdk-marker/quality")
     machine.succeed("systemctl restart sdk-producer.service")
-    machine.wait_until_succeeds(
-        control("hello", role="sdk-producer") + " | jq -e '.status == \"ok\"'"
-    )
+    wait_producer_ready("sdk-producer")
     machine.wait_until_succeeds("grep -qx v1:running /var/lib/request-sdk-marker/quality")
 
 
@@ -37,6 +35,7 @@ def recorder_reopen() -> None:
     machine.succeed("systemctl reset-failed overalls-request-sdk.service")
     machine.succeed("systemctl restart overalls-request-sdk.service")
     machine.wait_until_succeeds("systemctl is-active overalls-request-sdk.service")
+    wait_recorder_ready("sdk")
 
 
 def commit_reply_cut(operation: str, command: str, fault: str) -> str:
