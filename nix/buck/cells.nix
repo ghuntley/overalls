@@ -7,6 +7,8 @@
 let
   inherit (pkgs) lib;
   python = import ./python.nix { inherit pkgs; };
+  # The one Rust toolchain (ADR-0273), shared with the Nix builds and devenv.
+  rust = (import ../rust-toolchain.nix { inherit pkgs; }).toolchain;
   githubTools = import ../domains/artifacts/guest/github { inherit pkgs; };
   # Third-party npm trees from each committed package-lock.json (importNpmLock);
   # Buck2 npm_package actions link them as node_modules.
@@ -49,10 +51,10 @@ let
     cxx = "${pkgs.stdenv.cc}/bin/c++";
     ar = "${pkgs.stdenv.cc.bintools.bintools}/bin/ar";
     ld = "${pkgs.stdenv.cc}/bin/cc";
-    rustc = "${pkgs.rustc}/bin/rustc";
-    rustdoc = "${pkgs.rustc}/bin/rustdoc";
-    clippy = "${pkgs.clippy}/bin/clippy-driver";
-    rustfmt = "${pkgs.rustfmt}/bin/rustfmt";
+    # The single Rust toolchain root (rustc, rustdoc, clippy-driver, rustfmt,
+    # cargo) and the binutils its links and archives use (M5).
+    rust = "${rust}";
+    bintools = "${pkgs.stdenv.cc.bintools.bintools}/bin";
     # M7: Go, JavaScript, Python and script checks.
     go = "${pkgs.go_1_27}";
     patch = "${pkgs.gnupatch}/bin/patch";

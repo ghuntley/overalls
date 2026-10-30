@@ -8,10 +8,3 @@ inputs:
         follows: nixpkgs
   nixpkgs:
     url: github:cachix/devenv-nixpkgs/rolling
-  # Upstream Rust release toolchains with iOS standard libraries for the
-  # Darwin Mila Apple build (devenv.nix languages.rust).
-  rust-overlay:
-    url: github:oxalica/rust-overlay
-    inputs:
-      nixpkgs:
-        follows: nixpkgs

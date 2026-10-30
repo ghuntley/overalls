@@ -162,6 +162,17 @@ repo_check(
     path = ["toolchains//:erlang"],
 )
 
+# Workflow Rust toolchain literals (runners without Nix) against the single
+# toolchain in nix/rust-toolchain.nix (ADR-0273).
+repo_check(
+    name = "rust-toolchain-literals",
+    cmd = [_ELIXIR, "scripts/check_rust_toolchain_literals.exs"],
+    include = [".github/workflows/*", ".github/actions/*", "nix/rust-toolchain.nix", "scripts/check_rust_toolchain_literals.exs"],
+    labels = ["check", "precommit"],
+    owned = ALL_OWNED_FILES,
+    path = ["toolchains//:erlang"],
+)
+
 # The structured-event catalog gate per application (`mix logging.check`).
 LOGGING_APPS = ["audi", "brady", "enrico", "galileo", "lilly", "marshall", "peach", "porsche", "susan", "ziggy"]
 

@@ -1,7 +1,6 @@
 { pkgs }:
 let
   inherit (pkgs) lib;
-  rustVersion = "1.97.1";
   workspace = import ./cargo-workspace.nix { inherit pkgs; };
   source = workspace.source {
     name = "lyra-source";
@@ -13,55 +12,8 @@ let
       || builtins.elem name [ "Cargo.toml" "CONTRACTS" "LICENSE-APACHE" "LICENSE-MIT" "OVERALLS.md" "README.md" ];
   };
   inherit (workspace) vendor;
-  rustStd = target: hash: pkgs.fetchurl {
-    url = "https://static.rust-lang.org/dist/rust-std-${rustVersion}-${target}.tar.xz";
-    inherit hash;
-  };
-  targets = {
-    "x86_64-unknown-linux-gnu" = rustStd "x86_64-unknown-linux-gnu" (import ../pins.nix).rustStdX86_64LinuxGnu;
-    "x86_64-unknown-linux-musl" = rustStd "x86_64-unknown-linux-musl" (import ../pins.nix).rustStdX86_64LinuxMusl;
-    "aarch64-unknown-linux-musl" = rustStd "aarch64-unknown-linux-musl" (import ../pins.nix).rustStdAarch64LinuxMusl;
-    "x86_64-apple-darwin" = rustStd "x86_64-apple-darwin" (import ../pins.nix).rustStdX86_64Darwin;
-    "aarch64-apple-darwin" = rustStd "aarch64-apple-darwin" (import ../pins.nix).rustStdAarch64Darwin;
-    "x86_64-pc-windows-gnu" = rustStd "x86_64-pc-windows-gnu" (import ../pins.nix).rustStdX86_64WindowsGnu;
-    "x86_64-unknown-freebsd" = rustStd "x86_64-unknown-freebsd" (import ../pins.nix).rustStdX86_64Freebsd;
-    "x86_64-unknown-illumos" = rustStd "x86_64-unknown-illumos" (import ../pins.nix).rustStdX86_64Illumos;
-  };
-  rustcArchive = pkgs.fetchurl {
-    url = "https://static.rust-lang.org/dist/rustc-${rustVersion}-x86_64-unknown-linux-gnu.tar.xz";
-    hash = (import ../pins.nix).rustcArchive;
-  };
-  clippyArchive = pkgs.fetchurl {
-    url = "https://static.rust-lang.org/dist/clippy-${rustVersion}-x86_64-unknown-linux-gnu.tar.xz";
-    hash = (import ../pins.nix).clippyArchive;
-  };
-  toolchain = pkgs.stdenvNoCC.mkDerivation {
-    pname = "lyra-rust-toolchain";
-    version = rustVersion;
-    dontUnpack = true;
-    dontStrip = true;
-    nativeBuildInputs = with pkgs; [ autoPatchelfHook gnutar xz ];
-    buildInputs = with pkgs; [ stdenv.cc.cc.lib zlib libxml2 ];
-    # The illumos std archive is ELFOSABI_ILLUMOS and intentionally links the
-    # guest's libc family. Those libraries do not exist on the Linux builder;
-    # rustc only reads the target metadata, so keep the foreign ABI intact.
-    autoPatchelfIgnoreMissingDeps = [
-      "libsocket.so.1" "libpthread.so.1" "libumem.so.1" "libm.so.2"
-      "libsendfile.so.1" "liblgrp.so.1" "libc.so.1"
-    ];
-    installPhase = ''
-      mkdir -p "$out" "$TMPDIR/rust-dist"
-      tar -xJf ${rustcArchive} -C "$TMPDIR/rust-dist"
-      cp -a "$TMPDIR/rust-dist/rustc-1.97.1-x86_64-unknown-linux-gnu/rustc/." "$out/"
-      tar -xJf ${clippyArchive} -C "$TMPDIR/rust-dist"
-      cp -a "$TMPDIR/rust-dist/clippy-1.97.1-x86_64-unknown-linux-gnu/clippy-preview/." "$out/"
-      chmod u+w "$out/lib/rustlib"
-      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (target: archive: ''
-        tar -xJf ${archive} -C "$TMPDIR/rust-dist"
-        cp -a "$TMPDIR/rust-dist/rust-std-1.97.1-${target}/rust-std-${target}/lib/rustlib/${target}" "$out/lib/rustlib/"
-      '') targets)}
-    '';
-  };
+  # The single rust-overlay toolchain with every target std (ADR-0273).
+  inherit (import ../../../rust-toolchain.nix { inherit pkgs; }) toolchain;
   sdk = pkgs.fetchurl {
     url = "https://github.com/joseluisq/macosx-sdks/releases/download/11.3/MacOSX11.3.sdk.tar.xz";
     hash = (import ../pins.nix).macosSdk113;

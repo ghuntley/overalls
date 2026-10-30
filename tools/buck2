@@ -12,6 +12,7 @@ key_inputs() {
   git ls-files -z -- flake.nix flake.lock nix/buck \
     nix/domains/artifacts/dependency-hashes.json \
     nix/domains/artifacts/infrastructure/toolchain.nix \
+    nix/rust-toolchain.nix \
     nix/domains/artifacts/guest/github/default.nix \
     antithesis/nix/python-wheels.nix \
     '**/Cargo.lock' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 sha256sum

@@ -70,8 +70,8 @@ rules and reindeer, and the approved migration plan (T2 and M5).
 
 ## Implementation evidence
 
-Partial: decisions 1 and 4 are implemented by track T2. Decisions 2 and 3
-remain planned for milestone M5.
+Partial: decisions 1 and 4 are implemented by track T2. Decision 2 is partial
+and decision 3 planned, both in milestone M5.
 
 - **One workspace, one lock.** The root [`Cargo.toml`](../../../Cargo.toml)
   lists all 32 first-party crates as members: the 13 Lilly helpers, Lyra,
@@ -118,6 +118,29 @@ remain planned for milestone M5.
   refuse any other tracked `Cargo.lock`. Their tests are in
   [`pins_test.exs`](../../../marshall/test/architecture/pins_test.exs) and
   [`dependency_pins_test.exs`](../../../marshall/test/architecture/dependency_pins_test.exs).
+- **Toolchain (decision 2, partial).** The `rust-overlay` flake input in
+  [`flake.nix`](../../../flake.nix) (following `buildNixpkgs`) is the only
+  rust-overlay pin. [`rust-toolchain.nix`](../../../nix/rust-toolchain.nix)
+  reads it from `flake.lock` and defines the one release (1.97.1), its
+  components and its 14 target standard libraries: Linux gnu and musl,
+  Windows gnu, macOS, FreeBSD, illumos, iOS and the three Android ABIs. It
+  omits `rust-src`, because with it rustc maps std's `/rustc/<hash>` panic
+  locations to the store path and Lyra's and terminald's `allowedReferences`
+  fail; rust-analyzer gets the sources through `RUST_SRC_PATH`. The devenv
+  shell on every platform ([`devenv.nix`](../../../devenv.nix)), Lyra's and
+  terminald's cross and native builds
+  ([`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix)) and
+  Buck2's `[nix] rust` entry ([`cells.nix`](../../../nix/buck/cells.nix)) use
+  it. The prebuilt `rustStd*`, `rustcArchive` and `clippyArchive` pins and
+  devenv's own rust-overlay input are gone. Runners without Nix keep the
+  `toolchain:` literal in the Mila workflows;
+  [`check_rust_toolchain_literals.exs`](../../../scripts/check_rust_toolchain_literals.exs)
+  (`//:rust-toolchain-literals`, a precommit check) refuses one that differs
+  from the pinned version. Lyra, Lyra's tests, its Windows and native builds,
+  terminald (musl, Windows and native) and the editor broker's Windows build
+  rebuilt under it; the musl terminald output is byte-identical (same store
+  path). Remaining: the other `buildRustPackage` leaves still use nixpkgs
+  `rustPlatform` (1.99).
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.
@@ -125,7 +148,8 @@ remain planned for milestone M5.
   enclosing every crate. A regression test for this is in
   [`rust_lints_test.exs`](../../../marshall/test/architecture/rust_lints_test.exs).
   `cargo clippy --workspace --all-targets --locked -- -D warnings` and
-  `cargo fmt --all -- --check` pass on the workspace under nixpkgs Rust 1.99.
+  `cargo fmt --all -- --check` passed on the workspace under nixpkgs Rust 1.99,
+  and the clippy gate passes in the devenv shell under the pinned 1.97.1.
   The per-crate Nix gates still run their crate's clippy, including Lyra's and
   terminald's cross-target clippy under the pinned 1.97.1 toolchain.
 - **Platform builds.** The Mila Apple script, the Android Gradle task and the

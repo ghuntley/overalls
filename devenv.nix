@@ -6,6 +6,8 @@ let
   # by release packaging; enabling Elixir MUST NOT select a second OTP build.
   toolchain = import ./nix/domains/artifacts/infrastructure/toolchain.nix { inherit pkgs; };
   hostLock = import ./nix/domains/artifacts/hosts/host-tools.nix { inherit pkgs; };
+  # The one Rust toolchain (ADR-0273), pinned by flake.lock's rust-overlay.
+  rust = import ./nix/rust-toolchain.nix { inherit pkgs; };
   compactNix = inputs.nix-compact.lib.mkPackage { inherit pkgs; };
   # The same patched Firecracker the release metadata points Lilly at.
   inherit (import ./nix/domains/artifacts/infrastructure/firecracker.nix { inherit pkgs; }) vmm;
@@ -31,6 +33,8 @@ in
   env = {
     GREET = "devenv";
     OVERALLS_NIXPKGS_PATH = "${pkgs.path}";
+    # std sources for rust-analyzer; the toolchain itself omits rust-src.
+    RUST_SRC_PATH = rust.rustSrc;
   } // lib.optionalAttrs isLinux {
     OVERALLS_TEST_VMM_DIR = "${vmm}/bin";
   };
@@ -86,14 +90,9 @@ in
   languages.elixir.enable = true;
   languages.elixir.package = toolchain.elixir;
   languages.rust.enable = true;
-  # nixpkgs' rustc ships only the host standard library. On Darwin, take the
-  # same release from rust-overlay with the iOS targets mila-build needs.
-  languages.rust.channel = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin "stable";
-  languages.rust.version = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin "1.97.1";
-  languages.rust.targets = lib.mkIf pkgs.stdenv.hostPlatform.isDarwin [
-    "aarch64-apple-ios"
-    "aarch64-apple-ios-sim"
-  ];
+  # Every platform uses the repository's single Rust toolchain, with every
+  # target standard library the builds need (Mila iOS on Darwin included).
+  languages.rust.toolchainPackage = rust.toolchain;
 
   # @cc [owner:ghuntley,label:build] development-shell-prompt
   # Interactive devenv shells MUST initialize the Starship prompt.

@@ -33,9 +33,15 @@
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.niks3.inputs.treefmt-nix.follows = "";
     };
+    # The one Rust toolchain (ADR-0273). nix/rust-toolchain.nix reads this
+    # lock entry, so Buck2's cells, the Nix builds and devenv share one pin.
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay/19ecdd08213836b36c4296a3a4f4af5a3d5308db";
+      inputs.nixpkgs.follows = "buildNixpkgs";
+    };
   };
 
-  outputs = { self, buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store }:
+  outputs = { self, buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store, ... }:
     let
       system = "x86_64-linux";
       pkgs = buildNixpkgs.legacyPackages.${system};
