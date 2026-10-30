@@ -87,9 +87,15 @@ in pkgs.testers.runNixOSTest {
     };
     ci = { imports = [ (addressed [ 1 ] [ tailnet.ci ]) buckClient ]; };
     # A fleet host: its read-only client configuration comes from the module.
-    host = {
+    host = { config, ... }: {
       imports = [ (addressed [ 1 ] [ tailnet.host ]) buckClient sealed ];
       overalls.buckRemoteCache.client = { enable = true; address = tailnet.cache; caCertificate = "${fixtures}/ca.crt"; };
+      # The host updater's own configuration path (ADR-0271): the module's
+      # cache settings and the production runtime that turns them into the
+      # checkout's .buckconfig.local.
+      environment.etc."updater-remote-cache.json".text = builtins.toJSON config.services.overallsAutoUpdate.remoteCache;
+      environment.etc."updater-runtime.py".source = ../../../../domains/system/auto-update/runtime.py;
+      environment.etc."updater-config.py".source = ./updater_config.py;
     };
     outsider = {
       imports = [ (addressed [ 2 ] [ public.outsider ]) ];

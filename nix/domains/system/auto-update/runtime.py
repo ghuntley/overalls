@@ -32,9 +32,18 @@ BUCK2_HOME = STATE / "buck2-home"
 BUCK2_GCROOTS = STATE / "gcroots"
 BUCK2_ISOLATION = "overalls-update"
 BUCK2_PRESERVED = ["/buck-out", "/.buck-cells", "/.buck-cells.key", "/.buck-cells.gcroot"]
+# Hosts never upload to the Buck2 cache or execute remotely (ADR-0271,
+# ADR-0272): the updater's checkout configuration says so whatever the
+# candidate's committed .buckconfig contains.
 BUCK2_LOCAL_CONFIG = (
     "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
+    "  default_allow_cache_upload = false\n[overalls]\n  remote_execution = false\n"
 )
+# Seconds to wait for the cache listener before building without it.
+REMOTE_CACHE_PROBE_TIMEOUT = 5.0
+IPV4_OCTET = r"(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])"
+IPV4_ADDRESS = re.compile(rf"(?:{IPV4_OCTET}\.){{3}}{IPV4_OCTET}")
+INSTANCE_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
 DEPLOYMENT_PATH = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]{1,180}")
 
 
@@ -55,6 +64,16 @@ def unit_identity(system: Path, unit: str) -> tuple[str | None, tuple[tuple[str,
 KEYS = ["DATABASE_URL", "SECRET_KEY_BASE", "TOKEN_SIGNING_SECRET", "MARSHALL_CLOAK_KEYS"]
 
 
+class RemoteCache(TypedDict):
+    """The host's read-only NativeLink cache client (ADR-0272)."""
+
+    address: str
+    port: int
+    instanceName: str
+    caCertificate: str
+    clientIdentity: str
+
+
 class Configuration(TypedDict):
     repository: str
     branch: str
@@ -65,6 +84,7 @@ class Configuration(TypedDict):
     secretUnits: list[str]
     secretHelper: str
     resourcePolicyHelper: str
+    remoteCache: RemoteCache | None
 
 
 class SecretsHelper(Protocol):
@@ -251,7 +271,92 @@ def configuration_value(raw: object) -> Configuration:
         secretUnits=[string_value(item) for item in list_value(row["secretUnits"])],
         secretHelper=string_value(row["secretHelper"]),
         resourcePolicyHelper=string_value(row["resourcePolicyHelper"]),
+        remoteCache=remote_cache_value(row.get("remoteCache")),
     )
+
+
+def remote_cache_value(raw: object) -> RemoteCache | None:
+    if raw is None:
+        return None
+    row = object_value(raw)
+    address = string_value(row["address"])
+    port = integer_value(row["port"])
+    instance = string_value(row["instanceName"])
+    paths = [string_value(row["caCertificate"]), string_value(row["clientIdentity"])]
+    if (
+        not IPV4_ADDRESS.fullmatch(address)
+        or not 0 < port < 65536
+        or not INSTANCE_NAME.fullmatch(instance)
+        or not all(path.startswith("/") and not re.search(r"\s", path) for path in paths)
+    ):
+        raise ValueError("invalid remote cache")
+    return RemoteCache(
+        address=address,
+        port=port,
+        instanceName=instance,
+        caCertificate=paths[0],
+        clientIdentity=paths[1],
+    )
+
+
+def cache_reachable(address: str, port: int) -> bool:
+    try:
+        with socket.create_connection((address, port), timeout=REMOTE_CACHE_PROBE_TIMEOUT):
+            return True
+    except OSError:
+        return False
+
+
+# @cc [owner:ghuntley,label:deployment;recovery] updater-remote-cache-read-only
+# The updater's Buck2 configuration MUST always refuse cache uploads and remote
+# execution. It MAY add the host's read-only NativeLink cache client only while
+# the host's decrypted client identity is a non-empty regular file and the
+# cache listener accepts a connection; otherwise the build runs locally with
+# no cache section, so a missing credential or an unreachable cache never
+# blocks an update (ADR-0271, ADR-0272).
+def buck2_local_config(
+    cache: RemoteCache | None,
+    reachable: Callable[[str, int], bool] = cache_reachable,
+) -> tuple[str, str]:
+    """The checkout's .buckconfig.local and why the cache is or is not used."""
+    if cache is None:
+        return BUCK2_LOCAL_CONFIG, "not_configured"
+    identity = Path(cache["clientIdentity"])
+    try:
+        info = identity.stat()
+    except OSError:
+        return BUCK2_LOCAL_CONFIG, "identity_missing"
+    if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+        return BUCK2_LOCAL_CONFIG, "identity_missing"
+    if not reachable(cache["address"], cache["port"]):
+        return BUCK2_LOCAL_CONFIG, "unreachable"
+    section = (
+        "[buck2_re_client]\n"
+        f"  address = grpc://{cache['address']}:{cache['port']}\n"
+        "  tls = true\n"
+        f"  instance_name = {cache['instanceName']}\n"
+        f"  tls_ca_certs = {cache['caCertificate']}\n"
+        f"  tls_client_cert = {cache['clientIdentity']}\n"
+    )
+    return BUCK2_LOCAL_CONFIG + section, "enabled"
+
+
+# @cc [owner:ghuntley,label:recovery] updater-remote-cache-fail-open
+# A build that fails while the cache section is enabled MUST be retried once
+# with the cache section removed, so a cache that answers but fails (a
+# rejected or corrupt identity, a broken listener) never fails an update.
+def build_with_cache_fallback(
+    run: Callable[[], str], cache_state: str, disable_cache: Callable[[], None]
+) -> str:
+    """Run the build; with the cache enabled, retry once without it on failure."""
+    try:
+        return run()
+    except UpdateError:
+        if cache_state != "enabled":
+            raise
+    print(json.dumps({"event": "update.remote_cache", "state": "fallback"}), flush=True)
+    disable_cache()
+    return run()
 
 
 def atomic_json(path: Path, value: Mapping[str, object]) -> None:
@@ -484,8 +589,11 @@ class Deployment:
         # One build per daemon needs no inotify watcher, and notify would follow
         # buck-out's Nix result links through the whole system closure.
         local = CHECKOUT / ".buckconfig.local"
-        local.write_text(BUCK2_LOCAL_CONFIG)
+        local_config, cache_state = buck2_local_config(self.config["remoteCache"])
+        local.write_text(local_config)
         local.chmod(0o600)
+        if self.config["remoteCache"] is not None:
+            print(json.dumps({"event": "update.remote_cache", "state": cache_state}), flush=True)
         wrapper = CHECKOUT / "tools" / "buck2"
         if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
             raise UpdateError("build_tool_unavailable")
@@ -513,7 +621,16 @@ class Deployment:
             ]
             if self.config["verbose"]:
                 command += ["-v", "4"]
-            output = self.command(command, timeout=timeout, capture=True)
+
+            def disable_cache() -> None:
+                local.write_text(BUCK2_LOCAL_CONFIG)
+                self.stop_buck2()
+
+            output = build_with_cache_fallback(
+                lambda: self.command(command, timeout=timeout, capture=True),
+                cache_state,
+                disable_cache,
+            )
         finally:
             self.stop_buck2()
         reported = [

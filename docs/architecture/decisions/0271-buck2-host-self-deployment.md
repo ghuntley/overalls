@@ -80,6 +80,7 @@ the approved migration plan (M2).
 ## Implementation evidence
 
 Milestone M2 (2026-10-30) implements decisions 1, 2, 4 and the updater side of 5.
+M10 (2026-10-30) implements decision 3.
 
 - **Targets.** [buck/fleet.bzl](../../../buck/fleet.bzl) declares
   `:deployment`, `:base` and `:install` in each
@@ -131,6 +132,22 @@ Milestone M2 (2026-10-30) implements decisions 1, 2, 4 and the updater side of 5
     reasons stated in the text.
   - `status.json` records `builder: "buck2"` after each Buck2 build. This is
     the per-host signal for the activation gate.
+- **Cache reads (M10, decision 3).** The updater's `HOME` is its private
+  `buck2-home`, so root's `~/.buckconfig.d` cache file never applied to it.
+  The buck-re module passes the cache address, CA and identity path as the
+  updater's `remoteCache` setting, and `buck2_local_config` in runtime.py
+  appends the read-only `[buck2_re_client]` section to the checkout's
+  `.buckconfig.local` only while the identity is a non-empty regular file and
+  the listener accepts a connection within 5 s. The file always sets
+  `default_allow_cache_upload = false` and `remote_execution = false`, and the
+  attempt log records `update.remote_cache`. A build that fails while the
+  section is enabled is retried once without it (`fallback`), so a cache that
+  answers but fails never fails an update. Contracts
+  `updater-remote-cache-read-only` and `updater-remote-cache-fail-open`; unit
+  tests in the auto-update compatibility check; the `buck-remote-cache`
+  machine test builds as the updater does (cache hit for a CI-uploaded
+  action; local builds with the cache stopped, the identity absent, and the
+  identity rejected by the listener or not a certificate).
 - **Fixtures.** [support/update-fixture.nix](../../../nix/verification/tests/support/update-fixture.nix)
   builds an offline Buck2 fixture repository. It contains the real wrapper,
   `.buckconfig`, toolchains and rules, plus the pinned buck2 with cut-down
@@ -167,17 +184,15 @@ Milestone M2 (2026-10-30) implements decisions 1, 2, 4 and the updater side of 5
 
 Remaining:
 
-- Hosts do not read the NativeLink cache yet (decision 3, M4b). The updater
-  runs Buck2 with `HOME` set to its private `buck2-home`, so a host's cache
-  client configuration must go there, not in root's `~/.buckconfig.d`.
 - The per-host parameters stay fleet-wide `lib.assemble` defaults, because
   no host sets crash-dump encryption, antithesis flags or private service
   roots individually today. `nix_assemble` has no `params` channel yet.
 - The operator CLI ([cli.py](../../../nix/domains/artifacts/host/cli.py))
   still builds `nixosConfigurations`. It moves to `:base` and `:install`
   before the gate.
-- Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater, because they
-  read no shared Buck2 cache. The offline update fixture holds no
+- Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater unless CI has
+  uploaded them for the same cells and revision; that needs CI's cache
+  secrets (ADR-0272). The offline update fixture holds no
   application sources, so it replaces `buck/artifacts.bzl` with an empty
   dict. Its assemblies take every leaf from Nix, which means the in-VM tests
   do not exercise Buck2-built leaves on the update path. Machine-test

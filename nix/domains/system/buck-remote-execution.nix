@@ -219,6 +219,17 @@ in {
         };
       };
       systemd.tmpfiles.rules = [ "d /root/.buckconfig.d 0700 root root -" ];
+      # The updater runs Buck2 with its own HOME, so it never reads root's
+      # file; it writes the same read-only section into its checkout's
+      # .buckconfig.local while the identity exists and the cache answers
+      # (ADR-0271). No unit ordering: a missing cache never delays an update.
+      services.overallsAutoUpdate.remoteCache = {
+        inherit (client) address;
+        port = client.readPort;
+        instanceName = instance;
+        caCertificate = "${client.caCertificate}";
+        clientIdentity = secretFile "client.pem";
+      };
     })
   ];
 }

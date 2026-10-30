@@ -125,7 +125,7 @@ let
     };
   });
   configuration = pkgs.writeText "overalls-auto-update.json" (builtins.toJSON {
-    inherit (cfg) repository branch flakeAttr healthTimeout buildTimeout verbose secretUnits;
+    inherit (cfg) repository branch flakeAttr healthTimeout buildTimeout verbose secretUnits remoteCache;
     secretHelper = "${../secrets/prepare.py}";
     resourcePolicyHelper = "${./resources.py}";
   });
@@ -155,6 +155,19 @@ in
     healthTimeout = mkOption { type = types.ints.between 10 1800; default = 120; };
     buildTimeout = mkOption { type = types.ints.between 30 10800; default = 7200; description = "Seconds before a candidate build is stopped, its Buck2 daemon included."; };
     verbose = mkOption { type = types.bool; default = false; description = "Retain verbose build output in the private attempt log."; };
+    remoteCache = mkOption {
+      type = types.nullOr (types.submodule {
+        options = {
+          address = mkOption { type = localTypes.ipv4; description = "Tailnet IPv4 address of the NativeLink cache."; };
+          port = mkOption { type = types.port; description = "The cache's read-only listener."; };
+          instanceName = mkOption { type = types.strMatching "[A-Za-z0-9_-]{1,64}"; default = "main"; };
+          caCertificate = mkOption { type = localTypes.absolutePath; description = "Public CA that issued the cache server certificate."; };
+          clientIdentity = mkOption { type = localTypes.absolutePath; description = "Decrypted read-only client certificate and key; absent means local builds."; };
+        };
+      });
+      default = null;
+      description = "Read-only Buck2 cache for candidate builds (ADR-0272). Used only while the identity exists and the cache answers; otherwise builds are local.";
+    };
     sshKeyFile = mkOption { type = types.nullOr localTypes.privatePath; default = null; };
     knownHostsFile = mkOption { type = localTypes.absolutePath; default = "/etc/ssh/ssh_known_hosts"; };
     secretUnits = mkOption {

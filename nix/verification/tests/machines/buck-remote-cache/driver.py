@@ -38,9 +38,13 @@ def assert_ran(node: Machine, target: str, kind: str) -> None:
     assert f"{kind}: 1" in output, output
 
 
+UPDATER_HOME = "/var/lib/updater-buck2-home"
+
+
 def fresh(node: Machine) -> None:
     node.succeed(
         "(cd /root/project 2>/dev/null && HOME=/root buck2 kill >/dev/null 2>&1) || true;"
+        f" (cd /root/project 2>/dev/null && HOME={UPDATER_HOME} buck2 kill >/dev/null 2>&1) || true;"
         " rm -rf /root/project;"
         " cp -rL /etc/buck-project /root/project && chmod -R u+w /root/project"
     )
@@ -212,3 +216,50 @@ with subtest("a host reads through its module configuration and cannot upload"):
     assert_ran(host, "//:host_attempt", "local")
     ci.succeed("cd /root/project && HOME=/root buck2 clean")
     assert_ran(ci, "//:host_attempt", "local")
+
+
+def updater_build(expected_state: str, kind: str) -> None:
+    """Build as the updater does: its own HOME and its checkout configuration."""
+    fresh(host)
+    state = host.succeed("python3 /etc/updater-config.py /root/project/.buckconfig.local").strip()
+    assert state == expected_state, state
+    host.succeed("grep -qx '  default_allow_cache_upload = false' /root/project/.buckconfig.local")
+    output = host.succeed(
+        f"mkdir -p -m 0700 {UPDATER_HOME} && cd /root/project"
+        f" && HOME={UPDATER_HOME} buck2 build //:uploaded 2>&1"
+    )
+    assert f"{kind}: 1" in output, output
+
+
+with subtest("the updater reads the CI-built action through its own configuration"):
+    # Root's ~/.buckconfig.d is not the updater's: it runs Buck2 with a
+    # private HOME, so the cache settings come from the checkout's
+    # .buckconfig.local that the production runtime writes.
+    host.fail(f"test -e {UPDATER_HOME}/.buckconfig.d")
+    updater_build("enabled", "cached")
+
+with subtest("the updater builds locally when the cache is unreachable"):
+    cache.succeed("systemctl stop nativelink")
+    updater_build("unreachable", "local")
+    cache.succeed("systemctl start nativelink")
+    cache.wait_for_open_port(READ, TAILNET)
+
+with subtest("the updater builds locally without its identity"):
+    # As when the bundle could not be decrypted: the identity file is absent.
+    identity = "/run/overalls-secrets/buck-re/client.pem"
+    host.succeed(f"mv {identity} /root/client.pem.aside")
+    updater_build("identity_missing", "local")
+    host.succeed(f"mv /root/client.pem.aside {identity}")
+    updater_build("enabled", "cached")
+
+with subtest("the updater builds locally when the cache rejects its identity"):
+    # Configured and reachable, but the handshake fails: an identity from an
+    # untrusted CA, then one that is not a certificate at all. Buck2 treats
+    # the failed action-cache query as a miss and builds locally.
+    identity = "/run/overalls-secrets/buck-re/client.pem"
+    host.succeed(f"cp {identity} /root/client.pem.good")
+    for replacement in ["cat /etc/fixtures/rogue.pem", "echo not-a-certificate"]:
+        host.succeed(f"{replacement} > {identity}")
+        updater_build("enabled", "local")
+    host.succeed(f"cp /root/client.pem.good {identity}")
+    updater_build("enabled", "cached")

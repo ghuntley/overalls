@@ -132,6 +132,7 @@ class PreflightFixture(updater.Deployment):
             secretUnits=[],
             secretHelper="unused",
             resourcePolicyHelper="",
+            remoteCache=None,
         )
         self.root = root
         self.current_path = root / "candidate-staged.json"
