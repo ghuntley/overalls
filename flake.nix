@@ -281,6 +281,17 @@
           xargs -0 elixir scripts/check_conflict_markers.exs < "$TMPDIR/files"
           touch "$out"
         '';
+        rust-lints = pkgs.runCommand "overalls-rust-lints-check" {
+          nativeBuildInputs = [ built.toolchain.elixir ];
+          LC_ALL = "C.UTF-8";
+          source = ./.;
+        } ''
+          export HOME="$TMPDIR"
+          cd "$source"
+          find . -type f -not -path './.git/*' \( -name Cargo.toml -o -name '*.rs' \) -print0 > "$TMPDIR/files"
+          xargs -0 elixir scripts/check_rust_lints.exs < "$TMPDIR/files"
+          touch "$out"
+        '';
         terminald = built.terminaldChecks;
         terminald-windows = built.terminaldWindows;
         overalls-install-ps1 = import ./nix/verification/tests/overalls-install-ps1.nix { inherit pkgs; };

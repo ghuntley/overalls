@@ -137,6 +137,7 @@ the dependency pin alone establishes neither.
 
 - [ADR-0186: Covenant contract verification](0186-covenant-contract-verification.md)
 - [Elixir Hegel verification review](../reviews/2026-10-17-elixir-hegel-property-verification.md)
+- [ADR-0265: Rust code quality](0265-rust-code-quality.md) adopts Hegel as the Rust property engine
 
 ## Consequences
 

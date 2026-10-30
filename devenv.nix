@@ -225,6 +225,16 @@ in
         pass_filenames = false;
         stages = [ "pre-commit" "pre-merge-commit" ];
       };
+      # ADR-0265: adopted crates keep the canonical lint block, clippy.toml
+      # and a reason on every lint exception; the rust-lints Nix check covers CI.
+      rust-lints = {
+        enable = true;
+        name = "rust-lints";
+        entry = "${toolchain.elixir}/bin/elixir scripts/check_rust_lints.exs";
+        language = "system";
+        files = "(Cargo\\.toml|clippy\\.toml|\\.rs|scripts/rust/.*)$";
+        pass_filenames = false;
+      };
       python-ruff-format = {
         enable = true;
         name = "ruff-format";

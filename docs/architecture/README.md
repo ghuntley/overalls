@@ -1,5 +1,10 @@
 # Architecture
 
+[ADR-0265](decisions/0265-rust-code-quality.md) gives every Rust crate one
+canonical lint policy enforced by clippy gates and a drift checker, keeps
+`lib.rs` files as module indexes, and makes Hegel the only Rust property engine.
+Crates adopt it one at a time with their fixes.
+
 [ADR-0264](decisions/0264-hermetic-mila-journey-fixture.md) verifies Mila's Rust
 core against source-built Marshall and Porsche in a hermetic NixOS fixture. It
 proves admission, authorization and ledger effects, but not guest execution,
