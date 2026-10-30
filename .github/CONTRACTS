@@ -14,3 +14,14 @@ machine_all), run only in the daily backstop. A selection error, or any failed j
 nixos-machine-tests.yml MUST run every nixos_machine_test target daily, and
 on dispatch the space-separated check names given in `checks`, each through
 `tools/buck2 test` in its own job (ADR-0270).
+
+@cc [owner:ghuntley,label:security;build] ci-buck-re-optional
+ci.yml's build, test and precommit jobs MAY use the NativeLink cache and
+remote execution only through .github/actions/buck-re, which acts only when
+the repository variable BUCK_RE is "enabled", both the ephemeral Tailscale key
+and the CI uploader identity secrets exist, and the run is a push to trunk or a
+dispatch in ghuntley/overalls (never a pull request or fork); the step continues
+on error, so the ci gate never depends on NativeLink or tailnet reachability. It
+writes the identity to the runner's temporary directory and never to the
+checkout or a log, takes the address and port from the fleet roster, and
+leaves Buck2 local when the upload listener does not answer (ADR-0272).

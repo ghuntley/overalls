@@ -179,6 +179,19 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # Remote cache and execution (ADR-0272). Off unless the repository
+      # variable BUCK_RE is "enabled" and both secrets exist; only this
+      # repository's trunk pushes and dispatches use it, and a failure here
+      # leaves Buck2 local instead of failing the job.
+      - if: >-
+          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
+          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+          || github.event_name == 'workflow_dispatch')
+        continue-on-error: true
+        uses: ./.github/actions/buck-re
+        with:
+          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
+          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Build affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.builds }}
@@ -222,6 +235,19 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # Remote cache and execution (ADR-0272). Off unless the repository
+      # variable BUCK_RE is "enabled" and both secrets exist; only this
+      # repository's trunk pushes and dispatches use it, and a failure here
+      # leaves Buck2 local instead of failing the job.
+      - if: >-
+          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
+          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+          || github.event_name == 'workflow_dispatch')
+        continue-on-error: true
+        uses: ./.github/actions/buck-re
+        with:
+          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
+          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Test affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.tests }}
@@ -308,6 +334,19 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # Remote cache and execution (ADR-0272). Off unless the repository
+      # variable BUCK_RE is "enabled" and both secrets exist; only this
+      # repository's trunk pushes and dispatches use it, and a failure here
+      # leaves Buck2 local instead of failing the job.
+      - if: >-
+          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
+          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+          || github.event_name == 'workflow_dispatch')
+        continue-on-error: true
+        uses: ./.github/actions/buck-re
+        with:
+          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
+          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Precommit
         env:
           RANGE: ${{ needs.affected.outputs.range }}

@@ -1,0 +1,42 @@
+name: buck-re
+description: >-
+  Join the tailnet with an ephemeral key and point Buck2 at the NativeLink
+  cache and remote-execution workers with the CI uploader identity
+  (ADR-0272). Does nothing without both secrets or outside this
+  repository's trunk pushes and dispatches, and leaves Buck2 local when the
+  service does not answer.
+
+inputs:
+  tailscale-authkey:
+    description: Ephemeral, pre-authorised Tailscale key tagged for Buck2 CI.
+    required: false
+    default: ""
+  uploader-identity:
+    description: The CI uploader certificate followed by its key (PEM).
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Join the tailnet
+      if: >-
+        inputs.tailscale-authkey != '' && inputs.uploader-identity != ''
+        && github.repository == 'ghuntley/overalls'
+        && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+        || github.event_name == 'workflow_dispatch')
+      uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+      with:
+        authkey: ${{ inputs.tailscale-authkey }}
+        tags: tag:buck-re-ci
+        hostname: buck-re-ci-${{ github.run_id }}-${{ github.job }}-${{ github.run_attempt }}
+    - name: Configure the Buck2 remote cache and execution
+      if: >-
+        inputs.tailscale-authkey != '' && inputs.uploader-identity != ''
+        && github.repository == 'ghuntley/overalls'
+        && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+        || github.event_name == 'workflow_dispatch')
+      shell: bash
+      env:
+        BUCK_RE_UPLOADER_IDENTITY: ${{ inputs.uploader-identity }}
+      run: .github/scripts/buck-re-client.sh
