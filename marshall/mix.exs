@@ -158,6 +158,7 @@ defmodule Marshall.MixProject do
       "terminal.check": [&check_terminal/1],
       "workspace.check": [&check_workspace/1],
       "monospace.check": [&check_monospace/1],
+      "gettext.check": [&check_gettext/1],
       "localization.catalogs": ["run --no-start scripts/check_locale_catalogs.exs --strict"],
       "localization.documentation": ["run --no-start scripts/extract_documentation.exs --check"],
       "localization.data": [fn _ -> Code.eval_file("scripts/check_locale_data.exs", __DIR__) end],
@@ -179,7 +180,7 @@ defmodule Marshall.MixProject do
             "localization.data",
             "localization.documentation",
             "localization.catalogs",
-            "gettext.extract --check-up-to-date",
+            "gettext.check",
             "dialyzer --force-check"
           ]
     ]
@@ -208,6 +209,30 @@ defmodule Marshall.MixProject do
           _ ->
             Mix.raise("MARSHALL_TEST_PARTITIONS must be an integer of at least 2")
         end
+    end
+  end
+
+  # @cc [owner:ghuntley,label:verification] marshall-gettext-check-own-vm
+  # The catalog freshness gate MUST run `mix gettext.extract --check-up-to-date`
+  # in a separate test-environment VM and MUST fail precommit when it fails.
+  # In the precommit VM its forced recompile runs with protocols already
+  # consolidated. That records "already consolidated" warnings in the compile
+  # manifest, and the next `compile --warnings-as-errors` on that _build
+  # replays them and fails.
+  @spec check_gettext([String.t()]) :: :ok
+  defp check_gettext(_args) do
+    mix = System.find_executable("mix") || Mix.raise("cannot find the `mix` executable on PATH")
+
+    case System.cmd(mix, ["gettext.extract", "--check-up-to-date"],
+           env: [{"MIX_ENV", "test"}],
+           into: IO.stream(:stdio, :line),
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        :ok
+
+      {_, status} ->
+        Mix.raise("gettext.extract --check-up-to-date failed (exit status #{status})")
     end
   end
 
