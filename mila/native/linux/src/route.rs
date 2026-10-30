@@ -77,6 +77,36 @@ impl ActivationRoute {
     }
 }
 
+/// @cc [owner:ghuntley,label:security;navigation] linux-share-route-closed
+/// An outbound share link MUST be produced only by re-parsing the formatted
+/// route through [`ActivationRoute::parse`], so a shared link is always a
+/// canonical member of the closed route table and never carries a command.
+pub fn share_route(authority: &str, target: &Target) -> Result<String, RouteError> {
+    ActivationRoute::parse(&format!("overalls://{authority}{}", target.path()))
+        .map(|route| route.canonical())
+}
+
+/// Most bytes accepted from one drop or paste before it is refused whole.
+const MAX_SHARED_TEXT_BYTES: usize = 64 * 1024;
+
+/// @cc [owner:ghuntley,label:security;navigation] linux-share-inbound-batch
+/// Shared or dropped text MUST be split into at most the bounded activation
+/// batch of `text/uri-list` lines, skipping blank and `#` comment lines; text
+/// larger than the share bound MUST be refused whole as one rejected value.
+pub fn share_inbound(text: &str) -> ActivationBatch {
+    if text.len() > MAX_SHARED_TEXT_BYTES {
+        return ActivationBatch {
+            routes: Vec::new(),
+            rejected: 1,
+        };
+    }
+    ActivationBatch::parse(
+        text.lines()
+            .map(str::trim)
+            .filter(|line| !line.is_empty() && !line.starts_with('#')),
+    )
+}
+
 /// Parses all URI values delivered by a desktop open activation.
 ///
 /// Invalid values are deliberately represented as errors without retaining their input. This
@@ -586,6 +616,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn navigation_requires_the_selected_authenticated_deployment() {
         let route = ActivationRoute::parse(&format!("{HOST}/machines/{ID}/info")).expect("route");
         assert!(matches!(

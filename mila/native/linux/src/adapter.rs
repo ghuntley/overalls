@@ -80,6 +80,24 @@ pub fn decode_ssh_keys(bytes: &[u8]) -> Result<Vec<SshKey>, RuntimeError> {
     Ok(envelope.keys)
 }
 
+/// @cc [owner:ghuntley,label:protocol] linux-request-id-fresh
+/// A generated request identifier MUST be `porsche-` followed by 32 lower-case
+/// hexadecimal digits from the operating system CSPRNG; when the CSPRNG is
+/// unavailable no identifier is produced rather than a predictable one.
+pub fn new_request_id() -> Option<String> {
+    use std::io::Read;
+    let mut bytes = [0_u8; 16];
+    std::fs::File::open("/dev/urandom")
+        .and_then(|mut source| source.read_exact(&mut bytes))
+        .ok()?;
+    let mut id = String::with_capacity(40);
+    id.push_str("porsche-");
+    for byte in bytes {
+        id.push_str(&format!("{byte:02x}"));
+    }
+    Some(id)
+}
+
 /// Format the only destructive SSH-key operation after validating its opaque
 /// server key identifier. Request IDs are required for at-most-once mutation.
 pub fn format_ssh_key_revoke(key_id: &str, request_id: &str) -> Result<String, RuntimeError> {
@@ -893,6 +911,23 @@ pub enum RuntimeError {
 }
 
 #[cfg(test)]
+mod request_id_tests {
+    use super::{format_ssh_key_revoke, new_request_id};
+
+    #[test]
+    fn generated_request_ids_are_fresh_and_accepted() {
+        let first = new_request_id().expect("CSPRNG");
+        let second = new_request_id().expect("CSPRNG");
+        assert_ne!(first, second);
+        assert_eq!(first.len(), 40);
+        assert!(first[8..]
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+        assert!(format_ssh_key_revoke("key-1", &first).is_ok());
+    }
+}
+
+#[cfg(test)]
 mod web_tests {
     use super::*;
     const MACHINE: &str = "01234567-89ab-cdef-0123-456789abcdef";
@@ -1226,6 +1261,7 @@ mod tests {
         ));
     }
 
+    #[test]
     fn canonical_route_uses_shared_core_grammar() {
         assert_eq!(
             canonical_route("overalls://fleet.example/machines").unwrap(),

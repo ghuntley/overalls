@@ -69,6 +69,24 @@ impl TerminalRenderer {
         Ok(())
     }
 
+    /// Appends text of any length as consecutive bounded chunks. The whole
+    /// call is atomic: a rejected chunk leaves the viewport unchanged.
+    pub fn append_stream(&mut self, text: &str) -> Result<(), RenderError> {
+        let mut next = self.clone();
+        let mut rest = text;
+        while !rest.is_empty() {
+            let split = rest
+                .char_indices()
+                .nth(MAX_CHUNK_CHARS)
+                .map_or(rest.len(), |(offset, _)| offset);
+            let (chunk, after) = rest.split_at(split);
+            next.append_text(chunk)?;
+            rest = after;
+        }
+        *self = next;
+        Ok(())
+    }
+
     fn append_text_inner(&mut self, text: &str) -> Result<(), RenderError> {
         for character in text.chars() {
             match character {
@@ -161,6 +179,15 @@ pub struct PtyAttachRequest {
     pub read_write: bool,
 }
 
+/// One bounded read from a host PTY. `Idle` means the channel is still open
+/// and produced no displayable text; only `Eof` ends the stream.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PtyRead {
+    Text(String),
+    Idle,
+    Eof,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum PtyError {
     Unauthenticated,
@@ -182,14 +209,28 @@ pub trait PtyTransport {
     fn bind_generation(&mut self, _generation: u64) -> Result<(), PtyError> {
         Ok(())
     }
-    fn read_output(&mut self, generation: u64) -> Result<String, PtyError>;
-    fn send_input(&mut self, generation: u64, length: usize) -> Result<(), PtyError>;
+    fn read_output(&mut self, generation: u64) -> Result<PtyRead, PtyError>;
+    /// Sends user input that the reducer has already bounded and permitted.
+    fn send_input(&mut self, generation: u64, input: &[u8]) -> Result<(), PtyError>;
     fn resize(&mut self, generation: u64, columns: u16, rows: u16) -> Result<(), PtyError>;
     fn kill(&mut self, generation: u64) -> Result<(), PtyError>;
 }
 
 pub trait SessionAuthority {
     fn is_authenticated(&self) -> bool;
+}
+
+impl<A: SessionAuthority + ?Sized> SessionAuthority for &A {
+    fn is_authenticated(&self) -> bool {
+        (**self).is_authenticated()
+    }
+}
+
+impl SessionAuthority for std::rc::Rc<std::cell::RefCell<crate::session::SessionBinding>> {
+    fn is_authenticated(&self) -> bool {
+        self.try_borrow()
+            .is_ok_and(|binding| binding.is_authenticated())
+    }
 }
 
 impl SessionAuthority for crate::session::SessionBinding {
@@ -199,20 +240,15 @@ impl SessionAuthority for crate::session::SessionBinding {
 }
 
 /// Couples the reducer and renderer to a current authenticated session.
-pub struct AuthenticatedPty<'a, A: SessionAuthority, T: PtyTransport> {
-    authority: &'a A,
+pub struct AuthenticatedPty<A: SessionAuthority, T: PtyTransport> {
+    authority: A,
     transport: T,
     stream: crate::adapter::TerminalStream,
     renderer: TerminalRenderer,
 }
 
-impl<'a, A: SessionAuthority, T: PtyTransport> AuthenticatedPty<'a, A, T> {
-    pub fn new(
-        authority: &'a A,
-        transport: T,
-        columns: u16,
-        rows: u16,
-    ) -> Result<Self, RenderError> {
+impl<A: SessionAuthority, T: PtyTransport> AuthenticatedPty<A, T> {
+    pub fn new(authority: A, transport: T, columns: u16, rows: u16) -> Result<Self, RenderError> {
         Ok(Self {
             authority,
             transport,
@@ -248,34 +284,50 @@ impl<'a, A: SessionAuthority, T: PtyTransport> AuthenticatedPty<'a, A, T> {
         Ok(generation)
     }
 
-    pub fn read_output(&mut self, generation: u64) -> Result<String, PtyError> {
-        let text = self.transport.read_output(generation)?;
-        if text.is_empty() {
-            // A clean host EOF is terminal state. Fence input and resize
-            // immediately, even when the backend cannot perform a second
-            // close after EOF.
-            self.stream
-                .kill(generation)
-                .map_err(|_| PtyError::InvalidRequest)?;
-            return Ok(text);
+    /// Reads one chunk for the current generation. Output for any other
+    /// generation, or after the stream ended, is refused before the renderer.
+    pub fn read_output(&mut self, generation: u64) -> Result<PtyRead, PtyError> {
+        if !self.authority.is_authenticated() {
+            return Err(PtyError::Unauthenticated);
         }
-        self.stream
-            .output(generation, text.chars().count())
-            .map_err(|_| PtyError::InvalidRequest)?;
-        self.renderer
-            .append_text(&text)
-            .map_err(|_| PtyError::Render)?;
-        Ok(text)
+        if !self.stream.state().accepts_output(generation) {
+            return Err(PtyError::InvalidRequest);
+        }
+        match self.transport.read_output(generation)? {
+            PtyRead::Eof => {
+                // A clean host EOF is terminal state. Fence input and resize
+                // immediately, even when the backend cannot perform a second
+                // close after EOF.
+                self.stream
+                    .kill(generation)
+                    .map_err(|_| PtyError::InvalidRequest)?;
+                Ok(PtyRead::Eof)
+            }
+            PtyRead::Text(text) if text.is_empty() => Ok(PtyRead::Idle),
+            PtyRead::Text(text) => {
+                self.renderer
+                    .append_stream(&text)
+                    .map_err(|_| PtyError::Render)?;
+                self.stream
+                    .output(generation, text.chars().count())
+                    .map_err(|_| PtyError::InvalidRequest)?;
+                Ok(PtyRead::Text(text))
+            }
+            PtyRead::Idle => Ok(PtyRead::Idle),
+        }
     }
 
-    pub fn send_input(&mut self, generation: u64, length: usize) -> Result<(), PtyError> {
+    pub fn send_input(&mut self, generation: u64, input: &[u8]) -> Result<(), PtyError> {
+        if !self.authority.is_authenticated() {
+            return Err(PtyError::Unauthenticated);
+        }
         if generation != self.stream.state().generation() {
             return Err(PtyError::InvalidRequest);
         }
         self.stream
-            .validate_input(length)
+            .validate_input(input.len())
             .map_err(|_| PtyError::InvalidRequest)?;
-        self.transport.send_input(generation, length)
+        self.transport.send_input(generation, input)
     }
 
     pub fn resize(&mut self, generation: u64, columns: u16, rows: u16) -> Result<(), PtyError> {
@@ -298,6 +350,22 @@ impl<'a, A: SessionAuthority, T: PtyTransport> AuthenticatedPty<'a, A, T> {
     pub fn renderer(&self) -> &TerminalRenderer {
         &self.renderer
     }
+
+    /// Ends the current generation locally even when the host can no longer
+    /// close its channel, so a stale channel can never accept input again.
+    pub fn abandon(&mut self, generation: u64) {
+        let _ = self.transport.kill(generation);
+        let _ = self.stream.kill(generation);
+    }
+
+    /// Current reducer generation and phase, for presentation only.
+    pub fn state(&self) -> &mila_runtime::TerminalAttach {
+        self.stream.state()
+    }
+
+    pub fn transport_mut(&mut self) -> &mut T {
+        &mut self.transport
+    }
 }
 
 /// Operations supplied by the host's authenticated Porsche/PTY runtime.
@@ -305,8 +373,8 @@ impl<'a, A: SessionAuthority, T: PtyTransport> AuthenticatedPty<'a, A, T> {
 /// inside the host transport and never enter GTK state.
 pub trait HostPtyBackend {
     fn attach(&mut self, request: &PtyAttachRequest) -> Result<u64, PtyError>;
-    fn read_output(&mut self, channel: u64) -> Result<String, PtyError>;
-    fn send_input(&mut self, channel: u64, length: usize) -> Result<(), PtyError>;
+    fn read_output(&mut self, channel: u64) -> Result<PtyRead, PtyError>;
+    fn send_input(&mut self, channel: u64, input: &[u8]) -> Result<(), PtyError>;
     fn resize(&mut self, channel: u64, columns: u16, rows: u16) -> Result<(), PtyError>;
     fn kill(&mut self, channel: u64) -> Result<(), PtyError>;
 }
@@ -320,8 +388,8 @@ pub trait HostPtyBackend {
 /// `HostPtyTransport` requires.
 pub trait PorschePtyClient {
     fn open(&mut self, request: &PtyAttachRequest) -> Result<u64, PtyError>;
-    fn output(&mut self, channel: u64) -> Result<String, PtyError>;
-    fn input(&mut self, channel: u64, length: usize) -> Result<(), PtyError>;
+    fn output(&mut self, channel: u64) -> Result<PtyRead, PtyError>;
+    fn input(&mut self, channel: u64, input: &[u8]) -> Result<(), PtyError>;
     fn dimensions(&mut self, channel: u64, columns: u16, rows: u16) -> Result<(), PtyError>;
     fn close(&mut self, channel: u64) -> Result<(), PtyError>;
 }
@@ -364,12 +432,12 @@ impl<C: PorschePtyClient> HostPtyBackend for PorschePtyBackend<C> {
         Ok(channel)
     }
 
-    fn read_output(&mut self, channel: u64) -> Result<String, PtyError> {
+    fn read_output(&mut self, channel: u64) -> Result<PtyRead, PtyError> {
         self.client.output(channel)
     }
 
-    fn send_input(&mut self, channel: u64, length: usize) -> Result<(), PtyError> {
-        self.client.input(channel, length)
+    fn send_input(&mut self, channel: u64, input: &[u8]) -> Result<(), PtyError> {
+        self.client.input(channel, input)
     }
 
     fn resize(&mut self, channel: u64, columns: u16, rows: u16) -> Result<(), PtyError> {
@@ -444,14 +512,19 @@ impl<B: HostPtyBackend> PtyTransport for HostPtyTransport<B> {
         Ok(())
     }
 
-    fn read_output(&mut self, generation: u64) -> Result<String, PtyError> {
+    fn read_output(&mut self, generation: u64) -> Result<PtyRead, PtyError> {
         let channel = self.channel_for(generation)?;
-        self.backend.read_output(channel)
+        let read = self.backend.read_output(channel)?;
+        if read == PtyRead::Eof {
+            // The backend channel is gone; a later attach may open a new one.
+            self.active = None;
+        }
+        Ok(read)
     }
 
-    fn send_input(&mut self, generation: u64, length: usize) -> Result<(), PtyError> {
+    fn send_input(&mut self, generation: u64, input: &[u8]) -> Result<(), PtyError> {
         let channel = self.channel_for(generation)?;
-        self.backend.send_input(channel, length)
+        self.backend.send_input(channel, input)
     }
 
     fn resize(&mut self, generation: u64, columns: u16, rows: u16) -> Result<(), PtyError> {
@@ -474,7 +547,7 @@ impl<B: HostPtyBackend> PtyTransport for HostPtyTransport<B> {
 mod transport_tests {
     use super::{
         AuthenticatedPty, HostPtyBackend, HostPtyTransport, PorschePtyBackend, PorschePtyClient,
-        PtyAttachRequest, PtyError, PtyTransport, SessionAuthority,
+        PtyAttachRequest, PtyError, PtyRead, PtyTransport, SessionAuthority,
     };
 
     struct Authority(bool);
@@ -495,11 +568,11 @@ mod transport_tests {
             self.attached = true;
             Ok(())
         }
-        fn read_output(&mut self, _: u64) -> Result<String, PtyError> {
-            Ok("ready".to_owned())
+        fn read_output(&mut self, _: u64) -> Result<PtyRead, PtyError> {
+            Ok(PtyRead::Text("ready".to_owned()))
         }
-        fn send_input(&mut self, _: u64, length: usize) -> Result<(), PtyError> {
-            self.input = length;
+        fn send_input(&mut self, _: u64, input: &[u8]) -> Result<(), PtyError> {
+            self.input = input.len();
             Ok(())
         }
         fn resize(&mut self, _: u64, _: u16, _: u16) -> Result<(), PtyError> {
@@ -526,8 +599,11 @@ mod transport_tests {
         let authority = Authority(true);
         let mut pty = AuthenticatedPty::new(&authority, FakeTransport::default(), 80, 24).unwrap();
         let generation = pty.attach(request()).unwrap();
-        assert_eq!(pty.read_output(generation).unwrap(), "ready");
-        pty.send_input(generation, 4).unwrap();
+        assert_eq!(
+            pty.read_output(generation).unwrap(),
+            PtyRead::Text("ready".to_owned())
+        );
+        pty.send_input(generation, b"ls\r\n").unwrap();
         pty.resize(generation, 100, 30).unwrap();
         pty.kill(generation).unwrap();
         assert_eq!(pty.renderer().lines()[0], "ready");
@@ -540,10 +616,10 @@ mod transport_tests {
             fn attach(&mut self, _: &PtyAttachRequest) -> Result<(), PtyError> {
                 Ok(())
             }
-            fn read_output(&mut self, _: u64) -> Result<String, PtyError> {
-                Ok(String::new())
+            fn read_output(&mut self, _: u64) -> Result<PtyRead, PtyError> {
+                Ok(PtyRead::Eof)
             }
-            fn send_input(&mut self, _: u64, _: usize) -> Result<(), PtyError> {
+            fn send_input(&mut self, _: u64, _: &[u8]) -> Result<(), PtyError> {
                 Ok(())
             }
             fn resize(&mut self, _: u64, _: u16, _: u16) -> Result<(), PtyError> {
@@ -556,8 +632,12 @@ mod transport_tests {
         let authority = Authority(true);
         let mut pty = AuthenticatedPty::new(&authority, EofTransport, 80, 24).unwrap();
         let generation = pty.attach(request()).unwrap();
-        assert_eq!(pty.read_output(generation).unwrap(), "");
-        assert_eq!(pty.send_input(generation, 1), Err(PtyError::InvalidRequest));
+        assert_eq!(pty.read_output(generation).unwrap(), PtyRead::Eof);
+        assert_eq!(
+            pty.send_input(generation, b"x"),
+            Err(PtyError::InvalidRequest)
+        );
+        assert_eq!(pty.read_output(generation), Err(PtyError::InvalidRequest));
     }
 
     #[test]
@@ -565,9 +645,9 @@ mod transport_tests {
         let authority = Authority(true);
         let mut pty = AuthenticatedPty::new(&authority, FakeTransport::default(), 80, 24).unwrap();
         let generation = pty.attach(request()).unwrap();
-        assert_eq!(pty.send_input(generation, 0), Ok(()));
+        assert_eq!(pty.send_input(generation, b""), Ok(()));
         assert_eq!(
-            pty.send_input(generation, (1 << 20) + 1),
+            pty.send_input(generation, &vec![b'x'; (1 << 20) + 1]),
             Err(PtyError::InvalidRequest)
         );
         assert_eq!(pty.resize(generation, 0, 24), Err(PtyError::InvalidRequest));
@@ -587,9 +667,12 @@ mod transport_tests {
         let second = pty.attach(request()).unwrap();
         assert_ne!(first, second);
         assert_eq!(pty.read_output(first), Err(PtyError::InvalidRequest));
-        assert_eq!(pty.send_input(first, 1), Err(PtyError::InvalidRequest));
+        assert_eq!(pty.send_input(first, b"x"), Err(PtyError::InvalidRequest));
         assert_eq!(pty.resize(first, 80, 24), Err(PtyError::InvalidRequest));
-        assert_eq!(pty.read_output(second).unwrap(), "ready");
+        assert_eq!(
+            pty.read_output(second).unwrap(),
+            PtyRead::Text("ready".to_owned())
+        );
     }
 
     #[test]
@@ -611,14 +694,14 @@ mod transport_tests {
             Ok(41)
         }
 
-        fn read_output(&mut self, channel: u64) -> Result<String, PtyError> {
+        fn read_output(&mut self, channel: u64) -> Result<PtyRead, PtyError> {
             self.calls += 1;
             (channel == 41)
-                .then_some("host-ready".to_owned())
+                .then(|| PtyRead::Text("host-ready".to_owned()))
                 .ok_or(PtyError::Transport)
         }
 
-        fn send_input(&mut self, channel: u64, _: usize) -> Result<(), PtyError> {
+        fn send_input(&mut self, channel: u64, _: &[u8]) -> Result<(), PtyError> {
             self.calls += 1;
             (channel == 41).then_some(()).ok_or(PtyError::Transport)
         }
@@ -650,12 +733,15 @@ mod transport_tests {
         )
         .unwrap();
         let generation = pty.attach(request()).unwrap();
-        assert_eq!(pty.read_output(generation).unwrap(), "host-ready");
+        assert_eq!(
+            pty.read_output(generation).unwrap(),
+            PtyRead::Text("host-ready".to_owned())
+        );
         assert_eq!(
             pty.read_output(generation + 1),
             Err(PtyError::InvalidRequest)
         );
-        pty.send_input(generation, 4).unwrap();
+        pty.send_input(generation, b"date\r").unwrap();
         pty.resize(generation, 100, 30).unwrap();
         pty.kill(generation).unwrap();
         assert_eq!(pty.renderer().lines()[0], "host-ready");
@@ -686,10 +772,10 @@ mod transport_tests {
             self.opens += 1;
             Ok(73)
         }
-        fn output(&mut self, _: u64) -> Result<String, PtyError> {
-            Ok("porsche-ready".to_owned())
+        fn output(&mut self, _: u64) -> Result<PtyRead, PtyError> {
+            Ok(PtyRead::Text("porsche-ready".to_owned()))
         }
-        fn input(&mut self, _: u64, _: usize) -> Result<(), PtyError> {
+        fn input(&mut self, _: u64, _: &[u8]) -> Result<(), PtyError> {
             Ok(())
         }
         fn dimensions(&mut self, _: u64, _: u16, _: u16) -> Result<(), PtyError> {
@@ -711,7 +797,10 @@ mod transport_tests {
         };
         assert_eq!(backend.attach(&other), Err(PtyError::Unauthenticated));
         assert_eq!(backend.client_mut().opens, 1);
-        assert_eq!(backend.read_output(73).expect("output"), "porsche-ready");
+        assert_eq!(
+            backend.read_output(73).expect("output"),
+            PtyRead::Text("porsche-ready".to_owned())
+        );
         backend.kill(73).expect("close");
         assert_eq!(backend.client_mut().closes, 1);
     }

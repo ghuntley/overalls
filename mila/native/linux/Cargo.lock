@@ -1522,6 +1522,7 @@ dependencies = [
 name = "mila-native-linux"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "gtk4",
  "libadwaita",
  "mila-ffi",
@@ -1531,6 +1532,7 @@ dependencies = [
  "p256 0.13.2",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
 ]
 
 [[package]]

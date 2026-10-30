@@ -149,6 +149,16 @@ pub struct LiveSession {
     handle: Option<u64>,
     terminal: Option<u64>,
     submitted_mutations: HashSet<String>,
+    read_buffer: Vec<u8>,
+}
+
+/// One bounded terminal read. Bytes stay inside the host transport; the GTK
+/// surface only receives text decoded by `PtyTextDecoder`.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum TerminalChunk {
+    Data(Vec<u8>),
+    Idle,
+    Closed,
 }
 
 impl LiveSession {
@@ -186,6 +196,7 @@ impl LiveSession {
             handle: Some(handle),
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         })
     }
 
@@ -669,6 +680,50 @@ impl LiveSession {
         Ok(output)
     }
 
+    /// The PTY handle opened by [`Self::terminal_attach`], if still open.
+    pub const fn terminal_handle(&self) -> Option<u64> {
+        self.terminal
+    }
+
+    /// Reads at most one chunk, waiting no longer than `wait_ms` (at most
+    /// 1000). A closed channel releases its handle so a new attach can follow.
+    pub fn terminal_read(&mut self, wait_ms: u32) -> Result<TerminalChunk, SessionError> {
+        if wait_ms > 1_000 {
+            return Err(SessionError::InvalidInput);
+        }
+        let terminal = self.terminal.ok_or(SessionError::StaleHandle)?;
+        let capacity = mila_ffi::session::MILA_TERMINAL_READ_CAPACITY;
+        if self.read_buffer.len() != capacity {
+            self.read_buffer = vec![0_u8; capacity];
+        }
+        let mut written = 0_usize;
+        let mut event = mila_ffi::session::TerminalReadEvent::Idle;
+        let status = unsafe {
+            mila_ffi::session::mila_session_terminal_read_within(
+                terminal,
+                wait_ms,
+                self.read_buffer.as_mut_ptr(),
+                self.read_buffer.len(),
+                &mut written,
+                &mut event,
+            )
+        };
+        if status != mila_ffi::session::SessionStatus::Ok || written > capacity {
+            return Err(status.into());
+        }
+        use mila_ffi::session::TerminalReadEvent;
+        match event {
+            TerminalReadEvent::Data if written > 0 => {
+                Ok(TerminalChunk::Data(self.read_buffer[..written].to_vec()))
+            }
+            TerminalReadEvent::Data | TerminalReadEvent::Idle => Ok(TerminalChunk::Idle),
+            TerminalReadEvent::Closed => {
+                let _ = self.terminal_kill();
+                Ok(TerminalChunk::Closed)
+            }
+        }
+    }
+
     pub fn terminal_input(&mut self, input: &[u8]) -> Result<(), SessionError> {
         if input.len() > (1 << 20) {
             return Err(SessionError::InvalidInput);
@@ -784,6 +839,107 @@ fn valid_request_id(value: &str) -> bool {
     value.len() == 40
         && value.starts_with("porsche-")
         && value[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+}
+
+/// @cc [owner:ghuntley,label:security;terminal] linux-session-pty-backend
+/// The backend MUST operate only on the PTY handle it opened through the
+/// currently bound authenticated session, MUST refuse every channel operation
+/// when no session is bound or the handle differs, and MUST decode PTY bytes
+/// into display text before they leave the backend.
+///
+/// [`HostPtyBackend`](crate::terminal::HostPtyBackend) over the authenticated
+/// FFI session held by the GTK window or the headless journey driver.
+pub struct SessionPtyBackend {
+    binding: std::rc::Rc<std::cell::RefCell<SessionBinding>>,
+    decoder: crate::terminal_text::PtyTextDecoder,
+    wait_ms: u32,
+}
+
+impl SessionPtyBackend {
+    /// `wait_ms` bounds how long one read may block the caller (at most 1000).
+    pub fn new(binding: std::rc::Rc<std::cell::RefCell<SessionBinding>>, wait_ms: u32) -> Self {
+        Self {
+            binding,
+            decoder: crate::terminal_text::PtyTextDecoder::new(),
+            wait_ms: wait_ms.min(1_000),
+        }
+    }
+
+    fn with_channel<R>(
+        &mut self,
+        channel: u64,
+        operation: impl FnOnce(&mut LiveSession) -> Result<R, SessionError>,
+    ) -> Result<R, crate::terminal::PtyError> {
+        use crate::terminal::PtyError;
+        let mut binding = self
+            .binding
+            .try_borrow_mut()
+            .map_err(|_| PtyError::Transport)?;
+        let live = binding.session_mut().ok_or(PtyError::Unauthenticated)?;
+        if live.terminal_handle() != Some(channel) {
+            return Err(PtyError::InvalidRequest);
+        }
+        operation(live).map_err(|error| match error {
+            SessionError::InvalidInput => PtyError::InvalidRequest,
+            SessionError::StaleHandle => PtyError::Unauthenticated,
+            _ => PtyError::Transport,
+        })
+    }
+}
+
+impl crate::terminal::HostPtyBackend for SessionPtyBackend {
+    fn attach(
+        &mut self,
+        request: &crate::terminal::PtyAttachRequest,
+    ) -> Result<u64, crate::terminal::PtyError> {
+        use crate::terminal::PtyError;
+        let mut binding = self
+            .binding
+            .try_borrow_mut()
+            .map_err(|_| PtyError::Transport)?;
+        let live = binding.session_mut().ok_or(PtyError::Unauthenticated)?;
+        if !live.is_open() {
+            return Err(PtyError::Unauthenticated);
+        }
+        let channel = live
+            .terminal_attach(request.columns, request.rows)
+            .map_err(|error| match error {
+                SessionError::InvalidInput => PtyError::InvalidRequest,
+                _ => PtyError::Transport,
+            })?;
+        self.decoder = crate::terminal_text::PtyTextDecoder::new();
+        Ok(channel)
+    }
+
+    fn read_output(
+        &mut self,
+        channel: u64,
+    ) -> Result<crate::terminal::PtyRead, crate::terminal::PtyError> {
+        use crate::terminal::PtyRead;
+        let wait_ms = self.wait_ms;
+        match self.with_channel(channel, |live| live.terminal_read(wait_ms))? {
+            TerminalChunk::Data(bytes) => Ok(PtyRead::Text(self.decoder.decode(&bytes))),
+            TerminalChunk::Idle => Ok(PtyRead::Idle),
+            TerminalChunk::Closed => Ok(PtyRead::Eof),
+        }
+    }
+
+    fn send_input(&mut self, channel: u64, input: &[u8]) -> Result<(), crate::terminal::PtyError> {
+        self.with_channel(channel, |live| live.terminal_input(input))
+    }
+
+    fn resize(
+        &mut self,
+        channel: u64,
+        columns: u16,
+        rows: u16,
+    ) -> Result<(), crate::terminal::PtyError> {
+        self.with_channel(channel, |live| live.terminal_resize(columns, rows))
+    }
+
+    fn kill(&mut self, channel: u64) -> Result<(), crate::terminal::PtyError> {
+        self.with_channel(channel, LiveSession::terminal_kill)
+    }
 }
 
 /// The one session authority presented to the rest of the native UI.
@@ -1079,19 +1235,14 @@ pub struct ApprovalInfo {
 }
 
 impl ApprovalInfo {
+    /// @cc [owner:ghuntley,label:security;navigation] linux-approval-url-authority
+    /// An approval URL MUST be HTTPS with a DNS host and an optional canonical
+    /// non-zero port, and MUST NOT carry userinfo, a fragment or whitespace.
+    /// `validate_for_host` MUST compare the full authority, treating an
+    /// explicit `:443` as the default port, so a different host or port fails.
     pub fn validate(url: &str, fingerprint: &str, issued_at: u64) -> Result<Self, RuntimeError> {
-        let authority = url
-            .strip_prefix("https://")
-            .and_then(|rest| rest.split(['/', '?']).next());
         let valid_url = url.len() <= 2048
-            && authority.is_some_and(|host| {
-                !host.is_empty()
-                    && host != ":443"
-                    && !host.starts_with(':')
-                    && host
-                        .chars()
-                        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-'))
-            })
+            && approval_authority(url).is_some()
             && !url[8..].contains(['@', '#', ' ', '\t', '\n', '\r']);
         if !valid_url
             || fingerprint.is_empty()
@@ -1112,24 +1263,45 @@ impl ApprovalInfo {
     /// Validate that a browser approval remains on the selected deployment
     /// authority.  The URL is untrusted input even after the envelope parser
     /// accepts it; opening a different HTTPS origin would let a copied link
-    /// steer the native client to another deployment.
+    /// steer the native client to another deployment. `expected_authority` is
+    /// `host` or `host:port`.
     pub fn validate_for_host(
         url: &str,
         fingerprint: &str,
         issued_at: u64,
-        expected_host: &str,
+        expected_authority: &str,
     ) -> Result<Self, RuntimeError> {
         let info = Self::validate(url, fingerprint, issued_at)?;
-        let authority = info
-            .url
-            .strip_prefix("https://")
-            .and_then(|rest| rest.split(['/', '?']).next())
-            .ok_or(RuntimeError::InvalidInput)?;
-        if authority != expected_host {
+        let actual = approval_authority(&info.url).ok_or(RuntimeError::InvalidInput)?;
+        let expected =
+            parse_https_authority(expected_authority).ok_or(RuntimeError::InvalidInput)?;
+        if actual != expected {
             return Err(RuntimeError::InvalidInput);
         }
         Ok(info)
     }
+}
+
+/// `(host, port)` of an `https://` URL, with the default port made explicit.
+fn approval_authority(url: &str) -> Option<(String, u16)> {
+    let authority = url.strip_prefix("https://")?.split(['/', '?']).next()?;
+    parse_https_authority(authority)
+}
+
+fn parse_https_authority(authority: &str) -> Option<(String, u16)> {
+    let (host, port) = match authority.split_once(':') {
+        Some((host, port)) => {
+            let parsed = port.parse::<u16>().ok()?;
+            (parsed != 0 && parsed.to_string() == port).then_some((host, parsed))?
+        }
+        None => (authority, 443),
+    };
+    let valid_host = !host.is_empty()
+        && host.len() <= 253
+        && host
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-'));
+    valid_host.then(|| (host.to_ascii_lowercase(), port))
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -1490,6 +1662,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(
             session.web_set(
@@ -1509,6 +1682,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(
             session.web_show("bad machine"),
@@ -1542,6 +1716,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(session.device_list(), Err(SessionError::StaleHandle));
         assert_eq!(
@@ -1560,6 +1735,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(
             session.machine_action(
@@ -1593,6 +1769,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         let request = "porsche-00000000000000000000000000000000";
         assert_eq!(
@@ -1611,6 +1788,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         let request = "porsche-00000000000000000000000000000000";
         assert_eq!(
@@ -1641,6 +1819,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(
             session.thread_action(None, "thread ls", None, None, None),
@@ -1735,6 +1914,7 @@ mod tests {
             handle: None,
             terminal: None,
             submitted_mutations: HashSet::new(),
+            read_buffer: Vec::new(),
         };
         assert_eq!(
             session.thread_action(None, "thread prompt", None, Some("q"), Some(request)),
@@ -1848,6 +2028,34 @@ mod tests {
             "example.test"
         )
         .is_err());
+    }
+
+    #[test]
+    fn approval_url_authority_includes_canonical_port() {
+        let url = "https://localhost:8443/ssh/approve/a";
+        assert!(ApprovalInfo::validate(url, "fp", 0).is_ok());
+        assert!(ApprovalInfo::validate_for_host(url, "fp", 0, "localhost:8443").is_ok());
+        assert!(ApprovalInfo::validate_for_host(url, "fp", 0, "localhost").is_err());
+        assert!(ApprovalInfo::validate_for_host(url, "fp", 0, "localhost:9443").is_err());
+        assert!(ApprovalInfo::validate_for_host(
+            "https://example.test:443/a",
+            "fp",
+            0,
+            "example.test"
+        )
+        .is_ok());
+        for invalid in [
+            "https://localhost:0/a",
+            "https://localhost:08443/a",
+            "https://localhost:65536/a",
+            "https://localhost:/a",
+            "https://localhost:8443:1/a",
+        ] {
+            assert!(
+                ApprovalInfo::validate(invalid, "fp", 0).is_err(),
+                "{invalid}"
+            );
+        }
     }
 
     #[test]
