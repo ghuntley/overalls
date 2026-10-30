@@ -275,6 +275,7 @@ fn command_known(command: &str) -> bool {
             | "unpin"
             | "new"
             | "resize"
+            | "share show"
             | "share add"
             | "share remove"
             | "request show"
@@ -401,7 +402,7 @@ fn validate_command(
         "device rm" | "device prefs" | "share show" => (1, 1),
         "terminal attach" => (2, 2),
         "show" | "start" | "resize" | "request show" | "ssh-key remove" | "thread show"
-        | "thread turns" | "terminal ls" | "terminal new" | "web show" => (1, 1),
+        | "thread turns" | "terminal ls" | "terminal new" | "web show" | "share show" => (1, 1),
         "pause" | "resume" | "unpause" | "stop" | "rm" | "pin" | "unpin" => (1, 1),
         "new" => (0, 0),
         "share add" => (3, 3),

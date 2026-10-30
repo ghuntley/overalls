@@ -201,6 +201,39 @@ async fn authenticated_share_mutations_use_typed_commands_and_reject_bad_roles()
 }
 
 #[tokio::test]
+async fn machine_and_share_reads_use_grammar_checked_commands() {
+    let grants = br#"{"owner":{"email":"owner@example.test"},"items":[]}"#.to_vec();
+    let responses = Arc::new(Mutex::new(VecDeque::from([
+        reply(
+            &format!("show {FIRST} --json"),
+            machine(FIRST, "box").to_string().into_bytes(),
+        ),
+        reply(&format!("share show {FIRST} --json"), grants.clone()),
+        reply(&format!("share show {FIRST} --json"), b"not json".to_vec()),
+    ])));
+    let (trust, port, _, task) = endpoint(responses.clone()).await;
+    let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
+    let mut session =
+        ApplicationSession::connect(trust, port, &public, signer, Duration::from_secs(5))
+            .await
+            .unwrap();
+    let shown: Value = serde_json::from_slice(&session.machine_show(FIRST).await.unwrap()).unwrap();
+    assert_eq!(shown["name"], "box");
+    assert_eq!(session.share_show(FIRST).await.unwrap(), grants);
+    assert!(matches!(
+        session.share_show(FIRST).await,
+        Err(SessionError::Refused)
+    ));
+    assert!(matches!(
+        session.machine_show("not a machine").await,
+        Err(SessionError::InvalidListing)
+    ));
+    assert!(responses.lock().unwrap().is_empty());
+    session.close().await.unwrap();
+    task.abort();
+}
+
+#[tokio::test]
 async fn cyclic_pagination_keeps_previous_rows_and_cursor() {
     let responses = Arc::new(Mutex::new(VecDeque::from([
         reply("ls --json", page(vec![machine(FIRST, "kept")], Some(FIRST))),

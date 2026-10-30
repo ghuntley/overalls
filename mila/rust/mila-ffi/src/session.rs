@@ -569,6 +569,67 @@ pub unsafe extern "C" fn mila_session_ssh_key_revoke(
     })
 }
 
+/// Read one machine (`show MACHINE --json`); bounded JSON is copied to `out`.
+///
+/// # Safety
+/// `machine` references `machine_len` readable bytes; `out`/`written` follow
+/// [`mila_session_listing`].
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_machine_show(
+    handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        let runtime = runtime()?;
+        let entry = entry(handle)?;
+        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+        let data = runtime
+            .block_on(session.machine_show(machine))
+            .map_err(|e| match e {
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })?;
+        output(&data, out, capacity, written)
+    })
+}
+
+/// Read a machine's owner and access grants (`share show MACHINE --json`).
+///
+/// # Safety
+/// As [`mila_session_machine_show`].
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_share_show(
+    handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        let runtime = runtime()?;
+        let entry = entry(handle)?;
+        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+        let data = runtime
+            .block_on(session.share_show(machine))
+            .map_err(|e| match e {
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })?;
+        output(&data, out, capacity, written)
+    })
+}
+
 /// # Safety
 /// Pointer arguments MUST be valid for their declared lengths and output
 /// pointers writable for the duration of the call.

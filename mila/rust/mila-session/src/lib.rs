@@ -467,6 +467,38 @@ impl ApplicationSession {
         }
     }
 
+    /// @cc [owner:ghuntley,label:protocol;security] mila-session-machine-reads
+    /// `machine_show` and `share_show` MUST send only the grammar-checked
+    /// `show MACHINE --json` / `share show MACHINE --json` read for a canonical
+    /// machine identifier, MUST refuse a non-zero exit, oversized or non-JSON
+    /// output, and MUST NOT carry a request id or mutate state.
+    pub async fn machine_show(&mut self, machine: &str) -> Result<Vec<u8>, SessionError> {
+        self.machine_read("show", machine).await
+    }
+
+    /// Read a machine's owner and access grants (`share show`).
+    pub async fn share_show(&mut self, machine: &str) -> Result<Vec<u8>, SessionError> {
+        self.machine_read("share show", machine).await
+    }
+
+    async fn machine_read(
+        &mut self,
+        command: &str,
+        machine: &str,
+    ) -> Result<Vec<u8>, SessionError> {
+        let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
+        let line = mila_protocol::Command::parse(&format!("{command} {machine} --json"))
+            .and_then(|command| command.format())
+            .map_err(|_| SessionError::Refused)?;
+        let output = self.ssh.exec(&line, &[]).await?;
+        if output.exit_status != 0 || output.stdout.len() > 256 * 1024 {
+            return Err(SessionError::Refused);
+        }
+        serde_json::from_slice::<serde_json::Value>(&output.stdout)
+            .map_err(|_| SessionError::Refused)?;
+        Ok(output.stdout)
+    }
+
     /// Execute authenticated web endpoint inspection and return bounded JSON.
     pub async fn web_show(&mut self, machine: &str) -> Result<Vec<u8>, SessionError> {
         let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
