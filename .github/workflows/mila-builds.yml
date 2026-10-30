@@ -248,6 +248,16 @@ jobs:
       - name: Install Nix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      # The fixture launcher boots a KVM QEMU VM and refuses to fall back to TCG.
+      - name: Enable KVM for the journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        timeout-minutes: 5
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm -a -w /dev/kvm
       - name: Start hermetic journey fixture
         if: steps.journey.outputs.declared == 'true'
         timeout-minutes: 30
