@@ -521,10 +521,16 @@ defmodule ZFSGuestCloneFixture do
     original_bundle = File.read!(bundle)
 
     try do
+      # Since ec54d521d (ADR-0190) restart/4 admits the portable bundle before
+      # Disk.ready, so a malformed bundle refuses as invalid_workload_bundle.
       :ok = Storage.locked(pool, fn -> File.write(bundle, "{}") end)
-      {:error, :disk_not_ready} = Driver.restart(execution, pool, source, generation: revision)
+
+      {:error, :invalid_workload_bundle} =
+        Driver.restart(execution, pool, source, generation: revision)
+
       ^previous = Enum.map(files, &File.read/1)
       {:ok, ^authority} = Intent.read(directory)
+      {:ok, :stopped} = Unit.status(source)
     after
       :ok = Storage.locked(pool, fn -> File.write(bundle, original_bundle) end)
     end
