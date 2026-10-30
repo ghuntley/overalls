@@ -328,6 +328,15 @@ defmodule Marshall.Compute.DistributedCapacityRaceTest do
   # non-confirmed-delete terminal paths retain disk and clear temporary bytes;
   # addresses stay unique per profile without pre-archival reuse.
   # Real node startup and committed races consume the engine's input timer.
+  #
+  # The batch schedule has no finite domain, so ADR-0191's 100-case exploration
+  # applies (6fad4d347 raised it from 8). capacity-race-three-independent-peers
+  # requires fresh peers per sample, and booting them is only about 1.6 s of the
+  # 6-10 s a case takes; most of the rest is the fixed windows and committed
+  # races. Sharing peers across cases would therefore break that contract
+  # without fixing the budget. 100 cases took 637 s and 680 s locally, against
+  # the 300 s module budget that failed in CI, so this test gets 30 minutes.
+  @tag timeout: 1_800_000
   property "generated multi-node races preserve committed capacity accounting",
     profile: :ci,
     test_cases: 100 do
@@ -2690,15 +2699,20 @@ defmodule Marshall.Compute.DistributedCapacityRaceTest do
   # count as clone activation; at least one real transfer allocation MUST commit.
   # Returned SQL errors MUST fail, and committed opposite relocation endpoints,
   # complete allocation inventories and unreleased slot uniqueness MUST be checked.
-  property "opposite-source relocations and clone activation reach shared host locks",
-    profile: :ci,
-    test_cases: 100 do
-    rotation = draw("rotation", member_of([0, 1, 2]))
-    reverse = draw("reverse", boolean())
-
+  #
+  # The domain is finite: every generated case already ran all three rotations,
+  # so a case only chose the first rotation and the host direction, six points
+  # in all. 6fad4d347 raised it from 2 generated cases to the ADR-0191 default
+  # of 100: up to 300 samples of three fresh peers each, re-running those six
+  # points against a 300 s budget it could not meet in CI. Its exploration review
+  # sends true finite matrices to ordinary tests that enumerate every value, so
+  # this runs each rotation in both directions once. Every sample still starts
+  # and stops its own three peers, so ordering between samples is not an input.
+  # The six samples took 29 s locally, inside the unchanged 300 s module budget.
+  test "opposite-source relocations and clone activation reach shared host locks" do
     measure_stage(:lock_history, fn ->
-      for fixed_rotation <- Enum.uniq([rotation, 0, 1, 2]) do
-        unboxed(fn -> lock_schedule_sample(fixed_rotation, reverse) end)
+      for reverse <- [false, true], rotation <- [0, 1, 2] do
+        unboxed(fn -> lock_schedule_sample(rotation, reverse) end)
       end
     end)
   end

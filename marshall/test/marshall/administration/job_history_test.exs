@@ -66,6 +66,10 @@ defmodule Marshall.Administration.JobHistoryTest do
       )
 
     reader = Passkeys.user()
+    # Queue counts are installation-wide. Raw jobs committed by other partitions'
+    # fixtures stay visible through the per-case sandbox, so the pruned job is
+    # proven not to inflate counts against this case's own baseline, not against zero.
+    assert {:ok, %{counts: baseline}} = Administration.jobs(%{}, actor: reader)
     job = Fixture.insert("history_#{System.unique_integer([:positive])}")
     initial = %{state: :available, attempt: 0, error_count: 0}
     model = %{id: job.id, current: initial, events: [initial], raw: true}
@@ -83,7 +87,7 @@ defmodule Marshall.Administration.JobHistoryTest do
     assert_projection(%{model | raw: false}, reader)
     assert {:ok, page} = Administration.jobs(%{queue: job.queue}, actor: reader)
     assert Enum.map(page.items, & &1.id) == [job.id]
-    assert Enum.all?(Map.values(page.counts), &(&1 == 0))
+    assert page.counts == baseline
 
     Fixture.query(
       "UPDATE admin_job_snapshots SET expires_at=clock_timestamp()-interval '1 second' WHERE id=$1",

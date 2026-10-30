@@ -1460,99 +1460,103 @@ defmodule Marshall.Compute.DistributedAdmissionTest do
   # concurrent same-key retries on three independent nodes MUST return the
   # original VM, including archived history, with no added allocation rows.
   # Changed-shape retries MUST refuse while preserving that same row inventory.
-  @tag timeout: 300_000
+  #
+  # The input domain is finite: 3 repeat counts x 3 origins x 3 changed shapes,
+  # and a :node loss replaces the origin with a fresh owned BEAM, so origin does
+  # not vary that branch. 6fad4d347 moved this from 2 generated cases to the
+  # ADR-0191 default of 100, which in CI meant 100 cases x 4 histories, two with
+  # a fresh peer each, against a 300 s budget it could not meet. Its own
+  # exploration review sends true finite matrices to ordinary tests that
+  # enumerate every value, so this test runs every point of the domain once:
+  # 54 surviving-worker histories and 18 fresh-peer histories. That is a
+  # superset of anything 100 random draws could reach, and costs fewer peers.
+  # The 72 histories took 82 s locally; 600 s leaves room for a loaded runner.
+  @tag timeout: 600_000
   @tag uncertain_admission: true
-  @tag :hegel
   test "lost post-commit admission replies replay across three nodes", %{peers: peers} do
-    Hegel.check(
-      fn ->
-        repeats = draw("repeats", integer(1..3))
-        origin = draw("origin", integer(0..2))
+    changes = [%{vcpu: 1}, %{memory_bytes: 1_073_741_824}, %{disk_bytes: 4_294_967_296}]
 
-        changed =
-          draw(
-            "changed",
-            member_of([%{vcpu: 1}, %{memory_bytes: 1_073_741_824}, %{disk_bytes: 4_294_967_296}])
-          )
+    histories =
+      for repeats <- 1..3,
+          changed <- changes,
+          {loss, origin} <- [{:worker, 0}, {:worker, 1}, {:worker, 2}, {:node, nil}],
+          archived <- [false, true],
+          do: {repeats, changed, loss, origin, archived}
 
-        for loss <- [:worker, :node], archived <- [false, true] do
-          unboxed(fn ->
-            origin_peer =
-              if loss == :node, do: start_owned_admission_peer(), else: Enum.fetch!(peers, origin)
+    for {repeats, changed, loss, origin, archived} <- histories do
+      unboxed(fn ->
+        origin_peer =
+          if loss == :node, do: start_owned_admission_peer(), else: Enum.fetch!(peers, origin)
 
-            fixture = host_fixture()
-            actor = user()
-            params = request()
-            owned_peers = Enum.uniq([origin_peer | peers])
-            receipt = make_ref()
+        fixture = host_fixture()
+        actor = user()
+        params = request()
+        owned_peers = Enum.uniq([origin_peer | peers])
+        receipt = make_ref()
 
-            Cleanup.protect owned_peers do
-              worker =
-                :peer.call(
-                  origin_peer,
-                  Marshall.UncertainAdmissionFixture,
-                  :start,
-                  [self(), receipt, params, actor],
-                  30_000
-                )
+        Cleanup.protect owned_peers do
+          worker =
+            :peer.call(
+              origin_peer,
+              Marshall.UncertainAdmissionFixture,
+              :start,
+              [self(), receipt, params, actor],
+              30_000
+            )
 
-              monitor = Process.monitor(worker)
-              assert_receive {^receipt, :committed, ^worker, vm_id}, 30_000
-              refute_receive {^receipt, :returned, _id}, 0
-              assert [%{id: ^vm_id} = vm] = Ledger.read!(VirtualMachine, owner_id: actor.id)
-              assert [%{vm_id: ^vm_id}] = Ledger.read!(Reservation, vm_id: vm_id)
+          monitor = Process.monitor(worker)
+          assert_receive {^receipt, :committed, ^worker, vm_id}, 30_000
+          refute_receive {^receipt, :returned, _id}, 0
+          assert [%{id: ^vm_id} = vm] = Ledger.read!(VirtualMachine, owner_id: actor.id)
+          assert [%{vm_id: ^vm_id}] = Ledger.read!(Reservation, vm_id: vm_id)
 
-              assert [%{vm_id: ^vm_id, kind: :provision}] =
-                       Ledger.read!(Operation, requested_by_id: actor.id)
+          assert [%{vm_id: ^vm_id, kind: :provision}] =
+                   Ledger.read!(Operation, requested_by_id: actor.id)
 
-              case loss do
-                :worker ->
-                  assert true = :peer.call(origin_peer, Process, :exit, [worker, :kill], 30_000)
-                  assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 10_000
+          case loss do
+            :worker ->
+              assert true = :peer.call(origin_peer, Process, :exit, [worker, :kill], 30_000)
+              assert_receive {:DOWN, ^monitor, :process, ^worker, :killed}, 10_000
 
-                :node ->
-                  peer_monitor = Process.monitor(origin_peer)
-                  catch_exit(:peer.call(origin_peer, :erlang, :halt, [137], 30_000))
+            :node ->
+              peer_monitor = Process.monitor(origin_peer)
+              catch_exit(:peer.call(origin_peer, :erlang, :halt, [137], 30_000))
 
-                  assert_receive {:DOWN, ^peer_monitor, :process, ^origin_peer,
-                                  {:exit_status, 137}},
-                                 10_000
+              assert_receive {:DOWN, ^peer_monitor, :process, ^origin_peer, {:exit_status, 137}},
+                             10_000
 
-                  assert_receive {:DOWN, ^monitor, :process, ^worker, :noconnection}, 10_000
-              end
+              assert_receive {:DOWN, ^monitor, :process, ^worker, :noconnection}, 10_000
+          end
 
-              refute_receive {^receipt, :returned, _id}, 0
+          refute_receive {^receipt, :returned, _id}, 0
 
-              if archived, do: assert(:ok = Ledger.archive!(vm, :archive))
-              committed = Marshall.CommittedFixtureInventory.snapshot()
+          if archived, do: assert(:ok = Ledger.archive!(vm, :archive))
+          committed = Marshall.CommittedFixtureInventory.snapshot()
 
-              for _ <- 1..repeats do
-                results = race(peers, List.duplicate(params, 9), actor)
-                assert Enum.all?(results, &match?({:ok, %{id: ^vm_id}}, &1))
-                Marshall.CommittedFixtureInventory.assert_restored!(committed)
-              end
+          for _ <- 1..repeats do
+            results = race(peers, List.duplicate(params, 9), actor)
+            assert Enum.all?(results, &match?({:ok, %{id: ^vm_id}}, &1))
+            Marshall.CommittedFixtureInventory.assert_restored!(committed)
+          end
 
-              for peer <- peers do
-                assert {:error, error} =
-                         :peer.call(
-                           peer,
-                           Marshall.Compute,
-                           :provision,
-                           [Map.merge(params, changed), [actor: actor]],
-                           30_000
-                         )
+          for peer <- peers do
+            assert {:error, error} =
+                     :peer.call(
+                       peer,
+                       Marshall.Compute,
+                       :provision,
+                       [Map.merge(params, changed), [actor: actor]],
+                       30_000
+                     )
 
-                assert Exception.message(error) =~ "idempotency_conflict"
-                Marshall.CommittedFixtureInventory.assert_restored!(committed)
-              end
-            after
-              cleanup(fixture.host.id, actor.id)
-            end
-          end)
+            assert Exception.message(error) =~ "idempotency_conflict"
+            Marshall.CommittedFixtureInventory.assert_restored!(committed)
+          end
+        after
+          cleanup(fixture.host.id, actor.id)
         end
-      end,
-      test_cases: 100
-    )
+      end)
+    end
   end
 
   test "three nodes allocate distinct addresses across different hosts", %{peers: peers} do
