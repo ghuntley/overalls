@@ -72,7 +72,7 @@ committing to trunk for automatic deployment.
 
 - The spool's resource is exactly the five reviewed attributes. Rust test
   `schema_replaces_origin_and_discards_unreviewed_context` in
-  [`spool/src/lib.rs`](../../../elixir/diagnostics/native/spool/src/lib.rs).
+  [`spool/src/tests.rs`](../../../elixir/diagnostics/native/spool/src/tests.rs).
 - The spool refuses a revision that is empty, longer than 64 bytes or outside the
   simple alphabet: config validation in
   [`spool/src/main.rs`](../../../elixir/diagnostics/native/spool/src/main.rs).
@@ -93,7 +93,7 @@ committing to trunk for automatic deployment.
 - Implemented in:
   - [`flake.nix`](../../../flake.nix) (`hostSystem`);
   - [`trace-spool.nix`](../../../nix/domains/system/otel-fleet/trace-spool.nix);
-  - [`spool/src/lib.rs`](../../../elixir/diagnostics/native/spool/src/lib.rs);
+  - [`spool/src/schema.rs`](../../../elixir/diagnostics/native/spool/src/schema.rs);
   - [`lyra/src/telemetry.rs`](../../../lyra/src/telemetry.rs);
   - [`otel-fleet/default.nix`](../../../nix/domains/system/otel-fleet/default.nix);
   - [`operations-dashboard.nix`](../../../nix/domains/system/otel-fleet/operations-dashboard.nix);
