@@ -74,6 +74,22 @@ harness uses for real guest execution.
    the browser approval page, then drives `terminal new`, a named attach,
    output, input, resize, detach, reattach with replay and a server-side kill
    on a real guest PTY. It reaches Porsche at the deployment's public host.
+9. The control fixture also has a guest-backed terminal mode, so terminal
+   journeys run on every runner that can boot the fixture or reach it over
+   the tailnet. It needs no nested KVM. The seed provisions a second machine,
+   `seed.terminal_machine_id` (`seed.terminal_machine_name`), and observes it
+   running. A terminal stand-in (`mila-fixture-terminal`) connects to
+   Marshall's production provisioner stream (`HostStream`) with the synthetic
+   host's credential and speaks terminal stream v2. It also serves terminald
+   for that one machine: each session is a real PTY running a login shell as
+   the unprivileged `mila-guest` user, with a byte ring for replay and
+   Marshall's credit window. `terminal new`, named attach, input, output,
+   resize, detach, reattach with replay and kill therefore cross Porsche SSH,
+   Marshall's terminal authority, relay and ledger, and the Rust core
+   unchanged. The guestless refusal stays available on any machine the
+   fixture has not observed running: `terminal new` there returns Marshall's
+   closed `terminal_unavailable`. The stand-in answers no other machine, and
+   lifecycle actions on the terminal machine are outside its contract.
 
 Authorization: the hermetic-fixture and tunnelled-fixture choices in the Mila
 journey fixture request (2026-10-30); the Tailscale route was approved by the
@@ -117,8 +133,10 @@ Create these in the Tailscale admin console:
 
 Platform agents can close parity rows with execution evidence that shows a real
 backend accepting each command. The fixture proves admission, authorization,
-idempotent receipts, ledger state and browser approval. It does not prove guest
-execution, the terminal PTY data path, checkpoint restore, push delivery
+idempotent receipts, ledger state and browser approval. Its terminal mode
+proves the client, Porsche and Marshall halves of the terminal path against a
+real PTY. It does not prove guest execution, Lilly's terminal stream or the
+in-guest terminald, vsock transport, checkpoint restore, push delivery
 (APNs, FCM or WNS), or physical-device biometrics. Those stay with the fleet
 scenarios, device tests and release evidence. Synthetic operation completion
 must never be cited as evidence that the provisioner works.
@@ -137,16 +155,24 @@ must never be cited as evidence that the provisioner works.
 - Each subtest in the machine test asserts the backend effect in PostgreSQL:
   key rows, operations, resize and wake requests, grants, endpoint revisions,
   turns, plan implementation, device state and key archival.
+- The terminal stand-in only reaches Marshall through the host stream with the
+  synthetic host's own credential, serves only the seeded terminal machine,
+  and logs event names and counters, never terminal bytes or the token
+  (`mila-terminal-host-stand-in`).
 
 ## Implementation evidence
 
 - Fixture module: [`fixture.nix`](../../../nix/verification/tests/machines/mila-journey/fixture.nix).
   Seed and stand-in actions: [`fixture.exs`](../../../nix/verification/tests/machines/mila-journey/fixture.exs).
   Approver: [`approver.py`](../../../nix/verification/tests/machines/mila-journey/approver.py).
+  Terminal stand-in: [`terminal_host.py`](../../../nix/verification/tests/machines/mila-journey/terminal_host.py).
 - Machine test: [`default.nix`](../../../nix/verification/tests/machines/mila-journey/default.nix)
   and [`driver.py`](../../../nix/verification/tests/machines/mila-journey/driver.py).
   It was run locally on 2026-10-30 and all subtests passed, including the
-  fixture hooks and Marshall's closed `vm_busy` refusal:
+  fixture hooks, Marshall's closed `vm_busy` refusal, the guest-backed
+  terminal subtest (new, attach, echo, resize, replay, kill confirmed in the
+  ledger and the PTY's processes gone) and the guestless `terminal_unavailable`
+  refusal:
   `nix build -L .#checks.x86_64-linux.mila-journey`.
 - Fleet terminal journey: [`mila-terminal.py`](../../../nix/verification/tests/machines/fleet/scenarios/mila-terminal.py)
   on the [fleet harness](../../../nix/verification/tests/machines/fleet/default.nix)
@@ -177,9 +203,10 @@ must never be cited as evidence that the provisioner works.
 
 Remaining gaps:
 
-- With no guest, `terminal new` returns Marshall's closed `terminal_unavailable`
-  refusal in the control fixture. The PTY path is covered only by
-  `mila-journey-terminal` on the nested-KVM fleet harness.
+- The control fixture's terminal machine has no guest VM. Lilly's stream,
+  terminald, vsock and guest boot are covered only by `mila-journey-terminal`
+  on the nested-KVM fleet harness. The stand-in does not fence by placement
+  epoch and sends no `fenced` close.
 - Pause records intent, but the synthetic host stores no checkpoint, so resume
   is asserted only as an admitted wake.
 - The tunnel for macOS and Windows has not run until the secret and policy
