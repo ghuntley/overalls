@@ -1,0 +1,7 @@
+@cc [owner:ghuntley,label:verification] mila-localization-hegel-properties
+Hegel properties MUST cover `normalize` canonicalisation or deterministic
+rejection over arbitrary text, `direction` totality with the right-to-left
+locale set, `negotiate` totality returning only supported locales with the
+8192-byte bound and zero-quality refusal, and `choose` totality with its
+user, session, Accept-Language and default precedence. Catalog entry
+validation is covered by unit examples only.
