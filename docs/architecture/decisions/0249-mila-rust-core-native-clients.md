@@ -97,7 +97,7 @@ platform journeys and release artifacts still require execution evidence.
 
 The Android client binds machine creation and sharing to the authenticated
 Rust session through dedicated JNI entry points
-([`mila-ffi`](../../../mila/rust/mila-ffi/src/lib.rs) `nativeSessionMachineCreate`
+([`mila-ffi`](../../../mila/rust/mila-ffi/src/android/session_bridge.rs) `nativeSessionMachineCreate`
 and `nativeSessionShareMutation`); previously creation only echoed through the
 ABI probe and sharing reached the lifecycle seam, which Rust refused.
 [`MilaMachineFormController`](../../../mila/native/android/app/src/main/java/dev/overalls/mila/nativeui/MilaMachineCreate.kt)
