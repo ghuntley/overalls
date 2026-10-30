@@ -1,5 +1,7 @@
 use super::*;
+use crate::cli::decimal;
 use hegel::{generators as gs, TestCase};
+use std::ffi::OsString;
 use std::os::unix::ffi::OsStringExt;
 
 /// @cc [owner:ghuntley,label:verification] hegel-token-envelope-oracle
