@@ -287,20 +287,30 @@ with subtest("Audi stable names and strict nested SSH follow a real guest reloca
     )
 
     # Force only the outer transport address back to the former source. Keep
-    # the exact hostname, HTTPS key lookup and strict verification options.
-    profile = client.succeed("cat /var/lib/fleet-audi/ssh.conf")
-    needle = "-- " + hostname + " connect "
-    assert profile.count(needle) == 1
-    stale_profile = profile.replace(needle, "-- " + source_address + " connect ")
-    client.succeed(
-        "printf %s " + shlex.quote(stale_profile) + " >/var/lib/fleet-audi/stale-ssh.conf"
-    )
-    client.succeed("chown tester:users /var/lib/fleet-audi/stale-ssh.conf")
-    stale_arguments = list(ssh_arguments)
-    stale_arguments[2] = "/var/lib/fleet-audi/stale-ssh.conf"
-    client.fail(
-        ssh_environment + shlex.join([*stale_arguments, "true"]) + " >/dev/null 2>&1", timeout=30
-    )
+    # the exact hostname, the installed profile, its HTTPS key lookup and the
+    # strict verification options: the client's `overalls proxy` builds the
+    # outer SSH command itself, so pin the name in a private mount namespace.
+    # Hiding nscd makes glibc read the pinned hosts file for every lookup.
+    def ssh_pinned(address: str, command: str) -> str:
+        hosts = "/run/audi-relocation-hosts-" + address
+        # Keep every other static name (the control origin among them).
+        client.succeed(
+            f"grep -vwF {shlex.quote(hostname)} /etc/hosts >{hosts}; "
+            f"printf '%s %s\\n' {shlex.quote(address)} {shlex.quote(hostname)} >>{hosts}"
+        )
+        inner = (
+            f"mount --bind {hosts} /etc/hosts && "
+            "{ [ ! -d /run/nscd ] || mount -t tmpfs none /run/nscd; } && exec "
+            + ssh_environment
+            + shlex.join([*ssh_arguments, command])
+        )
+        return "unshare --mount --propagation private sh -c " + shlex.quote(inner)
+
+    # Positive control: the pinned path reaches the guest at its current host,
+    # so the stale refusal below cannot pass because pinning itself is broken.
+    code, output = client.execute(ssh_pinned(destination_address, "id -un") + " 2>&1", timeout=60)
+    assert code == 0 and output.strip() == remote_username, output[-2048:]
+    client.fail(ssh_pinned(source_address, "true") + " >/dev/null 2>&1", timeout=30)
 
     # Move the same retained disk back so both addition and removal of the
     # destination-only root are observed in the effective guest bundle.
