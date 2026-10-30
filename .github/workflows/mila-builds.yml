@@ -18,6 +18,19 @@ on:
       - "nix/platform/dartssh2.nix"
       - "nix/platform/patches/dartssh2-*"
       - ".github/workflows/mila-builds.yml"
+      # The Buck2 build of the //mila: targets (ADR-0269 M9): the wrapper and
+      # its no-Nix mode, the cells and toolchains, and only the rule files
+      # mila/BUCK loads (`buck2 audit includes mila/BUCK`) plus the driver.
+      - "tools/buck2"
+      - "tools/buck2_no_nix.py"
+      - "tools/buck2-no-nix.json"
+      - "toolchains/**"
+      - "nix/buck/**"
+      - ".buckconfig"
+      - "buck/mila.bzl"
+      - "buck/nix.bzl"
+      - "buck/checks.bzl"
+      - "buck/mila_platform.py"
   push:
     branches: [trunk]
     paths:
@@ -31,6 +44,19 @@ on:
       - "nix/platform/dartssh2.nix"
       - "nix/platform/patches/dartssh2-*"
       - ".github/workflows/mila-builds.yml"
+      # The Buck2 build of the //mila: targets (ADR-0269 M9): the wrapper and
+      # its no-Nix mode, the cells and toolchains, and only the rule files
+      # mila/BUCK loads (`buck2 audit includes mila/BUCK`) plus the driver.
+      - "tools/buck2"
+      - "tools/buck2_no_nix.py"
+      - "tools/buck2-no-nix.json"
+      - "toolchains/**"
+      - "nix/buck/**"
+      - ".buckconfig"
+      - "buck/mila.bzl"
+      - "buck/nix.bzl"
+      - "buck/checks.bzl"
+      - "buck/mila_platform.py"
   workflow_dispatch:
 
 concurrency:
