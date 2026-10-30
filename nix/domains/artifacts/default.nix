@@ -161,7 +161,18 @@ let
   # Fixed-output Mix dependency fetches and release compilation MUST use the
   # same explicit harness/guest/integrated-host selectors and production Mix
   # environment.
-  dependencies = lib.genAttrs [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ] (application:
+  mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
+  # Buck2 Rust leaves this set consumes as `artifacts.<name>` (buck/rust_artifacts.bzl).
+  rustArtifactNames = [ ];
+  # @cc [owner:ghuntley,label:build] assembly-artifact-names
+  # Every artifact key MUST name a leaf this set consumes: a Mix application
+  # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2
+  # Rust leaf in `rustArtifactNames`. A misspelt key would otherwise be ignored
+  # and the Nix build used silently (ADR-0269).
+  unknownArtifacts = builtins.filter
+    (name: !(builtins.elem name (mixApplications ++ map (name: "encrypted-${name}") mixApplications ++ rustArtifactNames)))
+    (builtins.attrNames artifacts);
+  dependencies = lib.genAttrs mixApplications (application:
     beam.fetchMixDeps {
       pname = "overalls-${application}-deps";
       inherit version;
@@ -333,6 +344,7 @@ let
   observabilityRuntimes = import ../system/observability-runtimes.nix { inherit pkgs; };
   traceSpool = import ./infrastructure/trace-spool.nix { inherit pkgs; };
 in
+assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
   inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool;
   inherit dependencies cedarLints cargoWorkspace hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;

@@ -242,6 +242,15 @@ the approved migration plan.
   - an imported artifact keeps its declared reference (bash);
   - `packages.hostTools` assembles under `restrict-eval`;
   - a tree that omits `nix/` fails to evaluate.
+- Every machine test's `nix_assemble` receives `ASSEMBLY_ARTIFACTS`
+  ([artifacts.bzl](../../../buck/artifacts.bzl)), the merge of the Rust
+  ([rust_artifacts.bzl](../../../buck/rust_artifacts.bzl), M5) and Mix
+  ([mix_artifacts.bzl](../../../buck/mix_artifacts.bzl), M6) imports, so a
+  leaf switched there is what the tests run. Host deployments are to read the
+  same dict (M2). The package set
+  ([default.nix](../../../nix/domains/artifacts/default.nix)) refuses an
+  artifact name it does not consume, so a misspelt key cannot silently leave
+  the Nix build in place.
 
 Remaining gaps, by milestone of the migration plan:
 
