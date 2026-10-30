@@ -1,2 +1,9 @@
 @cc [owner:ghuntley,label:security] mila-crypto-no-secret-diagnostics
 Private key bytes, signatures and derived authentication tokens MUST NOT be logged or formatted by production APIs.
+
+@cc [owner:ghuntley,label:verification] mila-crypto-hegel-properties
+Hegel properties MUST cover `DeviceKey::from_seed` against an independent
+P-256 scalar-range oracle, the `sign`/`verify` and `verify_public_key` round
+trip with message binding, and verification totality over arbitrary and
+corrupted signature and point bytes with its typed refusals. SHA-256 is a
+direct library wrapper and has no property.
