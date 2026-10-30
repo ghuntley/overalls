@@ -588,7 +588,14 @@ unchanged; (2) only after (1) has deployed does Lilly's observer start
 emitting it. Phase 1 evidence: the protocol round-trip property
 (`pool-observed-at-round-trip`) and
 [host_reports_test.exs](../../../marshall/test/marshall/compute/host_reports_test.exs)
-(`pool-observed-at-ingest`). Phase 2 and native fleet evidence are pending.
+(`pool-observed-at-ingest`). Phase 2 evidence:
+[PoolObserver](../../../lilly/lib/lilly/host/pool_observer.ex) and
+[Collector](../../../lilly/lib/lilly/host/collector.ex), with the BEAM test
+[pool_observer_test.exs](../../../lilly/test/host/pool_observer_test.exs). In
+that test a 6 s read keeps one-second collection with busy entries, then
+reports the read's start time; a crashed read keeps the previous observation;
+and with no observer the pool is reported busy. Native fleet evidence is
+pending.
 Review: [2026-10-30 pool observer](../reviews/2026-10-30-pool-observer.md).
 
 ## Open questions

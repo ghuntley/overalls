@@ -57,7 +57,8 @@ defmodule Lilly.Application do
                 private_children(config) ++
                 attribution_children(config) ++
                 status_child() ++
-                image_catalog_child(config)
+                image_catalog_child(config) ++
+                pool_observer_child(config)
 
             _ ->
               raise "invalid LILLY_CONFIG_FILE; expected a private, valid provisioner configuration"
@@ -84,6 +85,19 @@ defmodule Lilly.Application do
       Lilly.Events.emit("lilly.started", [])
       :ok = harness_started()
       {:ok, pid}
+    end
+  end
+
+  # @cc [owner:ghuntley,label:capacity;recovery] pool-observer-supervision
+  # Configured ZFS pools MUST be observed by Lilly.Host.PoolObserver, started
+  # last under rest-for-one so its restart restarts no other child. A pool
+  # without a published observation MUST be reported busy, never by stalling
+  # the host report.
+  @spec pool_observer_child(Lilly.Control.Config.t()) :: [{module(), term()}]
+  def pool_observer_child(config) do
+    case Enum.filter(config.pools, &(&1.backend == :zfs)) do
+      [] -> []
+      pools -> [{Lilly.Host.PoolObserver, {pools, []}}]
     end
   end
 

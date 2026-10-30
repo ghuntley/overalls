@@ -1,7 +1,7 @@
 defmodule Lilly.Host.Collector do
   @moduledoc "Complete capacity snapshots, distinct from reservations and from the control connection."
   require Lilly.Events
-  alias Lilly.Host.{Image, Inventory, Limits, Pool, Usage}
+  alias Lilly.Host.{Image, Inventory, Limits, Pool, PoolObserver, Usage}
 
   @type previous :: %{
           usage: Usage.previous()
@@ -19,7 +19,8 @@ defmodule Lilly.Host.Collector do
           pos_integer(),
           [Image.t()],
           map(),
-          %{String.t() => map()}
+          %{String.t() => map()},
+          OverallsProtocol.View.view()
         ) ::
           {:ok, OverallsProtocol.report(), previous()} | {:error, atom()}
   def sample(
@@ -29,7 +30,8 @@ defmodule Lilly.Host.Collector do
         sequence,
         images \\ [],
         coverage \\ %{},
-        native_io \\ %{}
+        native_io \\ %{},
+        observer \\ PoolObserver.view()
       ) do
     collect(
       pools,
@@ -39,18 +41,34 @@ defmodule Lilly.Host.Collector do
       images,
       DateTime.utc_now(),
       native_io,
-      coverage
+      coverage,
+      observer
     )
   end
 
   # @cc [owner:ghuntley,label:capacity] diagnostics-do-not-delay-sample
   # Capacity collection MUST NOT wait for native I/O or attach diagnostic
   # counters to control reports. Source-owned observability samples independently.
-  defp collect(pools, cgroup_path, previous, sequence, images, sampled_at, _native_io, coverage) do
+
+  # @cc [owner:ghuntley,label:capacity] pool-reads-do-not-delay-sample
+  # Collection MUST take pool entries from the background pool observer
+  # (PoolObserver.report/2) and MUST NOT read a pool inline while that observer
+  # runs, so a slow pool read cannot delay the host report or its sampled_at.
+  defp collect(
+         pools,
+         cgroup_path,
+         previous,
+         sequence,
+         images,
+         sampled_at,
+         _native_io,
+         coverage,
+         observer
+       ) do
     with true <- Pool.distinct?(pools),
          {:ok, inventory} <- Inventory.read(),
          {:ok, limits} <- Limits.read("/sys/fs/cgroup", cgroup_path, inventory) do
-      snapshots = Enum.map(pools, &Pool.report/1)
+      snapshots = Enum.map(pools, &PoolObserver.report(&1, observer))
 
       {capacity, usage} =
         Usage.sample(

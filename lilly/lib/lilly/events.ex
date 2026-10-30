@@ -366,6 +366,23 @@ defmodule Lilly.Events do
     ]
   )
 
+  defevent("lilly.pool_observer_absent",
+    level: :warning,
+    message: "Pool observer not running; pools are reported busy",
+    metadata: []
+  )
+
+  defevent("lilly.pool_observer_present",
+    message: "Pool observer running again",
+    metadata: []
+  )
+
+  defevent("lilly.pool_observation_failed",
+    level: :warning,
+    message: "Background pool observation read failed",
+    metadata: [pool_id: :uuid]
+  )
+
   defevent("pool.snapshot_withheld",
     level: :warning,
     message: "Storage pool capacity snapshot withheld",
