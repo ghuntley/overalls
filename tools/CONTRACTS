@@ -1,0 +1,4 @@
+@cc [owner:ghuntley,label:build] buck2-wrapper-pinned-cells
+tools/buck2 MUST exec only the buck2 from the flake-pinned buckCells and MUST
+rebuild .buck-cells whenever an input of buckCells may have changed, killing
+the daemon only when the cells store path actually changed (ADR-0269).

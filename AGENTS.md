@@ -56,6 +56,19 @@ it is empty.
    distribution's trust store. Rebuild those images once their `ca-certificates`
    (or equivalent) updates ship.
 
+## Builds
+
+- Buck2 is the only build entry point (ADR-0269). Run `tools/buck2`, never a
+  buck2 from `PATH` or a new `nix build .#…` entry point. Use the
+  [buck2 skill](.agents/skills/buck2/SKILL.md) for BUCK, `.bzl`, BXL,
+  toolchain and wrapper changes. Use the
+  [nix-builds skill](.agents/skills/nix-builds/SKILL.md) for pins, the Buck2
+  cells, NixOS modules and assembly.
+- Until an output moves to a Buck2 rule, it builds through the bootstrap
+  `nix_flake_attr` targets (`tools/buck2 build //:package-<name>` or
+  `//:check-<name>`). Delete the bootstrap use in the same change that moves
+  the output.
+
 ## Verification and implementation
 
 - Prefer NixOS machine integration tests and property-based tests above other

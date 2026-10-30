@@ -1,0 +1,3 @@
+load(":nix.bzl", "nix_owned")
+
+nix_owned()

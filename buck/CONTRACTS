@@ -1,0 +1,15 @@
+@cc [owner:ghuntley,label:build] nix-owned-files
+nix_owned MUST give each tracked file in its package an owning target, so
+uquery owner() maps every changed path to the graph; files without an owner
+select everything (ADR-0270).
+
+@cc [owner:ghuntley,label:build] nix-flake-attr-bootstrap-only
+nix_flake_attr MUST only wrap flake outputs that have not moved to Buck2 rules
+yet; it is deleted with the last flake package output and is never a
+compatibility layer (ADR-0269). Its srcs are the flake's whole source tree, so
+any owned change reruns it.
+
+@cc [owner:ghuntley,label:build] tracked-files-have-owners
+ownership MUST fail when a tracked file outside docs/ has no owning target,
+because the affected-target selector selects everything for unowned paths
+(ADR-0270).

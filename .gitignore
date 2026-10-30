@@ -27,3 +27,7 @@ erl_crash.dump
 
 # NixOS interactive test-driver REPL history
 .nixos-test-history
+.buck-cells
+.buck-cells.key
+.buck-cells.gcroot
+buck-out/

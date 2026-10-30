@@ -1,0 +1,5 @@
+@cc [owner:ghuntley,label:build] nix-toolchain-paths-in-action-keys
+Every Nix tool MUST resolve through read_root_config("nix", name) at load
+time so its store path is a target attribute and part of each consuming
+action's key; a missing entry fails rather than falling back to PATH
+(ADR-0269).

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Nix builds"
+  short_description: "Maintain pins, Buck2 cells and NixOS assembly"
+  default_prompt: "Use $nix-builds to add or refresh a pinned dependency, change the Buck2 cells or toolchains, or edit NixOS modules and assembly."
+policy:
+  allow_implicit_invocation: true

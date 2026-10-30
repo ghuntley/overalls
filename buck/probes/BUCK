@@ -1,0 +1,7 @@
+# Runs the pinned Elixir through toolchains//:elixir; a toolchain path change
+# changes this target's recursive hash (ADR-0269).
+genrule(
+    name = "elixir_version",
+    out = "version.txt",
+    cmd = "$(exe toolchains//:elixir)/bin/elixir -e 'IO.puts System.version()' > $OUT",
+)

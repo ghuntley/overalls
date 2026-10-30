@@ -1,0 +1,174 @@
+# ADR-0269: Buck2 is the build system; Nix supplies toolchains, pins and NixOS assembly
+
+- ID: ADR-0269
+- Date: 2026-10-30
+- Status: accepted
+- Implementation: partial
+- Components: build, Nix artifacts, verification, CI, developer tooling
+- Supersedes: none
+- Superseded by: none
+
+## Context
+
+Every Overalls artifact is built by one Nix flake: about 75 packages, about 298
+checks, the `nixosConfigurations` and the images. Developers then repeat those
+builds outside Nix with devenv, `mix precommit` in eleven projects, cargo and
+npm. An audit on 2026-10-30 found:
+
+- **No change-to-build mapping.** Nix knows derivation inputs, but nothing
+  maps a changed file to the packages, checks and machine tests that depend on
+  it, so no pull request runs a machine test (see
+  [ADR-0270](0270-graph-driven-machine-test-selection.md)).
+- **Duplicated build definitions.** The ten application names appear more
+  than twenty times, there are six Rust toolchains and about twenty copied
+  source filters, and `lilly-host-tools` has four definitions.
+- **Coarse caching.** A Nix derivation is the unit of caching, so a one-line
+  change in a crate or Mix project rebuilds the whole package. The development
+  loops therefore bypass Nix and drift from the release builds.
+
+The user decided on 2026-10-30:
+
+- Buck2 is the only build entry point, with no `nix build .#…` compatibility.
+- Nix keeps two jobs: it supplies toolchains and third-party dependencies
+  from pins ([ADR-0267](0267-single-dependency-pin-registry.md)), and it is the
+  library that Buck2 calls to assemble NixOS systems, images and machine tests.
+- NixOS machine tests remain, run as Buck2 tests.
+
+## Decision
+
+1. **Entry point.** `tools/buck2` is the only supported way to build, test and
+   check the repository. It runs the buck2 binary from the flake-pinned
+   `buckCells` output and nothing from `PATH`.
+2. **Cells from Nix.** `nix/buck/cells.nix` builds `buckCells` from
+   `flake.lock`-pinned nixpkgs and the pin registry. It contains:
+   - the pinned buck2;
+   - the prelude, taken from that buck2's bundled prelude;
+   - `toolchains.buckconfig`, which maps every tool name to its store path.
+
+   The wrapper rebuilds `.buck-cells` when an input of `buckCells` may have
+   changed, and kills the daemon only when the store path actually changes.
+3. **Toolchains in action keys.** `toolchains//` defines each tool with a
+   `nix_tool` target. It reads the store path from the `[nix]` configuration
+   section at load time, so the path becomes a target attribute and part of
+   every consuming action's key. A missing or non-store path fails loading.
+4. **Ownership.** Every tracked file outside `docs/` is owned by a Buck2 target
+   (`nix_owned`). BUCK files are covered by target hashes.
+5. **Bootstrap.** Until each flake output moves to a Buck2 rule, it is built by
+   a `nix_flake_attr` target.
+   - It is `local_only` and never uploads to a cache.
+   - It depends on all owned sources, so it reruns on any change.
+   - It is not a compatibility layer: each target is deleted in the same
+     change that moves its output, and the rule is deleted with the last one.
+6. **Assembly boundary.** NixOS systems, images and machine tests are
+   assembled by Nix from Buck2-built artifacts.
+   - Assembly evaluates `builtins.getFlake` over a copied tree that contains
+     only the declared sources.
+   - It runs with `restrict-eval` enabled, so an undeclared Nix input is an
+     evaluation error.
+   - `getFlake` keeps the lock file's `follows`.
+7. **First-party code.** First-party code moves from Nix derivations to Buck2
+   rules language by language, following the approved migration plan:
+   - Rust uses the prelude rules and reindeer.
+   - Elixir uses Mix rules with release parity.
+   - Go, JavaScript, Python and C follow.
+
+   Nix keeps third-party builds that have no Buck2 equivalent: the kernels,
+   firecracker, edk2, the guest bases and the SDKs.
+
+Authorization: the user's 2026-10-30 instructions ("buck2 will be only way to
+build, no nix backwards compatibility. we still want nixos machine tests via
+buck2"; "build stuff with buck2 but supply dependencies for buck2 via nix") and
+the approved migration plan.
+
+## Alternatives
+
+- **Keep Nix as the build system and add a file-to-check mapping.** This would
+  give selection, but leaves derivation-sized caching and the duplicated
+  developer builds. It also needs a second graph kept in step with the
+  derivations.
+- **Bazel with rules_nixpkgs.** It has a mature Nix integration, but no
+  Starlark-native BXL for precommit, and it has no prior use here. The
+  kangaroointernet repository already runs Buck2 with Nix-supplied toolchains.
+- **Buck2 wrapping Nix builds (Nix as the build).** This keeps two build
+  definitions per artifact. The user rejected backwards compatibility.
+- **Toolchains from `PATH` (devenv).** Store paths would not enter action keys,
+  so a toolchain bump could reuse stale cached outputs.
+
+## Consequences
+
+- One build graph serves releases, development, precommit and CI selection.
+- Per-crate and per-project actions are cached, locally and later in NativeLink
+  ([ADR-0272](0272-nativelink-remote-cache-and-execution.md)).
+- Contributors and hosts need Nix to materialise the cells. Windows runners
+  without Nix are limited to non-hermetic targets.
+- buck2 snapshot releases move fast. Each bump is a `flake.lock` change, which
+  selects every target.
+- During the migration, bootstrap targets rebuild their flake attribute for
+  any owned change. Nix's own cache keeps that cheap, but it is coarse.
+
+## Invariants and verification
+
+- `tools/buck2` execs only `.buck-cells/bin/buck2` from the pinned
+  `buckCells`. Checked by its `@cc buck2-wrapper-pinned-cells` contract and by
+  review.
+- Each toolchain path is a store path read from configuration, and changing it
+  changes the recursive target hash of every consumer. The M1 spike showed
+  this with `-c nix.elixir=…` on `//buck/probes:elixir_version`; a Buck2 test will
+  keep it.
+- The prelude loads from a cell root symlinked into `/nix/store`, and globs and
+  `uquery owner()` work through it (M1 spike).
+- Every tracked file outside `docs/` has an owner: `buck/bxl/ownership.bxl`.
+- An undeclared Nix read under assembly fails. The M1 spike showed
+  `restrict-eval` refusing `/etc/hostname`, and `getFlake "path:…"` keeping
+  `follows`. The `nix_assemble` regression test is planned for M3.
+- **Failure case:** an action that reads a tool through `PATH`, or a store
+  path that is not declared in the cells, would break hermeticity without
+  failing. Rule reviews and the planned remote-execution workers, which have
+  no ambient toolchains, are the backstops.
+
+## Implementation evidence
+
+- [cells.nix](../../../nix/buck/cells.nix) builds `buckCells`, exported from
+  [flake.nix](../../../flake.nix). The [wrapper](../../../tools/buck2) and
+  [.buckconfig](../../../.buckconfig) consume it.
+- [toolchains/BUCK](../../../toolchains/BUCK) and
+  [nix.bzl](../../../toolchains/nix.bzl) define the Nix tools. The
+  [probe](../../../buck/probes/BUCK) runs the pinned Elixir through them.
+- [buck/nix.bzl](../../../buck/nix.bzl) defines `nix_owned`, `owned_set` and the
+  bootstrap `nix_flake_attr`. The root [BUCK](../../../BUCK) generates bootstrap
+  targets from [bootstrap_attrs.bzl](../../../nix/buck/bootstrap_attrs.bzl),
+  which [bootstrap-attrs.sh](../../../nix/buck/bootstrap-attrs.sh) regenerates.
+- [ownership.bxl](../../../buck/bxl/ownership.bxl) checks file ownership.
+
+Remaining gaps, by milestone of the migration plan:
+
+- rust-overlay toolchain and per-language rules (M5–M7);
+- `nix_store_import`, `nix_assemble` and `lib.assemble` (M3);
+- removal of the flake package, check and configuration outputs (M11);
+- Darwin cells and the Windows mode without Nix (M9);
+- CI and devenv using `tools/buck2` (M1 follow-up, M8).
+
+## Open questions
+
+None. The spikes resolved symlinked cells and `getFlake` with `restrict-eval`.
+Selection uses Buck2's own target hashes, because buck2-change-detector is not
+packaged in nixpkgs ([ADR-0270](0270-graph-driven-machine-test-selection.md)).
+
+## Related decisions
+
+- [ADR-0267](0267-single-dependency-pin-registry.md) defines the pins that
+  `buckCells` consumes.
+- [ADR-0270](0270-graph-driven-machine-test-selection.md),
+  [ADR-0271](0271-buck2-host-self-deployment.md),
+  [ADR-0272](0272-nativelink-remote-cache-and-execution.md) and
+  [ADR-0273](0273-single-rust-workspace-and-toolchain.md) build on this
+  decision.
+- [ADR-0144](0144-nix-builds-exclude-guest-datasets.md),
+  [ADR-0188](0188-signed-overalls-cachix-substitution.md),
+  [ADR-0189](0189-cachix-watch-store-publishing.md) and
+  [ADR-0248](0248-fleet-build-scheduling.md) cover the Nix stores and caches
+  that assembly keeps using.
+- [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) builds Mila checks
+  in Nix. Those move to Buck2 targets in M9, and a superseding record follows
+  then.
+- Review: [Buck2 migration](../reviews/2026-10-30-buck2-migration.md).

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Buck2"
+  short_description: "Build, query and extend the Overalls Buck2 graph"
+  default_prompt: "Use $buck2 to add or change targets, rules, BXL or toolchains, and to build, test or select affected targets through tools/buck2."
+policy:
+  allow_implicit_invocation: true

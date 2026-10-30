@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Contract buck2-wrapper-pinned-cells: see tools/CONTRACTS.
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+case "$(uname -s)-$(uname -m)" in
+  Linux-x86_64) system=x86_64-linux ;;
+  Darwin-arm64) system=aarch64-darwin ;;
+  *) echo "tools/buck2: no buckCells for $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+esac
+key_inputs() {
+  git ls-files -z -- flake.nix flake.lock nix/buck \
+    nix/domains/artifacts/dependency-hashes.json \
+    nix/domains/artifacts/infrastructure/toolchain.nix \
+    '**/Cargo.lock' '**/package-lock.json' | sort -z | xargs -0 sha256sum
+}
+key=$(key_inputs | sha256sum | cut -d' ' -f1)
+state=.buck-cells.key
+if [[ ! -e .buck-cells || "$(cat "$state" 2>/dev/null)" != "$key" ]]; then
+  old=$(readlink .buck-cells 2>/dev/null || true)
+  new=$(nix build --no-link --print-out-paths ".#buckCells.$system")
+  if [[ "$new" != "$old" ]]; then
+    ln -sfn "$new" .buck-cells
+    nix-store --add-root .buck-cells.gcroot --realise "$new" >/dev/null 2>&1 || true
+    [[ -n "$old" ]] && "$old/bin/buck2" kill >/dev/null 2>&1 || true
+  fi
+  printf '%s\n' "$key" > "$state"
+fi
+exec "$root/.buck-cells/bin/buck2" "$@"

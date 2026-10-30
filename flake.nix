@@ -177,6 +177,9 @@
 
       legacyPackages.${system} = built;
 
+      # Buck2 prelude and Nix toolchain paths (ADR-0269); tools/buck2 links it.
+      buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (built) toolchain; };
+
       nixosModules = {
         default = import ./nix/domains/system/catalog.nix { packages = built; nixCompact = nix-compact; };
         # Kept out of the default catalog: only flake-built hosts and tests that

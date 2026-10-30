@@ -1,0 +1,3 @@
+load("@root//buck:nix.bzl", "nix_owned")
+
+nix_owned()

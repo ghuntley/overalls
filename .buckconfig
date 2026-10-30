@@ -1,0 +1,33 @@
+# Buck2 is the build entry point (ADR-0269). Run it through tools/buck2, which
+# links .buck-cells to the flake-pinned prelude and toolchain paths.
+[cells]
+  root = .
+  prelude = .buck-cells/prelude
+  toolchains = toolchains
+  none = none
+
+[cell_aliases]
+  config = prelude
+  ovr_config = prelude
+  fbcode = none
+  fbsource = none
+  fbcode_macros = none
+  buck = none
+
+[external_cells]
+  prelude = disabled
+
+[parser]
+  target_platform_detector_spec = target:root//...->prelude//platforms:default
+
+[build]
+  execution_platforms = prelude//platforms:default
+
+[buck2]
+  file_watcher = notify
+  digest_algorithms = SHA256
+
+[project]
+  ignore = .git, .buck-cells, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical
+
+<file:.buck-cells/toolchains.buckconfig>

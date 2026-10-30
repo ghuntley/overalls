@@ -1,0 +1,22 @@
+# Contract tracked-files-have-owners: see buck/CONTRACTS.
+
+_CELLS = ["toolchains", "none"]
+
+def _label(path: str) -> str:
+    cell, _, rest = path.partition("/")
+    return "{}//{}".format(cell, rest) if cell in _CELLS else "root//" + path
+
+def _main(ctx: bxl.Context) -> None:
+    # BUCK files are covered by target hashes rather than ownership.
+    files = [f for f in ctx.cli_args.files if not f.startswith("docs/") and f.rsplit("/", 1)[-1] != "BUCK"]
+    owners = ctx.uquery().owner([_label(f) for f in files])
+    owned = {str(f): True for f in ctx.uquery().inputs(owners)}
+    missing = [f for f in files if _label(f) not in owned]
+    if missing:
+        fail("{} tracked files have no Buck2 owner, e.g. {}".format(len(missing), missing[:10]))
+    ctx.output.print("ownership: {} files owned".format(len(files)))
+
+main = bxl_main(
+    impl = _main,
+    cli_args = {"files": cli_args.list(cli_args.string())},
+)
