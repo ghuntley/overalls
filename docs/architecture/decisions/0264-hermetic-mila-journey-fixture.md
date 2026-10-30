@@ -196,7 +196,7 @@ must never be cited as evidence that the provisioner works.
   uses the C ABI in [`session.rs`](../../../mila/rust/mila-ffi/src/session.rs).
   The core gaps the journey exposed were fixed in
   [`mila-session`](../../../mila/rust/mila-session/src/lib.rs),
-  [`mila-protocol`](../../../mila/rust/mila-protocol/src/lib.rs) and
+  [`mila-protocol`](../../../mila/rust/mila-protocol/src/grammar.rs) and
   [`ssh.rs`](../../../mila/rust/mila-transport/src/ssh.rs): v1 SSH key envelopes,
   `porsche-` request ids, `--no-wait` with `request show`, device
   register/ls/rm/prefs grammar, named `terminal attach` and closed refusal codes.
