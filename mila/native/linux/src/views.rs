@@ -12,6 +12,7 @@ use gtk::{gdk, glib, Align, Box, Button, Entry, Label, ListBox, Orientation, Tex
 use mila_native_linux::deep_link::{present, LinkNotice, Page};
 use mila_native_linux::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
 use mila_native_linux::session::SessionPtyBackend;
+use mila_native_linux::session::{ApprovalInfo, SignInFailure, SignInPhase};
 use mila_native_linux::ssh_keys_view::{RevokeOutcome, SshKeySource, SshKeysStatus};
 use mila_native_linux::terminal::{HostPtyTransport, PtyError};
 use mila_native_linux::terminal_surface::{TerminalSurface, TickOutcome};
@@ -817,4 +818,173 @@ pub(super) fn thread_target(thread: &Entry) -> Target {
     } else {
         Target::Thread { id }
     }
+}
+
+/// Sign-in page: Sign in, Open approval page, Reconnect and Sign out over the
+/// window's `SignInDriver`, plus the phase message, the approval fingerprint
+/// and the signed-in account. Returns the page renderer.
+pub(super) fn build_sign_in(
+    state: &NativeState,
+    sign_in_page: &Box,
+    deployment: &Entry,
+    status: &Label,
+) -> Rc<dyn Fn()> {
+    // Sign-in runs the GTK-independent SignInDriver: trust fetch, device
+    // key, certificate-authenticated connect, approval browser launch,
+    // whoami polling, heartbeat and reconnect run off the main loop. GTK
+    // forwards the buttons and renders the reducer's phase.
+    let sign_in_status = Label::new(None);
+    sign_in_status.set_wrap(true);
+    sign_in_status.set_halign(Align::Start);
+    let fingerprint_title = Label::new(Some(&strings::text(strings::Message::SignInFingerprint)));
+    fingerprint_title.set_halign(Align::Start);
+    let fingerprint_value = Label::new(None);
+    fingerprint_value.set_halign(Align::Start);
+    fingerprint_value.set_selectable(true);
+    let account_title = Label::new(Some(&strings::text(strings::Message::SignInAccount)));
+    account_title.set_halign(Align::Start);
+    let account_value = Label::new(None);
+    account_value.set_halign(Align::Start);
+    let sign_in_controls = Box::new(Orientation::Horizontal, 8);
+    let sign_in_button = Button::with_label(&strings::text(strings::Message::SignInStart));
+    let open_approval = Button::with_label(&strings::text(strings::Message::SignInOpenBrowser));
+    let reconnect = Button::with_label(&strings::text(strings::Message::SignInReconnect));
+    let sign_out_button = Button::with_label(&strings::text(strings::Message::SignInSignOut));
+    let render: Rc<dyn Fn()> = {
+        let state = state.clone();
+        let status = sign_in_status.clone();
+        let fingerprint_title = fingerprint_title.clone();
+        let fingerprint_value = fingerprint_value.clone();
+        let account_title = account_title.clone();
+        let account_value = account_value.clone();
+        let open_approval = open_approval.clone();
+        let reconnect = reconnect.clone();
+        let sign_out_button = sign_out_button.clone();
+        Rc::new(move || {
+            let driver = state.driver.borrow();
+            let flow = driver.flow();
+            let host = driver
+                .target()
+                .map(|target| target.https_authority())
+                .unwrap_or_default();
+            let message = match (flow.phase, flow.failure) {
+                (SignInPhase::SignedOut, _) => None,
+                (SignInPhase::Connecting, _) => Some(strings::format(
+                    strings::Message::SignInConnecting,
+                    &[("host", &host)],
+                )),
+                (SignInPhase::AwaitingApproval, _) => {
+                    Some(strings::text(strings::Message::SignInApprove))
+                }
+                (SignInPhase::SignedIn, _) => None,
+                (SignInPhase::Disconnected, _) => {
+                    Some(strings::text(strings::Message::SignInDisconnected))
+                }
+                (SignInPhase::Expired, _) => Some(strings::text(strings::Message::SignInExpired)),
+                (SignInPhase::Failed, failure) => Some(strings::text(match failure {
+                    Some(SignInFailure::DeviceKey) => strings::Message::SignInFailedDeviceKey,
+                    Some(SignInFailure::HostUntrusted) => strings::Message::SignInFailedHost,
+                    Some(SignInFailure::Refused) => strings::Message::SignInFailedRefused,
+                    Some(SignInFailure::Unreachable) => strings::Message::SignInFailedUnreachable,
+                    Some(SignInFailure::Protocol) | None => strings::Message::SignInFailedProtocol,
+                })),
+            };
+            status.set_label(message.as_deref().unwrap_or_default());
+            status.set_visible(message.is_some());
+            let fingerprint = flow
+                .approval
+                .as_ref()
+                .map(|approval| approval.fingerprint.clone());
+            fingerprint_title.set_visible(fingerprint.is_some());
+            fingerprint_value.set_visible(fingerprint.is_some());
+            fingerprint_value.set_label(fingerprint.as_deref().unwrap_or_default());
+            let signed_in = flow.phase == SignInPhase::SignedIn;
+            account_title.set_visible(signed_in);
+            account_value.set_visible(signed_in);
+            account_value.set_label(if signed_in {
+                flow.account.as_deref().unwrap_or_default()
+            } else {
+                ""
+            });
+            open_approval.set_sensitive(flow.approval.is_some());
+            reconnect.set_sensitive(
+                matches!(
+                    flow.phase,
+                    SignInPhase::Disconnected | SignInPhase::Expired | SignInPhase::Failed
+                ) && driver.target().is_some(),
+            );
+            sign_out_button.set_sensitive(flow.phase != SignInPhase::SignedOut);
+        })
+    };
+    *state.sign_in_render.borrow_mut() = Some(render.clone());
+
+    let sign_in_status_out = status.clone();
+    let deployment_input = deployment.clone();
+    let sign_in_state = state.clone();
+    sign_in_button.connect_clicked(move |_| {
+        let host = deployment_input.text().trim().to_owned();
+        let Ok(changed) = sign_in_state.update_deployments(|list| list.add_and_select(&host))
+        else {
+            sign_in_status_out
+                .set_label(&strings::text(strings::Message::SignInDeploymentRequired));
+            return;
+        };
+        if changed {
+            sign_in_state.drop_authority();
+        }
+        if let Err(message) = sign_in_state.begin_sign_in() {
+            sign_in_status_out.set_label(&strings::text(message));
+        }
+    });
+    sign_in_controls.append(&sign_in_button);
+
+    let approval_state = state.clone();
+    open_approval.connect_clicked(move |_| {
+        // Re-open the link the driver already validated for this
+        // generation's HTTPS authority; validate again at the boundary.
+        let approval = {
+            let driver = approval_state.driver.borrow();
+            let authority = driver.target().map(|target| target.https_authority());
+            driver.flow().approval.clone().zip(authority)
+        };
+        if let Some((approval, authority)) = approval {
+            if ApprovalInfo::validate_for_host(
+                &approval.url,
+                &approval.fingerprint,
+                approval.issued_at,
+                &authority,
+            )
+            .is_ok()
+            {
+                approval_state.browser.open(&approval);
+            }
+        }
+    });
+    sign_in_controls.append(&open_approval);
+
+    let reconnect_state = state.clone();
+    reconnect.connect_clicked(move |_| {
+        if reconnect_state.driver.borrow_mut().reconnect() {
+            reconnect_state.start_sign_in_pump();
+        }
+        reconnect_state.render_sign_in();
+    });
+    sign_in_controls.append(&reconnect);
+
+    let sign_out_state = state.clone();
+    sign_out_button.connect_clicked(move |_| {
+        // Never retain authenticated projections after sign-out: machine
+        // listing, terminal generation and SSH-key rows are all dropped.
+        // A subsequent session must refresh from the server.
+        sign_out_state.drop_authority();
+    });
+    sign_in_controls.append(&sign_out_button);
+    sign_in_page.append(&sign_in_controls);
+    sign_in_page.append(&sign_in_status);
+    sign_in_page.append(&fingerprint_title);
+    sign_in_page.append(&fingerprint_value);
+    sign_in_page.append(&account_title);
+    sign_in_page.append(&account_value);
+    render();
+    render
 }

@@ -267,5 +267,7 @@
   "linkSignInRequired": "ఈ లింక్‌ను తెరవడానికి {host}‌కు సైన్ ఇన్ చేయండి.",
   "terminalReconnect": "మళ్లీ కనెక్ట్ చేయండి",
   "terminalResize": "పరిమాణం మార్చు",
-  "terminalSend": "పంపు"
+  "terminalSend": "పంపు",
+  "signInFailedDeviceKey": "Mila ఈ పరికరం కీని తెరవలేకపోయింది, కాబట్టి కనెక్ట్ కాలేదు.",
+  "signInProfileInvalid": "ఈ డిప్లాయ్‌మెంట్ కనెక్షన్ సెట్టింగ్‌లు చెల్లవు, కాబట్టి Mila కనెక్ట్ కాలేదు."
 }

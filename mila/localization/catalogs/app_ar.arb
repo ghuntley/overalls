@@ -267,5 +267,7 @@
   "linkSignInRequired": "سجّل الدخول إلى {host} لفتح هذا الرابط.",
   "terminalReconnect": "إعادة الاتصال",
   "terminalResize": "تغيير الحجم",
-  "terminalSend": "إرسال"
+  "terminalSend": "إرسال",
+  "signInFailedDeviceKey": "تعذّر على Mila فتح مفتاح هذا الجهاز، لذا لم يتصل.",
+  "signInProfileInvalid": "إعدادات الاتصال لهذا النشر غير صالحة، لذا لم يتصل Mila."
 }

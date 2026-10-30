@@ -267,5 +267,7 @@
   "linkSignInRequired": "یہ لنک کھولنے کے لیے {host} میں سائن ان کریں۔",
   "terminalReconnect": "دوبارہ جوڑیں",
   "terminalResize": "سائز تبدیل کریں",
-  "terminalSend": "بھیجیں"
+  "terminalSend": "بھیجیں",
+  "signInFailedDeviceKey": "Mila اس ڈیوائس کی کلید نہیں کھول سکا، اس لیے کنیکٹ نہیں ہوا۔",
+  "signInProfileInvalid": "اس ڈیپلائمنٹ کی کنکشن ترتیبات غلط ہیں، اس لیے Mila کنیکٹ نہیں ہوا۔"
 }

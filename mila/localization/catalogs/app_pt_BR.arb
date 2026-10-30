@@ -267,5 +267,7 @@
   "linkSignInRequired": "Entre em {host} para abrir este link.",
   "terminalReconnect": "Reconectar",
   "terminalResize": "Redimensionar",
-  "terminalSend": "Enviar"
+  "terminalSend": "Enviar",
+  "signInFailedDeviceKey": "O Mila não conseguiu abrir a chave deste dispositivo, então não se conectou.",
+  "signInProfileInvalid": "As configurações de conexão desta implantação são inválidas, então o Mila não se conectou."
 }

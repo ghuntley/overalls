@@ -267,5 +267,7 @@
   "linkSignInRequired": "このリンクを開くには {host} にサインインしてください。",
   "terminalReconnect": "再接続",
   "terminalResize": "サイズ変更",
-  "terminalSend": "送信"
+  "terminalSend": "送信",
+  "signInFailedDeviceKey": "Mila はこのデバイスの鍵を開けなかったため、接続しませんでした。",
+  "signInProfileInvalid": "このデプロイメントの接続設定が無効なため、Mila は接続しませんでした。"
 }

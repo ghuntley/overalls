@@ -267,5 +267,7 @@
   "linkSignInRequired": "এই লিংকটি খুলতে {host}-এ সাইন ইন করুন।",
   "terminalReconnect": "আবার সংযোগ করুন",
   "terminalResize": "আকার বদলান",
-  "terminalSend": "পাঠান"
+  "terminalSend": "পাঠান",
+  "signInFailedDeviceKey": "Mila এই ডিভাইসের কী খুলতে পারেনি, তাই সংযোগ করেনি।",
+  "signInProfileInvalid": "এই ডিপ্লয়মেন্টের সংযোগ সেটিংস অবৈধ, তাই Mila সংযোগ করেনি।"
 }

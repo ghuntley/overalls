@@ -267,5 +267,7 @@
   "linkSignInRequired": "Inicie sessão em {host} para abrir esta ligação.",
   "terminalReconnect": "Voltar a ligar",
   "terminalResize": "Redimensionar",
-  "terminalSend": "Enviar"
+  "terminalSend": "Enviar",
+  "signInFailedDeviceKey": "O Mila não conseguiu abrir a chave deste dispositivo, por isso não se ligou.",
+  "signInProfileInvalid": "As definições de ligação desta implementação são inválidas, por isso o Mila não se ligou."
 }

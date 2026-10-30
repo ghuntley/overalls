@@ -190,7 +190,117 @@ jobs:
           sleep 1
           GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
             MILA_GTK_TESTS_REQUIRED=1 cargo test --locked
+          GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
+            MILA_GTK_TESTS_REQUIRED=1 cargo test --locked --features gtk-journey
           kill "$broadway"
+      - name: Build the GTK journey window
+        working-directory: mila/native/linux
+        run: |
+          cargo build --locked --release --features gtk-journey
+          cp target/release/mila-native-linux "$RUNNER_TEMP/mila-native-linux-gtk-journey"
+      - name: GTK journey wiring smoke (unreachable deployment)
+        # Drives the real window's Sign in button with no deployment behind
+        # it: the window's driver must create the device key, attempt the
+        # profile's HTTPS trust fetch and report the typed failure.
+        run: |
+          set -euo pipefail
+          dir="$RUNNER_TEMP/mila-gtk-smoke"
+          mkdir -m 700 "$dir"
+          cat > "$dir/descriptor.json" <<'JSON'
+          {"version":1,"deployment":{"host":"unreachable.invalid","ssh_port":2222,"https_port":8443},
+           "tls":{"ca_pem":"-----BEGIN CERTIFICATE-----\nMIIB\n-----END CERTIFICATE-----","server_name":"unreachable.invalid"},
+           "approver":{"url":"https://unreachable.invalid:8443/approve","bearer_token":"smoke"},
+           "seed":{"machine_name":"journey-machine","share_principal":"second@example.test"}}
+          JSON
+          gtk4-broadwayd :6 &
+          broadway=$!
+          sleep 1
+          status=0
+          GDK_BACKEND=broadway BROADWAY_DISPLAY=:6 GSETTINGS_BACKEND=memory \
+            "$RUNNER_TEMP/mila-native-linux-gtk-journey" --gtk-journey "$dir/descriptor.json" \
+            > "$dir/report.json" || status=$?
+          kill "$broadway"
+          cat "$dir/report.json"
+          test "$status" -eq 1
+          python3 -I - "$dir/report.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              report: object = json.load(handle)
+          steps = report.get("steps") if isinstance(report, dict) else None
+          expected = [{"name": "gtk_sign_in", "ok": False, "outcome": "host_untrusted"}]
+          if steps != expected:
+              raise SystemExit(f"unexpected GTK journey smoke report: {steps!r}")
+          PY
+      # The hermetic Marshall+Porsche journey fixture runs on this runner.
+      # Every fixture step is gated on the flake exposing `apps.<system>.mila-journey-fixture`,
+      # so the job stays green (journey skipped) until the fixture lands.
+      - name: Detect hermetic journey fixture
+        id: journey
+        run: |
+          if grep -rqs 'mila-journey-fixture' flake.nix nix; then
+            echo "declared=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "declared=false" >> "$GITHUB_OUTPUT"
+            echo "mila-journey-fixture is not declared; journey skipped"
+          fi
+      - name: Install Nix for the journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Start hermetic journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+          if ! nix eval --raw ".#apps.${system}.mila-journey-fixture.program" >/dev/null 2>&1; then
+            echo "flake has no apps.${system}.mila-journey-fixture; journey skipped"
+            exit 0
+          fi
+          dir="$RUNNER_TEMP/mila-journey"
+          mkdir -p "$dir"
+          chmod 700 "$dir"
+          nohup nix run ".#mila-journey-fixture" -- --descriptor "$dir/descriptor.json" \
+            > "$dir/fixture.log" 2>&1 &
+          echo "$!" > "$dir/fixture.pid"
+          for _ in $(seq 1 1500); do
+            if python3 -I -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$dir/descriptor.json" 2>/dev/null; then
+              break
+            fi
+            if ! kill -0 "$(cat "$dir/fixture.pid")" 2>/dev/null; then
+              tail -n 100 "$dir/fixture.log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          python3 -I - "$dir/descriptor.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              document: object = json.load(handle)
+          approver = document.get("approver") if isinstance(document, dict) else None
+          token = approver.get("bearer_token") if isinstance(approver, dict) else None
+          if not isinstance(token, str) or not token:
+              raise SystemExit("journey descriptor lacks approver.bearer_token")
+          print(f"::add-mask::{token}")
+          PY
+          echo "MILA_JOURNEY_DESCRIPTOR=$dir/descriptor.json" >> "$GITHUB_ENV"
+      - name: Linux journeys against the hermetic fixture
+        if: env.MILA_JOURNEY_DESCRIPTOR != ''
+        timeout-minutes: 15
+        run: |
+          set -euo pipefail
+          mila/native/linux/target/release/mila-linux-journey --descriptor "$MILA_JOURNEY_DESCRIPTOR"
+          gtk4-broadwayd :7 &
+          broadway=$!
+          sleep 1
+          status=0
+          GDK_BACKEND=broadway BROADWAY_DISPLAY=:7 GSETTINGS_BACKEND=memory \
+            "$RUNNER_TEMP/mila-native-linux-gtk-journey" --gtk-journey "$MILA_JOURNEY_DESCRIPTOR" || status=$?
+          kill "$broadway"
+          exit "$status"
       - name: Check formatting
         working-directory: mila/native/linux
         run: cargo fmt --all -- --check

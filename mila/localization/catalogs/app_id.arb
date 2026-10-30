@@ -267,5 +267,7 @@
   "linkSignInRequired": "Masuk ke {host} untuk membuka tautan ini.",
   "terminalReconnect": "Hubungkan ulang",
   "terminalResize": "Ubah ukuran",
-  "terminalSend": "Kirim"
+  "terminalSend": "Kirim",
+  "signInFailedDeviceKey": "Mila tidak dapat membuka kunci perangkat ini, jadi tidak tersambung.",
+  "signInProfileInvalid": "Pengaturan koneksi deployment ini tidak valid, jadi Mila tidak tersambung."
 }

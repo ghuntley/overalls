@@ -267,5 +267,7 @@
   "linkSignInRequired": "Melde dich bei {host} an, um diesen Link zu öffnen.",
   "terminalReconnect": "Neu verbinden",
   "terminalResize": "Größe ändern",
-  "terminalSend": "Senden"
+  "terminalSend": "Senden",
+  "signInFailedDeviceKey": "Mila konnte den Schlüssel dieses Geräts nicht öffnen und hat daher keine Verbindung hergestellt.",
+  "signInProfileInvalid": "Die Verbindungseinstellungen dieses Deployments sind ungültig, daher hat Mila keine Verbindung hergestellt."
 }

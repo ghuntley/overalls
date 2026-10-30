@@ -267,5 +267,7 @@
   "linkSignInRequired": "இந்த இணைப்பைத் திறக்க {host}-இல் உள்நுழையவும்.",
   "terminalReconnect": "மீண்டும் இணை",
   "terminalResize": "அளவை மாற்று",
-  "terminalSend": "அனுப்பு"
+  "terminalSend": "அனுப்பு",
+  "signInFailedDeviceKey": "இந்தச் சாதனத்தின் விசையை Mila-வால் திறக்க முடியவில்லை, எனவே இணைக்கவில்லை.",
+  "signInProfileInvalid": "இந்த வரிசைப்படுத்தலின் இணைப்பு அமைப்புகள் தவறானவை, எனவே Mila இணைக்கவில்லை."
 }

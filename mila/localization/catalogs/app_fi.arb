@@ -267,5 +267,7 @@
   "linkSignInRequired": "Kirjaudu palveluun {host} avataksesi tämän linkin.",
   "terminalReconnect": "Yhdistä uudelleen",
   "terminalResize": "Muuta kokoa",
-  "terminalSend": "Lähetä"
+  "terminalSend": "Lähetä",
+  "signInFailedDeviceKey": "Mila ei voinut avata tämän laitteen avainta, joten se ei muodostanut yhteyttä.",
+  "signInProfileInvalid": "Tämän käyttöönoton yhteysasetukset ovat virheelliset, joten Mila ei muodostanut yhteyttä."
 }

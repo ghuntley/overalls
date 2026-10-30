@@ -267,5 +267,7 @@
   "linkSignInRequired": "Bu bağlantıyı açmak için {host} hizmetinde oturum açın.",
   "terminalReconnect": "Yeniden bağlan",
   "terminalResize": "Yeniden boyutlandır",
-  "terminalSend": "Gönder"
+  "terminalSend": "Gönder",
+  "signInFailedDeviceKey": "Mila bu cihazın anahtarını açamadı, bu yüzden bağlanmadı.",
+  "signInProfileInvalid": "Bu dağıtımın bağlantı ayarları geçersiz, bu yüzden Mila bağlanmadı."
 }

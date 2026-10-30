@@ -267,5 +267,7 @@
   "linkSignInRequired": "Logga in på {host} för att öppna den här länken.",
   "terminalReconnect": "Anslut igen",
   "terminalResize": "Ändra storlek",
-  "terminalSend": "Skicka"
+  "terminalSend": "Skicka",
+  "signInFailedDeviceKey": "Mila kunde inte öppna den här enhetens nyckel och anslöt därför inte.",
+  "signInProfileInvalid": "Anslutningsinställningarna för den här driftsättningen är ogiltiga, så Mila anslöt inte."
 }

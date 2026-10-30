@@ -11,6 +11,12 @@ build = "build.rs"
 # This crate is deliberately standalone. It is not a member of mila/rust's workspace
 # until the generated runtime binding is ready to be integrated by a host build.
 
+[features]
+# Adds `mila-native-linux --gtk-journey <descriptor>`, which drives the real GTK
+# window against the hermetic fixture and approves through the fixture's
+# approver hook. Release builds leave it off.
+gtk-journey = []
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"

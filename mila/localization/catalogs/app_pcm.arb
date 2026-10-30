@@ -267,5 +267,7 @@
   "linkSignInRequired": "Sign in for {host} make you fit open dis link.",
   "terminalReconnect": "Connect again",
   "terminalResize": "Change size",
-  "terminalSend": "Send"
+  "terminalSend": "Send",
+  "signInFailedDeviceKey": "Mila no fit open dis device key, so e no connect.",
+  "signInProfileInvalid": "Di connection settings for dis deployment no correct, so Mila no connect."
 }

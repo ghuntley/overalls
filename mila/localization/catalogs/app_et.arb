@@ -267,5 +267,7 @@
   "linkSignInRequired": "Selle lingi avamiseks logi sisse teenusesse {host}.",
   "terminalReconnect": "Ühenda uuesti",
   "terminalResize": "Muuda suurust",
-  "terminalSend": "Saada"
+  "terminalSend": "Saada",
+  "signInFailedDeviceKey": "Mila ei saanud selle seadme võtit avada, seega ühendust ei loodud.",
+  "signInProfileInvalid": "Selle juurutuse ühenduse sätted on vigased, seega Mila ühendust ei loonud."
 }

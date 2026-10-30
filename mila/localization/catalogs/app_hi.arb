@@ -267,5 +267,7 @@
   "linkSignInRequired": "यह लिंक खोलने के लिए {host} में साइन इन करें।",
   "terminalReconnect": "फिर से कनेक्ट करें",
   "terminalResize": "आकार बदलें",
-  "terminalSend": "भेजें"
+  "terminalSend": "भेजें",
+  "signInFailedDeviceKey": "Mila इस डिवाइस की कुंजी नहीं खोल सका, इसलिए उसने कनेक्ट नहीं किया।",
+  "signInProfileInvalid": "इस डिप्लॉयमेंट की कनेक्शन सेटिंग अमान्य हैं, इसलिए Mila ने कनेक्ट नहीं किया।"
 }

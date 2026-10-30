@@ -267,5 +267,7 @@
   "linkSignInRequired": "이 링크를 열려면 {host}에 로그인하세요.",
   "terminalReconnect": "다시 연결",
   "terminalResize": "크기 조정",
-  "terminalSend": "보내기"
+  "terminalSend": "보내기",
+  "signInFailedDeviceKey": "Mila가 이 기기의 키를 열 수 없어 연결하지 않았습니다.",
+  "signInProfileInvalid": "이 배포의 연결 설정이 잘못되어 Mila가 연결하지 않았습니다."
 }

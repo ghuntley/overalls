@@ -267,5 +267,7 @@
   "linkSignInRequired": "Đăng nhập vào {host} để mở liên kết này.",
   "terminalReconnect": "Kết nối lại",
   "terminalResize": "Đổi kích thước",
-  "terminalSend": "Gửi"
+  "terminalSend": "Gửi",
+  "signInFailedDeviceKey": "Mila không thể mở khóa của thiết bị này nên đã không kết nối.",
+  "signInProfileInvalid": "Cài đặt kết nối của bản triển khai này không hợp lệ nên Mila đã không kết nối."
 }

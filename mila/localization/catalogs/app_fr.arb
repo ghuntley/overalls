@@ -267,5 +267,7 @@
   "linkSignInRequired": "Connectez-vous à {host} pour ouvrir ce lien.",
   "terminalReconnect": "Se reconnecter",
   "terminalResize": "Redimensionner",
-  "terminalSend": "Envoyer"
+  "terminalSend": "Envoyer",
+  "signInFailedDeviceKey": "Mila n'a pas pu ouvrir la clé de cet appareil et ne s'est donc pas connecté.",
+  "signInProfileInvalid": "Les paramètres de connexion de ce déploiement ne sont pas valides, Mila ne s'est donc pas connecté."
 }

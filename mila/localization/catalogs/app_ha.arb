@@ -267,5 +267,7 @@
   "linkSignInRequired": "Shiga {host} don buɗe wannan hanyar haɗi.",
   "terminalReconnect": "Sake haɗawa",
   "terminalResize": "Canza girma",
-  "terminalSend": "Aika"
+  "terminalSend": "Aika",
+  "signInFailedDeviceKey": "Mila ba ta iya buɗe maɓallin wannan na'urar ba, don haka ba ta haɗa ba.",
+  "signInProfileInvalid": "Saitunan haɗi na wannan aiki ba su da inganci, don haka Mila ba ta haɗa ba."
 }

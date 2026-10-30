@@ -267,5 +267,7 @@
   "linkSignInRequired": "Mag-sign in sa {host} para buksan ang link na ito.",
   "terminalReconnect": "Kumonekta muli",
   "terminalResize": "Baguhin ang laki",
-  "terminalSend": "Ipadala"
+  "terminalSend": "Ipadala",
+  "signInFailedDeviceKey": "Hindi mabuksan ng Mila ang key ng device na ito, kaya hindi ito kumonekta.",
+  "signInProfileInvalid": "Hindi wasto ang mga setting ng koneksyon ng deployment na ito, kaya hindi kumonekta ang Mila."
 }

@@ -1153,5 +1153,13 @@
   "terminalSend": "Send",
   "@terminalSend": {
     "description": "Terminal control that sends the typed input line."
+  },
+  "signInFailedDeviceKey": "Mila could not open this device's key, so it did not connect.",
+  "@signInFailedDeviceKey": {
+    "description": "Sign-in failure when the owner-only device key file is missing access, shared or malformed."
+  },
+  "signInProfileInvalid": "This deployment's connection settings are invalid, so Mila did not connect.",
+  "@signInProfileInvalid": {
+    "description": "Sign-in failure when the local connection profile for the selected deployment is invalid."
   }
 }

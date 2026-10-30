@@ -267,5 +267,7 @@
   "linkSignInRequired": "سجّل دخولك على {host} علشان تفتح اللينك ده.",
   "terminalReconnect": "اتصل تاني",
   "terminalResize": "غيّر الحجم",
-  "terminalSend": "ابعت"
+  "terminalSend": "ابعت",
+  "signInFailedDeviceKey": "Mila مقدرش يفتح مفتاح الجهاز ده، فمتصلش.",
+  "signInProfileInvalid": "إعدادات الاتصال بتاعة النشر ده مش صحيحة، فـ Mila متصلش."
 }

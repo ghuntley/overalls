@@ -5,27 +5,51 @@ use mila_native_linux::adapter::{
     browser_endpoint_url, decode_listing, decode_notification_devices, decode_web_endpoint,
     format_machine_action, format_thread_response, format_web_command,
 };
+use mila_native_linux::connection_profile::ConnectionProfiles;
 use mila_native_linux::deep_link::Page;
 use mila_native_linux::deployments::{DeploymentError, DeploymentList, DeploymentStore};
 use mila_native_linux::machine_view::{project_detail, project_listing};
 use mila_native_linux::notifications::NotificationState;
 use mila_native_linux::route::ActivationBatch;
-use mila_native_linux::session::{
-    ApprovalInfo, SessionBinding, SignInEvent, SignInFlow, SignInPhase, WhoamiOutcome,
+use mila_native_linux::session::{ApprovalInfo, LiveSession, SessionBinding};
+use mila_native_linux::signin_driver::{
+    ApprovalBrowser, DriverEvent, Execution, LiveConnector, SignInDriver, SignInPolicy,
 };
 use mila_native_linux::ssh_keys_view::SshKeysView;
 use std::{
     cell::{Cell, RefCell},
     rc::Rc,
+    sync::Arc,
+    time::{Duration, Instant},
 };
+#[cfg(feature = "gtk-journey")]
+mod gtk_journey;
 mod persistence;
 mod strings;
 mod views;
 const APPLICATION_ID: &str = "dev.overalls.Mila.Linux";
+/// Main-loop interval for applying sign-in driver results.
+const SIGN_IN_FRAME: Duration = Duration::from_millis(100);
+/// SSH connect and per-command timeout for the live session.
+const SESSION_TIMEOUT_MS: u32 = 20_000;
+
+/// Opens approval links in the user's default browser.
+struct GioBrowser;
+
+impl ApprovalBrowser for GioBrowser {
+    fn open(&self, approval: &ApprovalInfo) -> bool {
+        gio::AppInfo::launch_default_for_uri(&approval.url, None::<&gio::AppLaunchContext>).is_ok()
+    }
+}
 #[derive(Clone)]
 struct NativeState {
     status: Rc<RefCell<Option<Label>>>,
-    sign_in: Rc<RefCell<SignInFlow>>,
+    connector: Arc<LiveConnector>,
+    driver: Rc<RefCell<SignInDriver<LiveConnector>>>,
+    browser: Rc<dyn ApprovalBrowser>,
+    clock: Instant,
+    sign_in_pumping: Rc<Cell<bool>>,
+    sign_in_render: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
     session: Rc<RefCell<SessionBinding>>,
     machine_listing: Rc<RefCell<Option<mila_session::MachineListing>>>,
     deployment_store: Option<DeploymentStore>,
@@ -37,9 +61,26 @@ struct NativeState {
 }
 impl NativeState {
     fn new() -> Self {
+        Self::with_browser(Rc::new(GioBrowser))
+    }
+
+    fn with_browser(browser: Rc<dyn ApprovalBrowser>) -> Self {
+        let connector = Arc::new(LiveConnector::new(
+            mila_native_linux::device_key::default_path(),
+            SESSION_TIMEOUT_MS,
+        ));
         Self {
             status: Rc::new(RefCell::new(None)),
-            sign_in: Rc::new(RefCell::new(SignInFlow::default())),
+            driver: Rc::new(RefCell::new(SignInDriver::new(
+                connector.clone(),
+                SignInPolicy::default(),
+                Execution::Thread,
+            ))),
+            connector,
+            browser,
+            clock: Instant::now(),
+            sign_in_pumping: Rc::new(Cell::new(false)),
+            sign_in_render: Rc::new(RefCell::new(None)),
             session: Rc::new(RefCell::new(SessionBinding::default())),
             machine_listing: Rc::new(RefCell::new(None)),
             deployment_store: DeploymentStore::from_environment(),
@@ -72,6 +113,13 @@ impl NativeState {
     /// authenticated handle and projection: session, approval generation,
     /// machine listing, terminal generation and SSH-key rows.
     fn drop_authority(&self) {
+        self.driver.borrow_mut().sign_out();
+        self.release_session();
+    }
+
+    /// Releases the bound session and everything projected from it, without
+    /// ending the sign-in generation (a reconnect may follow).
+    fn release_session(&self) {
         if let Some(surface) = self.terminal.borrow_mut().as_mut() {
             surface.sign_out();
         }
@@ -79,12 +127,113 @@ impl NativeState {
         self.session.borrow_mut().clear();
         *self.machine_listing.borrow_mut() = None;
         self.ssh_keys.borrow_mut().sign_out();
-        let mut flow = self.sign_in.borrow_mut();
-        *flow = flow.clone().apply(SignInEvent::SignOut);
-        drop(flow);
         for render in self.rerender.borrow().iter() {
             render();
         }
+        self.render_sign_in();
+    }
+
+    fn render_sign_in(&self) {
+        let render = self.sign_in_render.borrow().clone();
+        if let Some(render) = render {
+            render();
+        }
+    }
+
+    fn now_ms(&self) -> u64 {
+        u64::try_from(self.clock.elapsed().as_millis()).unwrap_or(u64::MAX)
+    }
+
+    /// Starts signing in to the selected deployment through the driver.
+    fn begin_sign_in(&self) -> Result<(), strings::Message> {
+        let selected = self
+            .deployment_list()
+            .ok()
+            .and_then(|list| list.selected().cloned())
+            .ok_or(strings::Message::SignInDeploymentRequired)?;
+        let profiles = match ConnectionProfiles::default_path() {
+            Some(path) => ConnectionProfiles::load(&path),
+            None => Ok(ConnectionProfiles::default()),
+        }
+        .map_err(|_| strings::Message::SignInProfileInvalid)?;
+        let target = profiles
+            .resolve(&selected)
+            .map_err(|_| strings::Message::SignInProfileInvalid)?;
+        let switching = {
+            let driver = self.driver.borrow();
+            driver.is_active() && driver.target() != Some(&target)
+        };
+        if switching {
+            self.drop_authority();
+        }
+        self.driver.borrow_mut().start(target);
+        self.start_sign_in_pump();
+        self.render_sign_in();
+        Ok(())
+    }
+
+    fn start_sign_in_pump(&self) {
+        if self.sign_in_pumping.replace(true) {
+            return;
+        }
+        let state = self.clone();
+        glib::timeout_add_local(SIGN_IN_FRAME, move || {
+            if state.pump_sign_in() {
+                glib::ControlFlow::Continue
+            } else {
+                state.sign_in_pumping.set(false);
+                glib::ControlFlow::Break
+            }
+        });
+    }
+
+    /// One main-loop step: heartbeat the bound session, apply finished
+    /// driver jobs, bind an established session or release a lost one.
+    fn pump_sign_in(&self) -> bool {
+        let now = self.now_ms();
+        let before = {
+            let flow = self.driver.borrow();
+            let flow = flow.flow();
+            (flow.phase, flow.generation, flow.approval.is_some())
+        };
+        let mut lost = false;
+        if self.driver.borrow().heartbeat_due(now) {
+            let probe = self.session.borrow().session().and_then(LiveSession::probe);
+            let mut driver = self.driver.borrow_mut();
+            match probe {
+                Some(probe) => driver.heartbeat(probe, now),
+                None => lost = driver.report_loss(),
+            }
+        }
+        let events = self.driver.borrow_mut().poll(now, &*self.browser);
+        if lost {
+            self.release_session();
+        }
+        for event in events {
+            match event {
+                DriverEvent::Established { session, .. } => {
+                    self.session.borrow_mut().bind(session);
+                    {
+                        let mut keys = self.ssh_keys.borrow_mut();
+                        keys.set_device_fingerprint(self.connector.device_fingerprint());
+                        keys.begin_session();
+                    }
+                    for render in self.rerender.borrow().iter() {
+                        render();
+                    }
+                }
+                DriverEvent::Lost => self.release_session(),
+            }
+        }
+        let after = {
+            let flow = self.driver.borrow();
+            let flow = flow.flow();
+            (flow.phase, flow.generation, flow.approval.is_some())
+        };
+        if before != after {
+            self.render_sign_in();
+        }
+        self.driver.borrow().is_active()
     }
 
     fn show_page(&self, page: Page) {
@@ -266,13 +415,14 @@ impl NativeState {
         let machine_listing = self.machine_listing.clone();
         let refresh_machines = Button::with_label("Refresh machines");
         refresh_machines.connect_clicked(move |_| {
-            let binding = machine_session.borrow();
-            let Some(live) = binding.session() else {
+            let mut binding = machine_session.borrow_mut();
+            let Some(live) = binding.session_mut() else {
                 machine_status.set_label("Machine list unavailable until sign-in.");
                 return;
             };
+            // Read the deployment's current list, not the last cached one.
             match live
-                .listing()
+                .refresh()
                 .and_then(|bytes| {
                     decode_listing(&bytes)
                         .map_err(|_| mila_native_linux::session::SessionError::InvalidInput)
@@ -328,156 +478,8 @@ impl NativeState {
         machines_page.append(&refresh_machines);
         machines_page.append(&show_machine);
 
-        // The lifecycle controls are deliberately state-only until the host
-        // supplies its owner-only Linux device signer and HTTPS trust fetcher.
-        // They still exercise the same generation/approval/reconnect reducer as
-        // the connected path and never claim authenticated authority locally.
-        let sign_in_controls = Box::new(Orientation::Horizontal, 8);
-        let sign_in = self.sign_in.clone();
-        let sign_in_status = content.clone();
-        let deployment_input = deployment.clone();
-        let sign_in_button = Button::with_label(&strings::text(strings::Message::SignInStart));
-        let sign_in_state = self.clone();
-        sign_in_button.connect_clicked(move |_| {
-            let host = deployment_input.text().trim().to_owned();
-            let Ok(changed) = sign_in_state.update_deployments(|list| list.add_and_select(&host))
-            else {
-                sign_in_status
-                    .set_label(&strings::text(strings::Message::SignInDeploymentRequired));
-                return;
-            };
-            if changed {
-                sign_in_state.drop_authority();
-            }
-            let mut flow = sign_in.borrow_mut();
-            *flow = flow.clone().apply(SignInEvent::Start);
-            sign_in_status.set_label(&strings::text(strings::Message::SignInConnecting));
-        });
-        sign_in_controls.append(&sign_in_button);
-
-        let approval_url = Entry::builder()
-            .placeholder_text("Browser approval URL (HTTPS)")
-            .hexpand(true)
-            .build();
-        let approval_fingerprint = Entry::builder()
-            .placeholder_text("Approval fingerprint")
-            .hexpand(true)
-            .build();
-        let sign_in = self.sign_in.clone();
-        let sign_in_status = content.clone();
-        let url = approval_url.clone();
-        let fingerprint = approval_fingerprint.clone();
-        let approval_button = Button::with_label(&strings::text(strings::Message::SignInApprove));
-        approval_button.connect_clicked(move |_| {
-            let mut flow = sign_in.borrow_mut();
-            let generation = flow.generation;
-            let outcome = WhoamiOutcome::Approval {
-                url: url.text().trim().to_owned(),
-                fingerprint: fingerprint.text().trim().to_owned(),
-            };
-            *flow = flow.clone().apply(SignInEvent::Whoami {
-                generation,
-                outcome,
-                at: 0,
-            });
-            sign_in_status.set_label(if flow.phase == SignInPhase::AwaitingApproval {
-                "Approval pending; open the HTTPS link in your browser."
-            } else {
-                "Approval URL rejected by Rust policy."
-            });
-        });
-        sign_in_controls.append(&approval_button);
-
-        let sign_in = self.sign_in.clone();
-        let session = self.session.clone();
-        let sign_in_status = content.clone();
-        let check_approval = Button::with_label("Check approval");
-        check_approval.connect_clicked(move |_| {
-            let generation = sign_in.borrow().generation;
-            let outcome = match session.borrow().session() {
-                Some(live) => live.whoami(),
-                None => Err(mila_native_linux::session::SessionError::StaleHandle),
-            };
-            let mut flow = sign_in.borrow_mut();
-            match outcome {
-                Ok(outcome) => {
-                    *flow = flow.clone().apply(SignInEvent::Whoami {
-                        generation,
-                        outcome,
-                        at: 0,
-                    });
-                    sign_in_status.set_label(match flow.phase {
-                        SignInPhase::SignedIn => "Deployment approved and signed in.",
-                        SignInPhase::AwaitingApproval => "Approval is still pending.",
-                        _ => "Deployment identity check refused.",
-                    });
-                }
-                Err(_) => sign_in_status.set_label("No authenticated deployment session."),
-            }
-        });
-        sign_in_controls.append(&check_approval);
-
-        let sign_in = self.sign_in.clone();
-        let sign_in_status = content.clone();
-        let approval_deployment = deployment.clone();
-        let open_approval = Button::with_label(&strings::text(strings::Message::SignInOpenBrowser));
-        open_approval.connect_clicked(move |_| {
-            let flow = sign_in.borrow();
-            let Some(approval) = flow.approval.as_ref() else {
-                sign_in_status.set_label("No live approval link is available.");
-                return;
-            };
-            let expected_host = approval_deployment.text().trim().to_owned();
-            if ApprovalInfo::validate_for_host(
-                &approval.url,
-                &approval.fingerprint,
-                approval.issued_at,
-                &expected_host,
-            )
-            .is_err()
-            {
-                sign_in_status.set_label("Approval URL rejected by Rust policy.");
-                return;
-            }
-            match gio::AppInfo::launch_default_for_uri(
-                &approval.url,
-                None::<&gio::AppLaunchContext>,
-            ) {
-                Ok(()) => sign_in_status.set_label("Approval opened in the browser."),
-                Err(_) => sign_in_status.set_label("The browser could not open approval."),
-            }
-        });
-        sign_in_controls.append(&open_approval);
-
-        let sign_in_status = content.clone();
-        let sign_out_state = self.clone();
-        let sign_out_button = Button::with_label(&strings::text(strings::Message::SignInSignOut));
-        sign_out_button.connect_clicked(move |_| {
-            // Never retain authenticated projections after sign-out: machine
-            // listing, terminal generation and SSH-key rows are all dropped.
-            // A subsequent session must refresh from the server.
-            sign_out_state.drop_authority();
-            sign_in_status.set_label("Signed out; deployment trust and approval remain pinned.");
-        });
-        sign_in_controls.append(&sign_out_button);
-        sign_in_page.append(&sign_in_controls);
-        sign_in_page.append(&approval_url);
-        sign_in_page.append(&approval_fingerprint);
-
-        let sign_in = self.sign_in.clone();
-        let sign_in_status = content.clone();
-        let reconnect = Button::with_label(&strings::text(strings::Message::SignInReconnect));
-        reconnect.connect_clicked(move |_| {
-            let mut flow = sign_in.borrow_mut();
-            let previous = flow.phase;
-            *flow = flow.clone().apply(SignInEvent::Start);
-            sign_in_status.set_label(if previous == SignInPhase::Disconnected {
-                "Reconnect started; a fresh generation must reauthenticate."
-            } else {
-                "Reconnect requires a disconnected authenticated session."
-            });
-        });
-        sign_in_page.append(&reconnect);
+        // Sign-in runs the GTK-independent SignInDriver; see views::build_sign_in.
+        views::build_sign_in(self, &sign_in_page, &deployment, &content);
 
         // Linux intentionally reports lock capability explicitly. The shared retired client
         // policy marks Linux as unavailable; keeping this state visible prevents
@@ -1088,6 +1090,13 @@ impl NativeState {
     }
 }
 fn main() -> glib::ExitCode {
+    #[cfg(feature = "gtk-journey")]
+    {
+        let mut arguments = std::env::args_os().skip(1);
+        if arguments.next().as_deref() == Some(std::ffi::OsStr::new("--gtk-journey")) {
+            return gtk_journey::main(arguments);
+        }
+    }
     adw::init().expect("GTK/libadwaita initialization failed");
     let css = gtk::CssProvider::new();
     css.load_from_data("* { font-family: JetBrains Mono, monospace; font-size: 14px; } window, box { background: #fff; color: #000; } button, entry { border: 2px solid #000; border-radius: 0; background: #eee; color: #000; } button:hover { background: #000; color: #fff; } @media (prefers-color-scheme: dark) { window, box { background: #000; color: #fff; } button, entry { border-color: #fff; background: #111; color: #fff; } button:hover { background: #fff; color: #000; } } ");
@@ -1116,6 +1125,7 @@ fn main() -> glib::ExitCode {
 mod gtk_tests {
     use super::*;
     use mila_native_linux::route::share_inbound;
+    use mila_native_linux::session::{SignInFailure, SignInPhase};
 
     fn buttons(widget: &gtk::Widget, label: &str, found: &mut Vec<Button>) {
         if let Some(button) = widget.downcast_ref::<Button>() {
@@ -1316,6 +1326,101 @@ mod gtk_tests {
             status.label(),
             strings::text(strings::Message::DeploymentForgotten)
         );
+        sign_in_page_runs_the_live_driver(&directory);
         let _ = std::fs::remove_dir_all(&directory);
+    }
+
+    #[derive(Default)]
+    struct RecordingBrowser(Cell<u32>);
+
+    impl ApprovalBrowser for RecordingBrowser {
+        fn open(&self, _: &ApprovalInfo) -> bool {
+            self.0.set(self.0.get() + 1);
+            true
+        }
+    }
+
+    fn settle(state: &NativeState) {
+        let context = glib::MainContext::default();
+        let started = Instant::now();
+        while state.driver.borrow().is_active() && started.elapsed() < Duration::from_secs(60) {
+            context.iteration(false);
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        while context.iteration(false) {}
+    }
+
+    /// The Sign in button runs the window's real driver and live connector:
+    /// it creates the owner-only device key, attempts the HTTPS trust fetch
+    /// for the profile's port and CA, and renders the typed failure when the
+    /// deployment cannot present trust. No session is bound and no approval
+    /// link is opened.
+    fn sign_in_page_runs_the_live_driver(directory: &std::path::Path) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(directory).unwrap();
+        let key_path = directory.join("data").join("device-key");
+        let profiles = directory.join("connections.json");
+        std::env::set_var("MILA_DEPLOYMENT_PATH", directory.join("sign-in.json"));
+        std::env::set_var("MILA_DEVICE_KEY_PATH", &key_path);
+        std::env::set_var("MILA_CONNECTIONS_PATH", &profiles);
+        let browser = Rc::new(RecordingBrowser::default());
+        let state = NativeState::with_browser(browser.clone());
+        std::env::remove_var("MILA_DEPLOYMENT_PATH");
+        std::env::remove_var("MILA_DEVICE_KEY_PATH");
+        let status = Label::new(None);
+        let page = Box::new(Orientation::Vertical, 8);
+        let deployment = Entry::new();
+        views::build_sign_in(&state, &page, &deployment, &status);
+        let start = strings::text(strings::Message::SignInStart);
+
+        // An invalid profile fails closed before any key or network use.
+        std::fs::write(
+            &profiles,
+            br#"{"version":1,"profiles":[{"host":"bad host"}]}"#,
+        )
+        .unwrap();
+        std::fs::set_permissions(&profiles, std::fs::Permissions::from_mode(0o600)).unwrap();
+        deployment.set_text("unreachable.invalid");
+        find(&page, &start)[0].emit_clicked();
+        assert_eq!(
+            status.label(),
+            strings::text(strings::Message::SignInProfileInvalid)
+        );
+        assert!(!key_path.exists());
+        assert_eq!(state.driver.borrow().flow().phase, SignInPhase::SignedOut);
+
+        // A valid profile runs trust fetch on the profile's port and CA.
+        std::fs::write(
+            &profiles,
+            br#"{"version":1,"profiles":[{"host":"unreachable.invalid","ssh_port":2222,"https_port":9,"ca_file":"/nonexistent/ca.pem"}]}"#,
+        )
+        .unwrap();
+        find(&page, &start)[0].emit_clicked();
+        assert!(texts(&page).contains(&strings::format(
+            strings::Message::SignInConnecting,
+            &[("host", "unreachable.invalid:9")]
+        )));
+        settle(&state);
+        std::env::remove_var("MILA_CONNECTIONS_PATH");
+        let flow = state.driver.borrow().flow().clone();
+        assert_eq!(flow.phase, SignInPhase::Failed);
+        assert_eq!(flow.failure, Some(SignInFailure::HostUntrusted));
+        assert!(texts(&page).contains(&strings::text(strings::Message::SignInFailedHost)));
+        let mode = std::fs::metadata(&key_path).unwrap().permissions().mode();
+        assert_eq!(mode & 0o777, 0o600, "device key created owner-only");
+        assert!(!state.session.borrow().is_authenticated());
+        assert_eq!(browser.0.get(), 0);
+        assert!(!state.sign_in_pumping.get(), "pump stops when inactive");
+
+        // Reconnect retries the same target; Sign out ends the generation.
+        let reconnect = find(&page, &strings::text(strings::Message::SignInReconnect));
+        assert!(reconnect[0].is_sensitive());
+        let generation = flow.generation;
+        reconnect[0].emit_clicked();
+        assert!(state.driver.borrow().flow().generation > generation);
+        find(&page, &strings::text(strings::Message::SignInSignOut))[0].emit_clicked();
+        assert_eq!(state.driver.borrow().flow().phase, SignInPhase::SignedOut);
+        settle(&state);
+        assert_eq!(state.driver.borrow().flow().phase, SignInPhase::SignedOut);
     }
 }

@@ -267,5 +267,7 @@
   "linkSignInRequired": "Ingia kwenye {host} ili kufungua kiungo hiki.",
   "terminalReconnect": "Unganisha tena",
   "terminalResize": "Badilisha ukubwa",
-  "terminalSend": "Tuma"
+  "terminalSend": "Tuma",
+  "signInFailedDeviceKey": "Mila haikuweza kufungua ufunguo wa kifaa hiki, kwa hiyo haikuunganisha.",
+  "signInProfileInvalid": "Mipangilio ya muunganisho ya usambazaji huu si sahihi, kwa hiyo Mila haikuunganisha."
 }
