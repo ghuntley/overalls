@@ -184,8 +184,11 @@ with subtest("disabled host fixtures become usable only after real authenticated
         # stages every declared bundle before activation. Seal a credential
         # issued by the real Marshall domain at enrollment so the bundle
         # resolves like a deployed host; Peach itself stays stopped until a
-        # scenario starts it (peach-fleet-explicit-start).
-        token = f"{root}/peach-{machine.name}.token"
+        # scenario starts it (peach-fleet-explicit-start). The operator
+        # reserves its output exclusively (peach-operator-private-custody) and
+        # requires the "peach-" prefix, so this path MUST differ from the
+        # Galileo scenario's later "peach-<machine>.token" rotation output.
+        token = f"{root}/peach-dormant-{machine.name}.token"
         operator(m1, dict(action="peach-enroll", host_id=binding["host"], output=token))
         transfer(m1, token, machine, root + "/peach.token")
         machine.succeed("fleet-seal-peach")
