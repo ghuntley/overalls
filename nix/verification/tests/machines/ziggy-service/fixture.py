@@ -302,8 +302,10 @@ class Handler(BaseHTTPRequestHandler):
                     ),
                 ]
                 raw = b"".join(("data: " + json.dumps(event) + "\n\n").encode() for event in events)
+                # A streamed Responses call answers with SSE, as the provider does;
+                # Ziggy selects its stream reassembly from this content type.
                 self.send_response(200)
-                self.send_header("Content-Type", "application/json")
+                self.send_header("Content-Type", "text/event-stream")
                 self.send_header("Content-Length", str(len(raw)))
                 self.end_headers()
                 self.wfile.write(raw)
