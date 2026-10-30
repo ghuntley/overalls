@@ -109,7 +109,8 @@ defmodule Overalls.Pins do
          {output, 0} <- System.cmd(git, ["-C", root, "ls-files", "-z"], stderr_to_stdout: true) do
       String.split(output, <<0>>, trim: true)
     else
-      _ -> root |> Path.join("**/*.nix") |> Path.wildcard() |> Enum.map(&Path.relative_to(&1, root))
+      _ ->
+        root |> Path.join("**/*.nix") |> Path.wildcard() |> Enum.map(&Path.relative_to(&1, root))
     end
   end
 end

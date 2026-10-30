@@ -16,9 +16,14 @@ case Overalls.Pins.check(root) do
     for violation <- violations do
       message =
         case violation do
-          {:inline, path, line, _} -> "#{path}:#{line}: inline fixed-output hash; move it to the registry"
-          {:unused, key} -> "#{Overalls.Pins.registry()}: key #{key} is never read"
-          {:unknown, path, line, key} -> "#{path}:#{line}: registry has no key #{key}"
+          {:inline, path, line, _} ->
+            "#{path}:#{line}: inline fixed-output hash; move it to the registry"
+
+          {:unused, key} ->
+            "#{Overalls.Pins.registry()}: key #{key} is never read"
+
+          {:unknown, path, line, key} ->
+            "#{path}:#{line}: registry has no key #{key}"
         end
 
       IO.puts(:stderr, message)
