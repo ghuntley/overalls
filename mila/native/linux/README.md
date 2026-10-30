@@ -28,7 +28,10 @@ decisions live in GTK-independent library modules that the headless journey driv
 | `session::SessionPtyBackend` | `HostPtyBackend` over the authenticated FFI PTY, using the bounded-wait `mila_session_terminal_read_within`. |
 | `ssh_keys_view` | SSH-key settings rows, states, this-device protection and at-most-once revocation. |
 | `deep_link`, `route` | Navigation-only link presentation (page plus pre-filled identifiers), canonical share links and bounded `text/uri-list` intake for paste and drag-and-drop. |
-| `journey` | Headless live-journey driver behind `mila-linux-journey`. |
+| `signin_driver` | Live sign-in: `LiveConnector` (device key, HTTPS trust, SSH connect), approval browser launch once per generation, `whoami` polling, heartbeat, and bounded reconnect with a fresh generation. Blocking work runs on a worker thread; GTK polls results on the main loop. |
+| `device_key` | Owner-only P-256 device key (`$XDG_DATA_HOME/mila/device-key`), created once; only the OpenSSH public line and `SHA256:` fingerprint leave it. |
+| `connection_profile` | Optional owner-only `$XDG_CONFIG_HOME/mila/connections.json` overriding a deployment's SSH port (default 22), HTTPS port (default 443) and CA bundle. |
+| `journey` | Headless live-journey driver behind `mila-linux-journey`; it signs in through the same `SignInDriver`. |
 
 Every inbound link (desktop `open`, the link entry, or text dropped on the window) goes through
 `ActivationBatch` and `deep_link::present`. "Copy link" buttons place only a `route::share_route`
@@ -45,6 +48,22 @@ deep links, machine listing, share link, machine sharing, the terminal stream, a
 listing/protection/revocation. It prints a JSON report of step names and fixed outcome codes
 only, and exits 0 only when every step passed. The approver token reaches curl through an
 owner-only config file, never a process argument.
+
+### GTK sign-in and the GTK journey
+
+The Sign in button starts the window's `SignInDriver` for the selected deployment. The window
+binds only the session the driver establishes, so every page uses the session the user signed
+in with. A heartbeat checks the bound session's identity every 15 seconds off the main loop; a
+loss releases the session and every projection derived from it, then reconnects with a fresh
+generation (three attempts). A refusal ends the session without retrying.
+
+Built with `--features gtk-journey`, `mila-native-linux --gtk-journey <descriptor> [--workdir
+<new-dir>]` drives the real window against the fixture. It confines `XDG_CONFIG_HOME` and
+`XDG_DATA_HOME` to a private work directory, writes the fixture CA and connection profile there,
+and replaces the browser with the fixture approver. It then presses Sign in, Refresh machines, the
+SSH-key Refresh, Attach terminal and Send. It severs the bound session to exercise loss detection
+and reconnect, and finally presses Sign out. It prints the same redacted report shape. Release
+builds leave the feature off.
 
 ## Build and test
 
@@ -65,5 +84,6 @@ GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory MILA_GTK_TESTS
 ```
 
 Install `data/dev.overalls.Mila.desktop` with the executable on the desktop search path to enable
-system URI activation. The GTK sign-in button still drives only the reducer; connecting the GTK window to a live
-session (and so supplying the device fingerprint to the SSH-key page) remains open.
+system URI activation. Neither journey has a recorded passing run against the hermetic fixture yet;
+CI runs them once the flake exposes `mila-journey-fixture`, and always runs a GTK journey wiring
+smoke against an unreachable deployment.

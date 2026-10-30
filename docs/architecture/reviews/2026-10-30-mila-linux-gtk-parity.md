@@ -67,12 +67,52 @@ persistence outside Mila's local configuration file.
 - `cargo fmt --check` for both workspaces, and the shared localization catalog
   checks.
 
+## Follow-up: live GTK sign-in
+
+- **Driver.** `signin_driver::SignInDriver` drives the existing `SignInFlow`
+  reducer through the live sequence. It mirrors the Windows
+  `MilaSignInCoordinator`: one job per generation and stale results dropped
+  with their sessions. Approval links are checked against the target's HTTPS
+  authority and opened once per generation. Refusal, expiry and protocol
+  failures close the session. Reconnect is bounded and always starts a fresh
+  generation. Jobs run on a worker thread in GTK and inline in tests, and GTK
+  only applies results on the main loop. A new `SessionProbe` lets the
+  heartbeat call `whoami` off the main loop without moving the session out of
+  the window's binding.
+- **Connector.** `LiveConnector` opens the owner-only device key, reconciles
+  trust in Rust from an HTTPS fetch of the deployment's own origin, and
+  connects. It uses `HttpsTrustFetcher`: no redirects, an explicit port and an
+  optional CA from the connection profile.
+- **Window.** The Sign in page renders the reducer's phase, the approval
+  fingerprint and the account from the shared catalog. Its controls are Sign
+  in, Open approval page, Reconnect and Sign out. The earlier state-only
+  approval entries were removed. "Refresh machines" now reads the deployment's
+  list; it previously re-read the cached FFI listing, so it never fetched.
+- **GTK journey.** The `gtk-journey` feature drives the real window. The fixture
+  approver stands in for the browser, the bound session is severed to test
+  reconnect, and the report contains only step codes. CI always runs this
+  journey against an unreachable deployment, which must fail as
+  `host_untrusted`, and runs it against the fixture once the fixture exists.
+
+Architecture impact: this stays within ADR-0249. Rust decides, the GTK
+process holds the key custody and the I/O traits, and the connection profile
+holds only ports and a CA path. Neither the FFI nor the protocol changed.
+
+Verification: 127 library and 6 binary tests, including driver generation,
+expiry, reconnect-bound and operation-sequence tests, device-key and profile
+refusal tests, and a Broadway GTK test. In that test the Sign in button runs
+the real connector to a typed `HostUntrusted` failure and creates an
+owner-only key. A local Broadway run of `--gtk-journey` against an unreachable
+descriptor reported `host_untrusted`.
+
 ## Remaining gaps
 
-- The GTK sign-in button still drives only the reducer. Without a live session
-  the window's terminal and SSH-key pages show signed-out states, and the device
-  fingerprint is not yet supplied to the SSH-key view.
-- `mila-linux-journey` has no recorded passing run against the fixture. The
-  live PTY behaviour of `terminal attach --json` (prompt, echo) is unverified.
-- The ten new catalog messages were translated without native-speaker review.
-  Five of them reuse reviewed translations of identical English verbs.
+- Neither `mila-linux-journey` nor the GTK journey has a recorded passing run
+  against the fixture. The live PTY behaviour of `terminal attach --json`
+  (prompt, echo) is unverified.
+- The GTK journey replaces the browser with the fixture approver, so the
+  `gio::AppInfo::launch_default_for_uri` call itself is not exercised.
+- The heartbeat detects a lost session within 15 seconds. Page operations
+  that hit a transport error do not report the loss to the driver directly.
+- The twelve new catalog messages were translated without native-speaker
+  review. Five of them reuse reviewed translations of identical English verbs.

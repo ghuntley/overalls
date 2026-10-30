@@ -144,8 +144,15 @@ the session timeout; [transport](../../../mila/rust/mila-transport/tests/ssh.rs)
 widget test in [`main.rs`](../../../mila/native/linux/src/main.rs) runs on a
 headless Broadway display in CI, and
 [`mila-linux-journey`](../../../mila/native/linux/src/journey.rs) drives the
-same modules against the hermetic fixture descriptor. The GTK sign-in button
-does not yet open a live session, and no recorded fixture run exists; see the
+same modules against the hermetic fixture descriptor. The GTK Sign in button
+runs the [sign-in driver](../../../mila/native/linux/src/signin_driver.rs), which
+connects with the owner-only [device key](../../../mila/native/linux/src/device_key.rs),
+polls `whoami`, opens approval once per generation, heartbeats the bound session
+and reconnects after a loss. The window binds only the session the driver
+establishes. The headless journey signs in through the same driver, and the
+`gtk-journey` build drives the real window
+([`gtk_journey.rs`](../../../mila/native/linux/src/gtk_journey.rs)). Neither
+journey has a recorded fixture run; see the
 [Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
 
 ## Open questions
