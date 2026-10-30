@@ -100,7 +100,17 @@ jobs:
           # Only Marshall reads these; other projects see them empty.
           MARSHALL_TEST_PARTITIONS: ${{ matrix.partition && '4' || '' }}
           MIX_TEST_PARTITION: ${{ matrix.partition }}
-        run: devenv shell -- bash -euo pipefail -c 'mix deps.get && mix precommit'
+        # The cache volume keeps _build across runs, including compile
+        # manifests that recorded warnings (such as "already consolidated"
+        # from an older in-VM `gettext.extract`), and every later
+        # `compile --warnings-as-errors` replays them. A strict compile that
+        # fails is retried once with --force, which drops stale replays but
+        # still fails on any warning the current source produces.
+        run: >-
+          devenv shell -- bash -euo pipefail -c 'mix deps.get
+          && { MIX_ENV=test mix compile --warnings-as-errors
+          || MIX_ENV=test mix compile --force --warnings-as-errors; }
+          && mix precommit'
       - name: Verify precommit left no changes
         run: git diff --exit-code
 
