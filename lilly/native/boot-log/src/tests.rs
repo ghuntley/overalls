@@ -1,6 +1,5 @@
 use super::*;
-use hegel::generators as gs;
-use hegel::TestCase;
+use hegel::{generators as gs, TestCase};
 use std::ffi::OsStr;
 use std::time::Duration;
 
@@ -8,7 +7,7 @@ use std::time::Duration;
 /// Generated argument vectors MUST be classified by the independent selector
 /// spec: an optional leading `--reader-uid N` (N decimal, 1..=4294967294),
 /// then exactly an absolute log path and absolute command, plus extra argv.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn cli_selector_matches_independent_oracle(tc: TestCase) {
     let alphabet = [
         "",
@@ -72,7 +71,11 @@ fn cli_selector_matches_independent_oracle(tc: TestCase) {
     }
 }
 
-#[hegel::test]
+/// @cc [owner:ghuntley,label:verification;capacity] hegel-boot-log-drain-bounded-prefix
+/// Draining a generated stream through a real pipe MUST persist exactly the
+/// BOOT_LOG_LIMIT-truncated prefix of the independently stamped stream, for
+/// sizes around the pipe window and up to three times the limit.
+#[hegel::test(test_cases = 100)]
 fn drain_retains_exactly_the_bounded_prefix(tc: TestCase) {
     use std::io::Write as _;
     let size = tc.draw(hegel::one_of!(
@@ -202,7 +205,7 @@ fn partial_line_keeps_its_first_read_timestamp() {
 /// Arbitrary chunkings of generated console bytes MUST stamp identically to
 /// the whole buffer and to the independent line oracle for one clock reading,
 /// and stripping the prefixes MUST recover the input exactly.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn stamping_is_chunking_independent(tc: TestCase) {
     let input = console_bytes(&tc, 512);
     let now = Duration::from_millis(tc.draw(gs::integers::<u64>().max_value(10_000_000)));
@@ -222,9 +225,10 @@ fn stamping_is_chunking_independent(tc: TestCase) {
     assert_eq!(strip_prefix(&whole, now), input);
 }
 
+/// @cc [owner:ghuntley,label:verification;capacity] hegel-boot-log-retention-prefix
 /// The stamped retention MUST never exceed BOOT_LOG_LIMIT and MUST equal the
 /// limit-truncated prefix of the unbounded stamped stream for any chunking.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn retention_is_the_bounded_prefix_of_the_stamped_stream(tc: TestCase) {
     let lines = tc.draw(gs::integers::<usize>().min_value(0).max_value(4));
     let line_length = tc.draw(hegel::one_of!(
@@ -257,4 +261,204 @@ fn retention_is_the_bounded_prefix_of_the_stamped_stream(tc: TestCase) {
     let stamped = oracle_stamp(&input, now);
     assert_eq!(kept.len(), retention.retained());
     assert_eq!(kept, stamped[..stamped.len().min(BOOT_LOG_LIMIT)]);
+}
+
+/// Independent prefix text: decimal digits by repeated division, then the
+/// truncated millisecond field zero-padded to three digits by hand.
+#[expect(
+    clippy::duration_subsec,
+    reason = "the oracle derives milliseconds from nanoseconds, independently of push_prefix"
+)]
+fn prefix_oracle(now: Duration) -> Vec<u8> {
+    let mut seconds = now.as_secs();
+    let mut digits = Vec::new();
+    loop {
+        digits.push(b'0' + u8::try_from(seconds % 10).expect("digit"));
+        seconds /= 10;
+        if seconds == 0 {
+            break;
+        }
+    }
+    digits.reverse();
+    let millis = now.subsec_nanos() / 1_000_000;
+    let mut out = b"[+".to_vec();
+    out.extend(digits);
+    out.push(b'.');
+    for divisor in [100, 10, 1] {
+        out.push(b'0' + u8::try_from(millis / divisor % 10).expect("digit"));
+    }
+    out.extend_from_slice(b"] ");
+    out
+}
+
+/// @cc [owner:ghuntley,label:verification] hegel-boot-log-prefix-format-oracle
+/// `push_prefix` MUST append exactly `[+S.mmm] ` for every duration: whole
+/// seconds unbounded, milliseconds truncated (never rounded) and zero-padded,
+/// leaving the bytes already in the buffer untouched.
+#[hegel::test(test_cases = 300)]
+fn push_prefix_matches_the_independent_format_oracle(tc: TestCase) {
+    let seconds = tc.draw(hegel::one_of!(
+        gs::integers::<u64>().max_value(10_000),
+        gs::integers::<u64>()
+    ));
+    let nanos = tc.draw(gs::integers::<u32>().max_value(999_999_999));
+    let now = Duration::new(seconds, nanos);
+    let existing = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(16));
+    let mut out = existing.clone();
+    push_prefix(now, &mut out);
+    let mut expected = existing;
+    expected.extend(prefix_oracle(now));
+    assert_eq!(out, expected);
+}
+
+/// The candidate inode at the log path before open_log runs.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum LogShape {
+    Absent,
+    Regular,
+    HardLinked,
+    Symlink,
+    Directory,
+}
+
+/// @cc [owner:ghuntley,label:verification;security] hegel-boot-log-open-log-custody
+/// Without root, `open_log` MUST open exactly: an absent path, or a
+/// single-link regular file of mode 0600 owned by the writer, truncated, and
+/// with a reader only when it is the writer or the writer may hand the file to
+/// it. Symlinks (whose targets stay untouched), hard-linked files, directories
+/// and any other mode MUST be refused; an opened log is private to its owner.
+#[hegel::test(test_cases = 100)]
+fn open_log_refuses_every_unproven_inode(tc: TestCase) {
+    use std::os::unix::fs::PermissionsExt as _;
+    let shape = tc.draw(gs::sampled_from(vec![
+        LogShape::Absent,
+        LogShape::Regular,
+        LogShape::HardLinked,
+        LogShape::Symlink,
+        LogShape::Directory,
+    ]));
+    let mode = tc.draw(gs::sampled_from(vec![
+        0o600_u32, 0o600, 0o400, 0o640, 0o644, 0o660, 0o700, 0o606,
+    ]));
+    let euid = rustix::process::geteuid().as_raw();
+    let other = if euid == 1 { 2 } else { 1 };
+    let reader = tc.draw(gs::sampled_from(vec![None, Some(euid), Some(other)]));
+    let directory = tempfile::tempdir().expect("fixture directory");
+    let path = directory.path().join("boot.log.raw");
+    let target = directory.path().join("target");
+    let content = b"previous boot".to_vec();
+    match shape {
+        LogShape::Absent => {}
+        LogShape::Regular | LogShape::HardLinked => {
+            std::fs::write(&path, &content).expect("existing log");
+            std::fs::set_permissions(&path, std::fs::Permissions::from_mode(mode))
+                .expect("log mode");
+            if shape == LogShape::HardLinked {
+                std::fs::hard_link(&path, directory.path().join("alias")).expect("hard link");
+            }
+        }
+        LogShape::Symlink => {
+            std::fs::write(&target, &content).expect("symlink target");
+            std::fs::set_permissions(&target, std::fs::Permissions::from_mode(0o600))
+                .expect("target mode");
+            std::os::unix::fs::symlink(&target, &path).expect("symlink");
+        }
+        LogShape::Directory => std::fs::create_dir(&path).expect("directory"),
+    }
+    let base = match shape {
+        LogShape::Absent => true,
+        LogShape::Regular => mode == 0o600,
+        LogShape::HardLinked | LogShape::Symlink | LogShape::Directory => false,
+    };
+    let handed = reader.is_none_or(|uid| uid == euid || euid == 0);
+    let result = open_log(&path, reader);
+    assert_eq!(
+        result.is_ok(),
+        base && handed,
+        "{shape:?} {mode:o} {reader:?}"
+    );
+    if result.is_ok() {
+        let metadata = std::fs::symlink_metadata(&path).expect("opened log");
+        assert!(metadata.is_file());
+        assert_eq!(metadata.nlink(), 1);
+        assert_eq!(metadata.mode() & 0o777, 0o600);
+        assert_eq!(metadata.uid(), reader.unwrap_or(euid));
+        assert_eq!(metadata.len(), 0);
+    }
+    if shape == LogShape::Symlink {
+        assert_eq!(std::fs::read(&target).expect("target bytes"), content);
+    }
+}
+
+/// The settle fixture child: exits with BOOT_LOG_SETTLE_EXIT, or kills itself
+/// with BOOT_LOG_SETTLE_SIGNAL. It runs only when a property execs it by name.
+#[test]
+#[ignore = "boot-log settle fixture"]
+fn settle_fixture_child() {
+    if let Ok(signal) = std::env::var("BOOT_LOG_SETTLE_SIGNAL") {
+        let signal = rustix::process::Signal::from_named_raw(signal.parse().expect("signal"))
+            .expect("named signal");
+        rustix::process::kill_process(rustix::process::getpid(), signal).expect("self signal");
+        std::thread::sleep(Duration::from_secs(30));
+    }
+    let code: i32 = std::env::var("BOOT_LOG_SETTLE_EXIT")
+        .expect("exit code")
+        .parse()
+        .expect("numeric exit");
+    std::process::exit(code);
+}
+
+/// The settle fixture runner: settles a fixture child and exits with the
+/// result, so a re-raised signal ends this process and not the test harness.
+#[test]
+#[ignore = "boot-log settle fixture"]
+fn settle_fixture_runner() {
+    let mut child = settle_fixture("settle_fixture_child")
+        .spawn()
+        .expect("fixture child");
+    let code = settle(&mut child);
+    std::process::exit(i32::from(code));
+}
+
+fn settle_fixture(name: &str) -> Process {
+    let mut command = Process::new(std::env::current_exe().expect("test binary"));
+    command
+        .args([
+            "--exact",
+            &format!("tests::{name}"),
+            "--ignored",
+            "--nocapture",
+        ])
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null());
+    command
+}
+
+/// @cc [owner:ghuntley,label:verification;recovery] hegel-boot-log-settle-mapping
+/// `settle` MUST return a child's exit code unchanged, and for a child killed
+/// by a signal MUST end its own process by that same signal.
+#[hegel::test(test_cases = 24)]
+fn settle_preserves_exit_codes_and_reraises_signals(tc: TestCase) {
+    let signals = vec![
+        libc::SIGHUP,
+        libc::SIGINT,
+        libc::SIGKILL,
+        libc::SIGUSR1,
+        libc::SIGUSR2,
+        libc::SIGALRM,
+        libc::SIGTERM,
+    ];
+    let mut runner = settle_fixture("settle_fixture_runner");
+    let expected = if tc.draw(gs::booleans()) {
+        let code = tc.draw(gs::integers::<u8>());
+        runner.env("BOOT_LOG_SETTLE_EXIT", code.to_string());
+        (Some(i32::from(code)), None)
+    } else {
+        let signal = tc.draw(gs::sampled_from(signals));
+        runner.env("BOOT_LOG_SETTLE_SIGNAL", signal.to_string());
+        (None, Some(signal))
+    };
+    let status = runner.status().expect("fixture runner");
+    assert_eq!((status.code(), status.signal()), expected);
 }
