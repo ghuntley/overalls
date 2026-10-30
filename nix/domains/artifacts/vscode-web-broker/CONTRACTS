@@ -28,6 +28,8 @@ shutdown behavior MUST retire idle workers without an independent broker timer.
 @cc [owner:ghuntley,label:security] editor-broker-closed-diagnostics
 Broker diagnostics MUST contain only fixed event and reason enums. They MUST NOT
 contain incoming frames, paths, account identities, origins, arguments or bytes.
+A closed relay MUST name only which side ended first (silent worker, worker or
+client), and the guest unit MUST route these events to the journal.
 
 @cc [owner:ghuntley,label:security;recovery] windows-editor-staging-custody
 The separate Windows launcher library MUST bind a validated current execution,

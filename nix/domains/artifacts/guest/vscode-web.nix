@@ -43,6 +43,9 @@ in
       UMask = "0077";
       TasksMax = 256;
       StandardOutput = "null";
+      # stderr carries only the closed-schema broker events
+      # (editor-broker-closed-diagnostics); without this it inherits null.
+      StandardError = "journal";
     };
   };
   networking.firewall.allowedTCPPorts = [ 4444 ];

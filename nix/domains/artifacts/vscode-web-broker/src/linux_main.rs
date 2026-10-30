@@ -105,7 +105,6 @@ enum Event {
     Refused,
     WorkerStarted,
     Ready,
-    Closed,
     Failed,
 }
 
@@ -115,7 +114,6 @@ fn emit(event: Event, reason: Option<Refusal>) {
         Event::Refused => "editor.refused",
         Event::WorkerStarted => "editor.worker_started",
         Event::Ready => "editor.ready",
-        Event::Closed => "editor.closed",
         Event::Failed => "editor.broker_failed",
     };
     if let Some(reason) = reason {
@@ -126,6 +124,14 @@ fn emit(event: Event, reason: Option<Refusal>) {
     } else {
         eprintln!("{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\"}}");
     }
+}
+
+fn emit_closed(ending: Ending) {
+    let event = "editor.closed";
+    eprintln!(
+        "{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\",\"reason\":\"{}\"}}",
+        ending.name()
+    );
 }
 
 fn read_configuration(path: &Path) -> Result<Configuration, Refusal> {
@@ -724,20 +730,58 @@ fn ensure_worker(
     Err(Refusal::Readiness)
 }
 
-fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<(), Refusal> {
+/// Which relay direction reached its end first: the closed record names it
+/// without carrying any byte of either stream.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum Ending {
+    /// The worker ended before sending one byte to the gateway.
+    Silent,
+    /// The worker ended after sending a response.
+    Worker,
+    /// The gateway ended first.
+    Client,
+}
+
+impl Ending {
+    fn name(self) -> &'static str {
+        match self {
+            Self::Silent => "silent",
+            Self::Worker => "worker",
+            Self::Client => "client",
+        }
+    }
+}
+
+fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusal> {
     let mut client_writer = client.try_clone().map_err(|_| Refusal::Transport)?;
     let mut worker_reader = worker.try_clone().map_err(|_| Refusal::Transport)?;
+    let ending = Mutex::new(None);
     thread::scope(|scope| {
         scope.spawn(|| {
-            let _ = std::io::copy(&mut worker_reader, &mut client_writer);
+            let moved = std::io::copy(&mut worker_reader, &mut client_writer).unwrap_or(0);
+            ending
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get_or_insert(if moved == 0 {
+                    Ending::Silent
+                } else {
+                    Ending::Worker
+                });
             let _ = client_writer.shutdown(Shutdown::Both);
             let _ = worker_reader.shutdown(Shutdown::Both);
         });
         let _ = std::io::copy(&mut client, &mut worker);
+        ending
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get_or_insert(Ending::Client);
         let _ = client.shutdown(Shutdown::Both);
         let _ = worker.shutdown(Shutdown::Both);
     });
-    Ok(())
+    Ok(ending
+        .into_inner()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .unwrap_or(Ending::Client))
 }
 
 fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refusal> {
@@ -775,8 +819,8 @@ fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refus
         .set_write_timeout(None)
         .map_err(|_| Refusal::Transport)?;
     emit(Event::Ready, None);
-    relay(client, worker)?;
-    emit(Event::Closed, None);
+    let ending = relay(client, worker)?;
+    emit_closed(ending);
     Ok(())
 }
 
@@ -1105,5 +1149,64 @@ mod tests {
             );
             assert!(started.elapsed() < Duration::from_millis(120));
         });
+    }
+
+    /// Run one relay between a loopback gateway connection and a Unix worker
+    /// pair, letting `gateway` and `worker` drive their ends.
+    fn relay_ending(
+        gateway: impl FnOnce(TcpStream) + Send + 'static,
+        worker: impl FnOnce(UnixStream) + Send + 'static,
+    ) -> Ending {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let gateway = thread::spawn(move || gateway(TcpStream::connect(address).unwrap()));
+        let (client, _) = listener.accept().unwrap();
+        let (relayed, peer) = UnixStream::pair().unwrap();
+        let worker = thread::spawn(move || worker(peer));
+        let ending = relay(client, relayed).unwrap();
+        gateway.join().unwrap();
+        worker.join().unwrap();
+        ending
+    }
+
+    #[test]
+    fn closed_names_the_side_that_ended_first() {
+        // A worker that closes without answering is reported as silent.
+        let silent = relay_ending(
+            |mut gateway| {
+                gateway.write_all(b"GET / HTTP/1.1\r\n\r\n").unwrap();
+                let mut response = Vec::new();
+                let _ = gateway.read_to_end(&mut response);
+                assert_eq!(response, Vec::<u8>::new());
+            },
+            |mut worker| {
+                let mut request = [0_u8; 18];
+                worker.read_exact(&mut request).unwrap();
+            },
+        );
+        assert_eq!(silent, Ending::Silent);
+        let answered = relay_ending(
+            |mut gateway| {
+                gateway.write_all(b"GET / HTTP/1.1\r\n\r\n").unwrap();
+                let mut response = Vec::new();
+                let _ = gateway.read_to_end(&mut response);
+                assert_eq!(response, b"HTTP/1.1 204 \r\n\r\n");
+            },
+            |mut worker| {
+                let mut request = [0_u8; 18];
+                worker.read_exact(&mut request).unwrap();
+                worker.write_all(b"HTTP/1.1 204 \r\n\r\n").unwrap();
+            },
+        );
+        assert_eq!(answered, Ending::Worker);
+        let gateway_first = relay_ending(
+            |gateway| gateway.shutdown(Shutdown::Write).unwrap(),
+            |mut worker| {
+                let mut rest = Vec::new();
+                let _ = worker.read_to_end(&mut rest);
+                assert_eq!(rest, Vec::<u8>::new());
+            },
+        );
+        assert_eq!(gateway_first, Ending::Client);
     }
 }
