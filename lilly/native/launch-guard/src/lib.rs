@@ -63,17 +63,19 @@ fn parse_placement(unparsed: &OsStr) -> Option<String> {
             return None;
         }
     }
-    Some(String::from_utf8(bytes.to_vec()).expect("lowercase hex and dashes"))
+    // Every byte was checked to be ASCII hex or a dash above, so the UTF-8
+    // conversion cannot refuse; `.ok()` keeps the parser total regardless.
+    String::from_utf8(bytes.to_vec()).ok()
 }
 
 fn counter(unparsed: &OsStr) -> Option<u64> {
     let bytes = unparsed.as_bytes();
-    if bytes.is_empty() || bytes[0] == b'0' || !bytes.iter().all(|b| b.is_ascii_digit()) {
+    if bytes.is_empty() || bytes[0] == b'0' || !bytes.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let text = std::str::from_utf8(bytes).ok()?;
     let value: u64 = text.parse().ok()?;
-    (1..=u64::try_from(i64::MAX).unwrap())
+    (1..=i64::MAX.unsigned_abs())
         .contains(&value)
         .then_some(value)
 }
@@ -154,13 +156,13 @@ pub enum IntentError {
     Framing,
 }
 
-/// Read exactly INTENT_BYTES; anything else is a framing failure.
+/// Read exactly `INTENT_BYTES`; anything else is a framing failure.
 pub fn read_intent(intent: &OwnedFd) -> Result<Intent, IntentError> {
     let mut bytes = [0_u8; INTENT_BYTES];
     let mut used = 0;
     while used < INTENT_BYTES {
         match rustix::io::read(intent, &mut bytes[used..]) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Err(_) | Ok(0) => return Err(IntentError::Framing),
             Ok(count) => used += count,
         }
@@ -168,7 +170,7 @@ pub fn read_intent(intent: &OwnedFd) -> Result<Intent, IntentError> {
     decode_intent(&bytes)
 }
 
-/// Decode one intent frame: exactly INTENT_BYTES, laid out as the 36-byte
+/// Decode one intent frame: exactly `INTENT_BYTES`, laid out as the 36-byte
 /// placement, big-endian epoch, big-endian generation and the state byte.
 /// Any other length is a framing failure. Pure, so the frame layout can be
 /// checked without a descriptor.
@@ -204,7 +206,7 @@ pub fn run(request: &Request) -> u8 {
     };
     let acquired = loop {
         match flock(&lock, FlockOperation::LockShared) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             result => break result,
         }
     };

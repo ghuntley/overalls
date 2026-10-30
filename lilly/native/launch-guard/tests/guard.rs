@@ -14,6 +14,10 @@ struct Fixture {
     intent: PathBuf,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn fixture() -> Fixture {
     let directory = tempfile::tempdir().expect("fixture directory");
     let lock = directory.path().join("owner.lock");
@@ -30,6 +34,10 @@ fn fixture() -> Fixture {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn write_intent(fixture: &Fixture, placement: &str, epoch: u64, generation: u64, state: u8) {
     let mut bytes = Vec::with_capacity(INTENT_BYTES);
     bytes.extend_from_slice(placement.as_bytes());
@@ -40,6 +48,10 @@ fn write_intent(fixture: &Fixture, placement: &str, epoch: u64, generation: u64,
     std::fs::write(&fixture.intent, bytes).expect("intent payload");
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn spawn_guard(
     fixture: &Fixture,
     placement: &str,
@@ -61,6 +73,10 @@ fn spawn_guard(
         .expect("spawned guard")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn wait_code(child: &mut std::process::Child) -> Option<i32> {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
@@ -264,6 +280,10 @@ const WAITING_REVOCATIONS: [WaitingRevocation; 9] = [
     WaitingRevocation::Unchanged,
 ];
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn witnessed_shared_wait(child: &mut std::process::Child, lock: &std::path::Path) {
     use std::os::unix::fs::MetadataExt as _;
     let inode = std::fs::metadata(lock).expect("stable lock identity").ino();
@@ -338,6 +358,10 @@ fn waiting_guard_refuses_revoked_intent_after_exclusive_release(tc: hegel::TestC
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn waiting_intent_case(trigger: WaitingRevocation, epoch: u64, generation: u64) {
     use rustix::fs::{flock, FlockOperation};
     let fixture = fixture();

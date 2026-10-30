@@ -191,18 +191,18 @@ fn current_generation_predicate_is_exact(tc: TestCase) {
                 tc.draw(
                     gs::integers::<u64>()
                         .min_value(1)
-                        .max_value(u16::MAX as u64),
+                        .max_value(u64::from(u16::MAX)),
                 ),
-            )
+            );
         }
         2 => {
             request.generation = generation.wrapping_add(
                 tc.draw(
                     gs::integers::<u64>()
                         .min_value(1)
-                        .max_value(u16::MAX as u64),
+                        .max_value(u64::from(u16::MAX)),
                 ),
-            )
+            );
         }
         _ => intent.state = tc.draw(gs::integers::<u8>()),
     }
@@ -307,7 +307,7 @@ fn placement_parser_matches_independent_oracle(tc: TestCase) {
 
 /// @cc [owner:ghuntley,label:verification] hegel-launch-counter-oracle
 /// `counter` MUST accept exactly canonical decimal text (no sign, no leading
-/// zero, ASCII digits only) whose value lies in 1..=i64::MAX, judged by an
+/// zero, ASCII digits only) whose value lies in `1..=i64::MAX`, judged by an
 /// independent u128 oracle, and return that value.
 #[hegel::test(test_cases = 200)]
 fn counter_matches_independent_oracle(tc: TestCase) {
