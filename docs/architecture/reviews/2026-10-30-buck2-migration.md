@@ -617,8 +617,9 @@ import only changes its copy step, which the first swapped run showed as a
 missing `request_fixture`. `ASSEMBLY_ARTIFACTS`
 (`buck/artifacts.bzl`, merging `RUST_ARTIFACTS` and M6's `MIX_ARTIFACTS`)
 feeds every machine test, and `nix/domains/artifacts/default.nix` refuses an
-artifact name it does not consume. The flake, from which hosts self-deploy,
-keeps the Nix builds until the M2 activation gate; deletions are M11.
+artifact name it does not consume. Host `:deployment` targets read the same
+dict since M2 (7ccb4f72a), so hosts run these Buck2 builds; the flake keeps
+the Nix builds as a fallback until M11 deletes them.
 `rust_leaf_parity_test` (label `heavy`) builds the Nix side and fails when the
 two builds name different executables, when an executable's interpreter or
 RUNPATH differs, when it needs a library the Nix

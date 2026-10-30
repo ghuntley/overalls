@@ -183,7 +183,9 @@ partial, in milestone M5.
   machine run 41094831662, and fbb29d9fe held the swap back. An A/B cleared
   them (the failures were runner oversubscription; see the review), and the
   helpers now build `release`, with the panic strategy in the parity test.
-  Hosts keep the Nix builds until M2. Remaining: terminald, the editor broker
+  Since M2 (7ccb4f72a) a host's `:deployment` target carries the same
+  `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too; the flake's
+  Nix builds remain the fallback until M11. Remaining: terminald, the editor broker
   and Lyra (musl and cross targets), Marshall's Cedar NIF, Mila and its
   cbindgen header.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
