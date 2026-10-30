@@ -68,6 +68,16 @@ remote execution, and the approved migration plan.
   the worker's memory cap; and the tailnet policy restricting
   `tag:buck-re-ci` to Panterloons' port 50072 is an operator action, so until
   it is set only mTLS separates CI from the other listeners.
+- **Open security gap: cache poisoning through worker-identity exposure.**
+  Remote actions run as the worker user and can read the worker's mTLS
+  identity. Anyone who gets an action executed can take that identity,
+  register a rogue worker or write the CAS and action cache directly on the
+  worker listener (50074), and so feed forged outputs to every host that
+  reads the cache. Until the identity is reachable only by the worker
+  process, and results from unregistered workers are rejected, the CI
+  variable `BUCK_RE` MUST stay unset and no further worker (Dungarees) is
+  enabled. Today only the recovery-only uploader and executor documents can
+  submit actions.
 
 ## Invariants and verification
 
@@ -277,8 +287,11 @@ Remaining gaps:
   only) is an operator action.
 - Workers hold only the cells of their host's deployed revision, so remote
   execution helps only clients on that cells revision.
-- Actions run as the worker user and can read the worker identity, which can
-  write the action cache; see the review's residual risks.
+- **Open security gap** (see Consequences): actions run as the worker user
+  and can read the worker identity, which can write the CAS and action cache
+  on 50074 and register workers, so remote execution can poison the cache
+  hosts read. `BUCK_RE` stays unset and the Dungarees worker stays disabled
+  until the identity reaches only the worker process.
 - No precommit timing with remote execution has been recorded.
 
 ## Open questions
