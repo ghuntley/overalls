@@ -1,7 +1,7 @@
 { pkgs, ... }:
 let
   root = "/var/lib/inception-fixture-issuer";
-  # @cc [owner:ghuntley,label=verification;network] inception-fixture-acme-length
+  # @cc [owner:ghuntley,label:verification;network] inception-fixture-acme-length
   # The fixture must delimit its certificate-chain response explicitly. This
   # keeps the nested client from waiting for a connection close after certZ;
   # production issuers are unaffected.

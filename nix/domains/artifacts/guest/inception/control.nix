@@ -1,7 +1,7 @@
 { pkgs, ... }:
 let
   python = pkgs.python3.withPackages (p: [ p.cryptography ]);
-  # @cc [owner:ghuntley,label=recovery;network] inception-acme-no-keepalive
+  # @cc [owner:ghuntley,label:recovery;network] inception-acme-no-keepalive
   # The nested ACME client MUST use a fresh HTTP connection for each signed
   # exchange. Reusing the issuer connection across the directory/order flow
   # can leave the final POST-as-GET certificate body unread at the TAP boundary.
