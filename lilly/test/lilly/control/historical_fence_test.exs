@@ -222,6 +222,9 @@ defmodule Lilly.Control.HistoricalFenceTest do
   # Every terminal exchange class MUST stop every controlled actor, retain its
   # durable command and leave the runtime unable to restart work on a tick.
   @tag :hegel
+  # The full 100-case budget measured 33-54 s under the parallel suite on
+  # 8 local CPUs; the slower CI runner exceeded the 60 s default.
+  @tag timeout: 180_000
   test "terminal exchange fences stop generated actor rosters without losing intent", %{
     store: store,
     newer: newer

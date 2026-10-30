@@ -16,6 +16,9 @@ defmodule Lilly.VM.BootGenerationAdoptionPropertyTest do
   # These isolated file histories MUST NOT establish confined VMM or guest proof;
   # production callers' physical preconditions require separate native evidence.
   @tag :hegel
+  # The full 100-case budget measured 15-28 s under the parallel suite on
+  # 8 local CPUs; the slower CI runner exceeded the 60 s default.
+  @tag timeout: 180_000
   test "logical adoption preserves the boot but fences every older generation", %{
     tmp_dir: dir
   } do

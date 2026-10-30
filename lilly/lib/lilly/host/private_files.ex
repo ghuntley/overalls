@@ -113,9 +113,21 @@ defmodule Lilly.Host.PrivateFiles do
          do: safe_parents(Path.dirname(path))
   end
 
+  # The BEAM's own uid, read from /proc/self once per OS process: the BEAM
+  # never changes its uid, and safe_parents/1 otherwise stats /proc/self once
+  # per ancestor through the VM-wide file server, which every durable write
+  # and read in the node is queued behind.
+  @spec uid() :: non_neg_integer()
   defp uid do
-    {:ok, stat} = File.stat("/proc/self")
-    stat.uid
+    case :persistent_term.get({__MODULE__, :uid}, nil) do
+      nil ->
+        {:ok, stat} = File.stat("/proc/self")
+        :persistent_term.put({__MODULE__, :uid}, stat.uid)
+        stat.uid
+
+      uid ->
+        uid
+    end
   end
 
   # @cc [owner:ghuntley,label:security] private-files-trusted-owners

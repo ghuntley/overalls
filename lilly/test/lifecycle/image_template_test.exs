@@ -70,6 +70,9 @@ defmodule Lilly.Lifecycle.ImageTemplateTest do
   # production graph, reopen durable state after every operation and preserve
   # state and revision on refusal. Replays MUST NOT change either.
   @tag :hegel
+  # The full 100-case budget measured 14-26 s under the parallel suite on
+  # 8 local CPUs; the slower CI runner exceeded the 60 s default.
+  @tag timeout: 180_000
   test "publication and retirement require evidence; bindings and tombstones survive reopen", c do
     Hegel.check(
       fn ->

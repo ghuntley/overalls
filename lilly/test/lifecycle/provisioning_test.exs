@@ -39,6 +39,9 @@ defmodule Lilly.Lifecycle.ProvisioningTest do
   # of Ash's transition table. Reopen after every command; invalid requests MUST
   # preserve state and revision. Duplicate writes MUST NOT change either.
   @tag :hegel
+  # The full 100-case budget measured 15-26 s under the parallel suite on
+  # 8 local CPUs; the slower CI runner exceeded the 60 s default.
+  @tag timeout: 180_000
   test "generated progress, faults and replays preserve prerequisites and bindings", c do
     Hegel.check(
       fn ->

@@ -158,6 +158,9 @@ defmodule Lilly.VM.AntithesisActorPropertyTest do
   # durable attempt authority. Restart MUST adopt the completed fake unit without
   # another launch and replay the exact recovered outcome identity and sequence.
   @tag :hegel
+  # The full 100-case budget measured 16-26 s under the parallel suite on
+  # 8 local CPUs; the slower CI runner exceeded the 60 s default.
+  @tag timeout: 180_000
   test "completed launch survives actor death before outcome recording", %{tmp_dir: root} do
     Hegel.check(
       fn ->
