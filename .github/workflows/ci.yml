@@ -48,6 +48,7 @@ jobs:
     outputs:
       machine_tests: ${{ steps.plan.outputs.machine_tests }}
       evaluate: ${{ steps.plan.outputs.evaluate }}
+      evaluate_shards: ${{ steps.plan.outputs.evaluate_shards }}
       tests: ${{ steps.plan.outputs.tests }}
       builds: ${{ steps.plan.outputs.builds }}
       host_builds: ${{ steps.plan.outputs.host_builds }}
@@ -130,6 +131,9 @@ jobs:
           # evaluation without booting a VM, so a missing input or module
           # argument fails here rather than in the daily run.
           evaluate=$(jq -c '[.machine_tests[].target | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]' affected.json)
+          # One runner evaluating all ~200 suites hit the 60-minute timeout
+          # (run 41102561512), so evaluations shard 20 per runner.
+          evaluate_shards=$(jq -c '[range(0; length; 20) as $i | {index: ($i / 20 + 1), targets: .[$i:$i + 20]}]' <<<"$evaluate")
           tests=$(jq -c '[.tests[].target]' affected.json)
           # Bootstrap builds are flake outputs that publish-cache.yml builds.
           # expected_failure targets are soundness probes that must not build.
@@ -147,6 +151,7 @@ jobs:
           {
             echo "machine_tests=$machine"
             echo "evaluate=$evaluate"
+            echo "evaluate_shards=$evaluate_shards"
             echo "tests=$tests"
             echo "builds=$builds"
             echo "host_builds=$host_builds"
@@ -260,8 +265,13 @@ jobs:
   evaluate:
     needs: affected
     if: needs.affected.outputs.evaluate != '[]'
+    name: evaluate ${{ matrix.shard.index }}
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.affected.outputs.evaluate_shards) }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -270,7 +280,7 @@ jobs:
           install-devenv: "false"
       - name: Evaluate selected machine tests
         env:
-          TARGETS: ${{ needs.affected.outputs.evaluate }}
+          TARGETS: ${{ toJSON(matrix.shard.targets) }}
         run: |
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
