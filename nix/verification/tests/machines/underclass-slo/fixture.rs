@@ -110,6 +110,7 @@ fn seed(directory: &Path) -> Result<(), Box<dyn std::error::Error>> {
         residency: None,
         enterprise_url: None,
         plan: None,
+        disabled_reason: None,
         status: AccountStatus::Healthy,
         reset_at: 0,
         created_at: timestamp,
