@@ -186,6 +186,8 @@ defmodule Marshall.CredentialRetirementFixture do
 
       query("DELETE FROM ssh_keys WHERE user_id=$1", [id])
 
+      Marshall.CommittedFixtureCleanup.subscription_reviews!([user.id])
+
       for deletion <- Ledger.read!(UserDeletion, user_id: user.id) do
         Marshall.CommittedFixtureCleanup.jobs!("args->'primary_key'->>'id'=$1", [deletion.id])
       end

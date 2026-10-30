@@ -141,6 +141,8 @@ defmodule Marshall.TeamRetirementFixture do
     for user <- users do
       id = Ecto.UUID.dump!(user.id)
 
+      Marshall.CommittedFixtureCleanup.subscription_reviews!([user.id])
+
       for deletion <- Ledger.read!(UserDeletion, user_id: user.id) do
         Marshall.CommittedFixtureCleanup.jobs!("args->'primary_key'->>'id'=$1", [deletion.id])
       end

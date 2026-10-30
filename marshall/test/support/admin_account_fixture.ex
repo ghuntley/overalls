@@ -294,6 +294,8 @@ defmodule Marshall.AdminAccountFixture do
         query("DELETE FROM account_auth_emails WHERE id=$1", [Ecto.UUID.dump!(mail.id)])
       end
 
+      Marshall.CommittedFixtureCleanup.subscription_reviews!([user.id])
+
       for deletion <- Ledger.read!(Marshall.Accounts.UserDeletion, user_id: user.id),
           do: remove_jobs(deletion.id)
 

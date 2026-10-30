@@ -172,6 +172,8 @@ defmodule Marshall.GuestIdentityFixture do
 
       query("DELETE FROM account_guest_accounts WHERE user_id=$1", [id])
 
+      Cleanup.subscription_reviews!([user.id])
+
       for deletion <- Ledger.read!(UserDeletion, user_id: user.id),
           do: Cleanup.jobs!("args->'primary_key'->>'id'=$1", [deletion.id])
 

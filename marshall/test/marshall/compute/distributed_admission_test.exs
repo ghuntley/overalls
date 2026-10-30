@@ -389,6 +389,8 @@ defmodule Marshall.Compute.DistributedAdmissionTest do
             )
 
           for id <- Enum.reject([account.id, admin.id, fresh_user_id], &is_nil/1) |> Enum.uniq() do
+            Cleanup.subscription_reviews!([id])
+
             Cleanup.jobs!(
               "args->'primary_key'->>'id' IN (SELECT id::text FROM account_user_deletions WHERE user_id = $1)",
               [Ecto.UUID.dump!(id)]
@@ -1011,6 +1013,8 @@ defmodule Marshall.Compute.DistributedAdmissionTest do
                  &(&1.kind == :delete)
                ) == length(owned)
       after
+        Cleanup.subscription_reviews!([owner.id])
+
         Cleanup.jobs!(
           "args->'primary_key'->>'id' IN (SELECT id::text FROM account_user_deletions WHERE user_id=$1)",
           [Ecto.UUID.dump!(owner.id)]

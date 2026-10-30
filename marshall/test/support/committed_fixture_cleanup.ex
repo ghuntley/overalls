@@ -134,6 +134,18 @@ defmodule Marshall.CommittedFixtureCleanup do
     :ok
   end
 
+  # @cc [owner:ghuntley,label:verification] committed-fixture-subscription-reviews
+  # Account and membership changes enqueue thread-subscription reviews keyed by
+  # owner. Teardown MAY delete only reviews naming the fixture's exact user IDs,
+  # through jobs!/2 so their retained events and snapshots go too.
+  @spec subscription_reviews!([String.t()]) :: :ok
+  def subscription_reviews!(user_ids) do
+    jobs!(
+      "worker='Marshall.Threads.SubscriptionRevokeJob' AND args->>'owner_id'=ANY($1::text[])",
+      [user_ids]
+    )
+  end
+
   # @cc [owner:ghuntley,label:verification] committed-fixture-lifecycle-scope
   # Lifecycle cleanup MUST match only the fixture's exact VM or dedicated host
   # IDs. It MUST NOT delete by actor, age, job kind, or a database-wide predicate.
