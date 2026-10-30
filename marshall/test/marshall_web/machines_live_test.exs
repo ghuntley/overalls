@@ -72,18 +72,38 @@ defmodule MarshallWeb.MachinesLiveTest do
   # same authenticated list/detail lifecycle controls as other guests. Request
   # keys are UUIDs, rotate after an accepted mutation and remain bound to the
   # operation kind so forged reuse cannot enqueue a second intent.
-  test "windows machines expose list detail and lifecycle controls", %{conn: conn, owner: owner} do
+  test "windows machines expose list detail and lifecycle controls", %{
+    conn: conn,
+    owner: owner,
+    fixture: fixture
+  } do
     image = windows_v1_image_fixture()
-    {:ok, vm} = Compute.provision(request(%{image_id: image.id}), actor: owner)
+    report_windows_capacity(fixture, image.id)
+
+    # Admission refuses requests below the image minima (2 GiB, 32 GiB).
+    {:ok, vm} =
+      Compute.provision(
+        request(%{
+          image_id: image.id,
+          memory_bytes: image.minimum_memory_bytes,
+          disk_bytes: image.minimum_disk_bytes
+        }),
+        actor: owner
+      )
+
+    # The terminal link and stop control are offered only for a running machine.
+    vm = Ash.Seed.update!(vm, %{desired_state: :running, observed_state: :running})
     signed = signed_in(conn, owner)
 
     {:ok, listing, _} = live(signed, ~p"/machines")
-    assert has_element?(listing, "#machine-#{vm.id}")
+    assert has_element?(listing, "#machines-#{vm.id}")
     assert has_element?(listing, "#machine-terminal-#{vm.id}")
 
-    {:ok, detail, _} = live(signed, ~p"/machines/#{vm.id}")
+    assert has_element?(listing, "#machine-os-#{vm.id}", "Windows Server 2025 (agents)")
+
+    {:ok, detail, _} = live(signed, ~p"/machines/#{vm.id}/settings")
     assert has_element?(detail, "#machine-detail")
-    assert has_element?(detail, "#machine-os.status-label", "Windows Server 2025 (agents)")
+    assert has_element?(detail, "#machine-operating-system", "Windows Server 2025 (agents)")
     assert has_element?(detail, "#stop-machine")
     stop_key = power_key(detail, "#stop-machine")
 
@@ -289,8 +309,9 @@ defmodule MarshallWeb.MachinesLiveTest do
 
     assert has_element?(view, "#machine_profile option[selected][value='standard']")
     assert has_element?(view, "#machine_profile[aria-describedby='profile-guide']")
-    assert has_element?(view, "#profile-help-customer", "owner-only")
-    assert has_element?(view, "#profile-help-customer", "no outbound connections")
+    # Creation opens an agent thread; Customer VMs have no agent root (ADR-0099).
+    refute has_element?(view, "#machine_profile option[value='customer']")
+    refute has_element?(view, "#profile-help-customer")
     assert has_element?(view, "#profile-help-standard", "cannot start child agents")
     assert has_element?(view, "#profile-help-oss", "can start child agents")
     refute has_element?(view, "#profile-help-inception")
@@ -964,24 +985,30 @@ defmodule MarshallWeb.MachinesLiveTest do
     assert_redirect(view, ~p"/machines")
   end
 
-  test "exhaustion is shown without accepting another machine", %{conn: conn, owner: owner} do
+  test "exhaustion refuses admission without accepting another machine", %{
+    conn: conn,
+    owner: owner
+  } do
     for _ <- 1..2, do: assert({:ok, _} = Compute.provision(request(), actor: owner))
-    {:ok, view, _} = live(signed_in(conn, owner), ~p"/machines/new")
+    conn = signed_in(conn, owner)
+    {:ok, view, _} = live(conn, ~p"/machines/new")
 
-    view
-    |> form("#provision-form",
-      machine: %{
+    # Creation hands admission to the setup thread, so exhaustion is refused by
+    # ProvisionWorker's admission rather than by the form. No third machine is
+    # accepted and the receipt keeps offering a retry.
+    thread =
+      submit_provisioning(view, %{
         image_id: image_id(),
-        profile: "customer",
+        profile: "standard",
         vcpu: "1",
         memory_mib: "512",
         disk_gib: "2"
-      }
-    )
-    |> render_submit()
+      })
 
+    assert {:error, :insufficient_capacity} = admit(thread)
     assert length(Ledger.read!(VirtualMachine, owner_id: owner.id)) == 2
-    assert has_element?(view, "#flash-group [id^=flash-][id$=-error]")
+    {:ok, receipt, _html} = live(conn, ~p"/machines/provisioning/#{thread.id}")
+    assert has_element?(receipt, "#machine-provisioning")
   end
 
   test "login-token revocation blocks an already connected owner's lifecycle event", %{
@@ -1278,5 +1305,33 @@ defmodule MarshallWeb.MachinesLiveTest do
     {:ok, view, _} = live(signed_in(conn, owner), ~p"/machines/#{failed.id}")
     assert has_element?(view, "#machine-state[data-state=failed][data-tone=danger]", "Failed")
     assert has_element?(view, ".machine-title h1 + #machine-os[data-tone=muted] + #machine-state")
+  end
+
+  # The default fixture host reports only the Linux image on a 10 GiB pool; a
+  # Windows image needs its own inventory entry and a pool above its 32 GiB
+  # minimum disk before admission can place it.
+  @windows_pool_bytes 68_719_476_736
+  @spec report_windows_capacity(map(), String.t()) :: :ok
+  defp report_windows_capacity(fixture, image_id) do
+    [pool_report] = fixture.report.pools
+    [pool] = Ledger.read!(Marshall.Compute.StoragePool, id: fixture.pool.id)
+
+    report = %{
+      fixture.report
+      | sequence: fixture.report.sequence + 1,
+        sampled_at: Ledger.now(),
+        inventory: Map.update!(fixture.report.inventory, "images", &Enum.uniq([image_id | &1])),
+        pools: [
+          %{
+            pool_report
+            | total_bytes: @windows_pool_bytes,
+              free_bytes: @windows_pool_bytes,
+              storage: storage_observation(pool, @windows_pool_bytes, @windows_pool_bytes)
+          }
+        ]
+    }
+
+    {:ok, :ok} = Marshall.Compute.HostReports.ingest(fixture.host.id, fixture.epoch, report)
+    :ok
   end
 end

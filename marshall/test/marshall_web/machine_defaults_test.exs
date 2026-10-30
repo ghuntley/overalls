@@ -68,7 +68,7 @@ defmodule MarshallWeb.MachineDefaultsTest do
     assert has_element?(machine, "#machine_disk_gib[value='6']")
 
     machine
-    |> form("#provision-form", machine: %{vcpu: "4", profile: "customer"})
+    |> form("#provision-form", machine: %{vcpu: "4", profile: "standard"})
     |> render_change()
 
     path = assert_patch(machine)
@@ -76,7 +76,7 @@ defmodule MarshallWeb.MachineDefaultsTest do
     assert has_element?(machine, "#machine_vcpu[value='4']")
     {:ok, draft, _} = live(conn, path)
     assert has_element?(draft, "#machine_vcpu[value='4']")
-    assert has_element?(draft, "#machine_profile option[value=customer][selected]")
+    assert has_element?(draft, "#machine_profile option[value=standard][selected]")
     assert Security.current(c.owner.id).machine_default_profile == :oss
 
     {:ok, thread, _} = live(conn, ~p"/threads/new")

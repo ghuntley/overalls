@@ -78,12 +78,24 @@ defmodule MarshallWeb.AdminUsersLiveTest do
         email: target.email
       })
 
-    for {locale, progress, source} <- [
-          {"ja", %{blocked: false, completed_at: nil}, "Deleting machines"},
-          {"ar", %{blocked: true, completed_at: nil}, "Retrying machine cleanup"},
-          {"ja", %{blocked: false, completed_at: DateTime.utc_now()}, "Deleted"}
+    # Progress counters use :progress; completion goes through the state
+    # machine's begin_finalization and complete transitions.
+    for {locale, step, source} <- [
+          {"ja", {:progress, %{blocked: false}}, "Deleting machines"},
+          {"ar", {:progress, %{blocked: true}}, "Retrying machine cleanup"},
+          {"ja", :complete, "Deleted"}
         ] do
-      Ledger.update!(deletion, :progress, progress)
+      case step do
+        {:progress, progress} ->
+          Ledger.update!(deletion, :progress, progress)
+
+        :complete ->
+          [current] = Ledger.read!(Marshall.Accounts.UserDeletion, id: deletion.id)
+
+          current
+          |> Ledger.update!(:begin_finalization, %{})
+          |> Ledger.update!(:complete, %{completed_at: DateTime.utc_now()})
+      end
 
       {:ok, view, _} =
         conn

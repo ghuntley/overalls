@@ -34,7 +34,9 @@ defmodule MarshallWeb.LoggedOutAccessTest do
 
     assert html =~ ~s(href="/docs")
     assert html =~ ~s(href="/docs/browser-extension")
-    assert html =~ ~s(href="/sign-in")
+    # The docs sidebar lists only field notes since 42df2df27; sign-in lives
+    # in the public console header, not in documentation pages.
+    refute html =~ ~s(href="/sign-in")
     assert html =~ "Getting started"
     refute app_nav_links(html)
   end

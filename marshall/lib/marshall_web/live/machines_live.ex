@@ -682,9 +682,11 @@ defmodule MarshallWeb.MachinesLive do
   defp blank_to_nil(""), do: nil
   defp blank_to_nil(value), do: value
 
+  # @cc [owner:ghuntley,label:product] creation-form-agent-profiles
+  # Form creation opens a user thread, which always binds an agent root, and
+  # ADR-0099 gives Customer VMs none; the form MUST NOT offer Customer.
   defp profile_options(images) do
     ordinary = [
-      {dgettext("machines", "Customer"), "customer"},
       {dgettext("machines", "Standard"), "standard"},
       {"OSS", "oss"}
     ]

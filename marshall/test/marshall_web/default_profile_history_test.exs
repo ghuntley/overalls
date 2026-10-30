@@ -5,8 +5,9 @@ defmodule MarshallWeb.DefaultProfileHistoryTest do
   import Phoenix.LiveViewTest
   import Marshall.ComputeFixtures
   alias Marshall.Compute.{Ledger, Operation, Reservation, VirtualMachine}
+  alias Marshall.Threads.{ProvisionWorker, Thread}
 
-  @typep selection :: nil | :oss | :customer | :standard
+  @typep selection :: nil | :oss | :standard
 
   # @cc [owner:ghuntley,label:verification;product] browser-profile-draft-oracle
   # Omitted profiles MUST start as Standard (Work). Generated explicit choices, refreshes and
@@ -14,16 +15,19 @@ defmodule MarshallWeb.DefaultProfileHistoryTest do
   # replaying the same URL MUST create no additional VM, reservation or operation.
   @tag :hegel
   @tag :hegel_case_sandbox
+  # Each case now also admits through ProvisionWorker; 100 cases measured 59.9 s
+  # on a host at load ~40 (2026-10-30). Sized at about 3x that measurement.
+  @tag timeout: 180_000
   test "profile drafts survive refresh and reload before duplicate submission", %{conn: conn} do
     Hegel.check(
       fn ->
         Marshall.DataCase.isolate_property_case()
-        initial = draw("initial", member_of([nil, :oss, :customer, :standard]))
+        initial = draw("initial", member_of([nil, :oss, :standard]))
 
         changes =
           draw(
             "changes",
-            list_of(member_of([:refresh, :reload, :oss, :customer, :standard]), max_length: 8)
+            list_of(member_of([:refresh, :reload, :oss, :standard]), max_length: 8)
           )
 
         fixture = host_fixture()
@@ -44,6 +48,8 @@ defmodule MarshallWeb.DefaultProfileHistoryTest do
         view = draft_view(conn, url)
         expected = expected_profile(initial)
         assert has_element?(view, "#machine_profile option[selected][value='#{expected}']")
+        # Form creation opens an agent thread; Customer VMs have no agent root.
+        refute has_element?(view, "#machine_profile option[value='customer']")
 
         {view, url, expected} =
           Enum.reduce(changes ++ [:refresh, :reload], {view, url, expected}, fn
@@ -73,15 +79,18 @@ defmodule MarshallWeb.DefaultProfileHistoryTest do
 
         assert has_element?(view, "#machine_request_key[value='#{key}']")
         Ledger.update!(fixture.host, :report, %{reported_at: Ledger.now()})
-        view |> form("#provision-form", machine: %{}) |> render_submit()
+        # The form hands admission to a durable setup thread; ProvisionWorker
+        # admits the VM with the drafted profile.
+        thread = submit_provisioning(view)
+        assert {:snooze, _} = admit(thread)
         assert [%{id: id, profile: profile}] = Ledger.read!(VirtualMachine, owner_id: owner.id)
         assert Atom.to_string(profile) == expected
-        assert_redirect(view, "/machines/#{id}")
 
+        # Replaying the URL resolves to the same setup thread, not a new one.
         replay = draft_view(conn, url)
-        replay |> form("#provision-form", machine: %{}) |> render_submit()
-        assert_redirect(replay, "/machines/#{id}")
+        assert submit_provisioning(replay).id == thread.id
         assert [%{id: ^id}] = Ledger.read!(VirtualMachine, owner_id: owner.id)
+        assert [_thread] = Ledger.read!(Thread, creator_id: owner.id)
         assert length(Ledger.read!(Reservation, vm_id: id)) == 1
         assert length(Ledger.read!(Operation, vm_id: id)) == 1
       end,
@@ -110,6 +119,23 @@ defmodule MarshallWeb.DefaultProfileHistoryTest do
   @spec expected_profile(selection()) :: String.t()
   defp expected_profile(nil), do: "standard"
   defp expected_profile(profile), do: Atom.to_string(profile)
+
+  @spec submit_provisioning(Phoenix.LiveViewTest.View.t()) :: Thread.t()
+  defp submit_provisioning(view) do
+    view |> form("#provision-form", machine: %{}) |> render_submit()
+    {"/machines/provisioning/" <> thread_id, _flash} = assert_redirect(view)
+    [thread] = Ledger.read!(Thread, id: thread_id)
+    thread
+  end
+
+  @spec admit(Thread.t()) :: :ok | {:snooze, pos_integer()} | {:error, term()}
+  defp admit(thread) do
+    Oban.Testing.perform_job(
+      ProvisionWorker,
+      %{"thread_id" => thread.id, "machine_key" => thread.machine_key},
+      repo: Marshall.Repo
+    )
+  end
 
   @spec signed_in(Plug.Conn.t(), Marshall.Accounts.User.t()) :: Plug.Conn.t()
   defp signed_in(conn, user) do
