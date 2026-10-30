@@ -217,7 +217,9 @@ def select(root: Path, base: str, everything: bool) -> Selection:
     # global input selects everything regardless of which cells list it).
     cells = root / ".buck-cells" / "bin" / "buck2"
     buck2 = str(cells if cells.exists() else root / "tools" / "buck2")
-    present, deleted = changed_files(root, base)
+    # Selecting everything needs no base: the scheduled full run checks out
+    # one commit, so HEAD^ does not exist there.
+    present, deleted = ([], []) if everything else changed_files(root, base)
     files = present + deleted
     reasons = ["requested"] if everything else global_reasons(files)
     errors: list[Failure] = []
@@ -244,7 +246,7 @@ def select(root: Path, base: str, everything: bool) -> Selection:
         reasons = [f"{f} has no owning target" for f in sorted(unowned)]
         result = bxl(buck2, root, [], [], True)
     return Selection(
-        base=git(root, "rev-parse", base).strip(),
+        base="" if everything else git(root, "rev-parse", base).strip(),
         everything=bool(reasons),
         reasons=reasons,
         changed_files=files,
