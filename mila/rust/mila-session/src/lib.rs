@@ -58,10 +58,25 @@ pub struct ApplicationSession {
     seen_cursors: HashSet<Identifier>,
 }
 
+/// @cc [owner:ghuntley,label:protocol;security] mila-session-ssh-key-envelope
+/// `ssh-key list --json` output MUST be either Porsche's succeeded envelope
+/// (`{"version":1,"status":"succeeded","result":{"keys":[...]}}`) or a bare
+/// `{"keys":[...]}`; every key needs a canonical id and bounded printable
+/// fingerprint and algorithm. Any other status is refused.
 fn validate_ssh_keys(bytes: &[u8]) -> Result<(), SessionError> {
     let value: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|_| SessionError::Refused)?;
-    let keys = value
+    let body = match value.get("status") {
+        None => &value,
+        Some(status)
+            if status.as_str() == Some("succeeded")
+                && value.get("version").and_then(serde_json::Value::as_u64) == Some(1) =>
+        {
+            value.get("result").ok_or(SessionError::Refused)?
+        }
+        Some(_) => return Err(SessionError::Refused),
+    };
+    let keys = body
         .get("keys")
         .and_then(serde_json::Value::as_array)
         .ok_or(SessionError::Refused)?;
@@ -668,4 +683,40 @@ fn sort(machines: &mut [SnapshotMachine]) {
             &b.id,
         ))
     });
+}
+
+#[cfg(test)]
+mod ssh_key_envelope_tests {
+    use super::validate_ssh_keys;
+
+    const KEY: &str = r#"{"id":"11111111-1111-4111-8111-111111111111","label":"laptop","algorithm":"ecdsa-sha2-nistp256","fingerprint":"SHA256:abc","inserted_at":"2026-10-01T00:00:00Z"}"#;
+
+    #[test]
+    fn accepts_porsche_succeeded_envelope_and_bare_keys() {
+        let wrapped =
+            format!(r#"{{"version":1,"status":"succeeded","result":{{"keys":[{KEY}]}}}}"#);
+        assert!(validate_ssh_keys(wrapped.as_bytes()).is_ok());
+        let bare = format!(r#"{{"keys":[{KEY}]}}"#);
+        assert!(validate_ssh_keys(bare.as_bytes()).is_ok());
+        assert!(
+            validate_ssh_keys(br#"{"version":1,"status":"succeeded","result":{"keys":[]}}"#)
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn refuses_error_status_and_malformed_keys() {
+        assert!(
+            validate_ssh_keys(br#"{"version":1,"status":"error","error":"unauthorized"}"#).is_err()
+        );
+        assert!(
+            validate_ssh_keys(br#"{"version":2,"status":"succeeded","result":{"keys":[]}}"#)
+                .is_err()
+        );
+        assert!(validate_ssh_keys(br#"{"version":1,"status":"succeeded"}"#).is_err());
+        let bad_id = r#"{"keys":[{"id":"NOT-A-UUID","algorithm":"a","fingerprint":"f"}]}"#;
+        assert!(validate_ssh_keys(bad_id.as_bytes()).is_err());
+        let control = "{\"keys\":[{\"id\":\"11111111-1111-4111-8111-111111111111\",\"algorithm\":\"a\",\"fingerprint\":\"f\\u0001\"}]}";
+        assert!(validate_ssh_keys(control.as_bytes()).is_err());
+    }
 }
