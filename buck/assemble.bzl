@@ -40,7 +40,7 @@ nix_store_import = rule(
 )
 
 # GC roots live outside the repository: a store symlink under buck-out makes
-# the notify file watcher crawl and watch the whole closure on every start.
+# the file watcher crawl the whole closure on every start.
 def _gcroot_name(ctx: AnalysisContext) -> str:
     return str(ctx.label.raw_target()).replace("/", "_").replace(":", "__")
 

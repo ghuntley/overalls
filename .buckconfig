@@ -25,7 +25,13 @@
   execution_platforms = toolchains//:execution_platform
 
 [buck2]
-  file_watcher = notify
+# fs_hash_crawler holds no inotify watches. `notify` watches the whole root,
+# buck-out included despite project.ignore, at 20k-60k watches per daemon;
+# concurrent checkouts exhausted fs.inotify.max_user_watches and failed
+# commands with "OS file watch limit reached". Hosts use the same watcher
+# (ADR-0271). It re-crawls the sources per command (~1.3 s warm here); a
+# single checkout may set `notify` in .buckconfig.local.
+  file_watcher = fs_hash_crawler
   digest_algorithms = SHA256
 
 [project]
