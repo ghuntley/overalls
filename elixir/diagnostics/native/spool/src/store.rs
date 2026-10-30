@@ -315,10 +315,6 @@ impl Store {
     /// ACK MUST follow `SQLite` WAL FULL synchronous commit. Indexed immutable
     /// payloads MUST survive delivery ACKs and retention policy changes. Capacity
     /// exhaustion MUST refuse new data without deleting accepted custody.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn accept(&mut self, body: &[u8], now_ns: u64) -> Result<String, Error> {
         use rusqlite::OptionalExtension;
         if self.poisoned {
@@ -439,10 +435,6 @@ impl Store {
 
     /// @cc [owner:ghuntley,label:recovery] trace-archive-replay
     /// Replay MUST preserve accepted bytes and identity after upstream ACK.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn replay(&mut self) -> Result<(), Error> {
         if self.poisoned {
             return Err(Error::Poisoned);

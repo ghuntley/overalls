@@ -56,7 +56,8 @@ decision.
      - **rustc, deny:** `unsafe_op_in_unsafe_fn`, `unused_must_use`.
      - **rustc, warn:** `rust_2018_idioms`, `unused_qualifications`, trivial
        casts, `unreachable_pub`, `missing_debug_implementations`.
-     - **rustdoc:** `broken_intra_doc_links` is denied.
+     - **rustdoc:** left at its defaults. Denying `broken_intra_doc_links`
+       would reject every `/// @cc [owner:…]` contract tag as an unresolved link.
      - **clippy, warn:** the `all` and `pedantic` groups, plus `unwrap_used`,
        `expect_used`, `panic`, `todo`, `unimplemented`, `dbg_macro`,
        `undocumented_unsafe_blocks`, `multiple_unsafe_ops_per_block`,
