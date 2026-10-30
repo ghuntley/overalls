@@ -23,11 +23,6 @@ defmodule Lilly.Events do
     metadata: [pool_id: :uuid, outcome: :atom, duration_ms: :int]
   )
 
-  defevent("lilly.image_prewarm_retry_scheduled",
-    message: "Image prewarming retry scheduled after storage contention",
-    metadata: [pool_id: :uuid, attempt: :int, delay_ms: :int]
-  )
-
   defevent("lilly.image_template_quarantined",
     level: :warning,
     message: "Image template quarantined",

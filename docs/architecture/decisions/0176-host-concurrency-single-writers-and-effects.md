@@ -353,19 +353,6 @@ fast path inline and sends a miss to the steward. A create waits at most
 callers, that an expired wait does not cancel the build, and that a crashed
 build is reported.
 
-Prewarm treats `storage_busy` as contention, not as an outcome. Fleet machine
-tests showed the startup pool snapshot holding the pool lock for about
-1.2 s, longer than the template reservation's 1 s wait. Prewarm then gave up
-and left the first create to pay the whole inline template build. That took
-74 s on a 96-core host and 144 s with the fleet pinned to 8 CPUs, which is past
-the create's 2 min wait. [`ImagePrewarm`](../../../lilly/lib/lilly/host/image_prewarm.ex)
-now retries a busy prewarm with a doubling delay, from 5 s up to 60 s, for at
-most ten attempts. Retries run in the same process, so there is still one
-prewarm builder at a time, and they stop when that process stops (contract
-`image-prewarm-retries-busy`). [`ImagePrewarmTest`](../../../lilly/test/host/image_prewarm_test.exs)
-(`image-prewarm-busy-retried`) checks the retry, the attempt bound, that
-non-busy outcomes are not retried, and cancellation on stop.
-
 [`Image.load_cached/2`](../../../lilly/lib/lilly/host/image.ex) skips
 rehashing an unchanged configured image after a Lilly restart. It uses a
 private digest cache keyed by path, manifest ID and native nanosecond file
