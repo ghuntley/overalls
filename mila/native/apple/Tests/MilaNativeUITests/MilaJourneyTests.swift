@@ -7,8 +7,9 @@ import XCTest
 /// Trust reconciliation through the linked Rust ABI, with the shared transport fixture.
 final class MilaTrustDocumentTests: XCTestCase {
     private func ca(_ index: Int) throws -> String {
+        // Tests/MilaNativeUITests/<file> -> mila/native/apple -> mila
         let mila = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
-            .deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
         let data = try Data(contentsOf: mila.appendingPathComponent("rust/mila-transport/tests/fixtures/ssh_host_certificates.json"))
         let root = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
         let certificates = try XCTUnwrap(root["certificates"] as? [[String: Any]])
