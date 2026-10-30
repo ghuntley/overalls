@@ -3,6 +3,7 @@
 # actual releases and nested Firecracker guest. Pebble MUST validate real Audi
 # DNS proofs; no synthetic route or execution observation is injected. TLS trust
 # MUST remain verified. Private browser URLs/cookies MUST stay inside the client.
+import re
 from typing import Protocol
 
 
@@ -512,12 +513,15 @@ with subtest("guest reopens SSH after a later successful roster refresh"):
     )
     assert process_snapshot(vm) == before
 
-# @cc [owner:ghuntley,label:verification;recovery] audi-lilly-crash-closes-live-ingress
-# A killed packaged Lilly process MUST close already-established real SSH and
-# HTTP streams without stopping the independent guest VMM. Client timeouts MUST
-# NOT count as stream termination. Recovery MUST use fresh authenticated admission
-# with the unchanged strict SSH profile and verified HTTPS certificate.
-with subtest("Lilly process crash closes live ingress while preserving the guest"):
+# @cc [owner:ghuntley,label:verification;recovery] audi-lilly-crash-preserves-live-ingress
+# ADR-0187/ADR-0192: established real SSH and HTTP streams run in detached
+# lilly-ingress-bridge scopes outside lilly.service. A killed packaged Lilly
+# process MUST leave the same bridge processes, both live streams and the
+# independent guest VMM running; bytes MUST keep arriving after the restarted
+# Lilly re-adopts the bridges and past the 30 s adoption grace. Recovery MUST
+# still admit fresh authenticated connections with the unchanged strict SSH
+# profile and verified HTTPS certificate.
+with subtest("Lilly process crash preserves live ingress bridges and the guest"):
     operator(
         m1,
         dict(
@@ -530,64 +534,84 @@ with subtest("Lilly process crash closes live ingress while preserving the guest
         timeout=60,
     )
     client.wait_until_succeeds(ssh_environment + shlex.join([*ssh_arguments, "true"]), timeout=60)
-    crash_http = (
-        "import subprocess,pathlib; p=subprocess.Popen("
-        + repr(
+    bridge_pids = "pgrep -u lilly -f '/lilly-ingress-bridge --detached 5 3 4' || true"
+    idle_bridges = set(host.succeed(bridge_pids).split())
+    http_out = "/run/audi-crash-http.out"
+    ssh_out = "/var/lib/fleet-audi/crash-ssh.out"
+    client.succeed(
+        "systemd-run --quiet --no-block --unit=audi-crash-http "
+        f"--property=StandardOutput=file:{http_out} --property=StandardError=null "
+        + shlex.join(
             [
                 "/run/current-system/sw/bin/curl",
                 "--no-buffer",
                 "--silent",
                 "--show-error",
-                "--max-time",
-                "30",
                 "--cacert",
                 root + "/audi-root.pem",
                 "https://" + hostname + "/stream",
             ]
         )
-        + ",stdout=subprocess.PIPE,stderr=subprocess.DEVNULL); assert p.stdout.readline() == b'audi-guest\\n'; "
-        "pathlib.Path('/run/audi-crash-http-ready').touch(); "
-        "p.communicate(timeout=30); assert p.returncode in (0, 18, 52, 56)"
-    )
-    crash_ssh = (
-        "import os,subprocess,pathlib; os.environ['PATH']='/run/current-system/sw/bin'; "
-        "os.environ['HOME']='/home/tester'; os.environ['CURL_CA_BUNDLE']='/var/lib/fleet-audi/ca.crt'; "
-        "os.environ['SSL_CERT_FILE']='/var/lib/fleet-audi/ca.crt'; "
-        "p=subprocess.Popen("
-        + repr([*ssh_arguments, "while true; do printf 'audi-crash-live\\n'; sleep .1; done"])
-        + ",stdout=subprocess.PIPE,stderr=subprocess.DEVNULL); assert p.stdout.readline() == b'audi-crash-live\\n'; "
-        "pathlib.Path('/var/lib/fleet-audi/crash-ssh-ready').touch(); "
-        "p.communicate(timeout=30); assert p.returncode != 0"
-    )
-    client.succeed(
-        "systemd-run --quiet --no-block --unit=audi-crash-http "
-        "--property=Type=oneshot --property=RemainAfterExit=yes --property=StandardOutput=null "
-        "--property=StandardError=null python3 -c " + shlex.quote(crash_http)
     )
     client.succeed(
         "systemd-run --quiet --no-block --unit=audi-crash-ssh --property=User=tester "
-        "--property=Type=oneshot --property=RemainAfterExit=yes --property=StandardOutput=null "
-        "--property=StandardError=null /run/current-system/sw/bin/python3 -c "
-        + shlex.quote(crash_ssh)
+        "--property=Environment=PATH=/run/current-system/sw/bin "
+        "--property=Environment=HOME=/home/tester "
+        "--property=Environment=CURL_CA_BUNDLE=/var/lib/fleet-audi/ca.crt "
+        "--property=Environment=SSL_CERT_FILE=/var/lib/fleet-audi/ca.crt "
+        f"--property=StandardOutput=file:{ssh_out} --property=StandardError=null "
+        + shlex.join([*ssh_arguments, "while true; do printf 'audi-crash-live\\n'; sleep .1; done"])
     )
-    wait_audi_stream("audi-crash-http.service", "/run/audi-crash-http-ready")
-    wait_audi_stream("audi-crash-ssh.service", "/var/lib/fleet-audi/crash-ssh-ready")
+    client.wait_until_succeeds(f"grep -qx audi-guest {http_out}", timeout=60)
+    client.wait_until_succeeds(f"grep -qx audi-crash-live {ssh_out}", timeout=60)
+
+    def live_bridges() -> set[str]:
+        return set(host.succeed(bridge_pids).split()) - idle_bridges
+
+    eventually(lambda: len(live_bridges()) >= 2, timeout=30)
+    stream_bridges = live_bridges()
+    for pid in stream_bridges:
+        cgroup = host.succeed(f"cat /proc/{pid}/cgroup").strip()
+        assert re.fullmatch(
+            r"0::/lilly_ingress\.slice/lilly-ingress-[0-9a-f]{32}\.scope", cgroup
+        ), cgroup
+
+    def streams_flowing() -> None:
+        for unit in ("audi-crash-http.service", "audi-crash-ssh.service"):
+            client.succeed("systemctl is-active --quiet " + unit)
+        sizes = client.succeed(f"stat -c %s {http_out} {ssh_out}").split()
+        client.wait_until_succeeds(
+            f"test $(stat -c %s {http_out}) -gt {sizes[0]} "
+            f"&& test $(stat -c %s {ssh_out}) -gt {sizes[1]}",
+            timeout=10,
+        )
+        for pid in stream_bridges:
+            host.succeed(f"kill -0 {pid}")
+
     lilly_before = host.succeed("systemctl show lilly.service --property=MainPID --value").strip()
     assert int(lilly_before) > 0
     profile_before_crash = client.succeed("sha256sum " + ssh_root + "/ssh.conf").strip()
+    epoch = host.succeed("date +%s").strip()
     host.succeed("systemctl kill --signal=KILL --kill-whom=main lilly.service")
-    for service in ("audi-crash-http.service", "audi-crash-ssh.service"):
-        client.wait_for_unit(service, timeout=8)
-        assert (
-            client.succeed(
-                "systemctl show " + service + " --property=ExecMainStatus --value"
-            ).strip()
-            == "0"
-        )
+    streams_flowing()
     assert process_snapshot(vm) == before
-    host.wait_for_unit("lilly.service", timeout=60)
+    host.wait_until_succeeds(
+        'systemctl is-active --quiet lilly.service && test "$(systemctl show lilly.service '
+        f'--property=MainPID --value)" != {lilly_before}',
+        timeout=120,
+    )
     lilly_after = host.succeed("systemctl show lilly.service --property=MainPID --value").strip()
     assert int(lilly_after) > 0 and lilly_after != lilly_before
+    host.wait_until_succeeds(
+        f"journalctl -u lilly.service -o cat --since @{epoch} "
+        '| grep -E \'"event":"lilly.ingress_bridges_adopted".*"adopting":[1-9]\'',
+        timeout=120,
+    )
+    streams_flowing()
+    # Past the adoption grace the keepers guard the bridges rather than end them.
+    client.succeed("sleep 35")
+    streams_flowing()
+    assert process_snapshot(vm) == before
     client.wait_until_succeeds(ssh_environment + shlex.join([*ssh_arguments, "true"]), timeout=90)
     client.wait_until_succeeds(
         f"curl --fail --silent --max-time 10 --cacert {root}/audi-root.pem "
@@ -595,6 +619,10 @@ with subtest("Lilly process crash closes live ingress while preserving the guest
         timeout=90,
     )
     assert client.succeed("sha256sum " + ssh_root + "/ssh.conf").strip() == profile_before_crash
+    # Closing the clients ends their bridges by themselves.
+    client.succeed("systemctl stop audi-crash-http.service audi-crash-ssh.service")
+    for pid in stream_bridges:
+        host.wait_until_fails(f"kill -0 {pid}", timeout=60)
     assert process_snapshot(vm) == before
     operator(
         m1,

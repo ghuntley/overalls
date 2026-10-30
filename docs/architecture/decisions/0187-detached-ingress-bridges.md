@@ -228,6 +228,17 @@ authority, not this path, and are unchanged (see ADR-0192).
   ([`user-ssh-journey.py`](../../../nix/verification/tests/machines/fleet/scenarios/user-ssh-journey.py))
   passed in a native `user-ssh-journey-fleet` run on 2026-10-17 (64.99 s
   within 16 passing subtests).
+- Machine test: the Audi fleet subtest "Lilly process crash preserves live
+  ingress bridges and the guest"
+  ([`audi.py`](../../../nix/verification/tests/machines/fleet/scenarios/audi.py),
+  `audi-lilly-crash-preserves-live-ingress`) SIGKILLs the packaged Lilly with a
+  live public HTTP stream and a live strict-profile SSH stream through Audi,
+  and asserts the same bridge processes in `lilly_ingress.slice`, bytes still
+  arriving after re-adoption and past the 30-second grace, the unchanged guest
+  VMM, and fresh admission afterwards. It replaced an older assertion that a
+  Lilly crash closes live ingress, which contradicted decision 2 here. It
+  passed in a native `audi-fleet` run on 2026-10-30 (62.60 s within 19
+  passing subtests).
 
 - SSH renewal correction: [`Sessions`](../../../marshall/lib/marshall/ingress/sessions.ex)
   (`:renew_ssh`), tests in

@@ -1472,7 +1472,7 @@ assert !otelAudiSsh || (builtins.length otelAudiSshScenarioParts == 2
   && lib.hasInfix "audi-ssh-native-collector-outcome" (builtins.head otelAudiSshScenarioParts)
   && lib.hasInfix "for metric in (\"requests\", \"successes\")" (builtins.head otelAudiSshScenarioParts)
   && !(lib.hasInfix "action=\"share\"" (builtins.head otelAudiSshScenarioParts))
-  && !(lib.hasInfix "with subtest(\"Lilly process crash closes live ingress" (builtins.head otelAudiSshScenarioParts)));
+  && !(lib.hasInfix "with subtest(\"Lilly process crash preserves live ingress" (builtins.head otelAudiSshScenarioParts)));
 assert !guestCliRecovery || (agent && galileo && audi);
 assert !executorLoss || (agent && galileo && audi && agentCli && !ubuntu);
 assert !serverTool || (agent && galileo && audi && !ubuntu && !agentCli && !guestCliRecovery && !executorLoss && !otelGuest && !(artifactAgentPublish && threadTool));

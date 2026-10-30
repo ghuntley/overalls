@@ -179,6 +179,16 @@ with subtest("disabled host fixtures become usable only after real authenticated
         m1.succeed(f"fleet-op galileo-rotate {binding['host']} 14400 {token}", timeout=180)
         transfer(m1, token, machine, root + "/galileo.token")
         machine.succeed("fleet-seal-galileo")
+        # @cc [owner:ghuntley,label:verification;recovery] fleet-peach-bundle-sealed-dormant
+        # Every fleet host declares the Peach SOPS bundle, and the real updater
+        # stages every declared bundle before activation. Seal a credential
+        # issued by the real Marshall domain at enrollment so the bundle
+        # resolves like a deployed host; Peach itself stays stopped until a
+        # scenario starts it (peach-fleet-explicit-start).
+        token = f"{root}/peach-{machine.name}.token"
+        operator(m1, dict(action="peach-enroll", host_id=binding["host"], output=token))
+        transfer(m1, token, machine, root + "/peach.token")
+        machine.succeed("fleet-seal-peach")
         if galileo_enabled or ssh_private_enabled:
             transfer(m1, root + "/audi-root.pem", machine, "/run/galileo-audi-root.pem")
             machine.succeed("chmod 0444 /run/galileo-audi-root.pem")
