@@ -7,7 +7,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -16,7 +16,7 @@ import native_services as services
 
 
 @contextmanager
-def child() -> Iterator[subprocess.Popen[bytes]]:
+def child() -> Generator[subprocess.Popen[bytes]]:
     with subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(60)"],
         stdin=subprocess.DEVNULL,

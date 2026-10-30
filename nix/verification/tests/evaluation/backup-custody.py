@@ -15,7 +15,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 from typing import TypedDict
 
@@ -323,7 +323,7 @@ class Fixture:
 
 
 @contextlib.contextmanager
-def fixture() -> Iterator[Fixture]:
+def fixture() -> Generator[Fixture]:
     with tempfile.TemporaryDirectory(prefix="overalls-backup-custody-") as temporary:
         root = Path(temporary)
         try:

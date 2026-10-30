@@ -67,7 +67,7 @@ in {
         '';
         postStart = ''
           ${pkgs.coreutils}/bin/chgrp audi-private-signing /run/audi-private-issuer
-          for attempt in $(${pkgs.coreutils}/bin/seq 1 100); do
+          for attempt in $(${pkgs.coreutils}/bin/seq 1 900); do
             if test -S /run/audi-private-issuer/issuer.sock; then
               ${pkgs.coreutils}/bin/chgrp audi-private-signing /run/audi-private-issuer/issuer.sock
               ${pkgs.coreutils}/bin/chmod 0660 /run/audi-private-issuer/issuer.sock

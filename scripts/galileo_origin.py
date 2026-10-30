@@ -49,8 +49,15 @@ class Handler(BaseHTTPRequestHandler):
     bodies and peer tokens MUST NOT enter response bodies, logs or evidence.
     """
 
-    server: Origin
     protocol_version = "HTTP/1.1"
+
+    @property
+    def origin(self) -> Origin:
+        """The serving Origin, narrowed from BaseServer at runtime."""
+        server = self.server
+        if not isinstance(server, Origin):
+            raise TypeError("Handler must be served by Origin")
+        return server
 
     def log_message(self, format: str, *args: object) -> None:
         pass
@@ -95,7 +102,7 @@ class Handler(BaseHTTPRequestHandler):
         except ValueError:
             self.send_error(400)
             return
-        self.server.observe(case, accepted=True)
+        self.origin.observe(case, accepted=True)
         if case == "stall":
             deadline = time.monotonic() + 60
             while time.monotonic() < deadline:
@@ -106,12 +113,12 @@ class Handler(BaseHTTPRequestHandler):
                     except ConnectionError:
                         closed = True
                     if closed:
-                        self.server.observe(case, closed=True)
+                        self.origin.observe(case, closed=True)
                         self.close_connection = True
                         return
-            with self.server.lock:
-                self.server.observations[case]["timed_out"] = True
-            self.server.observe(case)
+            with self.origin.lock:
+                self.origin.observations[case]["timed_out"] = True
+            self.origin.observe(case)
             self.close_connection = True
             return
 
@@ -120,7 +127,7 @@ class Handler(BaseHTTPRequestHandler):
             "bearer": self.headers.get_all("authorization") == ["Bearer galileo-synthetic"],
             "basic": self.headers.get_all("authorization") == ["Basic " + basic],
             "static": self.headers.get_all("x-galileo-fixture") == ["galileo-synthetic"],
-            "peer": self.headers.get_all("x-overalls-source-vm") == [self.server.source],
+            "peer": self.headers.get_all("x-overalls-source-vm") == [self.origin.source],
             "authorization_absent": self.headers.get_all("authorization") is None,
             "path": case,
             "query_preserved": path.query == "probe=galileo",

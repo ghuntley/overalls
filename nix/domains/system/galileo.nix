@@ -88,7 +88,7 @@ in {
       '';
       postStart = ''
         ${pkgs.coreutils}/bin/chgrp galileo-proxy /run/galileo
-        for attempt in $(${pkgs.coreutils}/bin/seq 1 100); do
+        for attempt in $(${pkgs.coreutils}/bin/seq 1 900); do
           if test -S /run/galileo/proxy.sock; then
             ${pkgs.coreutils}/bin/chgrp galileo-proxy /run/galileo/proxy.sock
             ${pkgs.coreutils}/bin/chmod 0660 /run/galileo/proxy.sock

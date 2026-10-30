@@ -8,7 +8,7 @@ import struct
 import tempfile
 import time
 import unittest
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
 from pathlib import Path
@@ -39,7 +39,7 @@ class TerminalFixture:
         return self.elapsed
 
     @contextmanager
-    def connect(self, _uds: Path, port: int) -> Iterator[services.Connection]:
+    def connect(self, _uds: Path, port: int) -> Generator[services.Connection]:
         if port != 1075:
             raise AssertionError("unexpected synthetic service port")
         channel = TerminalConnection(self)
@@ -132,7 +132,7 @@ class TerminalConnection(services.Connection):
 
 
 @contextmanager
-def peer(handler: Callable[[services.Connection], None]) -> Iterator[Path]:
+def peer(handler: Callable[[services.Connection], None]) -> Generator[Path]:
     """One bounded local Firecracker handshake fixture, without a guest VM."""
     with tempfile.TemporaryDirectory(prefix="native-services-") as directory:
         path = Path(directory) / "v.sock"

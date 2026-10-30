@@ -15,7 +15,7 @@ import socket
 import struct
 import time
 import uuid
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -192,7 +192,7 @@ class Connection:
 
 
 @contextmanager
-def connect(uds: Path, port: int) -> Iterator[Connection]:
+def connect(uds: Path, port: int) -> Generator[Connection]:
     """Use the existing jail-local Firecracker channel, without guest TCP ports."""
     if type(port) is not int or not 0 < port <= 0xFFFF_FFFF:
         raise ValueError("invalid native service port")

@@ -14,7 +14,7 @@ import struct
 import subprocess
 import sys
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Generator
 from pathlib import Path
 from typing import NoReturn, TypedDict
 
@@ -254,7 +254,7 @@ def interrupt(*_: object) -> NoReturn:
 
 
 @contextlib.contextmanager
-def identity(key_file: str, work: Path) -> Iterator[tuple[dict[str, str], str]]:
+def identity(key_file: str, work: Path) -> Generator[tuple[dict[str, str], str]]:
     key = private_path(key_file)
     private = read_regular(key, private=True)
     # Copy the validated input so the converter never follows a swapped source.

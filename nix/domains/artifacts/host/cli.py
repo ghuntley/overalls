@@ -11,7 +11,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
-from collections.abc import Callable, Iterator, Mapping
+from collections.abc import Callable, Generator, Mapping
 from pathlib import Path
 from typing import NotRequired, TypedDict
 
@@ -279,7 +279,7 @@ def validate(h: Host) -> Host:
 
 
 @contextlib.contextmanager
-def published(repository: str, revision: str) -> Iterator[Path]:
+def published(repository: str, revision: str) -> Generator[Path]:
     if not re.fullmatch(r"[0-9a-f]{40}", revision):
         raise Failure("Use a full published Git commit")
     if not repository.startswith("ssh://") or not re.fullmatch(

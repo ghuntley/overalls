@@ -186,6 +186,9 @@ def main() -> None:
     admin_id, ordinary_id, target_id = (
         fixture_id(name) for name in ["admin", "ordinary", "target"]
     )
+    # Loaded CI runners need longer than Playwright's 5 s expect default for
+    # LiveView mounts; explicit tighter timeouts below still apply.
+    expect.set_options(timeout=30000)
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(
             executable_path="/run/current-system/sw/bin/chromium", args=["--no-sandbox"]

@@ -33,7 +33,9 @@
   '';
   postStart = ''
       ${pkgs.coreutils}/bin/chgrp ziggy-proxy /run/ziggy
-    for attempt in $(${pkgs.coreutils}/bin/seq 1 100); do
+    # The release can take well over 10 s to open its socket on loaded
+    # hosts; wait up to systemd's default 90 s start budget.
+    for attempt in $(${pkgs.coreutils}/bin/seq 1 900); do
       if test -S /run/ziggy/proxy.sock; then
         ${pkgs.coreutils}/bin/chgrp ziggy-proxy /run/ziggy/proxy.sock
         ${pkgs.coreutils}/bin/chmod 0660 /run/ziggy/proxy.sock

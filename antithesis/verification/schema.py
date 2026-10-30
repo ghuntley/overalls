@@ -6,7 +6,7 @@ import fcntl
 import json
 import os
 import tempfile
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -100,7 +100,7 @@ def atomic_json(path: Path, data: Json) -> None:
 
 
 @contextmanager
-def locked(path: Path) -> Iterator[None]:
+def locked(path: Path) -> Generator[None]:
     path.parent.mkdir(parents=True, exist_ok=True)
     descriptor = os.open(path.with_suffix(path.suffix + ".lock"), os.O_CREAT | os.O_RDWR, 0o600)
     try:

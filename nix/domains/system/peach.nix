@@ -69,7 +69,7 @@ in {
       '';
       postStart = ''
         ${pkgs.coreutils}/bin/chgrp peach-proxy /run/peach
-        for attempt in $(${pkgs.coreutils}/bin/seq 1 100); do
+        for attempt in $(${pkgs.coreutils}/bin/seq 1 900); do
           if test -S ${cfg.socket}; then
             ${pkgs.coreutils}/bin/chgrp peach-proxy ${cfg.socket}
             ${pkgs.coreutils}/bin/chmod 0660 ${cfg.socket}

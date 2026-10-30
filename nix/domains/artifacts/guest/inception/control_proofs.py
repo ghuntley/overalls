@@ -8,7 +8,7 @@ import secrets
 import stat
 import sys
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from typing import TypedDict
@@ -58,7 +58,7 @@ def now() -> int:
 
 
 @contextmanager
-def job_lock(root: Path) -> Iterator[None]:
+def job_lock(root: Path) -> Generator[None]:
     private_directory(root)
     fd = os.open(root / "job.lock", os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
     with os.fdopen(fd, "r+b") as lock:

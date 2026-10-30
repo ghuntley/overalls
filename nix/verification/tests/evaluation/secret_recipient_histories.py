@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 import traceback
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -374,7 +374,7 @@ class Fixture:
 
 
 @contextmanager
-def fixture(cli: Path) -> Iterator[Fixture]:
+def fixture(cli: Path) -> Generator[Fixture]:
     with tempfile.TemporaryDirectory(prefix="overalls-recipient-history-") as directory:
         root = Path(directory)
         require(stat.S_IMODE(root.stat().st_mode) == 0o700, "unsafe fixture root")

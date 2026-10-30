@@ -80,7 +80,7 @@ in {
         done
       '';
       postStart = lib.mkIf otelEnabled ''
-        for attempt in $(${pkgs.coreutils}/bin/seq 1 100); do
+        for attempt in $(${pkgs.coreutils}/bin/seq 1 900); do
           if test -S /run/enrico/status.sock; then
             ${pkgs.coreutils}/bin/chmod 0660 /run/enrico/status.sock
             exit 0

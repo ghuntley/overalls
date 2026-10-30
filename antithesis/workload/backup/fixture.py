@@ -13,7 +13,7 @@ import sys
 import tempfile
 import time
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -330,7 +330,7 @@ class BackupFixture:
         self.config["restic"] = str(RESTIC)
 
     @contextmanager
-    def backward_clock_step(self) -> Iterator[None]:
+    def backward_clock_step(self) -> Generator[None]:
         """@cc [owner:ghuntley,label:verification] backup-backward-clock-step-stub
         STUB (harness): operator runs inside this context preload libfaketime
         with a spec file that starts at real time. The Restic wrapper rewrites
@@ -427,7 +427,7 @@ def fixture_root() -> Path | None:
 
 
 @contextmanager
-def fixture(keep_last: int = 2) -> Iterator[BackupFixture]:
+def fixture(keep_last: int = 2) -> Generator[BackupFixture]:
     if not MODULES.joinpath("runtime.py").is_file() or not RESTIC.is_file():
         raise RuntimeError("production backup modules or Restic closure absent")
     with tempfile.TemporaryDirectory(

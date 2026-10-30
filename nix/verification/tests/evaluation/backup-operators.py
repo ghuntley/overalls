@@ -20,7 +20,7 @@ import tempfile
 import time
 import unittest
 import uuid
-from collections.abc import Iterator, Sequence
+from collections.abc import Generator, Sequence
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
@@ -417,7 +417,7 @@ def wait_for_marker(process: subprocess.Popen[bytes], marker: Path, timeout: flo
 
 
 @contextmanager
-def fixture() -> Iterator[Fixture]:
+def fixture() -> Generator[Fixture]:
     with tempfile.TemporaryDirectory(prefix="overalls-backup-operators-") as temporary:
         root = Path(temporary)
         # Assert cleanup even when a property or a subprocess fails.

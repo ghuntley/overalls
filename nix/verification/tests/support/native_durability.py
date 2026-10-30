@@ -21,7 +21,7 @@ import subprocess
 import tempfile
 import threading
 import time
-from collections.abc import Iterator
+from collections.abc import Generator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -273,7 +273,7 @@ class Host:
             path.unlink()
 
     @contextmanager
-    def launched(self, arguments: list[str]) -> Iterator[subprocess.Popen[bytes]]:
+    def launched(self, arguments: list[str]) -> Generator[subprocess.Popen[bytes]]:
         with (
             (self.work / "serial.log").open("ab") as serial,
             (self.work / "vmm-stderr.log").open("ab") as stderr,
@@ -287,7 +287,7 @@ class Host:
                 runner.cleanup_vm(process)
 
     @contextmanager
-    def ready(self, current: services.Binding) -> Iterator[runner.BootContext]:
+    def ready(self, current: services.Binding) -> Generator[runner.BootContext]:
         """Boot to complete readiness under isolated authority; the caller ends the boot."""
         self.prepare(current)
         with self.launched(self.arguments()) as process:
