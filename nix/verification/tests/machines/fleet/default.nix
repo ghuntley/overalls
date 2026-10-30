@@ -130,11 +130,22 @@ let
   # plus about 0.9 GB; the enrolled overhead is 512 MiB.
   raceUsed = guestManifest.minimum_disk_bytes + GiB + GiB / 2;
   raceGiB = ceilDiv (raceUsed + raceReservation * 5 / 2) GiB;
+  # @cc [owner:ghuntley,label:verification;capacity] fleet-guest-trust-derived-nixos-shape
+  # The guest-trust NixOS root request MUST be the alternative image's minimum
+  # disk rounded up to whole GiB (at least 4 GiB), and its pool MUST hold three
+  # such root-plus-bundle reservations beside both images' rootfs, 1 GiB of
+  # pool metadata and the 512 MiB enrolled overhead. Sizes come from the real
+  # manifests, so image growth cannot silently make the three-guest admission
+  # or the minimum-disk check impossible; admission still reads actual capacity.
+  trustNixosManifest = builtins.fromJSON (builtins.unsafeDiscardStringContext (builtins.readFile "${nixosGuest}/manifest.json"));
+  trustNixosDiskBytes = (lib.max 4 (ceilDiv trustNixosManifest.minimum_disk_bytes GiB)) * GiB;
+  trustGiB = ceilDiv (guestManifest.minimum_disk_bytes + trustNixosManifest.minimum_disk_bytes
+    + GiB + GiB / 2 + 3 * (trustNixosDiskBytes + GiB)) GiB;
   # @cc [owner:ghuntley,label:verification;capacity] suspension-fixture-checkpoint-headroom
   # Suspension scenarios MUST provide room for two full RAM checkpoints plus
   # destination disk/checkpoint transfer holds. Admission MUST still use actual
   # reported pool allocation; this budget MUST NOT fabricate free capacity.
-  storageGiB = if suspension then lib.max 64 raceGiB else if codingClis || cloning || cloneDestinationLoss || cloneMarshallRestart then lib.max 32 raceGiB else raceGiB;
+  storageGiB = if suspension then lib.max 64 raceGiB else if codingClis || cloning || cloneDestinationLoss || cloneMarshallRestart then lib.max 32 raceGiB else if guestTrust then lib.max trustGiB raceGiB else raceGiB;
   storageBudget = storageGiB * 1024 * 1024 * 1024;
   # @cc [owner:ghuntley,label:verification;capacity] editor-native-default-memory-budget
   # Editor, suspension and coding-client fixtures MUST retain the real 1 GiB host overhead and 64 MiB VMM
@@ -1434,9 +1445,10 @@ assert !sshRosterMatrix || (audi && relocation && !porsche && !cloning);
 # The plain fleet's pool MUST leave free space, after the template, first guest
 # and overhead, of at least two and fewer than three real startup reservations
 # for the selected image, so image growth fails here rather than as a timeout.
+# Guest trust runs no startup race; its pool is sized for three NixOS guests.
 assert builtins.isInt guestManifest.minimum_disk_bytes
   && (let free = storageGiB * GiB - raceUsed;
-      in suspension || cloning || codingClis || cloneDestinationLoss || cloneMarshallRestart
+      in suspension || cloning || codingClis || cloneDestinationLoss || cloneMarshallRestart || guestTrust
         || (free >= 2 * raceReservation && free < 3 * raceReservation));
 # @cc [owner:ghuntley,label:verification] resize-fixture-image-minima
 # The selected real image's numeric disk/memory minima MUST fit the fixed
@@ -1819,6 +1831,7 @@ assert editorFamily == null || (editor && !ubuntu
   ]
   else if guestTrust then ''
     storage_budget = ${toString storageBudget}
+    nixos_guest_disk_bytes = ${toString trustNixosDiskBytes}
     storage_images = "${storage}"
     qemu_img = "${pkgs.qemu_kvm}/bin/qemu-img"
     host_bindings = ${builtins.toJSON hosts}

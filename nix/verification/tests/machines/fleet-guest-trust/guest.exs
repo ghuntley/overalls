@@ -53,8 +53,11 @@ defmodule FleetGuestTrust do
     :final_delivery
   ]
 
+  @receipt_boot_fields [:placement_id, :execution_epoch, :generation, :boot_challenge]
+
   # @cc [owner:ghuntley,label:verification;security] fleet-trust-real-boot-receipt
-  # The probe MUST compare real journal, current boot and configured roots, then
+  # The probe MUST compare real journal, current boot and configured roots,
+  # including the readiness-recorded guest boot UUID against the receipt, then
   # reject a wrong-boot vsock exchange without writing journal or guest authority.
   # It MUST check actual guest bundle/service ordering and retained data; only
   # the public boot UUID or a closed failure stage may leave the probe, never
@@ -98,7 +101,14 @@ defmodule FleetGuestTrust do
     true = receipt["bundle_digest"] == GuestTrust.digest(roots)
     true = OverallsProtocol.uuid?(receipt["boot_id"])
     true = receipt["host_id"] == runtime.execution.network.host_id
-    true = Enum.all?(boot, fn {key, value} -> receipt[Atom.to_string(key)] == value end)
+    # The receipt binds the boot's placement, epoch, generation and challenge.
+    # Readiness then records the attested guest kernel boot UUID in the boot
+    # record (never a field of the trust receipt); it MUST equal the receipt's
+    # boot UUID. A fresh boot carries no continuation or other boot field.
+    {guest_boot_id, bound} = Map.pop(boot, :guest_boot_id)
+    true = Map.keys(bound) -- @receipt_boot_fields == [] and map_size(bound) == 4
+    true = Enum.all?(bound, fn {key, value} -> receipt[Atom.to_string(key)] == value end)
+    true = guest_boot_id == receipt["boot_id"]
 
     socket_path =
       Path.join([pool.path, ".lilly-jails", "firecracker", placement, "root", "v.sock"])

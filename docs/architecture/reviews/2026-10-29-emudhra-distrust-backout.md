@@ -95,11 +95,32 @@ All runs were on 2026-10-29, locally and on the tribuchet remote builders.
   check sets.
 - `galileo-fleet` failed its "source relocation" subtest the same way on
   trunk `543a147fe`, so the failure predates this change.
-- `fleet-guest-trust` failed twice on these pins: once at the receipt stage of
-  its third subtest, then at its second subtest with a broken pipe. Trunk
-  `543a147fe` failed its second subtest with a fixture timeout, with host load
-  around 30. No run on either tree has yet reached the receipt stage cleanly, so
-  this is an open gap rather than evidence either way.
+- `fleet-guest-trust` failed on these pins and on trunk `543a147fe` for four
+  separate reasons. None was load-related, and none was a product defect in
+  guest trust:
+  - Trunk `543a147fe`'s subtest-2 timeout: Lilly refused its configuration
+    (`invalid LILLY_CONFIG_FILE`) because of the fixture's credential filename.
+    `7c4ad7458` and the Lilly restart-sequencing commits had already fixed this.
+  - The broken pipe: host-side Ziggy hit its 512 MiB fixture `MemoryMax`, and
+    the test kernel's compulsory `panic_on_oom` rebooted the provisioner. This
+    happened in 2 of 4 runs. Ziggy's first LLMDB lookup alone peaks near
+    460 MiB RSS in a bare release. Every fleet variant now caps Ziggy at
+    1024 MiB (`fleet-ziggy-host-startup-budget`). Production's 4096 MiB default
+    is unchanged.
+  - The receipt stage: the probe compared every boot-record field with the trust
+    receipt. Since `9b46af85d`, readiness also records `guest_boot_id`, which the
+    receipt does not carry, so this always failed. A temporary closed-stage
+    diagnostic identified the field. The probe now compares the four bound fields
+    exactly and requires `guest_boot_id` to equal the receipt's boot UUID.
+  - After that fix, the NixOS provision failed the operator's minimum-disk check.
+    On these pins the NixOS image needs 4.31 GiB, more than the hard-coded 4 GiB
+    root. The fixture now derives the NixOS root from the manifest (5 GiB). The
+    pool (27 GiB), the expected holds and an over-quota 64 GiB refusal root
+    follow from it (`fleet-guest-trust-derived-nixos-shape`).
+
+  With these fixes, two consecutive runs passed all four subtests (the second
+  with `--rebuild`, test script 432.6 s and 425.1 s), as did
+  `fleet-guest-trust-configuration`.
 - Marshall: every failing location of a full suite run was rerun on these pins
   and on trunk.
   - Both trees fail the same tests: documentation inventory, logged-out docs,

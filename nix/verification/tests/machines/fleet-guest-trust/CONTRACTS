@@ -26,8 +26,9 @@ periodic marker replacement MUST NOT be mistaken for persistent unavailability.
 The fixture MUST NOT create markers or restart services to satisfy this check.
 
 @cc [owner:ghuntley,label:verification;capacity] fleet-native-physical-refusal
-Three usable NixOS guests MUST retain exactly three disk ownership holds totaling
-15 GiB. Settled virtual promises MUST NOT be treated as a physical admission cap.
+Three usable NixOS guests MUST retain exactly three disk ownership holds, each
+the fixture's manifest-derived NixOS root plus the 1 GiB workload bundle.
+Settled virtual promises MUST NOT be treated as a physical admission cap.
 The refusal control MUST keep the successful actor, image, profile and compute
 shape, request a valid root larger than the independently read actual pool quota,
 and observe insufficient_capacity without adding a VM or changing those holds.

@@ -25,12 +25,15 @@ in {
   lilly = { nodes, ... }: {
     networking.extraHosts = "${nodes.m1.networking.primaryIPAddress} api.openai.com api.anthropic.com";
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
-    # @cc [owner:ghuntley,label:verification;capacity] fleet-coding-clis-host-provider-budget
-    # Only the selected coding-client fixture may raise Ziggy's test override
-    # to 1024 MiB after the recorded 512 MiB startup cgroup OOM. This host-side
-    # fixture allowance MUST NOT change guest resource or headroom assertions,
-    # other fleet variants, or the production Ziggy memory default.
-    services.ziggy = { enable = true; secretsFile = "${root}/ziggy.enc.json"; cpuCores = 1; memoryMiB = if codingClis then 1024 else 512; agentEnable = agent; };
+    # @cc [owner:ghuntley,label:verification;capacity] fleet-ziggy-host-startup-budget
+    # Every fleet variant MUST cap host-side Ziggy at 1024 MiB. Ziggy's first
+    # catalog discovery loads the packaged LLMDB snapshot, which alone peaks
+    # near 460 MiB RSS in a bare release; at 512 MiB the cgroup OOM, with the
+    # test kernel's compulsory panic_on_oom, reboots the provisioner (recorded
+    # in coding-clis and fleet-guest-trust runs). This host-side cap MUST NOT
+    # change guest resource or headroom assertions or the production Ziggy
+    # memory default.
+    services.ziggy = { enable = true; secretsFile = "${root}/ziggy.enc.json"; cpuCores = 1; memoryMiB = 1024; agentEnable = agent; };
     services.galileo = { enable = true; secretsFile = "${root}/galileo.enc.json"; cpuCores = 1; memoryMiB = 512; };
     systemd.services.fleet-ziggy-credentials = {
       serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 600; };

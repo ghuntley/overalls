@@ -112,6 +112,14 @@ matrices were evaluated but not rerun; historical feature results retain their
 original scope. Terminal trust-retry exhaustion remains unverified, so this
 decision's implementation stays partial.
 
+The [2026-10-29 pin-bump review](../reviews/2026-10-29-emudhra-distrust-backout.md)
+records two consecutive passing [fleet-guest-trust](../../../nix/verification/tests/machines/fleet-guest-trust/driver.py)
+runs on 2026-10-30. They followed fixture-only corrections: the
+[probe](../../../nix/verification/tests/machines/fleet-guest-trust/guest.exs)
+now binds the readiness-recorded guest boot UUID to the receipt, and the NixOS
+root is derived from the image manifest. The decision and its implementation
+status are unchanged.
+
 [ADR-0154](0154-guest-boot-profile.md) adds a delivery-time optimization
 without changing this decision. Every boot still delivers and verifies the
 host's current set before networking. An Ubuntu image now ships its

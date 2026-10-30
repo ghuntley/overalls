@@ -308,6 +308,9 @@ with subtest("NixOS and Ubuntu boot trust survives refused stale delivery and re
     owner_id = identifier(users["owner_id"])
     used_hosts: set[str] = set()
     native_guests: dict[str, tuple[TrustMachine, str, str]] = {}
+    # Ubuntu's minimum fits the historical 4 GiB root; the NixOS root is derived
+    # from its real manifest minimum (whole GiB, at least 4 GiB) by the fixture.
+    root_bytes: dict[str, int] = {"ubuntu": 4294967296, "nixos": nixos_guest_disk_bytes}
     for distribution, image_field in (("ubuntu", "image_id"), ("nixos", "alternative_image_id")):
         image_id = image_identifier(users[image_field])
         request: dict[str, object] = dict(
@@ -315,7 +318,7 @@ with subtest("NixOS and Ubuntu boot trust survives refused stale delivery and re
             owner_id=owner_id,
             image_id=image_id,
             profile="oss",
-            disk_bytes=4294967296,
+            disk_bytes=root_bytes[distribution],
             key=str(uuid.uuid4()),
         )
         result = admit_request(request)
@@ -369,7 +372,7 @@ with subtest("real enlarged fixture pool admits three trust-enabled NixOS guests
             owner_id=owner_id,
             image_id=image_id,
             profile="oss",
-            disk_bytes=4294967296,
+            disk_bytes=nixos_guest_disk_bytes,
             key=str(uuid.uuid4()),
         )
         accepted = admit_request(extra_request)
@@ -378,6 +381,8 @@ with subtest("real enlarged fixture pool admits three trust-enabled NixOS guests
         extra_placement = identifier(accepted["placement_id"])
         observed(extra_vm, "running")
         receipt(host, extra_placement, "nixos", "seed")
+    # Each hold is the root plus the 1 GiB workload bundle (VMShape.reservation/1).
+    expected_holds = f"3|{3 * (nixos_guest_disk_bytes + 1073741824)}"
     assert (
         sql(
             "SELECT count(*) FROM compute_virtual_machines AS vm "
@@ -391,7 +396,7 @@ with subtest("real enlarged fixture pool admits three trust-enabled NixOS guests
         sql(
             f"SELECT count(*) || '|' || sum(disk_bytes) FROM compute_reservations WHERE host_id='{host_id}' AND disk_held"
         )
-        == "3|16106127360"
+        == expected_holds
     )
     before = sql("SELECT count(*) FROM compute_virtual_machines")
     assert before == "4"
@@ -399,8 +404,8 @@ with subtest("real enlarged fixture pool admits three trust-enabled NixOS guests
     # A valid root larger than the entire actual quota cannot fit even on an
     # otherwise idle pool; this expectation is independent of Budget arithmetic.
     quota_bytes = int(host.succeed("zfs get -Hpo value quota zroot/lilly").strip())
-    assert quota_bytes == storage_budget == 17179869184
-    impossible_root_bytes = 18253611008
+    assert quota_bytes == storage_budget
+    impossible_root_bytes = 68719476736
     assert impossible_root_bytes > quota_bytes
     rejected: dict[str, object] = dict(
         action="provision",
@@ -416,5 +421,5 @@ with subtest("real enlarged fixture pool admits three trust-enabled NixOS guests
         sql(
             f"SELECT count(*) || '|' || sum(disk_bytes) FROM compute_reservations WHERE host_id='{host_id}' AND disk_held"
         )
-        == "3|16106127360"
+        == expected_holds
     )
