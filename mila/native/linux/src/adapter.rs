@@ -1021,7 +1021,7 @@ mod web_tests {
         assert!(validate_push_registration(
             2,
             true,
-            "https://push.notify.windows.com:443/channel",
+            "https://push.notify.windows.com/channel",
             "app",
             "mila.example",
             None
@@ -1030,16 +1030,16 @@ mod web_tests {
         assert!(validate_push_registration(
             2,
             true,
-            "https://push.notify.windows.com:443/channel",
+            "https://push.notify.windows.com/channel",
             "app",
             "mila.example",
-            Some("https://push.notify.windows.com:443/channel")
+            Some("https://push.notify.windows.com/channel")
         )
         .is_ok());
         assert!(validate_push_registration(
             9,
             true,
-            "https://push.notify.windows.com:443/channel",
+            "https://push.notify.windows.com/channel",
             "app",
             "mila.example",
             None
