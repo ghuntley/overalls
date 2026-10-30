@@ -28,11 +28,13 @@ on:
         required: false
         default: false
 
-# One run per ref: a newer push replaces a pending one, and a started run
-# finishes. A replaced push stays covered because a push run compares against
-# the newest earlier started, non-cancelled run, not against event.before.
+# One run per ref and event: a newer push replaces a pending push, and a
+# started run finishes. Dispatches have their own group so a push never
+# replaces a covering dispatch. A replaced push stays covered because a push
+# run compares against the newest earlier started, non-cancelled push run, not
+# against event.before.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: false
 
 permissions:
