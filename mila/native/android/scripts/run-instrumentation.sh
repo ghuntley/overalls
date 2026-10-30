@@ -8,12 +8,15 @@
 #    against it with the descriptor as the base64 `milaJourneyDescriptor` instrumentation argument.
 set -euo pipefail
 
-gradle --no-daemon connectedDebugAndroidTest
+# A packaged-suite failure still lets the journey run, so one CI run reports both; the script
+# fails at the end if either did.
+packaged=0
+gradle --no-daemon connectedDebugAndroidTest || packaged=$?
 
 descriptor="${MILA_JOURNEY_DESCRIPTOR:-}"
 if [ -z "$descriptor" ]; then
   echo "mila-journey-fixture not running; hermetic journey skipped"
-  exit 0
+  exit "$packaged"
 fi
 test -s "$descriptor"
 
@@ -58,6 +61,9 @@ done
 adb reverse --list
 
 encoded="$(base64 -w0 "$descriptor")"
+# The encoded descriptor embeds the approver bearer; mask it like the raw token.
+echo "::add-mask::$encoded"
 gradle --no-daemon connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.overalls.mila.nativeui.MilaJourneyTest \
   "-Pandroid.testInstrumentationRunnerArguments.milaJourneyDescriptor=$encoded"
+exit "$packaged"
