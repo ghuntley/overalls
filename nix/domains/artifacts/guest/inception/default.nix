@@ -104,12 +104,12 @@ in
       TimeoutStartSec = 30;
       ExecStart = pkgs.writeShellScript "inception-disable-guest-network-offloads" ''
         set -eu
-        for attempt in $(seq 1 30); do
+        for attempt in $(${pkgs.coreutils}/bin/seq 1 30); do
           if ${pkgs.iproute2}/bin/ip link show eth0 >/dev/null 2>&1; then
             ${pkgs.ethtool}/bin/ethtool -K eth0 tso off gso off gro off tx off rx off >/dev/null 2>&1
             exit 0
           fi
-          sleep 1
+          ${pkgs.coreutils}/bin/sleep 1
         done
         exit 1
       '';

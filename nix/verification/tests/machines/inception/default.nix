@@ -180,7 +180,7 @@ in
                   ;;
               esac
             done
-            sleep 1
+            ${pkgs.coreutils}/bin/sleep 1
           done
         '';
       };
