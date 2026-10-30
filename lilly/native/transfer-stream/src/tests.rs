@@ -1,7 +1,10 @@
 use super::*;
+use crate::run::{debit, refill, window, Side};
 use hegel::generators as gs;
 use hegel::generators::Generator as _;
 use hegel::TestCase;
+use std::ffi::OsString;
+use std::os::unix::ffi::OsStrExt;
 
 /// @cc [owner:ghuntley,label:verification] hegel-side-classifier-lattice
 /// The outcome lattice is fully enumerable: five side pairs must terminate and
