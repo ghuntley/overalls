@@ -10,32 +10,31 @@ let
         fixture = lib.hasSuffix ".json" name && lib.hasSuffix "/tests/fixtures" (builtins.dirOf (toString path));
       in name != "target" && name != ".hegel" && (type == "directory" || fixture || lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "Cargo.lock" "clippy.toml" "CONTRACTS" "LICENSE-APACHE" "LICENSE-MIT" "OVERALLS.md" "README.md" ]);
   };
-  vendor = pkgs.rustPlatform.fetchCargoVendor {
+  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
     name = "lyra-vendor";
-    src = source;
-    hash = "sha256-h0p8FKZdcmv3baQx59H+zDnGRIZoQp4/PYBqOYppkiI=";
+    lockFile = ../../../../lyra/Cargo.lock;
   };
   rustStd = target: hash: pkgs.fetchurl {
     url = "https://static.rust-lang.org/dist/rust-std-${rustVersion}-${target}.tar.xz";
     inherit hash;
   };
   targets = {
-    "x86_64-unknown-linux-gnu" = rustStd "x86_64-unknown-linux-gnu" "sha256-HB5wSugBJrfeNPcuooJff9AXNt7CBzL67Uc3S5UoL7o=";
-    "x86_64-unknown-linux-musl" = rustStd "x86_64-unknown-linux-musl" "sha256-UdgxeGgFVvc6X6ithlt2of9UGGdEXAD8ZdxnJGvC3mY=";
-    "aarch64-unknown-linux-musl" = rustStd "aarch64-unknown-linux-musl" "sha256-Sf8IedlOLo6G1ehesVqSFZQ+jHi1E2PWVTRDWYyrXTE=";
-    "x86_64-apple-darwin" = rustStd "x86_64-apple-darwin" "sha256-D6eGUwI75b3+tBntyC47E0bMqiPqoDZJHM4IQQHHQd0=";
-    "aarch64-apple-darwin" = rustStd "aarch64-apple-darwin" "sha256-pIlfXGmV6DyrhofkaxQyRZI5gEne9xznXKMIyYHPIA0=";
-    "x86_64-pc-windows-gnu" = rustStd "x86_64-pc-windows-gnu" "sha256-UT7Uh11aNybQLFhyA08Gc1k640PqYqcJOSE+iUwnS+M=";
-    "x86_64-unknown-freebsd" = rustStd "x86_64-unknown-freebsd" "sha256-ney5I8TysfxX0tyzmoyclvkbHeWGq/N8/i257fRTDUM=";
-    "x86_64-unknown-illumos" = rustStd "x86_64-unknown-illumos" "sha256-Eo74pjuHPaccqvpbF2FzDB1vUk4nElO/CFKhMJ7/o0A=";
+    "x86_64-unknown-linux-gnu" = rustStd "x86_64-unknown-linux-gnu" (import ../pins.nix).rustStdX86_64LinuxGnu;
+    "x86_64-unknown-linux-musl" = rustStd "x86_64-unknown-linux-musl" (import ../pins.nix).rustStdX86_64LinuxMusl;
+    "aarch64-unknown-linux-musl" = rustStd "aarch64-unknown-linux-musl" (import ../pins.nix).rustStdAarch64LinuxMusl;
+    "x86_64-apple-darwin" = rustStd "x86_64-apple-darwin" (import ../pins.nix).rustStdX86_64Darwin;
+    "aarch64-apple-darwin" = rustStd "aarch64-apple-darwin" (import ../pins.nix).rustStdAarch64Darwin;
+    "x86_64-pc-windows-gnu" = rustStd "x86_64-pc-windows-gnu" (import ../pins.nix).rustStdX86_64WindowsGnu;
+    "x86_64-unknown-freebsd" = rustStd "x86_64-unknown-freebsd" (import ../pins.nix).rustStdX86_64Freebsd;
+    "x86_64-unknown-illumos" = rustStd "x86_64-unknown-illumos" (import ../pins.nix).rustStdX86_64Illumos;
   };
   rustcArchive = pkgs.fetchurl {
     url = "https://static.rust-lang.org/dist/rustc-${rustVersion}-x86_64-unknown-linux-gnu.tar.xz";
-    hash = "sha256-mBnQoy1WvTOVhTGcgCYOMyd59VQf1mg4q34BbWyBSBk=";
+    hash = (import ../pins.nix).rustcArchive;
   };
   clippyArchive = pkgs.fetchurl {
     url = "https://static.rust-lang.org/dist/clippy-${rustVersion}-x86_64-unknown-linux-gnu.tar.xz";
-    hash = "sha256-NEHfj7VNuYX4yKPoNWuIdKP5LMjMqFZc/jbx3BWTXnI=";
+    hash = (import ../pins.nix).clippyArchive;
   };
   toolchain = pkgs.stdenvNoCC.mkDerivation {
     pname = "lyra-rust-toolchain";
@@ -66,7 +65,7 @@ let
   };
   sdk = pkgs.fetchurl {
     url = "https://github.com/joseluisq/macosx-sdks/releases/download/11.3/MacOSX11.3.sdk.tar.xz";
-    hash = "sha256-mtwTc9OHnhlz0orZ8XyQUbApMWdKPsKiSYEomJ7OLLE=";
+    hash = (import ../pins.nix).macosSdk113;
   };
   # @cc [owner:ghuntley,label:build;verification] lyra-native-tls-check-toolchain
   # The sandboxed Lyra check MUST supply the build tools required by its

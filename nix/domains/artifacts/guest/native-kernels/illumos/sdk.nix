@@ -24,7 +24,7 @@ let
     nativeBuildInputs = [ pkgs.python313 ];
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
-    outputHash = "sha256-0it89ps+OsUq1+QAgcVsXYFXTrlWI4GkC4nUAZyr/gc=";
+    outputHash = (import ../../../pins.nix).illumosLinkerSysroot;
     passthru = { inherit packages; };
   } ''
     python3.13 ${../../illumos_sdk/fetch_sdk.py} "$out" ${lib.escapeShellArgs (map toString manifests)}

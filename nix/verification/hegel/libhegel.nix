@@ -10,7 +10,7 @@ pkgs.rustPlatform.buildRustPackage {
     owner = "hegeldev";
     repo = "hegel-rust";
     rev = "v0.47.4";
-    hash = "sha256-zxJjnVsoTvyBCw7T+6M2rfrIrcA4mYbgtDFjs0kdIt0=";
+    hash = (import ../../domains/artifacts/pins.nix).libhegelSource;
   };
 
   # Build only the C-ABI engine crate (cdylib/staticlib); the Rust frontend
@@ -38,7 +38,7 @@ pkgs.rustPlatform.buildRustPackage {
     runHook postInstall
   '';
 
-  cargoHash = "sha256-g01m7MHs6cqtSu/JNrn8hmWEN3KQvt9fZtcQv2VOIeo=";
+  cargoHash = (import ../../domains/artifacts/pins.nix).libhegelCargo;
 
   meta = with pkgs.lib; {
     description = "Native property-based testing engine (C ABI) from the Hypothesis authors";

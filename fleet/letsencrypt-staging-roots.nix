@@ -7,19 +7,19 @@ let
   roots = [
     (pkgs.fetchurl {
       url = "https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x1.pem";
-      hash = "sha256-Ol4RceX1wtQVItQ48iVgLkI2po+ynDI5mpWSGkroDnM=";
+      hash = (import ../nix/domains/artifacts/pins.nix).letsencryptStagingRootX1;
     })
     (pkgs.fetchurl {
       url = "https://letsencrypt.org/certs/staging/letsencrypt-stg-root-x2.pem";
-      hash = "sha256-SXw2wbUMDa/zCHDVkIybl68pIj1VEMXmwklX0MxQL7g=";
+      hash = (import ../nix/domains/artifacts/pins.nix).letsencryptStagingRootX2;
     })
     (pkgs.fetchurl {
       url = "https://letsencrypt.org/certs/staging/gen-y/root-ye.pem";
-      hash = "sha256-v0Goxff//BgeRtXfGiuGfw77bhad9vCkW9QGSx0CMIQ=";
+      hash = (import ../nix/domains/artifacts/pins.nix).letsencryptStagingRootYE;
     })
     (pkgs.fetchurl {
       url = "https://letsencrypt.org/certs/staging/gen-y/root-yr.pem";
-      hash = "sha256-czke1Vo+sJ8ShPi1SOVA9eJlFJyD6gt53YrpfAFmWdc=";
+      hash = (import ../nix/domains/artifacts/pins.nix).letsencryptStagingRootYR;
     })
   ];
 in

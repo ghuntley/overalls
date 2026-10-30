@@ -83,6 +83,8 @@ runs:
       shell: bash
       env:
         NIX_VERSION: 2.30.2
+        # The installer verifies its tarball digests itself; pin the script too.
+        NIX_INSTALLER_SHA256: 72871bd265ff3a9da7af486b42f39695591cdb7cd855140eaabce389dbd46f7c
         GITHUB_ACCESS_TOKEN: ${{ github.token }}
         SYSTEM_FEATURES: ${{ inputs.system-features }}
       run: |
@@ -102,6 +104,7 @@ runs:
         EOF
         curl -sSfL --retry 5 -o "$RUNNER_TEMP/install-nix" \
           "https://releases.nixos.org/nix/nix-$NIX_VERSION/install"
+        echo "$NIX_INSTALLER_SHA256  $RUNNER_TEMP/install-nix" | sha256sum --check --strict
         sh "$RUNNER_TEMP/install-nix" --daemon --yes --no-channel-add \
           --daemon-user-count "$(( $(nproc) * 2 ))" --nix-extra-conf-file "$conf"
         rm -f "$conf"

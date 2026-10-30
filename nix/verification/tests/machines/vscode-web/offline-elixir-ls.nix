@@ -7,13 +7,13 @@ let
     owner = "elixir-lsp";
     repo = "elixir-ls";
     rev = "v0.31.1";
-    hash = "sha256-H7u2rcH0qSiswC6aHdaFdM8IyEpXS74RQrVFuJx35Lo=";
+    hash = (import ../../../../domains/artifacts/pins.nix).elixirLsSource;
   };
   dependencies = beam.fetchMixDeps {
     pname = "editor-fixture-elixir-ls-dependencies";
     version = "0.31.1";
     src = source;
-    hash = "sha256-N6G/Nq+9P5XcjokkuVYr5I7xGyphs+B/HZOt4BsmNeE=";
+    hash = (import ../../../../domains/artifacts/pins.nix).elixirLsMixDeps;
     env.MIX_ENV = "prod";
     env.ERL_FLAGS = "+S 4:4";
   };

@@ -189,11 +189,11 @@ let
         type == "directory" && builtins.pathExists (../../../lilly/native + "/${name}/Cargo.lock"))
         (builtins.readDir ../../../lilly/native));
     in {
-      lyra = { locks = [ "lyra/Cargo.lock" ]; build = lyra; hashes.lyraVendor = lyra.vendor; };
+      lyra = { locks = [ "lyra/Cargo.lock" ]; build = lyra; hashes = { }; };
       terminald = {
         locks = [ "nix/domains/artifacts/terminald/Cargo.lock" ];
         build = pkgs.linkFarmFromDrvs "terminald-pins" [ terminald terminaldWindows ];
-        hashes.terminaldVendor = terminaldWindows.vendor;
+        hashes = { };
       };
       lilly-native = {
         locks = map (name: "lilly/native/${name}/Cargo.lock") nativeCrates;
@@ -223,6 +223,16 @@ let
       otel-guest-receiver = {
         locks = [ "nix/domains/system/otel-guest/receiver/Cargo.lock" ];
         build = pkgs.callPackage ../system/otel-guest/receiver.nix { };
+        hashes = { };
+      };
+      mila-linux-native = {
+        locks = [ "mila/native/linux/Cargo.lock" ];
+        build = (import ./mila { inherit pkgs; }).linuxNative;
+        hashes = { };
+      };
+      observability-runtimes = {
+        locks = [ "nix/domains/system/observability-runtimes/Cargo.lock" ];
+        build = import ../system/observability-runtimes.nix { inherit pkgs; };
         hashes = { };
       };
     };

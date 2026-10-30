@@ -31,8 +31,6 @@ let
   isLinux = pkgs.stdenv.hostPlatform.isLinux;
 in
 {
-  outputs.guest = import ./nix/domains/artifacts/guest { inherit pkgs; };
-  outputs.ubuntuGuest = (import ./nix/domains/artifacts/guest/ubuntu { inherit pkgs; }) { };
   # @cc [owner:ghuntley,label:isolation] jailed-vmm-static-runtime
   # outputs.vmm MUST supply a static Firecracker/jailer pair that can run inside
   # the prepared chroot without copying host dynamic libraries into each jail.
@@ -224,6 +222,16 @@ in
         always_run = true;
         pass_filenames = false;
         stages = [ "pre-commit" "pre-merge-commit" ];
+      };
+      # Third-party fixed-output hashes come only from dependency-hashes.json
+      # or lock files; the pins Nix check covers CI.
+      pins = {
+        enable = true;
+        name = "pins";
+        entry = "${toolchain.elixir}/bin/elixir scripts/check_pins.exs";
+        language = "system";
+        files = "(\\.nix|dependency-hashes\\.json)$";
+        pass_filenames = false;
       };
       # ADR-0265: adopted crates keep the canonical lint block, clippy.toml
       # and a reason on every lint exception; the rust-lints Nix check covers CI.

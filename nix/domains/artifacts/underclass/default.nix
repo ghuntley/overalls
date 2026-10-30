@@ -7,10 +7,10 @@ rustPlatform.buildRustPackage rec {
     owner = "ghuntley";
     repo = "underclass";
     rev = "d7a0ccf2fb0ee082ce18b561555a6174188c12fb";
-    hash = "sha256-B8ssdDiI3A/hSJtPj3oMpvDDbHixGZEUyxfORvZM1FI=";
+    hash = (import ../pins.nix).underclassSource;
   };
 
-  cargoHash = "sha256-trXMnTioYNjr74HjFcDjMvJ8GYUG0UTiPVi68PNBzEk=";
+  cargoHash = (import ../pins.nix).underclassCargo;
   # Name the vendored crates without the version: the fixed-output path then
   # survives pin bumps that keep Cargo.lock, instead of refetching ~300 crates.
   cargoDepsName = pname;

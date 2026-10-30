@@ -1,8 +1,8 @@
 { pkgs
 , nodeVersion ? "24.21.0"
-, nodeSha256 ? "sha256-FY92hbRN5R9sDfHRU1JsvNPhvHOajfxgdyHO913p5UE="
+, nodeSha256 ? (import ../pins.nix).nodeWindowsX64
 , ripgrepVersion ? "15.1.0"
-, ripgrepSha256 ? "sha256-EkUQuUtrqjOA0FH99GUOqoCjAsh21hHp26Cy4Y2HSTo="
+, ripgrepSha256 ? (import ../pins.nix).ripgrepWindowsX64
 }:
 let
   nodeArchive = pkgs.fetchurl {

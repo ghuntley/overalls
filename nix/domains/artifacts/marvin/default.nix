@@ -11,14 +11,14 @@ let
           name == "CONTRACTS" || name == "README.md");
   };
   version = (builtins.fromJSON (builtins.readFile ../../../../marvin/package.json)).version;
-  npmDeps = pkgs.fetchNpmDeps {
-    name = "overalls-marvin-${version}-npm-deps";
-    src = source;
-    hash = "sha256-LnzKLOxg5uIuNnDI1xGqEGFx0dQ8MCOT4FodqsqGpBo=";
-  };
+  # @cc [owner:ghuntley,label:build;security] marvin-lock-derived-dependencies
+  # npm dependencies MUST be fetched from package-lock.json's per-package
+  # integrity hashes with importNpmLock; the lock is the single pin.
+  npmDeps = pkgs.importNpmLock { npmRoot = source; };
   common = {
     pname = "overalls-marvin";
     inherit version npmDeps;
+    npmConfigHook = pkgs.importNpmLock.npmConfigHook;
     src = source;
     npmFlags = [ "--ignore-scripts" ];
     npmConfigIgnoreScripts = true;

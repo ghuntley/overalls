@@ -12,9 +12,9 @@ let
     version = "2.102.0";
     src = pkgs.fetchzip {
       url = "https://codeload.github.com/cli/cli/tar.gz/refs/tags/v2.102.0";
-      hash = "sha256-txjOmo46nwRxIutYR/lnFgYEWZpkbWC/ilrMAfTaFZc=";
+      hash = (import ../../pins.nix).ghSource;
     };
-    vendorHash = "sha256-hsG6wc7AfgPZhkWwO8Xzu4yR54Rp5+Z6yeTjwnI9S+o=";
+    vendorHash = (import ../../pins.nix).ghVendor;
     patches = [ ./gh.patch ];
     postPatch = ''
       mkdir -p internal/overalls
@@ -46,10 +46,10 @@ let
       owner = "git-lfs";
       repo = "git-lfs";
       tag = "v3.7.1";
-      hash = "sha256-N5ckTnyA3mueZre+rMhFZBiAFgEu4pmtzkiUidXnan8=";
+      hash = (import ../../pins.nix).gitLfsSource;
     };
     proxyVendor = true;
-    vendorHash = "sha256-SUnZ9uN43CAw/iHC8cPBm3nYD03d3Pg2pYS2PwjDCnE=";
+    vendorHash = (import ../../pins.nix).gitLfsVendor;
     patches = [ ./git-lfs.patch ];
     postPatch = ''
       mkdir -p internal/overalls

@@ -6,7 +6,7 @@ let
   # contract remains on the reviewed 0.149.0 application package.
   codexPkgs = import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/c8f90650c15282fa8656a041bfbbd2403997a9a7.tar.gz";
-    sha256 = "sha256-pRGOQSClnXNI2iLUG6DYpsGvYcuw0drOutVZFTJNw90=";
+    sha256 = (import ../pins.nix).codingClisNixpkgs;
   }) {
     system = pkgs.stdenv.hostPlatform.system;
     config = pkgs.config;
@@ -19,7 +19,7 @@ let
   # client update checks, binary updates and forced plugin updates.
   claudePkgs = import (builtins.fetchTarball {
     url = "https://github.com/NixOS/nixpkgs/archive/c8f90650c15282fa8656a041bfbbd2403997a9a7.tar.gz";
-    sha256 = "sha256-pRGOQSClnXNI2iLUG6DYpsGvYcuw0drOutVZFTJNw90=";
+    sha256 = (import ../pins.nix).codingClisNixpkgs;
   }) {
     localSystem = pkgs.stdenv.hostPlatform;
     overlays = pkgs.overlays;

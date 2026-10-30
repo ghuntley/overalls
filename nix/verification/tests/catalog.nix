@@ -43,7 +43,7 @@ in
 # Every current required check MUST be explicitly exported. Superseded checks
 # MUST be replaced in the documented catalog without compatibility aliases.
 # Release checks MUST use buildPkgs; machine checks MUST use testPkgs.
-buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "porsche-release" "ziggy-release" "brady-release" "galileo-release" "enrico-release" "susan-release" ] (name:
+buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "porsche-release" "ziggy-release" "brady-release" "galileo-release" "enrico-release" "peach-release" "susan-release" ] (name:
   let application = buildPkgs.lib.removeSuffix "-release" name;
   in import ./release {
     pkgs = buildPkgs;

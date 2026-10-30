@@ -100,7 +100,7 @@ liveness from a writable, migrated database. The explicit
 runs independently of the serving application.
 
 [Packaging](../../../scripts/package_release.sh) and its
-[Nix closure](../../../nix/domains/artifacts/applications/release-bundle.nix) produce immutable releases with
+Nix closure (`nix/domains/artifacts/applications/release-bundle.nix` at overalls revision `4c6fac25c`, file deleted) produce immutable releases with
 runtime dependencies and Lilly's canonical launcher paths. The
 Marshall service (`scripts/test/fixtures/legacy-deployment/systemd/marshall@.service` at overalls revision `9fe1e493`, repository deleted),
 Lilly service (`scripts/test/fixtures/legacy-deployment/systemd/lilly.service` at overalls revision `9fe1e493`, repository deleted),

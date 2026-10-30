@@ -15,7 +15,7 @@ let
       owner = "erlang";
       repo = "otp";
       tag = "OTP-29.0.6";
-      hash = "sha256-k5AsIz5c86XP2lA/MF9NwEJ5hD5Ln/uHqZvjhhsHBwI=";
+      hash = (import ../pins.nix).otpSource;
     };
   } // pkgs.lib.optionalAttrs encryptedCrashDumps {
     ERL_CRASH_DUMP_PUBLIC_KEY = "${../build-crash-dump-public.pem}";
@@ -38,7 +38,7 @@ let
       owner = "elixir-lang";
       repo = "elixir";
       tag = "v1.20.4";
-      hash = "sha256-Z/lAmD3wyiTnX2e7n2gHELkTpZ3AgGSjqNmvDxCH91g=";
+      hash = (import ../pins.nix).elixirSource;
     };
   } // pkgs.lib.optionalAttrs encryptedCrashDumps {
     ERL_CRASH_DUMP_PUBLIC_KEY = "${../build-crash-dump-public.pem}";

@@ -13,19 +13,19 @@ let
     owner = "freebsd";
     repo = "freebsd-src";
     rev = freebsdRevision;
-    hash = "sha256-UM1Imo9/iER87f7VPAI0R6I1UxHROkHyeUxQhgk1/AA=";
+    hash = (import ../../pins.nix).freebsdKernelSource;
   };
   illumosSource = pkgs.fetchFromGitHub {
     owner = "omniosorg";
     repo = "illumos-omnios";
     rev = illumosRevision;
-    hash = "sha256-IxfplFwqet+VvZkrKCnkxSOPNbv2l29VJ7a1b96WLqQ=";
+    hash = (import ../../pins.nix).illumosKernelSource;
   };
   omniosBuildSource = pkgs.fetchFromGitHub {
     owner = "omniosorg";
     repo = "omnios-build";
     rev = omniosBuildRevision;
-    hash = "sha256-vx3zvMiKaZiLF9IudtxboOqU8VAkxQMnrho2n0JWcMw=";
+    hash = (import ../../pins.nix).omniosBuildSource;
   };
 
   freebsdPatch = ./freebsd/0001-vsock-contract-scaffold.patch;
@@ -140,7 +140,7 @@ let
     os = "freebsd";
     source = freebsdSource;
     sourceRevision = freebsdRevision;
-    sourceHash = "sha256-UM1Imo9/iER87f7VPAI0R6I1UxHROkHyeUxQhgk1/AA=";
+    sourceHash = (import ../../pins.nix).freebsdKernelSource;
     patch = freebsdPatch;
     patchHash = freebsdPatchHash;
     configuration = freebsdConfig;
@@ -152,7 +152,7 @@ let
     os = "illumos";
     source = illumosSource;
     sourceRevision = illumosRevision;
-    sourceHash = "sha256-IxfplFwqet+VvZkrKCnkxSOPNbv2l29VJ7a1b96WLqQ=";
+    sourceHash = (import ../../pins.nix).illumosKernelSource;
     patch = illumosPatch;
     patchHash = illumosPatchHash;
     configuration = illumosConfig;
@@ -164,7 +164,7 @@ let
     inherit pkgs;
     source = freebsdSource;
     sourceRevision = freebsdRevision;
-    sourceHash = "sha256-UM1Imo9/iER87f7VPAI0R6I1UxHROkHyeUxQhgk1/AA=";
+    sourceHash = (import ../../pins.nix).freebsdKernelSource;
     abiPatch = freebsdPatch;
   };
   # Test-only: received-frame injection for native wrong-CID machine tests.
@@ -172,7 +172,7 @@ let
     inherit pkgs;
     source = freebsdSource;
     sourceRevision = freebsdRevision;
-    sourceHash = "sha256-UM1Imo9/iER87f7VPAI0R6I1UxHROkHyeUxQhgk1/AA=";
+    sourceHash = (import ../../pins.nix).freebsdKernelSource;
     abiPatch = freebsdPatch;
     faultInjection = true;
   };
@@ -182,7 +182,7 @@ let
     inherit pkgs;
     source = illumosSource;
     sourceRevision = illumosRevision;
-    sourceHash = "sha256-IxfplFwqet+VvZkrKCnkxSOPNbv2l29VJ7a1b96WLqQ=";
+    sourceHash = (import ../../pins.nix).illumosKernelSource;
     abiPatch = illumosPatch;
     toolchain = illumosToolchain;
   };
@@ -194,7 +194,7 @@ let
     passthru = {
       source = omniosBuildSource;
       sourceRevision = omniosBuildRevision;
-      sourceHash = "sha256-vx3zvMiKaZiLF9IudtxboOqU8VAkxQMnrho2n0JWcMw=";
+      sourceHash = (import ../../pins.nix).omniosBuildSource;
       artifact = {
         available = false;
         bytes = 0;
@@ -221,15 +221,15 @@ let
   pins = {
     freebsd = {
       revision = freebsdRevision;
-      hash = "sha256-UM1Imo9/iER87f7VPAI0R6I1UxHROkHyeUxQhgk1/AA=";
+      hash = (import ../../pins.nix).freebsdKernelSource;
     };
     illumos = {
       revision = illumosRevision;
-      hash = "sha256-IxfplFwqet+VvZkrKCnkxSOPNbv2l29VJ7a1b96WLqQ=";
+      hash = (import ../../pins.nix).illumosKernelSource;
     };
     omniosBuild = {
       revision = omniosBuildRevision;
-      hash = "sha256-vx3zvMiKaZiLF9IudtxboOqU8VAkxQMnrho2n0JWcMw=";
+      hash = (import ../../pins.nix).omniosBuildSource;
     };
   };
 in

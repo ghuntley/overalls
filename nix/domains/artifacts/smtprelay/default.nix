@@ -7,9 +7,9 @@ buildGoModule rec {
     owner = "grafana";
     repo = "smtprelay";
     rev = "v${version}";
-    hash = "sha256-phQsVH6kEvgyXvaBo7FmyxU8QOKnZKC5XQZhWhAFxE8=";
+    hash = (import ../pins.nix).smtprelaySource;
   };
-  vendorHash = "sha256-Y0xKm178PB9CX/SYL0+DG5R9GRJ0eNuIxwTgG9sYYdY=";
+  vendorHash = (import ../pins.nix).smtprelayVendor;
   patches = [ ./transport.patch ];
   ldflags = [ "-s" "-w" ];
   env.OTEL_SDK_DISABLED = "true";

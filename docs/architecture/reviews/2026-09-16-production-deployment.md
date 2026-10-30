@@ -11,7 +11,7 @@ Reviewed [runtime validation](../../../marshall/lib/marshall/operations/runtime_
 [health](../../../marshall/lib/marshall/operations/health.ex),
 [migration entry point](../../../marshall/lib/marshall/operations/migrate.ex),
 [release packaging](../../../scripts/package_release.sh),
-[Nix closure](../../../nix/domains/artifacts/applications/release-bundle.nix),
+Nix closure (`nix/domains/artifacts/applications/release-bundle.nix` at overalls revision `4c6fac25c`, file deleted),
 Marshall (`scripts/test/fixtures/legacy-deployment/systemd/marshall@.service` at overalls revision `9fe1e493`, repository deleted) and
 Lilly (`scripts/test/fixtures/legacy-deployment/systemd/lilly.service` at overalls revision `9fe1e493`, repository deleted) service units, and the
 [deployment guide](../../operations/deployment.md).

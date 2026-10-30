@@ -39,7 +39,7 @@ let
     nativeBuildInputs = [ pkgs.python313 pkgs.binutils ];
     outputHashAlgo = "sha256";
     outputHashMode = "recursive";
-    outputHash = "sha256-fOLcIWo1lZu17nU467/08Z9k2pWWNURoD1SJviAI9rk=";
+    outputHash = (import ../pins.nix).illumosGitRuntime;
     passthru = { packages = illumosPackages; gitPath = "/usr/bin/git"; };
   } ''
     cp -r ${sdkHelpers} illumos_sdk

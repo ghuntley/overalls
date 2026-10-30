@@ -15,10 +15,9 @@ let
         (type == "directory" || lib.hasSuffix ".rs" name ||
           builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
-  vendor = pkgs.rustPlatform.fetchCargoVendor {
+  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
     name = "terminald-vendor";
-    src = source;
-    hash = (builtins.fromJSON (builtins.readFile ../dependency-hashes.json)).terminaldVendor;
+    lockFile = ../terminald/Cargo.lock;
   };
 in
 pkgs.stdenv.mkDerivation {

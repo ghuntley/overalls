@@ -7,7 +7,7 @@ let
     version = "0.7.7";
     src = pkgs.fetchurl {
       url = "https://github.com/antithesishq/bombadil/releases/download/v0.7.7/bombadil-x86_64-linux";
-      sha256 = "2d06546b6de345a2438629f06186cdcd199d19b3a1981d4a65db8cc5f48e3b8b";
+      sha256 = (import ../../../../domains/artifacts/pins.nix).bombadilBinary;
     };
     dontUnpack = true;
     installPhase = ''install -Dm755 "$src" "$out/bin/bombadil"'';
@@ -15,7 +15,7 @@ let
   };
   types = pkgs.fetchurl {
     url = "https://registry.npmjs.org/@antithesishq/bombadil/-/bombadil-0.7.7.tgz";
-    sha256 = "415131d4570fe7671cbfe84ac2b24a00f2158343870f95a4515536543046b779";
+    sha256 = (import ../../../../domains/artifacts/pins.nix).bombadilTypes;
   };
   probes = pkgs.runCommand "localization-browser-probe-typed" {
     nativeBuildInputs = [ pkgs.ty pkgs.ruff pkgs.typescript pkgs.gnutar pkgs.gzip ];

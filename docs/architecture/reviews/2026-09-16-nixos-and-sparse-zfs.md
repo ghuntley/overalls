@@ -77,7 +77,7 @@ an abrupt-loss simulation that invalidates the relevant caches.
 ### 4. High — deployment and TLS changes require implementation
 
 [Packaging](../../../scripts/package_release.sh) builds outside Nix and then uses
-the [closure wrapper](../../../nix/domains/artifacts/applications/release-bundle.nix). The
+the closure wrapper (`nix/domains/artifacts/applications/release-bundle.nix` at overalls revision `4c6fac25c`, file deleted). The
 HAProxy example (`scripts/test/fixtures/legacy-deployment/haproxy.cfg.example` at overalls revision `9fe1e493`, repository deleted) and
 deployment contract (`scripts/test/fixtures/legacy-deployment/CONTRACTS` at overalls revision `9fe1e493`, repository deleted) require passthrough. They do not
 implement ADR-0030's source-built packages, host modules or TLS bridge.

@@ -122,6 +122,20 @@ case application do
     end
     {:error, :malformed} = apply(Audi.DNS.Wire, :decode, [<<0>>])
 
+  "peach" ->
+    for module <- [Marshall.Application, Lilly.Application, Audi.Application, Porsche.Application,
+      Galileo.Application, Ash, Oban, Ecto.Repo] do
+      if Code.ensure_loaded?(module), do: raise("another service or domain runtime included in Peach")
+    end
+    if Map.has_key?(metadata, "host_tools") or File.exists?(Path.join(root, "host-tools")),
+      do: raise("privileged host tools included in Peach release")
+    for module <- [Peach.Application, Peach.Config, Peach.Control, Peach.HTTP, Peach.Privacy] do
+      if not Code.ensure_loaded?(module), do: raise("Peach release module missing")
+    end
+    if not File.regular?(Path.join(root, "bin/peach")), do: raise("Peach release executable missing")
+    {:error, :invalid_configuration} = apply(Peach.Config, :load, ["/missing-peach-runtime-configuration"])
+    {:ok, []} = apply(Peach.Application, :children, [nil])
+
   "lilly" ->
     if Code.ensure_loaded?(Marshall.Application), do: raise("Marshall included in Lilly release")
 

@@ -40,7 +40,7 @@ let
   };
   ubuntu = pkgs.fetchurl {
     url = "https://cloud-images.ubuntu.com/noble/20260911/noble-server-cloudimg-amd64.img";
-    sha256 = "612b2c0cc1bc413a6cb8c38fd611794caf0f2b436c50013d8b3794db12ad7354";
+    sha256 = (import ../../../../domains/artifacts/pins.nix).ubuntuNobleCloudImage;
   };
   anywhere = import ../../../../domains/artifacts/host/installer.nix { inherit pkgs; };
 in pkgs.testers.runNixOSTest {

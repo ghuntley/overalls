@@ -146,7 +146,6 @@
         tool-mila-windows-source-bundle = built.mila.windowsSourceBundle;
         tool-mila-rust = built.mila.rust;
         tool-github-managed = built.githubTools.release;
-        tool-browser = built.browser;
         tool-vscode-web = built.vscodeWeb;
         tool-vscode-web-broker = built.vscodeWebBroker;
         tool-vscode-web-broker-windows = built.windowsEditorBroker;
@@ -213,7 +212,6 @@
           access = ./nix/domains/system/access.nix;
           audit = ./nix/domains/system/security-audit.nix;
           host-identity = ./nix/domains/system/host-identity.nix;
-          ssh-host-certificate = ./nix/domains/system/ssh-host-certificate.nix;
           secrets = import ./nix/domains/system/secrets/default.nix { packages = built; };
         };
         storage = {
@@ -262,14 +260,21 @@
         };
         package-input-lock =
           let
-            flakeLock = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes.buildNixpkgs.locked;
+            flakeNodes = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes;
             devenvNodes = (builtins.fromJSON (builtins.readFile ./devenv.lock)).nodes;
-            devenvLock = devenvNodes.${devenvNodes.root.inputs.nixpkgs}.locked;
+            flakeInput = name: flakeNodes.${flakeNodes.root.inputs.${name}}.locked;
+            devenvInput = name: devenvNodes.${devenvNodes.root.inputs.${name}}.locked;
             pinned = lock: "${lock.owner}/${lock.repo}/${lock.rev}";
+            # Inputs both locks carry: the application nixpkgs and nix-compact.
+            shared = { buildNixpkgs = "nixpkgs"; nix-compact = "nix-compact"; };
+            mismatches = nixpkgs.lib.filter (name: pinned (flakeInput name) != pinned (devenvInput shared.${name}))
+              (builtins.attrNames shared);
           in
-          if pinned flakeLock == pinned devenvLock
+          if mismatches == [ ]
           then pkgs.runCommand "overalls-package-input-lock-check" { } "touch $out"
-          else throw "flake.lock buildNixpkgs (${pinned flakeLock}) differs from devenv.lock nixpkgs (${pinned devenvLock})";
+          else throw (nixpkgs.lib.concatMapStringsSep "; " (name:
+            "flake.lock ${name} (${pinned (flakeInput name)}) differs from devenv.lock ${shared.${name}} (${pinned (devenvInput shared.${name})})")
+            mismatches);
         conflict-markers = pkgs.runCommand "overalls-conflict-markers-check" {
           nativeBuildInputs = [ built.toolchain.elixir pkgs.git ];
           LC_ALL = "C.UTF-8";
@@ -279,6 +284,15 @@
           cd "$source"
           find . -type f -not -path './.git/*' -print0 > "$TMPDIR/files"
           xargs -0 elixir scripts/check_conflict_markers.exs < "$TMPDIR/files"
+          touch "$out"
+        '';
+        pins = pkgs.runCommand "overalls-pins-check" {
+          nativeBuildInputs = [ built.toolchain.elixir ];
+          LC_ALL = "C.UTF-8";
+          source = ./.;
+        } ''
+          export HOME="$TMPDIR"
+          elixir "$source/scripts/check_pins.exs" "$source"
           touch "$out"
         '';
         rust-lints = pkgs.runCommand "overalls-rust-lints-check" {

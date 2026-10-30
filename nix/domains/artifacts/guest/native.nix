@@ -16,13 +16,13 @@ let
     # URL and digest explicit; updating this pin requires a reviewed source
     # refresh, rather than following Latest.
     url = "https://web.archive.org/web/20250625173735id_/https://download.freebsd.org/releases/VM-IMAGES/14.3-RELEASE/amd64/Latest/FreeBSD-14.3-RELEASE-amd64-BASIC-CLOUDINIT-ufs.raw.xz";
-    hash = "sha256-5zyETu3q+WirvfHlcvXeC2tgKflH7Rvp4iIEp0qIaqw=";
+    hash = (import ../pins.nix).freebsdCloudImage;
   };
   mkOmniOSSource = pkgs.fetchurl {
     pname = "omnios-r151050-cloud-raw";
     version = "r151050";
     url = "https://downloads.omnios.org/media/r151050/omnios-r151050.cloud.raw.zst";
-    hash = "sha256-787Bo109Vm7bEyjQd6VKgMHeKobdN+U73hL5bKXGi4s=";
+    hash = (import ../pins.nix).omniosCloudImage;
   };
   # illumos.org is the upstream operating-system project. It publishes the
   # common source and directs users to downstream distributions for installable
@@ -79,7 +79,7 @@ let
         nativeAdmission = false;
         source = mkFreeBSDSource;
         sourceUrl = "https://web.archive.org/web/20250625173735id_/https://download.freebsd.org/releases/VM-IMAGES/14.3-RELEASE/amd64/Latest/FreeBSD-14.3-RELEASE-amd64-BASIC-CLOUDINIT-ufs.raw.xz";
-        sourceHash = "sha256-5zyETu3q+WirvfHlcvXeC2tgKflH7Rvp4iIEp0qIaqw=";
+        sourceHash = (import ../pins.nix).freebsdCloudImage;
       }; } ''
       set -euo pipefail
       # A source receipt cannot replace the stock kernel in this disk. Fail
@@ -206,7 +206,7 @@ EOF
         upstreamUrl = illumosUpstreamUrl;
         source = mkOmniOSSource;
         sourceUrl = "https://downloads.omnios.org/media/r151050/omnios-r151050.cloud.raw.zst";
-        sourceHash = "sha256-787Bo109Vm7bEyjQd6VKgMHeKobdN+U73hL5bKXGi4s=";
+        sourceHash = (import ../pins.nix).omniosCloudImage;
       }; } ''
       set -euo pipefail
       # A source receipt cannot replace the stock kernel in this disk. Fail
