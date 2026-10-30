@@ -1,6 +1,5 @@
 """Actual Marshall → Audi → Lilly → Firecracker browser editor acceptance."""
 
-import base64
 import re
 
 editor_root = "/var/lib/fleet-vscode-web"

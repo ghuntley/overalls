@@ -105,6 +105,8 @@ enum Event {
     Refused,
     WorkerStarted,
     Ready,
+    Lingered,
+    LingerExpired,
     Failed,
 }
 
@@ -114,6 +116,8 @@ fn emit(event: Event, reason: Option<Refusal>) {
         Event::Refused => "editor.refused",
         Event::WorkerStarted => "editor.worker_started",
         Event::Ready => "editor.ready",
+        Event::Lingered => "editor.lingered",
+        Event::LingerExpired => "editor.linger_expired",
         Event::Failed => "editor.broker_failed",
     };
     if let Some(reason) = reason {
@@ -813,6 +817,19 @@ const LINGER: Duration = Duration::from_secs(10);
 /// LINGER passes. A worker that answers early and closes therefore yields
 /// its response, never an empty close the gateway reports as a missing
 /// response. A gateway end of stream or failure still closes both sides.
+/// Record the first relay ending and emit its closed record at that moment,
+/// before any linger, so the journal times the end itself.
+fn record(ending: &Mutex<Option<Ending>>, outcome: Ending) -> Ending {
+    let mut slot = ending
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    if slot.is_none() {
+        *slot = Some(outcome);
+        emit_closed(outcome);
+    }
+    slot.unwrap_or(outcome)
+}
+
 fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusal> {
     let mut client_writer = client.try_clone().map_err(|_| Refusal::Transport)?;
     let mut worker_reader = worker.try_clone().map_err(|_| Refusal::Transport)?;
@@ -828,18 +845,20 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusa
                 Pumped::Read => Ending::WorkerFault,
                 Pumped::Write => Ending::GatewayWrite,
             };
-            let recorded = *ending
-                .lock()
-                .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get_or_insert(outcome);
+            let recorded = record(ending, outcome);
             if !matches!(
                 recorded,
                 Ending::Client | Ending::GatewayRead | Ending::GatewayWrite
             ) {
                 let _ = client_writer.shutdown(Shutdown::Write);
+                let lingering = Instant::now();
                 if gateway_ended.recv_timeout(LINGER).is_ok() {
+                    if lingering.elapsed() >= Duration::from_secs(1) {
+                        emit(Event::Lingered, None);
+                    }
                     return;
                 }
+                emit(Event::LingerExpired, None);
             }
             let _ = client_writer.shutdown(Shutdown::Both);
         });
@@ -848,10 +867,7 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusa
             Pumped::Read => Ending::GatewayRead,
             Pumped::Write => Ending::WorkerClosed,
         };
-        let recorded = *ending
-            .lock()
-            .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get_or_insert(outcome);
+        let recorded = record(ending, outcome);
         if matches!(
             recorded,
             Ending::Client | Ending::GatewayRead | Ending::GatewayWrite
@@ -905,8 +921,7 @@ fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refus
         .set_write_timeout(None)
         .map_err(|_| Refusal::Transport)?;
     emit(Event::Ready, None);
-    let ending = relay(client, worker)?;
-    emit_closed(ending);
+    relay(client, worker)?;
     Ok(())
 }
 
