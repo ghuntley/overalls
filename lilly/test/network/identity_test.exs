@@ -48,6 +48,25 @@ defmodule Lilly.Network.IdentityTest do
     end
   end
 
+  property "gateway MAC is host- and slot-independent and outside the guest MAC space" do
+    slot = draw("slot", integer(2..65534))
+    other_slot = draw("other_slot", integer(2..65534))
+    other_vm = Lilly.UUID.generate()
+
+    for profile <- [:customer, :standard, :oss, :inception] do
+      {:ok, guest} = Guest.new(@vm, profile, slot)
+      {:ok, moved} = Guest.new(other_vm, profile, other_slot)
+      octet = %{customer: 10, standard: 20, oss: 30, inception: 40}[profile]
+      hex = octet |> Integer.to_string(16) |> String.downcase() |> String.pad_leading(2, "0")
+
+      assert guest.gateway_mac == "02:fc:00:#{hex}:00:01"
+      assert moved.gateway_mac == guest.gateway_mac
+      refute guest.gateway_mac == guest.mac
+      assert [first | _] = String.split(guest.gateway_mac, ":")
+      assert Bitwise.band(String.to_integer(first, 16), 0b11) == 0b10
+    end
+  end
+
   property "guest address, gateway, MAC and reserved UID use the same profile octet" do
     slot = draw("slot", integer(2..65534))
 

@@ -90,11 +90,29 @@ fn alias(value: &[u8]) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || b":.,-".contains(b))
 }
 
+/// A locally administered unicast MAC in lowercase colon form, as Lilly derives
+/// for guest TAP gateways.
+fn unicast_local_mac(value: &[u8]) -> bool {
+    let parts: Vec<&[u8]> = value.split(|b| *b == b':').collect();
+    parts.len() == 6
+        && parts.iter().all(|part| {
+            part.len() == 2
+                && part
+                    .iter()
+                    .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(b))
+        })
+        && std::str::from_utf8(parts[0])
+            .ok()
+            .and_then(|first| u8::from_str_radix(first, 16).ok())
+            .is_some_and(|first| first & 0b11 == 0b10)
+}
+
 /// @cc [owner:ghuntley,label:security] ip-arguments-lilly-devices
 /// ip MUST accept only reads (`[-j] [-d] [-4] link|addr|route|rule show ...`,
 /// `netns list`, `netns pids NS`), `netns add|delete NS`, link, address,
 /// tap, route and rule changes that name only Lilly's devices (uplink veth,
-/// guest taps, lo) and namespaces (`lilly-<12 hex>`), and `netns exec NS
+/// guest taps, lo) and namespaces (`lilly-<12 hex>`), a namespaced guest-tap
+/// address change only to a locally administered unicast MAC, and `netns exec NS
 /// EXE ...` where EXE's file name is ip, nft, sysctl or lilly-flow-label;
 /// that EXE is replaced by hostd's own path for the utility and the rest is
 /// checked by that utility's grammar in the namespace.
@@ -127,6 +145,9 @@ fn ip(argv: &[&[u8]], in_namespace: bool) -> bool {
         }
         [b"link", b"delete", link] => device(link),
         [b"link", b"set", b"dev", link, b"alias", value] => device(link) && alias(value),
+        [b"link", b"set", b"dev", tap, b"address", mac] => {
+            in_namespace && tap.starts_with(b"lv") && device(tap) && unicast_local_mac(mac)
+        }
         [b"link", b"set", b"dev", link, b"up" | b"down"]
         | [b"link", b"set", link, b"up" | b"down"] => device(link),
         [b"addr", b"replace", address, b"dev", link] => ipv4(address) && device(link),
@@ -158,7 +179,7 @@ fn ip(argv: &[&[u8]], in_namespace: bool) -> bool {
 /// @cc [owner:ghuntley,label:security] sysctl-keys-lilly-networking
 /// sysctl MUST accept only `-n net.ipv4.ip_forward` and `-qw` writes of the
 /// IPv4/IPv6 per-device keys Lilly sets (forwarding, redirects, source
-/// routing, rp_filter, src_valid_mark, arp_ignore, disable_ipv6) to 0, 1 or
+/// routing, rp_filter, src_valid_mark, arp_ignore, arp_announce, disable_ipv6) to 0, 1 or
 /// 2; in the root namespace only for Lilly's uplink device.
 fn sysctl(argv: &[&[u8]], in_namespace: bool) -> bool {
     match argv {
@@ -187,6 +208,7 @@ fn sysctl(argv: &[&[u8]], in_namespace: bool) -> bool {
                             "rp_filter",
                             "src_valid_mark",
                             "arp_ignore",
+                            "arp_announce",
                         ]
                         .contains(setting)
                 }

@@ -391,6 +391,10 @@ defmodule Lilly.Network do
   # with strict rp_filter, a host setting of 1 (Tailscale sets it on exit nodes)
   # makes reverse-path checks follow Brady's tproxy mark into its local-delivery
   # table, so every intercepted guest SYN is dropped as a local source.
+  # arp_announce MUST be 2: replies from 169.254.254.1 otherwise solicit a guest
+  # MAC with that source, and the TAP guard drops a guest ARP reply addressed
+  # anywhere but its gateway. A memory-restored guest that never re-ARPs would
+  # then stay unreachable until its own gateway entry expired.
   defp configure_link(config) do
     with :ok <-
            run(:sysctl, [
@@ -415,7 +419,9 @@ defmodule Lilly.Network do
              "net.ipv4.conf.all.src_valid_mark=0",
              "net.ipv4.conf.default.src_valid_mark=0",
              "net.ipv4.conf.all.arp_ignore=1",
-             "net.ipv4.conf.default.arp_ignore=1"
+             "net.ipv4.conf.default.arp_ignore=1",
+             "net.ipv4.conf.all.arp_announce=2",
+             "net.ipv4.conf.default.arp_announce=2"
            ]),
          :ok <- run(:ip, ["addr", "replace", "169.254.255.1/30", "dev", config.uplink]),
          :ok <- ns(config, :ip, ["addr", "replace", "169.254.255.2/30", "dev", "uplink"]),
@@ -497,7 +503,12 @@ defmodule Lilly.Network do
                else: :error
         end
 
+      # @cc [owner:ghuntley,label:recovery] tap-gateway-mac-before-up
+      # Every created or adopted TAP MUST carry the guest's host-independent
+      # gateway MAC before addressing and link-up. A kernel-random MAC breaks a
+      # memory-restored guest's cached gateway neighbour after relocation.
       with :ok <- result,
+           :ok <- ns(config, :ip, ["link", "set", "dev", guest.tap, "address", guest.gateway_mac]),
            :ok <- ns(config, :ip, ["link", "set", "dev", guest.tap, "alias", marker(guest)]),
            do: :ok
     end

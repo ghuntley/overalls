@@ -8,11 +8,24 @@ defmodule Lilly.Network.Guest do
     :addresses,
     :gateway,
     :mac,
+    :gateway_mac,
     :tap,
     :guard,
     :uid
   ]
-  defstruct [:vm_id, :profile, :slot, :address, :addresses, :gateway, :mac, :tap, :guard, :uid]
+  defstruct [
+    :vm_id,
+    :profile,
+    :slot,
+    :address,
+    :addresses,
+    :gateway,
+    :mac,
+    :gateway_mac,
+    :tap,
+    :guard,
+    :uid
+  ]
 
   @type t :: %__MODULE__{
           vm_id: String.t(),
@@ -22,6 +35,7 @@ defmodule Lilly.Network.Guest do
           addresses: [String.t()],
           gateway: String.t(),
           mac: String.t(),
+          gateway_mac: String.t(),
           tap: String.t(),
           guard: String.t(),
           uid: pos_integer()
@@ -38,10 +52,14 @@ defmodule Lilly.Network.Guest do
          {:ok, [address | _] = addresses} <- OverallsProtocol.AddressPool.addresses(profile, slot) do
       octet = %{customer: 10, standard: 20, oss: 30, inception: 40}[profile]
 
-      mac =
-        Enum.map_join([2, 252, 10, octet, div(slot, 256), rem(slot, 256)], ":", fn n ->
-          n |> Integer.to_string(16) |> String.downcase() |> String.pad_leading(2, "0")
-        end)
+      mac = format_mac([2, 252, 10, octet, div(slot, 256), rem(slot, 256)])
+
+      # @cc [owner:ghuntley,label:recovery;isolation] guest-gateway-mac-host-independent
+      # The host-side TAP MAC MUST depend only on the profile, never on host, slot or TAP
+      # creation, so a memory-restored guest's cached gateway neighbour stays valid on
+      # any destination (ADR-0199). It MUST stay locally administered unicast and
+      # outside the guest MAC space (third octet 0 versus 10).
+      gateway_mac = format_mac([2, 252, 0, octet, 0, 1])
 
       tag = :crypto.hash(:sha256, vm) |> Base.encode16(case: :lower) |> binary_part(0, 12)
 
@@ -54,6 +72,7 @@ defmodule Lilly.Network.Guest do
          addresses: addresses,
          gateway: "10.#{octet}.0.1",
          mac: mac,
+         gateway_mac: gateway_mac,
          tap: "lv" <> tag,
          guard: "guard_" <> String.replace(vm, "-", ""),
          uid: 1_000_000 + (div(octet, 10) - 1) * 65_536 + slot
@@ -61,5 +80,12 @@ defmodule Lilly.Network.Guest do
     else
       _ -> {:error, :invalid_guest_network}
     end
+  end
+
+  @spec format_mac([0..255]) :: String.t()
+  defp format_mac(octets) do
+    Enum.map_join(octets, ":", fn n ->
+      n |> Integer.to_string(16) |> String.downcase() |> String.pad_leading(2, "0")
+    end)
   end
 end

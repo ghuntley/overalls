@@ -452,6 +452,11 @@ with subtest("source relocation resolves new private routing and retires the sta
         "systemctl is-active lilly-vm-" + shlex.quote(old["placement_id"]) + ".service",
         "zfs list zroot/lilly/vm-" + shlex.quote(old["placement_id"]),
     )
+    # The restored guest keeps its pre-relocation gateway neighbour; it must
+    # already name the destination TAP before any guest traffic re-resolves it.
+    host_for(moved).succeed(
+        "fleet-galileo-guest gateway-neighbour " + shlex.quote(moved["placement_id"]), timeout=90
+    )
     host_for(moved).succeed(
         "fleet-galileo-guest direct-success " + shlex.quote(moved["placement_id"]), timeout=90
     )

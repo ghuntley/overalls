@@ -96,6 +96,7 @@ fn lillys_shapes_are_accepted() {
         ns(&["-j", "route", "show", "exact", "10.1.0.5/32"]),
         ns(&["addr", "replace", "10.1.0.1/32", "dev", TAP]),
         ns(&["link", "set", "dev", TAP, "up"]),
+        ns(&["link", "set", "dev", TAP, "address", "02:fc:00:14:00:01"]),
         ns(&["link", "set", "lo", "up"]),
         ns(&[
             "tuntap", "add", "dev", TAP, "mode", "tap", "user", "1000010",
@@ -176,7 +177,9 @@ fn lillys_shapes_are_accepted() {
             "/nix/store/y/bin/sysctl",
             "-qw",
             "net.ipv4.ip_forward=1",
-            "net.ipv4.conf.all.rp_filter=1"
+            "net.ipv4.conf.all.rp_filter=1",
+            "net.ipv4.conf.all.arp_announce=2",
+            "net.ipv4.conf.default.arp_announce=2"
         ]
     ));
     assert!(ok(
@@ -379,6 +382,32 @@ fn escapes_are_refused() {
         &["route", "replace", "default", "via", "1.2.3.4", "dev", "eth0"]
     ));
     assert!(refused(Utility::Ip, &["-j", "link", "set", "eth0", "down"]));
+    // Gateway MAC changes stay on namespaced guest taps and locally administered unicast.
+    let ns_ip = |rest: &[&'static str]| {
+        let mut argv = vec!["netns", "exec", NS, "/nix/store/x-iproute2/bin/ip"];
+        argv.extend_from_slice(rest);
+        argv
+    };
+    assert!(refused(
+        Utility::Ip,
+        &["link", "set", "dev", TAP, "address", "02:fc:00:14:00:01"]
+    ));
+    for (device, mac) in [
+        ("uplink", "02:fc:00:14:00:01"),
+        ("lo", "02:fc:00:14:00:01"),
+        ("eth0", "02:fc:00:14:00:01"),
+        (TAP, "00:fc:00:14:00:01"),
+        (TAP, "03:fc:00:14:00:01"),
+        (TAP, "02:FC:00:14:00:01"),
+        (TAP, "02:fc:00:14:00"),
+        (TAP, "02:fc:00:14:00:01:02"),
+        (TAP, "02:fc:00:14:00:0g"),
+    ] {
+        assert!(refused(
+            Utility::Ip,
+            &ns_ip(&["link", "set", "dev", device, "address", mac])
+        ));
+    }
     assert!(refused(Utility::Ip, &["-batch", "/tmp/x"]));
     assert!(refused(Utility::Nft, &["flush", "ruleset"]));
     assert!(refused(Utility::Nft, &["--file", "/etc/nftables.conf"]));
@@ -387,6 +416,10 @@ fn escapes_are_refused() {
     assert!(refused(
         Utility::Sysctl,
         &["-qw", "net.ipv4.conf.eth0.rp_filter=0"]
+    ));
+    assert!(refused(
+        Utility::Sysctl,
+        &["-qw", "net.ipv4.conf.eth0.arp_announce=2"]
     ));
     assert!(refused(Utility::Systemctl, &["stop", "sshd.service"]));
     assert!(refused(

@@ -376,3 +376,43 @@ environmental failures. Subsequent application shutdown caused 623 missing-Repo
 and one missing-endpoint-ETS failures. All recorded suspension and relocation
 capacity failures in that run were missing-Repo cascades; final focused checks
 passed, but this does not turn the interrupted broad gate into passing evidence.
+
+## Relocated guest networking correction (2026-10-30)
+
+The `galileo-fleet` subtest "source relocation resolves new private routing and
+retires the stale source" failed intermittently (two of four captured runs) on
+its first guest request after a memory-preserving relocation. Closed-value
+diagnostics showed the restored guest's first private-service exchange stalled
+for 3–15 seconds (a DNS lookup or a TCP connect that bypassed DNS), then
+recovered; the guest never reached Audi or Galileo during the stall. Two host
+networking defects violated ADR-0199's "validates destination networking"
+before resume:
+
+- The destination TAP had a kernel-random MAC, so the restored guest's cached
+  gateway neighbour named the source host's TAP and its frames were dropped
+  until that entry expired.
+- The namespace used the default `arp_announce=0`, so the destination
+  solicited the guest's MAC from 169.254.254.1 (the source of the reply it was
+  sending). The TAP guard correctly drops guest ARP addressed anywhere but the
+  gateway, and the restored guest had no reason to ARP itself, so the host
+  neighbour stayed incomplete (nft guard counters recorded the dropped replies).
+
+[Guest.new/3](../../../lilly/lib/lilly/network/guest.ex) now derives a
+host- and slot-independent, locally administered gateway MAC per profile, which
+[Lilly.Network](../../../lilly/lib/lilly/network.ex) sets on every created or
+adopted TAP before link-up. The router namespace pins `arp_announce=2`.
+[hostd's grammar](../../../lilly/native/hostd/src/policy.rs) admits only a
+namespaced guest-TAP address change to a locally administered unicast MAC and
+the per-namespace `arp_announce` key. The fleet scenario now asserts that the
+restored guest's gateway neighbour already holds that MAC before its first request.
+
+Evidence: hostd policy tests passed (12 matching tests), the full Lilly gate
+passed (670 tests, contracts, Dialyzer with 0 errors) including the new
+gateway-MAC property,
+and `galileo-fleet` passed in two of three runs with both corrections; in both
+passes the relocated guest's first direct request took about 1.5 seconds. The third run
+failed earlier, in the attachment subtest, on a PostgreSQL deadlock between
+integration creation and a concurrent Marshall read. That failure predates
+this change and also appears in other fleet checks; it is left open here. The run with
+only the MAC correction still failed, and the guard counters showed why. Native
+ARP behaviour is machine-test evidence, not BEAM evidence.

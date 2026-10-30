@@ -35,6 +35,19 @@ defmodule FleetGalileoGuest do
     command(socket, "systemctl start overalls-ssh-sync.timer overalls-agent-executor.service")
   end
 
+  # @cc [owner:ghuntley,label:verification;recovery] galileo-relocated-gateway-neighbour
+  # A memory-restored guest MUST hold its default gateway at the profile's
+  # host-independent MAC (02:fc:00:<profile octet>:00:01) so its cached
+  # neighbour stays valid after relocation; the check only reads guest state.
+  defp dispatch(socket, "gateway-neighbour", nil) do
+    command(
+      socket,
+      "gw=$(ip -j route show default | jq -r '.[0].gateway') && " <>
+        "test \"$(ip -j neigh show \"$gw\" dev eth0 | jq -r '.[0].lladdr')\" = " <>
+        "\"$(printf '02:fc:00:%02x:00:01' \"$(printf %s \"$gw\" | cut -d. -f2)\")\""
+    )
+  end
+
   defp dispatch(socket, "direct-success", nil) do
     command(
       socket,
