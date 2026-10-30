@@ -35,6 +35,8 @@ GLOBAL_FILES = frozenset(
         "tools/buck2",
         "nix/domains/artifacts/dependency-hashes.json",
         "nix/domains/artifacts/infrastructure/toolchain.nix",
+        # The nixos_machine_test command, part of the rule implementation.
+        "buck/machine_tests.py",
     }
 )
 GLOBAL_PREFIXES = ("toolchains/", "nix/buck/")

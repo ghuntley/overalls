@@ -53,9 +53,7 @@ nixos_machine_test(
     check = "ubuntu-guest",
     suite = "zfs-guest",
     nested_kvm = True,
-    labels = [
-        "known_inception_failure",
-    ],
+    labels = [],
     params = {
         "guest": "import ./fixtures/ubuntu { inherit packages; }",
         "ubuntu": "true",
@@ -70,9 +68,7 @@ nixos_machine_test(
     check = "zfs-guest",
     suite = "zfs-guest",
     nested_kvm = True,
-    labels = [
-        "known_inception_failure",
-    ],
+    labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",

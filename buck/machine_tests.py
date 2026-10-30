@@ -43,11 +43,9 @@ HEADER = (
 KVM_EVALUATION_CHECKS = frozenset({"firecracker-patch-tests", "foreign-linux-pam-helper"})
 NOT_MACHINE_CHECKS = frozenset({"windows-editor-acceptance-harness"})
 
-# Inception is known broken (AGENTS.md). The zfs-guest driver carries the
-# known-failing "Inception retains a separate sparse data drive" subtest.
-KNOWN_INCEPTION_FAILURES = frozenset(
-    {"inception", "inception-checkout", "inception-ssh-host-ca", "zfs-guest", "ubuntu-guest"}
-)
+# The Inception machine tests are known broken (AGENTS.md). The zfs-guest
+# Inception subtest is not a reason to skip zfs-guest: it stays required.
+KNOWN_INCEPTION_FAILURES = frozenset({"inception", "inception-checkout", "inception-ssh-host-ca"})
 
 # Modules that are plain paths and do not close over the application packages.
 PLAIN_MODULES = frozenset(

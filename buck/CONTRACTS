@@ -75,7 +75,8 @@ tools/affected MUST select every target whose recursive unconfigured hash
 (paths_and_contents) differs between base and head, plus the reverse
 dependencies of every changed file's owners. Deleted files MUST be resolved
 against the base graph. A changed file without an owner outside docs/, or a
-change to the cells' inputs, toolchains or rule files, MUST select every
+change to the cells' inputs, toolchains or rule files (including the
+nixos_machine_test command, buck/machine_tests.py), MUST select every
 target. Selection MUST only load targets and run queries, never build an
 action or a Nix derivation, and MUST report each package that fails to load
 instead of hiding it.

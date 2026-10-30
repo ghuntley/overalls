@@ -165,10 +165,11 @@ Remaining gaps:
   checks move to Buck2 rules.
 - `ci.yml` has no precommit job yet (M8), and its build job skips
   bootstrap builds, which `publish-cache.yml` already builds.
-- Known Inception failures (`inception`, `inception-checkout`,
-  `inception-ssh-host-ca`, and `zfs-guest`/`ubuntu-guest`, which carry the
-  known-failing Inception subtest) are labelled `known_inception_failure`:
-  `ci.yml` skips them, and the daily run reports them without failing.
+- The known-broken Inception machine tests (`inception`, `inception-checkout`,
+  `inception-ssh-host-ca`) are labelled `known_inception_failure`: `ci.yml`
+  skips them, and the daily run reports them without failing. `zfs-guest` and
+  `ubuntu-guest` stay required, although `zfs-guest`'s driver still runs the
+  known-failing Inception subtest; excluding it belongs in that driver.
 - Replays of `ab3816ebb` and `8fab8c411` are not yet recorded.
 
 ## Open questions
