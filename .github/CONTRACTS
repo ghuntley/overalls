@@ -3,7 +3,8 @@ ci.yml MUST run on every trunk push and on dispatch, one run per ref and event, 
 newer push replacing a pending run. It selects with tools/affected from the
 head of the newest earlier started, non-cancelled push run (so replaced pushes stay
 covered), or everything when there is no usable base, and MUST run the
-affected builds, tests and machine tests, each machine test as its own
+affected builds, tests and machine tests, evaluate every selected machine
+test's assembly (`[drv]`, deferred ones included), run each machine test as its own
 job wrapped in `cachix watch-exec`, and tools/precommit over the same range. Known Inception failures, and the full
 machine-test set when everything or more than 40 suites are selected (unless dispatched with
 machine_all), run only in the daily backstop. A selection error, or any failed job, MUST fail the ci job

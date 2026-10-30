@@ -47,6 +47,7 @@ jobs:
     timeout-minutes: 60
     outputs:
       machine_tests: ${{ steps.plan.outputs.machine_tests }}
+      evaluate: ${{ steps.plan.outputs.evaluate }}
       tests: ${{ steps.plan.outputs.tests }}
       builds: ${{ steps.plan.outputs.builds }}
       errors: ${{ steps.plan.outputs.errors }}
@@ -123,6 +124,11 @@ jobs:
             deferred=true
             machine='[]'
           fi
+          # Every selected machine test, deferred or not, evaluates per push:
+          # `<suite>.assembly[drv]` runs the declared-only, restricted
+          # evaluation without booting a VM, so a missing input or module
+          # argument fails here rather than in the daily run.
+          evaluate=$(jq -c '[.machine_tests[].target | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]' affected.json)
           tests=$(jq -c '[.tests[].target]' affected.json)
           # Bootstrap builds are flake outputs that publish-cache.yml builds.
           # expected_failure targets are soundness probes that must not build.
@@ -130,6 +136,7 @@ jobs:
           errors=$(jq '.errors | length' affected.json)
           {
             echo "machine_tests=$machine"
+            echo "evaluate=$evaluate"
             echo "tests=$tests"
             echo "builds=$builds"
             echo "errors=$errors"
@@ -139,6 +146,7 @@ jobs:
             jq -r '"everything: \(.everything) \(.reasons | join("; "))"' affected.json
             echo
             echo "- machine tests: $(jq length <<<"$machine") (deferred to the daily run: $deferred)"
+            echo "- machine-test evaluations: $(jq length <<<"$evaluate")"
             echo "- tests: $(jq length <<<"$tests")"
             echo "- builds: $(jq length <<<"$builds")"
             echo "- selection errors: $errors"
@@ -186,6 +194,25 @@ jobs:
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           cachix watch-exec overalls -- tools/buck2 test --keep-going "${targets[@]}"
+
+  evaluate:
+    needs: affected
+    if: needs.affected.outputs.evaluate != '[]'
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 60
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Evaluate selected machine tests
+        env:
+          TARGETS: ${{ needs.affected.outputs.evaluate }}
+        run: |
+          set -euo pipefail
+          mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
+          tools/buck2 build --keep-going "${targets[@]}"
 
   machine:
     needs: affected
@@ -241,7 +268,7 @@ jobs:
           tools/precommit "${range[@]}"
 
   ci:
-    needs: [affected, build, test, machine, precommit]
+    needs: [affected, build, test, evaluate, machine, precommit]
     if: always()
     runs-on: namespace-profile-cached-amd64
     steps:
@@ -251,6 +278,7 @@ jobs:
           BUILD: ${{ needs.build.result }}
           TEST: ${{ needs.test.result }}
           MACHINE: ${{ needs.machine.result }}
+          EVALUATE: ${{ needs.evaluate.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
           ERRORS: ${{ needs.affected.outputs.errors }}
         run: |
@@ -258,7 +286,7 @@ jobs:
           if [ "$AFFECTED" != success ]; then
             echo "::error::selection did not succeed ($AFFECTED)"; status=1
           fi
-          for job in "build:$BUILD" "test:$TEST" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
+          for job in "build:$BUILD" "test:$TEST" "evaluate:$EVALUATE" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
             case "${job#*:}" in
               success|skipped) ;;
               *) echo "::error::${job%%:*} did not succeed (${job#*:})"; status=1 ;;
