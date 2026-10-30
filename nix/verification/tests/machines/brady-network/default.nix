@@ -21,7 +21,14 @@ in pkgs.testers.runNixOSTest {
     networking.hostId = "aabbccdd";
     boot.supportedFilesystems = lib.optional storage "zfs";
     systemd.services.zfs-zed.enable = false;
-    virtualisation.emptyDiskImages = lib.optionals storage (if large then [ 524288 524288 ] else [ 4096 4096 ]);
+    # @cc [owner:ghuntley,label:verification;capacity] brady-storage-fixture-discard
+    # The sparse ZFS vdev images MUST pass guest discards to the host (the
+    # pool is created with autotrim) so their host allocation tracks live pool
+    # data. Without it every body the large scenario rewrites stays allocated
+    # in the qcow2 files until the runner's build volume is exhausted (guest
+    # WRITE I/O errors near 50 GB per vdev). Pool sizes and quotas are unchanged.
+    virtualisation.emptyDiskImages = map (size: { inherit size; driveConfig.driveExtraOpts.discard = "unmap"; })
+      (lib.optionals storage (if large then [ 524288 524288 ] else [ 4096 4096 ]));
     virtualisation.memorySize = 2048;
     boot.extraModprobeConfig = lib.optionalString storage "options zfs zfs_arc_max=268435456";
     environment.etc."brady-storage.py".source = ../../../../domains/system/brady/storage.py;

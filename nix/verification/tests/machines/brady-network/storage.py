@@ -4,7 +4,7 @@
 # This fixture does not provide the Lilly actor/Firecracker attribution proof.
 with subtest("cache recovers onto a separate native ZFS dataset"):
     router.succeed(
-        "zpool create -f -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
+        "zpool create -f -o autotrim=on -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
         "zfs create -o mountpoint=/pool -o quota=2G tank/lilly",
     )
     brady_storage = dict(

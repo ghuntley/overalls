@@ -7,7 +7,7 @@ import time
 # require publication and hits, and retain exact bytes after origin loss/restart.
 # Veth peers are native network fixtures, not Firecracker attribution evidence.
 router.succeed(
-    "zpool create -f -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
+    "zpool create -f -o autotrim=on -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
     "zfs create -o mountpoint=/pool -o quota=64G tank/lilly",
     "zfs create -o mountpoint=/clients -o quota=24G tank/clients",
 )
