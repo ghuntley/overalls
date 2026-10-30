@@ -147,6 +147,22 @@ jobs:
           dotnet run --project mila/windows-dotnet-smoke --configuration Release -p:MilaNativeDll=$staged
           if ($LASTEXITCODE -ne 0) { throw "Rust/.NET FFI smoke failed" }
 
+      # Journey mode drives the staged Rust session against the hermetic
+      # Marshall+Porsche fixture through its descriptor (version 1: deployment
+      # host/ports, inline CA, approver hook, seed). It is gated until the
+      # fixture tunnel step lands and writes MILA_JOURNEY_DESCRIPTOR, so the job
+      # stays green without a backend; once enabled a missing descriptor fails.
+      - name: Windows journey against the tunnelled fixture
+        if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' }}
+        shell: pwsh
+        env:
+          MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
+        run: |
+          if (-not (Test-Path $env:MILA_JOURNEY_DESCRIPTOR)) { throw "Journey fixture descriptor missing: $env:MILA_JOURNEY_DESCRIPTOR" }
+          $staged = Join-Path $env:GITHUB_WORKSPACE "mila/windows-dotnet/bin/Release/net10.0-windows10.0.19041.0/win-x64/mila_native.dll"
+          dotnet run --project mila/windows-dotnet-smoke --configuration Release -p:MilaNativeDll=$staged -- --descriptor $env:MILA_JOURNEY_DESCRIPTOR
+          if ($LASTEXITCODE -ne 0) { throw "Windows fixture journey failed" }
+
   linux-native:
     runs-on: ubuntu-24.04
     timeout-minutes: 45

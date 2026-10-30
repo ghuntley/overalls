@@ -111,6 +111,24 @@ suite against the hermetic Marshall+Porsche fixture is wired into CI but has no
 recorded passing execution until the fixture lands; FCM delivery is not
 hermetic and remains outside it.
 
+The Windows adapter's lifecycle layer keeps protocol authority in Rust:
+[`SignInCoordinator.cs`](../../../mila/windows-dotnet/Interop/SignInCoordinator.cs)
+polls `mila_session_whoami` and reconnects through the Rust session;
+[`TerminalStream.cs`](../../../mila/windows-dotnet/Interop/TerminalStream.cs)
+reattaches only on transport loss reported by `mila_session_terminal_read`;
+[`WindowsPushRegistration.cs`](../../../mila/windows-dotnet/Interop/WindowsPushRegistration.cs)
+sends the Rust-encoded Susan request and registers the push key with Porsche through
+`mila_session_device_register` (push key on stdin). The Rust grammar now accepts
+Porsche's `device` and `ssh-key list` commands, checked against the shared
+[`porsche_device_results.json`](../../../protocol/test/fixtures/porsche_device_results.json)
+fixture, and the Rust WNS channel check matches Susan's. The
+[lifecycle smoke](../../../mila/windows-dotnet-smoke/LifecycleSmoke.cs) runs these
+adapters against scripted peers in the `windows-native` CI job; its
+[journey mode](../../../mila/windows-dotnet-smoke/JourneySmoke.cs) needs the hermetic
+Marshall+Porsche fixture and is gated by the `MILA_WINDOWS_JOURNEY` repository
+variable. Windows X25519 poke-key custody, WNS delivery and live journey execution
+remain open.
+
 ## Open questions
 
 None blocking the direction; platform key-storage and release-signing details
