@@ -78,8 +78,21 @@ MilaFfiStatus mila_terminal_input_validate(size_t length, uint8_t read_write);
 MilaFfiStatus mila_terminal_resize_validate(uint16_t columns, uint16_t rows,
                                             uint8_t read_write);
 /* Authenticated PTY lifecycle. Handles are opaque and generation-bound. */
-MilaFfiStatus mila_session_terminal_attach(uint64_t session_handle, uint32_t columns,
-                                           uint32_t rows, uint64_t *out_terminal_handle);
+/* Opens or rejoins the caller's terminal session (`terminal new`); the JSON
+ * receipt's result.session_id names the session for attach_session. */
+MilaFfiStatus mila_session_terminal_new(uint64_t handle, const uint8_t *machine, size_t machine_len,
+                                        const uint8_t *request_id, size_t request_id_len,
+                                        uint8_t *output, size_t capacity, size_t *written);
+/* Attaches a bounded PTY to one named terminal session. Porsche refuses
+ * unnamed attach, so the Windows client no longer uses
+ * mila_session_terminal_attach. */
+MilaFfiStatus mila_session_terminal_attach_session(uint64_t session_handle, const uint8_t *machine,
+                                                   size_t machine_len, const uint8_t *terminal,
+                                                   size_t terminal_len, uint32_t columns,
+                                                   uint32_t rows, uint64_t *out_terminal_handle);
+/* Copies {"error": CODE|null} for the session's most recent refused command. */
+MilaFfiStatus mila_session_last_refusal(uint64_t handle, uint8_t *output, size_t capacity,
+                                        size_t *written);
 MilaFfiStatus mila_session_terminal_poll(uint64_t terminal_handle, uint8_t *output,
                                          size_t capacity, size_t *written);
 MilaFfiStatus mila_session_terminal_input(uint64_t terminal_handle, const uint8_t *input,

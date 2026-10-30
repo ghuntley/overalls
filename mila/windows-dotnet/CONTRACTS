@@ -16,8 +16,9 @@ Windows lifecycle adapters MUST keep authority in the Rust session: the
 deployment picker fences approval and session work by selection generation
 (`Interop/DeploymentPicker.cs`), sign-in polls `whoami` on the same Rust
 session and binds approval links to the selected host and HTTPS port
-(`Interop/SignInCoordinator.cs`), terminal reconnect distinguishes idle,
-closed and lost PTYs (`Interop/TerminalStream.cs`), WNS exchange sends the
+(`Interop/SignInCoordinator.cs`), terminal attach names a server session from
+`terminal new` and reconnect rejoins it, distinguishing idle, closed and lost
+PTYs (`Interop/TerminalStream.cs`), WNS exchange sends the
 channel only to Susan and the push key to Porsche only through Rust stdin
 (`Interop/WindowsPushRegistration.cs`), and share completion is navigation
 only (`Interop/ExternalActivation.cs`). The in-source `mila-windows-*` notes

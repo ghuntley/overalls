@@ -26,6 +26,12 @@ internal readonly record struct MilaNativeBytesResult(MilaNativeStatus Status, b
     internal bool Succeeded => Status == MilaNativeStatus.Ok && Data is not null;
 }
 
+/// <summary>Typed `terminal new` result: the named server session to attach, or the refusal status.</summary>
+internal readonly record struct MilaNativeTerminalOpen(MilaNativeStatus Status, string? SessionId)
+{
+    internal bool Succeeded => Status == MilaNativeStatus.Ok && SessionId is not null;
+}
+
 /// <summary>Push platforms accepted by Porsche's closed `device register` grammar.</summary>
 internal enum MilaDevicePlatform : byte { Ios = 0, Android = 1, Macos = 2, Windows = 3 }
 
@@ -160,6 +166,99 @@ internal static partial class RustNative
     }
 
     /// <summary>
+    /// @cc [owner:ghuntley,label:protocol;reliability] mila-windows-terminal-named-session
+    /// Terminal attach MUST name a server terminal session: `terminal new` opens
+    /// or rejoins the caller's session on one machine and its receipt's
+    /// <c>result.session_id</c> (a UUID) is the only identity passed to
+    /// `mila_session_terminal_attach_session`. Porsche refuses unnamed attach.
+    /// </summary>
+    internal static MilaNativeTerminalOpen TrySessionTerminalNew(ulong handle, Guid machineId, string requestId)
+    {
+        if (handle == 0 || machineId == Guid.Empty || !IsCanonicalRequestId(requestId))
+            return new(MilaNativeStatus.InvalidRequest, null);
+        byte[] machine = Encoding.UTF8.GetBytes(machineId.ToString("D"));
+        byte[] request = Encoding.UTF8.GetBytes(requestId);
+        GCHandle machinePin = GCHandle.Alloc(machine, GCHandleType.Pinned);
+        GCHandle requestPin = GCHandle.Alloc(request, GCHandleType.Pinned);
+        try
+        {
+            MilaNativeSessionBytesResult receipt = TrySessionBytesOnce((bytes, capacity, written) => SessionTerminalNewNative(
+                handle, machinePin.AddrOfPinnedObject(), (nuint)machine.Length,
+                requestPin.AddrOfPinnedObject(), (nuint)request.Length, bytes, capacity, written), 64 * 1024);
+            if (receipt.Status != MilaNativeStatus.Ok || receipt.Data is null) return new(receipt.Status, null);
+            return DecodeTerminalNew(receipt.Data) is { } session
+                ? new(MilaNativeStatus.Ok, session)
+                : new(MilaNativeStatus.InvalidRequest, null);
+        }
+        finally { machinePin.Free(); requestPin.Free(); }
+    }
+
+    /// <summary>Decodes the `terminal new` receipt to its canonical session UUID, or null.</summary>
+    internal static string? DecodeTerminalNew(ReadOnlySpan<byte> receipt)
+    {
+        try
+        {
+            using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(receipt.ToArray());
+            System.Text.Json.JsonElement root = document.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !root.TryGetProperty("result", out System.Text.Json.JsonElement result) ||
+                result.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                !result.TryGetProperty("session_id", out System.Text.Json.JsonElement id) ||
+                id.ValueKind != System.Text.Json.JsonValueKind.String ||
+                !Guid.TryParseExact(id.GetString(), "D", out Guid session) || session == Guid.Empty)
+                return null;
+            return session.ToString("D");
+        }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>Attaches a bounded PTY to one named server terminal session.</summary>
+    internal static (MilaNativeStatus Status, ulong? Handle) TrySessionTerminalAttachSession(
+        ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows)
+    {
+        if (sessionHandle == 0 || machineId == Guid.Empty || columns is 0 or > 4096 || rows is 0 or > 512 ||
+            !Guid.TryParseExact(terminalId, "D", out Guid terminal) || terminal == Guid.Empty)
+            return (MilaNativeStatus.InvalidRequest, null);
+        byte[] machine = Encoding.UTF8.GetBytes(machineId.ToString("D"));
+        byte[] session = Encoding.UTF8.GetBytes(terminal.ToString("D"));
+        GCHandle machinePin = GCHandle.Alloc(machine, GCHandleType.Pinned);
+        GCHandle sessionPin = GCHandle.Alloc(session, GCHandleType.Pinned);
+        try
+        {
+            MilaNativeStatus status = SessionTerminalAttachSessionNative(
+                sessionHandle, machinePin.AddrOfPinnedObject(), (nuint)machine.Length,
+                sessionPin.AddrOfPinnedObject(), (nuint)session.Length, columns, rows, out ulong handle);
+            return status == MilaNativeStatus.Ok && handle > 0 ? (status, handle) : (status, null);
+        }
+        catch (DllNotFoundException) { return (MilaNativeStatus.Unavailable, null); }
+        catch (EntryPointNotFoundException) { return (MilaNativeStatus.Unavailable, null); }
+        catch (BadImageFormatException) { return (MilaNativeStatus.Unavailable, null); }
+        finally { machinePin.Free(); sessionPin.Free(); }
+    }
+
+    /// <summary>
+    /// Returns the closed refusal code of the session's most recent refused
+    /// command (for example <c>terminal_unavailable</c>), or null.
+    /// </summary>
+    internal static string? TrySessionLastRefusal(ulong handle)
+    {
+        if (handle == 0) return null;
+        MilaNativeSessionBytesResult result = TrySessionBytesOnce(
+            (bytes, capacity, written) => SessionLastRefusalNative(handle, bytes, capacity, written), 1024);
+        if (!result.Succeeded || result.Data is null) return null;
+        try
+        {
+            using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(result.Data);
+            return document.RootElement.ValueKind == System.Text.Json.JsonValueKind.Object &&
+                document.RootElement.TryGetProperty("error", out System.Text.Json.JsonElement error) &&
+                error.ValueKind == System.Text.Json.JsonValueKind.String &&
+                error.GetString() is { Length: > 0 and <= 64 } code && code.All(c => c is >= 'a' and <= 'z' or '_')
+                ? code : null;
+        }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+
+    /// <summary>
     /// @cc [owner:ghuntley,label:reliability] mila-windows-session-bytes-once
     /// Session operations that execute a remote command MUST be invoked exactly
     /// once per call with a fixed bounded buffer. The size-probing helper repeats
@@ -193,6 +292,19 @@ internal static partial class RustNative
 
     [LibraryImport(LibraryName, EntryPoint = "mila_session_read_machines")]
     private static partial MilaNativeStatus SessionReadMachinesNative(ulong handle, byte more);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_new")]
+    private static partial MilaNativeStatus SessionTerminalNewNative(
+        ulong handle, IntPtr machine, nuint machineLength, IntPtr requestId, nuint requestIdLength,
+        IntPtr output, nuint capacity, IntPtr written);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_attach_session")]
+    private static partial MilaNativeStatus SessionTerminalAttachSessionNative(
+        ulong sessionHandle, IntPtr machine, nuint machineLength, IntPtr terminal, nuint terminalLength,
+        uint columns, uint rows, out ulong terminalHandle);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_last_refusal")]
+    private static partial MilaNativeStatus SessionLastRefusalNative(ulong handle, IntPtr output, nuint capacity, IntPtr written);
 
     [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_read")]
     private static partial MilaNativeStatus SessionTerminalReadNative(

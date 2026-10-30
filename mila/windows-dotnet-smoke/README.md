@@ -44,7 +44,8 @@ The descriptor is the hermetic Marshall+Porsche fixture's version 1 JSON:
  "deployment":{"host":"localhost","ssh_port":2222,"https_port":8443},
  "tls":{"ca_pem":"-----BEGIN CERTIFICATE-----...","server_name":"localhost"},
  "approver":{"url":"https://localhost:8443/...","bearer_token":"..."},
- "seed":{"machine_name":"...","share_principal":"second@example.test"}}
+ "seed":{"machine_name":"...","machine_id":"<uuid>",
+         "share_principal":"second@example.test","account_email":"owner@example.test"}}
 ```
 
 Unknown members, another version, a non-canonical host, zero ports, a server
@@ -54,7 +55,10 @@ before any connection. The journey trusts only the fixture CA, fetches
 with a CNG device key (deleted afterwards when the journey created it), lets the
 approver hook approve the browser link (`POST {approval_url, fingerprint}` with
 the Bearer token), then lists machines, adds and removes a viewer share on the
-seed machine, lists notification devices, attaches a terminal, simulates a
+seed machine (matched by `machine_id` and name, signed in as `account_email`),
+lists notification devices, opens a named terminal with `terminal new` and
+attaches to it (the fixture runs no guest, so the closed `terminal_unavailable`
+refusal is accepted there), simulates a
 transport loss and reconnects, and completes a share deferred before sign-in.
 The bearer token is never printed. The `windows-native` job runs it only when
 the repository variable `MILA_WINDOWS_JOURNEY` is `enabled` and the fixture

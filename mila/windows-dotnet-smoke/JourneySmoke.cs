@@ -17,7 +17,7 @@ using Mila.Windows.Interop;
 /// </remarks>
 internal sealed record MilaJourneyDescriptor(
     string Host, ushort SshPort, ushort HttpsPort, X509Certificate2 Ca, Uri ApproverUrl, string ApproverToken,
-    string MachineName, string SharePrincipal)
+    string MachineName, Guid MachineId, string SharePrincipal, string AccountEmail)
 {
     private const int MaxBytes = 64 * 1024;
 
@@ -32,7 +32,7 @@ internal sealed record MilaJourneyDescriptor(
         JsonElement deployment = Exact(root.GetProperty("deployment"), "host", "ssh_port", "https_port");
         JsonElement tls = Exact(root.GetProperty("tls"), "ca_pem", "server_name");
         JsonElement approver = Exact(root.GetProperty("approver"), "url", "bearer_token");
-        JsonElement seed = Exact(root.GetProperty("seed"), "machine_name", "share_principal");
+        JsonElement seed = Exact(root.GetProperty("seed"), "machine_name", "machine_id", "share_principal", "account_email");
         string host = Text(deployment, "host", 253);
         if (!MilaDeploymentHost.IsCanonical(host)) throw new InvalidDataException("descriptor host");
         ushort ssh = Port(deployment, "ssh_port");
@@ -55,13 +55,22 @@ internal sealed record MilaJourneyDescriptor(
         }
         string machine = Text(seed, "machine_name", 63);
         string principal = Text(seed, "share_principal", 320);
-        if (!principal.Contains('@') || principal.Any(char.IsWhiteSpace))
+        string account = Text(seed, "account_email", 320);
+        if (!Email(principal) || !Email(account) || string.Equals(principal, account, StringComparison.OrdinalIgnoreCase))
         {
             ca.Dispose();
-            throw new InvalidDataException("descriptor share principal");
+            throw new InvalidDataException("descriptor seed principals");
         }
-        return new(host, ssh, https, ca, hook, token, machine, principal);
+        if (!Guid.TryParseExact(Text(seed, "machine_id", 36), "D", out Guid machineId) || machineId == Guid.Empty)
+        {
+            ca.Dispose();
+            throw new InvalidDataException("descriptor seed machine id");
+        }
+        return new(host, ssh, https, ca, hook, token, machine, machineId, principal, account);
     }
+
+    private static bool Email(string value) =>
+        value.IndexOf('@') is > 0 and var at && at < value.Length - 1 && !value.Any(char.IsWhiteSpace);
 
     private static JsonElement Exact(JsonElement element, params string[] names)
     {
@@ -181,6 +190,8 @@ internal static class JourneySmoke
             MilaSignInState state = await coordinator.SignInAsync(target, cancellationToken);
             Program.Require(state.Phase == MilaSignInPhase.SignedIn && session.Handle is > 0 && !string.IsNullOrEmpty(state.Account),
                 $"journey sign-in ({state.Phase}/{state.Failure})");
+            Program.Require(string.Equals(state.Account, descriptor.AccountEmail, StringComparison.OrdinalIgnoreCase),
+                "journey signed in as the seeded account");
             Step(approver.Calls > 0 ? "browser approval sign-in" : "sign-in (key already approved)");
 
             Program.Require(shares.Complete(host, out MilaRoute shared) == MilaShareCompletionOutcome.Navigated &&
@@ -192,7 +203,7 @@ internal static class JourneySmoke
             MilaNativeSessionBytesResult listing = RustNative.TrySessionListing(handle);
             Program.Require(listing.Succeeded, "journey machine listing");
             MilaMachineRow machine = RustNative.DecodeSessionListing(listing.Data!).Machines
-                .FirstOrDefault(row => row.Name == descriptor.MachineName)
+                .FirstOrDefault(row => row.Id == descriptor.MachineId && row.Name == descriptor.MachineName)
                 ?? throw new InvalidOperationException("journey seed machine missing");
             Step("machine listing");
 
@@ -207,13 +218,27 @@ internal static class JourneySmoke
             _ = MilaWindowsNotificationDevicesController.DecodeListing(devices.Data!);
             Step("notification device listing");
 
-            MilaTerminalStream terminal = new(MilaRustTerminalTransport.Instance, () => session.Handle);
-            Program.Require(terminal.Attach(true, 80, 24), "journey terminal attach");
-            MilaTerminalPoll poll = MilaTerminalPoll.Idle;
-            for (int i = 0; i < 10 && poll is MilaTerminalPoll.Idle; i++) poll = terminal.Poll();
-            Program.Require(poll is MilaTerminalPoll.Output or MilaTerminalPoll.Idle or MilaTerminalPoll.Ended, $"journey terminal poll ({poll})");
-            terminal.Kill();
-            Step($"terminal attach ({poll})");
+            // Real Porsche refuses unnamed attach: `terminal new` names the session first.
+            // The hermetic fixture runs no guest, so Marshall refuses it with the
+            // closed `terminal_unavailable` reason, which the journey accepts.
+            MilaNativeTerminalOpen opened = RustNative.TrySessionTerminalNew(handle, machine.Id, RequestId());
+            if (!opened.Succeeded)
+            {
+                string? refusal = RustNative.TrySessionLastRefusal(handle);
+                Program.Require(refusal == "terminal_unavailable", $"journey terminal new ({opened.Status}/{refusal ?? "none"})");
+                Step("terminal new refused: terminal_unavailable (no guest)");
+            }
+            else
+            {
+                MilaTerminalStream terminal = new(MilaRustTerminalTransport.Instance, () => session.Handle);
+                Program.Require(terminal.Attach(machine.Id, machine.CanWrite, 80, 24) && terminal.TerminalId is not null,
+                    "journey named terminal attach");
+                MilaTerminalPoll poll = MilaTerminalPoll.Idle;
+                for (int i = 0; i < 10 && poll is MilaTerminalPoll.Idle; i++) poll = terminal.Poll();
+                Program.Require(poll is MilaTerminalPoll.Output or MilaTerminalPoll.Idle or MilaTerminalPoll.Ended, $"journey terminal poll ({poll})");
+                terminal.Kill();
+                Step($"named terminal attach ({poll})");
+            }
 
             Program.Require(coordinator.ReportTransportLoss(state.Generation) && session.Handle is null, "journey transport loss");
             state = await coordinator.ReconnectAsync(target, cancellationToken);
@@ -282,17 +307,23 @@ internal static class JourneyDescriptorSmoke
         string pem = ca.ExportCertificatePem();
         string Descriptor(string host = "localhost", int ssh = 2222, int https = 8443, string? server = null, string? pemText = null,
             string hook = "https://localhost:8443/__fixture/approve", string token = "fixture-token", string principal = "second@example.test",
-            int version = 1, string extra = "") => JsonSerializer.Serialize(new Dictionary<string, object>
+            int version = 1, string extra = "", string machineId = "019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a",
+            string account = "owner@example.test") => JsonSerializer.Serialize(new Dictionary<string, object>
         {
             ["version"] = version,
             ["deployment"] = new Dictionary<string, object> { ["host"] = host, ["ssh_port"] = ssh, ["https_port"] = https },
             ["tls"] = new Dictionary<string, object> { ["ca_pem"] = pemText ?? pem, ["server_name"] = server ?? host },
             ["approver"] = new Dictionary<string, object> { ["url"] = hook, ["bearer_token"] = token },
-            ["seed"] = new Dictionary<string, object> { ["machine_name"] = "journey-machine", ["share_principal"] = principal },
+            ["seed"] = new Dictionary<string, object>
+            {
+                ["machine_name"] = "journey-machine", ["machine_id"] = machineId,
+                ["share_principal"] = principal, ["account_email"] = account,
+            },
         }).Replace("\"version\"", extra + "\"version\"", StringComparison.Ordinal);
 
         MilaJourneyDescriptor parsed = MilaJourneyDescriptor.Parse(Encoding.UTF8.GetBytes(Descriptor()));
-        Program.Require(parsed is { Host: "localhost", SshPort: 2222, HttpsPort: 8443, MachineName: "journey-machine" } &&
+        Program.Require(parsed is { Host: "localhost", SshPort: 2222, HttpsPort: 8443, MachineName: "journey-machine",
+                AccountEmail: "owner@example.test" } && parsed.MachineId == Guid.Parse("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a") &&
             parsed.Ca.Thumbprint == ca.Thumbprint, "journey descriptor v1 parses");
         using (SocketsHttpHandler handler = parsed.PinnedHandler())
             Program.Require(handler.SslOptions.CertificateChainPolicy?.CustomTrustStore.Count == 1 && !handler.AllowAutoRedirect,
@@ -309,6 +340,9 @@ internal static class JourneyDescriptorSmoke
                      ("hook scheme", Descriptor(hook: "http://localhost:8443/approve")),
                      ("token", Descriptor(token: "has space")),
                      ("principal", Descriptor(principal: "not-an-email")),
+                     ("account", Descriptor(account: "@example.test")),
+                     ("same principal", Descriptor(account: "Second@example.test")),
+                     ("machine id", Descriptor(machineId: "journey-machine")),
                      ("unknown member", Descriptor(extra: "\"extra\":1,")),
                  })
         {

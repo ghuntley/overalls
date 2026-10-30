@@ -716,21 +716,6 @@ internal static partial class RustNative
         ushort columns, ushort rows, bool readWrite)
         => TryTerminal(() => TerminalResizeNative(columns, rows, readWrite ? (byte)1 : (byte)0));
 
-    internal static (MilaNativeStatus Status, ulong? Handle) TrySessionTerminalAttach(
-        ulong sessionHandle, ushort columns, ushort rows)
-    {
-        if (sessionHandle == 0 || columns is 0 or > 4096 || rows is 0 or > 512)
-            return (MilaNativeStatus.InvalidRequest, null);
-        try
-        {
-            MilaNativeStatus status = SessionTerminalAttachNative(sessionHandle, columns, rows, out ulong terminal);
-            return status == MilaNativeStatus.Ok && terminal > 0 ? (status, terminal) : (status, null);
-        }
-        catch (DllNotFoundException) { return (MilaNativeStatus.Unavailable, null); }
-        catch (EntryPointNotFoundException) { return (MilaNativeStatus.Unavailable, null); }
-        catch (BadImageFormatException) { return (MilaNativeStatus.Unavailable, null); }
-    }
-
     internal static MilaNativeTerminalBytesResult TrySessionTerminalPoll(ulong terminalHandle)
     {
         if (terminalHandle == 0) return new(MilaNativeStatus.InvalidRequest, null);
@@ -935,9 +920,6 @@ internal static partial class RustNative
     private static partial MilaNativeStatus TerminalResizeNative(
         ushort columns, ushort rows, byte readWrite);
 
-    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_attach")]
-    private static partial MilaNativeStatus SessionTerminalAttachNative(
-        ulong sessionHandle, uint columns, uint rows, out ulong terminalHandle);
     [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_poll")]
     private static partial MilaNativeStatus SessionTerminalPollNative(
         ulong terminalHandle, IntPtr output, nuint capacity, IntPtr written);

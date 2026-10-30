@@ -22,6 +22,7 @@ internal static class LifecycleSmoke
         SignInApprovalOutcomes();
         SignInReconnect();
         TerminalReconnect();
+        TerminalNewReceipt();
         PushRegistration();
         ShareCompletion();
         DeviceFixture();
@@ -247,15 +248,29 @@ internal static class LifecycleSmoke
         internal Queue<MilaNativeTerminalRead> Reads { get; } = new();
         internal List<ulong> Killed { get; } = [];
         internal List<ulong> AttachedSessions { get; } = [];
-        public (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, ushort columns, ushort rows)
+        internal List<string> AttachedTerminals { get; } = [];
+        internal Queue<MilaNativeTerminalOpen> Opens { get; } = new();
+        internal int OpenCount { get; private set; }
+        public MilaNativeTerminalOpen Open(ulong sessionHandle, Guid machineId)
         {
+            OpenCount++;
+            Program.Require(machineId == Machine, "terminal new names the selected machine");
+            return Opens.Count > 0 ? Opens.Dequeue() : new(MilaNativeStatus.Ok, $"019a0f73-3d4e-7f5a-8b6c-{OpenCount:x12}");
+        }
+        public (MilaNativeStatus Status, ulong? Handle) Attach(
+            ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows)
+        {
+            Program.Require(machineId == Machine && Guid.TryParseExact(terminalId, "D", out _), "attach names a server session");
             AttachedSessions.Add(sessionHandle);
+            AttachedTerminals.Add(terminalId);
             return Attaches.Count > 0 ? Attaches.Dequeue() : (MilaNativeStatus.Transport, null);
         }
         public MilaNativeTerminalRead Read(ulong terminalHandle) =>
             Reads.Count > 0 ? Reads.Dequeue() : new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Idle, null);
         public MilaNativeStatus Kill(ulong terminalHandle) { Killed.Add(terminalHandle); return MilaNativeStatus.Ok; }
     }
+
+    private static readonly Guid Machine = Guid.Parse("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a");
 
     private static MilaNativeTerminalRead Data(string text) =>
         new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Data, Encoding.UTF8.GetBytes(text));
@@ -267,7 +282,10 @@ internal static class LifecycleSmoke
         FakeTerminal transport = new();
         MilaTerminalStream stream = new(transport, () => session, maxReconnects: 2);
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 11));
-        Program.Require(stream.Attach(true, 80, 24) && stream.Session.NativeTerminalHandle == 11, "terminal attach");
+        Program.Require(!stream.Attach(Guid.Empty, true, 80, 24) && transport.OpenCount == 0, "attach requires a machine");
+        Program.Require(stream.Attach(Machine, true, 80, 24) && stream.Session.NativeTerminalHandle == 11 &&
+            transport.OpenCount == 1 && transport.AttachedTerminals[^1] == stream.TerminalId, "terminal attach names the terminal new session");
+        string named = stream.TerminalId!;
         long first = stream.Generation;
         transport.Reads.Enqueue(new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Idle, null));
         Program.Require(stream.Poll() == MilaTerminalPoll.Idle && stream.Session.State != MilaTerminalState.Reconnecting,
@@ -284,6 +302,7 @@ internal static class LifecycleSmoke
         Program.Require(stream.Poll() == MilaTerminalPoll.Reconnected && transport.Killed.Contains(11ul) &&
             stream.Generation > first && stream.Session.Output.Length == 0 && transport.AttachedSessions[^1] == 7,
             "transport loss reattaches with fresh generation");
+        Program.Require(transport.OpenCount == 1 && transport.AttachedTerminals[^1] == named, "reconnect rejoins the same named session");
         Program.Require(!stream.Session.AppendReceived(first, "late"), "stale generation output refused after reconnect");
         transport.Reads.Enqueue(Data("again\n"));
         Program.Require(stream.Poll() == MilaTerminalPoll.Output && stream.ReconnectAttempts == 0, "output resets attempts");
@@ -297,14 +316,14 @@ internal static class LifecycleSmoke
             "reconnect exhaustion ends stream");
         // Clean close ends without reconnect.
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 13));
-        stream.Attach(true, 80, 24);
+        stream.Attach(Machine, true, 80, 24);
         int attaches = transport.AttachedSessions.Count;
         transport.Reads.Enqueue(new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Closed, null));
         Program.Require(stream.Poll() == MilaTerminalPoll.Ended && transport.AttachedSessions.Count == attaches,
             "closed PTY never reconnects");
         // Kill during reconnect stops further attempts.
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 14));
-        stream.Attach(true, 80, 24);
+        stream.Attach(Machine, true, 80, 24);
         transport.Reads.Enqueue(Lost);
         stream.Poll();
         stream.Kill();
@@ -313,15 +332,32 @@ internal static class LifecycleSmoke
             "kill stops reconnect");
         // Signed-out session refuses reattach.
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 15));
-        stream.Attach(true, 80, 24);
+        stream.Attach(Machine, true, 80, 24);
         transport.Reads.Enqueue(Lost);
         session = null;
         Program.Require(stream.Poll() == MilaTerminalPoll.SignedOut && stream.Session.State == MilaTerminalState.SignedOut,
             "signed-out session refuses reconnect");
+        // A refused `terminal new` (for example terminal_unavailable) never attaches.
+        session = 7;
+        transport.Opens.Enqueue(new(MilaNativeStatus.InvalidRequest, null));
+        int before = transport.AttachedTerminals.Count;
+        Program.Require(!stream.Attach(Machine, true, 80, 24) && transport.AttachedTerminals.Count == before,
+            "refused terminal new does not attach");
+        // A refused (not lost) session attach forgets the name; the next attempt opens a new session.
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 17));
+        stream.Attach(Machine, true, 80, 24);
+        string gone = stream.TerminalId!;
+        transport.Reads.Enqueue(Lost);
+        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 18));
+        int opens = transport.OpenCount;
+        Program.Require(stream.Poll() == MilaTerminalPoll.Reconnecting && stream.TerminalId is null, "refused attach drops session id");
+        Program.Require(stream.Poll() == MilaTerminalPoll.Reconnected && transport.OpenCount == opens + 1 &&
+            stream.TerminalId is { } fresh && fresh != gone, "next attempt opens a new named session");
         // Revoked handle ends.
         session = 7;
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 16));
-        stream.Attach(true, 80, 24);
+        stream.Attach(Machine, true, 80, 24);
         transport.Reads.Enqueue(new(MilaNativeStatus.InvalidHandle, MilaTerminalReadEvent.Idle, null));
         Program.Require(stream.Poll() == MilaTerminalPoll.Ended, "revoked terminal handle ends stream");
     }
@@ -518,5 +554,29 @@ internal static class LifecycleSmoke
             (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds()).Status == MilaNativeStatus.InvalidRequest, "Rust refuses expired Susan key");
         Program.Require(RustNative.TrySessionDeviceRegister(ulong.MaxValue, MilaDevicePlatform.Windows, Encoding.UTF8.GetBytes(SusanReply),
             EncKey[..42] + "B", null, 1).Status == MilaNativeStatus.InvalidRequest, "Rust refuses non-canonical X25519 key");
+        // Named terminal sessions: the new exports are present and refuse unknown handles.
+        const string Request = "porsche-0123456789abcdef0123456789abcdef";
+        Program.Require(RustNative.TrySessionTerminalNew(ulong.MaxValue, Machine, Request).Status == MilaNativeStatus.InvalidHandle,
+            "terminal new unknown handle");
+        Program.Require(RustNative.TrySessionTerminalNew(ulong.MaxValue, Machine, "not-a-request").Status == MilaNativeStatus.InvalidRequest,
+            "terminal new requires canonical request id");
+        Program.Require(RustNative.TrySessionTerminalAttachSession(ulong.MaxValue, Machine, "019a0f73-3d4e-7f5a-8b6c-7d8e9f0a1b2c", 80, 24).Status ==
+            MilaNativeStatus.InvalidHandle, "named terminal attach unknown handle");
+        Program.Require(RustNative.TrySessionTerminalAttachSession(ulong.MaxValue, Machine, "not-a-session", 80, 24).Status ==
+            MilaNativeStatus.InvalidRequest, "named terminal attach requires a session UUID");
+        Program.Require(RustNative.TrySessionLastRefusal(ulong.MaxValue) is null, "last refusal unknown handle");
+    }
+
+    private static void TerminalNewReceipt()
+    {
+        string receipt = """{"version":1,"status":"succeeded","request_id":"porsche-0123456789abcdef0123456789abcdef","result":{"machine_id":"019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a","session_id":"019A0F73-3D4E-7F5A-8B6C-7D8E9F0A1B2C","guest_session_id":"3f2e1d0c-9b8a-4766-8544-332211009988","route":"overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/terminals/019a0f73-3d4e-7f5a-8b6c-7d8e9f0a1b2c"}}""";
+        Program.Require(RustNative.DecodeTerminalNew(Encoding.UTF8.GetBytes(receipt)) == "019a0f73-3d4e-7f5a-8b6c-7d8e9f0a1b2c",
+            "terminal new receipt names the canonical session");
+        foreach (string bad in new[]
+                 {
+                     """{"result":{}}""", """{"result":{"session_id":7}}""", """{"result":{"session_id":"x"}}""",
+                     """{"result":{"session_id":"00000000-0000-0000-0000-000000000000"}}""", """[]""", "not json",
+                 })
+            Program.Require(RustNative.DecodeTerminalNew(Encoding.UTF8.GetBytes(bad)) is null, "terminal new receipt refuses " + bad);
     }
 }

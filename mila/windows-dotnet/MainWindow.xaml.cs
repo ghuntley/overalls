@@ -574,7 +574,13 @@ public sealed partial class MainWindow : Window
             TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.SignedOut).Render(S);
             return;
         }
-        bool attached = RustNative.TryValidateTerminalAttach(0, 80, 24, true).IsValid && _terminalStream.Attach(true, 80, 24);
+        if (_selectedMachine is not { } machine)
+        {
+            TerminalStatus.Text = S("terminalRefused", "Terminal refused");
+            return;
+        }
+        bool attached = RustNative.TryValidateTerminalAttach(0, 80, 24, true).IsValid &&
+            _terminalStream.Attach(machine.Id, machine.CanWrite, 80, 24);
         TerminalOutput.Text = string.Empty;
         TerminalStatus.Text = attached ? S("terminalAttaching", "attaching") : S("terminalRefused", "Terminal refused");
         if (attached) _terminalPollTimer?.Start();

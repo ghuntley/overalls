@@ -5,7 +5,9 @@ namespace Mila.Windows.Interop;
 /// <summary>Native PTY operations; production calls the Rust session ABI.</summary>
 internal interface IMilaTerminalTransport
 {
-    (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, ushort columns, ushort rows);
+    /// <summary>Opens or rejoins the caller's named server terminal session (`terminal new`).</summary>
+    MilaNativeTerminalOpen Open(ulong sessionHandle, Guid machineId);
+    (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows);
     MilaNativeTerminalRead Read(ulong terminalHandle);
     MilaNativeStatus Kill(ulong terminalHandle);
 }
@@ -13,8 +15,11 @@ internal interface IMilaTerminalTransport
 internal sealed class MilaRustTerminalTransport : IMilaTerminalTransport
 {
     internal static readonly MilaRustTerminalTransport Instance = new();
-    public (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, ushort columns, ushort rows)
-        => RustNative.TrySessionTerminalAttach(sessionHandle, columns, rows);
+    public MilaNativeTerminalOpen Open(ulong sessionHandle, Guid machineId)
+        => RustNative.TrySessionTerminalNew(sessionHandle, machineId, "porsche-" + Guid.NewGuid().ToString("N"));
+    public (MilaNativeStatus Status, ulong? Handle) Attach(
+        ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows)
+        => RustNative.TrySessionTerminalAttachSession(sessionHandle, machineId, terminalId, columns, rows);
     public MilaNativeTerminalRead Read(ulong terminalHandle) => RustNative.TrySessionTerminalRead(terminalHandle);
     public MilaNativeStatus Kill(ulong terminalHandle) => RustNative.TrySessionTerminalKill(terminalHandle);
 }
@@ -51,6 +56,9 @@ internal enum MilaTerminalPoll
 /// MUST use the live authenticated session handle, start a new generation that
 /// discards prior output (replay reset) and refuses frames of older generations,
 /// and the attempt count MUST be bounded and reset only by received output.
+/// Every attach names a server terminal session obtained from `terminal new`;
+/// reconnect rejoins the same named session and opens a new one only when the
+/// session attach is refused rather than lost.
 /// </remarks>
 internal sealed class MilaTerminalStream
 {
@@ -64,6 +72,8 @@ internal sealed class MilaTerminalStream
     private bool _readWrite;
     private ushort _columns = 80;
     private ushort _rows = 24;
+    private Guid _machine;
+    private string? _terminalId;
 
     internal MilaTerminalStream(IMilaTerminalTransport transport, Func<ulong?> sessionHandle, int maxReconnects = DefaultMaxReconnects)
     {
@@ -76,11 +86,19 @@ internal sealed class MilaTerminalStream
     internal long Generation => _generation;
     internal int ReconnectAttempts => _attempts;
 
-    /// <summary>Attaches a fresh stream; any previous PTY is killed first.</summary>
-    internal bool Attach(bool readWrite, ushort columns, ushort rows)
+    /// <summary>The named server terminal session currently attached or being rejoined.</summary>
+    internal string? TerminalId => _terminalId;
+
+    /// <summary>Attaches a fresh stream to the caller's terminal session on one machine; any previous PTY is killed first.</summary>
+    internal bool Attach(Guid machineId, bool readWrite, ushort columns, ushort rows)
     {
         KillNative();
         Session.Kill(_generation);
+        if (machineId == Guid.Empty) return false;
+        // A fresh attach always asks `terminal new`, which rejoins the caller's
+        // personal session; only reconnects reuse the remembered session id.
+        _terminalId = null;
+        _machine = machineId;
         _attempts = 0;
         _readWrite = readWrite;
         _columns = columns;
@@ -148,9 +166,21 @@ internal sealed class MilaTerminalStream
     {
         if (_sessionHandle() is not { } handle || handle == 0) return false;
         long generation = checked(_generation + 1);
-        (MilaNativeStatus status, ulong? terminal) = _transport.Attach(handle, _columns, _rows);
+        if (_terminalId is null)
+        {
+            MilaNativeTerminalOpen opened = _transport.Open(handle, _machine);
+            if (!opened.Succeeded)
+            {
+                if (Session.State != MilaTerminalState.Reconnecting) Session.BeginReconnect(_generation);
+                return false;
+            }
+            _terminalId = opened.SessionId;
+        }
+        (MilaNativeStatus status, ulong? terminal) = _transport.Attach(handle, _machine, _terminalId!, _columns, _rows);
         if (status != MilaNativeStatus.Ok || terminal is not > 0)
         {
+            // A refused (not lost) attach means the named session is gone; the next attempt opens a new one.
+            if (status != MilaNativeStatus.Transport) _terminalId = null;
             // Keep the reconnecting state so a later poll retries within the bound.
             if (Session.State != MilaTerminalState.Reconnecting) Session.BeginReconnect(_generation);
             return false;

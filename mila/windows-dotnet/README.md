@@ -58,7 +58,10 @@ times through the Rust session; a revoked key returns to browser approval.
 
 ## Terminal reconnect
 
-`Interop/TerminalStream.cs` polls `mila_session_terminal_read`, which
+`Interop/TerminalStream.cs` names a server terminal session with
+`mila_session_terminal_new` and attaches with
+`mila_session_terminal_attach_session` (Porsche refuses unnamed attach;
+reconnect rejoins the same session id). It polls `mila_session_terminal_read`, which
 classifies each read as data, idle or closed and reports a lost transport
 separately. Only a lost transport reattaches, on the live session handle, with
 a new generation that discards prior output and refuses older frames; attempts
