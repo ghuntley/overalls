@@ -153,22 +153,16 @@ class MilaJourneyTest {
         assertEquals(MilaRouteResolution.Resolved, resolveMilaRoute(MilaRoute.Machine(seed.id), true, state.listing, null))
     }
 
-    @Test fun j03_createAndResizeThroughSessionBoundForm() = runBlocking<Unit> {
+    @Test fun j03_createThroughSessionBoundForm() = runBlocking<Unit> {
         val state = signedIn()
         val form = MilaMachineFormController(adapter)
         form.setSession(true, state.listing)
         expect(form.create(createdName, "1", "512", "2")) { "create admitted: ${form.state} ${refusal()}" }
         val created = eventually(120_000) { listing().machines.firstOrNull { it.name == createdName } }
         createdId = created.id
-
-        val seed = seed(listing())
-        fixture.observe(seed.id)
-        form.setSession(true, listing())
-        expect(form.resize(seed.id, "2", "1024", "3")) { "resize admitted: ${form.state} ${refusal()}" }
-        assertEquals(MilaMachineFormState.Applied(MilaMachineFormKind.Resize), form.state)
     }
 
-    @Test fun j04_lifecycleAdmission() = runBlocking<Unit> {
+    @Test fun j04_lifecycleAdmissionThenResize() = runBlocking<Unit> {
         val seed = seed(signedIn().listing)
         // Without the provisioner, each intent needs the fixture's observe stand-in first.
         // Observe settles observed_state to the desired state; move away from it and back.
@@ -191,6 +185,14 @@ class MilaJourneyTest {
         assertEquals("vm_busy", adapter.lastRefusal())
         // Resume is a durable wake request; with no checkpoint it is asserted as admitted only.
         lifecycle(made, MilaMachineCommand.Resume)
+
+        // Resize last: with no provisioner the pinned resize request stays in progress, and
+        // Marshall then refuses further lifecycle intents for the seed (resize_in_progress).
+        fixture.observe(seed.id)
+        val resize = MilaMachineFormController(adapter)
+        resize.setSession(true, listing())
+        expect(resize.resize(seed.id, "2", "1024", "3")) { "resize admitted: ${resize.state} ${refusal()}" }
+        assertEquals(MilaMachineFormState.Applied(MilaMachineFormKind.Resize), resize.state)
     }
 
     @Test fun j05_shareAddAndRemoveOnSeedMachine() = runBlocking<Unit> {
