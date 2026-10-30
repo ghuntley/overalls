@@ -31,7 +31,22 @@ try {
   await options.getByRole("button",{name:"Save"}).click();
   await options.locator("#status").getByText("Saved.").waitFor();
   assert.equal(await options.locator("#guide-link").getAttribute("href"),`${origin}/docs/browser-extension`);
-  await context.route("https://**/*",route=>route.fulfill({status:200,contentType:"text/html",body:"<!doctype html><title>Fixture</title>"}));
+  // Serve every HTTPS request from the browser target, not context.route:
+  // Playwright attaches to a tab opened by chrome.tabs.create only after its
+  // first navigation has started, so page-level routing misses the launch
+  // request. That request then reached the real provider, or failed to
+  // chrome-error:// without a network (the Nix sandbox). Browser-level Fetch
+  // covers every target, so no fixture request leaves the browser.
+  /** @type {string[]} */ const requested=[];
+  protocol.on("Fetch.requestPaused",event=>{
+    requested.push(event.request.url);
+    void protocol.send("Fetch.fulfillRequest",{
+      requestId:event.requestId,responseCode:200,
+      responseHeaders:[{name:"Content-Type",value:"text/html"}],
+      body:Buffer.from("<!doctype html><title>Fixture</title>").toString("base64"),
+    }).catch(()=>{});
+  });
+  await protocol.send("Fetch.enable",{patterns:[{urlPattern:"https://*",requestStage:"Request"}]});
   const page=await context.newPage();
   /** @type {number | undefined} */ let sourceTabId;
   for(const host of ["github.com","gitlab.com","codeberg.org","bitbucket.org"]) {
@@ -63,6 +78,12 @@ try {
       throw new Error(`Fixture launch failed for ${host}`);
     }
   }
+  // The fixture launches were served by the interceptor, and only the
+  // test's own source navigations carried the query secret; no launch
+  // request may carry the source query or fragment.
+  assert.equal(requested.filter(url=>url===`${origin}/launch/entry`).length,4);
+  assert.deepEqual(requested.filter(url=>url.includes("secret")),
+    ["github.com","gitlab.com","codeberg.org","bitbucket.org"].map(host=>`https://${host}/example/repository?access_token=query-secret`));
   await page.bringToFront(); await page.goto("https://example.com/unsupported");
   const worker=context.serviceWorkers()[0]; assert.ok(worker);
   assert.ok(sourceTabId!==undefined);
