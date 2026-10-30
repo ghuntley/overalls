@@ -7,7 +7,7 @@ pkgs.rustPlatform.buildRustPackage {
     filter = path: type:
       let name = builtins.baseNameOf path;
       in name != "target" && name != ".hegel" &&
-        (type == "directory" || pkgs.lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
+        (type == "directory" || pkgs.lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "clippy.toml" ]);
   };
   cargoLock.lockFile = ../../../../lilly/native/flow-label/Cargo.lock;
   strictDeps = true;

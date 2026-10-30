@@ -2,8 +2,8 @@ use std::ffi::{OsStr, OsString};
 
 /// Canonical dotted-quad IPv4 with exact parse/render round-trip: the C
 /// predecessor compared the input with its own canonical form byte for byte.
-/// The value keeps inet_pton's in-memory layout (network byte order), which
-/// nfct_set_attr_u32 and the kernel record use; a host-order integer would
+/// The value keeps `inet_pton`'s in-memory layout (network byte order), which
+/// `nfct_set_attr_u32` and the kernel record use; a host-order integer would
 /// query a byte-reversed address and never match a live flow.
 pub fn address(text: &OsStr) -> Option<u32> {
     let text = text.to_str()?;
@@ -23,7 +23,7 @@ pub fn port(text: &OsStr) -> Option<u16> {
     if bytes.is_empty() || bytes.len() > 5 || bytes[0] == b'0' {
         return None;
     }
-    if !bytes.iter().all(|b| b.is_ascii_digit()) {
+    if !bytes.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let value: u16 = text.parse().ok()?;

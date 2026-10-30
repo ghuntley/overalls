@@ -9,7 +9,7 @@ pub enum FlowError {
     Unavailable,
 }
 
-/// Attribute numbers from libnetfilter_conntrack.h (enum nf_conntrack_attr).
+/// Attribute numbers from `libnetfilter_conntrack.h` (enum `nf_conntrack_attr`).
 pub const ATTR_ORIG_IPV4_SRC: u8 = 0;
 pub const ATTR_ORIG_IPV4_DST: u8 = 1;
 pub const ATTR_ORIG_PORT_SRC: u8 = 8;
@@ -17,15 +17,15 @@ pub const ATTR_ORIG_PORT_DST: u8 = 9;
 pub const ATTR_L3PROTO: u8 = 15;
 pub const ATTR_L4PROTO: u8 = 17;
 pub const ATTR_CONNLABELS: u8 = 66;
-/// NFNL_SUBSYS_CTNETLINK.
+/// `NFNL_SUBSYS_CTNETLINK`.
 pub const CONNTRACK_SUBSYSTEM: u8 = 1;
-/// NFCT_T_NEW | NFCT_T_UPDATE | NFCT_T_DESTROY (7).
+/// `NFCT_T_NEW` | `NFCT_T_UPDATE` | `NFCT_T_DESTROY` (7).
 pub const NFCT_T_ALL: i32 = 7;
-/// nf_conntrack_query NFCT_Q_GET (3).
+/// `nf_conntrack_query` `NFCT_Q_GET` (3).
 pub const NFCT_Q_GET: u32 = 3;
-/// NFCT_CB_FAILURE (-1).
+/// `NFCT_CB_FAILURE` (-1).
 pub const CB_FAILURE: i32 = -1;
-/// NFCT_CB_CONTINUE (1).
+/// `NFCT_CB_CONTINUE` (1).
 pub const CB_CONTINUE: i32 = 1;
 
 mod cli;
@@ -43,6 +43,7 @@ pub use cli::{address, parse_cli, port, Query};
 pub use labels::Labels;
 
 /// One exact-lookup outcome.
+#[derive(Debug)]
 pub struct Lookup {
     pub query: Query,
     pub label: Option<Labels>,

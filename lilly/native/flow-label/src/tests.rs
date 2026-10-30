@@ -45,7 +45,7 @@ fn address_and_port_selectors_are_canonical(tc: TestCase) {
             if value > 255 {
                 return false;
             }
-            any[index] = value as u8;
+            any[index] = u8::try_from(value).expect("value is at most 255");
         }
         addr_text == format!("{}.{}.{}.{}", any[0], any[1], any[2], any[3])
     })();
@@ -71,7 +71,7 @@ fn address_and_port_selectors_are_canonical(tc: TestCase) {
 
 /// @cc [owner:ghuntley,label:verification] flow-selector-wire-layout
 /// A selected tuple MUST reach conntrack in network byte order, exactly as
-/// inet_pton and htons lay it out in memory, for every address and port.
+/// `inet_pton` and htons lay it out in memory, for every address and port.
 #[hegel::test(test_cases = 100)]
 fn selected_tuple_uses_network_byte_order_in_memory(tc: TestCase) {
     let octets = [
@@ -105,7 +105,9 @@ fn label_bit_endianness_matches_the_repr_spec(tc: TestCase) {
     let hex = label.to_hex();
     assert_eq!(hex.len(), 32);
     assert!(hex.bytes().all(|b| b.is_ascii_hexdigit()));
-    let hexstr = &hex[..2 * (15 - (bit / 8) as usize) + 2];
+    let hexstr = hex
+        .get(..2 * (15 - (bit / 8) as usize) + 2)
+        .expect("ascii hex prefix");
     let decoded = u8::from_str_radix(hexstr, 16).expect("hex pair");
     assert_eq!(decoded, 1 << (bit % 8));
 }

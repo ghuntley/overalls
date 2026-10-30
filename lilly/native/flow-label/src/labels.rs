@@ -15,6 +15,10 @@ impl Labels {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "each nibble is below 16, so from_digit with radix 16 always returns a digit"
+    )]
     pub fn to_hex(&self) -> String {
         let mut out = String::with_capacity(32);
         for byte in self.0 {

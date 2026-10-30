@@ -11,12 +11,11 @@ fn main() -> ExitCode {
     match parse_cli(&arguments) {
         None => ExitCode::FAILURE,
         Some(query) => match lookup(query) {
-            Err(_) => ExitCode::from(EXIT_FAILED),
-            Ok(None) => ExitCode::from(EXIT_FAILED),
+            Err(_) | Ok(None) => ExitCode::from(EXIT_FAILED),
             Ok(Some(label)) => {
                 let hex = label.to_hex();
                 writeln!(std::io::stdout(), "{hex}")
-                    .map(|_| ExitCode::SUCCESS)
+                    .map(|()| ExitCode::SUCCESS)
                     .unwrap_or_else(|_| ExitCode::from(EXIT_FAILED))
             }
         },
