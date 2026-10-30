@@ -132,7 +132,7 @@ for _ in 1 2 3 4 5 6 7 8 9 10 11 12; do
     fi
   done
   printf 'inception reject phase=%s\\n' "$phase"
-  sleep 30
+  /run/current-system/sw/bin/sleep 30
 done
 """
         )
