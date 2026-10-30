@@ -93,6 +93,27 @@ jobs:
       # Namespace sets TMPDIR under the long workspace path; Lilly's jail
       # socket paths built under tmp_dir must stay within the 108-byte UNIX
       # socket limit, as they do on hosts.
+      # Dialyxir names PLTs by OTP version only, so a rebuilt Erlang with the
+      # same version (for example after a flake.lock change) reuses PLTs on
+      # the cache volume that list beams from a store path the runner no
+      # longer has, and `dialyzer --force-check` fails with "File not found"
+      # (run 41084465906). Drop the PLTs whenever the Erlang root differs
+      # from the one they were built against.
+      - name: Drop Dialyzer PLTs built against another Erlang
+        env:
+          PROJECT: ${{ matrix.project }}
+        run: |
+          devenv shell -- bash -euo pipefail -c '
+            cd "$PROJECT"
+            root=$(erl -noshell -eval "io:put_chars(code:root_dir()), halt().")
+            marker=_build/.dialyzer-erlang-root
+            if [ "$(cat "$marker" 2>/dev/null || true)" != "$root" ]; then
+              echo "Erlang root is now $root; dropping cached PLTs"
+              rm -f _build/*/dialyxir_*.plt _build/*/dialyxir_*.plt.hash \
+                "$HOME"/.mix/dialyxir_*.plt "$HOME"/.mix/dialyxir_*.plt.hash
+              mkdir -p _build
+              printf "%s" "$root" > "$marker"
+            fi'
       - name: mix precommit
         working-directory: ${{ matrix.project }}
         env:
