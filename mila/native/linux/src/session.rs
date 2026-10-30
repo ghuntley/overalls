@@ -520,6 +520,42 @@ impl LiveSession {
         }
     }
 
+    /// Read one machine (`show MACHINE --json`) as bounded JSON.
+    pub fn machine_show(&mut self, machine_id: &str) -> Result<Vec<u8>, SessionError> {
+        self.machine_read(machine_id, mila_ffi::session::mila_session_machine_show)
+    }
+
+    /// Read a machine's owner and grants (`share show MACHINE --json`).
+    pub fn share_show(&mut self, machine_id: &str) -> Result<Vec<u8>, SessionError> {
+        self.machine_read(machine_id, mila_ffi::session::mila_session_share_show)
+    }
+
+    fn machine_read(
+        &mut self,
+        machine_id: &str,
+        read: unsafe extern "C" fn(
+            u64,
+            *const u8,
+            usize,
+            *mut u8,
+            usize,
+            *mut usize,
+        ) -> mila_ffi::session::SessionStatus,
+    ) -> Result<Vec<u8>, SessionError> {
+        validate_session_identifier(machine_id)?;
+        let handle = self.handle()?;
+        copy_output(|out, capacity, written| unsafe {
+            read(
+                handle,
+                machine_id.as_bytes().as_ptr(),
+                machine_id.len(),
+                out,
+                capacity,
+                written,
+            )
+        })
+    }
+
     /// Read a machine-bound web endpoint through the authenticated session.
     /// The response remains bounded and owned by the Rust adapter.
     pub fn web_show(&mut self, machine_id: &str) -> Result<Vec<u8>, SessionError> {

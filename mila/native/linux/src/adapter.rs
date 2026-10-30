@@ -98,6 +98,67 @@ pub fn new_request_id() -> Option<String> {
     Some(id)
 }
 
+/// @cc [owner:ghuntley,label:protocol] linux-request-ledger-retry
+/// A page mutation MUST reuse its request identifier only while its outcome is
+/// unknown (the transport failed), including across a reconnect to the same
+/// deployment; any definite outcome, a sign-out or a deployment switch MUST
+/// forget it so a later press is a new request. Keys name the action and its
+/// target and MUST NOT contain payload text.
+#[derive(Debug, Default)]
+pub struct RequestLedger {
+    pending: std::collections::HashMap<String, String>,
+}
+
+impl RequestLedger {
+    /// The id for `key`: the retained one after a transport failure, else a
+    /// fresh CSPRNG id. `None` only when the CSPRNG is unavailable.
+    pub fn id_for(&self, key: &str) -> Option<String> {
+        self.pending.get(key).cloned().or_else(new_request_id)
+    }
+
+    /// Records how a mutation using `id` ended.
+    pub fn settle(&mut self, key: &str, id: String, outcome_unknown: bool) {
+        if outcome_unknown {
+            self.pending.insert(key.to_owned(), id);
+        } else {
+            self.pending.remove(key);
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.pending.clear();
+    }
+
+    pub fn len(&self) -> usize {
+        self.pending.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.pending.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod request_ledger_tests {
+    use super::RequestLedger;
+
+    #[test]
+    fn retains_ids_only_while_the_outcome_is_unknown() {
+        let mut ledger = RequestLedger::default();
+        let first = ledger.id_for("start:m").unwrap();
+        assert_ne!(ledger.id_for("start:m").unwrap(), first);
+        ledger.settle("start:m", first.clone(), true);
+        assert_eq!(ledger.id_for("start:m").unwrap(), first);
+        assert_ne!(ledger.id_for("stop:m").unwrap(), first);
+        ledger.settle("start:m", first.clone(), false);
+        assert!(ledger.is_empty());
+        assert_ne!(ledger.id_for("start:m").unwrap(), first);
+        ledger.settle("start:m", first, true);
+        ledger.clear();
+        assert_eq!(ledger.len(), 0);
+    }
+}
+
 /// Format the only destructive SSH-key operation after validating its opaque
 /// server key identifier. Request IDs are required for at-most-once mutation.
 pub fn format_ssh_key_revoke(key_id: &str, request_id: &str) -> Result<String, RuntimeError> {
@@ -141,8 +202,9 @@ pub fn decode_share_listing(bytes: &[u8]) -> Result<(String, Vec<ShareGrant>), R
         owner: Owner,
         items: Vec<ShareGrant>,
     }
+    let bytes = crate::porsche_results::result_bytes(bytes)?;
     let envelope: Envelope =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
+        serde_json::from_slice(&bytes).map_err(|_| RuntimeError::InvalidInput)?;
     let mut grant_ids = std::collections::HashSet::with_capacity(envelope.items.len());
     if envelope.owner.email.len() > 320
         || !valid_email(&envelope.owner.email)
@@ -313,63 +375,6 @@ pub fn format_thread_command(
         .map_err(|_| RuntimeError::InvalidInput)
 }
 
-/// A bounded, presentation-safe thread summary returned by the runtime.
-#[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
-pub struct ThreadSummary {
-    pub id: String,
-    #[serde(default)]
-    pub title: String,
-    #[serde(default)]
-    pub state: String,
-}
-
-/// Decode `thread ls --json` without allowing unbounded server data into GTK.
-pub fn decode_thread_list(bytes: &[u8]) -> Result<Vec<ThreadSummary>, RuntimeError> {
-    if bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
-    #[derive(Deserialize)]
-    struct Envelope {
-        threads: Vec<ThreadSummary>,
-    }
-    let envelope: Envelope =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
-    if envelope.threads.len() > 512
-        || envelope.threads.iter().any(|thread| {
-            thread.id.is_empty()
-                || thread.id.len() > 128
-                || thread.title.len() > 512
-                || thread.state.len() > 64
-        })
-    {
-        return Err(RuntimeError::InvalidInput);
-    }
-    Ok(envelope.threads)
-}
-
-/// Render a bounded thread response for the GTK status view.  The native host
-/// must never interpolate untrusted server bytes directly into a widget: parse
-/// JSON first, then cap the compact representation before handing it to GTK.
-pub fn format_thread_response(bytes: &[u8]) -> Result<String, RuntimeError> {
-    if bytes.is_empty() || bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
-    let value: serde_json::Value =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
-    let compact = serde_json::to_string(&value).map_err(|_| RuntimeError::Unavailable)?;
-    const MAX_DISPLAY: usize = 4096;
-    if compact.len() > MAX_DISPLAY {
-        let end = compact
-            .char_indices()
-            .take_while(|(index, _)| *index < MAX_DISPLAY.saturating_sub(1))
-            .map(|(index, _)| index)
-            .last()
-            .unwrap_or(0);
-        return Ok(format!("{}…", &compact[..end]));
-    }
-    Ok(compact)
-}
-
 /// Format the read-only turn history operation through the shared protocol parser.
 pub fn format_thread_turns(thread_id: &str, after: Option<&str>) -> Result<String, RuntimeError> {
     if thread_id.is_empty()
@@ -405,29 +410,6 @@ mod thread_tests {
         );
         assert!(format_thread_turns("bad id", None).is_err());
         assert!(format_thread_turns("thread-1", Some("bad cursor")).is_err());
-    }
-    #[test]
-    fn list_decoder_rejects_oversized_items() {
-        let data = br#"{"threads":[{"id":"t1","title":"A","state":"open"}]}"#;
-        assert_eq!(decode_thread_list(data).unwrap()[0].id, "t1");
-        let bad = format!(
-            r#"{{"threads":[{{"id":"t1","title":"{}"}}]}}"#,
-            "x".repeat(513)
-        );
-        assert!(decode_thread_list(bad.as_bytes()).is_err());
-    }
-
-    #[test]
-    fn response_renderer_is_json_checked_and_bounded() {
-        assert_eq!(
-            format_thread_response(br#"{"ok":true}"#).unwrap(),
-            r#"{"ok":true}"#
-        );
-        assert!(format_thread_response(b"not-json").is_err());
-        let large = format!(r#"{{"value":"{}"}}"#, "x".repeat(8_000));
-        let rendered = format_thread_response(large.as_bytes()).unwrap();
-        assert!(rendered.len() <= 4_099);
-        assert!(rendered.ends_with('…'));
     }
 }
 
@@ -481,8 +463,9 @@ pub fn decode_web_endpoint(bytes: &[u8]) -> Result<WebEndpoint, RuntimeError> {
     if bytes.len() > 64 * 1024 {
         return Err(RuntimeError::InvalidInput);
     }
+    let bytes = crate::porsche_results::result_bytes(bytes)?;
     let endpoint: WebEndpoint =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
+        serde_json::from_slice(&bytes).map_err(|_| RuntimeError::InvalidInput)?;
     let route = crate::route::ActivationRoute::parse(&endpoint.route).ok();
     let route_matches_machine = route.as_ref().is_some_and(|route| {
         matches!(
@@ -507,7 +490,6 @@ pub fn decode_web_endpoint(bytes: &[u8]) -> Result<WebEndpoint, RuntimeError> {
         || endpoint.route.len() > 2_048
         || endpoint.route.chars().any(char::is_control)
         || !route_matches_machine
-        || (endpoint.visibility == "public" && endpoint.url.is_none())
         || endpoint
             .url
             .as_deref()
@@ -963,7 +945,11 @@ mod web_tests {
         let mismatched = br#"{"machine_id":"01234567-89ab-cdef-0123-456789abcdef","label":"web-box","port":8080,"visibility":"private","policy_revision":4,"url":null,"route":"overalls://fleet.example/machines/01234567-89ab-cdef-0123-456789abcdee/web"}"#;
         assert!(decode_web_endpoint(mismatched).is_err());
         let public_without_url = br#"{"machine_id":"01234567-89ab-cdef-0123-456789abcdef","label":"web-box","port":8080,"visibility":"public","policy_revision":4,"url":null,"route":"overalls://fleet.example/machines/01234567-89ab-cdef-0123-456789abcdef/web"}"#;
-        assert!(decode_web_endpoint(public_without_url).is_err());
+        // A deployment without a public web domain reports a public endpoint
+        // with no address; it decodes, but there is nothing to open.
+        let public_without_url =
+            decode_web_endpoint(public_without_url).expect("public endpoint without address");
+        assert!(browser_endpoint_url(&public_without_url).is_none());
         let wrong_port = br#"{"machine_id":"01234567-89ab-cdef-0123-456789abcdef","label":"web-box","port":8080,"visibility":"private","policy_revision":4,"url":"https://web-box.example:8443/path","route":"overalls://fleet.example/machines/01234567-89ab-cdef-0123-456789abcdef/web"}"#;
         assert!(decode_web_endpoint(wrong_port).is_err());
         let malformed_port = br#"{"machine_id":"01234567-89ab-cdef-0123-456789abcdef","label":"web-box","port":8080,"visibility":"private","policy_revision":4,"url":"https://web-box.example:abc/path","route":"overalls://fleet.example/machines/01234567-89ab-cdef-0123-456789abcdef/web"}"#;
