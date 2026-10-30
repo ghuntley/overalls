@@ -12,7 +12,7 @@ defmodule Marshall.Terminal.PersonalSessionTest do
     test_cases: 100 do
     Marshall.DataCase.isolate_property_case()
     fixture = terminal_fixture()
-    stream = stream_fixture(fixture.host.id, :property)
+    stream = stream_fixture(fixture.host.id, &Overalls.HegelFixtures.start_supervised!/1)
 
     assert {:ok, account} =
              Ledger.transaction(fn -> GuestAccounts.ensure!(fixture.owner.id) end)

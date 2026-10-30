@@ -18,7 +18,11 @@ defmodule Marshall.MixProject do
       deps: deps(),
       compilers: [:phoenix_live_view] ++ Mix.compilers(),
       listeners: [Phoenix.CodeReloader],
-      consolidate_protocols: Mix.env() != :dev
+      consolidate_protocols: Mix.env() != :dev,
+      # Shared SCIM Team fixtures are loaded with Code.require_file/2 by their
+      # tests. Without this, `mix test --warnings-as-errors` reports the file as
+      # misnamed and exits 1 after an otherwise passing suite.
+      test_ignore_filters: ["test/marshall/scim/team_fixture.exs"]
     ]
   end
 

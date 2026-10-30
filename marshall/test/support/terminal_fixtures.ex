@@ -1,11 +1,5 @@
-# The helper is also required by test_helper.exs for test runtime. Load it before
-# compiling support modules so their static fixture calls remain checkable.
-Code.require_file("../../../scripts/test/hegel_fixtures.exs", __DIR__)
-
 defmodule Marshall.TerminalFixtures do
   @moduledoc false
-  # This helper is required by test_helper.exs after test-support compilation.
-  @compile {:no_warn_undefined, {Overalls.HegelFixtures, :start_supervised!, 1}}
   import Marshall.ComputeFixtures
   alias Marshall.Compute.{Credentials, Host, Ledger, Operation, ProvisionerControl}
 
@@ -142,15 +136,17 @@ defmodule Marshall.TerminalFixtures do
   # @cc [owner:ghuntley,label:integration] fake-stream-replies-synthetic-controls
   # The stream fixture MUST only answer catalogued control messages with
   # synthetic identifiers; it never carries terminal bytes or host secrets.
-  @spec stream_fixture(String.t(), :test | :property) :: pid()
-  def stream_fixture(host_id, lifetime \\ :test) when lifetime in [:test, :property] do
+  #
+  # `start` owns the stream's lifetime: ExUnit's start_supervised!/1 for a
+  # test, or a generated-case starter such as the test-time
+  # `Overalls.HegelFixtures.start_supervised!/1` for one Hegel case. The
+  # starter is passed in because that helper is a script loaded by
+  # test_helper.exs, never a compiled test-support module Dialyzer can see.
+  @spec stream_fixture(String.t(), (map() -> pid())) :: pid()
+  def stream_fixture(host_id, start \\ &ExUnit.Callbacks.start_supervised!/1)
+      when is_function(start, 1) do
     owner = self()
     ref = make_ref()
-
-    start =
-      if lifetime == :property,
-        do: &Overalls.HegelFixtures.start_supervised!/1,
-        else: &ExUnit.Callbacks.start_supervised!/1
 
     pid =
       start.(%{

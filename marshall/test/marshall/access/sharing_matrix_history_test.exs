@@ -62,7 +62,11 @@ defmodule Marshall.Access.SharingMatrixHistoryTest do
       )
 
     fixture = Fixture.create()
-    Marshall.TerminalFixtures.stream_fixture(fixture.host.id, :property)
+
+    Marshall.TerminalFixtures.stream_fixture(
+      fixture.host.id,
+      &Overalls.HegelFixtures.start_supervised!/1
+    )
 
     roles =
       [:manager, :viewer, :operator, :web, :revoked, :viewer, :manager, :revoked] ++ tail
@@ -182,7 +186,12 @@ defmodule Marshall.Access.SharingMatrixHistoryTest do
       )
 
     fixture = Fixture.create()
-    Marshall.TerminalFixtures.stream_fixture(fixture.host.id, :property)
+
+    Marshall.TerminalFixtures.stream_fixture(
+      fixture.host.id,
+      &Overalls.HegelFixtures.start_supervised!/1
+    )
+
     second = Fixture.provision_second(fixture)
     vms = [fixture.vm, second.vm]
 

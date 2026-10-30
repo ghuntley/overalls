@@ -74,7 +74,13 @@ defmodule Marshall.Terminal.RemoteTest do
     end)
 
     fixture = Marshall.TerminalFixtures.terminal_fixture()
-    stream = Marshall.TerminalFixtures.stream_fixture(fixture.host.id, :property)
+
+    stream =
+      Marshall.TerminalFixtures.stream_fixture(
+        fixture.host.id,
+        &Overalls.HegelFixtures.start_supervised!/1
+      )
+
     {:ok, location} = Directory.lookup(fixture.host.id)
     remote = start_remote(location, &Overalls.HegelFixtures.start_supervised!/1)
     %{fixture: fixture, stream: stream, remote: remote, budget: budget, budget_id: budget_id}
