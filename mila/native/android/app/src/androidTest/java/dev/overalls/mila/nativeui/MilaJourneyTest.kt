@@ -105,7 +105,7 @@ class MilaJourneyTest {
 
     private fun machineNamed(listing: MilaSessionListing, name: String): MilaMachineRow? = listing.machines.firstOrNull { it.name == name }
 
-    @Test fun j01_signInRequiresBrowserApprovalThenReconnectsWithoutIt() = runBlocking {
+    @Test fun j01_signInRequiresBrowserApprovalThenReconnectsWithoutIt() = runBlocking<Unit> {
         // A fresh device key always needs approval; delete any key left by an earlier run.
         KeyStore.getInstance("AndroidKeyStore").apply { load(null); deleteEntry("dev.overalls.mila.device.${fixture.host}") }
         val resolved = material()
@@ -121,7 +121,7 @@ class MilaJourneyTest {
         assertTrue("approved key reconnects without approval", signIn.reconnect(resolved.config, resolved.signer))
     }
 
-    @Test fun j02_machineListingIncludesSeedMachine() = runBlocking {
+    @Test fun j02_machineListingIncludesSeedMachine() = runBlocking<Unit> {
         val state = signedIn()
         fixture.seedMachineName?.let { name -> assertNotNull("seed machine $name", machineNamed(state.listing, name)) }
         val detail = MilaMachineDetailController(adapter)
@@ -130,7 +130,7 @@ class MilaJourneyTest {
         assertFalse(detail.select(UUID.randomUUID()))
     }
 
-    @Test fun j03_createAndResizeThroughSessionBoundForm() = runBlocking {
+    @Test fun j03_createAndResizeThroughSessionBoundForm() = runBlocking<Unit> {
         val state = signedIn()
         val form = MilaMachineFormController(adapter)
         form.setSession(true, state.listing)
@@ -143,7 +143,7 @@ class MilaJourneyTest {
         assertEquals(MilaMachineFormState.Applied(MilaMachineFormKind.Resize), form.state)
     }
 
-    @Test fun j04_lifecycleStopStartPauseResume() = runBlocking {
+    @Test fun j04_lifecycleStopStartPauseResume() = runBlocking<Unit> {
         val state = signedIn()
         val id = createdId ?: machineNamed(state.listing, createdName)?.id
         assumeTrue("created machine from j03", id != null)
@@ -157,7 +157,7 @@ class MilaJourneyTest {
         }
     }
 
-    @Test fun j05_shareAddAndRemoveOnSeedMachine() = runBlocking {
+    @Test fun j05_shareAddAndRemoveOnSeedMachine() = runBlocking<Unit> {
         val principal = fixture.sharePrincipal
         assumeTrue("descriptor seed.share_principal", principal != null)
         val state = signedIn()
@@ -169,7 +169,7 @@ class MilaJourneyTest {
         assertTrue("share remove: ${sharing.state}", sharing.submit(principal, remove = true))
     }
 
-    @Test fun j06_threadListingAndDetail() = runBlocking {
+    @Test fun j06_threadListingAndDetail() = runBlocking<Unit> {
         signedIn()
         val threads = adapter.threadListing().getOrThrow()
         val detail = MilaThreadDetailController(adapter)
@@ -180,7 +180,7 @@ class MilaJourneyTest {
         }
     }
 
-    @Test fun j07_terminalRoundTripsInputThroughPty() = runBlocking {
+    @Test fun j07_terminalRoundTripsInputThroughPty() = runBlocking<Unit> {
         signedIn()
         val handle = adapter.terminalOpen(80, 24, true).getOrThrow()
         val renderer = MilaTerminalRenderer()
@@ -197,7 +197,7 @@ class MilaJourneyTest {
         }
     }
 
-    @Test fun j08_webEndpointShowsForSeedMachine() = runBlocking {
+    @Test fun j08_webEndpointShowsForSeedMachine() = runBlocking<Unit> {
         val state = signedIn()
         val target = fixture.seedMachineName?.let { machineNamed(state.listing, it) } ?: state.listing.machines.first()
         val web = MilaWebController(adapter)
@@ -206,7 +206,7 @@ class MilaJourneyTest {
         assertEquals(target.id, web.endpoint?.machineId)
     }
 
-    @Test fun j09_sshKeysListIncludesThisDevice() = runBlocking {
+    @Test fun j09_sshKeysListIncludesThisDevice() = runBlocking<Unit> {
         signedIn()
         val controller = MilaSshKeyController(adapter.sshKeyStore())
         controller.refresh()
@@ -214,7 +214,7 @@ class MilaJourneyTest {
         assertFalse("current device key cannot be revoked", controller.revoke(controller.keys.first { it.isCurrentDevice }))
     }
 
-    @Test fun j10_notificationDeviceListAndRefusals() = runBlocking {
+    @Test fun j10_notificationDeviceListAndRefusals() = runBlocking<Unit> {
         signedIn()
         // Device creation needs a real FCM registration token, which cannot be hermetic; the
         // journey covers authenticated listing and refusal of malformed device identities.
@@ -223,7 +223,7 @@ class MilaJourneyTest {
         assertTrue(adapter.notificationDeviceRemove("").isFailure)
     }
 
-    @Test fun j11_deleteCreatedMachine() = runBlocking {
+    @Test fun j11_deleteCreatedMachine() = runBlocking<Unit> {
         val state = signedIn()
         val id = createdId ?: machineNamed(state.listing, createdName)?.id
         assumeTrue("created machine from j03", id != null)

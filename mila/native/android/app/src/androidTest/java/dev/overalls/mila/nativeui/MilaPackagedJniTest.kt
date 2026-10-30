@@ -31,7 +31,7 @@ class MilaPackagedJniTest {
     }
 
     @Test
-    fun packagedAdapterRefusesCreateAndShareWhileSignedOut() = kotlinx.coroutines.runBlocking {
+    fun packagedAdapterRefusesCreateAndShareWhileSignedOut() = kotlinx.coroutines.runBlocking<Unit> {
         val adapter = LinkedMilaFfiAdapter()
         assert(adapter.machineCreate(MilaMachineCreateRequest("devbox", 1, 512, 5)).isFailure)
         val principal = MilaSharePrincipal.parse("person@example.test").getOrThrow()

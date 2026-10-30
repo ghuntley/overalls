@@ -53,6 +53,17 @@ class MilaAppLockDeviceTest {
         assertTrue(device.wait(Until.hasObject(By.pkg(context.packageName).depth(0)), WAIT_MS))
     }
 
+    /** Waits for the platform prompt to take focus from Mila and reports what is focused otherwise. */
+    private fun awaitPlatformPrompt() {
+        val deadline = System.currentTimeMillis() + WAIT_MS
+        while (System.currentTimeMillis() < deadline) {
+            if (device.currentPackageName != null && device.currentPackageName != context.packageName) return
+            Thread.sleep(250)
+        }
+        val focus = shell("dumpsys window").lines().filter { "mCurrentFocus" in it || "mFocusedApp" in it }.joinToString(" | ")
+        throw AssertionError("BiometricPrompt did not take focus; current=${device.currentPackageName} $focus")
+    }
+
     private fun lockScreenShown(): Boolean = device.wait(Until.hasObject(By.text(MilaStrings.text(MilaMessage.LockUnlock))), WAIT_MS) == true
     private fun shellShown(): Boolean = device.wait(Until.hasObject(By.text(MilaStrings.text(MilaMessage.SignIn))), WAIT_MS) == true
 
@@ -92,14 +103,14 @@ class MilaAppLockDeviceTest {
 
         // Cancelling the platform prompt is a failed attempt and keeps the shell obscured.
         device.findObject(By.text(MilaStrings.text(MilaMessage.LockUnlock))).click()
-        assertNotNull("BiometricPrompt credential UI", device.wait(Until.findObject(By.pkg("com.android.systemui")), WAIT_MS))
+        awaitPlatformPrompt()
         device.pressBack()
         assertNotNull(device.wait(Until.findObject(By.text(MilaStrings.text(MilaMessage.LockFailed))), WAIT_MS))
         assertTrue(device.findObject(By.text(MilaStrings.text(MilaMessage.SignIn))) == null)
 
         // The device credential completes the prompt and reveals the shell.
         device.findObject(By.text(MilaStrings.text(MilaMessage.LockUnlock))).click()
-        assertNotNull(device.wait(Until.findObject(By.pkg("com.android.systemui")), WAIT_MS))
+        awaitPlatformPrompt()
         Thread.sleep(1_000)
         shell("input text $TEST_PIN")
         shell("input keyevent KEYCODE_ENTER")
