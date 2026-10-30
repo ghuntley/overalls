@@ -719,3 +719,6 @@ pub enum ProtocolError {
     #[error("invalid JSON")]
     InvalidJson,
 }
+
+#[cfg(test)]
+mod tests;

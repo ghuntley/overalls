@@ -1,0 +1,10 @@
+@cc [owner:ghuntley,label:verification] mila-protocol-hegel-properties
+Hegel properties MUST cover agreement with the shared Elixir route and command
+fixtures, the `Command::parse`/`format` round-trip on generated and well-formed
+lines with totality and the byte cap on arbitrary input, the private
+`lex`/`quote` round-trip, `decode_reply` totality and envelope classification,
+and the `device_public_key_valid` and `parse_platform` accept sets against
+independent oracles. Commands whose arguments begin with `--` are excluded from
+the round-trip because `format` emits no separator; such lines fail closed on
+re-parse. Receipt `request_id` values are decoded without `RequestId::parse`
+validation, so the envelope property does not claim it.
