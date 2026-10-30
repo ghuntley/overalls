@@ -756,6 +756,9 @@ struct AndroidSigner {
     vm: jni::JavaVM,
     signer: jni::objects::GlobalRef,
 }
+/// @cc [owner:ghuntley,label:security] jni-android-signer-no-pending-exception
+/// The Android signer callback MUST return failure, never a pending Java exception, to the
+/// Rust thread that invoked it; a signing failure becomes a refused connect, not a crash.
 unsafe extern "C" fn android_sign(
     context: usize,
     message: *const u8,
@@ -772,30 +775,40 @@ unsafe extern "C" fn android_sign(
     } else {
         std::slice::from_raw_parts(message, length)
     };
-    let input = match env.byte_array_from_slice(bytes) {
-        Ok(v) => v,
-        Err(_) => return -1,
-    };
-    let value = match env.call_method(
-        &state.signer,
-        "sign",
-        "([B)[B",
-        &[jni::objects::JValue::Object(&input.into())],
-    ) {
-        Ok(v) => v,
-        Err(_) => return -1,
-    };
-    let object = match value.l() {
-        Ok(v) => v,
-        Err(_) => return -1,
-    };
-    let array = jni::objects::JByteArray::from(object);
-    let signature = match env.convert_byte_array(array) {
-        Ok(v) if v.len() == 64 => v,
-        _ => return -1,
-    };
-    std::ptr::copy_nonoverlapping(signature.as_ptr(), output, 64);
-    0
+    let signature = android_sign_bytes(&mut env, &state.signer, bytes);
+    // A Java exception left pending on this attached Rust thread would be dispatched as
+    // uncaught when the thread detaches (killing the app), or abort the next JNI call.
+    if env.exception_check().unwrap_or(true) {
+        let _ = env.exception_clear();
+        return -1;
+    }
+    match signature {
+        Some(signature) => {
+            std::ptr::copy_nonoverlapping(signature.as_ptr(), output, 64);
+            0
+        }
+        None => -1,
+    }
+}
+
+fn android_sign_bytes(
+    env: &mut jni::JNIEnv<'_>,
+    signer: &jni::objects::GlobalRef,
+    bytes: &[u8],
+) -> Option<Vec<u8>> {
+    let input = env.byte_array_from_slice(bytes).ok()?;
+    let value = env
+        .call_method(
+            signer,
+            "sign",
+            "([B)[B",
+            &[jni::objects::JValue::Object(&input.into())],
+        )
+        .ok()?;
+    let array = jni::objects::JByteArray::from(value.l().ok()?);
+    env.convert_byte_array(array)
+        .ok()
+        .filter(|signature| signature.len() == 64)
 }
 
 #[no_mangle]

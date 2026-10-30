@@ -10,8 +10,25 @@ set -euo pipefail
 
 # A packaged-suite failure still lets the journey run, so one CI run reports both; the script
 # fails at the end if either did.
+# On failure, print the crash and main log buffers and any native tombstones. The approver bearer
+# and the encoded descriptor are registered with ::add-mask:: before the journey starts.
+dump_device_logs() {
+  echo "::group::adb logcat (crash, main) after $1"
+  adb logcat -d -b crash -b main -v threadtime | tail -n 1500 || true
+  echo "::endgroup::"
+  echo "::group::tombstones after $1"
+  adb root >/dev/null 2>&1 && adb wait-for-device || true
+  for tombstone in $(adb shell 'ls /data/tombstones/tombstone_* 2>/dev/null' | tr -d '\r' | grep -v '\.pb$' || true); do
+    echo "== $tombstone"
+    adb shell cat "$tombstone" | head -n 200 || true
+  done
+  echo "::endgroup::"
+}
+
 packaged=0
+adb logcat -c || true
 gradle --no-daemon connectedDebugAndroidTest || packaged=$?
+if [ "$packaged" -ne 0 ]; then dump_device_logs "packaged suite"; fi
 
 descriptor="${MILA_JOURNEY_DESCRIPTOR:-}"
 if [ -z "$descriptor" ]; then
@@ -63,7 +80,13 @@ adb reverse --list
 encoded="$(base64 -w0 "$descriptor")"
 # The encoded descriptor embeds the approver bearer; mask it like the raw token.
 echo "::add-mask::$encoded"
+adb logcat -c || true
+journey=0
 gradle --no-daemon connectedDebugAndroidTest \
   -Pandroid.testInstrumentationRunnerArguments.class=dev.overalls.mila.nativeui.MilaJourneyTest \
-  "-Pandroid.testInstrumentationRunnerArguments.milaJourneyDescriptor=$encoded"
+  "-Pandroid.testInstrumentationRunnerArguments.milaJourneyDescriptor=$encoded" || journey=$?
+if [ "$journey" -ne 0 ]; then
+  dump_device_logs "journey"
+  exit "$journey"
+fi
 exit "$packaged"

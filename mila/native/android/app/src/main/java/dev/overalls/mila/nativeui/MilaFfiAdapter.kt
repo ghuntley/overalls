@@ -277,7 +277,7 @@ internal object MilaRustFfi : MilaRustBindings {
 
     override fun sessionConnect(trust: ByteArray, host: String, publicKey: String, port: Int, timeoutMs: Int, signer: MilaDeviceKey): MilaSessionHandle? {
         check(loaded) { "mila_ffi is unavailable" }
-        return nativeSessionConnect(trust, host, publicKey, port, timeoutMs, signer)?.let(::MilaSessionHandle)
+        return nativeSessionConnect(trust, host, publicKey, port, timeoutMs, signer).takeIf { it != 0L }?.let(::MilaSessionHandle)
     }
     override fun sessionRead(handle: Long, more: Boolean): Int = nativeSessionRead(handle, more)
     override fun sessionListing(handle: Long): ByteArray? = nativeSessionListing(handle)
@@ -339,7 +339,8 @@ internal object MilaRustFfi : MilaRustBindings {
     external fun nativeMachineActions(snapshot: ByteArray, host: String, port: Int, hasPort: Boolean, index: Int): Int
 
     @JvmStatic
-    external fun nativeSessionConnect(trust: ByteArray, host: String, publicKey: String, port: Int, timeoutMs: Int, signer: MilaDeviceKey): Long?
+    /** Returns the session handle, or 0 when Rust refused; Rust returns a primitive `jlong`. */
+    external fun nativeSessionConnect(trust: ByteArray, host: String, publicKey: String, port: Int, timeoutMs: Int, signer: MilaDeviceKey): Long
     @JvmStatic
     external fun nativeTrustDocumentReconcile(pinned: ByteArray?, fetched: ByteArray?, host: String, now: Long): ByteArray?
     @JvmStatic
