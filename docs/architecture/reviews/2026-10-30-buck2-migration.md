@@ -855,3 +855,124 @@ path. The Buck2 leaves name crates by their relative cell path
 (`.buck-cells/rust/vendor/...`), never a store path, and each parity test's
 embedded-path scan refuses an import that would carry one. The prelude's own
 `--remap-path-prefix` wins over a toolchain flag, so no extra remap is set.
+
+## M9: Mila platforms
+
+This milestone implements the Mila part of ADR-0269. It makes no new
+decision; the shipped Windows DLL stays MSVC, and the record superseding
+ADR-0227 is still to be written.
+
+**Non-hermetic targets.** Xcode, the Android SDK with Gradle, and the .NET
+SDK are not in Nix, so `mila_platform` (`buck/mila.bzl`) runs them through a
+typed driver (`buck/mila_platform.py`) from the Buck2 daemon's environment.
+Buck2 local actions inherit the daemon's environment, not the client's: a
+probe action did not see a variable set only on a later `buck2 build`.
+The driver therefore checks its `require` programs and names `tools/buck2
+kill` when one is missing. Each target carries the label `non_hermetic`, is
+`local_only` with `allow_cache_upload = False`, so no SDK-dependent output
+reaches the NativeLink cache or remote execution, and is compatible only
+with `toolchains//:non_hermetic_enabled` (`-c overalls.non_hermetic=true`)
+and its host OS. `buck2 build //...` skips the 14 Mila platform targets, and
+`affected.bxl` drops them from selection. Their source globs are declared
+inputs, and the in-tree build outputs are in `project.ignore`.
+
+| Platform | Targets | Pinning |
+| --- | --- | --- |
+| Apple | `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`, `macos-dev`, `ios-dev`, `macos-release`, `ios-release` | Swift packages have no dependencies; Rust from the root `Cargo.lock` |
+| Android | `android-debug`, `android-release`, `android-ffi-clippy` | `gradle/verification-metadata.xml` (SHA-256, 532 components) |
+| Windows | `windows-ffi-msvc`, `windows-ffi-msvc-clippy`, `windows-dotnet`, `windows-smoke` | `packages.lock.json`, `RestoreLockedMode` |
+| Linux (hermetic) | `windows-ffi-gnu`, `windows-ffi-gnu-clippy` | vendored `rust//` crates |
+
+The Gradle and NuGet locks are no Nix inputs and do not fit the
+`dependencyPins` model, so `scripts/pins.ex` gains `platform_locks`: a
+`.csproj` without `RestorePackagesWithLockFile`, `RestoreLockedMode` and a
+committed lock, or a Gradle build without verification metadata, is a
+violation. Robolectric downloads its `android-all` jar at test time, outside
+Gradle's resolution, so that jar is unverified.
+
+**Windows FFI.** `cargo zigbuild` cross-builds `mila-ffi` for
+`x86_64-pc-windows-gnu` offline from the vendored crates. The DLL imports only
+system and UCRT libraries and contains no store or home path. Three findings
+shaped the rule: build scripts need a host `cc`; cargo-zigbuild's wrapper
+paths must be absolute because rustc runs in each crate's directory; and
+`RUSTFLAGS` replaces the `dlltool` flag cargo-zigbuild adds, so the path
+remaps go in the Cargo home's target `rustflags`. The gnu DLL is not
+bit-reproducible and the .NET interop has only been verified against MSVC,
+so it stays a compile and Clippy check. Switching the shipped DLL to gnu
+would need its own decision.
+
+**Darwin cells.** `buckCells.aarch64-darwin` evaluates once devenv's patched
+nixpkgs source (an import-from-derivation) is substituted from
+devenv.cachix.org; only three small derivations are built. Hermetic toolchains
+there are a stub that fails when run, so a Darwin runner builds only
+`non_hermetic` targets. `tools/buck2` falls back to `shasum` on macOS.
+
+**Without Nix.** `tools/buck2 --no-nix` (Git Bash on Windows, or Linux)
+downloads the buck2 release and prelude archive named in
+`tools/buck2-no-nix.json` and refuses either unless its SHA-256 matches the
+pin registry. It writes a real `.buck-cells` directory with an empty `rust`
+cell and `[overalls] no_nix = true, non_hermetic = true`; `toolchains//`
+accepts any path then, and a hermetic target fails at analysis.
+`nix/buck/no-nix.nix` builds the same downloads as `//tools:buck2-no-nix-*`
+kits, and fails when the release or prelude no longer matches the pinned
+nixpkgs buck2, so a buck2 bump must update the file and pins together. The
+cells name only the kits' derivations, so materialising the cells does not
+fetch them. `.gitattributes` keeps `tools/buck2` LF on Windows checkouts.
+
+**CI.** `mila-builds.yml` keeps its job names and artifact paths:
+- source-bundle builds the bundles through bootstrap targets;
+- apple-native installs Nix with the overalls and devenv caches, materialises
+  the cells, and builds `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`
+  and the dev apps;
+- android-native builds `android-ffi-clippy` and `android-debug`;
+- windows-native downloads buck2 directly (no dependency on source-bundle)
+  and builds the four Windows targets.
+The tailnet and journey steps are unchanged (ADR-0264), and the workflow now
+also runs when the wrapper, cells, toolchains or the rule files `mila/BUCK`
+loads change.
+
+The first dispatched run (41111464288) found two faults that local Linux
+runs could not:
+- Git Bash rewrites POSIX-looking arguments when it starts a Windows
+  program, so `//mila:windows-ffi-msvc` reached buck2.exe as `/mila:…`.
+  `tools/buck2 --no-nix` now disables that conversion.
+- A case-insensitive checkout (macOS, Windows) cannot hold both the root
+  `BUCK` file and the `buck/` directory, so the root package was missing and
+  `//mila:apple-ffi -> //:workspace_files` failed to analyse. The Mila
+  sources named the root files on Linux only (8da625617) until 055218ae8
+  renamed the root build file to `BUCK.v2`; 8b444aa8a restored the
+  dependency on every platform, and its run 41124115576 built every Apple
+  and Windows target with it.
+
+Run 41114668466 (8da625617) is the M9 gate, repeated by 41122878867 after
+the rename: linux-native, android-native and
+source-bundle pass; apple-native and windows-native pass every build step
+and fail only where the tailnet fixture is unreachable, as on earlier trunk
+runs (journey-fixture-tailnet: the fixture node is not tagged
+`tag:mila-ci`). The "Native platform gate" fails on open parity-matrix rows,
+also as before. Timings on a cache hit:
+
+| Job | Buck2 setup | Build steps | Tailnet join after job start |
+| --- | --- | --- | --- |
+| windows-native | cells 12 s | FFI 2m30, Clippy 55 s, .NET 1m32, smoke 9 s | 5m44 (4m54 to 7m25 before) |
+| apple-native | Nix 49 s, Cachix 7 s, cells 1m38 | FFI 1m24, Clippy 38 s, Swift 53 s, dev apps 1m54 and 1m47 | 9m34 (about 7m before) |
+
+**Release (held).** A reviewed change to `mila-release.yml`, not yet pushed
+and waiting on the user's decision and a test tag, builds the bundles and
+Linux tarball through bootstrap targets, the Android APK through
+`tools/buck2 --no-nix` and `//mila:android-release`, and the Apple FFI and
+signed apps through `//mila:apple-ffi` and `//mila:<platform>-release`.
+Signing secrets stay in the import step, which runs no Buck2 command; the
+release step restarts the daemon with only variables and the paths and
+profile name the import step writes to `$GITHUB_ENV`. A local probe started a
+daemon with canary `CERTIFICATE`, `CERTIFICATE_PASSWORD`, `NOTARY_KEY` and
+`MILA_KEYCHAIN` values and built a non_hermetic target: none appeared in
+`buck2 log what-ran`, `buck2 log show`, the decoded event log or buck-out.
+The release job repeats that check on every Apple release, also when the
+build fails: it masks the canaries and fails when the keychain password,
+certificate password or notary key and issuer IDs reach the daemon's
+environment, an event log, buck-out, `~/.buck` or a buck2 temporary
+directory, when the identity is in an action's command or environment, or
+when any of those places holds a copy of the iOS export options. No uploaded
+artifact contains buck-out or a Buck2 log. The legacy Flutter Windows
+release job is unchanged.

@@ -255,6 +255,32 @@ the approved migration plan.
   observability-runtimes and the trace spool); each has a `heavy`
   `rust_leaf_parity_test` against its Nix build.
 
+- M9 (partial) builds the Mila platforms as Buck2 targets
+  ([mila/BUCK](../../../mila/BUCK), [mila.bzl](../../../buck/mila.bzl)).
+  Xcode, Gradle and .NET are `non_hermetic` targets: they run the platform
+  SDK from the daemon's environment, are `local_only` with
+  `allow_cache_upload = False`, and are compatible only with
+  `-c overalls.non_hermetic=true` and their host OS, so `buck2 build //...`
+  and [affected.bxl](../../../buck/bxl/affected.bxl) skip them. Their
+  third-party inputs are pinned by Gradle dependency verification metadata
+  and NuGet `packages.lock.json` in locked mode; the Swift packages have no
+  dependencies. Those locks are no Nix inputs, so `check_pins`
+  ([pins.ex](../../../scripts/pins.ex) `platform_locks`, tested in
+  [pins_test.exs](../../../marshall/test/architecture/pins_test.exs)) refuses
+  a platform project that restores without them. `buckCells.aarch64-darwin`
+  evaluates and keeps the host tools; Linux-only tools become a stub there.
+  `tools/buck2 --no-nix` downloads the buckCells buck2 release and prelude,
+  verified against the pin registry, and enables only `non_hermetic`
+  targets; [no-nix.nix](../../../nix/buck/no-nix.nix) fails when those pins
+  stop matching the buckCells buck2. A hermetic `//mila:windows-ffi-gnu`
+  cross-build and Clippy check run on Linux; the shipped DLL stays MSVC.
+  `mila-builds.yml` builds Apple, Android and Windows through these
+  targets; the `mila-release.yml` change is held for a test release. Local evidence: the Android targets build and pass
+  their unit tests, the Windows gnu targets build, and `--no-nix` loads and
+  tests a non_hermetic target on Linux. CI run 41114668466 built every
+  Apple, Android and Windows target; the review records the runs and the
+  two faults the first one found.
+
 Remaining gaps, by milestone of the migration plan:
 
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
@@ -275,7 +301,13 @@ Remaining gaps, by milestone of the migration plan:
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
 - removal of the flake package, check and configuration outputs (M11);
-- Darwin cells and the Windows mode without Nix (M9);
+- M9 leftovers: `mila-release.yml` still builds through Nix and the
+  platform tools directly (its Buck2 change and Apple signing-leak check are
+  held for a test release), and its legacy Flutter Windows job is unchanged;
+  the
+  Robolectric `android-all` jar Gradle downloads at test time is outside the
+  verification metadata; the gnu Windows DLL is a check, not a reproducible
+  artifact; and the record superseding ADR-0227 is not yet written;
 - the `publish-cache.yml` gates job, which reaches Buck2 through
   `prek run --all-files` and still repeats the ADR and contract steps that the
   `ci.yml` precommit job now runs;
@@ -306,6 +338,6 @@ packaged in nixpkgs ([ADR-0270](0270-graph-driven-machine-test-selection.md)).
   [ADR-0248](0248-fleet-build-scheduling.md) cover the Nix stores and caches
   that assembly keeps using.
 - [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) builds Mila checks
-  in Nix. Those move to Buck2 targets in M9, and a superseding record follows
-  then.
+  in Nix. M9 moved the native platform builds to Buck2 targets; the
+  superseding record is still to be written.
 - Review: [Buck2 migration](../reviews/2026-10-30-buck2-migration.md).
