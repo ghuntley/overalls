@@ -272,5 +272,11 @@
   "terminalResize": "Badilisha ukubwa",
   "terminalSend": "Tuma",
   "signInFailedDeviceKey": "Mila haikuweza kufungua ufunguo wa kifaa hiki, kwa hiyo haikuunganisha.",
-  "signInProfileInvalid": "Mipangilio ya muunganisho ya usambazaji huu si sahihi, kwa hiyo Mila haikuunganisha."
+  "signInProfileInvalid": "Mipangilio ya muunganisho ya usambazaji huu si sahihi, kwa hiyo Mila haikuunganisha.",
+  "settingsLanguage": "Lugha",
+  "deploymentPortLabel": "Mlango",
+  "deploymentTrustLabel": "Imani iliyobanwa",
+  "deploymentSave": "Hifadhi usambazaji",
+  "lockNow": "Funga sasa",
+  "pushEndpointHint": "https://deployment.example/push"
 }

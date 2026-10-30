@@ -272,5 +272,11 @@
   "terminalResize": "Изменить размер",
   "terminalSend": "Отправить",
   "signInFailedDeviceKey": "Mila не удалось открыть ключ этого устройства, поэтому подключение не выполнено.",
-  "signInProfileInvalid": "Параметры подключения этого развёртывания недействительны, поэтому Mila не подключилась."
+  "signInProfileInvalid": "Параметры подключения этого развёртывания недействительны, поэтому Mila не подключилась.",
+  "settingsLanguage": "Язык",
+  "deploymentPortLabel": "Порт",
+  "deploymentTrustLabel": "Закреплённое доверие",
+  "deploymentSave": "Сохранить развёртывание",
+  "lockNow": "Заблокировать сейчас",
+  "pushEndpointHint": "https://deployment.example/push"
 }

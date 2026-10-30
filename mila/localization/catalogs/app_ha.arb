@@ -272,5 +272,11 @@
   "terminalResize": "Canza girma",
   "terminalSend": "Aika",
   "signInFailedDeviceKey": "Mila ba ta iya buɗe maɓallin wannan na'urar ba, don haka ba ta haɗa ba.",
-  "signInProfileInvalid": "Saitunan haɗi na wannan aiki ba su da inganci, don haka Mila ba ta haɗa ba."
+  "signInProfileInvalid": "Saitunan haɗi na wannan aiki ba su da inganci, don haka Mila ba ta haɗa ba.",
+  "settingsLanguage": "Harshe",
+  "deploymentPortLabel": "Tashar haɗi",
+  "deploymentTrustLabel": "Amincewa da aka maƙala",
+  "deploymentSave": "Adana shigarwa",
+  "lockNow": "Kulle yanzu",
+  "pushEndpointHint": "https://deployment.example/push"
 }

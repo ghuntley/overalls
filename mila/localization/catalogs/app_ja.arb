@@ -272,5 +272,11 @@
   "terminalResize": "サイズ変更",
   "terminalSend": "送信",
   "signInFailedDeviceKey": "Mila はこのデバイスの鍵を開けなかったため、接続しませんでした。",
-  "signInProfileInvalid": "このデプロイメントの接続設定が無効なため、Mila は接続しませんでした。"
+  "signInProfileInvalid": "このデプロイメントの接続設定が無効なため、Mila は接続しませんでした。",
+  "settingsLanguage": "言語",
+  "deploymentPortLabel": "ポート",
+  "deploymentTrustLabel": "固定された信頼",
+  "deploymentSave": "デプロイメントを保存",
+  "lockNow": "今すぐロック",
+  "pushEndpointHint": "https://deployment.example/push"
 }

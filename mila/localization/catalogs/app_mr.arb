@@ -272,5 +272,11 @@
   "terminalResize": "आकार बदला",
   "terminalSend": "पाठवा",
   "signInFailedDeviceKey": "Mila या डिव्हाइसची की उघडू शकले नाही, म्हणून कनेक्ट केले नाही.",
-  "signInProfileInvalid": "या डिप्लॉयमेंटची कनेक्शन सेटिंग्ज अवैध आहेत, म्हणून Mila ने कनेक्ट केले नाही."
+  "signInProfileInvalid": "या डिप्लॉयमेंटची कनेक्शन सेटिंग्ज अवैध आहेत, म्हणून Mila ने कनेक्ट केले नाही.",
+  "settingsLanguage": "भाषा",
+  "deploymentPortLabel": "पोर्ट",
+  "deploymentTrustLabel": "पिन केलेला विश्वास",
+  "deploymentSave": "डिप्लॉयमेंट जतन करा",
+  "lockNow": "आत्ता लॉक करा",
+  "pushEndpointHint": "https://deployment.example/push"
 }

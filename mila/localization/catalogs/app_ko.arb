@@ -272,5 +272,11 @@
   "terminalResize": "크기 조정",
   "terminalSend": "보내기",
   "signInFailedDeviceKey": "Mila가 이 기기의 키를 열 수 없어 연결하지 않았습니다.",
-  "signInProfileInvalid": "이 배포의 연결 설정이 잘못되어 Mila가 연결하지 않았습니다."
+  "signInProfileInvalid": "이 배포의 연결 설정이 잘못되어 Mila가 연결하지 않았습니다.",
+  "settingsLanguage": "언어",
+  "deploymentPortLabel": "포트",
+  "deploymentTrustLabel": "고정된 신뢰",
+  "deploymentSave": "배포 저장",
+  "lockNow": "지금 잠금",
+  "pushEndpointHint": "https://deployment.example/push"
 }

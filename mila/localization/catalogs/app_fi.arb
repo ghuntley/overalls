@@ -272,5 +272,11 @@
   "terminalResize": "Muuta kokoa",
   "terminalSend": "Lähetä",
   "signInFailedDeviceKey": "Mila ei voinut avata tämän laitteen avainta, joten se ei muodostanut yhteyttä.",
-  "signInProfileInvalid": "Tämän käyttöönoton yhteysasetukset ovat virheelliset, joten Mila ei muodostanut yhteyttä."
+  "signInProfileInvalid": "Tämän käyttöönoton yhteysasetukset ovat virheelliset, joten Mila ei muodostanut yhteyttä.",
+  "settingsLanguage": "Kieli",
+  "deploymentPortLabel": "Portti",
+  "deploymentTrustLabel": "Kiinnitetty luottamus",
+  "deploymentSave": "Tallenna käyttöönotto",
+  "lockNow": "Lukitse nyt",
+  "pushEndpointHint": "https://deployment.example/push"
 }

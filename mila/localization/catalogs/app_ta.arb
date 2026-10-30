@@ -272,5 +272,11 @@
   "terminalResize": "அளவை மாற்று",
   "terminalSend": "அனுப்பு",
   "signInFailedDeviceKey": "இந்தச் சாதனத்தின் விசையை Mila-வால் திறக்க முடியவில்லை, எனவே இணைக்கவில்லை.",
-  "signInProfileInvalid": "இந்த வரிசைப்படுத்தலின் இணைப்பு அமைப்புகள் தவறானவை, எனவே Mila இணைக்கவில்லை."
+  "signInProfileInvalid": "இந்த வரிசைப்படுத்தலின் இணைப்பு அமைப்புகள் தவறானவை, எனவே Mila இணைக்கவில்லை.",
+  "settingsLanguage": "மொழி",
+  "deploymentPortLabel": "போர்ட்",
+  "deploymentTrustLabel": "பொருத்தப்பட்ட நம்பிக்கை",
+  "deploymentSave": "வரிசைப்படுத்தலைச் சேமி",
+  "lockNow": "இப்போது பூட்டு",
+  "pushEndpointHint": "https://deployment.example/push"
 }

@@ -272,5 +272,11 @@
   "terminalResize": "Cambiar tamaño",
   "terminalSend": "Enviar",
   "signInFailedDeviceKey": "Mila no pudo abrir la clave de este dispositivo, así que no se conectó.",
-  "signInProfileInvalid": "La configuración de conexión de este despliegue no es válida, así que Mila no se conectó."
+  "signInProfileInvalid": "La configuración de conexión de este despliegue no es válida, así que Mila no se conectó.",
+  "settingsLanguage": "Idioma",
+  "deploymentPortLabel": "Puerto",
+  "deploymentTrustLabel": "Confianza fijada",
+  "deploymentSave": "Guardar despliegue",
+  "lockNow": "Bloquear ahora",
+  "pushEndpointHint": "https://deployment.example/push"
 }

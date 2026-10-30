@@ -272,5 +272,11 @@
   "terminalResize": "تغيير الحجم",
   "terminalSend": "إرسال",
   "signInFailedDeviceKey": "تعذّر على Mila فتح مفتاح هذا الجهاز، لذا لم يتصل.",
-  "signInProfileInvalid": "إعدادات الاتصال لهذا النشر غير صالحة، لذا لم يتصل Mila."
+  "signInProfileInvalid": "إعدادات الاتصال لهذا النشر غير صالحة، لذا لم يتصل Mila.",
+  "settingsLanguage": "اللغة",
+  "deploymentPortLabel": "المنفذ",
+  "deploymentTrustLabel": "الثقة المثبّتة",
+  "deploymentSave": "حفظ النشر",
+  "lockNow": "اقفل الآن",
+  "pushEndpointHint": "https://deployment.example/push"
 }

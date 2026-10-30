@@ -272,5 +272,11 @@
   "terminalResize": "आकार बदलें",
   "terminalSend": "भेजें",
   "signInFailedDeviceKey": "Mila इस डिवाइस की कुंजी नहीं खोल सका, इसलिए उसने कनेक्ट नहीं किया।",
-  "signInProfileInvalid": "इस डिप्लॉयमेंट की कनेक्शन सेटिंग अमान्य हैं, इसलिए Mila ने कनेक्ट नहीं किया।"
+  "signInProfileInvalid": "इस डिप्लॉयमेंट की कनेक्शन सेटिंग अमान्य हैं, इसलिए Mila ने कनेक्ट नहीं किया।",
+  "settingsLanguage": "भाषा",
+  "deploymentPortLabel": "पोर्ट",
+  "deploymentTrustLabel": "पिन किया गया भरोसा",
+  "deploymentSave": "डिप्लॉयमेंट सहेजें",
+  "lockNow": "अभी लॉक करें",
+  "pushEndpointHint": "https://deployment.example/push"
 }

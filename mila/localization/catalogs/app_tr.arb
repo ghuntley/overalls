@@ -272,5 +272,11 @@
   "terminalResize": "Yeniden boyutlandır",
   "terminalSend": "Gönder",
   "signInFailedDeviceKey": "Mila bu cihazın anahtarını açamadı, bu yüzden bağlanmadı.",
-  "signInProfileInvalid": "Bu dağıtımın bağlantı ayarları geçersiz, bu yüzden Mila bağlanmadı."
+  "signInProfileInvalid": "Bu dağıtımın bağlantı ayarları geçersiz, bu yüzden Mila bağlanmadı.",
+  "settingsLanguage": "Dil",
+  "deploymentPortLabel": "Bağlantı noktası",
+  "deploymentTrustLabel": "Sabitlenmiş güven",
+  "deploymentSave": "Dağıtımı kaydet",
+  "lockNow": "Şimdi kilitle",
+  "pushEndpointHint": "https://deployment.example/push"
 }

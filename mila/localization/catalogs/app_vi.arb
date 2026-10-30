@@ -272,5 +272,11 @@
   "terminalResize": "Đổi kích thước",
   "terminalSend": "Gửi",
   "signInFailedDeviceKey": "Mila không thể mở khóa của thiết bị này nên đã không kết nối.",
-  "signInProfileInvalid": "Cài đặt kết nối của bản triển khai này không hợp lệ nên Mila đã không kết nối."
+  "signInProfileInvalid": "Cài đặt kết nối của bản triển khai này không hợp lệ nên Mila đã không kết nối.",
+  "settingsLanguage": "Ngôn ngữ",
+  "deploymentPortLabel": "Cổng",
+  "deploymentTrustLabel": "Tin cậy đã ghim",
+  "deploymentSave": "Lưu bản triển khai",
+  "lockNow": "Khóa ngay",
+  "pushEndpointHint": "https://deployment.example/push"
 }

@@ -272,5 +272,11 @@
   "terminalResize": "Muuda suurust",
   "terminalSend": "Saada",
   "signInFailedDeviceKey": "Mila ei saanud selle seadme võtit avada, seega ühendust ei loodud.",
-  "signInProfileInvalid": "Selle juurutuse ühenduse sätted on vigased, seega Mila ühendust ei loonud."
+  "signInProfileInvalid": "Selle juurutuse ühenduse sätted on vigased, seega Mila ühendust ei loonud.",
+  "settingsLanguage": "Keel",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Kinnitatud usaldus",
+  "deploymentSave": "Salvesta juurutus",
+  "lockNow": "Lukusta kohe",
+  "pushEndpointHint": "https://deployment.example/push"
 }

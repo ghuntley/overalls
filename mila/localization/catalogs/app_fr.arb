@@ -272,5 +272,11 @@
   "terminalResize": "Redimensionner",
   "terminalSend": "Envoyer",
   "signInFailedDeviceKey": "Mila n'a pas pu ouvrir la clé de cet appareil et ne s'est donc pas connecté.",
-  "signInProfileInvalid": "Les paramètres de connexion de ce déploiement ne sont pas valides, Mila ne s'est donc pas connecté."
+  "signInProfileInvalid": "Les paramètres de connexion de ce déploiement ne sont pas valides, Mila ne s'est donc pas connecté.",
+  "settingsLanguage": "Langue",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Confiance épinglée",
+  "deploymentSave": "Enregistrer le déploiement",
+  "lockNow": "Verrouiller maintenant",
+  "pushEndpointHint": "https://deployment.example/push"
 }

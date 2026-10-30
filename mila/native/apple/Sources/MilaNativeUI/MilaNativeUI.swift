@@ -206,7 +206,7 @@ private struct MilaMachineCreateView: View {
     @State private var error = false
     var body: some View {
         NavigationStack { Form {
-            TextField("Name", text: $name).textContentType(.nickname)
+            TextField(MilaStrings.text(.machineName), text: $name).textContentType(.nickname)
             TextField(MilaStrings.text(.fieldCpu), text: $cpu)
             TextField(MilaStrings.text(.fieldMemory), text: $memory)
             TextField(MilaStrings.text(.fieldDisk), text: $disk)
@@ -489,9 +489,9 @@ private struct SettingsView: View {
             }
             Section(MilaStrings.text(.deployments)) {
                 TextField(MilaStrings.text(.deploymentHost), text: $deploymentHost)
-                TextField("Port", text: $deploymentPort)
-                TextField("Pinned trust", text: $deploymentTrust)
-                Button("Save deployment") {
+                TextField(MilaStrings.text(.deploymentPort), text: $deploymentPort)
+                TextField(MilaStrings.text(.deploymentTrust), text: $deploymentTrust)
+                Button(MilaStrings.text(.deploymentSave)) {
                     guard let port = UInt16(deploymentPort), let trust = Data(base64Encoded: deploymentTrust), session.upsert(MilaDeployment(host: deploymentHost, port: port, trust: trust)) else { deploymentStatus = "Invalid deployment"; return }
                     deploymentStatus = "Deployment saved"
                 }
@@ -514,8 +514,8 @@ private struct SettingsView: View {
                 }
                 .pickerStyle(.segmented)
             }
-            Section("Language") {
-                Picker("Language", selection: $locale) {
+            Section(MilaStrings.text(.settingsLanguage)) {
+                Picker(MilaStrings.text(.settingsLanguage), selection: $locale) {
                     // The empty tag follows the device language; it is labelled
                     // with that language's autonym.
                     Text(MilaStrings.localeDisplayName(MilaStrings.activeLocale(override: nil, preferredLanguages: Locale.preferredLanguages))).tag("")
@@ -536,7 +536,7 @@ private struct SettingsView: View {
                 }))
                     .disabled(!lockController.canEnable)
                 if appLockEnabled {
-                    Button("Lock now", systemImage: "lock.fill") {
+                    Button(MilaStrings.text(.lockNow), systemImage: "lock.fill") {
                         lockController.lock()
                     }
                     .disabled(lockController.state == .locked || lockController.state == .unavailable)
@@ -547,7 +547,7 @@ private struct SettingsView: View {
                 Text(MilaStrings.text(.notificationsExplain)).font(.caption)
                 SecureField("Device token", text: $notificationToken)
                     .textContentType(.oneTimeCode)
-                TextField("https://deployment.example/push", text: $notificationEndpoint)
+                TextField(MilaStrings.text(.pushEndpointHint), text: $notificationEndpoint)
                     .textContentType(.URL)
                     .autocorrectionDisabled()
                 HStack {

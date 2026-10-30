@@ -272,5 +272,11 @@
   "terminalResize": "Baguhin ang laki",
   "terminalSend": "Ipadala",
   "signInFailedDeviceKey": "Hindi mabuksan ng Mila ang key ng device na ito, kaya hindi ito kumonekta.",
-  "signInProfileInvalid": "Hindi wasto ang mga setting ng koneksyon ng deployment na ito, kaya hindi kumonekta ang Mila."
+  "signInProfileInvalid": "Hindi wasto ang mga setting ng koneksyon ng deployment na ito, kaya hindi kumonekta ang Mila.",
+  "settingsLanguage": "Wika",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Naka-pin na tiwala",
+  "deploymentSave": "I-save ang deployment",
+  "lockNow": "I-lock ngayon",
+  "pushEndpointHint": "https://deployment.example/push"
 }

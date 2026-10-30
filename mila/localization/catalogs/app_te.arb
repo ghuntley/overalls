@@ -272,5 +272,11 @@
   "terminalResize": "పరిమాణం మార్చు",
   "terminalSend": "పంపు",
   "signInFailedDeviceKey": "Mila ఈ పరికరం కీని తెరవలేకపోయింది, కాబట్టి కనెక్ట్ కాలేదు.",
-  "signInProfileInvalid": "ఈ డిప్లాయ్‌మెంట్ కనెక్షన్ సెట్టింగ్‌లు చెల్లవు, కాబట్టి Mila కనెక్ట్ కాలేదు."
+  "signInProfileInvalid": "ఈ డిప్లాయ్‌మెంట్ కనెక్షన్ సెట్టింగ్‌లు చెల్లవు, కాబట్టి Mila కనెక్ట్ కాలేదు.",
+  "settingsLanguage": "భాష",
+  "deploymentPortLabel": "పోర్ట్",
+  "deploymentTrustLabel": "పిన్ చేసిన నమ్మకం",
+  "deploymentSave": "డిప్లాయ్‌మెంట్‌ను సేవ్ చేయి",
+  "lockNow": "ఇప్పుడే లాక్ చేయి",
+  "pushEndpointHint": "https://deployment.example/push"
 }

@@ -272,5 +272,11 @@
   "terminalResize": "Ubah ukuran",
   "terminalSend": "Kirim",
   "signInFailedDeviceKey": "Mila tidak dapat membuka kunci perangkat ini, jadi tidak tersambung.",
-  "signInProfileInvalid": "Pengaturan koneksi deployment ini tidak valid, jadi Mila tidak tersambung."
+  "signInProfileInvalid": "Pengaturan koneksi deployment ini tidak valid, jadi Mila tidak tersambung.",
+  "settingsLanguage": "Bahasa",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Kepercayaan yang disematkan",
+  "deploymentSave": "Simpan deployment",
+  "lockNow": "Kunci sekarang",
+  "pushEndpointHint": "https://deployment.example/push"
 }

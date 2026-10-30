@@ -272,5 +272,11 @@
   "terminalResize": "Redimensionar",
   "terminalSend": "Enviar",
   "signInFailedDeviceKey": "O Mila não conseguiu abrir a chave deste dispositivo, por isso não se ligou.",
-  "signInProfileInvalid": "As definições de ligação desta implementação são inválidas, por isso o Mila não se ligou."
+  "signInProfileInvalid": "As definições de ligação desta implementação são inválidas, por isso o Mila não se ligou.",
+  "settingsLanguage": "Idioma",
+  "deploymentPortLabel": "Porta",
+  "deploymentTrustLabel": "Confiança fixada",
+  "deploymentSave": "Guardar implementação",
+  "lockNow": "Bloquear agora",
+  "pushEndpointHint": "https://deployment.example/push"
 }

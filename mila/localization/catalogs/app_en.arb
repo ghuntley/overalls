@@ -1173,5 +1173,29 @@
   "signInProfileInvalid": "This deployment's connection settings are invalid, so Mila did not connect.",
   "@signInProfileInvalid": {
     "description": "Sign-in failure when the local connection profile for the selected deployment is invalid."
+  },
+  "settingsLanguage": "Language",
+  "@settingsLanguage": {
+    "description": "Settings section and picker label for the app language."
+  },
+  "deploymentPortLabel": "Port",
+  "@deploymentPortLabel": {
+    "description": "Field label for a deployment's SSH port in Settings."
+  },
+  "deploymentTrustLabel": "Pinned trust",
+  "@deploymentTrustLabel": {
+    "description": "Field label for the pinned trust document of a deployment in Settings."
+  },
+  "deploymentSave": "Save deployment",
+  "@deploymentSave": {
+    "description": "Button that saves the deployment entered in Settings."
+  },
+  "lockNow": "Lock now",
+  "@lockNow": {
+    "description": "Button that locks the app immediately."
+  },
+  "pushEndpointHint": "https://deployment.example/push",
+  "@pushEndpointHint": {
+    "description": "Example notification relay endpoint URL; keep as is."
   }
 }

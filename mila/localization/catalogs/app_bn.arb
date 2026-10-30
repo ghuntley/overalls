@@ -272,5 +272,11 @@
   "terminalResize": "আকার বদলান",
   "terminalSend": "পাঠান",
   "signInFailedDeviceKey": "Mila এই ডিভাইসের কী খুলতে পারেনি, তাই সংযোগ করেনি।",
-  "signInProfileInvalid": "এই ডিপ্লয়মেন্টের সংযোগ সেটিংস অবৈধ, তাই Mila সংযোগ করেনি।"
+  "signInProfileInvalid": "এই ডিপ্লয়মেন্টের সংযোগ সেটিংস অবৈধ, তাই Mila সংযোগ করেনি।",
+  "settingsLanguage": "ভাষা",
+  "deploymentPortLabel": "পোর্ট",
+  "deploymentTrustLabel": "পিন করা বিশ্বাস",
+  "deploymentSave": "ডিপ্লয়মেন্ট সংরক্ষণ করুন",
+  "lockNow": "এখনই লক করুন",
+  "pushEndpointHint": "https://deployment.example/push"
 }

@@ -272,5 +272,11 @@
   "terminalResize": "Change size",
   "terminalSend": "Send",
   "signInFailedDeviceKey": "Mila no fit open dis device key, so e no connect.",
-  "signInProfileInvalid": "Di connection settings for dis deployment no correct, so Mila no connect."
+  "signInProfileInvalid": "Di connection settings for dis deployment no correct, so Mila no connect.",
+  "settingsLanguage": "Language",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Pinned trust",
+  "deploymentSave": "Save deployment",
+  "lockNow": "Lock am now",
+  "pushEndpointHint": "https://deployment.example/push"
 }

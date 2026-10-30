@@ -272,5 +272,11 @@
   "terminalResize": "غيّر الحجم",
   "terminalSend": "ابعت",
   "signInFailedDeviceKey": "Mila مقدرش يفتح مفتاح الجهاز ده، فمتصلش.",
-  "signInProfileInvalid": "إعدادات الاتصال بتاعة النشر ده مش صحيحة، فـ Mila متصلش."
+  "signInProfileInvalid": "إعدادات الاتصال بتاعة النشر ده مش صحيحة، فـ Mila متصلش.",
+  "settingsLanguage": "اللغة",
+  "deploymentPortLabel": "البورت",
+  "deploymentTrustLabel": "الثقة المتثبتة",
+  "deploymentSave": "احفظ النشر",
+  "lockNow": "اقفل دلوقتي",
+  "pushEndpointHint": "https://deployment.example/push"
 }

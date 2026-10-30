@@ -272,5 +272,11 @@
   "terminalResize": "Ändra storlek",
   "terminalSend": "Skicka",
   "signInFailedDeviceKey": "Mila kunde inte öppna den här enhetens nyckel och anslöt därför inte.",
-  "signInProfileInvalid": "Anslutningsinställningarna för den här driftsättningen är ogiltiga, så Mila anslöt inte."
+  "signInProfileInvalid": "Anslutningsinställningarna för den här driftsättningen är ogiltiga, så Mila anslöt inte.",
+  "settingsLanguage": "Språk",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Fäst förtroende",
+  "deploymentSave": "Spara driftsättning",
+  "lockNow": "Lås nu",
+  "pushEndpointHint": "https://deployment.example/push"
 }

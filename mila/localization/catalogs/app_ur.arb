@@ -272,5 +272,11 @@
   "terminalResize": "سائز تبدیل کریں",
   "terminalSend": "بھیجیں",
   "signInFailedDeviceKey": "Mila اس ڈیوائس کی کلید نہیں کھول سکا، اس لیے کنیکٹ نہیں ہوا۔",
-  "signInProfileInvalid": "اس ڈیپلائمنٹ کی کنکشن ترتیبات غلط ہیں، اس لیے Mila کنیکٹ نہیں ہوا۔"
+  "signInProfileInvalid": "اس ڈیپلائمنٹ کی کنکشن ترتیبات غلط ہیں، اس لیے Mila کنیکٹ نہیں ہوا۔",
+  "settingsLanguage": "زبان",
+  "deploymentPortLabel": "پورٹ",
+  "deploymentTrustLabel": "پن کیا گیا اعتماد",
+  "deploymentSave": "ڈیپلائمنٹ محفوظ کریں",
+  "lockNow": "ابھی لاک کریں",
+  "pushEndpointHint": "https://deployment.example/push"
 }

@@ -272,5 +272,11 @@
   "terminalResize": "Größe ändern",
   "terminalSend": "Senden",
   "signInFailedDeviceKey": "Mila konnte den Schlüssel dieses Geräts nicht öffnen und hat daher keine Verbindung hergestellt.",
-  "signInProfileInvalid": "Die Verbindungseinstellungen dieses Deployments sind ungültig, daher hat Mila keine Verbindung hergestellt."
+  "signInProfileInvalid": "Die Verbindungseinstellungen dieses Deployments sind ungültig, daher hat Mila keine Verbindung hergestellt.",
+  "settingsLanguage": "Sprache",
+  "deploymentPortLabel": "Port",
+  "deploymentTrustLabel": "Fixiertes Vertrauen",
+  "deploymentSave": "Deployment speichern",
+  "lockNow": "Jetzt sperren",
+  "pushEndpointHint": "https://deployment.example/push"
 }
