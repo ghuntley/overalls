@@ -302,7 +302,7 @@ private struct MachineDetailView: View {
             Button(MilaStrings.text(.cancel), role: .cancel) {}
         }
         .sheet(isPresented: $showTerminal) {
-            MilaTerminalView(transport: (adapter as? LinkedMilaFFIAdapter)?.terminalTransport() ?? MilaNoopTerminalTransport())
+            MilaTerminalView(transport: (adapter as? LinkedMilaFFIAdapter)?.terminalTransport(machine: machine.id) ?? MilaNoopTerminalTransport())
         }
         #if canImport(WebKit)
         .sheet(isPresented: $showWeb, onDismiss: { web.end(webGeneration) }) {

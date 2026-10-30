@@ -47,7 +47,7 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         case thread(UUID?, String, String?, String?, UUID?)
         case webShow(UUID)
         case webSet(UUID, UInt16, Bool, UInt64)
-        case ptyAttach(UInt32, UInt32), ptyPoll(UInt64), ptyInput(UInt64, Data), ptyResize(UInt64, UInt32, UInt32), ptyKill(UInt64)
+        case ptyAttach(UUID, UInt32, UInt32), ptyPoll(UInt64), ptyInput(UInt64, Data), ptyResize(UInt64, UInt32, UInt32), ptyKill(UInt64)
     }
     private let lock = NSLock()
     private var recorded: [Call] = []
@@ -92,8 +92,8 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
     func webSet(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) throws { record(.webSet(machine, port, publicAccess, revision)) }
     func close() { record(.close); lock.lock(); authenticated = false; lock.unlock() }
 
-    func terminalAttach(columns: UInt32, rows: UInt32) throws -> UInt64 {
-        record(.ptyAttach(columns, rows))
+    func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64 {
+        record(.ptyAttach(machine, columns, rows))
         lock.lock(); defer { lock.unlock() }
         guard authenticated else { throw MilaSessionError.staleHandle }
         nextTerminal += 1

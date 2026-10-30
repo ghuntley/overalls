@@ -108,6 +108,15 @@ MilaFfiStatus mila_session_terminal_input(uint64_t terminal_handle, const uint8_
 MilaFfiStatus mila_session_terminal_resize(uint64_t terminal_handle, uint32_t columns,
                                             uint32_t rows);
 MilaFfiStatus mila_session_terminal_kill(uint64_t terminal_handle);
+/* Opens or rejoins the caller's personal terminal session (`terminal new`) and
+ * writes Porsche's bounded JSON receipt naming it. */
+int32_t mila_session_terminal_new(uint64_t handle, const uint8_t *machine, size_t machine_len,
+    const uint8_t *request_id, size_t request_id_len, uint8_t *output, size_t capacity, size_t *written);
+/* Attaches a bounded PTY to one named terminal session of one machine. Porsche
+ * refuses the unnamed `mila_session_terminal_attach` form. */
+int32_t mila_session_terminal_attach_session(uint64_t session_handle, const uint8_t *machine,
+    size_t machine_len, const uint8_t *terminal, size_t terminal_len, uint32_t columns,
+    uint32_t rows, uint64_t *out_terminal_handle);
 
 #ifdef __cplusplus
 }

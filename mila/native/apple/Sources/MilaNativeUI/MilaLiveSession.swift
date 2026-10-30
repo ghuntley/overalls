@@ -46,7 +46,9 @@ public protocol MilaSessionClient: AnyObject, Sendable {
 /// identifiers owned by the session that opened them.
 public protocol MilaPtySession: AnyObject, Sendable {
     var isAuthenticated: Bool { get }
-    func terminalAttach(columns: UInt32, rows: UInt32) throws -> UInt64
+    /// Opens (or rejoins) the caller's personal terminal session on `machine`
+    /// and attaches a PTY to it by name.
+    func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64
     func terminalPoll(_ terminal: UInt64) throws -> Data
     func terminalInput(_ terminal: UInt64, data: Data) throws
     func terminalResize(_ terminal: UInt64, columns: UInt32, rows: UInt32) throws
@@ -233,13 +235,28 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
         return try copyListing(current)
     }
 
-    /// Opens an authenticated PTY owned by this session. The returned opaque
-    /// handle is valid only until `terminalKill` or session close.
-    public func terminalAttach(columns: UInt32 = 120, rows: UInt32 = 40) throws -> UInt64 {
+    /// @cc [owner:ghuntley,label:security;protocol] mila-apple-named-terminal-attach
+    /// Opens an authenticated PTY owned by this session on a named terminal
+    /// session: `terminal new` (at-most-once request ID) yields the caller's
+    /// personal session for this machine, then the PTY attaches to exactly that
+    /// machine and session. The unnamed legacy attach is never used; Porsche
+    /// refuses it. The returned handle is valid until `terminalKill` or close.
+    public func terminalAttach(machine: UUID, columns: UInt32 = 120, rows: UInt32 = 40) throws -> UInt64 {
         let current = try validHandle()
         guard (1...4096).contains(columns), (1...512).contains(rows) else { throw MilaSessionError.invalidInput }
+        let machineBytes = Array(machine.uuidString.lowercased().utf8)
+        let requestBytes = Array(milaRequestID(UUID()).utf8)
+        let receipt = try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
+            machineBytes.withUnsafeBufferPointer { m in requestBytes.withUnsafeBufferPointer { r in
+                mila_session_terminal_new(current, m.baseAddress, m.count, r.baseAddress, r.count, output, capacity, written)
+            }}
+        }
+        let named = try MilaTerminalReceipt.session(receipt, machine: machine)
+        let terminalBytes = Array(named.uuidString.lowercased().utf8)
         var terminal: UInt64 = 0
-        let status = mila_session_terminal_attach(current, columns, rows, &terminal).rawValue
+        let status = machineBytes.withUnsafeBufferPointer { m in terminalBytes.withUnsafeBufferPointer { t in
+            mila_session_terminal_attach_session(current, m.baseAddress, m.count, t.baseAddress, t.count, columns, rows, &terminal)
+        }}
         guard status == 0, terminal != 0 else { throw Self.error(status) }
         return terminal
     }
@@ -334,6 +351,21 @@ private func milaAppleSessionSigner(_ context: UInt, _ message: UnsafePointer<UI
         raw.copyBytes(to: signature, count: 64)
         return 0
     } catch { return -1 }
+}
+
+/// `terminal new` receipt: `{"version":1,"status":"succeeded","result":{"machine_id","session_id",...}}`.
+struct MilaTerminalReceipt: Decodable {
+    let machineID: UUID
+    let sessionID: UUID
+    enum CodingKeys: String, CodingKey { case machineID = "machine_id", sessionID = "session_id" }
+
+    /// The named session, only when the receipt is for the requested machine.
+    static func session(_ data: Data, machine: UUID) throws -> UUID {
+        let receipt: MilaTerminalReceipt
+        do { receipt = try MilaPorscheEnvelope<MilaTerminalReceipt>.decode(data) } catch { throw MilaSessionError.invalidInput }
+        guard receipt.machineID == machine else { throw MilaSessionError.invalidInput }
+        return receipt.sessionID
+    }
 }
 
 /// Stable class reference handed to Rust as the callback context during connect.

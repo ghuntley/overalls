@@ -47,9 +47,10 @@ public final class MilaAuthenticatedTerminalTransport: MilaTerminalTransport, @u
         self.transport = transport
     }
 
-    /// Production transport backed by the authenticated Rust PTY registry.
-    public convenience init(session: any MilaPtySession) {
-        self.init(session: session, transport: MilaLiveSessionTerminalTransport(session: session))
+    /// Production transport backed by the authenticated Rust PTY registry,
+    /// attaching to the caller's named terminal session on `machine`.
+    public convenience init(session: any MilaPtySession, machine: UUID) {
+        self.init(session: session, transport: MilaLiveSessionTerminalTransport(session: session, machine: machine))
     }
 
     /// Internal seam for native host tests; production callers must provide a live session.
@@ -100,6 +101,7 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
     /// Back-off between empty polls (no data, window adjust, or a closed channel).
     static let idlePoll: Duration = .milliseconds(25)
     private let session: any MilaPtySession
+    private let machine: UUID
     private let idle: Duration
     private let lock = NSLock()
     private var terminal: UInt64 = 0
@@ -113,8 +115,8 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
         return body()
     }
 
-    public init(session: any MilaPtySession) { self.session = session; self.idle = Self.idlePoll }
-    init(session: any MilaPtySession, idle: Duration) { self.session = session; self.idle = idle }
+    public init(session: any MilaPtySession, machine: UUID) { self.session = session; self.machine = machine; self.idle = Self.idlePoll }
+    init(session: any MilaPtySession, machine: UUID, idle: Duration) { self.session = session; self.machine = machine; self.idle = idle }
 
     /// The PTY generation bound to the current handle; zero while detached.
     var currentGeneration: UInt64 { withTerminalLock { terminal == 0 ? 0 : generation } }
@@ -126,7 +128,7 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
         guard readWrite else { throw MilaTerminalError.permissionDenied }
         guard session.isAuthenticated else { throw MilaTerminalError.unavailable }
         let handle: UInt64
-        do { handle = try session.terminalAttach(columns: UInt32(columns), rows: UInt32(rows)) }
+        do { handle = try session.terminalAttach(machine: machine, columns: UInt32(columns), rows: UInt32(rows)) }
         catch { throw MilaTerminalError.unavailable }
         let previous = withTerminalLock { let old = terminal; terminal = handle; generation &+= 1; return old }
         if previous != 0 { session.terminalKill(previous) }

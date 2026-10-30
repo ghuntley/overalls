@@ -305,11 +305,11 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         ptySession = pty ?? (session as? any MilaPtySession)
     }
 
-    /// Returns the authenticated PTY transport for native terminal presentation.
+    /// Returns the authenticated PTY transport for a machine's terminal.
     /// Unsigned adapters deliberately return nil so a terminal cannot open.
-    public func terminalTransport() -> (any MilaTerminalTransport)? {
+    public func terminalTransport(machine: UUID) -> (any MilaTerminalTransport)? {
         guard let ptySession else { return nil }
-        return MilaAuthenticatedTerminalTransport(session: ptySession)
+        return MilaAuthenticatedTerminalTransport(session: ptySession, machine: machine)
     }
 
     /// Closes the authenticated Rust session. Later calls fail as stale.

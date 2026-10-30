@@ -10,7 +10,7 @@ import WebKit
         let session = RecordingSession()
         session.ptyOutput = [Data("hello ".utf8), Data(), Data("world".utf8)]
         let adapter = LinkedMilaFFIAdapter(session: session)
-        let transport = try XCTUnwrap(adapter.terminalTransport())
+        let transport = try XCTUnwrap(adapter.terminalTransport(machine: MilaListingFixture.running))
         let controller = MilaTerminalController(transport: transport)
         await controller.attach(columns: 100, rows: 30)
         XCTAssertEqual(controller.state, .attached)
@@ -19,7 +19,7 @@ import WebKit
         await controller.resize(columns: 120, rows: 40)
         await controller.close()
         let terminal: UInt64 = 101
-        XCTAssertEqual(session.calls.first, .ptyAttach(100, 30))
+        XCTAssertEqual(session.calls.first, .ptyAttach(MilaListingFixture.running, 100, 30))
         XCTAssertTrue(session.calls.contains(.ptyInput(terminal, Data("ls\n".utf8))))
         XCTAssertTrue(session.calls.contains(.ptyResize(terminal, 120, 40)))
         XCTAssertTrue(session.calls.contains(.ptyKill(terminal)))
@@ -29,7 +29,7 @@ import WebKit
 
     func testReattachKillsPreviousHandleAndAdvancesGeneration() async throws {
         let session = RecordingSession()
-        let transport = MilaLiveSessionTerminalTransport(session: session, idle: .milliseconds(1))
+        let transport = MilaLiveSessionTerminalTransport(session: session, machine: MilaListingFixture.running, idle: .milliseconds(1))
         try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: true)
         let first = transport.currentGeneration
         try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: true)
@@ -44,7 +44,7 @@ import WebKit
 
     func testDeauthenticatedSessionEndsStreamAndRefusesOperations() async throws {
         let session = RecordingSession()
-        let transport = MilaLiveSessionTerminalTransport(session: session, idle: .milliseconds(1))
+        let transport = MilaLiveSessionTerminalTransport(session: session, machine: MilaListingFixture.running, idle: .milliseconds(1))
         try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: true)
         session.close()
         let ended = try await transport.receiveOutput()
@@ -58,12 +58,16 @@ import WebKit
     func testAuthenticatedWrapperForwardsOutput() async throws {
         let session = RecordingSession()
         session.ptyOutput = [Data("ok".utf8)]
-        let transport = MilaAuthenticatedTerminalTransport(session: session)
+        let transport = MilaAuthenticatedTerminalTransport(session: session, machine: MilaListingFixture.running)
         try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: true)
         let chunk = try await transport.receiveOutput()
         XCTAssertEqual(chunk, Data("ok".utf8))
         let unsignedAdapter = LinkedMilaFFIAdapter()
-        XCTAssertNil(unsignedAdapter.terminalTransport())
+        let receipt = Data(#"{"version":1,"status":"succeeded","result":{"machine_id":"11111111-1111-4111-8111-111111111111","session_id":"66666666-6666-4666-8666-666666666666","route":"overalls://x"}}"#.utf8)
+        XCTAssertEqual(try MilaTerminalReceipt.session(receipt, machine: MilaListingFixture.running), UUID(uuidString: "66666666-6666-4666-8666-666666666666"))
+        XCTAssertThrowsError(try MilaTerminalReceipt.session(receipt, machine: MilaListingFixture.stopped), "receipt for another machine")
+        XCTAssertThrowsError(try MilaTerminalReceipt.session(Data(#"{"version":1,"status":"error","error":"terminal_unavailable"}"#.utf8), machine: MilaListingFixture.running))
+        XCTAssertNil(unsignedAdapter.terminalTransport(machine: MilaListingFixture.running))
     }
 }
 
@@ -131,7 +135,7 @@ final class MilaLiveSessionRustLinkTests: XCTestCase {
             ("thread", { _ = try session.threadAction(thread: nil, command: "thread ls", secondary: nil, input: nil, requestID: nil) }),
             ("webShow", { _ = try session.webShow(machine: id) }),
             ("webSet", { try session.webSet(machine: id, port: 443, publicAccess: false, revision: 1, requestID: id) }),
-            ("ptyAttach", { _ = try session.terminalAttach(columns: 80, rows: 24) }),
+            ("ptyAttach", { _ = try session.terminalAttach(machine: id, columns: 80, rows: 24) }),
             ("ptyPoll", { _ = try session.terminalPoll(0xDEAD_BEEF) }),
             ("ptyInput", { try session.terminalInput(0xDEAD_BEEF, data: Data("x".utf8)) }),
             ("ptyResize", { try session.terminalResize(0xDEAD_BEEF, columns: 80, rows: 24) }),
@@ -148,7 +152,7 @@ final class MilaLiveSessionRustLinkTests: XCTestCase {
 
     func testSwiftBoundsRejectBeforeRust() {
         let session = MilaLiveSession(unconnectedHandleForTesting: 0xDEAD_BEEF)
-        XCTAssertThrowsError(try session.terminalAttach(columns: 0, rows: 24)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.terminalAttach(machine: UUID(), columns: 0, rows: 24)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.terminalInput(1, data: Data())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.machineResize(machine: UUID(), cpu: 0, memory: 2048, disk: 20, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.webSet(machine: UUID(), port: 0, publicAccess: true, revision: 1, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
