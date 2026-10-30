@@ -930,6 +930,18 @@
   "@sharingFailed": {
     "description": "Shown when the sharing list could not be read."
   },
+  "machineName": "Name",
+  "@machineName": {
+    "description": "Field label for a machine's name when creating one; required."
+  },
+  "machinesFailed": "Machines could not be loaded.",
+  "@machinesFailed": {
+    "description": "Shown when the machine list could not be loaded."
+  },
+  "signInRequired": "Sign in to this deployment first.",
+  "@signInRequired": {
+    "description": "Shown when an action needs a signed-in session for the selected deployment."
+  },
   "sharingEmailInvalid": "Enter an email address.",
   "@sharingEmailInvalid": {
     "description": "Error under the email field."

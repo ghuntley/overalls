@@ -41,21 +41,23 @@ pub(super) struct LinkTargets {
 
 /// A destructive action awaiting explicit confirmation.
 #[derive(Clone, Debug, Eq, PartialEq)]
-enum Pending {
+pub(super) enum Pending {
     RemoveDeployment(String),
     RevokeKey(String),
+    DeleteMachine(String),
+    RemoveShare { machine: String, email: String },
 }
 
 /// One confirmation bar shared by the settings pages.
 #[derive(Clone)]
 pub(super) struct ConfirmBar {
-    container: Box,
+    pub(super) container: Box,
     prompt: Label,
     pending: Rc<RefCell<Option<Pending>>>,
 }
 
 impl ConfirmBar {
-    fn new() -> (Self, Button) {
+    pub(super) fn new() -> (Self, Button) {
         let container = Box::new(Orientation::Horizontal, 8);
         let prompt = Label::new(None);
         prompt.set_wrap(true);
@@ -77,14 +79,14 @@ impl ConfirmBar {
         (bar, confirm)
     }
 
-    fn ask(&self, confirm: &Button, pending: Pending, prompt: &str, action: &str) {
+    pub(super) fn ask(&self, confirm: &Button, pending: Pending, prompt: &str, action: &str) {
         self.prompt.set_label(prompt);
         confirm.set_label(action);
         *self.pending.borrow_mut() = Some(pending);
         self.container.set_visible(true);
     }
 
-    fn take(&self) -> Option<Pending> {
+    pub(super) fn take(&self) -> Option<Pending> {
         let pending = self.pending.borrow_mut().take();
         self.container.set_visible(false);
         pending
@@ -95,13 +97,13 @@ impl ConfirmBar {
     }
 }
 
-fn clear_list(list: &ListBox) {
+pub(super) fn clear_list(list: &ListBox) {
     while let Some(child) = list.first_child() {
         list.remove(&child);
     }
 }
 
-fn heading(text: &str) -> Label {
+pub(super) fn heading(text: &str) -> Label {
     let label = Label::new(Some(text));
     label.set_halign(Align::Start);
     label.add_css_class("title-3");
@@ -319,7 +321,14 @@ fn start_polling(state: &NativeState, view: &TextView, status: &Label) {
         }
         match outcome {
             TickOutcome::Ended => status.set_label(&strings::text(strings::Message::TerminalEnded)),
-            TickOutcome::Failed(error) => status.set_label(&strings::text(terminal_error(error))),
+            TickOutcome::Failed(error) => {
+                status.set_label(&strings::text(terminal_error(error)));
+                // A transport failure means the session itself is gone:
+                // release it and reconnect now rather than at the heartbeat.
+                if error == PtyError::Transport {
+                    state.session_lost();
+                }
+            }
             _ => {}
         }
         if outcome.keeps_polling() {
