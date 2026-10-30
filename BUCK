@@ -64,6 +64,10 @@ owned_set(
 
 filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
 
+# Root manifests that Nix builds read: the Cargo workspace (ADR-0273), its
+# clippy.toml, and pyproject.toml for the ruff checks inside machine tests.
+filegroup(name = "workspace_files", srcs = ["Cargo.lock", "Cargo.toml", "clippy.toml", "pyproject.toml"], visibility = ["PUBLIC"])
+
 # Machine checks are nixos_machine_test targets (nix/verification/tests/machines).
 [nix_flake_attr(name = "check-" + attr, attr = "checks.x86_64-linux." + attr, labels = ["bootstrap", "check"]) for attr in BOOTSTRAP_CHECKS if attr not in MACHINE_TESTS]
 

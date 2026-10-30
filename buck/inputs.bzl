@@ -2,12 +2,22 @@
 # (ADR-0270). Each entry is a leaf filegroup so nix_assemble can copy it.
 # Coarse until modules have their own targets (M11).
 
-# The flake, modules, fleet inventory and secrets.
+# The flake, root manifests, modules, fleet inventory and secrets.
 NIX_INPUTS = [
     "//:flake",
+    "//:workspace_files",
     "//fleet:srcs",
     "//nix:srcs",
+    "//nix/domains/artifacts/guest/github:srcs",
+    # support/zfs-node.nix installs this suite's probe for every ZFS node.
+    "//nix/verification/tests/machines/native-zfs:srcs",
+    # The trace-spool module validates spans against the diagnostics schema.
+    "//elixir:trace_schema",
     "//secrets:srcs",
+] + [
+    # The root Cargo workspace's member manifests (cargo-workspace.nix).
+    "//{}:cargo_manifests".format(package)
+    for package in ["elixir", "enrico", "lilly", "lyra", "marshall", "mila"]
 ]
 
 # The application and tool sources behind the package set, read by suites

@@ -1,3 +1,7 @@
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# Root Cargo workspace members' manifests (ADR-0273), which every Nix Rust
+# build reads through cargo-workspace.nix; machine-test assembly declares them.
+filegroup(name = "cargo_manifests", srcs = glob(["native/*/Cargo.toml"]), visibility = ["PUBLIC"])
