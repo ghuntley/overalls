@@ -229,12 +229,19 @@ class MilaJourneyTest {
     }
 
     @Test fun j07_terminalWithoutGuestIsRefusedClosed() = runBlocking<Unit> {
-        val seed = seed(signedIn().listing)
+        val state = signedIn()
         // The unnamed legacy attach is never offered.
         assertTrue(adapter.terminalOpen(80, 24, true).isFailure)
-        val opened = adapter.terminalOpen(seed.id, 80, 24)
-        // No guest executes in the fixture: Marshall refuses with the closed terminal_unavailable code.
-        assertTrue("terminal must be refused without a guest", opened.isFailure)
+        // Admitted but never observed running: no guest executes for this machine.
+        val idleName = "mila-android-idle-" + UUID.randomUUID().toString().take(8)
+        val form = MilaMachineFormController(adapter)
+        form.setSession(true, state.listing)
+        expect(form.create(idleName, "1", "512", "2")) { "idle create admitted: ${form.state} ${refusal()}" }
+        val idle = eventually(120_000) { listing().machines.firstOrNull { it.name == idleName } }
+        val terminal = MilaTerminalSessionController(adapter)
+        terminal.setSession(true)
+        assertFalse("terminal must be refused without a guest", terminal.open(idle.id, 80, 24))
+        assertTrue(terminal.state is MilaTerminalSessionState.Failed)
         assertEquals("terminal_unavailable", adapter.lastRefusal())
     }
 
@@ -281,5 +288,51 @@ class MilaJourneyTest {
         val made = createdId
         assumeTrue("created machine from j03", made != null)
         lifecycle(made!!, MilaMachineCommand.Delete)
+    }
+
+    /** Polls the live terminal until [marker] appears in its output, within [timeoutMs]. */
+    private suspend fun MilaTerminalSessionController.awaitOutput(marker: String, timeoutMs: Long): Boolean {
+        val seen = StringBuilder()
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (System.currentTimeMillis() < deadline) {
+            poll()?.let { seen.append(it.toString(Charsets.UTF_8)); if (seen.length > 256 * 1024) seen.delete(0, seen.length - 64 * 1024) }
+            if (marker in seen) return true
+            delay(200)
+        }
+        return false
+    }
+
+    @Test fun j12_guestTerminalEchoResizeReplayAndKill() = runBlocking<Unit> {
+        val machine = checkNotNull(fixture.terminalMachineId) { "descriptor seed.terminal_machine_id" }
+        signedIn()
+        val terminal = MilaTerminalSessionController(adapter)
+        terminal.setSession(true)
+        // Only terminal operations run on this machine. Right after boot the guest terminal
+        // service can still answer temporarily_unavailable; retry that refusal alone.
+        var opened = terminal.open(machine, 100, 30)
+        val deadline = System.currentTimeMillis() + 120_000
+        while (!opened && adapter.lastRefusal() == "temporarily_unavailable" && System.currentTimeMillis() < deadline) {
+            delay(2_000)
+            opened = if ((terminal.state as? MilaTerminalSessionState.Failed)?.session != null) terminal.reattach(100, 30)
+                else terminal.open(machine, 100, 30)
+        }
+        expect(opened) { "terminal attach: ${terminal.state} ${refusal()}" }
+        val session = (terminal.state as MilaTerminalSessionState.Live).session
+
+        val marker = "mila-" + UUID.randomUUID().toString().replace("-", "").take(12)
+        assertTrue(terminal.send("echo $marker-\$((6*7))\r".toByteArray(Charsets.UTF_8)))
+        assertTrue("echo output", terminal.awaitOutput("$marker-42", 60_000))
+
+        expect(terminal.resize(132, 40)) { "resize: ${terminal.state} ${refusal()}" }
+        assertTrue(terminal.send("stty size\r".toByteArray(Charsets.UTF_8)))
+        assertTrue("stty reports the new size", terminal.awaitOutput("40 132", 30_000))
+
+        assertTrue(terminal.detach())
+        expect(terminal.reattach(132, 40)) { "reattach: ${terminal.state} ${refusal()}" }
+        assertEquals(session, (terminal.state as MilaTerminalSessionState.Live).session)
+        assertTrue("replayed output after reattach", terminal.awaitOutput("$marker-42", 60_000))
+
+        expect(terminal.kill()) { "kill: ${terminal.state} ${refusal()}" }
+        assertEquals(MilaTerminalSessionState.Ended(session), terminal.state)
     }
 }

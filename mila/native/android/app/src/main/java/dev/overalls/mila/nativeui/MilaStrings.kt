@@ -17,6 +17,9 @@ internal enum class MilaMessage(val catalogId: String) {
     FieldInvalid("machineFieldInvalid"), RequestWaiting("requestWaiting"), RequestSucceeded("requestSucceeded"), RequestFailed("requestFailed"), RequestRefused("requestRefused"),
     ShareRole("sharingRole"), ShareRoleViewer("shareRoleViewer"), ShareRoleOperator("shareRoleOperator"), ShareRoleManager("shareRoleManager"),
     MachineNotFound("machineNotFound"), ShareRoute("webShare"), LinkRefused("linkRefused"), LockUnavailable("lockUnavailable"),
+    TerminalNew("terminalNew"), TerminalReconnect("terminalReconnect"), TerminalSend("terminalSend"), TerminalClose("terminalClose"),
+    TerminalLive("terminalLive"), TerminalAttaching("terminalAttaching"), TerminalEnded("terminalEnded"),
+    TerminalRefused("terminalRefused"), TerminalInvalid("terminalInvalid"), TerminalSignedOut("terminalSignedOut"),
 }
 
 internal object MilaStrings {
@@ -41,6 +44,10 @@ internal object MilaStrings {
         MilaMessage.FieldInvalid to "Check this value.", MilaMessage.RequestWaiting to "Waiting for the request to finish…", MilaMessage.RequestSucceeded to "Done.", MilaMessage.RequestFailed to "The request failed.", MilaMessage.RequestRefused to "The deployment refused the request.",
         MilaMessage.ShareRole to "Role", MilaMessage.ShareRoleViewer to "viewer", MilaMessage.ShareRoleOperator to "operator", MilaMessage.ShareRoleManager to "manager",
         MilaMessage.MachineNotFound to "This machine is not available.", MilaMessage.ShareRoute to "Share", MilaMessage.LinkRefused to "Mila cannot open this link.", MilaMessage.LockUnavailable to "App lock is not available on this device.",
+        MilaMessage.TerminalNew to "New terminal", MilaMessage.TerminalReconnect to "Reconnect", MilaMessage.TerminalSend to "Send", MilaMessage.TerminalClose to "Close",
+        MilaMessage.TerminalLive to "live", MilaMessage.TerminalAttaching to "attaching", MilaMessage.TerminalEnded to "The terminal session ended.",
+        MilaMessage.TerminalRefused to "The deployment refused to attach to this terminal session.", MilaMessage.TerminalInvalid to "Mila could not attach to this terminal session.",
+        MilaMessage.TerminalSignedOut to "This device is no longer authorized. Sign in again to attach.",
     )
     fun configure(context: Context, locale: Locale = Locale.getDefault()) {
         val tag = locale.toLanguageTag().replace('_', '-')

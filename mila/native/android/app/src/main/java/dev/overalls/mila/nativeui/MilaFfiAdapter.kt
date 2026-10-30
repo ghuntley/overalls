@@ -161,6 +161,12 @@ interface MilaFfiAdapter {
         terminalResize(columns, rows, true)
     /** Closes the Rust-owned PTY handle. */
     fun terminalClose(handle: Long): Result<Unit> = Result.success(Unit)
+    /** `terminal new`: opens or rejoins the caller's named session on [machineId]. */
+    fun terminalNew(machineId: UUID): Result<MilaTerminalSessionRef> = Result.failure(IllegalStateException("terminal unavailable"))
+    /** Attaches a PTY to [session]; returns the PTY handle. */
+    fun terminalAttach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Result<Long> = Result.failure(IllegalStateException("terminal unavailable"))
+    /** `terminal kill`: true when the server reports the session closed. */
+    fun terminalEnd(session: MilaTerminalSessionRef): Result<Boolean> = Result.failure(IllegalStateException("terminal unavailable"))
 }
 
 /** Inputs needed to establish the certificate-authenticated Porsche session. */
@@ -232,6 +238,8 @@ interface MilaRustBindings {
     fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = null
     /** Attaches a PTY to one named terminal session of one machine; 0 on refusal. */
     fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = 0
+    /** `terminal kill` for one named session; returns its JSON receipt, or null on refusal. */
+    fun sessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray? = null
     /** Registers this device with Susan's key-issuance reply; returns Porsche's JSON receipt. */
     fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = null
     /** `{"error": <closed code or null>}` for the session's last Porsche refusal. */
@@ -322,6 +330,7 @@ internal object MilaRustFfi : MilaRustBindings {
     override fun sessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long = nativeSessionTerminalOpen(handle, columns, rows)
     override fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = nativeSessionTerminalNew(handle, machine, requestId)
     override fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = nativeSessionTerminalAttachSession(handle, machine, terminal, columns, rows)
+    override fun sessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray? = nativeSessionTerminalEnd(handle, machine, terminal, requestId)
     override fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = nativeSessionDeviceRegister(handle, platform, susanReply, encPubkey, label, now)
     override fun sessionLastRefusal(handle: Long): ByteArray? = nativeSessionLastRefusal(handle)
     override fun sessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray? = nativeSessionTerminalPoll(handle, maxBytes)
@@ -378,6 +387,7 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long
     @JvmStatic external fun nativeSessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray?
     @JvmStatic external fun nativeSessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long
+    @JvmStatic external fun nativeSessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray?
     @JvmStatic external fun nativeSessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray?
     @JvmStatic external fun nativeSessionLastRefusal(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray?
@@ -486,16 +496,27 @@ class MilaSessionHandle internal constructor(
      * (`terminal new`) and attach to that machine and session id; the unnamed legacy attach is
      * never used because real Porsche refuses it.
      */
-    @Synchronized fun terminalOpenSession(machine: UUID, columns: Int, rows: Int, requestId: String): Result<Long> = runCatching {
-        check(!closed); require(requestId.matches(MILA_REQUEST_ID)); require(columns in 1..4096 && rows in 1..512)
+    @Synchronized fun terminalNew(machine: UUID, requestId: String): Result<MilaTerminalSessionRef> = runCatching {
+        check(!closed); require(requestId.matches(MILA_REQUEST_ID))
         val receipt = bindings.sessionTerminalNew(nativeHandle, machine.toString(), requestId) ?: error("terminal new refused")
         require(receipt.size <= 64 * 1024) { "terminal receipt exceeds bound" }
         val result = org.json.JSONObject(receipt.toString(Charsets.UTF_8)).getJSONObject("result")
-        val terminal = result.getString("session_id")
-        require(terminal.matches(Regex("^[A-Za-z0-9-]{1,64}$"))) { "invalid terminal session id" }
-        bindings.sessionTerminalAttachSession(nativeHandle, machine.toString(), terminal, columns, rows).takeIf { it > 0 }
+        MilaTerminalSessionRef(machine, result.getString("session_id"))
+    }
+    @Synchronized fun terminalAttach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Result<Long> = runCatching {
+        check(!closed); require(columns in 1..4096 && rows in 1..512)
+        bindings.sessionTerminalAttachSession(nativeHandle, session.machine.toString(), session.id, columns, rows).takeIf { it > 0 }
             ?: error("terminal attach rejected")
     }
+    @Synchronized fun terminalEnd(session: MilaTerminalSessionRef, requestId: String): Result<Boolean> = runCatching {
+        check(!closed); require(requestId.matches(MILA_REQUEST_ID))
+        val receipt = bindings.sessionTerminalEnd(nativeHandle, session.machine.toString(), session.id, requestId) ?: error("terminal kill refused")
+        require(receipt.size <= 64 * 1024) { "terminal receipt exceeds bound" }
+        val root = org.json.JSONObject(receipt.toString(Charsets.UTF_8))
+        (root.optJSONObject("result") ?: root).optBoolean("closed", false)
+    }
+    @Synchronized fun terminalOpenSession(machine: UUID, columns: Int, rows: Int, requestId: String): Result<Long> =
+        terminalNew(machine, requestId).mapCatching { terminalAttach(it, columns, rows).getOrThrow() }
     /** Registers this device; the Susan reply carries the push key and never enters UI state. */
     @Synchronized fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String?, now: Long): Result<ByteArray> = runCatching {
         check(!closed); require(susanReply.length <= 4096 && encPubkey.length <= 64 && (label == null || label.length <= 256))
@@ -667,6 +688,12 @@ class LinkedMilaFfiAdapter(
         Result.failure(IllegalStateException("terminal requires a machine"))
     override fun terminalOpen(machineId: UUID, columns: Int, rows: Int): Result<Long> =
         authenticatedValue { authenticatedSession!!.terminalOpenSession(machineId, columns, rows, milaRequestId()) }
+    override fun terminalNew(machineId: UUID): Result<MilaTerminalSessionRef> =
+        authenticatedValue { authenticatedSession!!.terminalNew(machineId, milaRequestId()) }
+    override fun terminalAttach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Result<Long> =
+        authenticatedValue { authenticatedSession!!.terminalAttach(session, columns, rows) }
+    override fun terminalEnd(session: MilaTerminalSessionRef): Result<Boolean> =
+        authenticatedValue { authenticatedSession!!.terminalEnd(session, milaRequestId()) }
     fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String? = null): Result<ByteArray> =
         authenticatedSession?.notificationDeviceRegister(susanReply, encPubkey, label, System.currentTimeMillis() / 1000)
             ?: Result.failure(IllegalStateException("session unavailable"))

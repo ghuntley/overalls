@@ -39,6 +39,8 @@ data class MilaJourneyDescriptor(
     val fixtureUrl: URI,
     val seedMachineName: String?,
     val seedMachineId: java.util.UUID?,
+    /** Running guest-backed machine reserved for terminal operations only. */
+    val terminalMachineId: java.util.UUID?,
     val sharePrincipal: String?,
     val accountEmail: String?,
 ) {
@@ -110,6 +112,7 @@ data class MilaJourneyDescriptor(
                 ),
                 seedMachineName = seed?.optString("machine_name")?.takeIf { it.isNotBlank() },
                 seedMachineId = seed?.optString("machine_id")?.takeIf { it.isNotBlank() }?.let(java.util.UUID::fromString),
+                terminalMachineId = seed?.optString("terminal_machine_id")?.takeIf { it.isNotBlank() }?.let(java.util.UUID::fromString),
                 sharePrincipal = seed?.optString("share_principal")?.takeIf { it.isNotBlank() },
                 accountEmail = seed?.optString("account_email")?.takeIf { it.isNotBlank() },
             )

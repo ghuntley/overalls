@@ -432,48 +432,59 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
-@Composable private fun TerminalControls(adapter: MilaFfiAdapter, machineId: java.util.UUID) {
-    var result by remember { mutableStateOf("Terminal idle") }
-    var terminalHandle by remember { mutableStateOf<Long?>(null) }
+@Composable private fun TerminalControls(adapter: MilaFfiAdapter, machineId: java.util.UUID, signedIn: Boolean) {
+    val scope = rememberCoroutineScope()
+    val controller = remember(adapter, machineId) { MilaTerminalSessionController(adapter) }
+    var state by remember(controller) { mutableStateOf(controller.state) }
     var input by remember { mutableStateOf("") }
     var output by remember { mutableStateOf("") }
-    val renderer = remember { MilaTerminalRenderer() }
-    LaunchedEffect(terminalHandle) {
-        val handle = terminalHandle ?: return@LaunchedEffect
-        while (terminalHandle == handle) {
-            adapter.terminalPoll(handle).onSuccess { bytes ->
-                if (bytes.isNotEmpty()) {
-                    renderer.append(bytes)
-                    output = renderer.text()
-                }
-            }
+    val renderer = remember(controller) { MilaTerminalRenderer() }
+    LaunchedEffect(signedIn) { controller.setSession(signedIn); state = controller.state }
+    LaunchedEffect(state) {
+        val live = state as? MilaTerminalSessionState.Live ?: return@LaunchedEffect
+        while (controller.state == live) {
+            controller.poll()?.let { bytes -> renderer.append(bytes); output = renderer.text() }
             delay(100)
         }
     }
-    DisposableEffect(Unit) { onDispose { terminalHandle?.let { adapter.terminalClose(it) } } }
+    DisposableEffect(controller) { onDispose { controller.detach() } }
+    fun run(step: suspend MilaTerminalSessionController.() -> Boolean) {
+        scope.launch { controller.step(); state = controller.state }
+    }
+    val live = state is MilaTerminalSessionState.Live
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(MilaStrings.text(MilaMessage.Terminal), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({
-                terminalHandle?.let { adapter.terminalClose(it) }
-                terminalHandle = adapter.terminalOpen(machineId, 80, 24).getOrNull()
-                result = if (terminalHandle != null) "Attached" else "Attach rejected"
-            }) { Text(MilaStrings.text(MilaMessage.Attach)) }
-            Button({
-                val handle = terminalHandle
-                result = if (handle != null && adapter.terminalInputBytes(handle, input.toByteArray(Charsets.UTF_8)).isSuccess) {
-                    input = ""; "Input sent"
-                } else "Input rejected"
-            }, enabled = terminalHandle != null && input.isNotEmpty()) { Text(MilaStrings.text(MilaMessage.Input)) }
-            Button({
-                val handle = terminalHandle
-                result = if (handle != null && adapter.terminalResizeHandle(handle, 80, 24).isSuccess) "Resized" else "Resize rejected"
-            }, enabled = terminalHandle != null) { Text(MilaStrings.text(MilaMessage.Resize)) }
-            Button({ terminalHandle?.let { adapter.terminalClose(it) }; terminalHandle = null; result = "Closed" }, enabled = terminalHandle != null) { Text("Close") }
+            Button({ renderer.clear(); output = ""; run { open(machineId, 80, 24) } }, enabled = signedIn && state !is MilaTerminalSessionState.Attaching) {
+                Text(MilaStrings.text(MilaMessage.TerminalNew))
+            }
+            Button({ run { reattach(80, 24) } }, enabled = state is MilaTerminalSessionState.Detached || (state as? MilaTerminalSessionState.Failed)?.session != null) {
+                Text(MilaStrings.text(MilaMessage.TerminalReconnect))
+            }
+            Button({ val bytes = input.toByteArray(Charsets.UTF_8); run { send(bytes).also { if (it) input = "" } } }, enabled = live && input.isNotEmpty()) {
+                Text(MilaStrings.text(MilaMessage.TerminalSend))
+            }
+            Button({ run { resize(80, 24) } }, enabled = live) { Text(MilaStrings.text(MilaMessage.Resize)) }
+            Button({ run { kill() } }, enabled = live || state is MilaTerminalSessionState.Detached) { Text(MilaStrings.text(MilaMessage.TerminalClose)) }
         }
-        OutlinedTextField(value = input, onValueChange = { if (boundedTerminalInput(it)) input = it }, label = { Text("Input") }, enabled = terminalHandle != null)
+        OutlinedTextField(value = input, onValueChange = { if (boundedTerminalInput(it)) input = it }, label = { Text(MilaStrings.text(MilaMessage.Input)) }, enabled = live)
         Text(output, style = MaterialTheme.typography.bodySmall)
-        Text(result, style = MaterialTheme.typography.labelSmall)
+        Text(
+            when (val current = state) {
+                MilaTerminalSessionState.SignedOut -> MilaStrings.text(MilaMessage.TerminalSignedOut)
+                MilaTerminalSessionState.Idle -> ""
+                MilaTerminalSessionState.Attaching -> MilaStrings.text(MilaMessage.TerminalAttaching)
+                is MilaTerminalSessionState.Live -> MilaStrings.text(MilaMessage.TerminalLive)
+                is MilaTerminalSessionState.Detached -> MilaStrings.text(MilaMessage.TerminalReconnect)
+                is MilaTerminalSessionState.Ended -> MilaStrings.text(MilaMessage.TerminalEnded)
+                is MilaTerminalSessionState.Failed -> when (current.reason) {
+                    MilaTerminalFailure.SignedOut -> MilaStrings.text(MilaMessage.TerminalSignedOut)
+                    MilaTerminalFailure.Refused -> MilaStrings.text(MilaMessage.TerminalRefused)
+                    MilaTerminalFailure.Invalid -> MilaStrings.text(MilaMessage.TerminalInvalid)
+                }
+            },
+            style = MaterialTheme.typography.labelSmall,
+        )
     }
 }
 
@@ -590,7 +601,7 @@ internal fun machineFormStatus(state: MilaMachineFormState, kind: MilaMachineFor
         }
         MachineSharingControls(adapter, machine, signedIn, listing)
         if (machine != null) MilaWebControls(adapter, machine, signedIn)
-        if (machine != null && signedIn) TerminalControls(adapter, machine.id)
+        if (machine != null && signedIn) TerminalControls(adapter, machine.id, signedIn)
         Text(
             when (val current = controller.state) {
                 MilaMachineMutationState.SignedOut -> MilaStrings.text(MilaMessage.RuntimeUnavailable)

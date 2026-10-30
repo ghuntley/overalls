@@ -59,6 +59,7 @@ class MilaTerminalRenderer {
         }
     }
     fun text(): String = (lines + listOf(current.toString()).filter { it.isNotEmpty() }).joinToString("\n")
+    fun clear() { lines.clear(); current = StringBuilder(); escape = false; csi = false }
 }
 /** Bounded host-side source. Implementations must bind reads to the authenticated session. */
 fun interface MilaPtySource {

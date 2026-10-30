@@ -53,7 +53,10 @@ credential-free device.
 `mila-journey-fixture` Marshall+Porsche backend: sign-in with browser approval and reconnect,
 machine listing, session-bound create/resize, lifecycle admission (including the closed `vm_busy`
 resize refusal while a pause is unobserved), sharing, thread prompt/answer/plan approval, the
-terminal's closed refusal without a guest, web, SSH keys and notification-device CRUD. The fixture's
+terminal's closed `terminal_unavailable` refusal on a never-observed machine, live terminal I/O on
+the fixture's guest-backed `seed.terminal_machine_id` (named `terminal new`, attach, echo, resize to
+132x40 with `stty size`, detach and reattach with replay, then `terminal kill` reporting `closed`),
+web, SSH keys and notification-device CRUD. The fixture's
 Bearer-protected `POST <approver.fixture_url><action>` hooks (`observe`, `thread-create`,
 `thread-ready`, `thread-question`, `thread-proposal`) stand in for the absent provisioner and agent
 and are required. It is skipped unless the `milaJourneyDescriptor` instrumentation
@@ -65,7 +68,7 @@ argument carries the base64 fixture descriptor (version 1):
   "deployment": { "host": "localhost", "ssh_port": 2222, "https_port": 8443 },
   "tls": { "ca_pem": "-----BEGIN CERTIFICATE-----…", "server_name": "localhost" },
   "approver": { "url": "https://localhost:8444/approve", "fixture_url": "https://localhost:8444/fixture/", "bearer_token": "…" },
-  "seed": { "machine_name": "…", "machine_id": "…", "share_principal": "…", "account_email": "…" }
+  "seed": { "machine_name": "…", "machine_id": "…", "terminal_machine_id": "…", "terminal_machine_name": "…", "share_principal": "…", "account_email": "…" }
 }
 ```
 
