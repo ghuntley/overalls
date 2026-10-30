@@ -410,8 +410,11 @@ def browser_signal(name: str) -> None:
             return True
         alive, _ = client.execute("systemctl is-active --quiet clone-browser-fixture.service")
         if alive != 0:
-            client.succeed("cat " + browser_root + "/browser.log")
-            raise AssertionError("Clone browser exited before checkpoint")
+            # Only the helper's fixed stage/category record leaves the client.
+            _, failure = client.execute(
+                'grep -m1 \'"event": "clone_browser_failed"\' ' + browser_root + "/browser.log"
+            )
+            raise AssertionError("Clone browser exited before checkpoint: " + failure.strip())
         return False
 
     eventually(ready, timeout=600)

@@ -7,7 +7,7 @@ import time
 import uuid
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import ConsoleMessage, Page, Request, Response, expect, sync_playwright
 
@@ -181,6 +181,19 @@ def run(*, create: bool = True) -> None:
                 stage = role + " create real machine"
                 page.goto(ORIGIN + "/machines/new")
                 connected(page)
+                # The /machines/new preset defaults to Work (ADR-0240); choose
+                # OSS explicitly and wait for the draft to record each choice.
+                page.locator("#machine_profile").select_option("oss")
+                page.wait_for_url(
+                    lambda url: parse_qs(urlsplit(url).query).get("machine[profile]") == ["oss"]
+                )
+                page.locator("#machine_image_id").select_option(users["image_id"])
+                page.wait_for_url(
+                    lambda url: (
+                        parse_qs(urlsplit(url).query).get("machine[image_id]")
+                        == [users["image_id"]]
+                    )
+                )
                 expect(page.locator("#machine_profile")).to_have_value("oss")
                 expect(page.locator("#machine_image_id")).to_have_value(users["image_id"])
                 page.locator("#provision-submit").click()

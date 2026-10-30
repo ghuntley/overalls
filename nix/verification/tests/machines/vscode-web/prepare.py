@@ -8,7 +8,7 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from playwright.sync_api import Error, TimeoutError, expect, sync_playwright
 
@@ -90,6 +90,18 @@ def main(progress: PreparationProgress) -> None:
         progress.stage = "form"
         page.goto("https://control.example.test/machines/new")
         expect(page.locator("[data-phx-main].phx-connected")).to_be_visible()
+        # The /machines/new preset defaults to Work (ADR-0240); choose OSS
+        # explicitly and wait for the draft to record each choice.
+        page.locator("#machine_profile").select_option("oss")
+        page.wait_for_url(
+            lambda url: parse_qs(urlsplit(url).query).get("machine[profile]") == ["oss"]
+        )
+        page.locator("#machine_image_id").select_option(users["image_id"])
+        page.wait_for_url(
+            lambda url: (
+                parse_qs(urlsplit(url).query).get("machine[image_id]") == [users["image_id"]]
+            )
+        )
         expect(page.locator("#machine_profile")).to_have_value("oss")
         expect(page.locator("#machine_image_id")).to_have_value(users["image_id"])
         progress.stage = "submit"
