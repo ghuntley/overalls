@@ -131,7 +131,10 @@ defmodule Overalls.Pins do
           lock not in tracked ->
             {:platform_lock, path, "has no tracked #{lock}"}
 
-          not String.contains?(text, "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>") ->
+          not String.contains?(
+            text,
+            "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>"
+          ) ->
             {:platform_lock, path, "does not set RestorePackagesWithLockFile"}
 
           not Regex.match?(~r/<RestoreLockedMode[^>]*>true<\/RestoreLockedMode>/, text) ->
@@ -163,6 +166,7 @@ defmodule Overalls.Pins do
       |> Enum.map(fn path -> {path, File.read!(Path.join(root, path))} end)
 
     registry = root |> Path.join(@registry) |> File.read!() |> JSON.decode!()
+
     inline(files) ++
       registry_use(registry, files) ++
       cargo_locks(paths) ++ platform_locks(paths, &File.read!(Path.join(root, &1)))
