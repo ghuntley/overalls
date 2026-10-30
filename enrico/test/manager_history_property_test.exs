@@ -11,6 +11,11 @@ defmodule Enrico.ManagerHistoryPropertyTest do
   @attempt "22222222-2222-4222-8222-222222222222"
   @head String.duplicate("a", 40)
 
+  # Real git children converge in milliseconds on an idle host but can take
+  # several seconds on a loaded CI runner; a short deadline there fails a case
+  # that then passes on replay, which Hegel reports as flaky.
+  @await_ms 60_000
+
   property "occupied native writer refuses clone cleanup and administrative removal before effects",
     profile: :ci do
     suffix = draw("suffix", member_of(["a", "b", "c"]))
@@ -106,7 +111,7 @@ defmodule Enrico.ManagerHistoryPropertyTest do
         Process.exit(if(culprit == :manager, do: old_manager, else: old_tasks), :kill)
 
         for {pid, ref} <- monitors do
-          assert_receive {:DOWN, ^ref, :process, ^pid, _}, 10_000
+          assert_receive {:DOWN, ^ref, :process, ^pid, _}, @await_ms
         end
 
         await(fn ->
@@ -431,7 +436,7 @@ defmodule Enrico.ManagerHistoryPropertyTest do
   end
 
   @spec await((-> boolean()), integer()) :: :ok
-  defp await(predicate, deadline \\ System.monotonic_time(:millisecond) + 5_000) do
+  defp await(predicate, deadline \\ System.monotonic_time(:millisecond) + @await_ms) do
     cond do
       predicate.() ->
         :ok

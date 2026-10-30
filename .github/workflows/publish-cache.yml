@@ -46,7 +46,9 @@ jobs:
   # Each Elixir project's `mix precommit` gate against the devenv PostgreSQL.
   precommit:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    timeout-minutes: 90
+    # Marshall's full suite alone runs about two hours; the others finish well
+    # inside this limit.
+    timeout-minutes: 240
     strategy:
       fail-fast: false
       matrix:
