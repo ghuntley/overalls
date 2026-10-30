@@ -31,7 +31,7 @@ fn account_sid(name: &str) -> io::Result<String> {
     let name = wide(name);
     let mut buffer: *mut u8 = null_mut();
     // SAFETY: name is terminated and the Net API returns its owned level-4 record.
-    let status = unsafe { NetUserGetInfo(null(), name.as_ptr(), 4, &mut buffer) };
+    let status = unsafe { NetUserGetInfo(null(), name.as_ptr(), 4, &raw mut buffer) };
     if status != NERR_Success || buffer.is_null() {
         return Err(net_error(status));
     }
@@ -39,8 +39,10 @@ fn account_sid(name: &str) -> io::Result<String> {
     let info = unsafe { &*buffer.cast::<USER_INFO_4>() };
     let mut sid_text = null_mut();
     let enabled = info.usri4_flags & UF_ACCOUNTDISABLE == 0;
+    // SAFETY: the SID stays valid until the Net API buffer is freed below, and
+    // `sid_text` receives a LocalAlloc string freed after the copy.
     let converted =
-        enabled && unsafe { ConvertSidToStringSidW(info.usri4_user_sid, &mut sid_text) } != 0;
+        enabled && unsafe { ConvertSidToStringSidW(info.usri4_user_sid, &raw mut sid_text) } != 0;
     // SAFETY: release precisely the Net API allocation.
     unsafe {
         NetApiBufferFree(buffer.cast());
@@ -50,7 +52,7 @@ fn account_sid(name: &str) -> io::Result<String> {
     }
     let mut length = 0usize;
     // SAFETY: the SID API returned a terminated string; SID strings are at most 256 units.
-    while length < 256 && unsafe { *sid_text.add(length) } != 0 {
+    while length < 256 && unsafe { *sid_text.wrapping_add(length) } != 0 {
         length += 1;
     }
     let result = if length < 256 {
@@ -72,7 +74,8 @@ fn profile_for_sid(sid: &str) -> io::Result<PathBuf> {
     ));
     let field = wide("ProfileImagePath");
     let mut path = vec![0u16; 4096];
-    let mut bytes = (path.len() * 2) as u32;
+    let mut bytes = u32::try_from(path.len() * 2)
+        .map_err(|_| io::Error::other("account profile unavailable"))?;
     // SAFETY: the writable UTF-16 buffer has exactly the specified byte capacity.
     // RegGetValue expands REG_EXPAND_SZ, so the resolved value is the SID's
     // registered profile rather than a guess based on the account name.
@@ -84,13 +87,13 @@ fn profile_for_sid(sid: &str) -> io::Result<PathBuf> {
             RRF_RT_REG_SZ | RRF_RT_REG_EXPAND_SZ,
             null_mut(),
             path.as_mut_ptr().cast(),
-            &mut bytes,
+            &raw mut bytes,
         )
     };
     if status != 0 {
         return Err(net_error(status));
     }
-    if bytes < 2 || bytes as usize > path.len() * 2 || bytes % 2 != 0 {
+    if bytes < 2 || bytes as usize > path.len() * 2 || !bytes.is_multiple_of(2) {
         return Err(io::Error::other("account profile unavailable"));
     }
     let path = String::from_utf16(&path[..bytes as usize / 2 - 1])
@@ -111,7 +114,7 @@ pub fn profile_home(name: &str) -> io::Result<PathBuf> {
 }
 
 /// @cc [owner:ghuntley,label:security;recovery] windows-profile-native-api-bound
-/// Profile creation MUST use CreateProfile's MAX_PATH-sized output buffer,
+/// Profile creation MUST use `CreateProfile`'s MAX_PATH-sized output buffer,
 /// then verify the SID-bound registered directory before account activation
 /// succeeds. An RPC/API failure MUST leave activation failed and the account
 /// disabled; a guessed user-directory path MUST NOT replace registration.
@@ -127,6 +130,8 @@ fn ensure_profile(name: &str) -> io::Result<()> {
     // CreateProfile's RPC buffer is bounded by MAX_PATH. Passing 4096 units
     // returns RPC_X_BAD_STUB_DATA before creating the SID-bound profile.
     let mut profile = [0u16; MAX_PATH as usize];
+    let units = u32::try_from(profile.len())
+        .map_err(|_| io::Error::other("account profile creation failed"))?;
     // SAFETY: SID and username are terminated; profile supplies the declared
     // writable buffer. Windows creates the actual profile and registry binding.
     let status = unsafe {
@@ -134,7 +139,7 @@ fn ensure_profile(name: &str) -> io::Result<()> {
             wide_sid.as_ptr(),
             wide_name.as_ptr(),
             profile.as_mut_ptr(),
-            profile.len() as u32,
+            units,
         )
     };
     if status < 0 {
@@ -146,7 +151,7 @@ fn ensure_profile(name: &str) -> io::Result<()> {
 
 /// Net API status as an `io::Error`.
 fn net_error(status: u32) -> io::Error {
-    io::Error::from_raw_os_error(status as i32)
+    io::Error::from_raw_os_error(status.cast_signed())
 }
 
 /// Current account flags, or `None` when the user does not exist.
@@ -155,13 +160,17 @@ fn flags(name: &str) -> io::Result<Option<u32>> {
     let mut buffer: *mut u8 = null_mut();
     // SAFETY: `wide_name` is NUL-terminated UTF-16; `buffer` receives a
     // Net API allocation freed below.
-    let status = unsafe { NetUserGetInfo(null(), wide_name.as_ptr(), 1, &mut buffer) };
+    let status = unsafe { NetUserGetInfo(null(), wide_name.as_ptr(), 1, &raw mut buffer) };
     if status == NERR_UserNotFound {
         return Ok(None);
     }
     if status != NERR_Success || buffer.is_null() {
         return Err(net_error(status));
     }
+    #[expect(
+        clippy::cast_ptr_alignment,
+        reason = "Net API buffers are allocated aligned for the requested USER_INFO level"
+    )]
     // SAFETY: level 1 returns a USER_INFO_1 the API allocated.
     let flags = unsafe { (*buffer.cast::<USER_INFO_1>()).usri1_flags };
     // SAFETY: the buffer came from the Net API and is freed exactly once.
@@ -185,7 +194,7 @@ fn set_flags(name: &str, value: u32) -> io::Result<()> {
             wide_name.as_ptr(),
             1008,
             (&raw const info).cast::<u8>(),
-            &mut parameter,
+            &raw mut parameter,
         )
     };
     if status != NERR_Success {
@@ -200,10 +209,13 @@ fn random_password() -> io::Result<String> {
     // never meant to be entered with this password.
     let first = boot_id::generate()?;
     let second = boot_id::generate()?;
+    let first = first.replace('-', "");
+    let second = second.replace('-', "");
+    let unavailable = || io::Error::other("system RNG unavailable");
     Ok(format!(
         "Kp-{}{}",
-        &first.replace('-', "")[..16],
-        &second.replace('-', "")[..12]
+        first.get(..16).ok_or_else(unavailable)?,
+        second.get(..12).ok_or_else(unavailable)?
     ))
 }
 
@@ -223,7 +235,14 @@ fn create(name: &str) -> io::Result<()> {
     };
     let mut parameter = 0u32;
     // SAFETY: level 1 takes a USER_INFO_1 whose strings outlive the call.
-    let status = unsafe { NetUserAdd(null(), 1, (&raw const info).cast::<u8>(), &mut parameter) };
+    let status = unsafe {
+        NetUserAdd(
+            null(),
+            1,
+            (&raw const info).cast::<u8>(),
+            &raw mut parameter,
+        )
+    };
     password.fill(0);
     if status == NERR_Success || status == NERR_UserExists {
         Ok(())
@@ -272,7 +291,7 @@ pub fn retire_bootstrap_administrator() -> io::Result<()> {
             wide_name.as_ptr(),
             1003,
             (&raw const info).cast::<u8>(),
-            &mut parameter,
+            &raw mut parameter,
         )
     };
     password.fill(0);

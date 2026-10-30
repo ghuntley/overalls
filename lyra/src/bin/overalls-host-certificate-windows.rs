@@ -195,7 +195,7 @@ mod agent {
         Ok(())
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let logger = Logger::new("host-certificate");
         logger.log("start");
         let directory = program_data().join("ssh");
@@ -228,12 +228,11 @@ mod agent {
         logger.log("host_key_generated");
         let mut installed = false;
         loop {
-            match bundle_path() {
-                Some(bundle) => std::env::set_var("OVERALLS_SSH_CA_BUNDLE", &bundle),
-                None => {
-                    std::thread::sleep(Duration::from_secs(5));
-                    continue;
-                }
+            if let Some(bundle) = bundle_path() {
+                std::env::set_var("OVERALLS_SSH_CA_BUNDLE", &bundle);
+            } else {
+                std::thread::sleep(Duration::from_secs(5));
+                continue;
             }
             let time = now().unwrap_or(0);
             if current(&directory, &key, time) {
@@ -247,24 +246,21 @@ mod agent {
                         continue;
                     }
                 }
-                std::thread::sleep(Duration::from_secs(3600));
+                std::thread::sleep(Duration::from_hours(1));
                 continue;
             }
-            match renew(&directory, &key) {
-                Ok(()) => {
-                    if !installed {
-                        installed = true;
-                        logger.log("certificate_installed");
-                        logger.publish();
-                    } else {
-                        logger.log("certificate_renewed");
-                    }
-                    std::thread::sleep(Duration::from_secs(3600));
+            if renew(&directory, &key).is_ok() {
+                if installed {
+                    logger.log("certificate_renewed");
+                } else {
+                    installed = true;
+                    logger.log("certificate_installed");
+                    logger.publish();
                 }
-                Err(_) => {
-                    logger.log("certificate_unavailable");
-                    std::thread::sleep(Duration::from_secs(if installed { 600 } else { 10 }));
-                }
+                std::thread::sleep(Duration::from_hours(1));
+            } else {
+                logger.log("certificate_unavailable");
+                std::thread::sleep(Duration::from_secs(if installed { 600 } else { 10 }));
             }
         }
     }

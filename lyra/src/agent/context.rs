@@ -17,7 +17,7 @@ const DIRECTORY_LIMIT: usize = 2_000;
 const ENTRY_LIMIT: usize = 20_000;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Failure {
+pub(super) enum Failure {
     InvalidArguments,
     InvalidConfiguration,
     AccountUnavailable,
@@ -30,7 +30,7 @@ pub enum Failure {
 }
 
 impl Failure {
-    pub fn code(self) -> &'static str {
+    pub(super) fn code(self) -> &'static str {
         match self {
             Self::InvalidArguments => "invalid_arguments",
             Self::InvalidConfiguration => "invalid_configuration",
@@ -377,7 +377,7 @@ impl<F: FnMut() -> bool> Scan<'_, F> {
                 }
                 children.push(child.map_err(|_| Failure::ReadFailed)?);
             }
-            children.sort_by_key(std::fs::DirEntry::file_name);
+            children.sort_by_key(fs::DirEntry::file_name);
             for child in children.into_iter().rev() {
                 let metadata =
                     fs::symlink_metadata(child.path()).map_err(|_| Failure::ContextChanged)?;
@@ -412,7 +412,7 @@ fn collect<F: FnMut() -> bool>(
         seen: BTreeSet::new(),
         directory_count: 0,
         entry_count: 0,
-        deadline: Instant::now() + Duration::from_secs(60),
+        deadline: Instant::now() + Duration::from_mins(1),
         heartbeat,
     };
     let configuration_path = home.join(".overalls/config.json");
@@ -494,7 +494,7 @@ fn configuration(path: &Path) -> Result<(Configuration, Option<String>), Failure
     Ok((config, Some(digest(&bytes))))
 }
 
-fn page(inventory: Inventory, cursor: Option<&Cursor>) -> Result<Value, Failure> {
+fn page(inventory: &Inventory, cursor: Option<&Cursor>) -> Result<Value, Failure> {
     let serialized = serde_json::to_vec(&inventory).map_err(|_| Failure::ContextLimit)?;
     let inventory_digest = digest(&serialized);
     let offset = cursor.map_or(0, |c| c.offset);
@@ -534,7 +534,7 @@ fn page(inventory: Inventory, cursor: Option<&Cursor>) -> Result<Value, Failure>
     Ok(response)
 }
 
-pub fn run_inventory(
+pub(super) fn run_inventory(
     arguments: &Value,
     heartbeat: &mut impl FnMut() -> bool,
 ) -> Result<Value, Failure> {
@@ -566,7 +566,7 @@ pub fn run_inventory(
         return Err(Failure::ContextChanged);
     }
     inventory.source_digest = Some(source_digest);
-    page(inventory, args.cursor.as_ref())
+    page(&inventory, args.cursor.as_ref())
 }
 
 fn source_digest(paths: &crate::workspace_receiver::Paths) -> Result<String, Failure> {
@@ -581,7 +581,7 @@ fn source_digest(paths: &crate::workspace_receiver::Paths) -> Result<String, Fai
 /// explicit byte offset. No truncation, lossy text conversion or replacement
 /// content may be represented as the requested version. Base64 preserves UTF-8
 /// split boundaries and keeps a 4096-byte chunk within the executor RPC envelope.
-pub fn run_read(arguments: &Value) -> Result<Value, Failure> {
+pub(super) fn run_read(arguments: &Value) -> Result<Value, Failure> {
     let args: ReadArguments =
         serde_json::from_value(arguments.clone()).map_err(|_| Failure::InvalidArguments)?;
     if args.version != 1 || !valid_digest(&args.digest) || !(1..=4096).contains(&args.limit) {
@@ -689,14 +689,14 @@ mod tests {
         }
         let machine = temp.path().join("machine");
         let first = page(
-            collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
+            &collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
             None,
         )
         .unwrap();
         let cursor: Cursor = serde_json::from_value(first["next_cursor"].clone()).unwrap();
         assert!(cursor.offset > 0 && cursor.offset < 60);
         let second = page(
-            collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
+            &collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
             Some(&cursor),
         )
         .unwrap();
@@ -704,7 +704,7 @@ mod tests {
         fs::write(skills.join("skill000/SKILL.md"), "changed").unwrap();
         assert_eq!(
             page(
-                collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
+                &collect(&args(), &home, &cwd, &machine, &mut || true).unwrap(),
                 Some(&cursor)
             )
             .unwrap_err(),

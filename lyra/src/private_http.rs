@@ -75,7 +75,7 @@ fn client_for(
     let builder = reqwest::blocking::Client::builder().use_rustls_tls();
     let builder = certificates.into_iter().fold(
         builder.tls_built_in_root_certs(false),
-        |client, certificate| client.add_root_certificate(certificate),
+        reqwest::blocking::ClientBuilder::add_root_certificate,
     );
     builder
         .no_proxy()

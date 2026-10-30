@@ -22,8 +22,7 @@ pub struct Logger {
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|elapsed| elapsed.as_secs())
-        .unwrap_or(0)
+        .map_or(0, |elapsed| elapsed.as_secs())
 }
 
 impl Logger {
@@ -56,8 +55,7 @@ impl Logger {
             let mounted = Command::new("mountvol.exe")
                 .args(["S:", "/S"])
                 .status()
-                .map(|status| status.success())
-                .unwrap_or(false);
+                .is_ok_and(|status| status.success());
             if mounted || Path::new("S:\\").exists() {
                 let target = Path::new(PUBLISHED_DIR).join(format!("{}.log", self.name));
                 let copied = fs::create_dir_all(PUBLISHED_DIR)

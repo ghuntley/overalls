@@ -251,7 +251,7 @@ mod tests {
     }
 
     fn serve(listener: TcpListener) {
-        serve_with(listener, false)
+        serve_with(listener, false);
     }
 
     /// `linger` keeps each connection open after the response, as MMDS does.
@@ -260,7 +260,7 @@ mod tests {
             for stream in listener.incoming().take(2) {
                 let mut stream = stream.unwrap();
                 std::thread::spawn(move || {
-                    let mut reader = std::io::BufReader::new(stream.try_clone().unwrap());
+                    let mut reader = io::BufReader::new(stream.try_clone().unwrap());
                     let mut request = String::new();
                     let mut headers = Vec::new();
                     loop {
@@ -302,9 +302,8 @@ mod tests {
     #[test]
     fn fetches_with_a_session_token_and_validates() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = match listener.local_addr().unwrap() {
-            std::net::SocketAddr::V4(address) => address,
-            _ => unreachable!(),
+        let std::net::SocketAddr::V4(address) = listener.local_addr().unwrap() else {
+            unreachable!()
         };
         serve(listener);
         let document = fetch_from(address, Duration::from_secs(5)).unwrap();
@@ -317,9 +316,8 @@ mod tests {
     #[test]
     fn completes_without_waiting_for_the_server_to_close() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let address = match listener.local_addr().unwrap() {
-            std::net::SocketAddr::V4(address) => address,
-            _ => unreachable!(),
+        let std::net::SocketAddr::V4(address) = listener.local_addr().unwrap() else {
+            unreachable!()
         };
         serve_with(listener, true);
         let started = std::time::Instant::now();

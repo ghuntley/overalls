@@ -113,9 +113,8 @@ fn execute_transfer(
     {
         return Ok(("failed", json!({"reason": "invalid_arguments"})));
     }
-    let bytes = match read_file(&path) {
-        Ok(bytes) => bytes,
-        Err(_) => return Ok(("failed", json!({"reason": "attachment_read_failed"}))),
+    let Ok(bytes) = read_file(&path) else {
+        return Ok(("failed", json!({"reason": "attachment_read_failed"})));
     };
     let sha256 = hex::encode(Sha256::digest(&bytes));
     if !heartbeat() {

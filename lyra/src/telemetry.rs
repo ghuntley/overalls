@@ -106,7 +106,8 @@ fn now_ns() -> u64 {
         .duration_since(UNIX_EPOCH)
         .unwrap_or_default()
         .as_nanos()
-        .min(u128::from(u64::MAX)) as u64
+        .try_into()
+        .unwrap_or(u64::MAX)
 }
 
 fn sum(name: &str, value: u64, snapshot: &Snapshot, now: u64) -> Metric {
@@ -116,7 +117,7 @@ fn sum(name: &str, value: u64, snapshot: &Snapshot, now: u64) -> Metric {
             data_points: vec![NumberDataPoint {
                 start_time_unix_nano: snapshot.start_ns,
                 time_unix_nano: now,
-                value: Some(NumberValue::AsInt(value.min(i64::MAX as u64) as i64)),
+                value: Some(NumberValue::AsInt(i64::try_from(value).unwrap_or(i64::MAX))),
                 ..Default::default()
             }],
             aggregation_temporality: AggregationTemporality::Cumulative as i32,
@@ -239,10 +240,11 @@ fn encode_trace(command_id: &str, started_ns: u64, ended_ns: u64) -> Option<Vec<
 // control transition succeeds. Telemetry failure MUST NOT affect tool execution,
 // and arguments, output, URLs, credentials and arbitrary errors MUST NOT enter OTLP.
 pub(crate) fn tool_result(command_id: &str, completed: bool, duration: Duration) {
+    static STATE: OnceLock<Mutex<Snapshot>> = OnceLock::new();
+    static WORKER: OnceLock<Option<SyncSender<Diagnostic>>> = OnceLock::new();
     if !crate::config::guest_root() {
         return;
     }
-    static STATE: OnceLock<Mutex<Snapshot>> = OnceLock::new();
     let now = now_ns();
     let state = STATE.get_or_init(|| Mutex::new(Snapshot::new(now)));
     let snapshot = match state.try_lock() {
@@ -255,10 +257,9 @@ pub(crate) fn tool_result(command_id: &str, completed: bool, duration: Duration)
     let payload = encode(&snapshot, now);
     let trace = encode_trace(
         command_id,
-        now.saturating_sub(duration.as_nanos().min(u128::from(u64::MAX)) as u64),
+        now.saturating_sub(u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)),
         now,
     );
-    static WORKER: OnceLock<Option<SyncSender<Diagnostic>>> = OnceLock::new();
     if let Some(worker) = WORKER.get_or_init(|| diagnostic_queue(QUEUE_CAPACITY, export).ok()) {
         // Snapshot totals continue across refused queue admission; a later
         // accepted snapshot includes them. Individual spans remain best effort.
@@ -311,7 +312,10 @@ mod tests {
         let outcomes = tc.draw(gs::integers::<u8>());
         let mut state = Snapshot::new(1);
         for index in 0..=outcomes {
-            state.record(index & 1 == 0, Duration::from_millis(duration_ms as u64));
+            state.record(
+                index & 1 == 0,
+                Duration::from_millis(u64::from(duration_ms)),
+            );
         }
         let bytes = encode(&state, 2);
         let decoded = ExportMetricsServiceRequest::decode(bytes.as_slice()).unwrap();
@@ -320,7 +324,12 @@ mod tests {
         assert_eq!(state.calls, u64::from(outcomes) + 1);
         assert_eq!(state.errors, u64::from(outcomes).div_ceil(2));
         assert_eq!(state.buckets.iter().sum::<u64>(), state.calls);
-        assert!(state.duration_sum <= 86_400.0 * state.calls as f64);
+        #[expect(
+            clippy::cast_precision_loss,
+            reason = "generated call counts are far below 2^52"
+        )]
+        let calls = state.calls as f64;
+        assert!(state.duration_sum <= 86_400.0 * calls);
         assert_eq!(
             metrics
                 .iter()

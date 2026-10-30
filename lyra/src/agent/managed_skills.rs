@@ -19,12 +19,12 @@ const MAX_FETCH: u64 = 64 * 1024 * 1024;
 const MAX_HEADER: usize = 4 * 1024;
 const MAX_SKILL: u64 = 1024 * 1024;
 const MAX_RECEIPT: u64 = 16 * 1024;
-const TIMEOUT: Duration = Duration::from_secs(120);
+const TIMEOUT: Duration = Duration::from_mins(2);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct Failure(&'static str);
+pub(super) struct Failure(&'static str);
 impl Failure {
-    pub fn code(&self) -> &'static str {
+    pub(super) fn code(&self) -> &'static str {
         self.0
     }
 }
@@ -90,7 +90,10 @@ fn managed_root() -> PathBuf {
 /// use only validated public sources, and never execute repository code. Reusing an
 /// operation ID with different inputs MUST refuse; pending receipts MUST NOT replay
 /// an ambiguous installation. Existing edited revisions MUST never be overwritten.
-pub fn run_install(arguments: &Value, heartbeat: &mut impl FnMut() -> bool) -> Result<Value> {
+pub(super) fn run_install(
+    arguments: &Value,
+    heartbeat: &mut impl FnMut() -> bool,
+) -> Result<Value> {
     install_at(&managed_root(), arguments, heartbeat)
 }
 
@@ -177,7 +180,7 @@ fn install_at(
 /// Status MUST NOT fetch, install or recover a pending operation. Installed status
 /// MUST verify the retained revision before returning its descriptor; pending work
 /// is uncertain, and missing receipts are explicitly absent.
-pub fn run_status(arguments: &Value) -> Result<Value> {
+pub(super) fn run_status(arguments: &Value) -> Result<Value> {
     status_at(&managed_root(), arguments)
 }
 fn status_at(root: &Path, arguments: &Value) -> Result<Value> {
@@ -358,7 +361,7 @@ fn regular_file(path: &Path, max: u64) -> Result<File> {
     #[cfg(windows)]
     {
         use std::os::windows::fs::OpenOptionsExt;
-        options.custom_flags(0x00200000);
+        options.custom_flags(0x0020_0000);
     }
     #[cfg(unix)]
     {
@@ -455,6 +458,10 @@ fn sync_directory(path: &Path) -> Result<()> {
         .map_err(|_| Failure("storage_failed"))
 }
 #[cfg(windows)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Windows has no directory fsync; the Unix variant shares the signature"
+)]
 fn sync_directory(_path: &Path) -> Result<()> {
     Ok(())
 }
@@ -592,9 +599,9 @@ fn read_bounded(path: &Path, limit: u64) -> Result<Vec<u8>> {
 fn skill_header(bytes: &[u8]) -> Result<String> {
     let text = std::str::from_utf8(bytes).map_err(|_| Failure("invalid_skill"))?;
     let mut lines = text.split_inclusive('\n');
-    if !lines
+    if lines
         .next()
-        .is_some_and(|line| line.trim_end_matches(['\r', '\n']) == "---")
+        .is_none_or(|line| line.trim_end_matches(['\r', '\n']) != "---")
     {
         return Err(Failure("invalid_skill"));
     }
@@ -608,7 +615,7 @@ fn skill_header(bytes: &[u8]) -> Result<String> {
             return Err(Failure("invalid_skill"));
         }
         if line.trim_end_matches(['\r', '\n']) == "---" {
-            let header = &text[..end];
+            let header = text.get(..end).ok_or(Failure("invalid_skill"))?;
             if serde_json::to_vec(header)
                 .map_err(|_| Failure("invalid_skill"))?
                 .len()
@@ -622,6 +629,10 @@ fn skill_header(bytes: &[u8]) -> Result<String> {
     Err(Failure("invalid_skill"))
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear, audited install sequence; splitting would scatter its rollback"
+)]
 fn materialize(
     installation: &Path,
     args: &Install,
@@ -769,7 +780,7 @@ fn extract_tree<H: FnMut() -> bool>(
         }
         let bytes = git.run(
             &["--git-dir", repo_arg, "cat-file", "blob", object],
-            length as usize,
+            usize::try_from(length).map_err(|_| Failure("content_too_large"))?,
         )?;
         if bytes.len() as u64 != length {
             return Err(Failure("invalid_tree"));

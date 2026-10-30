@@ -8,7 +8,7 @@ let
       let name = builtins.baseNameOf path;
         # Shared WorkspaceSource vectors (ADR-0128) are read by `cargo test`.
         fixture = lib.hasSuffix ".json" name && lib.hasSuffix "/tests/fixtures" (builtins.dirOf (toString path));
-      in name != "target" && name != ".hegel" && (type == "directory" || fixture || lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" "LICENSE-APACHE" "LICENSE-MIT" "OVERALLS.md" "README.md" ]);
+      in name != "target" && name != ".hegel" && (type == "directory" || fixture || lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "Cargo.lock" "clippy.toml" "CONTRACTS" "LICENSE-APACHE" "LICENSE-MIT" "OVERALLS.md" "README.md" ]);
   };
   vendor = pkgs.rustPlatform.fetchCargoVendor {
     name = "lyra-vendor";
@@ -81,7 +81,7 @@ let
     src = source;
     # git: tests/workspace_object_format.rs drives the production clone plan
     # against a real repository.
-    nativeBuildInputs = with pkgs; [ cargo rustc clippy openssh openssl perl util-linux git ];
+    nativeBuildInputs = with pkgs; [ cargo rustc clippy rustfmt openssh openssl perl util-linux git ];
     dontConfigure = true;
     buildPhase = ''
       export HOME="$TMPDIR/home"
@@ -101,8 +101,9 @@ let
       if [ "$(id -u)" != 0 ] && [ "$(stat -c %u /)" = "$(id -u)" ]; then
         chmod go-w /
       fi
+      cargo fmt --check
       cargo test --locked --offline
-      cargo clippy --all-targets --offline -- -D warnings
+      cargo clippy --all-targets --locked --offline -- -D warnings
       # Windows guest agents: type-check the shared library and every Windows
       # bin for x86_64-pc-windows-gnu with the pinned toolchain (no linking, so
       # zig is not needed here). The Linux-only bins are not built for Windows.

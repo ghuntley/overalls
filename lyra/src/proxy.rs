@@ -56,7 +56,7 @@ fn valid_host_keys<'a>(host: &str, bytes: &'a [u8], allow_multiple: bool) -> io:
 // @cc [owner:ghuntley,label:security] lyra-generated-profile-key-lookup
 // The host-key command MUST obtain only current keys through the bounded Rust
 // HTTPS client. Nested gateway rotation permits a bounded set.
-pub fn print_host_key(url: &str, host: &str, allow_multiple: bool) -> io::Result<()> {
+pub(crate) fn print_host_key(url: &str, host: &str, allow_multiple: bool) -> io::Result<()> {
     if !config::valid_host(host) {
         return Err(io::Error::other("invalid host key name"));
     }
@@ -84,11 +84,11 @@ fn known_host(config: &Config, host: &str, label: &str) -> io::Result<NamedTempF
 }
 
 /// @cc [owner:ghuntley,label:security] lyra-proof-agent-parity
-/// The isolated gateway SSH process MUST use the effective IdentityAgent of
+/// The isolated gateway SSH process MUST use the effective `IdentityAgent` of
 /// the Porsche whoami proof connection, including Host/Match rules, direct and
-/// relative socket paths, $VARIABLE, ${VARIABLE}, inherited SSH_AUTH_SOCK and
-/// none. Agent paths MUST remain a child-only SSH_AUTH_SOCK value and never
-/// enter the shell ProxyCommand or persistent diagnostics.
+/// relative socket paths, $VARIABLE, ${VARIABLE}, inherited `SSH_AUTH_SOCK` and
+/// none. Agent paths MUST remain a child-only `SSH_AUTH_SOCK` value and never
+/// enter the shell `ProxyCommand` or persistent diagnostics.
 fn proof_identity_agent(origin: &str, ssh: &OsStr) -> io::Result<AgentSelection> {
     let host = origin
         .strip_prefix("https://")
@@ -96,7 +96,7 @@ fn proof_identity_agent(origin: &str, ssh: &OsStr) -> io::Result<AgentSelection>
         .ok_or_else(|| io::Error::other("invalid origin"))?;
     let local = lyra::platform::local_user_name()?;
     let username = local.as_str();
-    if username.len() > 255 || username.chars().any(|character| character.is_control()) {
+    if username.len() > 255 || username.chars().any(char::is_control) {
         return Err(io::Error::other("invalid local username"));
     }
     let output = Command::new(ssh)
@@ -157,17 +157,14 @@ fn valid_environment_name(name: &str) -> bool {
 
 /// @cc [owner:ghuntley,label:security] lyra-agent-setting-parse
 /// The parsed setting MUST preserve OpenSSH-expanded socket bytes and resolve
-/// only its documented none, SSH_AUTH_SOCK and $VARIABLE special forms. It MUST
+/// only its documented none, `SSH_AUTH_SOCK` and $VARIABLE special forms. It MUST
 /// reject duplicate, oversized or control-character values. An explicitly
 /// empty socket path MUST remain distinct from an absent setting.
 fn parse_identity_agent(output: &[u8]) -> io::Result<AgentSetting> {
     let mut selected = None;
     for line in output.split(|byte| *byte == b'\n') {
         if let Some(value) = line.strip_prefix(b"identityagent ") {
-            if selected.is_some()
-                || value.len() > 4096
-                || value.iter().any(|byte| byte.is_ascii_control())
-            {
+            if selected.is_some() || value.len() > 4096 || value.iter().any(u8::is_ascii_control) {
                 return Err(io::Error::other("invalid SSH identity agent"));
             }
             selected = Some(match value {
@@ -191,6 +188,10 @@ fn parse_identity_agent(output: &[u8]) -> io::Result<AgentSetting> {
 /// OpenSSH prints the agent setting as raw bytes on Unix and as UTF-8 on
 /// Windows (an agent named pipe such as `\\.\pipe\openssh-ssh-agent`).
 #[cfg(unix)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Unix conversion is total; the Windows variant shares the signature"
+)]
 fn os_from_bytes(value: &[u8]) -> io::Result<OsString> {
     use std::os::unix::ffi::OsStringExt;
     Ok(OsString::from_vec(value.to_vec()))
@@ -220,7 +221,7 @@ fn path_option(path: &Path) -> String {
 /// permit an encrypted selected key's passphrase or macOS Keychain lookup,
 /// while disabling server password methods. It MUST inherit relay bytes
 /// without inspecting or logging them.
-pub fn run(host: &str, identity: &str) -> io::Result<i32> {
+pub(crate) fn run(host: &str, identity: &str) -> io::Result<i32> {
     if !config::valid_ssh_identity_name(identity) {
         return Err(io::Error::other("invalid SSH identity"));
     }
@@ -242,7 +243,7 @@ pub fn run(host: &str, identity: &str) -> io::Result<i32> {
         }
     };
     let trust = crate::trust::load(&config.origin, &config.zone)?;
-    let current = std::fs::read_to_string(key.path())?;
+    let current = fs::read_to_string(key.path())?;
     let fields: Vec<_> = current.split_whitespace().collect();
     if fields.len() != 3 {
         return Err(io::Error::other("invalid gateway identity"));
@@ -251,7 +252,7 @@ pub fn run(host: &str, identity: &str) -> io::Result<i32> {
         &format!("{} {}", fields[1], fields[2]),
         &trust.management_host,
     )?;
-    std::fs::write(
+    fs::write(
         key.path(),
         crate::trust::gateway_known_hosts(&trust, &alias)?,
     )?;
@@ -276,7 +277,7 @@ pub fn run(host: &str, identity: &str) -> io::Result<i32> {
     .stderr(Stdio::inherit())
     .status()?;
     let code = result.code().unwrap_or(1);
-    let _ = log::emit(Event::ProxyEnded, Some(code as u64));
+    let _ = log::emit(Event::ProxyEnded, Some(i64::from(code).cast_unsigned()));
     Ok(code)
 }
 
@@ -419,7 +420,7 @@ mod tests {
                 .get_envs()
                 .find(|(key, _)| *key == "SSH_AUTH_SOCK")
                 .and_then(|(_, value)| value),
-            Some(std::ffi::OsStr::new(
+            Some(OsStr::new(
                 "/Users/user/Library/Group Containers/1Password/agent.sock"
             ))
         );
@@ -584,9 +585,7 @@ mod tests {
                 .get_envs()
                 .find(|(name, _)| *name == "SSH_AUTH_SOCK")
                 .and_then(|(_, value)| value),
-            Some(std::ffi::OsStr::new(
-                "/Users/person/Group Containers/agent.sock"
-            ))
+            Some(OsStr::new("/Users/person/Group Containers/agent.sock"))
         );
         assert_eq!(
             AgentSetting::Variable("MISSING".into())
@@ -617,7 +616,7 @@ mod tests {
             disabled
                 .get_envs()
                 .find(|(name, _)| *name == "SSH_AUTH_SOCK"),
-            Some((std::ffi::OsStr::new("SSH_AUTH_SOCK"), None))
+            Some((OsStr::new("SSH_AUTH_SOCK"), None))
         );
         let inherited = command_for(&AgentSelection::Inherited);
         assert!(inherited
@@ -641,7 +640,7 @@ mod tests {
                 .get_envs()
                 .find(|(name, _)| *name == "SSH_AUTH_SOCK")
                 .and_then(|(_, value)| value)
-                .map(std::ffi::OsStr::as_bytes),
+                .map(OsStr::as_bytes),
             Some(&b"/tmp/agent-\xff.sock"[..])
         );
     }
@@ -652,11 +651,7 @@ mod tests {
         if let Ok(agent) = parse_identity_agent(&bytes) {
             match agent {
                 AgentSetting::Socket(path) => {
-                    assert!(!path
-                        .as_os_str()
-                        .as_bytes()
-                        .iter()
-                        .any(|byte| byte.is_ascii_control()));
+                    assert!(!path.as_os_str().as_bytes().iter().any(u8::is_ascii_control));
                     assert!(path.as_os_str().as_bytes().len() <= 4096);
                 }
                 AgentSetting::Variable(name) => assert!(valid_environment_name(&name)),
@@ -717,7 +712,8 @@ mod tests {
         assert!(valid_host_keys(host, format!("{one}{two}extra").as_bytes(), true).is_err());
         let many = (0..17)
             .map(|offset| format!("{host} ssh-ed25519 {:032x}\n", first.wrapping_add(offset)))
-            .collect::<String>();
+            .collect::<Vec<_>>()
+            .concat();
         assert!(valid_host_keys(host, many.as_bytes(), true).is_err());
     }
 }

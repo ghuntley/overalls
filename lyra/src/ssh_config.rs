@@ -76,7 +76,7 @@ fn resolve_account(origin: &str, ssh: &OsStr) -> io::Result<AccountIdentity> {
     let local = lyra::platform::local_user_name()?;
     let known_hosts = config::home()?.join(".ssh").join("known_hosts");
     let username = local.as_str();
-    if username.len() > 255 || username.chars().any(|character| character.is_control()) {
+    if username.len() > 255 || username.chars().any(char::is_control) {
         return Err(io::Error::other("invalid local username"));
     }
     let response = Command::new(ssh)
@@ -89,10 +89,7 @@ fn resolve_account(origin: &str, ssh: &OsStr) -> io::Result<AccountIdentity> {
         ])
         .args([
             "-o",
-            &format!(
-                "GlobalKnownHostsFile={}",
-                lyra::platform::null_device()
-            ),
+            &format!("GlobalKnownHostsFile={}", lyra::platform::null_device()),
             "-o",
             "StrictHostKeyChecking=yes",
             "-o",
@@ -124,7 +121,7 @@ fn quote_shell(value: &str) -> io::Result<String> {
 }
 
 /// @cc [owner:ghuntley,label:security] lyra-windows-proxy-command-quoting
-/// Win32-OpenSSH starts ProxyCommand with `CreateProcess`, not `sh -c`, so the
+/// Win32-OpenSSH starts `ProxyCommand` with `CreateProcess`, not `sh -c`, so the
 /// executable MUST be one double-quoted absolute path with `%` doubled; a path
 /// containing `"`, a control character or a NUL MUST be refused.
 fn quote_windows(value: &str) -> io::Result<String> {
@@ -191,7 +188,7 @@ fn keygen_program(ssh: &OsStr) -> PathBuf {
     }
 }
 
-fn local_identity(ssh_dir: &std::path::Path, registered: &str, keygen: &Path) -> String {
+fn local_identity(ssh_dir: &Path, registered: &str, keygen: &Path) -> String {
     if registered.split_whitespace().take(2).count() != 2 {
         return "overalls-identity.pub".into();
     }
@@ -207,7 +204,12 @@ fn local_identity(ssh_dir: &std::path::Path, registered: &str, keygen: &Path) ->
         let Some(filename) = path.file_name().and_then(|name| name.to_str()) else {
             continue;
         };
-        if filename.ends_with(".pub")
+        #[expect(
+            clippy::case_sensitive_file_extension_comparisons,
+            reason = "OpenSSH writes public-key siblings with exactly the lowercase .pub suffix"
+        )]
+        let public_sibling = filename.ends_with(".pub");
+        if public_sibling
             || !config::valid_ssh_identity_name(filename)
             || !fs::metadata(&path).is_ok_and(|metadata| metadata.len() <= 65_536)
         {
@@ -230,11 +232,11 @@ fn local_identity(ssh_dir: &std::path::Path, registered: &str, keygen: &Path) ->
         let sibling_matches = fs::metadata(&sibling)
             .is_ok_and(|metadata| metadata.is_file() && metadata.len() <= 4096)
             && fs::read(&sibling).is_ok_and(|public| same_public_key(registered, &public));
-        let matched = match derived {
+        let identity_matches = match derived {
             Ok(public) => same_public_key(registered, &public),
             Err(_) => sibling_matches,
         };
-        if matched {
+        if identity_matches {
             matches.push(filename.to_owned());
         }
     }
@@ -270,13 +272,18 @@ fn splice(prior: &str, block: &str) -> io::Result<String> {
     let content = match (prior.matches(START).count(), prior.matches(END).count()) {
         (0, 0) => prior.to_owned(),
         (1, 1) => {
-            let begin = prior.find(START).expect("counted begin marker");
-            let finish = prior.find(END).expect("counted end marker");
+            let (Some(begin), Some(finish)) = (prior.find(START), prior.find(END)) else {
+                return Err(io::Error::other("invalid managed SSH block"));
+            };
             if begin >= finish {
                 return Err(io::Error::other("invalid managed SSH block"));
             }
-            let mut content = prior[..begin].to_owned();
-            content.push_str(&prior[finish + END.len()..]);
+            let (Some(before), Some(after)) = (prior.get(..begin), prior.get(finish + END.len()..))
+            else {
+                return Err(io::Error::other("invalid managed SSH block"));
+            };
+            let mut content = before.to_owned();
+            content.push_str(after);
             content
         }
         _ => return Err(io::Error::other("invalid managed SSH block")),
@@ -296,7 +303,7 @@ fn splice(prior: &str, block: &str) -> io::Result<String> {
 // directory that is fsynced and renamed; symlinked or nonregular targets MUST
 // be refused beforehand. A refusal or a dropped temporary file MUST leave the
 // pre-existing file and directory listing byte-identical.
-fn install_block(ssh_dir: &std::path::Path, block: &str) -> io::Result<()> {
+fn install_block(ssh_dir: &Path, block: &str) -> io::Result<()> {
     let path = ssh_dir.join("config");
     if fs::symlink_metadata(&path).is_ok_and(|metadata| metadata.file_type().is_symlink()) {
         return Err(io::Error::other("symlinked SSH config unsupported"));
@@ -316,8 +323,8 @@ fn install_block(ssh_dir: &std::path::Path, block: &str) -> io::Result<()> {
 
 /// @cc [owner:ghuntley,label:security] lyra-wildcard-proxy-command
 /// Setup MUST reject unsafe OpenSSH clients before placing a hostname token in
-/// ProxyCommand. It MUST modify only Lyra's managed block in the user config.
-pub fn install(origin: String, zone: String, ssh: Option<PathBuf>) -> io::Result<()> {
+/// `ProxyCommand`. It MUST modify only Lyra's managed block in the user config.
+pub(crate) fn install(origin: String, zone: String, ssh: Option<PathBuf>) -> io::Result<()> {
     let ssh_program = match ssh {
         Some(path) if config::valid_ssh_program(&path) => Some(path),
         Some(_) => return Err(io::Error::other("invalid OpenSSH client path")),
@@ -509,7 +516,7 @@ mod tests {
         "# BEGIN OVERALLS SSH\r\n# END OVERALLS SSH\r\n",
     ];
 
-    fn inventory(directory: &std::path::Path) -> Vec<(String, Vec<u8>)> {
+    fn inventory(directory: &Path) -> Vec<(String, Vec<u8>)> {
         let mut entries = Vec::new();
         for entry in fs::read_dir(directory).unwrap() {
             let entry = entry.unwrap();
@@ -541,7 +548,11 @@ mod tests {
     fn strip_managed(text: &str) -> String {
         match (text.find(START), text.find(END)) {
             (Some(begin), Some(finish)) if begin < finish => {
-                format!("{}{}", &text[..begin], &text[finish + END.len()..])
+                format!(
+                    "{}{}",
+                    text.get(..begin).unwrap(),
+                    text.get(finish + END.len()..).unwrap()
+                )
             }
             _ => text.to_owned(),
         }

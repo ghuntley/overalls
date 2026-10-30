@@ -68,7 +68,7 @@ fn guid(value: &str) -> io::Result<[u8; 16]> {
         return Err(invalid());
     }
     let mut bytes = [0_u8; 16];
-    for (index, pair) in digits.chunks_exact(2).enumerate() {
+    for (index, pair) in digits.as_chunks::<2>().0.iter().enumerate() {
         bytes[index] = u8::from_str_radix(std::str::from_utf8(pair).map_err(|_| invalid())?, 16)
             .map_err(|_| invalid())?;
     }
@@ -96,7 +96,7 @@ fn header(bytes: &[u8]) -> io::Result<Header> {
     if bytes.len() != 512
         || &bytes[..8] != b"EFI PART"
         || word(bytes, 8)? != 0x0001_0000
-        || word(bytes, 12)? != HEADER_BYTES as u32
+        || usize::try_from(word(bytes, 12)?).map_err(|_| invalid())? != HEADER_BYTES
         || word(bytes, 20)? != 0
         || word(bytes, 84)? != 128
     {
@@ -144,23 +144,23 @@ fn specs(os: Os) -> &'static [Spec] {
             (
                 3,
                 66740,
-                2163891,
+                2_163_891,
                 "516e7cb5-6ecf-11d6-8ff8-00022d09712b",
                 "92519c37-42bc-11f0-9e0b-002590ec5bf2",
                 "swapfs",
             ),
             (
                 4,
-                2163892,
-                2165939,
+                2_163_892,
+                2_165_939,
                 "516e7cb4-6ecf-11d6-8ff8-00022d09712b",
                 "92519c3b-42bc-11f0-9e0b-002590ec5bf2",
                 "config-drive",
             ),
             (
                 5,
-                2165940,
-                12651699,
+                2_165_940,
+                12_651_699,
                 "516e7cb6-6ecf-11d6-8ff8-00022d09712b",
                 "92519c40-42bc-11f0-9e0b-002590ec5bf2",
                 "rootfs",
@@ -170,23 +170,23 @@ fn specs(os: Os) -> &'static [Spec] {
             (
                 1,
                 256,
-                524543,
+                524_543,
                 "c12a7328-f81f-11d2-ba4b-00a0c93ec93b",
                 "3ddfc4e1-8931-4041-a067-9c3af6e7e6ff",
                 "loader",
             ),
             (
                 2,
-                524544,
-                16760798,
+                524_544,
+                16_760_798,
                 "6a898cc3-1dd2-11b2-99a6-080020736631",
                 "9610b7a1-df6c-1a45-ba89-159690b86a8d",
                 "zfs",
             ),
             (
                 9,
-                16760799,
-                16777182,
+                16_760_799,
+                16_777_182,
                 "6a945a3b-1dd2-11b2-99a6-080020736631",
                 "4ae19670-ff90-8249-a2f6-d9a305e6fa78",
                 "",
@@ -207,8 +207,12 @@ fn disk_guid(os: Os) -> &'static str {
 /// valid matching CRCs and the pinned disk/partition identities and layout.
 /// Physical capacity MUST contain the previous backup header; shrinking,
 /// foreign disks, extra partitions, relocated starts and overlapping entries
-/// MUST fail before any mutation. Only root length and the OmniOS reserved
+/// MUST fail before any mutation. Only root length and the `OmniOS` reserved
 /// tail location MAY differ from the pinned image.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one fail-closed validation sequence over both GPT copies"
+)]
 pub(super) fn read<R: Read + Seek>(disk: &mut R, disk_bytes: u64, os: Os) -> io::Result<Table> {
     if !disk_bytes.is_multiple_of(SECTOR) || !(1 << 30..=1 << 50).contains(&disk_bytes) {
         return Err(invalid());
@@ -267,7 +271,7 @@ pub(super) fn read<R: Read + Seek>(disk: &mut R, disk_bytes: u64, os: Os) -> io:
         return Err(invalid());
     }
     let mut partitions = Vec::new();
-    for (slot, row) in bytes.chunks_exact(128).enumerate() {
+    for (slot, row) in bytes.as_chunks::<128>().0.iter().enumerate() {
         let Some(spec) = specs(os).iter().find(|spec| spec.0 == slot + 1) else {
             // libefi serializes an unassigned zero-size entry as start=0,
             // end=UINT64_MAX. This exact sentinel is part of the pinned image.
@@ -275,7 +279,7 @@ pub(super) fn read<R: Read + Seek>(disk: &mut R, disk_bytes: u64, os: Os) -> io:
             if os == Os::Illumos {
                 empty[40..48].fill(0xff);
             }
-            if row != empty {
+            if *row != empty {
                 return Err(invalid());
             }
             continue;
@@ -531,7 +535,7 @@ mod tests {
                 assert!(read(&mut bad, size, os).is_err(), "offset {offset}");
             }
             let mut bad = image(os, size, size, |_, entries| {
-                put64(entries, root + 40, size / 512)
+                put64(entries, root + 40, size / 512);
             });
             assert!(read(&mut bad, size, os).is_err());
             let mut bad = image(os, size, size, |_, entries| entries[5 * 128] = 1);

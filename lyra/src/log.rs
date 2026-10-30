@@ -9,7 +9,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 const SEGMENT_BYTES: u64 = 5 * 1024 * 1024;
 
 #[derive(Clone, Copy)]
-pub enum Event {
+pub(crate) enum Event {
     Configured,
     ProxyAgentSelected,
     ProxyStarted,
@@ -79,7 +79,7 @@ fn directory() -> io::Result<PathBuf> {
 /// @cc [owner:ghuntley,label:security] lyra-log-fixed-fields
 /// This API MUST accept only a closed event and numeric data. No SSH payload,
 /// argument, environment value, hostname or arbitrary error text may enter it.
-pub fn emit(event: Event, value: Option<u64>) -> io::Result<()> {
+pub(crate) fn emit(event: Event, value: Option<u64>) -> io::Result<()> {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(io::Error::other)?;
@@ -124,7 +124,7 @@ pub fn emit(event: Event, value: Option<u64>) -> io::Result<()> {
     Ok(())
 }
 
-pub fn path() -> io::Result<PathBuf> {
+pub(crate) fn path() -> io::Result<PathBuf> {
     directory()
 }
 

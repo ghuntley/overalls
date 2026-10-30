@@ -65,31 +65,31 @@ mod native {
         };
         for cid in [0, 2, 4] {
             let address = Address::new(cid);
-            // SAFETY: address is the reviewed 16-byte native ABI for this call.
             require_errno(
+                // SAFETY: address is the reviewed 16-byte native ABI for this call.
                 unsafe { libc::bind(fd.as_raw_fd(), (&raw const address).cast(), 16) },
                 bad_bind_error,
             )?;
         }
         let mut malformed = Address::new(3);
         malformed.zero[0] = 1;
-        // SAFETY: malformed remains a live 16-byte address; the kernel validates it.
         require_errno(
+            // SAFETY: malformed remains a live 16-byte address; the kernel validates it.
             unsafe { libc::bind(fd.as_raw_fd(), (&raw const malformed).cast(), 16) },
             bad_bind_error,
         )?;
         immutable_buffers(&fd)?;
         socket_capacity()?;
         let host = Address::new(2);
-        // SAFETY: host is a live 16-byte address with the public native layout.
         require_errno(
+            // SAFETY: host is a live 16-byte address with the public native layout.
             unsafe { libc::connect(fd.as_raw_fd(), (&raw const host).cast(), 16) },
             libc::EOPNOTSUPP,
         )?;
         let mut token = [0_u8; 65];
         let mut short: libc::socklen_t = 64;
-        // SAFETY: token and short are writable for the synchronous option call.
         require_errno(
+            // SAFETY: token and short are writable for the synchronous option call.
             unsafe {
                 libc::getsockopt(
                     fd.as_raw_fd(),
@@ -101,8 +101,8 @@ mod native {
             },
             libc::EMSGSIZE,
         )?;
-        // SAFETY: token is a live 65-byte input buffer; the option is read-only.
         require_errno(
+            // SAFETY: token is a live 65-byte input buffer; the option is read-only.
             unsafe { libc::setsockopt(fd.as_raw_fd(), AF_VSOCK, 1, token.as_ptr().cast(), 65) },
             libc::EOPNOTSUPP,
         )?;
@@ -113,30 +113,46 @@ mod native {
             return Err(io::Error::last_os_error());
         }
         if child == 0 {
-            // SAFETY: no supplementary groups are retained; setuid permanently
-            // drops root. The child never returns into the parent test process.
-            unsafe {
-                if libc::setgroups(0, std::ptr::null()) != 0
-                    || libc::setgid(65534) != 0
-                    || libc::setuid(65534) != 0
-                {
-                    libc::_exit(2);
-                }
-                let unprivileged = libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0);
-                if unprivileged >= 0 {
-                    libc::close(unprivileged);
-                    libc::_exit(3);
-                }
-                #[cfg(target_os = "freebsd")]
-                let error = *libc::__error();
-                #[cfg(any(target_os = "illumos", target_os = "solaris"))]
-                let error = *libc::___errno();
-                libc::_exit(if error == libc::EPERM || error == libc::EACCES {
-                    0
-                } else {
-                    4
-                });
+            fn child_exit(code: libc::c_int) -> ! {
+                // SAFETY: _exit ends the forked child immediately, without
+                // running destructors or flushing state shared with the parent.
+                unsafe { libc::_exit(code) }
             }
+            // No supplementary groups are retained; setuid permanently drops
+            // root. The child never returns into the parent test process.
+            // SAFETY: a null list with zero length clears every supplementary group.
+            if unsafe { libc::setgroups(0, std::ptr::null()) } != 0 {
+                child_exit(2);
+            }
+            // SAFETY: setgid takes only an integer group ID.
+            if unsafe { libc::setgid(65534) } != 0 {
+                child_exit(2);
+            }
+            // SAFETY: setuid takes only an integer user ID.
+            if unsafe { libc::setuid(65534) } != 0 {
+                child_exit(2);
+            }
+            // SAFETY: socket takes only integer arguments.
+            let unprivileged = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
+            if unprivileged >= 0 {
+                // SAFETY: the child owns the descriptor it just created.
+                unsafe { libc::close(unprivileged) };
+                child_exit(3);
+            }
+            // SAFETY: the errno accessor has no preconditions and returns this
+            // thread's errno location.
+            #[cfg(target_os = "freebsd")]
+            let location = unsafe { libc::__error() };
+            // SAFETY: as above.
+            #[cfg(any(target_os = "illumos", target_os = "solaris"))]
+            let location = unsafe { libc::___errno() };
+            // SAFETY: the errno location is valid for the current thread.
+            let error = unsafe { *location };
+            child_exit(if error == libc::EPERM || error == libc::EACCES {
+                0
+            } else {
+                4
+            });
         }
         let mut status: libc::c_int = 0;
         loop {
@@ -166,21 +182,26 @@ mod native {
         } else {
             libc::ENOPROTOOPT
         };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "c_int is 4 bytes, far below socklen_t::MAX"
+        )]
+        let int_length = size_of::<libc::c_int>() as libc::socklen_t;
         for option in [
             libc::SO_SNDBUF,
             libc::SO_RCVBUF,
             libc::SO_SNDLOWAT,
             libc::SO_RCVLOWAT,
         ] {
-            // SAFETY: requested is a live native integer input, of exact size.
             require_errno(
+                // SAFETY: requested is a live native integer input, of exact size.
                 unsafe {
                     libc::setsockopt(
                         fd.as_raw_fd(),
                         libc::SOL_SOCKET,
                         option,
                         (&raw const requested).cast(),
-                        size_of::<libc::c_int>() as libc::socklen_t,
+                        int_length,
                     )
                 },
                 expected,
@@ -189,7 +210,7 @@ mod native {
         #[cfg(target_os = "freebsd")]
         for option in [libc::SO_SNDBUF, libc::SO_RCVBUF] {
             let mut actual: libc::c_int = 0;
-            let mut length = size_of::<libc::c_int>() as libc::socklen_t;
+            let mut length = int_length;
             // SAFETY: actual and length are writable native integer outputs.
             if unsafe {
                 libc::getsockopt(
@@ -201,7 +222,7 @@ mod native {
                 )
             } != 0
                 || actual != 65_536
-                || length != size_of::<libc::c_int>() as libc::socklen_t
+                || length != int_length
             {
                 return Err(io::Error::other("native socket capacity differs"));
             }
@@ -437,7 +458,7 @@ mod native {
         }
     }
 
-    pub fn run(require_fault_injection: bool) -> io::Result<()> {
+    pub(crate) fn run(require_fault_injection: bool) -> io::Result<()> {
         boundaries()?;
         if require_fault_injection {
             #[cfg(target_os = "freebsd")]
@@ -492,11 +513,7 @@ fn main() -> ! {
         (Some("--require-fault-injection"), None) => true,
         _ => std::process::exit(64),
     };
-    std::process::exit(if native::run(require_fault_injection).is_ok() {
-        0
-    } else {
-        1
-    });
+    std::process::exit(i32::from(native::run(require_fault_injection).is_err()));
 }
 
 #[cfg(not(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris")))]

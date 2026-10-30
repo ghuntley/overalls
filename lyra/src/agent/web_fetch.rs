@@ -141,7 +141,7 @@ fn fetch(args: &Arguments) -> (&'static str, Value) {
     } else {
         body.into_owned()
     };
-    bounded_result(converted, mime)
+    bounded_result(converted, &mime)
 }
 
 fn accept_header(format: &str) -> &'static str {
@@ -152,7 +152,7 @@ fn accept_header(format: &str) -> &'static str {
     }
 }
 
-fn bounded_result(content: String, content_type: String) -> (&'static str, Value) {
+fn bounded_result(content: String, content_type: &str) -> (&'static str, Value) {
     let mut kept = content;
     let mut truncated = kept.len() > RESULT_LIMIT;
     if truncated {
@@ -258,10 +258,10 @@ mod tests {
             true,
         );
         assert_eq!(converted, "# Title\n\nText & more");
-        let (_, result) = bounded_result("\"".repeat(20_000), "text/plain".to_owned());
+        let (_, result) = bounded_result("\"".repeat(20_000), "text/plain");
         assert!(result["truncated"].as_bool().unwrap());
         assert!(serde_json::to_vec(&result).unwrap().len() <= RESULT_LIMIT);
-        let (_, large) = bounded_result("\"".repeat(5 * 1024 * 1024), "text/plain".to_owned());
+        let (_, large) = bounded_result("\"".repeat(5 * 1024 * 1024), "text/plain");
         assert!(large["truncated"].as_bool().unwrap());
         assert!(serde_json::to_vec(&large).unwrap().len() <= RESULT_LIMIT);
     }

@@ -44,6 +44,10 @@ impl Job {
         // SAFETY: zero is a valid bit pattern for the plain-data limit structure.
         let mut limits: JOBOBJECT_EXTENDED_LIMIT_INFORMATION = unsafe { zeroed() };
         limits.BasicLimitInformation.LimitFlags = JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the limit structure is a few hundred bytes"
+        )]
         // SAFETY: the structure is passed with its exact size.
         let configured = unsafe {
             SetInformationJobObject(

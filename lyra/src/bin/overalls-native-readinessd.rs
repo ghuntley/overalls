@@ -31,26 +31,22 @@ fn main() -> ! {
         }
     }
 
-    let (boot, address, gateway) = match native_guest::identity() {
-        Ok(value) => value,
-        Err(_) => std::process::exit(1),
+    let Ok((boot, address, gateway)) = native_guest::identity() else {
+        std::process::exit(1);
     };
-    let listener = match Listener::bind(readiness::PORT, 4) {
-        Ok(value) => value,
-        Err(_) => std::process::exit(2),
+    let Ok(listener) = Listener::bind(readiness::PORT, 4) else {
+        std::process::exit(2);
     };
     let os = if cfg!(target_os = "freebsd") {
         "freebsd"
     } else {
         "illumos"
     };
-    let kernel_digest = match kernel_probe::kernel_sha256(os) {
-        Ok(digest) => digest,
-        Err(_) => std::process::exit(3),
+    let Ok(kernel_digest) = kernel_probe::kernel_sha256(os) else {
+        std::process::exit(3);
     };
-    let kernel_build_id = match kernel_probe::verified_build_id(&listener) {
-        Ok(build_id) => build_id,
-        Err(_) => std::process::exit(4),
+    let Ok(kernel_build_id) = kernel_probe::verified_build_id(&listener) else {
+        std::process::exit(4);
     };
     let mut probe = Live {
         address,
@@ -61,9 +57,8 @@ fn main() -> ! {
         listener: &listener,
     };
     loop {
-        let mut connection = match listener.accept() {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok(mut connection) = listener.accept() else {
+            continue;
         };
         if let Ok(Some(response)) = readiness::answer(
             connection.peer_cid,

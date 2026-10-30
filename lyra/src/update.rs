@@ -28,7 +28,7 @@ struct Manifest {
 }
 #[derive(Default, Serialize, Deserialize)]
 #[serde(default)]
-pub struct Status {
+pub(crate) struct Status {
     pub installed: String,
     pub staged: Option<String>,
     pub last_check: Option<String>,
@@ -46,7 +46,7 @@ fn update_dir() -> io::Result<PathBuf> {
 
 /// Open `path` for writing with a Unix creation mode (owner-only state 0600,
 /// executables 0700); Windows files inherit the profile ACL.
-fn create_with_mode(path: &Path, mode: u32, truncate: bool) -> io::Result<std::fs::File> {
+fn create_with_mode(path: &Path, mode: u32, truncate: bool) -> io::Result<fs::File> {
     let mut options = OpenOptions::new();
     options.write(true).create(true).truncate(truncate);
     #[cfg(unix)]
@@ -64,11 +64,11 @@ fn create_with_mode(path: &Path, mode: u32, truncate: bool) -> io::Result<std::f
 // descriptor. The flock belongs to the open file description, which a process
 // spawned by another thread duplicates until exec despite O_CLOEXEC; a close
 // would let that copy keep the update lock after its holder finished.
-struct UpdateGate(std::fs::File);
+struct UpdateGate(fs::File);
 
 impl std::ops::Deref for UpdateGate {
-    type Target = std::fs::File;
-    fn deref(&self) -> &std::fs::File {
+    type Target = fs::File;
+    fn deref(&self) -> &fs::File {
         &self.0
     }
 }
@@ -101,7 +101,7 @@ fn write_status(dir: &Path, status: &Status) -> io::Result<()> {
     lyra::durable::rename(&temp, &dir.join("status.json"))
 }
 
-pub fn status() -> io::Result<Status> {
+pub(crate) fn status() -> io::Result<Status> {
     Ok(read_status(&update_dir()?))
 }
 
@@ -123,7 +123,14 @@ fn reexec(path: &Path) -> io::Error {
 }
 
 /// Mark a fresh executable owner-executable (0700) on Unix.
-fn make_executable(file: &std::fs::File) -> io::Result<()> {
+#[cfg_attr(
+    not(unix),
+    expect(
+        clippy::unnecessary_wraps,
+        reason = "only Unix sets permissions fallibly; callers share one signature"
+    )
+)]
+fn make_executable(file: &fs::File) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::PermissionsExt;
@@ -140,7 +147,7 @@ fn digest_file(path: &Path) -> io::Result<String> {
     Ok(hex::encode(Sha256::digest(fs::read(path)?)))
 }
 
-pub fn current_digest() -> io::Result<String> {
+pub(crate) fn current_digest() -> io::Result<String> {
     digest_file(&env::current_exe()?)
 }
 
@@ -171,7 +178,7 @@ fn install_seed(executable: &Path, managed: &Path) -> io::Result<()> {
 /// replaced before re-exec, provided the installed binary is still the one
 /// from which the update was staged. Managed guests leave activation to the
 /// seed supervisor.
-pub fn startup() -> io::Result<()> {
+pub(crate) fn startup() -> io::Result<()> {
     let executable = env::current_exe()?;
     let managed = config::managed_bin()?;
     if cfg!(windows) && executable == managed {
@@ -249,7 +256,7 @@ fn replace_running(pending: &Path, managed: &Path) -> io::Result<()> {
     }
 }
 
-pub fn spawn_check() -> io::Result<()> {
+pub(crate) fn spawn_check() -> io::Result<()> {
     let current = config::managed_bin()?;
     let mut child = Command::new(current);
     child
@@ -266,14 +273,18 @@ pub fn spawn_check() -> io::Result<()> {
 #[cfg(unix)]
 fn detach(child: &mut Command) {
     use std::os::unix::process::CommandExt;
+    let hook = || {
+        // SAFETY: setsid takes no arguments and is async-signal-safe.
+        if unsafe { libc::setsid() } < 0 {
+            Err(io::Error::last_os_error())
+        } else {
+            Ok(())
+        }
+    };
+    // SAFETY: the hook runs between fork and exec and only calls the
+    // async-signal-safe setsid and reads errno; it neither allocates nor locks.
     unsafe {
-        child.pre_exec(|| {
-            if libc::setsid() < 0 {
-                Err(io::Error::last_os_error())
-            } else {
-                Ok(())
-            }
-        });
+        child.pre_exec(hook);
     }
 }
 
@@ -388,7 +399,7 @@ fn work() -> io::Result<()> {
     let content = fetch(
         &format!("{origin}{}", artifact.path),
         MAX_ARTIFACT_BYTES,
-        Duration::from_secs(120),
+        Duration::from_mins(2),
     )?;
     if !valid_download(&content, &expected)
         || artifact.bytes.is_some_and(|size| size != content.len())
@@ -445,7 +456,7 @@ fn activate_staged_at(managed: &Path, dir: &Path) -> io::Result<Option<String>> 
     fs::File::open(parent)?.sync_all()?;
     fs::rename(&pending, managed)?;
     fs::File::open(parent)?.sync_all()?;
-    state.installed = digest.clone();
+    state.installed.clone_from(&digest);
     state.staged = None;
     write_status(dir, &state)?;
     Ok(Some(digest))
@@ -552,7 +563,7 @@ fn next_check() -> Instant {
 /// the candidate registers. Update activation MUST wait for the executor's
 /// graceful exit between commands; a failed registration MUST restore the
 /// previous executable before restarting the executor.
-pub fn supervise() -> io::Result<i32> {
+pub(crate) fn supervise() -> io::Result<i32> {
     if !config::guest_root() || env::current_exe()? == config::managed_bin()? {
         return Err(io::Error::other("not guest seed"));
     }
@@ -591,7 +602,7 @@ pub fn supervise() -> io::Result<i32> {
             check = None;
             if read_status(&update_dir()?).staged.is_some() {
                 fs::write("/run/overalls-agent/stop", b"")?;
-                let deadline = Instant::now() + Duration::from_secs(60);
+                let deadline = Instant::now() + Duration::from_mins(1);
                 while child.try_wait()?.is_none() && Instant::now() < deadline {
                     thread::sleep(Duration::from_millis(500));
                 }
@@ -631,7 +642,7 @@ fn mark_failed(dir: &Path) {
     }
 }
 
-pub fn worker() {
+pub(crate) fn worker() {
     if work().is_err() {
         let _ = log::emit(Event::UpdateFailed, None);
         if let Ok(dir) = update_dir() {
@@ -682,7 +693,7 @@ mod tests {
         assert!(!valid_artifact(&valid, "/bin/", "linux-amd64"));
         let invalid = Artifact {
             path: valid.path,
-            sha256: format!("A{}", &digest[1..]),
+            sha256: format!("A{}", digest.get(1..).unwrap()),
             bytes: valid.bytes,
         };
         assert!(!valid_artifact(

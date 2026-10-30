@@ -75,14 +75,15 @@ pub(crate) fn run(machine: &str, thread_id: Option<&str>) -> Result<i32, &'stati
     let config = config::load().map_err(|_| "CLI configuration unavailable")?;
     let secret = random_bytes::<32>().map_err(|_| "random source unavailable")?;
     let bearer = format!("overalls_agent_{}", hex::encode(secret));
-    let code = hex::encode(Sha256::digest(bearer.as_bytes()));
+    let digest = Sha256::digest(bearer.as_bytes());
+    let code = hex::encode(digest);
     eprintln!(
         "Open {}/agents/cli/approve/{machine}/{code} and approve code {}",
         config.origin,
-        &code[..12]
+        hex::encode(&digest[..6])
     );
     let session_path = format!("/api/agents/v1/session?vm_id={machine}");
-    let approval_deadline = Instant::now() + Duration::from_secs(600);
+    let approval_deadline = Instant::now() + Duration::from_mins(10);
     loop {
         let session: SessionResponse = rpc(&config.origin, &bearer, "GET", &session_path, None)?;
         if matches!(session.status, ApprovalState::Approved) {
@@ -94,23 +95,22 @@ pub(crate) fn run(machine: &str, thread_id: Option<&str>) -> Result<i32, &'stati
         thread::sleep(Duration::from_secs(2));
     }
 
-    let selected = match thread_id {
-        Some(id) => id.to_owned(),
-        None => {
-            let response: ThreadsResponse = rpc(
-                &config.origin,
-                &bearer,
-                "GET",
-                &format!("/api/agents/v1/threads?vm_id={machine}"),
-                None,
-            )?;
-            response
-                .threads
-                .into_iter()
-                .find(|thread| thread.parent_thread_id.is_none())
-                .map(|thread| thread.id)
-                .ok_or("agent thread unavailable")?
-        }
+    let selected = if let Some(id) = thread_id {
+        id.to_owned()
+    } else {
+        let response: ThreadsResponse = rpc(
+            &config.origin,
+            &bearer,
+            "GET",
+            &format!("/api/agents/v1/threads?vm_id={machine}"),
+            None,
+        )?;
+        response
+            .threads
+            .into_iter()
+            .find(|thread| thread.parent_thread_id.is_none())
+            .map(|thread| thread.id)
+            .ok_or("agent thread unavailable")?
     };
     if !valid_uuid(&selected) {
         return Err("agent thread unavailable");
@@ -140,7 +140,7 @@ pub(crate) fn run(machine: &str, thread_id: Option<&str>) -> Result<i32, &'stati
     // beyond the result deadline nor any credential/prompt in diagnostics. The
     // 3600s deadline mirrors the one-hour approval window, and a completed
     // turn's result remains reachable until the server-side session expires.
-    let result_deadline = Instant::now() + Duration::from_secs(3600);
+    let result_deadline = Instant::now() + Duration::from_hours(1);
     loop {
         let turn: TurnResponse = rpc(&config.origin, &bearer, "GET", &result_path, None)?;
         match turn.status {
@@ -190,14 +190,13 @@ fn random_uuid() -> io::Result<String> {
     let mut bytes = random_bytes::<16>()?;
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let raw = hex::encode(bytes);
     Ok(format!(
         "{}-{}-{}-{}-{}",
-        &raw[..8],
-        &raw[8..12],
-        &raw[12..16],
-        &raw[16..20],
-        &raw[20..]
+        hex::encode(&bytes[..4]),
+        hex::encode(&bytes[4..6]),
+        hex::encode(&bytes[6..8]),
+        hex::encode(&bytes[8..10]),
+        hex::encode(&bytes[10..])
     ))
 }
 
@@ -248,7 +247,7 @@ mod tests {
     fn generated_request_keys_are_canonical() {
         let id = random_uuid().expect("random UUID");
         assert!(valid_uuid(&id));
-        assert_eq!(&id[14..15], "4");
+        assert_eq!(id.get(14..15), Some("4"));
         assert!(!valid_uuid("../other-machine"));
     }
 

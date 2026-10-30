@@ -24,9 +24,9 @@ mod probe {
 
     /// Probe port; the host dials it through Firecracker's `CONNECT 1099`.
     const PORT: u32 = 1099;
-    /// The viosock driver binds at first boot through PnP and its Winsock
+    /// The viosock driver binds at first boot through `PnP` and its Winsock
     /// provider service starts afterwards; wait for it generously.
-    const DISCOVERY_BUDGET: Duration = Duration::from_secs(600);
+    const DISCOVERY_BUDGET: Duration = Duration::from_mins(10);
     const LOG_DIR: &str = "C:\\overalls\\logs";
     const LOG: &str = "C:\\overalls\\logs\\winprobe.log";
     const PUBLISHED_DIR: &str = "S:\\overalls\\logs";
@@ -35,8 +35,7 @@ mod probe {
     fn now() -> u64 {
         SystemTime::now()
             .duration_since(UNIX_EPOCH)
-            .map(|elapsed| elapsed.as_secs())
-            .unwrap_or(0)
+            .map_or(0, |elapsed| elapsed.as_secs())
     }
 
     fn log(line: &str) {
@@ -53,8 +52,7 @@ mod probe {
             let mounted = Command::new("mountvol.exe")
                 .args(["S:", "/S"])
                 .status()
-                .map(|status| status.success())
-                .unwrap_or(false);
+                .is_ok_and(|status| status.success());
             if mounted || Path::new("S:\\").exists() {
                 let copied = fs::create_dir_all(PUBLISHED_DIR)
                     .and_then(|()| fs::copy(LOG, PUBLISHED))
@@ -86,16 +84,16 @@ mod probe {
         ));
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         log(&format!("start version {}", env!("CARGO_PKG_VERSION")));
         if let Err(error) = vsock::startup() {
             log(&format!("WSAStartup failed: {error}"));
             publish();
             return 1;
         }
-        let mut last_report = std::time::Instant::now() - Duration::from_secs(60);
+        let mut last_report: Option<std::time::Instant> = None;
         let family = match vsock::discover(DISCOVERY_BUDGET, |error| {
-            if last_report.elapsed() >= Duration::from_secs(30) {
+            if last_report.is_none_or(|reported| reported.elapsed() >= Duration::from_secs(30)) {
                 log(&format!("vsock provider not ready: {error}"));
                 if let Ok(providers) = vsock::catalog() {
                     for provider in providers {
@@ -105,7 +103,7 @@ mod probe {
                         ));
                     }
                 }
-                last_report = std::time::Instant::now();
+                last_report = Some(std::time::Instant::now());
             }
         }) {
             Ok(family) => family,

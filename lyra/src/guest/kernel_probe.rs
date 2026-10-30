@@ -148,7 +148,7 @@ fn hash_kernel(path: &Path) -> io::Result<String> {
         return Err(io::Error::other("invalid kernel artifact"));
     }
     let mut digest = Sha256::new();
-    let mut buffer = [0_u8; 64 * 1024];
+    let mut buffer = vec![0_u8; 64 * 1024];
     let mut bytes = 0_u64;
     loop {
         let read = file.read(&mut buffer)?;
@@ -208,9 +208,8 @@ pub fn run(os: &str) -> io::Result<()> {
     loop {
         // A rejected peer or reset must consume only that connection; it must
         // not take the attestation service down for the rest of the boot.
-        let mut connection = match listener.accept() {
-            Ok(connection) => connection,
-            Err(_) => continue,
+        let Ok(mut connection) = listener.accept() else {
+            continue;
         };
         if verified_build_id(&listener).is_ok_and(|current| current == build_id)
             && kernel_sha256(os).is_ok_and(|current| current == digest)
@@ -301,12 +300,12 @@ mod tests {
         assert!(read_build_id(directory.path(), owner).is_err());
         #[cfg(unix)]
         {
+            use std::os::unix::fs::PermissionsExt;
             let link = directory.path().join("link");
             fs::write(&path, "a".repeat(64)).unwrap();
             std::os::unix::fs::symlink(&path, &link).unwrap();
             assert!(read_build_id(&link, owner).is_err());
             assert!(read_build_id(&path, owner.wrapping_add(1)).is_err());
-            use std::os::unix::fs::PermissionsExt;
             fs::set_permissions(&path, fs::Permissions::from_mode(0o666)).unwrap();
             assert!(read_build_id(&path, owner).is_err());
             fs::set_permissions(&path, fs::Permissions::from_mode(0o644)).unwrap();

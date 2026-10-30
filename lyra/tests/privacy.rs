@@ -13,6 +13,10 @@ impl Drop for Server {
 use tempfile::tempdir;
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one end-to-end privacy scenario with its fixtures inline"
+)]
 fn command_and_environment_canary_never_enter_persistent_diagnostics() {
     let home = tempdir().unwrap();
     let state = home.path().join("state");
@@ -86,7 +90,7 @@ fn command_and_environment_canary_never_enter_persistent_diagnostics() {
         .success());
     fs::write(fixture_bin.join("ssh-trust.json"), serde_json::to_vec(&serde_json::json!({
         "version":1,"ca":"ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA",
-        "management_host":"127.0.0.1","zone":"vm.example","retirement":2421446400_u64
+        "management_host":"127.0.0.1","zone":"vm.example","retirement":2_421_446_400_u64
     })).unwrap()).unwrap();
     let mut server = Server(
         Command::new("openssl")

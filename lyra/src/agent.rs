@@ -40,7 +40,7 @@ const RPC_BODY_LIMIT: usize = 12_288;
 /// Largest `attachment/transfer` request and response body.
 const ATTACHMENT_TRANSFER_BODY_LIMIT: usize = 360_448;
 /// Largest serialized `artifact_chunk` body: one base64 196_608-byte chunk
-/// (262_144 bytes) plus the fixed identity fields, within Ziggy's route limit.
+/// (`262_144` bytes) plus the fixed identity fields, within Ziggy's route limit.
 const ARTIFACT_CHUNK_BODY_LIMIT: usize = 270_336;
 
 #[derive(Debug)]
@@ -535,7 +535,7 @@ fn rpc_observed<Response: DeserializeOwned, Body: Serialize>(
 
 /// @cc [owner:ghuntley,label:security] lyra-artifact-chunk-rpc-bound
 /// Only `artifact_chunk` MAY send a body above the 12 KiB control RPC limit, and
-/// never above 270_336 bytes; an oversized body is refused before any network
+/// never above `270_336` bytes; an oversized body is refused before any network
 /// effect. Only `{"accepted": true}` acknowledges a chunk.
 fn artifact_chunk(request: &artifact_stage::ChunkRequest<'_>) -> bool {
     let Ok(payload) = serde_json::to_vec(request) else {

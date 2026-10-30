@@ -192,7 +192,7 @@ mod tests {
             let home = os.home("u200001");
             let home = home.to_str().unwrap();
             let shell = format!("/{}", os.shell());
-            let create = os.create_user("u200001", 200001, home, &shell);
+            let create = os.create_user("u200001", 200_001, home, &shell);
             assert!(create.arguments.contains(&"200001".to_owned()));
             assert!(create.arguments.contains(&home.to_owned()));
             assert!(create.arguments.contains(&shell));
@@ -204,7 +204,7 @@ mod tests {
             for action in std::iter::once(create)
                 .chain(os.activate("u200001", &shell))
                 .chain(retired)
-                .chain([os.create_group("u200001", 200001)])
+                .chain([os.create_group("u200001", 200_001)])
             {
                 assert!(action.program.starts_with('/'));
                 assert!(action
@@ -232,7 +232,7 @@ mod tests {
     #[test]
     fn native_reactivation_does_not_use_password_unlock_or_empty_password() {
         assert!(Platform::Illumos
-            .create_user("u200001", 200001, "/export/home/u200001", "/bin/bash")
+            .create_user("u200001", 200_001, "/export/home/u200001", "/bin/bash")
             .arguments
             .windows(2)
             .any(|pair| pair == ["-m", "-Z"]));

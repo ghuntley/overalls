@@ -192,7 +192,7 @@ pub fn download(
         return Err(io::Error::other("artifact unavailable"));
     }
     let mut bytes = 0usize;
-    let mut buffer = [0u8; 65_536];
+    let mut buffer = vec![0u8; 65_536];
     loop {
         let count = response.read(&mut buffer)?;
         if count == 0 {
@@ -216,20 +216,20 @@ fn request_with_status(
     bearer: Option<&str>,
     maximum: usize,
     timeout: Duration,
-    observation: Observation<'_>,
+    Observation { expected, failed }: Observation<'_>,
 ) -> io::Result<Vec<u8>> {
     if !valid_https(url) || maximum == 0 || timeout.is_zero() {
-        (observation.failed)(RequestFailure {
+        (failed)(RequestFailure {
             stage: RequestStage::Validation,
             kind: io::ErrorKind::InvalidInput,
         });
         return Err(io::Error::other("invalid HTTPS request"));
     }
     let client = client(url, timeout).inspect_err(|error| {
-        (observation.failed)(RequestFailure {
+        (failed)(RequestFailure {
             stage: RequestStage::Client,
             kind: error.kind(),
-        })
+        });
     })?;
     let mut outbound = client.request(method, url);
     if let Some(secret) = bearer {
@@ -243,7 +243,7 @@ fn request_with_status(
             .body(bytes.to_vec());
     }
     let response = outbound.send().map_err(|error| {
-        (observation.failed)(RequestFailure {
+        (failed)(RequestFailure {
             stage: RequestStage::Send,
             kind: if error.is_timeout() {
                 io::ErrorKind::TimedOut
@@ -255,22 +255,22 @@ fn request_with_status(
         });
         io::Error::other("HTTPS request failed")
     })?;
-    if !accepted_status(response.status(), observation.expected)
+    if !accepted_status(response.status(), expected)
         || response
             .content_length()
             .is_some_and(|length| length > maximum as u64)
     {
-        (observation.failed)(RequestFailure {
+        (failed)(RequestFailure {
             stage: RequestStage::Status,
             kind: io::ErrorKind::PermissionDenied,
         });
         return Err(io::Error::other("HTTPS response unavailable"));
     }
     bounded_body(response, maximum).inspect_err(|error| {
-        (observation.failed)(RequestFailure {
+        (failed)(RequestFailure {
             stage: RequestStage::Body,
             kind: error.kind(),
-        })
+        });
     })
 }
 
@@ -383,7 +383,7 @@ mod tests {
         if valid_https(&value) {
             let parsed = Url::parse(&value).expect("accepted URL parses");
             assert_eq!(parsed.scheme(), "https");
-            assert!(parsed.username().is_empty());
+            assert_eq!(parsed.username(), "");
             assert!(parsed.password().is_none());
             assert!(parsed.fragment().is_none());
         }

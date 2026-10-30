@@ -31,6 +31,10 @@ struct Fixture {
 }
 
 impl Fixture {
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn new(installed: &[u8]) -> Self {
         let fixture = Self {
             root: tempfile::tempdir().expect("private root"),
@@ -64,16 +68,29 @@ impl Fixture {
         self.root.path().join(path)
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn executable(&self, path: &str, bytes: &[u8]) {
         fs::write(self.path(path), bytes).expect("fixture executable");
         fs::set_permissions(self.path(path), fs::Permissions::from_mode(0o700))
             .expect("executable mode");
     }
 
+    #[expect(
+        clippy::expect_used,
+        clippy::unwrap_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn status(&self, value: &Value) {
         fs::write(self.path(STATUS), serde_json::to_vec(value).unwrap()).expect("fixture status");
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn read_status(&self) -> Value {
         serde_json::from_slice(&fs::read(self.path(STATUS)).expect("status bytes"))
             .expect("typed JSON value")
@@ -86,6 +103,10 @@ impl Fixture {
         self.status(&status);
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn interrupted_activation(&self, candidate: &[u8]) {
         fs::hard_link(
             self.path(MANAGED),
@@ -102,6 +123,10 @@ impl Fixture {
         // must derive the installed identity from the actual executable bytes.
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn start(&mut self) {
         assert!(self.supervisor.is_none());
         let script = r#"
@@ -138,6 +163,10 @@ exec chroot "$1" /seed agent-supervisor
         );
     }
 
+    #[expect(
+        clippy::unwrap_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn wait_for(&mut self, seconds: u64, assertion: impl Fn(&Self) -> bool) {
         let deadline = Instant::now() + Duration::from_secs(seconds);
         loop {
@@ -158,6 +187,10 @@ exec chroot "$1" /seed agent-supervisor
         }
     }
 
+    #[expect(
+        clippy::unwrap_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn registered(&mut self, bytes: &[u8], seconds: u64) {
         let expected = digest(bytes);
         self.wait_for(seconds, |fixture| {
@@ -166,6 +199,10 @@ exec chroot "$1" /seed agent-supervisor
         assert_eq!(fs::read(self.path(MANAGED)).unwrap(), bytes);
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn stop(&mut self) {
         if let Some(mut child) = self.supervisor.take() {
             let descendants: Vec<ProcessIdentity> = descendants(child.id())
@@ -187,6 +224,10 @@ exec chroot "$1" /seed agent-supervisor
         fs::create_dir(self.path("run/overalls-agent")).expect("fresh boot state");
     }
 
+    #[expect(
+        clippy::unwrap_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn executors(&self) -> Vec<ProcessIdentity> {
         descendants(self.supervisor.as_ref().unwrap().id())
             .into_iter()
@@ -225,6 +266,10 @@ impl ProcessIdentity {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn descendants(parent: u32) -> Vec<u32> {
     let mut found = Vec::new();
     let children =
@@ -243,6 +288,11 @@ impl Drop for Fixture {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn shell() -> PathBuf {
     let output = Command::new("sh")
         .args(["-c", "command -v sh"])
@@ -255,6 +305,11 @@ fn shell() -> PathBuf {
     path
 }
 
+#[expect(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn fixture_path() -> std::ffi::OsString {
     let mut directories = Vec::new();
     for name in [
@@ -317,6 +372,10 @@ fn candidate(failure: Failure, revision: u64) -> Vec<u8> {
     }
 }
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn rejected_history(failure: Failure, revision: u64, reboot: bool) {
     let old = executor(revision, false);
     let bad = candidate(failure, revision);

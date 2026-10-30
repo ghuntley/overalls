@@ -168,7 +168,7 @@ mod tests {
         for input in inputs {
             let mut stream = stream(input);
             assert!(answer(&mut stream, &boot(), || panic!("invalid request synced")).is_err());
-            assert!(stream.output.is_empty());
+            assert_eq!(stream.output, Vec::<u8>::new());
             assert!(stream.input.position() <= (MAX_LINE + 1) as u64);
         }
     }
@@ -180,6 +180,6 @@ mod tests {
             "sync failed"
         )))
         .is_err());
-        assert!(stream.output.is_empty());
+        assert_eq!(stream.output, Vec::<u8>::new());
     }
 }

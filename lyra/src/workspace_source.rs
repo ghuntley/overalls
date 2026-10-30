@@ -104,6 +104,10 @@ impl WorkspaceSource {
             self.display_name()
         )
     }
+    #[expect(
+        clippy::match_same_arms,
+        reason = "one arm per provider and revision keeps the URL table readable"
+    )]
     pub fn to_url(&self) -> String {
         let base = format!("https://{}/{}", self.provider.host(), self.display_name());
         let suffix = match (&self.provider, &self.revision) {
@@ -258,6 +262,10 @@ fn change(value: &str, tabs: &[&str], allowed: &[&str]) -> Result<Revision, Refu
     }
     Ok(Revision::Change { value })
 }
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Git names are case-sensitive; only the exact lowercase suffix is reserved"
+)]
 pub fn decode(value: &Value) -> Result<WorkspaceSource, InvalidMessage> {
     let wire: Wire = serde_json::from_value(value.clone()).map_err(|_| InvalidMessage)?;
     if wire.version != 2
@@ -314,6 +322,10 @@ fn valid_namespace(provider: Provider, parts: &[&str]) -> bool {
             && !p.contains("..")
     })
 }
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Git names are case-sensitive; only the exact lowercase suffix is reserved"
+)]
 fn valid_repository(value: &str) -> bool {
     (1..=100).contains(&value.len())
         && !value.starts_with('-')
@@ -323,6 +335,10 @@ fn valid_repository(value: &str) -> bool {
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || b"._-".contains(&b))
 }
+#[expect(
+    clippy::case_sensitive_file_extension_comparisons,
+    reason = "Git names are case-sensitive; only the exact lowercase suffix is reserved"
+)]
 fn valid_named(value: &str) -> bool {
     (1..=255).contains(&value.len())
         && value != "@"
@@ -343,6 +359,6 @@ fn valid_revision(revision: &Revision) -> bool {
         Revision::Default => true,
         Revision::Ref { value } | Revision::Tag { value } => valid_named(value),
         Revision::Commit { value } => valid_commit(value) && value.to_ascii_lowercase() == *value,
-        Revision::Change { value } => *value > 0 && *value <= i32::MAX as u32,
+        Revision::Change { value } => *value > 0 && i32::try_from(*value).is_ok(),
     }
 }

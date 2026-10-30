@@ -60,19 +60,18 @@ mod daemon {
         }
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let host = Windows {
             logger: Logger::new("agentd"),
         };
         host.logger.log("start");
         host.logger.publish();
-        match agent::run(&host) {
-            Ok(code) => code,
-            Err(_) => {
-                host.logger.log("executor_unavailable");
-                host.logger.publish();
-                1
-            }
+        if let Ok(code) = agent::run(&host) {
+            code
+        } else {
+            host.logger.log("executor_unavailable");
+            host.logger.publish();
+            1
         }
     }
 }

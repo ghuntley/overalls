@@ -40,6 +40,10 @@ struct Receipt<'a> {
     bundle_digest: &'a str,
 }
 
+#[expect(
+    clippy::struct_field_names,
+    reason = "fields mirror the boot identity names in the receipt wire format"
+)]
 struct Boot {
     placement_id: String,
     execution_epoch: u64,
@@ -433,7 +437,8 @@ fn read_frame(stream: &mut impl Read) -> io::Result<Request> {
 
 fn write_frame(stream: &mut impl Write, receipt: &Receipt<'_>) -> io::Result<()> {
     let body = serde_json::to_vec(receipt)?;
-    stream.write_all(&(body.len() as u32).to_be_bytes())?;
+    let length = u32::try_from(body.len()).map_err(|_| io::Error::other("invalid frame"))?;
+    stream.write_all(&length.to_be_bytes())?;
     stream.write_all(&body)
 }
 
@@ -449,10 +454,16 @@ fn notify_ready() -> io::Result<()> {
 
 fn listener() -> io::Result<RawFd> {
     // AF_VSOCK is independent of guest IP routing and the CA being installed.
+    // SAFETY: socket takes only integer arguments and returns a new descriptor
+    // or -1; no memory is shared with the kernel.
     let fd = unsafe { libc::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
     if fd < 0 {
         return Err(io::Error::last_os_error());
     }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "AF_VSOCK (40) fits sa_family_t (u16)"
+    )]
     let address = libc::sockaddr_vm {
         svm_family: libc::AF_VSOCK as libc::sa_family_t,
         svm_reserved1: 0,
@@ -460,15 +471,23 @@ fn listener() -> io::Result<RawFd> {
         svm_cid: libc::VMADDR_CID_ANY,
         svm_zero: [0; 4],
     };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
+    )]
+    // SAFETY: `address` is a fully initialised sockaddr_vm that outlives the
+    // call, and the length passed is its exact size.
     let result = unsafe {
         libc::bind(
             fd,
             (&raw const address).cast(),
-            std::mem::size_of_val(&address) as libc::socklen_t,
+            size_of_val(&address) as libc::socklen_t,
         )
     };
+    // SAFETY: `fd` is the socket created above and is still owned here.
     if result < 0 || unsafe { libc::listen(fd, 1) } < 0 {
         let error = io::Error::last_os_error();
+        // SAFETY: `fd` is owned here and is closed exactly once before return.
         unsafe { libc::close(fd) };
         return Err(error);
     }
@@ -479,8 +498,15 @@ fn serve(store: &Store, boot: &Boot) -> io::Result<()> {
     let fd = listener()?;
     event("awaiting");
     loop {
+        // SAFETY: sockaddr_vm is plain old data; all-zero bytes are valid.
         let mut peer: libc::sockaddr_vm = unsafe { std::mem::zeroed() };
-        let mut size = std::mem::size_of_val(&peer) as libc::socklen_t;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
+        )]
+        let mut size = size_of_val(&peer) as libc::socklen_t;
+        // SAFETY: `peer` and `size` are live, writable and correctly sized for
+        // the address accept4 stores; `fd` is the listening socket.
         let connection = unsafe {
             libc::accept4(
                 fd,
@@ -492,36 +518,47 @@ fn serve(store: &Store, boot: &Boot) -> io::Result<()> {
         if connection < 0 {
             continue;
         }
+        // SAFETY: accept4 returned a new descriptor that nothing else owns;
+        // the File takes sole ownership and closes it on drop.
         let mut stream = unsafe { File::from_raw_fd(connection) };
         let timeout = libc::timeval {
             tv_sec: 5,
             tv_usec: 0,
         };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "timeval is 16 bytes, far below socklen_t::MAX"
+        )]
+        // SAFETY: `timeout` is initialised, outlives the call and the length
+        // is its exact size; `connection` is owned by `stream`.
         let receive_timeout = unsafe {
             libc::setsockopt(
                 connection,
                 libc::SOL_SOCKET,
                 libc::SO_RCVTIMEO,
                 (&raw const timeout).cast(),
-                std::mem::size_of_val(&timeout) as libc::socklen_t,
+                size_of_val(&timeout) as libc::socklen_t,
             )
         };
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "timeval is 16 bytes, far below socklen_t::MAX"
+        )]
+        // SAFETY: as above, for the send timeout.
         let send_timeout = unsafe {
             libc::setsockopt(
                 connection,
                 libc::SOL_SOCKET,
                 libc::SO_SNDTIMEO,
                 (&raw const timeout).cast(),
-                std::mem::size_of_val(&timeout) as libc::socklen_t,
+                size_of_val(&timeout) as libc::socklen_t,
             )
         };
         if receive_timeout < 0 || send_timeout < 0 {
             event("rejected");
             continue;
         }
-        if peer.svm_family != libc::AF_VSOCK as libc::sa_family_t
-            || peer.svm_cid != libc::VMADDR_CID_HOST
-        {
+        if i32::from(peer.svm_family) != libc::AF_VSOCK || peer.svm_cid != libc::VMADDR_CID_HOST {
             event("rejected");
             continue;
         }
@@ -577,12 +614,12 @@ fn main() {
     let Some(store) = parse_store(&args) else {
         std::process::exit(2);
     };
-    match boot().and_then(|identity| serve(&store, &identity)) {
-        Ok(()) => {}
-        Err(_) => {
-            event("unavailable");
-            std::process::exit(1);
-        }
+    if boot()
+        .and_then(|identity| serve(&store, &identity))
+        .is_err()
+    {
+        event("unavailable");
+        std::process::exit(1);
     }
 }
 
@@ -667,7 +704,7 @@ mod tests {
     #[test]
     fn bounded_frames_reject_every_truncated_length_prefix() {
         for length in [0, MAX_FRAME + 1] {
-            let input = (length as u32).to_be_bytes().to_vec();
+            let input = u32::try_from(length).unwrap().to_be_bytes().to_vec();
             assert!(read_frame(&mut input.as_slice()).is_err());
         }
         for size in 1..64_u32 {

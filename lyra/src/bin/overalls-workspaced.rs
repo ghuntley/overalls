@@ -30,10 +30,16 @@ fn event(name: &'static str) {
 }
 
 fn listener() -> io::Result<RawFd> {
+    // SAFETY: socket takes only integer arguments and returns a new descriptor
+    // or -1; no memory is shared with the kernel.
     let fd = unsafe { libc::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
     if fd < 0 {
         return Err(io::Error::last_os_error());
     }
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "AF_VSOCK (40) fits sa_family_t (u16)"
+    )]
     let address = libc::sockaddr_vm {
         svm_family: libc::AF_VSOCK as libc::sa_family_t,
         svm_reserved1: 0,
@@ -41,15 +47,23 @@ fn listener() -> io::Result<RawFd> {
         svm_cid: libc::VMADDR_CID_ANY,
         svm_zero: [0; 4],
     };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
+    )]
+    // SAFETY: `address` is a fully initialised sockaddr_vm that outlives the
+    // call, and the length passed is its exact size.
     let result = unsafe {
         libc::bind(
             fd,
             (&raw const address).cast(),
-            std::mem::size_of_val(&address) as libc::socklen_t,
+            size_of_val(&address) as libc::socklen_t,
         )
     };
+    // SAFETY: `fd` is the socket created above and is still owned here.
     if result < 0 || unsafe { libc::listen(fd, 4) } < 0 {
         let error = io::Error::last_os_error();
+        // SAFETY: `fd` is owned here and is closed exactly once before return.
         unsafe { libc::close(fd) };
         return Err(error);
     }
@@ -62,13 +76,19 @@ fn set_timeouts(connection: RawFd) -> bool {
         tv_usec: 0,
     };
     [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO].iter().all(|option| {
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "timeval is 16 bytes, far below socklen_t::MAX"
+        )]
+        // SAFETY: `timeout` is initialised, outlives the call and the length
+        // is its exact size; the caller owns `connection`.
         let result = unsafe {
             libc::setsockopt(
                 connection,
                 libc::SOL_SOCKET,
                 *option,
                 (&raw const timeout).cast(),
-                std::mem::size_of_val(&timeout) as libc::socklen_t,
+                size_of_val(&timeout) as libc::socklen_t,
             )
         };
         result == 0
@@ -99,7 +119,7 @@ fn spawn_clone(
             };
             let outcome =
                 state.clone_with_retry(&source, &mut git, Retry::GUEST, &mut thread::sleep, || {
-                    event("clone_retry")
+                    event("clone_retry");
                 });
             match outcome {
                 Ok(receiver::Status::Done) => event("cloned"),
@@ -128,8 +148,15 @@ fn serve(binding: &Binding, image: Image) -> io::Result<()> {
     let fd = listener()?;
     event("awaiting");
     loop {
+        // SAFETY: sockaddr_vm is plain old data; all-zero bytes are valid.
         let mut peer: libc::sockaddr_vm = unsafe { std::mem::zeroed() };
-        let mut size = std::mem::size_of_val(&peer) as libc::socklen_t;
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
+        )]
+        let mut size = size_of_val(&peer) as libc::socklen_t;
+        // SAFETY: `peer` and `size` are live, writable and correctly sized for
+        // the address accept4 stores; `fd` is the listening socket.
         let connection = unsafe {
             libc::accept4(
                 fd,
@@ -141,9 +168,11 @@ fn serve(binding: &Binding, image: Image) -> io::Result<()> {
         if connection < 0 {
             continue;
         }
+        // SAFETY: accept4 returned a new descriptor that nothing else owns;
+        // the File takes sole ownership and closes it on drop.
         let mut stream = unsafe { File::from_raw_fd(connection) };
         if !set_timeouts(connection)
-            || peer.svm_family != libc::AF_VSOCK as libc::sa_family_t
+            || i32::from(peer.svm_family) != libc::AF_VSOCK
             || peer.svm_cid != libc::VMADDR_CID_HOST
         {
             event("rejected");

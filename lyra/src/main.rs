@@ -75,7 +75,7 @@ enum Command {
     },
     /// Create a machine that clones a public GitHub, GitLab, Codeberg or Bitbucket repository, then SSH into it.
     Open {
-        /// https://github.com/OWNER/REPO[/tree/BRANCH|/commit/SHA|/pull/N]
+        /// <https://github.com/OWNER/REPO>[/tree/BRANCH|/commit/SHA|/pull/N]
         url: String,
         /// Command to run in the checkout instead of a login shell.
         #[arg(last = true)]
@@ -95,6 +95,10 @@ enum LogsCommand {
     Path,
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "flat top-level command dispatch; each arm delegates to a module"
+)]
 fn run() -> Result<i32, &'static str> {
     if let Some(code) = lyra::agent::maintenance::run_tool() {
         return Ok(code);

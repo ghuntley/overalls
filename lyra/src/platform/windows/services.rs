@@ -48,7 +48,7 @@ fn status(name: &str) -> io::Result<u32> {
     // SAFETY: SERVICE_STATUS is plain data that QueryServiceStatus fills.
     let mut status: SERVICE_STATUS = unsafe { zeroed() };
     // SAFETY: `status` is a writable SERVICE_STATUS.
-    if unsafe { QueryServiceStatus(service.0, &mut status) } == 0 {
+    if unsafe { QueryServiceStatus(service.0, &raw mut status) } == 0 {
         return Err(last_error());
     }
     Ok(status.dwCurrentState)

@@ -1,4 +1,4 @@
-//! AF_VSOCK on Windows through the virtio-win `viosock` driver and its Winsock
+//! `AF_VSOCK` on Windows through the virtio-win `viosock` driver and its Winsock
 //! provider (ADR-0171).
 //!
 //! Windows has no `AF_VSOCK` constant: the provider registers a dynamic
@@ -41,6 +41,22 @@ struct SockaddrVm {
     cid: u32,
 }
 
+/// Byte length of [`SockaddrVm`] as Winsock's `int` address length.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "SOCKADDR_VM is 12 bytes"
+)]
+const SOCKADDR_VM_LEN: i32 = size_of::<SockaddrVm>() as i32;
+
+/// Byte length of a DWORD socket option value.
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_possible_wrap,
+    reason = "a DWORD is 4 bytes"
+)]
+const DWORD_LEN: i32 = size_of::<u32>() as i32;
+
 /// How the address family was found.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Source {
@@ -76,7 +92,7 @@ pub fn startup() -> io::Result<()> {
     // SAFETY: WSADATA is plain data that WSAStartup fills.
     let mut data: WSADATA = unsafe { zeroed() };
     // SAFETY: requests Winsock 2.2 with a writable WSADATA.
-    let started = unsafe { WSAStartup(0x0202, &mut data) };
+    let started = unsafe { WSAStartup(0x0202, &raw mut data) };
     if started == 0 {
         Ok(())
     } else {
@@ -113,8 +129,8 @@ fn ioctl_family() -> io::Result<u16> {
             null(),
             0,
             out.as_mut_ptr().cast(),
-            out.len() as u32,
-            &mut returned,
+            4,
+            &raw mut returned,
             null_mut(),
         )
     };
@@ -147,22 +163,23 @@ pub struct Provider {
 pub fn catalog() -> io::Result<Vec<Provider>> {
     let mut length = 0u32;
     // SAFETY: a null buffer with a zero length asks Winsock for the size.
-    let probe = unsafe { WSAEnumProtocolsW(null(), null_mut(), &mut length) };
+    let probe = unsafe { WSAEnumProtocolsW(null(), null_mut(), &raw mut length) };
     if probe != SOCKET_ERROR {
         return Ok(Vec::new());
     }
     let count = length as usize / size_of::<WSAPROTOCOL_INFOW>() + 1;
     // SAFETY: WSAPROTOCOL_INFOW is plain data; zero is a valid bit pattern.
     let mut buffer: Vec<WSAPROTOCOL_INFOW> = vec![unsafe { zeroed() }; count];
-    let mut length = (buffer.len() * size_of::<WSAPROTOCOL_INFOW>()) as u32;
+    let mut length = u32::try_from(buffer.len() * size_of::<WSAPROTOCOL_INFOW>())
+        .map_err(|_| io::Error::other("Winsock catalog too large"))?;
     // SAFETY: `buffer` holds `length` writable bytes of WSAPROTOCOL_INFOW.
-    let filled = unsafe { WSAEnumProtocolsW(null(), buffer.as_mut_ptr(), &mut length) };
+    let filled = unsafe { WSAEnumProtocolsW(null(), buffer.as_mut_ptr(), &raw mut length) };
     if filled == SOCKET_ERROR {
         return Err(wsa_error());
     }
     Ok(buffer
         .iter()
-        .take(filled as usize)
+        .take(usize::try_from(filled).map_err(|_| wsa_error())?)
         .map(|info| {
             let end = info
                 .szProtocol
@@ -259,7 +276,7 @@ impl Listener {
             bind(
                 handle,
                 (&raw const address).cast::<SOCKADDR>(),
-                size_of::<SockaddrVm>() as i32,
+                SOCKADDR_VM_LEN,
             )
         };
         // SAFETY: `handle` is a valid socket from socket() above.
@@ -282,10 +299,15 @@ impl Listener {
     pub fn accept(&self, timeout: Duration) -> io::Result<Connection> {
         // SAFETY: SockaddrVm is plain data; zero is a valid bit pattern.
         let mut peer: SockaddrVm = unsafe { zeroed() };
-        let mut size = size_of::<SockaddrVm>() as i32;
+        let mut size = SOCKADDR_VM_LEN;
         // SAFETY: `peer` is a writable 12-byte address buffer and `size` its length.
-        let connection =
-            unsafe { accept(self.socket, (&raw mut peer).cast::<SOCKADDR>(), &mut size) };
+        let connection = unsafe {
+            accept(
+                self.socket,
+                (&raw mut peer).cast::<SOCKADDR>(),
+                &raw mut size,
+            )
+        };
         if connection == INVALID_SOCKET {
             return Err(wsa_error());
         }
@@ -298,7 +320,7 @@ impl Listener {
                     SOL_SOCKET,
                     option,
                     (&raw const millis).cast::<u8>(),
-                    size_of::<u32>() as i32,
+                    DWORD_LEN,
                 );
             }
         }
@@ -306,10 +328,14 @@ impl Listener {
             // Some accepts complete before the provider fills the peer address;
             // ask for it once more. An unknown peer is reported as CID 0 and is
             // never the host.
-            let mut size = size_of::<SockaddrVm>() as i32;
+            let mut size = SOCKADDR_VM_LEN;
             // SAFETY: `peer` is a writable 12-byte address buffer and `size` its length.
             unsafe {
-                getpeername(connection, (&raw mut peer).cast::<SOCKADDR>(), &mut size);
+                getpeername(
+                    connection,
+                    (&raw mut peer).cast::<SOCKADDR>(),
+                    &raw mut size,
+                );
             }
         }
         Ok(Connection {
@@ -344,7 +370,7 @@ impl Read for Connection {
         if received == SOCKET_ERROR {
             Err(wsa_error())
         } else {
-            Ok(received as usize)
+            usize::try_from(received).map_err(|_| wsa_error())
         }
     }
 }
@@ -357,7 +383,7 @@ impl Write for Connection {
         if sent == SOCKET_ERROR {
             Err(wsa_error())
         } else {
-            Ok(sent as usize)
+            usize::try_from(sent).map_err(|_| wsa_error())
         }
     }
 

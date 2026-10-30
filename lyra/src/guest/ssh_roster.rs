@@ -425,8 +425,8 @@ mod tests {
 
         assert!(reconcile(invalid, &mut store, &mut fake).is_err());
         assert!(store.state.is_none());
-        assert!(fake.active.is_empty());
-        assert!(fake.disabled.is_empty());
+        assert_eq!(fake.active.len(), 0);
+        assert_eq!(fake.disabled.len(), 0);
     }
 
     #[test]

@@ -1,4 +1,4 @@
-//! Portable AF_VSOCK transport for the firmware guest agents.
+//! Portable `AF_VSOCK` transport for the firmware guest agents.
 //!
 //! Stock FreeBSD and illumos kernels do not implement this transport. This
 //! adapter describes ADR-0190's reviewed custom kernel socket ABI; compiling
@@ -21,8 +21,24 @@ pub const GUEST_CID: u32 = 3;
 /// Bind a listener on any local CID.
 pub const CID_ANY: u32 = u32::MAX;
 const SOCKADDR_VM_SIZE: usize = 16;
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the 16-byte address length fits u8"
+)]
+#[cfg(any(target_os = "freebsd", test))]
+const SOCKADDR_VM_LEN_U8: u8 = SOCKADDR_VM_SIZE as u8;
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the 16-byte address length fits socklen_t"
+)]
+const SOCKADDR_VM_SOCKLEN: libc::socklen_t = SOCKADDR_VM_SIZE as libc::socklen_t;
 const VSOCK_SO_BUILD_ID: libc::c_int = 1;
 const BUILD_ID_BYTES: usize = 65;
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the 65-byte identity length fits socklen_t"
+)]
+const BUILD_ID_SOCKLEN: libc::socklen_t = BUILD_ID_BYTES as libc::socklen_t;
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
@@ -57,7 +73,7 @@ trait VmAddress: Default {
 impl VmAddress for BsdSockaddrVm {
     fn any(port: u32) -> Self {
         Self {
-            length: SOCKADDR_VM_SIZE as u8,
+            length: SOCKADDR_VM_LEN_U8,
             family: 45,
             port,
             cid: CID_ANY,
@@ -65,7 +81,7 @@ impl VmAddress for BsdSockaddrVm {
         }
     }
     fn host_peer(&self) -> bool {
-        self.length == SOCKADDR_VM_SIZE as u8 && self.family == 45 && self.cid == HOST_CID
+        self.length == SOCKADDR_VM_LEN_U8 && self.family == 45 && self.cid == HOST_CID
     }
     fn peer_cid(&self) -> u32 {
         self.cid
@@ -97,11 +113,13 @@ type SockaddrVm = FlatSockaddrVm;
 
 /// A host-only listener.  [`Listener::accept`] closes a connection before
 /// returning an error when its family or peer CID is not trusted.
+#[derive(Debug)]
 pub struct Listener {
     fd: RawFd,
 }
 
 /// A bounded native-vsock connection with the observed peer CID.
+#[derive(Debug)]
 pub struct Connection {
     file: File,
     pub peer_cid: u32,
@@ -130,7 +148,7 @@ impl Listener {
     /// output MUST refuse; a userspace environment variable cannot supply it.
     pub fn kernel_build_id(&self) -> io::Result<String> {
         let mut bytes = [0_u8; BUILD_ID_BYTES];
-        let mut length = BUILD_ID_BYTES as libc::socklen_t;
+        let mut length = BUILD_ID_SOCKLEN;
         // SAFETY: the listener owns fd; bytes and length are writable for this
         // synchronous custom-kernel getsockopt call.
         if unsafe {
@@ -145,7 +163,7 @@ impl Listener {
         {
             return Err(io::Error::last_os_error());
         }
-        if length != BUILD_ID_BYTES as libc::socklen_t {
+        if length != BUILD_ID_SOCKLEN {
             return Err(io::Error::other("invalid kernel build identity length"));
         }
         decode_build_id(&bytes)
@@ -166,13 +184,8 @@ impl Listener {
         set_close_on_exec(fd)?;
         let address = SockaddrVm::any(port);
         // SAFETY: address is a live 16-byte sockaddr_vm for this call.
-        let bound = unsafe {
-            libc::bind(
-                fd,
-                (&raw const address).cast(),
-                SOCKADDR_VM_SIZE as libc::socklen_t,
-            )
-        } == 0;
+        let bound =
+            unsafe { libc::bind(fd, (&raw const address).cast(), SOCKADDR_VM_SOCKLEN) } == 0;
         // SAFETY: fd is valid and owned by this setup path.
         let listening = bound && unsafe { libc::listen(fd, backlog) } == 0;
         if !listening {
@@ -184,11 +197,11 @@ impl Listener {
         Ok(Self { fd })
     }
 
-    /// Accept one peer, requiring AF_VSOCK and the host CID before exposing
+    /// Accept one peer, requiring `AF_VSOCK` and the host CID before exposing
     /// the stream to a protocol parser.
     pub fn accept(&self) -> io::Result<Connection> {
         let mut peer = SockaddrVm::default();
-        let mut length = SOCKADDR_VM_SIZE as libc::socklen_t;
+        let mut length = SOCKADDR_VM_SOCKLEN;
         // SAFETY: peer and length are writable buffers valid for this call.
         let fd = unsafe { libc::accept(self.fd, (&raw mut peer).cast(), &raw mut length) };
         if fd < 0 {
@@ -197,7 +210,7 @@ impl Listener {
         set_close_on_exec(fd)?;
         // SAFETY: fd is newly accepted and owned by the returned connection.
         let file = unsafe { File::from_raw_fd(fd) };
-        if length != SOCKADDR_VM_SIZE as libc::socklen_t || !peer.host_peer() {
+        if length != SOCKADDR_VM_SOCKLEN || !peer.host_peer() {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 "non-host vsock peer",
@@ -247,6 +260,11 @@ fn set_timeouts(fd: RawFd) -> io::Result<()> {
         tv_sec: 5,
         tv_usec: 0,
     };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "timeval is 16 bytes, far below socklen_t::MAX"
+    )]
+    let timeout_length = size_of_val(&timeout) as libc::socklen_t;
     for option in [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO] {
         // SAFETY: timeout remains live for the synchronous setsockopt call.
         if unsafe {
@@ -255,7 +273,7 @@ fn set_timeouts(fd: RawFd) -> io::Result<()> {
                 libc::SOL_SOCKET,
                 option,
                 (&raw const timeout).cast(),
-                std::mem::size_of_val(&timeout) as libc::socklen_t,
+                timeout_length,
             )
         } < 0
         {
@@ -289,10 +307,10 @@ mod tests {
         assert_eq!(AF_VSOCK, if cfg!(target_os = "freebsd") { 45 } else { 40 });
         assert_eq!(HOST_CID, 2);
         assert_eq!(GUEST_CID, 3);
-        assert_eq!(std::mem::size_of::<SockaddrVm>(), SOCKADDR_VM_SIZE);
+        assert_eq!(size_of::<SockaddrVm>(), SOCKADDR_VM_SIZE);
         assert_eq!(SockaddrVm::any(1024).peer_cid(), CID_ANY);
-        assert_eq!(std::mem::size_of::<BsdSockaddrVm>(), SOCKADDR_VM_SIZE);
-        assert_eq!(std::mem::size_of::<FlatSockaddrVm>(), SOCKADDR_VM_SIZE);
+        assert_eq!(size_of::<BsdSockaddrVm>(), SOCKADDR_VM_SIZE);
+        assert_eq!(size_of::<FlatSockaddrVm>(), SOCKADDR_VM_SIZE);
         assert_eq!(std::mem::offset_of!(BsdSockaddrVm, family), 1);
         assert_eq!(std::mem::offset_of!(BsdSockaddrVm, port), 4);
         assert_eq!(std::mem::offset_of!(FlatSockaddrVm, port), 4);

@@ -25,7 +25,7 @@ pub fn identity() -> io::Result<(Boot, Ipv4Addr, Ipv4Addr)> {
     let document = loop {
         match mmds::fetch(Duration::from_secs(5)) {
             Ok(document) => break document,
-            Err(error) if started.elapsed() < Duration::from_secs(600) => {
+            Err(error) if started.elapsed() < Duration::from_mins(10) => {
                 let _ = error;
                 std::thread::sleep(Duration::from_secs(2));
             }
@@ -52,8 +52,7 @@ pub fn identity() -> io::Result<(Boot, Ipv4Addr, Ipv4Addr)> {
 /// Read or atomically create the per-boot UUID in volatile storage.
 pub fn boot_id() -> io::Result<String> {
     let path = std::env::var_os("OVERALLS_BOOT_ID")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/var/run/overalls/boot-id"));
+        .map_or_else(|| PathBuf::from("/var/run/overalls/boot-id"), PathBuf::from);
     if let Ok(value) = fs::read_to_string(&path) {
         let value = value.trim().to_owned();
         if valid_uuid(&value) {
@@ -97,8 +96,7 @@ pub fn network_ready(address: Ipv4Addr, gateway: Ipv4Addr) -> io::Result<bool> {
 /// A synced write proves that the guest root is writable before readiness.
 pub fn writable_root() -> io::Result<()> {
     let directory = std::env::var_os("OVERALLS_RUN_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/var/run/overalls"));
+        .map_or_else(|| PathBuf::from("/var/run/overalls"), PathBuf::from);
     fs::create_dir_all(&directory)?;
     let path = directory.join(format!(".readiness-{}", std::process::id()));
     let mut file = File::create(&path)?;
@@ -123,6 +121,13 @@ pub fn flush_root() -> io::Result<()> {
         use std::os::fd::AsRawFd;
         use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
 
+        // FreeBSD14.3 sys/ufs/ffs/fs.h: _IOW('U', 1, fsid_t), _IO('U', 2).
+        // Stock growfs uses the same root-fsid suspension. Its kernel path
+        // waits for VFS_SYNC(MNT_SUSPEND), including UFS softdep dependencies.
+        const SUSPEND: libc::c_ulong =
+            0x8000_5501 | ((size_of::<libc::fsid_t>() as libc::c_ulong) << 16);
+        const RESUME: libc::c_ulong = 0x2000_5502;
+
         let mut root = MaybeUninit::<libc::statfs>::uninit();
         // SAFETY: the fixed NUL-terminated path and writable statfs storage are
         // valid for the call; the output is read only after success.
@@ -131,11 +136,15 @@ pub fn flush_root() -> io::Result<()> {
         }
         // SAFETY: successful statfs initialized this structure.
         let root = unsafe { root.assume_init() };
-        let kind: Vec<u8> = root.f_fstypename.iter().map(|value| *value as u8).collect();
+        let kind: Vec<u8> = root
+            .f_fstypename
+            .iter()
+            .map(|value| u8::from_ne_bytes(value.to_ne_bytes()))
+            .collect();
         let source: Vec<u8> = root
             .f_mntfromname
             .iter()
-            .map(|value| *value as u8)
+            .map(|value| u8::from_ne_bytes(value.to_ne_bytes()))
             .collect();
         validate_ufs_root(&kind, &source, root.f_flags & libc::MNT_RDONLY as u64 != 0)?;
         let device = OpenOptions::new()
@@ -146,12 +155,6 @@ pub fn flush_root() -> io::Result<()> {
         if !device.metadata()?.file_type().is_char_device() {
             return Err(io::Error::other("invalid native flush device"));
         }
-        // FreeBSD14.3 sys/ufs/ffs/fs.h: _IOW('U', 1, fsid_t), _IO('U', 2).
-        // Stock growfs uses the same root-fsid suspension. Its kernel path
-        // waits for VFS_SYNC(MNT_SUSPEND), including UFS softdep dependencies.
-        const SUSPEND: libc::c_ulong =
-            0x8000_5501 | ((size_of::<libc::fsid_t>() as libc::c_ulong) << 16);
-        const RESUME: libc::c_ulong = 0x2000_5502;
         let mut identity = root.f_fsid;
         // SAFETY: the ioctl receives the exact statfs fsid and its correct
         // native size. Closing the owned descriptor invokes kernel resume
@@ -179,8 +182,8 @@ pub fn flush_root() -> io::Result<()> {
 }
 
 /// @cc [owner:ghuntley,label:recovery] native-freebsd-device-cache-flush
-/// Pinned FreeBSD UFS never sends BIO_FLUSH on suspension or fsync
-/// (softdep_flushcache defaults to off), so completed writes may still sit in
+/// Pinned FreeBSD UFS never sends `BIO_FLUSH` on suspension or fsync
+/// (`softdep_flushcache` defaults to off), so completed writes may still sit in
 /// the virtio device's volatile cache. After resume the agent MUST send one
 /// DIOCGFLUSH through the image's fixed `gpt/swapfs` partition provider, which
 /// shares the root's disk and is never exclusively held, and MUST refuse the
@@ -189,6 +192,10 @@ pub fn flush_root() -> io::Result<()> {
 fn flush_disk_cache() -> io::Result<()> {
     use std::os::fd::AsRawFd;
     use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
+
+    // FreeBSD14.3 sys/sys/disk.h: DIOCGFLUSH _IO('d', 135); checked by the
+    // native-growth ABI gate.
+    const DIOCGFLUSH: libc::c_ulong = 0x2000_6487;
 
     // GEOM refuses BIO_FLUSH on a consumer without write access, and the
     // mounted root holds its provider exclusively; the swap partition does not.
@@ -200,9 +207,6 @@ fn flush_disk_cache() -> io::Result<()> {
     if !disk.metadata()?.file_type().is_char_device() {
         return Err(io::Error::other("invalid native flush disk"));
     }
-    // FreeBSD14.3 sys/sys/disk.h: DIOCGFLUSH _IO('d', 135); checked by the
-    // native-growth ABI gate.
-    const DIOCGFLUSH: libc::c_ulong = 0x2000_6487;
     // SAFETY: DIOCGFLUSH takes no argument and only issues BIO_FLUSH to the
     // provider's disk; the owned descriptor stays open for the call.
     if unsafe { libc::ioctl(disk.as_raw_fd(), DIOCGFLUSH) } != 0 {
@@ -227,8 +231,7 @@ fn validate_ufs_root(kind: &[u8], source: &[u8], readonly: bool) -> io::Result<(
 /// or when the current roster/certificate refresh has withheld `ssh-ready`.
 pub fn services_ready() -> io::Result<bool> {
     let directory = std::env::var_os("OVERALLS_RUN_DIR")
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("/var/run/overalls"));
+        .map_or_else(|| PathBuf::from("/var/run/overalls"), PathBuf::from);
     services_ready_in(&directory)
 }
 
@@ -360,14 +363,13 @@ fn valid_uuid(value: &str) -> bool {
 }
 
 fn format_uuid(bytes: [u8; 16]) -> String {
-    let hex = hex::encode(bytes);
     format!(
         "{}-{}-{}-{}-{}",
-        &hex[..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..]
+        hex::encode(&bytes[..4]),
+        hex::encode(&bytes[4..6]),
+        hex::encode(&bytes[6..8]),
+        hex::encode(&bytes[8..10]),
+        hex::encode(&bytes[10..])
     )
 }
 

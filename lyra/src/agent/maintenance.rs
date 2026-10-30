@@ -233,6 +233,13 @@ fn file_name(name: &str) -> String {
     }
 }
 
+#[cfg_attr(
+    not(unix),
+    expect(
+        clippy::unnecessary_wraps,
+        reason = "only Unix sets permissions fallibly; callers share one signature"
+    )
+)]
 fn mode(path: &Path, executable: bool) -> io::Result<()> {
     #[cfg(unix)]
     {
@@ -251,6 +258,8 @@ fn directory(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        // SAFETY: geteuid has no preconditions and cannot fail.
+        let euid = unsafe { libc::geteuid() };
         for ancestor in path.ancestors().skip(1) {
             match fs::symlink_metadata(ancestor) {
                 Ok(metadata) => {
@@ -261,7 +270,7 @@ fn directory(path: &Path) -> io::Result<()> {
                         // host UID may be unmapped in a Nix build namespace.
                         || (ancestor != Path::new("/")
                             && metadata.uid() != 0
-                            && metadata.uid() != unsafe { libc::geteuid() })
+                            && metadata.uid() != euid)
                         || (bits & 0o022 != 0 && !(metadata.uid() == 0 && bits & 0o1000 != 0))
                     {
                         return Err(io::Error::other("invalid tool ancestor"));
@@ -302,7 +311,9 @@ fn directory(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        if metadata.uid() != unsafe { libc::geteuid() } {
+        // SAFETY: geteuid has no preconditions and cannot fail.
+        let euid = unsafe { libc::geteuid() };
+        if metadata.uid() != euid {
             return Err(io::Error::other("invalid tool owner"));
         }
         fs::set_permissions(path, fs::Permissions::from_mode(0o755))?;
@@ -327,7 +338,7 @@ fn verified(path: &Path, artifact: &Artifact) -> io::Result<bool> {
     }
     let mut source = File::open(path)?;
     let mut hash = Sha256::new();
-    let mut buffer = [0u8; 65_536];
+    let mut buffer = vec![0u8; 65_536];
     loop {
         let bytes = source.read(&mut buffer)?;
         if bytes == 0 {
@@ -517,7 +528,7 @@ fn health(target: &Path) -> bool {
             match child.try_wait() {
                 Ok(Some(status)) if status.success() => break,
                 Ok(None) if start.elapsed() < Duration::from_secs(5) => {
-                    std::thread::sleep(Duration::from_millis(25))
+                    std::thread::sleep(Duration::from_millis(25));
                 }
                 _ => {
                     let _ = child.kill();
@@ -569,6 +580,18 @@ pub fn run_tool() -> Option<i32> {
 /// One-shot migration entrypoint for older executors. The existing executor's
 /// exact lease remains authoritative; this path never registers another fence.
 pub fn bootstrap_invocation() -> Option<i32> {
+    struct Bootstrap;
+    impl Host for Bootstrap {
+        fn digest(&self) -> io::Result<String> {
+            Err(io::Error::other("bootstrap does not register"))
+        }
+        fn tool_result(&self, _: &str, _: bool, _: Duration) {}
+        fn fetch_event(&self, _: super::FetchEvent) {}
+        fn stop_requested(&self) -> bool {
+            false
+        }
+        fn ready(&self, _: &str) {}
+    }
     let arguments: Vec<_> = std::env::args().skip(1).collect();
     if arguments
         .first()
@@ -584,18 +607,6 @@ pub fn bootstrap_invocation() -> Option<i32> {
     };
     if epoch == 0 {
         return Some(64);
-    }
-    struct Bootstrap;
-    impl Host for Bootstrap {
-        fn digest(&self) -> io::Result<String> {
-            Err(io::Error::other("bootstrap does not register"))
-        }
-        fn tool_result(&self, _: &str, _: bool, _: Duration) {}
-        fn fetch_event(&self, _: super::FetchEvent) {}
-        fn stop_requested(&self) -> bool {
-            false
-        }
-        fn ready(&self, _: &str) {}
     }
     let lease = LeaseRequest {
         executor_id: &arguments[1],
@@ -706,7 +717,7 @@ impl Setup {
             };
             match fs::symlink_metadata(&path) {
                 Ok(metadata) if metadata.file_type().is_symlink() => {
-                    record.link = Some(fs::read_link(&path)?)
+                    record.link = Some(fs::read_link(&path)?);
                 }
                 Ok(metadata) if metadata.is_file() => {
                     let backup = journal.join(index.to_string());
@@ -957,7 +968,7 @@ fn systemctl(arguments: &[&str]) -> io::Result<Vec<u8>> {
         match child.try_wait() {
             Ok(Some(status)) if status.success() => break,
             Ok(None) if started.elapsed() < Duration::from_secs(3) => {
-                std::thread::sleep(Duration::from_millis(20))
+                std::thread::sleep(Duration::from_millis(20));
             }
             _ => {
                 let _ = child.kill();
@@ -1086,29 +1097,35 @@ fn windows_acl_spec(root: &Path, descriptor_text: &str) -> io::Result<()> {
     // adding administrators' grants would leave a planted creator ACL intact.
     let sddl: Vec<u16> = descriptor_text.encode_utf16().chain(Some(0)).collect();
     let mut descriptor = std::ptr::null_mut();
-    // SAFETY: both UTF-16 buffers are NUL terminated; the returned descriptor
-    // remains live through SetFileSecurityW and is released exactly once.
-    unsafe {
-        if ConvertStringSecurityDescriptorToSecurityDescriptorW(
+    // SAFETY: the SDDL buffer is NUL terminated and outlives the call; on
+    // success the function stores a LocalAlloc descriptor in `descriptor`.
+    let converted = unsafe {
+        ConvertStringSecurityDescriptorToSecurityDescriptorW(
             sddl.as_ptr(),
             1,
-            &mut descriptor,
+            &raw mut descriptor,
             std::ptr::null_mut(),
-        ) == 0
-        {
-            return Err(io::Error::other("tool ACL unavailable"));
-        }
-        let success = SetFileSecurityW(
+        )
+    };
+    if converted == 0 {
+        return Err(io::Error::other("tool ACL unavailable"));
+    }
+    // SAFETY: the path buffer is NUL terminated and `descriptor` is the live
+    // descriptor returned above; it is not freed until after this call.
+    let success = unsafe {
+        SetFileSecurityW(
             path.as_ptr(),
             OWNER_SECURITY_INFORMATION
                 | DACL_SECURITY_INFORMATION
                 | PROTECTED_DACL_SECURITY_INFORMATION,
             descriptor,
-        );
-        LocalFree(descriptor);
-        if success == 0 {
-            return Err(io::Error::other("tool ACL unavailable"));
-        }
+        )
+    };
+    // SAFETY: `descriptor` came from LocalAlloc via the conversion above and
+    // is released exactly once here.
+    unsafe { LocalFree(descriptor) };
+    if success == 0 {
+        return Err(io::Error::other("tool ACL unavailable"));
     }
     Ok(())
 }
@@ -1171,6 +1188,7 @@ mod tests {
             .contains("name = Preserved"));
         fs::remove_dir_all(&paths.run).unwrap();
         assert!(tools.path().join("workspace-policy/gitconfig").is_file());
+        #[expect(clippy::mem_forget, reason = "simulates process death that skips Drop")]
         std::mem::forget(journal);
         Setup::recover_at(tools.path(), vec![(config.clone(), false)]).unwrap();
         assert_eq!(fs::read(config).unwrap(), original);
@@ -1197,7 +1215,7 @@ mod tests {
     fn fixture(seed: u64, succeeds: bool) -> (Maintenance, BTreeMap<String, Vec<u8>>) {
         let executable = format!(
             "#!/bin/sh\n# fixture {seed}\nexit {}\n",
-            if succeeds { 0 } else { 1 }
+            u8::from(!succeeds)
         )
         .into_bytes();
         let data = BTreeMap::from([
@@ -1228,6 +1246,10 @@ mod tests {
         )
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "matches the production fetch callback signature"
+    )]
     fn fetch(
         data: &BTreeMap<String, Vec<u8>>,
         artifact: &Artifact,
@@ -1441,7 +1463,8 @@ mod tests {
             (absent.clone(), false),
         ];
         let journal = Setup::begin_at(root.path(), targets.clone()).unwrap();
-        std::mem::forget(journal); // abrupt process death skips Drop
+        #[expect(clippy::mem_forget, reason = "abrupt process death skips Drop")]
+        std::mem::forget(journal);
         fs::write(&regular, b"interrupted-launcher").unwrap();
         fs::remove_file(&link).unwrap();
         fs::write(&link, b"interrupted-link-replacement").unwrap();
@@ -1464,6 +1487,7 @@ mod tests {
         fs::write(&foreign, b"foreign-preserved").unwrap();
         let targets = vec![(permitted, true)];
         let journal = Setup::begin_at(root.path(), targets.clone()).unwrap();
+        #[expect(clippy::mem_forget, reason = "simulates process death that skips Drop")]
         std::mem::forget(journal);
         let path = root.path().join("setup-pending/journal.json");
         let mut records: Vec<SetupRecord> =

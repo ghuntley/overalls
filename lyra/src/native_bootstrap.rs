@@ -145,9 +145,11 @@ fn output(program: &str, arguments: &[&str]) -> io::Result<String> {
         // SAFETY: pipe owns this descriptor; both fcntl calls only change its
         // status flags so a wedged system query cannot block startup forever.
         let flags = unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_GETFL) };
-        if flags < 0
-            || unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
-        {
+        if flags < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned pipe.
+        if unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
             return Err(io::Error::last_os_error());
         }
         let mut bytes = Vec::new();
@@ -364,6 +366,10 @@ fn private_directory(path: &Path) -> io::Result<()> {
 /// publish its current boot identity atomically with mode 0600 under the
 /// root-owned volatile mode-0700 runtime directory only after network success.
 /// MMDS tokens and identity fields MUST NOT enter diagnostics or command output.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one ordered first-boot sequence; each step gates the next"
+)]
 pub fn run(os: Os) -> io::Result<()> {
     // SAFETY: geteuid only reads the current process credential.
     if unsafe { libc::geteuid() } != 0 {
@@ -405,7 +411,7 @@ pub fn run(os: Os) -> io::Result<()> {
     let document = loop {
         match mmds::fetch(Duration::from_secs(5)) {
             Ok(document) => break document,
-            Err(_) if started.elapsed() < Duration::from_secs(120) => {
+            Err(_) if started.elapsed() < Duration::from_mins(2) => {
                 std::thread::sleep(Duration::from_secs(1));
             }
             Err(_) => return Err(io::Error::other("native metadata unavailable")),

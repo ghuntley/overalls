@@ -110,6 +110,7 @@ pub fn from_command_line(line: &str) -> io::Result<Option<GitIdentity>> {
 /// Missing identity MUST clear the include, and existing links or writable parent
 /// directories MUST refuse rather than redirect privileged writes.
 pub fn install(directory: &Path, identity: Option<&GitIdentity>) -> io::Result<()> {
+    use std::io::Write;
     fs::create_dir_all(directory)?;
     let metadata = fs::symlink_metadata(directory)?;
     if !metadata.file_type().is_dir() {
@@ -118,8 +119,10 @@ pub fn install(directory: &Path, identity: Option<&GitIdentity>) -> io::Result<(
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
+        // SAFETY: geteuid has no preconditions and cannot fail.
+        let euid = unsafe { libc::geteuid() };
         if fs::canonicalize(directory)? != directory
-            || metadata.uid() != unsafe { libc::geteuid() }
+            || metadata.uid() != euid
             || metadata.mode() & 0o022 != 0
         {
             return Err(io::Error::other("invalid git identity directory"));
@@ -139,7 +142,6 @@ pub fn install(directory: &Path, identity: Option<&GitIdentity>) -> io::Result<(
         .map(GitIdentity::configuration)
         .transpose()?
         .unwrap_or_default();
-    use std::io::Write;
     let mut file = tempfile::NamedTempFile::new_in(directory)?;
     file.write_all(content.as_bytes())?;
     #[cfg(unix)]

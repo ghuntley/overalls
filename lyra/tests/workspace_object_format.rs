@@ -21,12 +21,20 @@ impl GitRunner for AdvertisedGit {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn run_git(git: &mut SystemGit, arguments: &[&str]) -> Vec<u8> {
     let arguments: Vec<String> = arguments.iter().map(|value| (*value).into()).collect();
     git.output_with_timeout(&arguments, Duration::from_secs(5))
         .expect("bounded local git fixture")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn git_under(root: &Path) -> SystemGit {
     let path = std::env::var_os("PATH").expect("pinned shell PATH");
     let program = std::env::split_paths(&path)
@@ -94,7 +102,10 @@ fn real_git_checks_out_both_object_formats() {
             ("branch", "https://github.com/fixture/repo/tree/main".into()),
             (
                 "abbreviated",
-                format!("https://github.com/fixture/repo/commit/{}", &commit[..40]),
+                format!(
+                    "https://github.com/fixture/repo/commit/{}",
+                    commit.get(..40).unwrap()
+                ),
             ),
             (
                 "github-change",

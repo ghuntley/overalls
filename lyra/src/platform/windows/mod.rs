@@ -17,7 +17,7 @@ use windows_sys::Win32::Foundation::GetLastError;
 pub fn last_error() -> io::Error {
     // SAFETY: GetLastError has no preconditions.
     let code = unsafe { GetLastError() };
-    io::Error::from_raw_os_error(code as i32)
+    io::Error::from_raw_os_error(code.cast_signed())
 }
 
 /// NUL-terminated UTF-16 for Win32 wide-string parameters.

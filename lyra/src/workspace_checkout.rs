@@ -174,7 +174,7 @@ pub fn select_ref(
         .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "workspace ref unavailable"))
 }
 fn advertised_refs(output: &[u8]) -> io::Result<Vec<(&str, &str, ObjectFormat)>> {
-    if output.len() > MAXIMUM_RESPONSE as usize {
+    if output.len() as u64 > MAXIMUM_RESPONSE {
         return Err(refused());
     }
     let output = std::str::from_utf8(output).map_err(|_| refused())?;
@@ -256,7 +256,7 @@ pub fn api_url(source: &WorkspaceSource) -> io::Result<String> {
     }
 }
 pub fn decode_head(provider: Provider, bytes: &[u8]) -> io::Result<Checkout> {
-    if bytes.len() > MAXIMUM_RESPONSE as usize {
+    if bytes.len() as u64 > MAXIMUM_RESPONSE {
         return Err(refused());
     }
     let (url, sha) = match provider {
@@ -371,7 +371,7 @@ mod tests {
         );
         assert!(decode_head(
             Provider::Codeberg,
-            &vec![b' '; MAXIMUM_RESPONSE as usize + 1]
+            &vec![b' '; usize::try_from(MAXIMUM_RESPONSE).unwrap() + 1]
         )
         .is_err());
     }

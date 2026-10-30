@@ -9,6 +9,7 @@ use lyra::workspace_receiver::{
 use lyra::workspace_source::{self, Revision, WorkspaceSource};
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::fmt::Write as _;
 use std::fs;
 use std::io;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
@@ -40,6 +41,10 @@ struct Refused {
     reason: String,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn vectors() -> &'static Vectors {
     static VECTORS: OnceLock<Vectors> = OnceLock::new();
     VECTORS.get_or_init(|| {
@@ -53,6 +58,10 @@ fn vectors() -> &'static Vectors {
     })
 }
 
+#[expect(
+    clippy::panic,
+    reason = "shared-vector oracle: a mismatch must fail the test"
+)]
 fn check_accepted(vector: &Accepted) {
     let source = workspace_source::parse_url(&vector.url)
         .unwrap_or_else(|reason| panic!("{} refused: {reason}", vector.url));
@@ -64,6 +73,10 @@ fn check_accepted(vector: &Accepted) {
     assert_eq!(workspace_source::decode(&source.encode()), Ok(source));
 }
 
+#[expect(
+    clippy::panic,
+    reason = "shared-vector oracle: a mismatch must fail the test"
+)]
 fn check_refused(vector: &Refused) {
     match workspace_source::parse_url(&vector.url) {
         Ok(source) => panic!("{} accepted as {source:?}", vector.url),
@@ -119,7 +132,7 @@ fn assert_inert(source: &WorkspaceSource) {
     }
     match source.revision() {
         Revision::Default => {}
-        Revision::Change { value } => assert!(*value > 0 && *value <= i32::MAX as u32),
+        Revision::Change { value } => assert!(*value > 0 && i32::try_from(*value).is_ok()),
         Revision::Ref { value } | Revision::Tag { value } | Revision::Commit { value } => {
             assert!(allowed(value, b"/@+=,"));
             assert!(!value.contains(".."));
@@ -183,10 +196,18 @@ fn request(source: &WorkspaceSource, binding: &Binding) -> Value {
     })
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn line(value: &Value) -> Vec<u8> {
     serde_json::to_vec(value).expect("request encoding")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn accepted_sources() -> Vec<WorkspaceSource> {
     vectors()
         .accepted
@@ -236,7 +257,7 @@ fn envelope_validation_refuses_every_mutation(tc: TestCase) {
     let mut value = valid.clone();
     match mutation {
         Mutation::Placement => {
-            value["placement_id"] = json!("22222222-2222-4222-8222-222222222222")
+            value["placement_id"] = json!("22222222-2222-4222-8222-222222222222");
         }
         Mutation::Epoch => {
             let delta = tc.draw(gs::integers::<u64>().min_value(1).max_value(1 << 40));
@@ -275,6 +296,10 @@ struct FakeGit {
 }
 
 impl GitRunner for FakeGit {
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn output(&mut self, _: &[String]) -> io::Result<Vec<u8>> {
         let mut output = format!("{}\trefs/heads/main\n", "a".repeat(40));
         for vector in &vectors().accepted {
@@ -288,7 +313,7 @@ impl GitRunner for FakeGit {
                     _ => None,
                 };
                 if let Some(reference) = reference {
-                    output.push_str(&format!("{}\t{reference}\n", "a".repeat(40)));
+                    let _ = writeln!(output, "{}\t{reference}", "a".repeat(40));
                 }
             }
             let prefix = match source.revision() {
@@ -297,7 +322,7 @@ impl GitRunner for FakeGit {
                 _ => None,
             };
             if let Some((kind, value)) = prefix {
-                output.push_str(&format!("{}\trefs/{kind}/{value}\n", "a".repeat(40)));
+                let _ = writeln!(output, "{}\trefs/{kind}/{value}", "a".repeat(40));
             }
         }
         Ok(output.into_bytes())
@@ -310,6 +335,10 @@ impl GitRunner for FakeGit {
         })
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn run(&mut self, arguments: &[String]) -> io::Result<bool> {
         let step = self.calls.len();
         self.calls.push(arguments.to_vec());
@@ -359,6 +388,10 @@ impl ReceiverMachine {
         Paths::under(self.root.path())
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn deliver(&mut self, source: WorkspaceSource) {
         let decision = self.receiver.deliver(&source).expect("delivery");
         match &self.persisted {
@@ -379,6 +412,10 @@ impl ReceiverMachine {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn clone_once(&mut self, fail_at: Option<usize>) {
         let Some(source) = self.persisted.clone() else {
             return;
@@ -429,6 +466,10 @@ impl ReceiverMachine {
 
 #[hegel::state_machine]
 impl ReceiverMachine {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn deliver_same(&mut self, tc: TestCase) {
         let source = match &self.persisted {
@@ -438,6 +479,10 @@ impl ReceiverMachine {
         self.deliver(source);
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn deliver_different(&mut self, tc: TestCase) {
         let source = tc.draw(gs::sampled_from(self.sources.clone()));
@@ -445,6 +490,11 @@ impl ReceiverMachine {
         self.deliver(source);
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[rule]
     fn replay(&mut self, _: TestCase) {
         let Some(source) = self.persisted.clone() else {
@@ -456,6 +506,11 @@ impl ReceiverMachine {
         self.deliver(delivery.source);
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[rule]
     fn restart(&mut self, _: TestCase) {
         let receiver = Receiver::new(self.paths()).expect("restart");
@@ -485,12 +540,21 @@ impl ReceiverMachine {
         self.clone_once(None);
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn clone_failure(&mut self, tc: TestCase) {
         let step = tc.draw(gs::integers::<usize>().max_value(3));
         self.clone_once(Some(step));
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[rule]
     fn retries_exhausted(&mut self, _: TestCase) {
         let Some(source) = self.persisted.clone() else {
@@ -515,6 +579,11 @@ impl ReceiverMachine {
         self.status = Status::Failed;
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[invariant]
     fn source_written_at_most_once(&mut self, _: TestCase) {
         let paths = self.paths();
@@ -529,6 +598,11 @@ impl ReceiverMachine {
         }
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[invariant]
     fn no_clone_after_done_and_status_matches(&mut self, _: TestCase) {
         if let Some(count) = self.calls_at_done {
@@ -559,6 +633,11 @@ impl ReceiverMachine {
         }
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[invariant]
     fn git_arguments_never_become_options(&mut self, _: TestCase) {
         for call in &self.git.calls {
@@ -639,12 +718,20 @@ fn receiver_state_machine(tc: TestCase) {
     hegel::stateful::run(machine, tc);
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn native_receiver(paths: Paths) -> Receiver {
     Receiver::new(paths)
         .expect("native receiver")
         .with_shared_git_configuration()
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn real_git(system_configuration: &Path, arguments: &[&std::ffi::OsStr], foreign: bool) -> Output {
     Command::new("git")
         .env_clear()

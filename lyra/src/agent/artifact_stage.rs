@@ -286,7 +286,7 @@ mod tests {
         }
     }
 
-    fn arguments(files: Value) -> Value {
+    fn arguments(files: &Value) -> Value {
         json!({
             "publish_request_id": ID,
             "max_file_bytes": 16_777_216,
@@ -319,11 +319,13 @@ mod tests {
         let directory = tempfile::tempdir().expect("tempdir");
         let large = directory.path().join("large.bin");
         let small = directory.path().join("small.txt");
-        let content: Vec<u8> = (0..CHUNK_BYTES * 2 + 5).map(|i| i as u8).collect();
+        let content: Vec<u8> = (0..CHUNK_BYTES * 2 + 5)
+            .map(|i| i.to_le_bytes()[0])
+            .collect();
         std::fs::write(&large, &content).expect("write");
         std::fs::write(&small, b"hello").expect("write");
 
-        let (result, seen) = collect(&arguments(json!([
+        let (result, seen) = collect(&arguments(&json!([
             {"file_index": 0, "source_path": large.to_str().expect("utf8")},
             {"file_index": 1, "source_path": small.to_str().expect("utf8")},
         ])));
@@ -405,22 +407,22 @@ mod tests {
             json!([{"file_index": 255, "source_path": "/a"}]),
             json!([{"file_index": 0, "source_path": "/a", "extra": 1}]),
         ] {
-            assert_eq!(collect(&arguments(files)).0, Err(Failure::PathInvalid));
+            assert_eq!(collect(&arguments(&files)).0, Err(Failure::PathInvalid));
         }
         let too_many: Vec<Value> = (0..256)
             .map(|index| json!({"file_index": index, "source_path": "/a"}))
             .collect();
         assert_eq!(
-            collect(&arguments(Value::Array(too_many))).0,
+            collect(&arguments(&Value::Array(too_many))).0,
             Err(Failure::PathInvalid)
         );
-        let mut bad_id = arguments(json!([{"file_index": 0, "source_path": "/a"}]));
+        let mut bad_id = arguments(&json!([{"file_index": 0, "source_path": "/a"}]));
         bad_id["publish_request_id"] = json!("../x");
         assert_eq!(collect(&bad_id).0, Err(Failure::PathInvalid));
-        let mut over_ceiling = arguments(json!([{"file_index": 0, "source_path": "/a"}]));
+        let mut over_ceiling = arguments(&json!([{"file_index": 0, "source_path": "/a"}]));
         over_ceiling["max_total_bytes"] = json!(67_108_865);
         assert_eq!(collect(&over_ceiling).0, Err(Failure::TooLarge));
-        let mut over_file_ceiling = arguments(json!([{"file_index": 0, "source_path": "/a"}]));
+        let mut over_file_ceiling = arguments(&json!([{"file_index": 0, "source_path": "/a"}]));
         over_file_ceiling["max_file_bytes"] = json!(67_108_865);
         assert_eq!(collect(&over_file_ceiling).0, Err(Failure::TooLarge));
     }
@@ -429,7 +431,7 @@ mod tests {
     // for both bounds) pass validation rather than being refused as too large.
     #[test]
     fn marshall_publish_limits_are_accepted() {
-        let mut request = arguments(json!([{"file_index": 0, "source_path": "/a"}]));
+        let mut request = arguments(&json!([{"file_index": 0, "source_path": "/a"}]));
         request["max_file_bytes"] = json!(67_108_864);
         request["max_total_bytes"] = json!(67_108_864);
         assert!(validate(&request).is_ok());
@@ -445,7 +447,7 @@ mod tests {
         std::os::unix::fs::symlink(&target, &link).expect("symlink");
         let path = |p: &std::path::Path| p.to_str().expect("utf8").to_owned();
 
-        let (result, seen) = collect(&arguments(json!([
+        let (result, seen) = collect(&arguments(&json!([
             {"file_index": 0, "source_path": path(&target)},
             {"file_index": 1, "source_path": path(&link)},
         ])));
@@ -453,20 +455,20 @@ mod tests {
         assert!(seen.is_empty(), "no chunk is sent before every file passes");
 
         let (result, _) = collect(&arguments(
-            json!([{"file_index": 0, "source_path": path(directory.path())}]),
+            &json!([{"file_index": 0, "source_path": path(directory.path())}]),
         ));
         assert_eq!(result, Err(Failure::NotRegularFile));
 
         let (result, _) = collect(&arguments(
-            json!([{"file_index": 0, "source_path": path(&directory.path().join("missing"))}]),
+            &json!([{"file_index": 0, "source_path": path(&directory.path().join("missing"))}]),
         ));
         assert_eq!(result, Err(Failure::PathInvalid));
 
-        let mut small_limit = arguments(json!([{"file_index": 0, "source_path": path(&target)}]));
+        let mut small_limit = arguments(&json!([{"file_index": 0, "source_path": path(&target)}]));
         small_limit["max_file_bytes"] = json!(9);
         assert_eq!(collect(&small_limit).0, Err(Failure::TooLarge));
 
-        let mut total_limit = arguments(json!([
+        let mut total_limit = arguments(&json!([
             {"file_index": 0, "source_path": path(&target)},
             {"file_index": 1, "source_path": path(&target)},
         ]));

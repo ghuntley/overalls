@@ -45,15 +45,16 @@ pub struct Route {
 pub fn addresses() -> io::Result<Vec<Address>> {
     let mut table: *mut MIB_UNICASTIPADDRESS_TABLE = null_mut();
     // SAFETY: `table` receives a kernel-allocated table freed below.
-    let status = unsafe { GetUnicastIpAddressTable(AF_INET, &mut table) };
+    let status = unsafe { GetUnicastIpAddressTable(AF_INET, &raw mut table) };
     if status != ERROR_SUCCESS || table.is_null() {
-        return Err(io::Error::from_raw_os_error(status as i32));
+        return Err(io::Error::from_raw_os_error(status.cast_signed()));
     }
-    // SAFETY: the table is valid until FreeMibTable; `Table` holds NumEntries rows.
-    let rows = unsafe {
-        let count = (*table).NumEntries as usize;
-        std::slice::from_raw_parts((*table).Table.as_ptr(), count)
-    };
+    // SAFETY: the table is valid until FreeMibTable.
+    let count = unsafe { (*table).NumEntries } as usize;
+    // SAFETY: as above; this only takes the address of the row array.
+    let first = unsafe { (*table).Table.as_ptr() };
+    // SAFETY: `Table` holds NumEntries initialised rows until FreeMibTable.
+    let rows = unsafe { std::slice::from_raw_parts(first, count) };
     let found = rows
         .iter()
         .filter(|row| row.DadState == IpDadStatePreferred)
@@ -74,15 +75,16 @@ pub fn addresses() -> io::Result<Vec<Address>> {
 pub fn routes() -> io::Result<Vec<Route>> {
     let mut table: *mut MIB_IPFORWARD_TABLE2 = null_mut();
     // SAFETY: `table` receives a kernel-allocated table freed below.
-    let status = unsafe { GetIpForwardTable2(AF_INET, &mut table) };
+    let status = unsafe { GetIpForwardTable2(AF_INET, &raw mut table) };
     if status != ERROR_SUCCESS || table.is_null() {
-        return Err(io::Error::from_raw_os_error(status as i32));
+        return Err(io::Error::from_raw_os_error(status.cast_signed()));
     }
-    // SAFETY: the table is valid until FreeMibTable; `Table` holds NumEntries rows.
-    let rows = unsafe {
-        let count = (*table).NumEntries as usize;
-        std::slice::from_raw_parts((*table).Table.as_ptr(), count)
-    };
+    // SAFETY: the table is valid until FreeMibTable.
+    let count = unsafe { (*table).NumEntries } as usize;
+    // SAFETY: as above; this only takes the address of the row array.
+    let first = unsafe { (*table).Table.as_ptr() };
+    // SAFETY: `Table` holds NumEntries initialised rows until FreeMibTable.
+    let rows = unsafe { std::slice::from_raw_parts(first, count) };
     let found = rows
         .iter()
         .filter_map(|row| {

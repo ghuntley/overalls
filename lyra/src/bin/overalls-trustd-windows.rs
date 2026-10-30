@@ -4,7 +4,7 @@
 //! Lilly dials vsock port 1030 once per boot with the public CA roots the
 //! platform's private services use. The daemon validates the request against
 //! this boot (MMDS identity plus the volatile boot UUID), installs the roots
-//! into `LocalMachine\Root` through CryptoAPI so Schannel clients trust them,
+//! into `LocalMachine\Root` through `CryptoAPI` so Schannel clients trust them,
 //! writes the PEM bundle Git and the agents' HTTP clients read
 //! (`C:\overalls\trust\bundle-<digest>\ca-bundle.pem`, named by
 //! `C:\overalls\trust\current`), and only then answers with the `installed`
@@ -24,7 +24,7 @@ mod daemon {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
-    const IDENTITY_BUDGET: Duration = Duration::from_secs(600);
+    const IDENTITY_BUDGET: Duration = Duration::from_mins(10);
     const TRUST_DIR: &str = "C:\\overalls\\trust";
     const BASE_BUNDLE: &str = "C:\\overalls\\trust\\base-ca-bundle.pem";
 
@@ -101,7 +101,7 @@ mod daemon {
         trust::write_frame(connection, &trust::receipt(&request, boot))
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let logger = Logger::new("trustd");
         logger.log("start");
         if vsock::startup().is_err() {
@@ -118,13 +118,10 @@ mod daemon {
             }
         };
         logger.log("identity_bound");
-        let family = match vsock::discover(IDENTITY_BUDGET, |_| {}) {
-            Ok(family) => family,
-            Err(_) => {
-                logger.log("vsock_unavailable");
-                logger.publish();
-                return 3;
-            }
+        let Ok(family) = vsock::discover(IDENTITY_BUDGET, |_| {}) else {
+            logger.log("vsock_unavailable");
+            logger.publish();
+            return 3;
         };
         let listener = match Listener::bind(family, trust::PORT, 1) {
             Ok(listener) => listener,
@@ -140,12 +137,9 @@ mod daemon {
         logger.log(&format!("listening port={}", trust::PORT));
         logger.publish();
         loop {
-            let mut connection = match listener.accept(Duration::from_secs(10)) {
-                Ok(connection) => connection,
-                Err(_) => {
-                    std::thread::sleep(Duration::from_millis(200));
-                    continue;
-                }
+            let Ok(mut connection) = listener.accept(Duration::from_secs(10)) else {
+                std::thread::sleep(Duration::from_millis(200));
+                continue;
             };
             match serve_one(&mut connection, &boot, &logger) {
                 Ok(()) => {

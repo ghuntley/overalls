@@ -63,7 +63,7 @@ impl Trust {
     }
 }
 
-#[derive(Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct Issued {
     pub version: u8,

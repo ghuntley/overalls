@@ -5,7 +5,7 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 
 #[derive(Clone, Deserialize, Serialize)]
-pub struct Config {
+pub(crate) struct Config {
     pub origin: String,
     pub zone: String,
     /// The OpenSSH client `config-ssh` verified (Windows: an absolute
@@ -15,7 +15,7 @@ pub struct Config {
     pub ssh_program: Option<String>,
 }
 
-pub fn home() -> io::Result<PathBuf> {
+pub(crate) fn home() -> io::Result<PathBuf> {
     let value = env::var_os("HOME")
         .or_else(|| {
             if cfg!(windows) {
@@ -32,7 +32,7 @@ pub fn home() -> io::Result<PathBuf> {
     Ok(path)
 }
 
-pub fn state_dir() -> io::Result<PathBuf> {
+pub(crate) fn state_dir() -> io::Result<PathBuf> {
     if guest_root() {
         return Ok(PathBuf::from("/var/lib/overalls"));
     }
@@ -52,7 +52,7 @@ pub fn state_dir() -> io::Result<PathBuf> {
     }
 }
 
-pub fn config_dir() -> io::Result<PathBuf> {
+pub(crate) fn config_dir() -> io::Result<PathBuf> {
     if cfg!(windows) {
         return Ok(windows_folder("APPDATA")?.join("Overalls"));
     }
@@ -64,7 +64,7 @@ pub fn config_dir() -> io::Result<PathBuf> {
     }
 }
 
-pub fn managed_bin() -> io::Result<PathBuf> {
+pub(crate) fn managed_bin() -> io::Result<PathBuf> {
     if guest_root() {
         return Ok(PathBuf::from("/var/lib/overalls/bin/overalls"));
     }
@@ -90,29 +90,30 @@ fn windows_folder(name: &str) -> io::Result<PathBuf> {
 }
 
 #[cfg(target_os = "linux")]
-pub fn guest_root() -> bool {
-    (unsafe { libc::geteuid() } == 0) && std::path::Path::new("/etc/overalls/guest-agent").is_file()
+pub(crate) fn guest_root() -> bool {
+    // SAFETY: geteuid has no preconditions and cannot fail.
+    let euid = unsafe { libc::geteuid() };
+    euid == 0 && std::path::Path::new("/etc/overalls/guest-agent").is_file()
 }
 
 /// Managed guests are Linux; a macOS or Windows workstation never is one.
 #[cfg(not(target_os = "linux"))]
-pub fn guest_root() -> bool {
+pub(crate) fn guest_root() -> bool {
     false
 }
 
 /// @cc [owner:ghuntley,label:security] workstation-ssh-program
 /// A recorded OpenSSH client MUST be an absolute path to an existing file
 /// named `ssh` or `ssh.exe`; otherwise the CLI uses `ssh` from PATH.
-pub fn ssh_program(config: Option<&Config>) -> std::ffi::OsString {
+pub(crate) fn ssh_program(config: Option<&Config>) -> std::ffi::OsString {
     config
         .and_then(|config| config.ssh_program.as_deref())
         .map(PathBuf::from)
         .filter(|path| valid_ssh_program(path))
-        .map(PathBuf::into_os_string)
-        .unwrap_or_else(|| "ssh".into())
+        .map_or_else(|| "ssh".into(), PathBuf::into_os_string)
 }
 
-pub fn valid_ssh_program(path: &std::path::Path) -> bool {
+pub(crate) fn valid_ssh_program(path: &std::path::Path) -> bool {
     path.is_absolute()
         && path.is_file()
         && matches!(
@@ -121,18 +122,18 @@ pub fn valid_ssh_program(path: &std::path::Path) -> bool {
         )
 }
 
-pub fn valid_zone(value: &str) -> bool {
+pub(crate) fn valid_zone(value: &str) -> bool {
     valid_dns_name(value, 189)
 }
 
-pub fn valid_host(value: &str) -> bool {
+pub(crate) fn valid_host(value: &str) -> bool {
     valid_dns_name(value, 253)
 }
 
 // @cc [owner:ghuntley,label:security] lyra-identity-selector-one-component
 // The identity selected by setup MUST remain one bounded .ssh filename; it may
 // not turn the outer proxy's identity option into a path or SSH token expansion.
-pub fn valid_ssh_identity_name(value: &str) -> bool {
+pub(crate) fn valid_ssh_identity_name(value: &str) -> bool {
     (1..=255).contains(&value.len())
         && value != "."
         && value != ".."
@@ -153,7 +154,7 @@ fn valid_dns_name(value: &str, maximum: usize) -> bool {
         })
 }
 
-pub fn valid_origin(value: &str) -> bool {
+pub(crate) fn valid_origin(value: &str) -> bool {
     let Some(authority) = value.strip_prefix("https://") else {
         return false;
     };
@@ -164,7 +165,7 @@ pub fn valid_origin(value: &str) -> bool {
     !host.is_empty() && valid_zone(host) && valid_port && !authority.contains('@')
 }
 
-pub fn valid_label(value: &str) -> bool {
+pub(crate) fn valid_label(value: &str) -> bool {
     let Some((prefix, id)) = value.rsplit_once('-') else {
         return false;
     };
@@ -179,13 +180,13 @@ pub fn valid_label(value: &str) -> bool {
             .all(|b| b.is_ascii_digit() || (b'a'..=b'f').contains(&b))
 }
 
-pub fn label_for<'a>(host: &'a str, zone: &str) -> Option<&'a str> {
+pub(crate) fn label_for<'a>(host: &'a str, zone: &str) -> Option<&'a str> {
     let suffix = format!(".{zone}");
     let label = host.strip_suffix(&suffix)?;
     valid_label(label).then_some(label)
 }
 
-pub fn save(config: &Config) -> io::Result<()> {
+pub(crate) fn save(config: &Config) -> io::Result<()> {
     if !valid_origin(&config.origin) || !valid_zone(&config.zone) {
         return Err(io::Error::other("invalid configuration"));
     }
@@ -200,7 +201,7 @@ pub fn save(config: &Config) -> io::Result<()> {
     Ok(())
 }
 
-pub fn load() -> io::Result<Config> {
+pub(crate) fn load() -> io::Result<Config> {
     let bytes = fs::read(config_dir()?.join("config.json"))?;
     if bytes.len() > 4096 {
         return Err(io::Error::other("configuration too large"));
@@ -224,7 +225,7 @@ mod tests {
         assert!(!valid_label(&format!("a;touch-{id}")));
         assert_eq!(
             label_for(&format!("a-{id}.vm.example"), "vm.example"),
-            Some(&format!("a-{id}")[..])
+            Some(format!("a-{id}").as_str())
         );
         assert!(!valid_origin("https://example.com:"));
     }

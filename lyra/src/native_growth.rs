@@ -68,8 +68,8 @@ impl Receipt {
             || !self.disk_bytes.is_multiple_of(512)
             || self.root_start
                 != match os {
-                    Os::FreeBsd => 2165940,
-                    Os::Illumos => 524544,
+                    Os::FreeBsd => 2_165_940,
+                    Os::Illumos => 524_544,
                 }
             || self.root_end_before < self.root_start
             || self.root_end_after < self.root_end_before
@@ -140,7 +140,7 @@ fn root_file(path: &Path, limit: u64) -> io::Result<Vec<u8>> {
 /// Bootstrap MUST require the root-owned, bounded, typed success receipt from
 /// the every-boot growth service before configuring network or boot identity.
 /// The runtime filesystem MUST be cleared by cleanvar (FreeBSD) or mounted
-/// volatile (OmniOS) before growth runs; prior-boot receipts grant no authority.
+/// volatile (`OmniOS`) before growth runs; prior-boot receipts grant no authority.
 pub fn require_success(os: Os) -> io::Result<()> {
     runtime_directory()?;
     let receipt: Receipt =
@@ -168,9 +168,11 @@ fn command(program: &str, arguments: &[&str], capture: bool) -> io::Result<Strin
         if let Some(pipe) = &pipe {
             // SAFETY: pipe owns its descriptor; these calls only set its status flags.
             let flags = unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_GETFL) };
-            if flags < 0
-                || unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) }
-                    < 0
+            if flags < 0 {
+                return Err(invalid());
+            }
+            // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned pipe.
+            if unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
             {
                 return Err(invalid());
             }
@@ -180,7 +182,7 @@ fn command(program: &str, arguments: &[&str], capture: bool) -> io::Result<Strin
         let mut buffer = [0_u8; 4096];
         let started = Instant::now();
         loop {
-            if started.elapsed() > Duration::from_secs(120) {
+            if started.elapsed() > Duration::from_mins(2) {
                 return Err(invalid());
             }
             if !eof {
@@ -392,8 +394,11 @@ fn capacity(file: &File) -> io::Result<u64> {
     let mut sector: libc::c_uint = 0;
     // SAFETY: pinned FreeBSD disk.h defines these read-only ioctls with the
     // exact off_t/u_int output objects supplied here; no disk bytes are written.
-    if unsafe { libc::ioctl(file.as_raw_fd(), 0x4008_6481, &mut bytes) } < 0
-        || unsafe { libc::ioctl(file.as_raw_fd(), 0x4004_6480, &mut sector) } < 0
+    if unsafe { libc::ioctl(file.as_raw_fd(), 0x4008_6481, &mut bytes) } < 0 {
+        return Err(invalid());
+    }
+    // SAFETY: as above; DIOCGSECTORSIZE writes only the supplied u_int.
+    if unsafe { libc::ioctl(file.as_raw_fd(), 0x4004_6480, &mut sector) } < 0
         || sector != 512
         || bytes <= 0
     {
@@ -405,6 +410,10 @@ fn capacity(file: &File) -> io::Result<u64> {
 #[cfg(any(target_os = "illumos", target_os = "solaris"))]
 fn capacity(file: &File) -> io::Result<u64> {
     #[repr(C)]
+    #[expect(
+        clippy::struct_field_names,
+        reason = "mirrors the dkio.h dk_minfo field layout"
+    )]
     struct Media {
         media_type: u32,
         sector_bytes: u32,
@@ -444,11 +453,15 @@ fn disk(path: &str) -> io::Result<File> {
 /// Growth MUST run as root against only the actual mounted pinned root, with
 /// no caller-selected target. A complete read-only GPT/capacity preflight MUST
 /// precede native mutation. FreeBSD MUST preserve the root UUID/start and every
-/// nonroot entry; OmniOS MUST additionally match the assembly pool GUID and a
+/// nonroot entry; `OmniOS` MUST additionally match the assembly pool GUID and a
 /// single whole-disk ZFS vdev, preserving loader and reserved-tail identity.
-/// OmniOS pool discovery MUST NOT depend on a persisted zpool cache, and MUST
+/// `OmniOS` pool discovery MUST NOT depend on a persisted zpool cache, and MUST
 /// create disk links before label discovery on a first boot at a new path.
 /// Failure MUST withhold a success receipt and MUST NOT emit native output.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one ordered grow sequence whose receipt depends on every step"
+)]
 pub fn run(os: Os) -> io::Result<()> {
     // SAFETY: geteuid reads the process credential without modifying state.
     if unsafe { libc::geteuid() } != 0 {
@@ -695,11 +708,11 @@ mod tests {
             os: Os::FreeBsd,
             outcome: Outcome::Unchanged,
             disk_bytes: 6_477_687_296,
-            root_start: 2165940,
-            root_end_before: 12651699,
-            root_end_after: 12651699,
-            backup_before: 12651732,
-            backup_after: 12651732,
+            root_start: 2_165_940,
+            root_end_before: 12_651_699,
+            root_end_after: 12_651_699,
+            backup_before: 12_651_732,
+            backup_after: 12_651_732,
             native_admission: false,
         };
         receipt.validate(Os::FreeBsd).unwrap();

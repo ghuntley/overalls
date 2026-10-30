@@ -181,7 +181,7 @@ pub fn encode_reply(reply: Reply, binding: &Binding, nonce: &str) -> io::Result<
 pub fn read_request(stream: &mut impl Read) -> io::Result<Vec<u8>> {
     use std::io::BufRead;
     let limit = u64::try_from(MAXIMUM_REQUEST + 1).map_err(io::Error::other)?;
-    let mut reader = std::io::BufReader::new(stream.take(limit));
+    let mut reader = io::BufReader::new(stream.take(limit));
     let mut line = Vec::with_capacity(1024);
     reader.read_until(b'\n', &mut line)?;
     if line.last() == Some(&b'\n') {
@@ -300,6 +300,7 @@ pub trait GitRunner {
 }
 
 /// Plain system `git` with a fixed environment; never a shell.
+#[derive(Debug)]
 pub struct SystemGit {
     pub program: PathBuf,
     pub ca_bundle: PathBuf,
@@ -387,13 +388,12 @@ impl GitGroup {
             .map_err(|_| io::Error::other("invalid git process"))
     }
 
-    fn kill(&self) -> io::Result<()> {
+    fn kill(&self) {
         // SAFETY: command() creates our child's process group with its PID. The
         // positive validated PID identifies only the group owned by this invocation.
         unsafe {
             libc::killpg(self.0, libc::SIGKILL);
         }
-        Ok(())
     }
 }
 #[cfg(windows)]
@@ -404,9 +404,8 @@ impl GitGroup {
         crate::platform::windows::job::Job::attach(child).map(Self)
     }
 
-    fn kill(&self) -> io::Result<()> {
+    fn kill(&self) {
         self.0.terminate();
-        Ok(())
     }
 }
 impl SystemGit {
@@ -445,14 +444,14 @@ impl SystemGit {
         });
         let output = receiver.recv_timeout(timeout);
         if !matches!(&output, Ok(Ok(bytes)) if bytes.len() <= 1_048_576) {
-            group.kill()?;
+            group.kill();
         }
         let status = loop {
             if let Some(status) = child.try_wait()? {
                 break status;
             }
             if started.elapsed() >= timeout {
-                group.kill()?;
+                group.kill();
                 break child.wait()?;
             }
             std::thread::sleep(Duration::from_millis(10));
@@ -587,6 +586,7 @@ impl Retry {
 }
 
 /// Persistent receiver state rooted at [`Paths`].
+#[derive(Debug)]
 pub struct Receiver {
     paths: Paths,
     shared_git_configuration: bool,
@@ -633,6 +633,10 @@ fn set_mode(file: &File, mode: u32) -> io::Result<()> {
     file.set_permissions(fs::Permissions::from_mode(mode))
 }
 #[cfg(windows)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Windows files inherit their directory ACL; the Unix variant shares the signature"
+)]
 fn set_mode(_file: &File, _mode: u32) -> io::Result<()> {
     Ok(())
 }
@@ -643,6 +647,10 @@ fn set_path_mode(path: &Path, mode: u32) -> io::Result<()> {
     fs::set_permissions(path, fs::Permissions::from_mode(mode))
 }
 #[cfg(windows)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "Windows paths inherit their directory ACL; the Unix variant shares the signature"
+)]
 fn set_path_mode(_path: &Path, _mode: u32) -> io::Result<()> {
     Ok(())
 }
@@ -667,6 +675,7 @@ impl Receiver {
     }
 
     /// Enable the native image's root-controlled system Git include.
+    #[must_use]
     pub fn with_shared_git_configuration(mut self) -> Self {
         self.shared_git_configuration = true;
         self
@@ -791,15 +800,12 @@ impl Receiver {
             self.publish(Status::Done)?;
             return Ok(None);
         }
-        match persisted {
-            Some(source) => {
-                self.publish(Status::Cloning)?;
-                Ok(Some(source))
-            }
-            None => {
-                self.publish(Status::Waiting)?;
-                Ok(None)
-            }
+        if let Some(source) = persisted {
+            self.publish(Status::Cloning)?;
+            Ok(Some(source))
+        } else {
+            self.publish(Status::Waiting)?;
+            Ok(None)
         }
     }
 
@@ -930,6 +936,10 @@ fn share(root: &Path) -> io::Result<()> {
 /// Windows checkouts are shared through the workspace directory's ACL, which
 /// the Windows workspace service sets once (gate 5); no per-file mode exists.
 #[cfg(windows)]
+#[expect(
+    clippy::unnecessary_wraps,
+    reason = "the Windows service sets the workspace ACL once; the Unix variant shares the signature"
+)]
 fn share(_root: &Path) -> io::Result<()> {
     Ok(())
 }
@@ -961,7 +971,7 @@ mod tests {
     fn reply_is_one_bounded_line() {
         let bytes = encode_reply(Reply::Accepted, &binding(), &"b".repeat(64)).expect("reply");
         assert!(bytes.len() <= MAXIMUM_REPLY);
-        assert_eq!(bytes.iter().filter(|byte| **byte == b'\n').count(), 1);
+        assert_eq!(bytes.split(|byte| *byte == b'\n').count(), 2);
         let value: Value = serde_json::from_slice(&bytes).expect("json");
         assert_eq!(value["state"], "accepted");
         assert_eq!(value["execution_epoch"], 3);
@@ -973,8 +983,8 @@ mod tests {
         let total: Duration = (0..retry.attempts - 1)
             .map(|attempt| retry.delay(attempt))
             .sum();
-        assert!(total <= Duration::from_secs(900));
-        assert!(total >= Duration::from_secs(300));
+        assert!(total <= Duration::from_mins(15));
+        assert!(total >= Duration::from_mins(5));
     }
 
     #[test]

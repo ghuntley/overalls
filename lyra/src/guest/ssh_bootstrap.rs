@@ -102,6 +102,10 @@ mod tests {
     use std::{fs, io};
 
     #[derive(Default)]
+    #[expect(
+        clippy::struct_excessive_bools,
+        reason = "independent fixture switches for each platform outcome"
+    )]
     struct Fixture {
         current: bool,
         certificate: bool,

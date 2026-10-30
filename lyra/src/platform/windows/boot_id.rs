@@ -1,7 +1,7 @@
 //! Per-boot identity for Windows guests (ADR-0171).
 //!
 //! Linux agents read `/proc/sys/kernel/random/boot_id`. Windows has no such
-//! value, so the first agent of a boot generates a UUIDv4 and keeps it in a
+//! value, so the first agent of a boot generates a `UUIDv4` and keeps it in a
 //! **volatile** registry key (`HKLM\SOFTWARE\Overalls\Boot`, value `BootId`):
 //! stable for every process of this boot, gone at the next one. A named mutex
 //! serialises the first generation so all agents agree.
@@ -38,16 +38,18 @@ fn valid_uuid(value: &str) -> bool {
         })
 }
 
-/// A fresh lowercase UUIDv4 from the system RNG.
+/// A fresh lowercase `UUIDv4` from the system RNG.
 pub fn generate() -> io::Result<String> {
     let mut bytes = [0u8; 16];
+    let length =
+        u32::try_from(bytes.len()).map_err(|_| io::Error::other("system RNG unavailable"))?;
     // SAFETY: `bytes` is a writable 16-byte buffer; the system-preferred RNG
     // needs no algorithm handle.
     let status = unsafe {
         BCryptGenRandom(
             null_mut(),
             bytes.as_mut_ptr(),
-            bytes.len() as u32,
+            length,
             BCRYPT_USE_SYSTEM_PREFERRED_RNG,
         )
     };
@@ -56,14 +58,13 @@ pub fn generate() -> io::Result<String> {
     }
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    let hex: String = bytes.iter().map(|byte| format!("{byte:02x}")).collect();
     Ok(format!(
         "{}-{}-{}-{}-{}",
-        &hex[0..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..32]
+        hex::encode(&bytes[0..4]),
+        hex::encode(&bytes[4..6]),
+        hex::encode(&bytes[6..8]),
+        hex::encode(&bytes[8..10]),
+        hex::encode(&bytes[10..16])
     ))
 }
 
@@ -92,10 +93,12 @@ impl Mutex {
 
 impl Drop for Mutex {
     fn drop(&mut self) {
-        // SAFETY: this process holds the mutex and the handle, released and
-        // closed exactly once.
+        // SAFETY: this process holds the mutex, released exactly once.
         unsafe {
             ReleaseMutex(self.0);
+        }
+        // SAFETY: the handle is owned by this guard and closed exactly once.
+        unsafe {
             CloseHandle(self.0);
         }
     }
@@ -119,12 +122,12 @@ impl Key {
                 REG_OPTION_VOLATILE,
                 KEY_READ | KEY_WRITE,
                 null(),
-                &mut key,
-                &mut disposition,
+                &raw mut key,
+                &raw mut disposition,
             )
         };
         if status != ERROR_SUCCESS {
-            return Err(io::Error::from_raw_os_error(status as i32));
+            return Err(io::Error::from_raw_os_error(status.cast_signed()));
         }
         Ok(Self(key))
     }
@@ -133,7 +136,7 @@ impl Key {
         let name = wide(VALUE);
         let mut kind = 0u32;
         let mut buffer = [0u16; 64];
-        let mut size = (buffer.len() * 2) as u32;
+        let mut size = u32::try_from(size_of_val(&buffer)).ok()?;
         // SAFETY: `buffer` holds `size` writable bytes; `kind` and `size` are
         // writable outputs.
         let status = unsafe {
@@ -141,9 +144,9 @@ impl Key {
                 self.0,
                 name.as_ptr(),
                 null(),
-                &mut kind,
+                &raw mut kind,
                 buffer.as_mut_ptr().cast::<u8>(),
-                &mut size,
+                &raw mut size,
             )
         };
         if status != ERROR_SUCCESS || kind != REG_SZ {
@@ -158,6 +161,8 @@ impl Key {
     fn write(&self, value: &str) -> io::Result<()> {
         let name = wide(VALUE);
         let data = wide(value);
+        let bytes =
+            u32::try_from(data.len() * 2).map_err(|_| io::Error::other("invalid boot ID"))?;
         // SAFETY: `data` is NUL-terminated UTF-16 of the stated byte length.
         let status = unsafe {
             RegSetValueExW(
@@ -166,11 +171,11 @@ impl Key {
                 0,
                 REG_SZ,
                 data.as_ptr().cast::<u8>(),
-                (data.len() * 2) as u32,
+                bytes,
             )
         };
         if status != ERROR_SUCCESS {
-            return Err(io::Error::from_raw_os_error(status as i32));
+            return Err(io::Error::from_raw_os_error(status.cast_signed()));
         }
         Ok(())
     }
@@ -186,7 +191,7 @@ impl Drop for Key {
 }
 
 /// @cc [owner:ghuntley,label:security;recovery] windows-boot-id-volatile-once
-/// boot_id MUST return the same lowercase UUIDv4 to every process of one
+/// `boot_id` MUST return the same lowercase `UUIDv4` to every process of one
 /// Windows boot and a different one after a reboot: it lives only in a
 /// volatile registry key, is generated at most once per boot under a named
 /// mutex, and a malformed stored value is replaced rather than returned.

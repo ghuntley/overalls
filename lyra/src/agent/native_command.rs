@@ -45,7 +45,11 @@ impl<R: Read + AsRawFd> Pipe<R> {
         let fd = source.as_raw_fd();
         // SAFETY: source owns the descriptor; only its status flags change.
         let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-        if flags < 0 || unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
+        if flags < 0 {
+            return Err(io::Error::last_os_error());
+        }
+        // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned descriptor.
+        if unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
             return Err(io::Error::last_os_error());
         }
         Ok(Self {
@@ -69,7 +73,7 @@ impl<R: Read + AsRawFd> Pipe<R> {
                     let retained = count.min(limit.saturating_sub(self.bytes.len()));
                     self.bytes.extend_from_slice(&buffer[..retained]);
                 }
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
                 Err(error) if error.kind() == io::ErrorKind::WouldBlock => break,
                 Err(error) => return Err(error),
             }
@@ -139,13 +143,10 @@ fn collect(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
     let mut child = command.spawn()?;
-    let pid = match libc::pid_t::try_from(child.id()) {
-        Ok(pid) => pid,
-        Err(_) => {
-            let _ = child.kill();
-            let _ = child.wait();
-            return Err(io::Error::other("invalid native child PID"));
-        }
+    let Ok(pid) = libc::pid_t::try_from(child.id()) else {
+        let _ = child.kill();
+        let _ = child.wait();
+        return Err(io::Error::other("invalid native child PID"));
     };
     let mut group = Group(Some(pid));
     let result = (|| {
@@ -303,6 +304,7 @@ mod tests {
         assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
         // The direct child has already been reaped by the command runner.
         assert_eq!(
+            // SAFETY: a null status pointer is permitted and WNOHANG never blocks.
             unsafe { libc::waitpid(pids[0], std::ptr::null_mut(), libc::WNOHANG) },
             -1
         );

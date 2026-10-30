@@ -163,13 +163,11 @@ fn roots_from_pem(bytes: &[u8]) -> io::Result<RootCertStore> {
     let mut remaining = text;
     let mut roots = RootCertStore::empty();
     let mut count = 0;
-    while let Some(begin) = remaining.find(BEGIN) {
-        let encoded = &remaining[begin + BEGIN.len()..];
-        let end = encoded.find(END).ok_or_else(|| unavailable("gateway-ca"))?;
-        let value: String = encoded[..end]
-            .chars()
-            .filter(|c| !c.is_whitespace())
-            .collect();
+    while let Some((_, after)) = remaining.split_once(BEGIN) {
+        let (encoded, rest) = after
+            .split_once(END)
+            .ok_or_else(|| unavailable("gateway-ca"))?;
+        let value: String = encoded.chars().filter(|c| !c.is_whitespace()).collect();
         let der = STANDARD
             .decode(value)
             .map_err(|_| unavailable("gateway-ca"))?;
@@ -177,7 +175,7 @@ fn roots_from_pem(bytes: &[u8]) -> io::Result<RootCertStore> {
             .add(CertificateDer::from(der))
             .map_err(|_| unavailable("gateway-ca"))?;
         count += 1;
-        remaining = &encoded[end + END.len()..];
+        remaining = rest;
     }
     if count == 0 {
         return Err(unavailable("gateway-ca"));
@@ -227,7 +225,7 @@ fn post_gateway(
         .map_err(|_| unavailable("gateway-connect"))?;
     stream
         .set_read_timeout(Some(Duration::from_secs(10)))
-        .and_then(|_| stream.set_write_timeout(Some(Duration::from_secs(10))))
+        .and_then(|()| stream.set_write_timeout(Some(Duration::from_secs(10))))
         .map_err(|_| unavailable("gateway-connect"))?;
     let server_name = ServerName::try_from(client.host.clone())
         .map_err(|_| unavailable("gateway-tls-hostname"))?;
@@ -250,8 +248,8 @@ fn post_gateway(
     );
     stream
         .write_all(request.as_bytes())
-        .and_then(|_| stream.write_all(&body))
-        .and_then(|_| stream.flush())
+        .and_then(|()| stream.write_all(&body))
+        .and_then(|()| stream.flush())
         .map_err(|_| unavailable("gateway-connect"))?;
     let (status, response) = read_response(&mut stream)?;
     if !(200..300).contains(&status) {
@@ -359,10 +357,10 @@ fn run() -> io::Result<()> {
         )?)?),
         _ => return Err(ssh_certificate::invalid()),
     };
-    let directory = gateway
-        .as_ref()
-        .map(|c| c.key_dir.clone())
-        .unwrap_or_else(|| PathBuf::from(Platform::current().host_keys()));
+    let directory = gateway.as_ref().map_or_else(
+        || PathBuf::from(Platform::current().host_keys()),
+        |c| c.key_dir.clone(),
+    );
     if !directory.try_exists()? {
         fs::create_dir(&directory)?;
         fs::set_permissions(&directory, fs::Permissions::from_mode(0o700))?;
@@ -476,12 +474,11 @@ fn renew(directory: &Path, key: &str, gateway: Option<&Gateway>) -> io::Result<(
     Ok(())
 }
 fn main() -> ExitCode {
-    match run() {
-        Ok(()) => ExitCode::SUCCESS,
-        Err(_) => {
-            eprintln!("SSH host certificate unavailable");
-            ExitCode::FAILURE
-        }
+    if run().is_ok() {
+        ExitCode::SUCCESS
+    } else {
+        eprintln!("SSH host certificate unavailable");
+        ExitCode::FAILURE
     }
 }
 

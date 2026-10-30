@@ -1,6 +1,10 @@
 //! Boot-bound source-v2 workspace receiver for native guests.
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one ordered boot-bound receiver loop; recovery precedes listening"
+)]
 fn main() -> ! {
     use lyra::native_guest;
     use lyra::native_vsock::Listener;
@@ -16,9 +20,8 @@ fn main() -> ! {
     } else {
         "illumos"
     };
-    let (boot, _, _) = match native_guest::identity() {
-        Ok(value) => value,
-        Err(_) => std::process::exit(1),
+    let Ok((boot, _, _)) = native_guest::identity() else {
+        std::process::exit(1);
     };
     let identity =
         lyra::guest::mmds::fetch(std::time::Duration::from_secs(5)).and_then(|document| {
@@ -95,14 +98,12 @@ fn main() -> ! {
         Ok(None) => {}
         Err(_) => std::process::exit(4),
     }
-    let listener = match Listener::bind(receiver::PORT, 4) {
-        Ok(value) => value,
-        Err(_) => std::process::exit(3),
+    let Ok(listener) = Listener::bind(receiver::PORT, 4) else {
+        std::process::exit(3);
     };
     loop {
-        let mut connection = match listener.accept() {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok(mut connection) = listener.accept() else {
+            continue;
         };
         match receiver::answer(&mut connection, &binding, &state) {
             Ok((decision, source)) if decision.clone => spawn(&state, &cloning, source),

@@ -101,7 +101,11 @@ mod sync {
     fn roster_lock() -> io::Result<File> {
         let file = lyra::platform::open_private(
             Path::new(LOCK),
-            OpenOptions::new().read(true).write(true).create(true).truncate(false),
+            OpenOptions::new()
+                .read(true)
+                .write(true)
+                .create(true)
+                .truncate(false),
         )?;
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
@@ -238,7 +242,7 @@ mod sync {
     /// Keys per account as last applied, for matching login fingerprints.
     type KeyIndex = HashMap<String, Vec<String>>;
 
-    fn apply_keys(state: &State, listing: AuthorizedKeys) -> io::Result<KeyIndex> {
+    fn apply_keys(state: &State, listing: &AuthorizedKeys) -> io::Result<KeyIndex> {
         fs::create_dir_all(KEYS_DIR)?;
         let mut index = KeyIndex::new();
         for account in &state.accounts {
@@ -329,7 +333,7 @@ mod sync {
     /// match both requested name and UID before the shared reconciler runs.
     /// Missing trust, stale roster or reconciliation failure MUST return failure
     /// with no credentials, identity, response body or arguments in diagnostics.
-    pub fn ensure_account(username: &str, uid: u32) -> io::Result<()> {
+    pub(crate) fn ensure_account(username: &str, uid: u32) -> io::Result<()> {
         if !ssh_roster::valid_name(username) || !ssh_roster::UID_RANGE.contains(&uid) {
             return Err(io::Error::other("invalid account"));
         }
@@ -353,7 +357,7 @@ mod sync {
         if listing.version == 0 {
             return Err(io::Error::other("invalid authorized keys"));
         }
-        apply_keys(state, listing)
+        apply_keys(state, &listing)
     }
 
     /// @cc [owner:ghuntley,label:security;recovery] windows-key-fetch-after-bootstrap
@@ -419,7 +423,7 @@ mod sync {
             let Ok(mut file) = File::open(&self.path) else {
                 return Vec::new();
             };
-            let length = file.metadata().map(|m| m.len()).unwrap_or(0);
+            let length = file.metadata().map_or(0, |m| m.len());
             if length < self.offset {
                 // Rotated or truncated: start over.
                 self.offset = 0;
@@ -439,9 +443,9 @@ mod sync {
             self.offset += chunk.len() as u64;
             self.partial.push_str(&String::from_utf8_lossy(&chunk));
             let mut lines = Vec::new();
-            while let Some(index) = self.partial.find('\n') {
-                let line = self.partial[..index].trim_end_matches('\r').to_owned();
-                self.partial = self.partial[index + 1..].to_owned();
+            while let Some((line, rest)) = self.partial.split_once('\n') {
+                let line = line.trim_end_matches('\r').to_owned();
+                self.partial = rest.to_owned();
                 lines.push(line);
             }
             lines
@@ -471,7 +475,7 @@ mod sync {
         }
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let logger = Logger::new("ssh-sync");
         logger.log("start");
         let _ = fs::create_dir_all(SSH_DIR);
@@ -533,14 +537,12 @@ fn main() {
     let arguments: Vec<String> = std::env::args().skip(1).take(4).collect();
     let status = match arguments.as_slice() {
         [] => sync::run(),
-        [operation, username, uid] if operation == "--ensure-account" => {
-            match uid.parse::<u32>() {
-                Ok(parsed) if parsed.to_string() == *uid => {
-                    if sync::ensure_account(username, parsed).is_ok() { 0 } else { 1 }
-                }
-                _ => 64,
+        [operation, username, uid] if operation == "--ensure-account" => match uid.parse::<u32>() {
+            Ok(parsed) if parsed.to_string() == *uid => {
+                i32::from(sync::ensure_account(username, parsed).is_err())
             }
-        }
+            _ => 64,
+        },
         _ => 64,
     };
     std::process::exit(status);

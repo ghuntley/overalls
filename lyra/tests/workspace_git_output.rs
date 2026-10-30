@@ -17,6 +17,10 @@ fn helper_invocation(name: &str) -> bool {
     std::env::args().any(|argument| argument == name)
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn invoked_program() -> PathBuf {
     PathBuf::from(std::env::args_os().next().expect("invoked executable"))
 }
@@ -61,6 +65,11 @@ fn workspace_git_sleeping_pipe_helper() {
     clippy::zombie_processes,
     reason = "the fixture parent must exit before its stdout-holding child; the regression verifies group cancellation"
 )]
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn spawn_pipe_holder() {
     let mut child = Command::new(invoked_program())
         .args([
@@ -102,6 +111,11 @@ fn workspace_git_oversized_pipe_helper() {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    clippy::panic,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn process_alive(pid: u32) -> bool {
     match fs::read_to_string(format!("/proc/{pid}/stat")) {
         Ok(stat) => {
@@ -114,6 +128,10 @@ fn process_alive(pid: u32) -> bool {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn bounded_output(helper: &str, timeout: Duration) {
     let root = tempfile::tempdir().expect("fixture root");
     let program = root.path().join("fake-git");
@@ -172,7 +190,7 @@ fn output_limit_kills_active_parent_and_descendant() {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] workspace-git-system-config
-/// Native SystemGit MUST select only the daemon-owned system configuration and
+/// Native `SystemGit` MUST select only the daemon-owned system configuration and
 /// MUST leave ordinary guest Git isolated from system configuration.
 #[test]
 fn native_system_config_is_selected_without_widening_defaults() {
@@ -225,12 +243,20 @@ fn native_system_config_is_selected_without_widening_defaults() {
 
 struct Advertised(Vec<u8>);
 impl GitRunner for Advertised {
+    #[expect(
+        clippy::panic,
+        reason = "test double: an unexpected call must fail the test"
+    )]
     fn run(&mut self, _: &[String]) -> io::Result<bool> {
         panic!("resolution must not invoke checkout commands")
     }
     fn output(&mut self, _: &[String]) -> io::Result<Vec<u8>> {
         Ok(self.0.clone())
     }
+    #[expect(
+        clippy::panic,
+        reason = "test double: an unexpected call must fail the test"
+    )]
     fn change_head(&mut self, _: &WorkspaceSource) -> io::Result<Checkout> {
         panic!("named resolution must not invoke a provider API")
     }

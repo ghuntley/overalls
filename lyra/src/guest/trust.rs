@@ -32,7 +32,7 @@ pub struct Request {
     pub roots: Vec<String>,
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Serialize)]
 pub struct Receipt<'a> {
     pub version: u8,
     pub state: &'static str,
@@ -141,7 +141,8 @@ pub fn read_frame(stream: &mut impl Read) -> io::Result<Request> {
 /// Write one length-prefixed receipt frame.
 pub fn write_frame(stream: &mut impl Write, receipt: &Receipt<'_>) -> io::Result<()> {
     let body = serde_json::to_vec(receipt)?;
-    stream.write_all(&(body.len() as u32).to_be_bytes())?;
+    let length = u32::try_from(body.len()).map_err(|_| io::Error::other("invalid frame"))?;
+    stream.write_all(&length.to_be_bytes())?;
     stream.write_all(&body)
 }
 
@@ -202,12 +203,17 @@ mod tests {
             "bundle_digest": request.bundle_digest, "roots": request.roots
         }))
         .unwrap();
-        let mut framed = (body.len() as u32).to_be_bytes().to_vec();
+        let mut framed = u32::try_from(body.len()).unwrap().to_be_bytes().to_vec();
         framed.extend_from_slice(&body);
         let parsed = read_frame(&mut framed.as_slice()).unwrap();
         assert_eq!(parsed.roots.len(), 1);
         assert!(read_frame(&mut [0u8, 0, 0, 0].as_slice()).is_err());
-        assert!(read_frame(&mut (MAX_FRAME as u32 + 1).to_be_bytes().as_slice()).is_err());
+        assert!(read_frame(
+            &mut (u32::try_from(MAX_FRAME).unwrap() + 1)
+                .to_be_bytes()
+                .as_slice()
+        )
+        .is_err());
         let boot = boot();
         let mut out = Vec::new();
         write_frame(&mut out, &receipt(&parsed, &boot)).unwrap();

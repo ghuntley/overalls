@@ -40,7 +40,7 @@ fn optional_text(result: io::Result<Vec<u8>>) -> io::Result<String> {
 /// Appending trust MUST NOT promote unmanaged trailing text into a managed
 /// marker; a configuration that would splice that way refuses before any
 /// write.
-pub fn install(origin: &str, zone: &str) -> io::Result<Trust> {
+pub(crate) fn install(origin: &str, zone: &str) -> io::Result<Trust> {
     let bytes = http::request_exact(
         &format!("{origin}/bin/ssh-trust.json"),
         reqwest::StatusCode::OK,
@@ -103,7 +103,7 @@ fn merge(prior: &str, trust: &Trust) -> io::Result<String> {
         (Some(a), Some(b))
             if a < b && prior.matches(&start).count() == 1 && prior.matches(&end).count() == 1 =>
         {
-            if prior[a..b + end.len()] != block {
+            if prior.get(a..b + end.len()) != Some(block.as_str()) {
                 return Err(io::Error::other("SSH CA trust conflicts"));
             }
             Ok(prior.to_owned())
@@ -128,7 +128,7 @@ fn merge(prior: &str, trust: &Trust) -> io::Result<String> {
         _ => Err(io::Error::other("invalid managed SSH trust")),
     }
 }
-pub fn load(origin: &str, zone: &str) -> io::Result<Trust> {
+pub(crate) fn load(origin: &str, zone: &str) -> io::Result<Trust> {
     let trust: Trust =
         serde_json::from_str(&read(&config::home()?.join(".ssh/overalls-trust.json"))?)?;
     validate(&trust, origin, zone)?;
@@ -139,7 +139,7 @@ pub fn load(origin: &str, zone: &str) -> io::Result<Trust> {
 
 /// Preserve OpenSSH revocation matching (including hashed names and CA keys)
 /// while narrowing positive trust to the exact current gateway alias.
-pub fn gateway_known_hosts(trust: &Trust, alias: &str) -> io::Result<String> {
+pub(crate) fn gateway_known_hosts(trust: &Trust, alias: &str) -> io::Result<String> {
     gateway_trust_files(
         trust,
         alias,
@@ -177,8 +177,11 @@ fn revocations(content: &str) -> String {
     content
         .lines()
         .filter(|line| line.split_whitespace().next() == Some("@revoked"))
-        .map(|line| format!("{line}\n"))
-        .collect()
+        .fold(String::new(), |mut out, line| {
+            out.push_str(line);
+            out.push('\n');
+            out
+        })
 }
 
 #[cfg(test)]

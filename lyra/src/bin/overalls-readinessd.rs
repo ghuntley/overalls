@@ -26,7 +26,7 @@ mod daemon {
     use std::path::{Path, PathBuf};
     use std::time::{Duration, Instant};
 
-    const IDENTITY_BUDGET: Duration = Duration::from_secs(600);
+    const IDENTITY_BUDGET: Duration = Duration::from_mins(10);
     const RUN_DIR: &str = "C:\\overalls\\run";
     const SSHD: &str = "sshd";
     /// Services that must be RUNNING before the guest is ready, besides sshd:
@@ -119,7 +119,7 @@ mod daemon {
         Ok((boot, address, gateway))
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let logger = Logger::new("readinessd");
         logger.log("start");
         if let Err(error) = vsock::startup() {
@@ -170,16 +170,13 @@ mod daemon {
         };
         let mut answered = false;
         loop {
-            let mut connection = match listener.accept(Duration::from_secs(2)) {
-                Ok(connection) => connection,
-                Err(_) => {
-                    std::thread::sleep(Duration::from_millis(200));
-                    continue;
-                }
+            let Ok(mut connection) = listener.accept(Duration::from_secs(2)) else {
+                std::thread::sleep(Duration::from_millis(200));
+                continue;
             };
             match readiness::answer(connection.peer_cid, HOST_CID, &boot, &mut live) {
-                Ok(Some(line)) => {
-                    if connection.write_all(&line).is_ok() && !answered {
+                Ok(Some(answer)) => {
+                    if connection.write_all(&answer).is_ok() && !answered {
                         answered = true;
                         logger.log("ready_answered");
                         logger.publish();

@@ -26,7 +26,7 @@ mod daemon {
     use std::thread;
     use std::time::{Duration, Instant};
 
-    const IDENTITY_BUDGET: Duration = Duration::from_secs(600);
+    const IDENTITY_BUDGET: Duration = Duration::from_mins(10);
     /// Git for Windows' launcher, installed machine-wide by winget from the pinned manifest (ADR-0173).
     const GIT: &str = "C:\\Program Files\\Git\\cmd\\git.exe";
     const TRUST_DIR: &str = "C:\\overalls\\trust";
@@ -134,7 +134,7 @@ mod daemon {
         }
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         let logger = Logger::new("workspaced");
         logger.log("start");
         if vsock::startup().is_err() {
@@ -178,13 +178,10 @@ mod daemon {
                 return 5;
             }
         }
-        let family = match vsock::discover(IDENTITY_BUDGET, |_| {}) {
-            Ok(family) => family,
-            Err(_) => {
-                logger.log("vsock_unavailable");
-                logger.publish();
-                return 3;
-            }
+        let Ok(family) = vsock::discover(IDENTITY_BUDGET, |_| {}) else {
+            logger.log("vsock_unavailable");
+            logger.publish();
+            return 3;
         };
         let listener = match Listener::bind(family, PORT, 4) {
             Ok(listener) => listener,
@@ -200,12 +197,9 @@ mod daemon {
         logger.log(&format!("listening port={PORT}"));
         logger.publish();
         loop {
-            let mut connection = match listener.accept(Duration::from_secs(5)) {
-                Ok(connection) => connection,
-                Err(_) => {
-                    thread::sleep(Duration::from_millis(200));
-                    continue;
-                }
+            let Ok(mut connection) = listener.accept(Duration::from_secs(5)) else {
+                thread::sleep(Duration::from_millis(200));
+                continue;
             };
             if !connection.from_host() {
                 logger.log("rejected");

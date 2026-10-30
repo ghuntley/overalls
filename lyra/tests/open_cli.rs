@@ -37,6 +37,10 @@ fi
 exit "$(cat "$dir/guest.status")"
 "#;
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 /// One shared HOME so the CLI's seed copy happens once per test process.
 fn home() -> &'static Path {
     static HOME: OnceLock<PathBuf> = OnceLock::new();
@@ -71,6 +75,10 @@ struct Url {
     url: String,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn urls() -> &'static (Vec<String>, Vec<String>) {
     static URLS: OnceLock<(Vec<String>, Vec<String>)> = OnceLock::new();
     URLS.get_or_init(|| {
@@ -119,20 +127,24 @@ struct OpenMachine {
 }
 
 fn uuid(value: u128) -> String {
-    let hex = format!("{value:032x}");
+    let bytes = value.to_be_bytes();
     format!(
         "{}-{}-{}-{}-{}",
-        &hex[..8],
-        &hex[8..12],
-        &hex[12..16],
-        &hex[16..20],
-        &hex[20..]
+        hex::encode(&bytes[..4]),
+        hex::encode(&bytes[4..6]),
+        hex::encode(&bytes[6..8]),
+        hex::encode(&bytes[8..10]),
+        hex::encode(&bytes[10..])
     )
 }
 
 /// Independent oracle for `OverallsProtocol.IngressName.label/2`.
+#[expect(
+    clippy::expect_used,
+    reason = "generated machine names are ASCII, so every byte offset is a boundary"
+)]
 fn expected_label(name: &str, id: u128) -> String {
-    let prefix = &name[..name.len().min(22)];
+    let prefix = name.get(..name.len().min(22)).expect("ASCII machine name");
     format!("v-{}-{id:032x}", prefix.trim_end_matches('-'))
 }
 
@@ -140,6 +152,10 @@ fn single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\\''"))
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture: a failed setup step must abort the test"
+)]
 fn read_calls(directory: &Path) -> Vec<Vec<String>> {
     let mut entries: Vec<(usize, Vec<String>)> = fs::read_dir(directory)
         .expect("calls")
@@ -190,6 +206,10 @@ impl OpenMachine {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture: a failed setup step must abort the test"
+    )]
     fn execute(&mut self) -> (i32, Vec<Vec<String>>) {
         let directory = self.fixture.path();
         let calls = directory.join("calls");
@@ -227,6 +247,10 @@ impl OpenMachine {
         (output.status.code().unwrap_or(-1), read_calls(&calls))
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "shared-vector oracle: a mismatch must fail the test"
+    )]
     fn check_porsche_call(&mut self, call: &[String], source: &WorkspaceSource) {
         let canonical = source.to_url();
         let fixed: Vec<&str> = vec![
@@ -304,6 +328,10 @@ done
 
 #[hegel::state_machine]
 impl OpenMachine {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn validate_url(&mut self, tc: TestCase) {
         let (accepted, refused) = urls();
@@ -315,6 +343,10 @@ impl OpenMachine {
         };
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn create(&mut self, tc: TestCase) {
         self.porsche = tc.draw(gs::sampled_from(vec![
@@ -336,6 +368,10 @@ impl OpenMachine {
         ]));
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn guest_session(&mut self, tc: TestCase) {
         self.guest_exit = tc.draw(gs::integers::<u8>().max_value(3));
@@ -347,6 +383,11 @@ impl OpenMachine {
         }
     }
 
+    // `expect` is unfulfillable here: the state-machine macro re-emits rules.
+    #[allow(
+        clippy::expect_used,
+        reason = "Hegel state-machine rule: a failed step must fail the property"
+    )]
     #[rule]
     fn open(&mut self, _: TestCase) {
         let (code, calls) = self.execute();

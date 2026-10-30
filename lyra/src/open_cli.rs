@@ -31,7 +31,7 @@ struct Created {
 
 /// The created machine, reduced to validated identity fields.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Machine {
+pub(crate) struct Machine {
     pub id: String,
     pub name: String,
     /// The guest SSH host Marshall reported, when an ingress zone exists.
@@ -64,7 +64,7 @@ fn valid_machine_name(value: &str) -> bool {
 }
 
 /// Parse Porsche's `new --json` result for this request.
-pub fn parse_created(bytes: &[u8], request_id: &str) -> io::Result<Machine> {
+pub(crate) fn parse_created(bytes: &[u8], request_id: &str) -> io::Result<Machine> {
     if bytes.len() > MAXIMUM_RESPONSE {
         return Err(io::Error::other("response too large"));
     }
@@ -88,8 +88,8 @@ pub fn parse_created(bytes: &[u8], request_id: &str) -> io::Result<Machine> {
 }
 
 /// `OverallsProtocol.IngressName.label/2`: the SSH label persisted at creation.
-pub fn ingress_label(machine: &Machine) -> Option<String> {
-    let prefix = &machine.name[..machine.name.len().min(22)];
+pub(crate) fn ingress_label(machine: &Machine) -> Option<String> {
+    let prefix = machine.name.get(..machine.name.len().min(22))?;
     let label = format!(
         "v-{}-{}",
         prefix.trim_end_matches('-'),
@@ -100,7 +100,7 @@ pub fn ingress_label(machine: &Machine) -> Option<String> {
 
 /// Prefer Marshall's reported SSH host within the configured zone; otherwise
 /// derive the persisted ingress label.
-pub fn guest_host(machine: &Machine, zone: &str) -> Option<String> {
+pub(crate) fn guest_host(machine: &Machine, zone: &str) -> Option<String> {
     match machine.ssh_host.as_deref() {
         Some(host) => {
             let label = config::label_for(host, zone)?;
@@ -111,7 +111,7 @@ pub fn guest_host(machine: &Machine, zone: &str) -> Option<String> {
 }
 
 /// Porsche listens on the configured origin's host at port 22 (ADR-0046).
-pub fn porsche_host(origin: &str) -> Option<&str> {
+pub(crate) fn porsche_host(origin: &str) -> Option<&str> {
     let authority = origin.strip_prefix("https://")?;
     let host = authority
         .split_once(':')
@@ -132,7 +132,11 @@ fn fresh_request_id() -> io::Result<String> {
 // validated machine identity, the configured zone and a fixed remote script
 // whose sole interpolation is the grammar-restricted repository name. User
 // command words are single-quoted, never evaluated locally, and never logged.
-pub fn porsche_arguments(host: &str, source: &WorkspaceSource, request_id: &str) -> Vec<String> {
+pub(crate) fn porsche_arguments(
+    host: &str,
+    source: &WorkspaceSource,
+    request_id: &str,
+) -> Vec<String> {
     [
         "-T",
         "-p",
@@ -168,7 +172,7 @@ fn quote(value: &str) -> io::Result<String> {
 
 /// The fixed guest script: wait for the clone status, enter the checkout,
 /// then start a login shell or the quoted user command.
-pub fn remote_script(source: &WorkspaceSource, command: &[String]) -> io::Result<String> {
+pub(crate) fn remote_script(source: &WorkspaceSource, command: &[String]) -> io::Result<String> {
     let run = if command.is_empty() {
         "exec \"${SHELL:-/bin/sh}\" -l".to_owned()
     } else {
@@ -206,12 +210,12 @@ cd -- /workspace/{repo} || exit 1
 }
 
 /// Guest SSH argv (without the program name).
-pub fn guest_arguments(host: &str, script: &str) -> Vec<String> {
+pub(crate) fn guest_arguments(host: &str, script: &str) -> Vec<String> {
     vec!["-t".into(), "--".into(), host.into(), script.into()]
 }
 
 /// A non-interactive login that only proves the new guest accepts SSH.
-pub fn probe_arguments(host: &str) -> Vec<String> {
+pub(crate) fn probe_arguments(host: &str) -> Vec<String> {
     vec![
         "-o".into(),
         "BatchMode=yes".into(),
@@ -224,7 +228,7 @@ pub fn probe_arguments(host: &str) -> Vec<String> {
 }
 
 /// How long to wait for a freshly created guest to accept SSH.
-pub fn ready_timeout(value: Option<&str>) -> Duration {
+pub(crate) fn ready_timeout(value: Option<&str>) -> Duration {
     let seconds = value
         .and_then(|text| text.parse::<u64>().ok())
         .filter(|seconds| (1..=3600).contains(seconds))
@@ -260,11 +264,11 @@ fn wait_for_guest(ssh: &OsStr, host: &str, timeout: Duration) -> Result<(), &'st
             eprintln!("overalls: waiting for the machine to accept SSH");
             announced = true;
         }
-        thread::sleep((timeout - elapsed).min(Duration::from_secs(5)));
+        thread::sleep(timeout.saturating_sub(elapsed).min(Duration::from_secs(5)));
     }
 }
 
-pub fn run(url: &str, command: &[String]) -> Result<i32, &'static str> {
+pub(crate) fn run(url: &str, command: &[String]) -> Result<i32, &'static str> {
     let source = workspace_source::parse_url(url).map_err(|_| "invalid repository URL")?;
     let settings = config::load().map_err(|_| "Overalls SSH is not configured")?;
     let porsche = porsche_host(&settings.origin).ok_or("invalid configured origin")?;
@@ -375,11 +379,11 @@ mod tests {
 
     #[test]
     fn ready_timeout_is_bounded() {
-        assert_eq!(ready_timeout(None), Duration::from_secs(180));
+        assert_eq!(ready_timeout(None), Duration::from_mins(3));
         assert_eq!(ready_timeout(Some("1")), Duration::from_secs(1));
-        assert_eq!(ready_timeout(Some("3600")), Duration::from_secs(3600));
+        assert_eq!(ready_timeout(Some("3600")), Duration::from_hours(1));
         for invalid in ["0", "3601", "-1", "x", ""] {
-            assert_eq!(ready_timeout(Some(invalid)), Duration::from_secs(180));
+            assert_eq!(ready_timeout(Some(invalid)), Duration::from_mins(3));
         }
     }
 

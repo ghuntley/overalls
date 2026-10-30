@@ -232,9 +232,9 @@ fn activate(account: &Account, shell: &str) -> io::Result<()> {
             match existing_group(&account.username)? {
                 Some(gid) if gid == account.uid => {}
                 Some(_) => return Err(io::Error::other("conflicting guest group")),
-                None => invoke(platform.create_group(&account.username, account.uid))?,
+                None => invoke(&platform.create_group(&account.username, account.uid))?,
             }
-            invoke(platform.create_user(&account.username, account.uid, expected, shell))?
+            invoke(&platform.create_user(&account.username, account.uid, expected, shell))?;
         }
     }
     let metadata = fs::symlink_metadata(&directory)
@@ -244,7 +244,7 @@ fn activate(account: &Account, shell: &str) -> io::Result<()> {
     }
     prepare_home(&directory, account.uid, account.uid)?;
     for action in platform.activate(&account.username, shell) {
-        invoke(action)?;
+        invoke(&action)?;
     }
     let body = format!("{} ALL=(ALL:ALL) NOPASSWD: ALL\n", account.username);
     write_atomic(&sudo_policy(account), body.as_bytes(), 0o440)
@@ -263,13 +263,13 @@ fn deactivate(account: &Account) -> io::Result<()> {
             "/bin/sh"
         };
         for action in Platform::current().deactivate(&account.username, nologin) {
-            invoke(action)?;
+            invoke(&action)?;
         }
     }
     Ok(())
 }
 
-fn invoke(action: Invocation) -> io::Result<()> {
+fn invoke(action: &Invocation) -> io::Result<()> {
     let arguments: Vec<&str> = action.arguments.iter().map(String::as_str).collect();
     run(action.program, &arguments)
 }
@@ -334,6 +334,7 @@ fn write_atomic(path: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
 // Timer, stdin and on-demand reconciliation MUST hold the same root-owned
 // exclusive lock through state validation, account changes and state commit.
 fn account_lock() -> io::Result<File> {
+    // SAFETY: geteuid has no preconditions and cannot fail.
     if unsafe { libc::geteuid() } != 0 {
         return Err(io::Error::other("account reconciliation requires root"));
     }
@@ -711,25 +712,22 @@ fn emit(event: &str, severity: &str) {
 
 fn main() -> ExitCode {
     let command = std::env::args().nth(1);
-    match execute() {
-        Ok(()) => {
-            let event = match command.as_deref() {
-                Some("authorize") => "ssh.key_eligible",
-                Some("login") => "ssh.login_recorded",
-                _ => "ssh.roster_reconciled",
-            };
-            emit(event, "info");
-            ExitCode::SUCCESS
-        }
-        Err(_) => {
-            let event = match command.as_deref() {
-                Some("authorize") => "ssh.key_denied",
-                Some("login" | "session") => "ssh.login_denied",
-                _ => "ssh.roster_rejected",
-            };
-            emit(event, "warning");
-            ExitCode::FAILURE
-        }
+    if execute().is_ok() {
+        let event = match command.as_deref() {
+            Some("authorize") => "ssh.key_eligible",
+            Some("login") => "ssh.login_recorded",
+            _ => "ssh.roster_reconciled",
+        };
+        emit(event, "info");
+        ExitCode::SUCCESS
+    } else {
+        let event = match command.as_deref() {
+            Some("authorize") => "ssh.key_denied",
+            Some("login" | "session") => "ssh.login_denied",
+            _ => "ssh.roster_rejected",
+        };
+        emit(event, "warning");
+        ExitCode::FAILURE
     }
 }
 

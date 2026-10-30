@@ -51,7 +51,7 @@ mod daemon {
         }
     }
 
-    pub fn run() -> i32 {
+    pub(crate) fn run() -> i32 {
         agent::run(&Native).unwrap_or(1)
     }
 }

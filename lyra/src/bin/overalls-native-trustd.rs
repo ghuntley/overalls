@@ -12,26 +12,21 @@ fn main() -> ! {
     } else {
         "illumos"
     };
-    let (boot, _, _) = match native_guest::identity() {
-        Ok(value) => value,
-        Err(_) => std::process::exit(1),
+    let Ok((boot, _, _)) = native_guest::identity() else {
+        std::process::exit(1);
     };
-    let listener = match Listener::bind(trust::PORT, 1) {
-        Ok(value) => value,
-        Err(_) => std::process::exit(2),
+    let Ok(listener) = Listener::bind(trust::PORT, 1) else {
+        std::process::exit(2);
     };
     loop {
-        let mut connection = match listener.accept() {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok(mut connection) = listener.accept() else {
+            continue;
         };
-        let request = match trust::read_frame(&mut connection) {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok(request) = trust::read_frame(&mut connection) else {
+            continue;
         };
-        let (base, destination) = match native_guest::trust_paths(os) {
-            Ok(value) => value,
-            Err(_) => continue,
+        let Ok((base, destination)) = native_guest::trust_paths(os) else {
+            continue;
         };
         if native_guest::install_trust(
             Path::new(base),

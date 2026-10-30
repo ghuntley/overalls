@@ -31,7 +31,7 @@ fn lookup(username: &str, uid: u32) -> Result<PathBuf, Failure> {
             account.as_mut_ptr(),
             buffer.as_mut_ptr().cast(),
             buffer.len(),
-            &mut result,
+            &raw mut result,
         )
     };
     if status != 0 || result.is_null() {

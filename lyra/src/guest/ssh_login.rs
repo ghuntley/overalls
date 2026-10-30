@@ -21,13 +21,12 @@ pub struct Accepted {
 }
 
 /// @cc [owner:ghuntley,label:security] ssh-login-line-closed-parse
-/// parse_accepted MUST recognise only sshd's `Accepted publickey for … ssh2:
+/// `parse_accepted` MUST recognise only sshd's `Accepted publickey for … ssh2:
 /// <type> SHA256:<fingerprint>` form with a safe username and a base64
 /// fingerprint of 43 characters, wherever the line's prefix (timestamp, pid)
 /// places it; every other line yields nothing.
 pub fn parse_accepted(line: &str) -> Option<Accepted> {
-    let start = line.find("Accepted publickey for ")?;
-    let rest = &line[start + "Accepted publickey for ".len()..];
+    let (_, rest) = line.split_once("Accepted publickey for ")?;
     let (username, rest) = rest.split_once(" from ")?;
     if !crate::guest::ssh_roster::valid_name(username) {
         return None;
