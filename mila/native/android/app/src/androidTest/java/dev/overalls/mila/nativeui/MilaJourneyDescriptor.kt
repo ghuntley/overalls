@@ -181,11 +181,11 @@ suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONO
 
 /**
  * Asks the fixture to stand in for the absent provisioner for one machine (`observe`), so the next
- * lifecycle intent is admissible.
+ * lifecycle intent is admissible. Returns the settled observed state (the machine's desired state).
  */
-suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID) {
+suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID): String {
     val reply = fixture(MilaFixtureAction.Observe, JSONObject().put("machine_id", machine.toString()))
-    check(reply.optString("observed_state").isNotBlank()) { "observe hook returned no observed_state" }
+    return reply.optString("observed_state").also { check(it.isNotBlank()) { "observe hook returned no observed_state" } }
 }
 
 /** Reads one UUID field from a fixture hook reply. */

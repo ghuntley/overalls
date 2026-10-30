@@ -107,6 +107,9 @@ class MilaJourneyTest {
     private suspend fun listing(): MilaSessionListing = adapter.refreshListing().getOrThrow()
     private fun refusal(): String = "refusal=${adapter.lastRefusal()}"
 
+    /** Asserts [ok]; the description is built after the call so it reports the resulting state. */
+    private inline fun expect(ok: Boolean, describe: () -> String) { assertTrue(describe(), ok) }
+
     private fun seed(listing: MilaSessionListing): MilaMachineRow {
         val id = fixture.seedMachineId
         val row = if (id != null) listing.machines.firstOrNull { it.id == id }
@@ -120,7 +123,7 @@ class MilaJourneyTest {
         val detail = MilaMachineDetailController(adapter)
         detail.setSession(true, listing())
         assertTrue("machine $machine listed", detail.select(machine))
-        assertTrue("$command admitted: ${detail.state} ${refusal()}", detail.submit(command))
+        expect(detail.submit(command)) { "$command admitted: ${detail.state} ${refusal()}" }
     }
 
     @Test fun j01_signInRequiresBrowserApprovalThenReconnectsWithoutIt() = runBlocking<Unit> {
@@ -154,22 +157,26 @@ class MilaJourneyTest {
         val state = signedIn()
         val form = MilaMachineFormController(adapter)
         form.setSession(true, state.listing)
-        assertTrue("create admitted: ${form.state} ${refusal()}", form.create(createdName, "1", "512", "2"))
+        expect(form.create(createdName, "1", "512", "2")) { "create admitted: ${form.state} ${refusal()}" }
         val created = eventually(120_000) { listing().machines.firstOrNull { it.name == createdName } }
         createdId = created.id
 
         val seed = seed(listing())
         fixture.observe(seed.id)
         form.setSession(true, listing())
-        assertTrue("resize admitted: ${form.state} ${refusal()}", form.resize(seed.id, "2", "1024", "3"))
+        expect(form.resize(seed.id, "2", "1024", "3")) { "resize admitted: ${form.state} ${refusal()}" }
         assertEquals(MilaMachineFormState.Applied(MilaMachineFormKind.Resize), form.state)
     }
 
     @Test fun j04_lifecycleAdmission() = runBlocking<Unit> {
         val seed = seed(signedIn().listing)
         // Without the provisioner, each intent needs the fixture's observe stand-in first.
-        for (command in listOf(MilaMachineCommand.Stop, MilaMachineCommand.Start)) {
-            fixture.observe(seed.id)
+        // Observe settles observed_state to the desired state; move away from it and back.
+        val settled = fixture.observe(seed.id)
+        val order = if (settled == "stopped") listOf(MilaMachineCommand.Start, MilaMachineCommand.Stop)
+            else listOf(MilaMachineCommand.Stop, MilaMachineCommand.Start)
+        for ((index, command) in order.withIndex()) {
+            if (index > 0) fixture.observe(seed.id)
             lifecycle(seed.id, command)
         }
         fixture.observe(seed.id)
@@ -193,8 +200,8 @@ class MilaJourneyTest {
         val sharing = MilaMachineSharingController(adapter)
         sharing.setSession(true, state.listing)
         assertTrue(sharing.setMachine(seed(state.listing)))
-        assertTrue("share add: ${sharing.state} ${refusal()}", sharing.submit(principal!!, role = MilaShareRole.Operator))
-        assertTrue("share remove: ${sharing.state} ${refusal()}", sharing.submit(principal, remove = true))
+        expect(sharing.submit(principal!!, role = MilaShareRole.Operator)) { "share add: ${sharing.state} ${refusal()}" }
+        expect(sharing.submit(principal, remove = true)) { "share remove: ${sharing.state} ${refusal()}" }
     }
 
     @Test fun j06_threadPromptAnswerAndPlanApproval() = runBlocking<Unit> {
@@ -207,16 +214,16 @@ class MilaJourneyTest {
         val detail = MilaThreadDetailController(adapter)
         detail.setSession(true, listed)
         assertTrue(detail.select(thread))
-        assertTrue("prompt: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Prompt, "Report the hostname please"))
+        expect(detail.submit(MilaThreadCommand.Prompt, "Report the hostname please")) { "prompt: ${detail.state} ${refusal()}" }
         val question = fixture.fixture(MilaFixtureAction.ThreadQuestion, JSONObject().put("thread_id", thread.toString())).fixtureId("question_id")
-        assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
+        expect(detail.submit(MilaThreadCommand.Show)) { "show: ${detail.state} ${refusal()}" }
         val shown = (detail.state as MilaThreadActionState.Applied).thread
         assertEquals("pending question reported by thread show", question, shown.questionId)
-        assertTrue("answer: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Answer, """{"approach":{"selected":"First","text":""}}"""))
+        expect(detail.submit(MilaThreadCommand.Answer, """{"approach":{"selected":"First","text":""}}""")) { "answer: ${detail.state} ${refusal()}" }
         val plan = fixture.fixture(MilaFixtureAction.ThreadProposal, JSONObject().put("thread_id", thread.toString())).fixtureId("plan_id")
-        assertTrue("show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
+        expect(detail.submit(MilaThreadCommand.Show)) { "show: ${detail.state} ${refusal()}" }
         assertEquals("latest plan reported by thread show", plan, (detail.state as MilaThreadActionState.Applied).thread.planId)
-        assertTrue("plan approve: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.PlanApprove))
+        expect(detail.submit(MilaThreadCommand.PlanApprove)) { "plan approve: ${detail.state} ${refusal()}" }
     }
 
     @Test fun j07_terminalWithoutGuestIsRefusedClosed() = runBlocking<Unit> {
@@ -233,10 +240,10 @@ class MilaJourneyTest {
         val seed = seed(signedIn().listing)
         val web = MilaWebController(adapter)
         web.setSession(true)
-        assertTrue("web show: ${web.error} ${refusal()}", web.show(seed.id))
+        expect(web.show(seed.id)) { "web show: ${web.error} ${refusal()}" }
         val before = web.endpoint!!
         assertEquals(seed.id, before.machineId)
-        assertTrue("web set: ${web.error} ${refusal()}", web.set(seed.id, 8080, public = true))
+        expect(web.set(seed.id, 8080, public = true)) { "web set: ${web.error} ${refusal()}" }
         assertTrue(web.show(seed.id))
         assertEquals(before.revision + 1, web.endpoint!!.revision)
         assertEquals(8080, web.endpoint!!.port)
@@ -261,9 +268,9 @@ class MilaJourneyTest {
         val receipt = adapter.notificationDeviceRegister(reply, base64url(32)).getOrElse { throw AssertionError("register: ${refusal()}", it) }
         val device = JSONObject(receipt.toString(Charsets.UTF_8)).getJSONObject("result").getString("id")
         assertTrue(adapter.notificationDevices().getOrThrow().toString(Charsets.UTF_8).contains(device))
-        assertTrue("disable ${refusal()}", adapter.notificationDevicePreferences(device, false).isSuccess)
-        assertTrue("enable ${refusal()}", adapter.notificationDevicePreferences(device, true).isSuccess)
-        assertTrue("remove ${refusal()}", adapter.notificationDeviceRemove(device).isSuccess)
+        expect(adapter.notificationDevicePreferences(device, false).isSuccess) { "disable ${refusal()}" }
+        expect(adapter.notificationDevicePreferences(device, true).isSuccess) { "enable ${refusal()}" }
+        expect(adapter.notificationDeviceRemove(device).isSuccess) { "remove ${refusal()}" }
         assertTrue(adapter.notificationDevicePreferences("bad device", true).isFailure)
     }
 
