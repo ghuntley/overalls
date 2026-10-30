@@ -452,7 +452,8 @@ fn run(config: Config, replay_only: bool) -> Result<(), Error> {
                     if authenticate(&stream, &config)? != producer {
                         return Err(Error::Foreign);
                     }
-                    let body = schema.sanitize(&body, &config.service, &config.host, &config.revision)?;
+                    let body =
+                        schema.sanitize(&body, &config.service, &config.host, &config.revision)?;
                     store
                         .lock()
                         .map_err(|_| Error::Storage)?

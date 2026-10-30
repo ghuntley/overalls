@@ -14,3 +14,14 @@ events, baggage and arbitrary resource identity MUST NOT reach upstream.
 Archive quota exhaustion MUST refuse new data without evicting accepted batches.
 Telemetry failure MUST NOT signal or restart the producer, mutate application
 authority or inspect its command arguments, terminal or disk streams.
+
+@cc [owner:ghuntley,label:verification] trace-spool-hegel-properties
+Hegel properties MUST cover: sanitize refusal of unreviewed attribute keys for
+arbitrary string values; the schema attribute closure over arbitrary keys (uuid
+keys accepted iff an independent UUID oracle agrees, enum keys only with reviewed
+values, numeric keys only with non-negative integers, all else refused); body-limit
+and empty-body refusal in sanitize and accept, plus accept's zero-clock and
+retention-overflow refusal with unchanged custody; `sql` accepting exactly the
+signed SQLite range and round-tripping through SQLite via `number`; `digest` and
+the accept identity against an independent SHA-256; and archive survival across
+ACK loss, delivery, reopen with a shorter retention, replay and expiry.

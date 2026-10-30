@@ -13,4 +13,4 @@ sha2 = "0.10"
 rusqlite = { version = "0.38", features = ["bundled"] }
 
 [dev-dependencies]
-proptest = "1"
+hegeltest = "=0.28.8"

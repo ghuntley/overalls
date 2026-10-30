@@ -6,7 +6,7 @@ pkgs.rustPlatform.buildRustPackage {
     src = ../../../../elixir/diagnostics/native/spool;
     filter = path: type:
       let name = builtins.baseNameOf path;
-      in name != "target" && (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
+      in name != "target" && name != ".hegel" && (type == "directory" || pkgs.lib.hasSuffix ".rs" name ||
         builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
   };
   cargoLock.lockFile = ../../../../elixir/diagnostics/native/spool/Cargo.lock;
