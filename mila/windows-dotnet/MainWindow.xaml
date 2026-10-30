@@ -18,13 +18,22 @@
           <TextBlock x:Name="SettingsStatus" Opacity="0.7" />
         </StackPanel>
         <StackPanel Spacing="6">
+          <TextBlock x:Name="DeploymentsTitle" FontSize="18" />
+          <ListView x:Name="DeploymentRows" DisplayMemberPath="Host" MinHeight="48" SelectionMode="Single" SelectionChanged="OnDeploymentSelected" />
           <TextBlock x:Name="DeploymentHostLabel" />
-          <TextBox x:Name="DeploymentHost" PlaceholderText="overalls.example" />
-          <ListView x:Name="DeploymentRows" DisplayMemberPath="Host" MinHeight="48" SelectionChanged="OnDeploymentSelected" />
-          <Button x:Name="ForgetDeployment" Click="ForgetDeploymentClicked" HorizontalAlignment="Left" />
-          <Button x:Name="ConnectDeployment" Click="ConnectToDeployment" HorizontalAlignment="Left" />
-          <TextBox x:Name="ApprovalUrl" PlaceholderText="https://overalls.example/approve" Visibility="Collapsed" />
-          <TextBox x:Name="ApprovalFingerprint" Visibility="Collapsed" />
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="DeploymentHost" PlaceholderText="overalls.example" Width="260" />
+            <TextBox x:Name="DeploymentPort" Width="90" InputScope="Number" />
+            <Button x:Name="AddDeployment" Click="AddDeploymentClicked" VerticalAlignment="Bottom" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Button x:Name="ConnectDeployment" Click="ConnectToDeployment" />
+            <Button x:Name="ReconnectDeployment" Click="ReconnectClicked" Visibility="Collapsed" />
+            <Button x:Name="SignOutDeployment" Click="SignOutClicked" IsEnabled="False" />
+            <Button x:Name="ForgetDeployment" Click="ForgetDeploymentClicked" IsEnabled="False" />
+          </StackPanel>
+          <TextBox x:Name="ApprovalUrl" IsReadOnly="True" Visibility="Collapsed" />
+          <TextBox x:Name="ApprovalFingerprint" IsReadOnly="True" Visibility="Collapsed" />
           <Button x:Name="OpenApproval" Click="OpenApprovalPage" Visibility="Collapsed" HorizontalAlignment="Left" />
         </StackPanel>
         <ListView x:Name="MachineRows" DisplayMemberPath="Name" MinHeight="120" SelectionChanged="OnMachineSelected" />

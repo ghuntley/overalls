@@ -601,12 +601,13 @@ internal static partial class RustNative
         IntPtr requestPtr = Marshal.StringToCoTaskMemUTF8(requestId ?? string.Empty);
         try
         {
-            return TrySessionBytes((bytes, capacity, written) => SessionThreadActionNative(
+            // Prompts, answers and plan decisions execute remotely: call once.
+            return TrySessionBytesOnce((bytes, capacity, written) => SessionThreadActionNative(
                 handle, threadPtr, (nuint)Encoding.UTF8.GetByteCount(threadText ?? string.Empty),
                 commandPtr, (nuint)Encoding.UTF8.GetByteCount(command), secondaryPtr,
                 (nuint)Encoding.UTF8.GetByteCount(secondary ?? string.Empty), inputPtr,
                 (nuint)Encoding.UTF8.GetByteCount(input ?? string.Empty), requestPtr,
-                (nuint)Encoding.UTF8.GetByteCount(requestId ?? string.Empty), bytes, capacity, written));
+                (nuint)Encoding.UTF8.GetByteCount(requestId ?? string.Empty), bytes, capacity, written), 256 * 1024);
         }
         finally
         {

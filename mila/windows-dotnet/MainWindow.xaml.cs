@@ -10,7 +10,6 @@ public sealed partial class MainWindow : Window
 {
     private string? _activeHost;
     private string? _deviceFingerprint;
-    private ushort _deploymentPort = MilaDeployment.DefaultPort;
     private bool _notificationsEnabled;
     private readonly MilaWindowsNotificationController _notificationController = new();
     private readonly MilaWindowsNotificationDevicesController _notificationDevices;
@@ -20,8 +19,9 @@ public sealed partial class MainWindow : Window
     private MilaMachineRow? _selectedMachine;
     private readonly MilaAppLockController _appLock = new(new MilaWindowsHelloBroker());
     private readonly MilaSessionConnection _session = new();
-    private readonly MilaTerminalSession _terminal = new();
-    private long _terminalGeneration;
+    private readonly MilaTerminalStream _terminalStream;
+    private MilaTerminalSession _terminal => _terminalStream.Session;
+    private long _terminalGeneration => _terminalStream.Generation;
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _terminalPollTimer;
     private ulong _webRevision;
     private Uri? _webUrl;
@@ -29,17 +29,36 @@ public sealed partial class MainWindow : Window
     private long _webGeneration;
     private long _machineGeneration;
     private readonly MilaSignInFlow _signIn = new();
+    private readonly MilaSignInCoordinator _coordinator;
+    private readonly MilaDeploymentPicker _picker;
+    private readonly MilaShareCompletion _shareCompletion = new(new MilaExternalActivationGate());
+    private readonly MilaWindowsPushRegistration _pushRegistration;
+    private MilaSignInTarget? _signInTarget;
+    private DeviceKey? _deviceKey;
     private bool _closed;
-    private MilaExternalActivation? _pendingActivation;
     public MainWindow(string? activation = null)
     {
         InitializeComponent();
+        _terminalStream = new MilaTerminalStream(MilaRustTerminalTransport.Instance, () => _session.Handle);
+        _coordinator = new MilaSignInCoordinator(_signIn, _session, new MilaLauncherApprovalBrowser());
+        _coordinator.Changed += state => DispatcherQueue.TryEnqueue(() => ShowSignInState(state));
+        _picker = new MilaDeploymentPicker(MilaDeploymentStore.Repository, _ => SignOutActiveDeployment());
+        _pushRegistration = new MilaWindowsPushRegistration(
+            new MilaWindowsAppSdkChannelSource(WnsRemoteId()), new MilaUnavailablePokeKeySource(),
+            new MilaSusanKeyClient(MilaSusanKeyClient.DefaultOrigin), _notificationController);
         _terminalPollTimer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
         _terminalPollTimer.Interval = TimeSpan.FromMilliseconds(100);
         _terminalPollTimer.Tick += (_, _) => PollTerminalOutput();
         _sshKeys = new MilaSshKeysController(LoadSshKeysAsync, RevokeSshKeyAsync);
         _notificationDevices = new MilaWindowsNotificationDevicesController(LoadNotificationDevicesAsync, RemoveNotificationDeviceAsync, SetNotificationPreferenceAsync);
-        Closed += (_, _) => { _closed = true; _signIn.SignOut(); _session.Dispose(); };
+        Closed += (_, _) =>
+        {
+            _closed = true;
+            _terminalStream.SignOut();
+            _coordinator.SignOut();
+            _session.Dispose();
+            _deviceKey?.Dispose();
+        };
         Activated += (_, args) =>
         {
             if (args.WindowActivationState == WindowActivationState.Deactivated)
@@ -55,27 +74,97 @@ public sealed partial class MainWindow : Window
         Navigation.SelectedItem = Navigation.MenuItems[0];
         if (!string.IsNullOrWhiteSpace(activation)) HandleExternalActivation(activation);
     }
+    private static Guid? WnsRemoteId() =>
+        Guid.TryParse(Environment.GetEnvironmentVariable("MILA_WNS_REMOTE_ID"), out Guid id) ? id : null;
     private void LoadDeployments()
     {
-        DeploymentRows.ItemsSource = MilaDeploymentStore.LoadAll();
-        if (MilaDeploymentStore.Load() is not { } deployment) return;
-        DeploymentHost.Text = deployment.Host;
-        _deploymentPort = deployment.Port;
+        MilaDeploymentPickerState state = _picker.State;
+        DeploymentRows.ItemsSource = state.Deployments;
+        DeploymentRows.SelectedItem = state.Selected;
+        ForgetDeployment.IsEnabled = state.Selected is not null;
     }
     private void OnDeploymentSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (DeploymentRows.SelectedItem is not MilaDeployment deployment) return;
+        if (DeploymentRows.SelectedItem is not MilaDeployment deployment || _picker.State.Selected == deployment) return;
+        if (_picker.Select(deployment) is null) return;
+        _shareCompletion.OnDeploymentSelected(deployment.Host);
         DeploymentHost.Text = deployment.Host;
-        _deploymentPort = deployment.Port;
+        DeploymentPort.Text = deployment.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        ForgetDeployment.IsEnabled = true;
+        ShowSignInState(_signIn.State);
+    }
+    private void AddDeploymentClicked(object sender, RoutedEventArgs args) => AddDeploymentFromInput(select: true);
+    private MilaDeployment? AddDeploymentFromInput(bool select)
+    {
+        ushort port = ushort.TryParse(DeploymentPort.Text.Trim(), System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out ushort parsed) ? parsed : (ushort)0;
+        MilaDeploymentAddResult result = _picker.Add(DeploymentHost.Text, port, out MilaDeployment? deployment);
+        if (MilaPresentation.DeploymentAdd(result) is { } message)
+        {
+            StatusText.Text = message.Render(S);
+            return null;
+        }
+        if (select && deployment is not null && _picker.Select(deployment) is not null)
+            _shareCompletion.OnDeploymentSelected(deployment.Host);
+        LoadDeployments();
+        return _picker.State.Selected ?? deployment;
     }
     private void ForgetDeploymentClicked(object sender, RoutedEventArgs args)
     {
         if (DeploymentRows.SelectedItem is not MilaDeployment deployment) return;
-        if (MilaDeploymentStore.Forget(deployment))
+        if (_picker.Forget(deployment))
         {
+            _shareCompletion.Cancel();
             LoadDeployments();
-            StatusText.Text = S("deploymentForgotten", "Deployment forgotten");
+            StatusText.Text = MilaPresentation.SignIn(MilaSignInState.Initial, null).Render(S);
         }
+    }
+    /// <summary>Tears down every authenticated surface of the active deployment.</summary>
+    private void SignOutActiveDeployment()
+    {
+        _coordinator.SignOut();
+        _signInTarget = null;
+        _deviceKey?.Dispose();
+        _deviceKey = null;
+        _activeHost = null;
+        _deviceFingerprint = null;
+        _selectedMachine = null;
+        MachineRows.ItemsSource = Array.Empty<MilaMachineRow>();
+        _threadController.SetSession(false, null);
+        _machineMutation.SetSession(false);
+        UpdateMachineMutationAvailability();
+        _notificationController.SetSession(false);
+        _notificationsEnabled = false;
+        _webGeneration++;
+        _machineGeneration++;
+        _webUrl = null;
+        _webRevision = 0;
+        WebBrowser.Source = null;
+        WebBrowser.Visibility = Visibility.Collapsed;
+        WebStatus.Text = S("webNoAddress", "No web address");
+        _terminalPollTimer?.Stop();
+        _terminalStream.SignOut();
+        TerminalOutput.Text = string.Empty;
+        TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.SignedOut).Render(S);
+        ShowSignInState(_signIn.State);
+    }
+    private void ShowSignInState(MilaSignInState state)
+    {
+        if (_closed) return;
+        bool pending = state.Phase == MilaSignInPhase.AwaitingApproval && state.Approval is not null;
+        ApprovalUrl.Text = pending ? state.Approval!.Url : string.Empty;
+        ApprovalFingerprint.Text = pending ? state.Approval!.Fingerprint : string.Empty;
+        ApprovalUrl.Visibility = ApprovalFingerprint.Visibility = OpenApproval.Visibility =
+            pending ? Visibility.Visible : Visibility.Collapsed;
+        ReconnectDeployment.Visibility = state.Phase == MilaSignInPhase.Disconnected ? Visibility.Visible : Visibility.Collapsed;
+        SignOutDeployment.IsEnabled = state.Phase != MilaSignInPhase.SignedOut;
+        ConnectDeployment.IsEnabled = state.Phase is not (MilaSignInPhase.Connecting or MilaSignInPhase.AwaitingApproval);
+        StatusText.Text = MilaPresentation.SignIn(state, _picker.State.Selected?.Host).Render(S);
+    }
+    private void SignOutClicked(object sender, RoutedEventArgs args)
+    {
+        _shareCompletion.Cancel();
+        SignOutActiveDeployment();
     }
     internal void HandleExternalActivation(string activation)
     {
@@ -86,37 +175,47 @@ public sealed partial class MainWindow : Window
             StatusText.Text = S("invalidRoute", "This link is not a valid Mila route.");
             return;
         }
-        // Share activations must be authorized against the already-authenticated
-        // deployment before changing navigation or host state. Never let the
-        // incoming route establish its own trust context.
+        // Share activations are authorized against the already-authenticated
+        // deployment before changing navigation or host state, and an incoming
+        // route never establishes its own trust context. Shares for a deployment
+        // that is not yet authenticated are held and completed after sign-in.
         if (external is { IsShareTarget: true } share)
         {
-            bool authenticated = _session.Handle is { } handle && handle != 0;
-            if (!MilaShareTarget.TryAuthorize(share, authenticated, _activeHost, out _))
+            bool authenticated = _signIn.State.Phase == MilaSignInPhase.SignedIn && _session.Handle is > 0;
+            MilaShareCompletionOutcome outcome = _shareCompletion.Offer(share, authenticated, _activeHost, out MilaRoute authorized);
+            if (outcome != MilaShareCompletionOutcome.Navigated)
             {
-                // Retain a validated share route until the target deployment is
-                // authenticated, then replay it through the same authorization gate.
-                _pendingActivation = share;
-                DeploymentHost.Text = share.Route.Host;
-                StatusText.Text = S("signInFirst", "Sign in first");
+                bool stored = _picker.State.Deployments.Any(deployment => deployment.Host == share.Route.Host);
+                if (outcome == MilaShareCompletionOutcome.Deferred && !stored) DeploymentHost.Text = share.Route.Host;
+                StatusText.Text = MilaPresentation.Share(outcome, share.Route.Host, stored)?.Render(S) ?? string.Empty;
                 return;
             }
+            NavigateTo(authorized, shared: true);
+            return;
         }
-        _activeHost = route.Value.Host;
-        DeploymentHost.Text = route.Value.Host;
-        Navigation.SelectedItem = route.Value.Kind switch
+        if (_activeHost is not null && route.Value.Host != _activeHost)
+        {
+            StatusText.Text = MilaPresentation.Share(MilaShareCompletionOutcome.Deferred, route.Value.Host,
+                _picker.State.Deployments.Any(deployment => deployment.Host == route.Value.Host))?.Render(S) ?? string.Empty;
+            return;
+        }
+        NavigateTo(route.Value, shared: false);
+    }
+    private void NavigateTo(MilaRoute route, bool shared)
+    {
+        Navigation.SelectedItem = route.Kind switch
         {
             MilaRouteKind.Thread or MilaRouteKind.Threads => Navigation.MenuItems[1],
             MilaRouteKind.Settings => Navigation.MenuItems[2],
             _ => Navigation.MenuItems[0]
         };
-        StatusText.Text = route.Value.Kind switch
+        StatusText.Text = route.Kind switch
         {
-            MilaRouteKind.Machine => $"{S("routeMachine", "Machine")}: {route.Value.Id?.ToString("D")}",
-            MilaRouteKind.Thread => $"{S("routeThread", "Thread")}: {route.Value.Id?.ToString("D")}",
-            _ => $"{S("routeOpened", "Opened")}: {route.Value.Path}"
+            MilaRouteKind.Machine => $"{S("routeMachine", "Machine")}: {route.Id?.ToString("D")}",
+            MilaRouteKind.Thread => $"{S("routeThread", "Thread")}: {route.Id?.ToString("D")}",
+            _ => $"{S("routeOpened", "Opened")}: {route.Path}"
         };
-        if (external is { IsShareTarget: true })
+        if (shared)
             StatusText.Text += $" ({S("routeShared", "shared")})";
     }
     private static string S(string id, string fallback) => MilaStrings.Text(id, fallback);
@@ -130,7 +229,13 @@ public sealed partial class MainWindow : Window
         StatusText.Text = S("ready", "Ready");
         DeploymentHostLabel.Text = S("deploymentHostLabel", "Deployment host");
         DeploymentHost.PlaceholderText = S("deploymentHostHint", "overalls.example");
-        ConnectDeployment.Content = S("signInStart", "Sign in in browser");
+        DeploymentsTitle.Text = S("deploymentsTitle", "Deployments");
+        DeploymentPort.Header = S("webPort", "Port");
+        DeploymentPort.Text = MilaDeployment.DefaultPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        AddDeployment.Content = S("addDeployment", "Add deployment");
+        ReconnectDeployment.Content = S("signInReconnect", "Reconnect");
+        SignOutDeployment.Content = S("signInSignOut", "Sign out");
+        ConnectDeployment.Content = S("signInStart", "Sign in with browser");
         ForgetDeployment.Content = S("forgetDeployment", "Forget deployment");
         ApprovalFingerprint.Header = S("signInFingerprint", "Key fingerprint");
         OpenApproval.Content = S("signInOpenBrowser", "Open approval page");
@@ -378,21 +483,39 @@ public sealed partial class MainWindow : Window
         }
         finally { WebSet.IsEnabled = true; }
     }
-    private void ToggleNotifications(object sender, RoutedEventArgs args)
+    private async void ToggleNotifications(object sender, RoutedEventArgs args)
     {
-        if (_session.Handle is not { } handle || handle == 0)
+        if (_session.Handle is not { } handle || handle == 0 || _activeHost is not { } host)
         {
             _notificationController.SetSession(false);
             _notificationsEnabled = false;
-            NotificationsStatus.Text = S("signInFirst", "Sign in first");
+            NotificationsStatus.Text = MilaPresentation.Push(MilaPushRegistrationOutcome.SignedOut).Render(S);
             return;
         }
-        _notificationsEnabled = !_notificationsEnabled;
-        MilaNativePokeResult result = RustNative.TryValidatePushPoke(ReadOnlySpan<byte>.Empty, (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds());
-        NotificationsStatus.Text = result.IsValid
-            ? (_notificationsEnabled ? S("pushStateOn", "Notifications on") : S("pushStateOff", "Notifications off"))
-            : S("pushUnsupported", "Notifications unavailable");
-        NotificationsButton.Content = _notificationsEnabled ? S("notificationsTurnOff", "Turn notifications off") : S("notificationsTurnOn", "Turn notifications on");
+        NotificationsButton.IsEnabled = false;
+        try
+        {
+            if (_notificationsEnabled)
+            {
+                string? device = _pushRegistration.DeviceId;
+                if (device is not null) await Task.Run(() => RustNative.TrySessionDeviceRemove(handle, device));
+                _notificationController.Disable();
+                _notificationsEnabled = false;
+                NotificationsStatus.Text = S("pushStateOff", "off");
+            }
+            else
+            {
+                NotificationsStatus.Text = S("pushStateRegistering", "registering");
+                MilaPushRegistrationOutcome outcome = await _pushRegistration.RegisterAsync(
+                    handle, host, () => _session.Handle, S("notificationsThisDevice", "This device"));
+                _notificationsEnabled = outcome == MilaPushRegistrationOutcome.Registered;
+                NotificationsStatus.Text = MilaPresentation.Push(outcome).Render(S);
+            }
+            NotificationsButton.Content = _notificationsEnabled
+                ? S("notificationsTurnOff", "Turn notifications off") : S("notificationsTurnOn", "Turn notifications on");
+            await RefreshNotificationDevicesAsync();
+        }
+        finally { NotificationsButton.IsEnabled = true; }
     }
     private async void RefreshNotificationsClicked(object sender, RoutedEventArgs args)
     {
@@ -438,50 +561,34 @@ public sealed partial class MainWindow : Window
 
     private async void OpenApprovalPage(object sender, RoutedEventArgs args)
     {
-        MilaSignInState state = _signIn.State;
-        MilaApprovalInfo? approval = state.Approval;
-        if (approval is null && _signIn.SetApproval(state.Generation, ApprovalUrl.Text.Trim(), ApprovalFingerprint.Text.Trim(),
-                (ulong)DateTimeOffset.UtcNow.ToUnixTimeSeconds()))
-            approval = _signIn.State.Approval;
-        if (approval is null || !await Launcher.LaunchUriAsync(new Uri(approval.Url)))
-            StatusText.Text = S("signInExpired", "The approval link is no longer valid. Start again to get a new one.");
+        // Only the Rust-session approval bound to the selected deployment opens;
+        // text typed into the approval fields is never trusted as a link.
+        if (_signIn.State is not { Phase: MilaSignInPhase.AwaitingApproval, Approval: { } approval } ||
+            !await new MilaLauncherApprovalBrowser().OpenAsync(approval, CancellationToken.None))
+            StatusText.Text = MilaPresentation.SignIn(_signIn.State with { Phase = MilaSignInPhase.Expired }, null).Render(S);
     }
     private void ValidateTerminalAttach(object sender, RoutedEventArgs args)
     {
         if (_session.Handle is not { } sessionHandle || sessionHandle == 0)
         {
-            TerminalStatus.Text = S("signInFirst", "Sign in first");
+            TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.SignedOut).Render(S);
             return;
         }
-        MilaNativeTerminalResult result = RustNative.TryValidateTerminalAttach(0, 80, 24, true);
-        if (_terminal.NativeTerminalHandle != 0) RustNative.TrySessionTerminalKill(_terminal.NativeTerminalHandle);
-        _terminalGeneration = DateTime.UtcNow.Ticks;
-        ulong? terminalHandle = result.IsValid
-            ? RustNative.TrySessionTerminalAttach(sessionHandle, 80, 24).Handle
-            : null;
-        bool attached = terminalHandle is > 0 && _terminal.BeginAuthenticatedAttach(sessionHandle, _terminalGeneration, true) > 0 &&
-            _terminal.SetNativeTerminal(terminalHandle.Value);
-        TerminalStatus.Text = attached ? S("terminalAttaching", "Attaching…") : S("terminalRefused", "Terminal refused");
-        if (attached)
-        {
-            _terminalPollTimer?.Start();
-            MilaNativeTerminalBytesResult polled = RustNative.TrySessionTerminalPoll(terminalHandle!.Value);
-            if (polled.Succeeded && polled.Data is { Length: > 0 } bytes)
-            {
-                string text = System.Text.Encoding.UTF8.GetString(bytes);
-                if (_terminal.AppendReceived(_terminalGeneration, text)) TerminalOutput.Text = _terminal.Output;
-            }
-        }
+        bool attached = RustNative.TryValidateTerminalAttach(0, 80, 24, true).IsValid && _terminalStream.Attach(true, 80, 24);
+        TerminalOutput.Text = string.Empty;
+        TerminalStatus.Text = attached ? S("terminalAttaching", "attaching") : S("terminalRefused", "Terminal refused");
+        if (attached) _terminalPollTimer?.Start();
     }
     private void PollTerminalOutput()
     {
         if (_closed) { _terminalPollTimer?.Stop(); return; }
-        ulong terminal = _terminal.NativeTerminalHandle;
-        if (terminal == 0 || !_terminal.Reconnect(_terminalGeneration)) return;
-        MilaNativeTerminalBytesResult polled = RustNative.TrySessionTerminalPoll(terminal);
-        if (!polled.Succeeded || polled.Data is not { Length: > 0 } bytes) return;
-        string text = System.Text.Encoding.UTF8.GetString(bytes);
-        if (_terminal.AppendReceived(_terminalGeneration, text)) TerminalOutput.Text = _terminal.Output;
+        MilaTerminalPoll poll = _terminalStream.Poll();
+        if (poll == MilaTerminalPoll.Output || poll == MilaTerminalPoll.Reconnected) TerminalOutput.Text = _terminal.Output;
+        if (poll != MilaTerminalPoll.Idle && poll != MilaTerminalPoll.Output)
+            TerminalStatus.Text = MilaPresentation.Terminal(poll).Render(S);
+        if (poll is MilaTerminalPoll.Ended or MilaTerminalPoll.Exhausted or MilaTerminalPoll.SignedOut or MilaTerminalPoll.Detached)
+            _terminalPollTimer?.Stop();
+        if (poll == MilaTerminalPoll.SignedOut || poll == MilaTerminalPoll.Exhausted) ReportSessionTransportLoss();
     }
     private void ValidateTerminalResize(object sender, RoutedEventArgs args)
     {
@@ -513,138 +620,92 @@ public sealed partial class MainWindow : Window
     }
     private void KillTerminal(object sender, RoutedEventArgs args)
     {
-        if (_session.Handle is not { } sessionHandle || sessionHandle == 0)
-        {
-            TerminalStatus.Text = S("signInFirst", "Sign in first");
-            return;
-        }
-        // Kill is valid while an authenticated attach is still negotiating;
-        // requiring Reconnect here left an attaching PTY impossible to cancel.
-        if (_terminal.NativeTerminalHandle != 0) RustNative.TrySessionTerminalKill(_terminal.NativeTerminalHandle);
-        _terminal.Kill(_terminalGeneration);
+        // Kill is valid while an authenticated attach is still negotiating or
+        // reconnecting; it also stops any further reconnect attempt.
+        _terminalStream.Kill();
         _terminalPollTimer?.Stop();
-        TerminalStatus.Text = S("terminalEnded", "Terminal ended");
+        TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.Ended).Render(S);
     }
     private void ConnectToDeployment(object sender, RoutedEventArgs args)
     {
-        string host = DeploymentHost.Text.Trim();
-        if (host.Length == 0)
+        MilaDeployment? deployment = _picker.State.Selected;
+        string typed = MilaDeploymentHost.Canonicalize(DeploymentHost.Text) ?? string.Empty;
+        if (deployment is null || deployment.Host != typed) deployment = AddDeploymentFromInput(select: true) ?? _picker.State.Selected;
+        if (deployment is null || deployment.Host != typed)
         {
-            StatusText.Text = S("invalidHost", "Enter a valid deployment host.");
+            StatusText.Text = MilaPresentation.DeploymentAdd(MilaDeploymentAddResult.InvalidHost)!.Render(S);
             return;
         }
-        StatusText.Text = S("signInConnecting", "Connecting to deployment…").Replace("{host}", host, StringComparison.Ordinal);
-        ConnectDeployment.IsEnabled = false;
-        // A browser connection is not an authenticated Rust session yet. Keep
-        // mutation controls explicitly signed out until the session broker
-        // supplies its non-zero handle.
-        _activeHost = null;
-        _deviceFingerprint = null;
-        _selectedMachine = null;
-        MachineRows.ItemsSource = Array.Empty<MilaMachineRow>();
-        UpdateMachineMutationAvailability();
-        _threadController.SetSession(false, null);
-        _machineMutation.SetSession(false);
-        long generation = _signIn.Start();
-        _session.SignOut();
-        _notificationController.SetSession(false);
-        _notificationsEnabled = false;
-        // Clear authenticated web and terminal state before beginning a new
-        // approval generation. This prevents stale endpoint navigation or a
-        // previous PTY stream from surviving a deployment switch.
-        _webGeneration++;
-        _machineGeneration++;
-        _webUrl = null;
-        _webRevision = 0;
-        WebBrowser.Source = null;
-        WebBrowser.Visibility = Visibility.Collapsed;
-        WebStatus.Text = S("webNoAddress", "No web address");
-        _terminal.Kill(_terminalGeneration);
-        TerminalOutput.Text = string.Empty;
-        TerminalStatus.Text = S("terminalEnded", "Terminal ended");
-        _ = RefreshSshKeyListAsync();
-        _ = ConnectDeploymentAsync(host, generation);
+        SignOutActiveDeployment();
+        long selection = _picker.State.SelectionGeneration;
+        _ = ConnectDeploymentAsync(deployment, selection);
     }
-    private async Task ConnectDeploymentAsync(string host, long generation)
+    private void ReconnectClicked(object sender, RoutedEventArgs args)
     {
+        if (_signInTarget is not { } target || _signIn.State.Phase != MilaSignInPhase.Disconnected) return;
+        _ = CompleteSignInAsync(_coordinator.ReconnectAsync(target), target.Host);
+    }
+    /// <summary>Called when a session operation reports a lost transport.</summary>
+    private void ReportSessionTransportLoss()
+    {
+        if (_signIn.State is { Phase: MilaSignInPhase.SignedIn } state && _coordinator.ReportTransportLoss(state.Generation))
+        {
+            _activeHost = null;
+            _machineMutation.SetSession(false);
+            UpdateMachineMutationAvailability();
+        }
+    }
+    private async Task ConnectDeploymentAsync(MilaDeployment deployment, long selection)
+    {
+        string host = deployment.Host;
         try
         {
             byte[]? trust = await new MilaTrustEnrollment(
                 MilaTrustStore.HttpsFetch(host), RustNative.TryReconcileTrust)
                 .ResolveAsync(host);
+            if (_closed || !_picker.IsCurrent(selection, deployment)) return;
             if (trust is null)
             {
-                _activeHost = null;
-                _session.SignOut();
-                if (!_signIn.AwaitApproval(generation)) return;
-                ApprovalUrl.Visibility = Visibility.Visible;
-                ApprovalFingerprint.Visibility = Visibility.Visible;
-                OpenApproval.Visibility = Visibility.Visible;
-                StatusText.Text = S("signInApprove", "Approve this device in your browser, then return here.");
+                StatusText.Text = MilaPresentation.SignIn(MilaSignInState.Initial with
+                    { Phase = MilaSignInPhase.Failed, Failure = MilaSignInFailure.HostUntrusted }, host).Render(S);
                 return;
             }
-
-            using DeviceKey deviceKey = DeviceKey.OpenOrCreate(host);
+            DeviceKey deviceKey = DeviceKey.OpenOrCreate(host);
+            _deviceKey?.Dispose();
+            _deviceKey = deviceKey;
             byte[] publicKey = deviceKey.PublicPoint();
             _deviceFingerprint = MilaSshKeysController.Fingerprint(System.Text.Encoding.UTF8.GetString(publicKey));
-            byte[] trustBytes = trust;
-            byte[] publicKeyBytes = publicKey;
-            bool connected = await Task.Run(() => _session.Connect(
-                trustBytes, host, publicKeyBytes, _deploymentPort, 30_000, bytes => deviceKey.Sign(bytes)));
-            if (_closed) return;
-            if (!connected || _session.Handle is not { } handle)
-            {
-                _activeHost = null;
-                _signIn.Fail(MilaSignInFailure.Unreachable, generation);
-                _machineMutation.SetSession(false);
-                UpdateMachineMutationAvailability();
-                StatusText.Text = S("signInFailedUnreachable", "Unable to connect to deployment.");
-                return;
-            }
-
-            _activeHost = host;
-            _signIn.Authenticated(generation, host);
-            _notificationController.SetSession(true);
-            ApprovalUrl.Visibility = Visibility.Collapsed;
-            ApprovalFingerprint.Visibility = Visibility.Collapsed;
-            OpenApproval.Visibility = Visibility.Collapsed;
-            MilaDeploymentStore.Save(new MilaDeployment(host, _deploymentPort));
-            _machineMutation.SetSession(true, handle);
-            UpdateMachineMutationAvailability();
-            StatusText.Text = S("connected", MilaStrings.Connected);
-            if (_pendingActivation is { } pending &&
-                string.Equals(pending.Route.Host, host, StringComparison.OrdinalIgnoreCase))
-            {
-                _pendingActivation = null;
-                HandleExternalActivation(pending.IsShareTarget ? "--share " + $"overalls://{pending.Route.Host}{pending.Route.Path}" :
-                    $"overalls://{pending.Route.Host}{pending.Route.Path}");
-            }
-            await RefreshSshKeyListAsync();
-            await RefreshNotificationDevicesAsync();
-            RefreshMachines();
+            MilaSignInTarget target = new(host, deployment.Port, 443, trust, publicKey, bytes => deviceKey.Sign(bytes));
+            _signInTarget = target;
+            await CompleteSignInAsync(_coordinator.SignInAsync(target), host);
         }
         catch (ArgumentException)
         {
-            _activeHost = null;
-            _session.SignOut();
-            _signIn.Fail(MilaSignInFailure.HostUntrusted, generation);
-            if (!_closed && _signIn.State.Generation == generation)
-                StatusText.Text = S("invalidHost", "Enter a valid deployment host.");
+            if (!_closed && _picker.IsCurrent(selection, deployment))
+                StatusText.Text = MilaPresentation.DeploymentAdd(MilaDeploymentAddResult.InvalidHost)!.Render(S);
         }
         catch (Exception error) when (error is CryptographicException or IOException or UnauthorizedAccessException)
         {
-            _activeHost = null;
-            _session.SignOut();
-            _signIn.Fail(MilaSignInFailure.Unreachable, generation);
-            _machineMutation.SetSession(false);
-            UpdateMachineMutationAvailability();
-            if (!_closed && _signIn.State.Generation == generation)
-                StatusText.Text = S("signInFailedUnreachable", "Unable to connect to deployment.");
+            if (!_closed && _picker.IsCurrent(selection, deployment))
+                StatusText.Text = MilaPresentation.SignIn(MilaSignInState.Initial with
+                    { Phase = MilaSignInPhase.Failed, Failure = MilaSignInFailure.Unreachable }, host).Render(S);
         }
-        finally
-        {
-            if (!_closed) ConnectDeployment.IsEnabled = true;
-        }
+    }
+    private async Task CompleteSignInAsync(Task<MilaSignInState> signIn, string host)
+    {
+        MilaSignInState state = await signIn;
+        if (_closed) return;
+        ShowSignInState(state);
+        if (state.Phase != MilaSignInPhase.SignedIn || _session.Handle is not { } handle || _signInTarget?.Host != host) return;
+        _activeHost = host;
+        _notificationController.SetSession(true);
+        _machineMutation.SetSession(true, handle);
+        UpdateMachineMutationAvailability();
+        if (_shareCompletion.Complete(host, out MilaRoute shared) == MilaShareCompletionOutcome.Navigated)
+            NavigateTo(shared, shared: true);
+        await RefreshSshKeyListAsync();
+        await RefreshNotificationDevicesAsync();
+        RefreshMachines();
     }
     private async Task RefreshLockAvailabilityAsync()
     {
@@ -747,9 +808,15 @@ public sealed partial class MainWindow : Window
         MachineRows.ItemsSource = Array.Empty<MilaMachineRow>();
         if (_activeHost is not { } host || _session.Handle is not { } sessionHandle)
             return;
-        MilaNativeSessionBytesResult result = await Task.Run(() => RustNative.TrySessionListing(sessionHandle));
+        (MilaNativeStatus read, MilaNativeSessionBytesResult result) = await Task.Run(() =>
+        {
+            // Listing copies the Rust-held page; refresh it first over the session.
+            MilaNativeStatus status = RustNative.TrySessionReadMachines(sessionHandle, more: false);
+            return (status, RustNative.TrySessionListing(sessionHandle));
+        });
         if (generation != _machineGeneration || _session.Handle != sessionHandle || _activeHost is null)
             return;
+        if (read == MilaNativeStatus.Transport) { ReportSessionTransportLoss(); return; }
         if (result.Succeeded && result.Data is { } bytes)
         {
             try

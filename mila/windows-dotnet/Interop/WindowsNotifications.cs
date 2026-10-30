@@ -56,7 +56,18 @@ internal sealed class MilaWindowsNotificationDevicesController
     {
         if (bytes.Length > 256 * 1024) throw new InvalidDataException("Notification listing too large");
         using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
-        if (!document.RootElement.TryGetProperty("devices", out JsonElement devices))
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object) throw new InvalidDataException("Invalid notification listing");
+        // Porsche replies `{"version":1,"status":"succeeded","result":{"items":[...]}}`
+        // (protocol/test/fixtures/porsche_device_results.json); the local store
+        // persists the flattened `{"devices":[...]}` projection.
+        JsonElement devices;
+        if (root.TryGetProperty("result", out JsonElement envelope))
+        {
+            if (envelope.ValueKind != JsonValueKind.Object || !envelope.TryGetProperty("items", out devices))
+                throw new InvalidDataException("Invalid notification listing");
+        }
+        else if (!root.TryGetProperty("devices", out devices))
             return Array.Empty<MilaWindowsNotificationDevice>();
         if (devices.ValueKind != JsonValueKind.Array || devices.GetArrayLength() > 256) throw new InvalidDataException("Invalid notification listing");
         List<MilaWindowsNotificationDevice> result = new(devices.GetArrayLength());

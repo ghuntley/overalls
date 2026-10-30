@@ -25,6 +25,17 @@
     <Compile Include="../windows-dotnet/Interop/WebEndpoint.cs" Link="Interop/WebEndpoint.cs" />
     <Compile Include="../windows-dotnet/Interop/WebOrigin.cs" Link="Interop/WebOrigin.cs" />
     <Compile Include="../windows-dotnet/Interop/TerminalSession.cs" Link="Interop/TerminalSession.cs" />
+    <Compile Include="../windows-dotnet/Interop/TerminalStream.cs" Link="Interop/TerminalStream.cs" />
+    <Compile Include="../windows-dotnet/Interop/RustNativeLifecycle.cs" Link="Interop/RustNativeLifecycle.cs" />
+    <Compile Include="../windows-dotnet/Interop/DeploymentPicker.cs" Link="Interop/DeploymentPicker.cs" />
+    <Compile Include="../windows-dotnet/Interop/SignInCoordinator.cs" Link="Interop/SignInCoordinator.cs" />
+    <Compile Include="../windows-dotnet/Interop/WindowsPushRegistration.cs" Link="Interop/WindowsPushRegistration.cs" />
+    <Compile Include="../windows-dotnet/Interop/MilaPresentation.cs" Link="Interop/MilaPresentation.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Catalog and wire fixtures checked by the hermetic smoke; never shipped. -->
+    <None Include="../localization/catalogs/*.arb" LinkBase="fixtures/catalogs" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="../../protocol/test/fixtures/porsche_device_results.json" Link="fixtures/porsche_device_results.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="StageMilaNative" AfterTargets="Build">
     <Error Condition="'$(MilaNativeDll)' == '' Or !Exists('$(MilaNativeDll)')" Text="Supply MilaNativeDll pointing to the staged production mila_native.dll." />

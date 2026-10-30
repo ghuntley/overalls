@@ -10,3 +10,15 @@ MUST remain runnable without a retired client SDK or `retired-runtime` executabl
 executable and native library, and reject any retired client runtime artifacts. This is a
 packaging boundary check; native Windows execution and signing remain covered by
 Windows CI evidence.
+
+@cc [owner:ghuntley,label:security;reliability] native-windows-lifecycle-adapters
+Windows lifecycle adapters MUST keep authority in the Rust session: the
+deployment picker fences approval and session work by selection generation
+(`Interop/DeploymentPicker.cs`), sign-in polls `whoami` on the same Rust
+session and binds approval links to the selected host and HTTPS port
+(`Interop/SignInCoordinator.cs`), terminal reconnect distinguishes idle,
+closed and lost PTYs (`Interop/TerminalStream.cs`), WNS exchange sends the
+channel only to Susan and the push key to Porsche only through Rust stdin
+(`Interop/WindowsPushRegistration.cs`), and share completion is navigation
+only (`Interop/ExternalActivation.cs`). The in-source `mila-windows-*` notes
+state each obligation; `windows-dotnet-smoke` exercises them hermetically.

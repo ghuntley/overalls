@@ -16,15 +16,23 @@ internal enum MilaSignInFailure { HostUntrusted, Refused, Protocol, Unreachable 
 /// <summary>Approval metadata held only in memory while a sign-in is pending.</summary>
 internal sealed record MilaApprovalInfo(string Url, string Fingerprint, ulong IssuedAt)
 {
-    internal static MilaApprovalInfo? TryCreate(string url, string fingerprint, ulong issuedAt)
+    /// <summary>
+    /// Validates approval metadata. When <paramref name="expectedHost"/> is set the
+    /// link MUST name exactly that deployment host on <paramref name="httpsPort"/>,
+    /// so a whoami reply cannot send the browser to another origin.
+    /// </summary>
+    internal static MilaApprovalInfo? TryCreate(string url, string fingerprint, ulong issuedAt,
+        string? expectedHost = null, ushort httpsPort = 443)
     {
+        if (httpsPort == 0) return null;
         if (url.Length is 0 or > 2048 || fingerprint.Length is 0 or > 256 ||
             url.Any(char.IsControl) || fingerprint.Any(char.IsControl) ||
             !Uri.TryCreate(url, UriKind.Absolute, out Uri? parsed) ||
             parsed.Scheme != Uri.UriSchemeHttps || parsed.Host.Length == 0 ||
             Uri.CheckHostName(parsed.Host) is UriHostNameType.Unknown ||
-            parsed.UserInfo.Length != 0 || parsed.Port is not (-1 or 443) ||
-            parsed.Fragment.Length != 0)
+            parsed.UserInfo.Length != 0 || parsed.Fragment.Length != 0 ||
+            (httpsPort == 443 ? parsed.Port is not (-1 or 443) : parsed.Port != httpsPort) ||
+            (expectedHost is not null && !string.Equals(parsed.Host, expectedHost, StringComparison.Ordinal)))
             return null;
         return new(url, fingerprint, issuedAt);
     }
@@ -76,9 +84,10 @@ internal sealed class MilaSignInFlow
         }
     }
 
-    internal bool SetApproval(long generation, string url, string fingerprint, ulong issuedAt)
+    internal bool SetApproval(long generation, string url, string fingerprint, ulong issuedAt,
+        string? expectedHost = null, ushort httpsPort = 443)
     {
-        MilaApprovalInfo? approval = MilaApprovalInfo.TryCreate(url, fingerprint, issuedAt);
+        MilaApprovalInfo? approval = MilaApprovalInfo.TryCreate(url, fingerprint, issuedAt, expectedHost, httpsPort);
         if (approval is null) return false;
         lock (_gate)
         {

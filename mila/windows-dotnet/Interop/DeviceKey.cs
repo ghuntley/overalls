@@ -23,7 +23,8 @@ internal sealed class DeviceKey : IDisposable
     {
         ArgumentNullException.ThrowIfNull(host);
         string[] labels = host.Split('.');
-        if (host.Length > 253 || labels.Length < 2 || labels.Any(label =>
+        // `localhost` is the only single-label host: the loopback journey fixture.
+        if (host.Length > 253 || (labels.Length < 2 && host != "localhost") || labels.Any(label =>
             label.Length is < 1 or > 63 || label[0] == '-' || label[^1] == '-' ||
             label.Any(c => !(c is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'))))
             throw new ArgumentException("Invalid canonical deployment host", nameof(host));

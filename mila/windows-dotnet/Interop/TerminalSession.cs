@@ -38,9 +38,25 @@ internal sealed class MilaTerminalSession
         return true;
     }
     internal ulong NativeTerminalHandle => _terminalHandle;
+
+    /// Detaches the native handle after its owner has killed it, so sign-out
+    /// does not close an already-closed handle a second time.
+    internal void ClearNativeTerminal() => _terminalHandle = 0;
+
+    /// Marks a lost transport for the current generation. Output and input stay
+    /// refused until a fresh authenticated attach generation replaces it.
+    internal bool BeginReconnect(long generation)
+    {
+        if (generation != _generation || State is not (MilaTerminalState.Attaching or MilaTerminalState.Live or MilaTerminalState.ReadOnly))
+            return false;
+        State = MilaTerminalState.Reconnecting;
+        _terminalHandle = 0;
+        return true;
+    }
     internal bool Append(long generation, ReadOnlySpan<char> text)
     {
-        if (generation != _generation || State is MilaTerminalState.SignedOut or MilaTerminalState.Killed) return false;
+        if (generation != _generation || State is MilaTerminalState.SignedOut or MilaTerminalState.Killed or
+            MilaTerminalState.Failed or MilaTerminalState.Reconnecting) return false;
         if (_output.Length + text.Length > MaxOutputCharacters) return false;
         _output.Append(text);
         State = MilaTerminalState.Live;
@@ -54,7 +70,8 @@ internal sealed class MilaTerminalSession
         Append(generation, text);
     internal bool Resize(long generation, ushort columns, ushort rows)
     {
-        if (generation != _generation || !_readWrite || columns is 0 or > 4096 || rows is 0 or > 512) return false;
+        if (generation != _generation || !_readWrite || columns is 0 or > 4096 || rows is 0 or > 512 ||
+            State is not (MilaTerminalState.Attaching or MilaTerminalState.Live)) return false;
         State = MilaTerminalState.Live;
         return true;
     }
@@ -82,4 +99,4 @@ internal sealed class MilaTerminalSession
     }
 }
 
-internal enum MilaTerminalState { SignedOut, Attaching, ReadOnly, Live, Failed, Killed }
+internal enum MilaTerminalState { SignedOut, Attaching, ReadOnly, Live, Failed, Killed, Reconnecting }

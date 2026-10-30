@@ -14,8 +14,21 @@ internal static class Program
         if (!condition) throw new InvalidOperationException(check);
     }
 
-    private static void Main()
+    private static int Main(string[] args)
     {
+        // Journey mode: `--descriptor PATH` runs only the fixture journey; the
+        // hermetic checks below are the default and need no backend.
+        if (args is ["--descriptor", { Length: > 0 } descriptor])
+        {
+            if (!OperatingSystem.IsWindows()) throw new PlatformNotSupportedException("journey mode requires Windows CNG");
+            JourneySmoke.Run(descriptor);
+            return 0;
+        }
+        if (args.Length != 0)
+        {
+            Console.Error.WriteLine("usage: Mila.Windows.Smoke [--descriptor PATH]");
+            return 2;
+        }
         SessionLifecycleSmoke.Run();
         SignInFlowSmoke.Run();
         WindowsNotificationsSmoke.Run();
@@ -164,7 +177,10 @@ internal static class Program
         RustNative.CheckOutputBounds(route);
         AssertRoutes();
         AssertExternalActivation();
+        LifecycleSmoke.Run();
+        JourneyDescriptorSmoke.Run();
         Console.WriteLine("Windows Rust FFI smoke passed.");
+        return 0;
     }
 
     private static void AssertRoutes()
