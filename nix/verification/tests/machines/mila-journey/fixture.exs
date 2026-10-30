@@ -1,8 +1,9 @@
 # @cc [owner:ghuntley,label:verification;security] mila-journey-fixture-authority
 # The hermetic Mila journey fixture MAY seed only disposable ordinary users, a
 # synthetic image catalog entry and a synthetic host (control session,
-# headroom reports, and explicit per-machine operation completion and state
-# observation standing in for the absent provisioner), and MAY
+# headroom reports, a host credential for the terminal stand-in's stream, and
+# explicit per-machine operation completion and state observation standing in
+# for the absent provisioner), and MAY
 # stand in for the model's question and plan tool calls through the same
 # Planning domain functions. Every tested Mila operation MUST still enter
 # through Porsche SSH and Marshall's production authority. Login tokens and
@@ -34,12 +35,32 @@ defmodule MilaJourneyFixture do
     member = user(@member)
     image = image()
     {host, pool} = host()
+    # The terminal stand-in authenticates its stream with this host credential.
+    {:ok, issued} =
+      Marshall.Compute.Credentials.rotate(host.id, Marshall.Compute.CredentialLifetime.maximum())
+
+    private_write(Path.join(@root, "host.token"), issued.token)
     report!(host, pool, image.id, 1)
 
     {:ok, vm} =
       Marshall.Compute.provision(
         %{
           idempotency_key: "mila-journey-seed-machine",
+          architecture: :x86_64,
+          image_id: image.id,
+          profile: :standard,
+          vcpu: 1,
+          memory_bytes: 536_870_912,
+          disk_bytes: 2_147_483_648
+        },
+        actor: owner
+      )
+
+    # A second machine whose guest terminal the stand-in serves (real PTYs).
+    {:ok, terminal_vm} =
+      Marshall.Compute.provision(
+        %{
+          idempotency_key: "mila-journey-seed-terminal",
           architecture: :x86_64,
           image_id: image.id,
           profile: :standard,
@@ -64,7 +85,9 @@ defmodule MilaJourneyFixture do
       "host_id" => host.id,
       "pool_id" => pool.id,
       "machine_id" => vm.id,
-      "machine_name" => vm.name
+      "machine_name" => vm.name,
+      "terminal_machine_id" => terminal_vm.id,
+      "terminal_machine_name" => terminal_vm.name
     }
   end
 
@@ -72,7 +95,9 @@ defmodule MilaJourneyFixture do
   # The synthetic host opens a control session and reports fresh headroom
   # through the same Ash resources the provisioner control channel uses, so
   # admission and placement decisions are real. It MUST NOT acknowledge
-  # operations or report guest state: no guest executes in this fixture.
+  # operations or report guest state for any machine except the seeded
+  # terminal machine, which it observes running for the terminal stand-in.
+  # It publishes the stream identity owner-only.
   def run("host") do
     seed = seed()
     [host] = Ledger.read!(Host, id: seed["host_id"])
@@ -98,7 +123,21 @@ defmodule MilaJourneyFixture do
         })
       end)
 
-    report_loop(host, pool, seed["image_id"], 1)
+    observe!(seed["terminal_machine_id"])
+
+    private_write(
+      Path.join(@root, "terminal-host.json"),
+      JSON.encode!(%{
+        "base_url" => "https://localhost:9443",
+        "token" => File.read!(Path.join(@root, "host.token")),
+        "host_id" => host.id,
+        "session_id" => session,
+        "epoch" => host.connection_epoch,
+        "vm_id" => seed["terminal_machine_id"]
+      })
+    )
+
+    report_loop(host, pool, seed["image_id"], 1, seed["terminal_machine_id"])
   end
 
   # A fresh owner magic-link token for the browser approver (private file only).
@@ -114,22 +153,7 @@ defmodule MilaJourneyFixture do
   # admissible. This establishes no guest execution; it is invoked explicitly
   # by the journey after each accepted physical mutation.
   def run("observe") do
-    id = System.fetch_env!("MILA_FIXTURE_MACHINE")
-
-    {:ok, vm} =
-      retrying(fn ->
-        vm = Ledger.lock!(Marshall.Compute.VirtualMachine, id)
-
-        Ledger.read!(Marshall.Compute.Operation, vm_id: id)
-        |> Enum.filter(&(&1.status in [:pending, :acknowledged]))
-        |> Enum.each(&Ledger.update!(&1, :complete, %{}))
-
-        Ledger.update!(vm, :observe, %{
-          observed_state: vm.desired_state,
-          observed_at: Ledger.now()
-        })
-      end)
-
+    vm = observe!(System.fetch_env!("MILA_FIXTURE_MACHINE"))
     %{"observed_state" => Atom.to_string(vm.observed_state)}
   end
 
@@ -287,6 +311,24 @@ defmodule MilaJourneyFixture do
     end
   end
 
+  defp observe!(id) do
+    {:ok, vm} =
+      retrying(fn ->
+        vm = Ledger.lock!(Marshall.Compute.VirtualMachine, id)
+
+        Ledger.read!(Marshall.Compute.Operation, vm_id: id)
+        |> Enum.filter(&(&1.status in [:pending, :acknowledged]))
+        |> Enum.each(&Ledger.update!(&1, :complete, %{}))
+
+        Ledger.update!(vm, :observe, %{
+          observed_state: vm.desired_state,
+          observed_at: Ledger.now()
+        })
+      end)
+
+    vm
+  end
+
   defp seed, do: Path.join(@root, "seed.json") |> File.read!() |> JSON.decode!()
 
   defp user(email) do
@@ -365,12 +407,15 @@ defmodule MilaJourneyFixture do
     {host, pool}
   end
 
-  defp report_loop(host, pool, image_id, sequence) do
+  defp report_loop(host, pool, image_id, sequence, terminal_vm) do
     {:ok, :ok} =
       HostReports.ingest(host.id, host.connection_epoch, report(pool, image_id, sequence))
 
+    # The terminal machine's stand-in guest follows Marshall's lifecycle intent
+    # (for example an idle pause and its wake), as a running host would.
+    if rem(sequence, 5) == 0, do: observe!(terminal_vm)
     Process.sleep(1_000)
-    report_loop(host, pool, image_id, sequence + 1)
+    report_loop(host, pool, image_id, sequence + 1, terminal_vm)
   end
 
   defp report!(host, pool, image_id, sequence) do

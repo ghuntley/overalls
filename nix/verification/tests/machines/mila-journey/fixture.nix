@@ -19,6 +19,13 @@ let
     cp ${./approver.py} "$out/approver.py"
     ty check --python ${python}/bin/python3 "$out/approver.py"
   '';
+  terminalPython = pkgs.python3.withPackages (p: [ p.websockets ]);
+  # The guest terminal stand-in passes its own type check against its runtime.
+  terminalHost = pkgs.runCommand "mila-journey-terminal-host-typed" { nativeBuildInputs = [ pkgs.ty ]; } ''
+    mkdir -p "$out"
+    cp ${./terminal_host.py} "$out/terminal_host.py"
+    ty check --python ${terminalPython}/bin/python3 "$out/terminal_host.py"
+  '';
   marshallEnvironment = config.systemd.services.overalls-test-migrate.environment;
   action = pkgs.writeShellScriptBin "mila-fixture-action" ''
     set -eu
@@ -46,6 +53,8 @@ let
                    fixture_url: "https://${host}:${toString approverPort}/fixture/",
                    bearer_token: ($token | rtrimstr("\n"))},
         seed: {machine_name: $seed[0].machine_name, machine_id: $seed[0].machine_id,
+               terminal_machine_name: $seed[0].terminal_machine_name,
+               terminal_machine_id: $seed[0].terminal_machine_id,
                share_principal: $seed[0].member_email, account_email: $seed[0].owner_email}}' \
       > /run/mila-fixture/descriptor.json.tmp
     mv /run/mila-fixture/descriptor.json.tmp /run/mila-fixture/descriptor.json
@@ -107,6 +116,27 @@ in
     script = "exec mila-fixture-action host";
   };
 
+  # Guest shells for the terminal stand-in run as this unprivileged account.
+  users.users.mila-guest = {
+    isNormalUser = true;
+    home = "/home/mila-guest";
+    shell = pkgs.bashInteractive;
+  };
+
+  # Guest terminal stand-in (terminal_host.py): Lilly's terminal stream plus
+  # terminald for the seeded terminal machine, backed by real PTYs.
+  systemd.services.mila-fixture-terminal = {
+    description = "Mila journey guest terminal stand-in";
+    after = [ "mila-fixture-host.service" ];
+    path = [ pkgs.bashInteractive pkgs.coreutils ];
+    serviceConfig = { Restart = "always"; RestartSec = 2; UMask = "0077"; };
+    script = ''
+      until [ -s /run/mila-fixture/terminal-host.json ]; do sleep 1; done
+      exec ${terminalPython}/bin/python3 -I ${terminalHost}/terminal_host.py \
+        /run/mila-fixture/terminal-host.json /run/overalls-test/ca.crt
+    '';
+  };
+
   # @cc [owner:ghuntley,label:verification] mila-fixture-explicit-start
   # The fixture's schema migration and seed run only when this unit is started
   # explicitly (by the machine test or the launcher), never at module boot.
@@ -120,7 +150,10 @@ in
       systemctl start overalls-test-migrate.service
       until curl -fsS --cacert /run/overalls-test/ca.crt ${origin}/health/ready >/dev/null; do sleep 1; done
       [ -s /run/mila-fixture/seed.json ] || mila-fixture-action seed
+      rm -f /run/mila-fixture/terminal-host.json
       systemctl start mila-fixture-host.service porsche.service mila-fixture-approver.service
+      until [ -s /run/mila-fixture/terminal-host.json ]; do sleep 1; done
+      systemctl start mila-fixture-terminal.service
       # Ready only once Porsche presents its Marshall-issued host certificate.
       until ssh-keyscan -c -p ${toString sshPort} 127.0.0.1 2>/dev/null | grep -q 'ssh-ed25519-cert-v01@openssh.com'; do sleep 1; done
       until curl -fsS --cacert /run/overalls-test/ca.crt ${origin}/bin/ssh-trust.json >/dev/null; do sleep 1; done

@@ -4,9 +4,12 @@ Every step runs the `mila-journey` driver, which reaches the deployment only
 through the C ABI that the native shells use (HTTPS trust document plus
 Porsche `--json` commands). Each subtest then asserts the backend effect in
 Marshall's PostgreSQL ledger. The synthetic host stands in for the absent
-provisioner only through explicit `observe` calls; no guest executes here, so
-terminal attach is asserted as Marshall's closed `terminal_unavailable`
-refusal and native terminal evidence stays with the fleet PTY scenarios.
+provisioner only through explicit `observe` calls. No guest VM executes here:
+the seeded terminal machine's guest terminal is the stand-in
+`terminal_host.py`, which serves real PTYs over Marshall's production terminal
+stream. A machine without a running guest is refused with Marshall's closed
+`terminal_unavailable`. Real guest terminal evidence stays with the fleet
+`mila-journey-terminal` scenario.
 """
 
 import base64
@@ -128,6 +131,9 @@ with subtest("fixture backend is ready and publishes the v1 descriptor"):
     )
     seed = object_fields(json.loads(node.succeed("cat /run/mila-fixture/seed.json")))
     machine = text(seed, "machine_id")
+    terminal_machine = text(seed, "terminal_machine_id")
+    assert text(descriptor, "seed", "terminal_machine_id") == terminal_machine
+    assert text(descriptor, "seed", "terminal_machine_name") == text(seed, "terminal_machine_name")
     owner = text(seed, "owner_id")
     member = text(seed, "member_email")
 
@@ -332,8 +338,30 @@ with subtest("bearer-protected fixture hooks run only closed stand-in actions"):
     assert hook("shell", "{}")[0] == 404
 
 
-with subtest("terminal attach is refused with Marshall's closed reason without a guest"):
-    reason = mila_refusal("terminal", machine)
+with subtest("guest-backed terminal: new, attach, echo, resize, replay and kill on a real PTY"):
+    assert desired(terminal_machine) == "running"
+    result = mila("terminal", terminal_machine)
+    for evidence in ("output_seen", "resized", "replayed_after_reconnect", "killed"):
+        assert result[evidence] is True, (evidence, result)
+    terminal_session = text(result, "session_id")
+    node.wait_until_succeeds(
+        'test "$(sudo -u postgres psql --no-psqlrc -d marshall -Atc '
+        + shlex.quote(
+            f"SELECT kill_status FROM terminal_sessions WHERE id = {literal(terminal_session)} "
+            f"AND vm_id = {literal(terminal_machine)}"
+        )
+        + ')" = confirmed',
+        timeout=120,
+    )
+    # The killed shell ran as the unprivileged guest account and is gone.
+    node.wait_until_fails("pgrep -u mila-guest", timeout=30)
+
+with subtest("terminal attach is refused with Marshall's closed reason without a running guest"):
+    # Admitted but never observed running: no guest executes for this machine.
+    idle = mila("create", "mila-idle", "1", "512", "2")
+    receipt_operation(idle)
+    idle_machine = text(idle, "receipt", "result", "id")
+    reason = mila_refusal("terminal", idle_machine)
     assert "terminal_unavailable" in reason, reason
 
 with subtest("notification device register, list, preferences and remove"):
