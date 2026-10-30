@@ -271,7 +271,12 @@ def _producer_recorder_history(successes: list[bool], reopens: int) -> None:
     # Each Hegel case starts from a recorder boundary. The preceding fixed
     # checks may deliberately leave a gap/corrupt marker; a real restart
     # performs the production recovery handshake before generation begins.
-    machine.succeed("systemctl reset-failed sdk-producer.service")
+    # A failed unit is always loaded; an inactive one systemd has already
+    # garbage-collected reports "not loaded", leaving nothing to reset.
+    machine.succeed(
+        "systemctl reset-failed sdk-producer.service 2>/dev/null"
+        " || ! systemctl is-failed --quiet sdk-producer.service"
+    )
     machine.succeed("rm -f /var/lib/request-sdk-marker/quality")
     machine.succeed("systemctl restart sdk-producer.service")
     machine.wait_until_succeeds(
