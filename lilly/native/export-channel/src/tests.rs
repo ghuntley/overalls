@@ -1,6 +1,7 @@
 use super::*;
 use hegel::generators as gs;
 use hegel::TestCase;
+use std::ffi::{OsStr, OsString};
 
 fn good_key(tc: &TestCase) -> String {
     let alphabet: Vec<char> = ('A'..='Z')
