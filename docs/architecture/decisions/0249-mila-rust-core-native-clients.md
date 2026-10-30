@@ -129,6 +129,25 @@ Marshall+Porsche fixture and is gated by the `MILA_WINDOWS_JOURNEY` repository
 variable. Windows X25519 poke-key custody, WNS delivery and live journey execution
 remain open.
 
+The Linux GTK client keeps its decisions in GTK-independent library modules:
+the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),
+the [terminal surface](../../../mila/native/linux/src/terminal_surface.rs) over
+`AuthenticatedPty`/`HostPtyTransport` with host-side
+[PTY text decoding](../../../mila/native/linux/src/terminal_text.rs), the
+[SSH-key view](../../../mila/native/linux/src/ssh_keys_view.rs) and
+navigation-only [deep-link presentation](../../../mila/native/linux/src/deep_link.rs).
+The terminal reads through the additive bounded-wait
+`mila_session_terminal_read_within` FFI entry, which reports the same
+`TerminalReadEvent` codes as `mila_session_terminal_read` without waiting for
+the session timeout; [transport](../../../mila/rust/mila-transport/tests/ssh.rs) and
+[FFI](../../../mila/rust/mila-ffi/tests/session.rs) tests cover it. A GTK
+widget test in [`main.rs`](../../../mila/native/linux/src/main.rs) runs on a
+headless Broadway display in CI, and
+[`mila-linux-journey`](../../../mila/native/linux/src/journey.rs) drives the
+same modules against the hermetic fixture descriptor. The GTK sign-in button
+does not yet open a live session, and no recorded fixture run exists; see the
+[Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
+
 ## Open questions
 
 None blocking the direction; platform key-storage and release-signing details
