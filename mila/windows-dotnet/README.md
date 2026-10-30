@@ -39,7 +39,14 @@ existing typed Mila transport and must not be added as untyped FFI payloads.
 The development host is Linux, so the Windows SDK and .NET SDK are not
 available here. The project files are checked for contract and XML syntax;
 `dotnet restore` and a Windows build must run in the Windows CI job described by
-ADR-0235.
+ADR-0235. That job runs the Buck2 targets `//mila:windows-ffi-msvc`,
+`//mila:windows-dotnet` and `//mila:windows-smoke` through
+`tools/buck2 --no-nix` (ADR-0269; see the buck2 skill).
+
+NuGet restores in locked mode from `packages.lock.json` here and in
+`../windows-dotnet-smoke`. After changing a `PackageReference`, refresh the lock
+with `dotnet restore -p:RestoreLockedMode=false -p:EnableWindowsTargeting=true`
+(this works on Linux too) and review the diff.
 
 ## Deployments, sign-in and reconnect
 

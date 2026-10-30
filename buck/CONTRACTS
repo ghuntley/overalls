@@ -81,7 +81,8 @@ change to the cells' inputs, toolchains or rule files (including the
 nixos_machine_test command, buck/machine_tests.py), MUST select every
 target. Selection MUST only load targets and run queries, never build an
 action or a Nix derivation, and MUST report each package that fails to load
-instead of hiding it.
+instead of hiding it. Targets labelled non_hermetic are never selected: their
+SDKs exist only on the platform workflows' runners.
 
 @cc [owner:ghuntley,label:build] script-tests-run-locally
 script_test and nixos_machine_test commands MUST run locally from the project
@@ -182,3 +183,19 @@ restrict-eval and allowed-uris options, and writes only its derivation path:
 it builds nothing beyond import-from-derivation and roots nothing, so every
 machine-test assembly can be checked for undeclared inputs without running
 its VMs (ADR-0270).
+
+@cc [owner:ghuntley,label:build;verification] mila-non-hermetic-targets
+mila_platform targets MUST carry the non_hermetic label and MUST be compatible
+only with `overalls.non_hermetic=true` on their own OS, so `buck2 build //...`,
+`buck2 test //...` and affected selection skip them. Their actions MUST run
+locally and never read or write a cache, because the SDKs they run come from
+the daemon's PATH, which no action key records. Third-party inputs MUST come
+only from committed lock files: Gradle verification metadata for Android and
+NuGet packages.lock.json in locked mode for Windows (ADR-0269 M9).
+
+@cc [owner:ghuntley,label:build;security] mila-windows-ffi-cross-build
+mila_windows_ffi MUST build mila_ffi.dll for x86_64-pc-windows-gnu on Linux
+from the single Nix Rust toolchain, cargo-zigbuild, zig and the rust// cell's
+vendored root-lock crates, offline and with a clean environment, and MUST keep
+checkout and store paths out of the binary; its clippy mode MUST deny warnings
+for that target (ADR-0265, ADR-0273, ADR-0269 M9).

@@ -1,13 +1,57 @@
 #!/usr/bin/env bash
 # Contract buck2-wrapper-pinned-cells: see tools/CONTRACTS.
+# Contract buck2-no-nix-mode: see tools/CONTRACTS.
+#
+#   tools/buck2 <buck2 args>            buck2 from the flake-pinned buckCells
+#   tools/buck2 --no-nix <buck2 args>   runners without Nix (Windows): the
+#       pinned buck2 and prelude (tools/buck2-no-nix.json, hashes from the pin
+#       registry) with a configuration that builds only non_hermetic targets.
+#       OVERALLS_BUCK2_KIT may name a //tools:buck2-no-nix-<os> output instead
+#       of downloading (ADR-0269 M9).
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
+state=.buck-cells.key
+
+if [[ "${1:-}" == --no-nix ]]; then
+  shift
+  case "$(uname -s)-$(uname -m)" in
+    MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) kit_system=x86_64-windows python=python ;;
+    Linux-x86_64) kit_system=x86_64-linux python=python3 ;;
+    *) echo "tools/buck2 --no-nix: no pinned buck2 for $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+  esac
+  if [[ -L .buck-cells ]]; then
+    # Leaving the Nix cells: stop their daemon and drop the store link.
+    .buck-cells/bin/buck2 kill >/dev/null 2>&1 || true
+    rm -f .buck-cells
+  fi
+  if [[ -n "${OVERALLS_BUCK2_KIT:-}" ]]; then
+    if [[ "$(cat .buck-cells/kit-id 2>/dev/null || true)" != "$(cat "$OVERALLS_BUCK2_KIT/kit-id")" ]]; then
+      for old in .buck-cells/bin/buck2 .buck-cells/bin/buck2.exe; do
+        [[ -x "$old" ]] && "$old" kill >/dev/null 2>&1 || true
+      done
+      rm -rf .buck-cells
+      cp -R "$OVERALLS_BUCK2_KIT" .buck-cells
+      chmod -R u+w .buck-cells
+    fi
+  else
+    "$python" tools/buck2_no_nix.py "$kit_system" .buck-cells
+  fi
+  # Copies and uploads can drop the empty rust/ cell directory.
+  mkdir -p .buck-cells/rust
+  printf 'no-nix %s\n' "$(cat .buck-cells/kit-id)" > "$state"
+  exe=.buck-cells/bin/buck2
+  [[ -f "$exe.exe" ]] && exe=$exe.exe
+  exec "$root/$exe" "$@"
+fi
+
 case "$(uname -s)-$(uname -m)" in
   Linux-x86_64) system=x86_64-linux ;;
   Darwin-arm64) system=aarch64-darwin ;;
-  *) echo "tools/buck2: no buckCells for $(uname -s)-$(uname -m)" >&2; exit 1 ;;
+  *) echo "tools/buck2: no buckCells for $(uname -s)-$(uname -m); use --no-nix for non_hermetic targets" >&2; exit 1 ;;
 esac
+# macOS has shasum, not sha256sum.
+if command -v sha256sum >/dev/null; then sha=(sha256sum); else sha=(shasum -a 256); fi
 key_inputs() {
   git ls-files -z -- flake.nix flake.lock nix/buck \
     nix/domains/artifacts/dependency-hashes.json \
@@ -17,15 +61,19 @@ key_inputs() {
     nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix \
     lyra/vendor/fs2 \
     nix/domains/artifacts/guest/github/default.nix \
-    antithesis/nix/python-wheels.nix \
-    '**/Cargo.lock' '**/Cargo.toml' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 sha256sum
+    antithesis/nix/python-wheels.nix tools/buck2-no-nix.json \
+    '**/Cargo.lock' '**/Cargo.toml' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 "${sha[@]}"
   # The rust cell discovers Cargo targets from Rust file names, not contents.
   git ls-files -- '*.rs' | sort
 }
-key=$(key_inputs | sha256sum | cut -d' ' -f1)
-state=.buck-cells.key
+key=$(key_inputs | "${sha[@]}" | cut -d' ' -f1)
 if [[ ! -e .buck-cells || "$(cat "$state" 2>/dev/null)" != "$key" ]]; then
   old=$(readlink .buck-cells 2>/dev/null || true)
+  if [[ -d .buck-cells && ! -L .buck-cells ]]; then
+    # A --no-nix kit: stop its daemon and replace it with the cells link.
+    .buck-cells/bin/buck2 kill >/dev/null 2>&1 || true
+    rm -rf .buck-cells
+  fi
   new=$(nix build --no-link --print-out-paths ".#buckCells.$system")
   if [[ "$new" != "$old" ]]; then
     ln -sfn "$new" .buck-cells

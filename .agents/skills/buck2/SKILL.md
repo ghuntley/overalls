@@ -160,6 +160,55 @@ match Nix byte for byte. Compare them with `diff -r`.
   merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`; every key must be a name the
   package set consumes, or evaluation fails.
 
+**Mila platforms** (`buck/mila.bzl`, `mila/BUCK`, ADR-0269 M9). Xcode,
+Gradle and .NET need SDKs that Nix does not supply, so these are
+`non_hermetic` targets:
+- **What they are.** `mila_platform(name, os, steps, outputs, env, path_env,
+  require, srcs, check)` runs `steps` in the checkout through
+  `buck/mila_platform.py`, with the SDKs from the **daemon's** `PATH`, then
+  copies `outputs` (repository paths) into buck-out with a `SHA256SUMS`. The
+  actions are `local_only` and never use a cache. Third-party packages are
+  pinned by lock files, which `//:pins` requires: Gradle's
+  `gradle/verification-metadata.xml` and NuGet `packages.lock.json` restored
+  in locked mode.
+- **When they build.** Only with `-c overalls.non_hermetic=true` and on their
+  own OS (`target_compatible_with` uses `toolchains//:non_hermetic_enabled`).
+  `buck2 build //...`, `buck2 test //...`, verification and `tools/affected`
+  skip them.
+- **Targets.**
+  - Apple (macOS): `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`,
+    `{macos,ios}-{dev,release}` (wrapping `mila/native/mila-build`).
+  - Android (Linux): `android-debug`, `android-release`, `android-ffi-clippy`.
+  - Windows: `windows-ffi-msvc`, `windows-ffi-msvc-clippy`, `windows-dotnet`,
+    `windows-smoke`.
+  - Hermetic, on Linux: `windows-ffi-gnu` and `windows-ffi-gnu-clippy`
+    cross-build the FFI crate for `x86_64-pc-windows-gnu` with cargo-zigbuild
+    and the `rust//` cell's vendored crates. They are a compile and Clippy
+    check only; the shipped DLL stays MSVC.
+- **The daemon's environment is the SDK.** Buck2 local actions inherit the
+  environment of the daemon, not of the command. Install the SDKs first. Run
+  `tools/buck2 kill` after changing `PATH` or a variable a build reads (the
+  release signing inputs, for example).
+- **macOS.** `tools/buck2` builds `buckCells.aarch64-darwin`: buck2, the
+  prelude and a few host tools. Every other `[nix]` tool is a stub, and the
+  `rust//` cell is empty. Its patched nixpkgs source comes from devenv's
+  Cachix.
+- **Windows (no Nix).** `tools/buck2 --no-nix …` downloads the buck2 release
+  and the prelude named in `tools/buck2-no-nix.json` and checks them against
+  the pin registry (`buck2WindowsBinary`, `buck2Prelude`). It needs `python`
+  and `zstd` (or Python 3.14). It writes a real `.buck-cells` directory whose
+  configuration sets `[overalls] no_nix` and `non_hermetic`. Tools resolve
+  from `PATH`, and any hermetic target fails at analysis.
+  - `OVERALLS_BUCK2_KIT` may name a `//tools:buck2-no-nix-<os>` output
+    instead of downloading. Building those kits also checks that the no-Nix
+    pins are exactly the buckCells buck2 and prelude: refresh
+    `tools/buck2-no-nix.json` and the three registry keys with every buck2
+    bump.
+  - The Linux kit runs this mode on a development host.
+- **Example (Android, on Linux):** install JDK 17, Gradle 9.3.1, the Android
+  SDK and NDK and cargo-ndk on `PATH`, then
+  `tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug`.
+
 **Not yet Buck2.** Checks that evaluate NixOS (`nix-compact-*`,
 `fleet-builds-configuration`) stay bootstrap targets until `nix_assemble`
 (M3).
@@ -378,7 +427,11 @@ command, the single prek hook and CI call it.
   against `/var/lib/nativelink-worker-cells/id` on the workers).
 - **Bumping buck2.** buck2 comes from `buildNixpkgs`. Bump `flake.lock`, rerun
   the spikes in the [migration review](../../../docs/architecture/reviews/2026-10-30-buck2-migration.md),
-  and expect every target to be selected.
+  and expect every target to be selected. Update `tools/buck2-no-nix.json` and
+  the `buck2WindowsBinary`, `buck2LinuxBinary` and `buck2Prelude` pins in the
+  same change; `//tools:buck2-no-nix-linux` fails until they match.
+- **A `non_hermetic` target is "incompatible".** Pass
+  `-c overalls.non_hermetic=true`, and build it on its own OS.
 
 ## Verification
 

@@ -2,7 +2,9 @@
 Every Nix tool MUST resolve through read_root_config("nix", name) at load
 time so its store path is a target attribute and part of each consuming
 action's key; a missing entry fails rather than falling back to PATH
-(ADR-0269).
+(ADR-0269). The only exception is `tools/buck2 --no-nix`
+(`[overalls] no_nix = true`), where the kit names its few tools by bare name,
+every other tool fails at analysis, and only non_hermetic targets build.
 
 @cc [owner:ghuntley,label:build] nix-rust-toolchain
 nix_rust_toolchain MUST take rustc, rustdoc and clippy-driver only from the

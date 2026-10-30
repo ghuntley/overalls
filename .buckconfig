@@ -31,8 +31,9 @@
 [project]
 # Wrapper state is never a source: .buck-cells.gcroot points at the cells
 # closure, and globbing it would copy buck2 and the prelude into every
-# assembled tree. .buckconfig.local holds per-checkout overrides.
-  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical
+# assembled tree. .buckconfig.local holds per-checkout overrides. The mila/
+# entries are the in-tree outputs of the non_hermetic platform builds (M9).
+  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical, mila/build, mila/native/apple/.build, mila/native/apple/App/.build, mila/native/apple/Sources/MilaNativeUI/Resources/*.json, mila/native/android/.gradle, mila/native/android/.kotlin, mila/native/android/build, mila/native/android/app/build, mila/native/android/local.properties, mila/windows-dotnet/bin, mila/windows-dotnet/obj, mila/windows-dotnet-smoke/bin, mila/windows-dotnet-smoke/obj
 
 <file:.buck-cells/toolchains.buckconfig>
 

@@ -1,0 +1,4 @@
+# Shell scripts run on Windows runners through Git Bash, where the
+# runner's Git would otherwise check them out with CRLF line endings.
+tools/buck2 text eol=lf
+*.sh text eol=lf

@@ -1,0 +1,9 @@
+{
+  "release": "2026-10-15",
+  "prelude": "9ebf1e1c3d174cabf9886c884ab547cfa64acc81",
+  "binaries": {
+    "x86_64-windows": {"asset": "buck2-x86_64-pc-windows-msvc.exe.zst", "pin": "buck2WindowsBinary", "file": "buck2.exe"},
+    "x86_64-linux": {"asset": "buck2-x86_64-unknown-linux-gnu.zst", "pin": "buck2LinuxBinary", "file": "buck2"}
+  },
+  "prelude_pin": "buck2Prelude"
+}

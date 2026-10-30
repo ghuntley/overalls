@@ -1,3 +1,4 @@
+load("@root//buck:mila.bzl", "mila_platform", "mila_windows_ffi")
 load("@root//buck:nix.bzl", "nix_owned", "nix_store_run")
 
 nix_owned()
@@ -16,3 +17,198 @@ nix_store_run(
 # Root Cargo workspace members' manifests (ADR-0273), which every Nix Rust
 # build reads through cargo-workspace.nix; machine-test assembly declares them.
 filegroup(name = "cargo_manifests", srcs = glob(["native/linux/Cargo.toml", "rust/*/Cargo.toml"]), visibility = ["PUBLIC"])
+
+# Platform builds (ADR-0269 M9, ADR-0235). See buck/mila.bzl: the Xcode,
+# Gradle and .NET targets are non_hermetic and build only with
+# `-c overalls.non_hermetic=true` on their own OS; CI runs them in
+# .github/workflows/mila-builds.yml and mila-release.yml. Each runs in the
+# checkout and copies its outputs into buck-out, so the in-tree paths the
+# journey steps read (mila/rust/target, mila/build, the Gradle and .NET build
+# directories) stay where they were.
+
+# Generated in-tree outputs; .buckconfig also ignores them for nix_owned.
+_BUILD_OUTPUTS = [
+    "build/**",
+    "rust/target/**",
+    "**/.hegel/**",
+    "native/apple/.build/**",
+    "native/apple/App/.build/**",
+    "native/apple/Sources/MilaNativeUI/Resources/*.json",
+    "native/android/.gradle/**",
+    "native/android/.kotlin/**",
+    "native/android/build/**",
+    "native/android/app/build/**",
+    "native/android/local.properties",
+    "windows-dotnet/bin/**",
+    "windows-dotnet/obj/**",
+    "windows-dotnet-smoke/bin/**",
+    "windows-dotnet-smoke/obj/**",
+]
+
+# The FFI crate and the Mila crates it links, with the root workspace
+# manifest and lock that pin them (ADR-0273).
+_FFI_SRCS = glob(["rust/**"], exclude = _BUILD_OUTPUTS) + ["//:workspace_files"]
+_LOCALIZATION = glob(["localization/**"], exclude = _BUILD_OUTPUTS)
+_APPLE = glob(["native/apple/**", "native/mila-build"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
+_ANDROID = glob(["native/android/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
+_WINDOWS = glob(["windows-dotnet/**", "windows-dotnet-smoke/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + [
+    "//protocol:srcs",
+]
+
+_FFI_MANIFEST = ["--manifest-path", "mila/rust/mila-ffi/Cargo.toml"]
+
+# --- Windows FFI. ---
+
+# The shipped mila_native.dll is MSVC, built on the Windows runner
+# (:windows-ffi-msvc). These Linux targets cross-build the same crate for
+# x86_64-pc-windows-gnu as a hermetic compile and Clippy check of its
+# cfg(windows) code (ADR-0265); the gnu DLL is not shipped.
+mila_windows_ffi(name = "windows-ffi-gnu", srcs = _FFI_SRCS, labels = ["check"])
+
+mila_windows_ffi(name = "windows-ffi-gnu-clippy", mode = "clippy", srcs = _FFI_SRCS, labels = ["check"])
+
+# --- Apple (macOS runners; Xcode and the rustup toolchain from PATH). ---
+
+# The host static library that `swift test` links (MILA_FFI_LIB_DIR). Built
+# in mila/rust/target, where the journey step also reads it.
+mila_platform(
+    name = "apple-ffi",
+    os = "macos",
+    steps = [{"argv": ["cargo", "build"] + _FFI_MANIFEST + ["--locked", "--target-dir", "mila/rust/target", "-p", "mila-ffi", "--release"], "cwd": "."}],
+    outputs = {"libmila_ffi.a": "mila/rust/target/release/libmila_ffi.a"},
+    require = ["cargo"],
+    srcs = _FFI_SRCS,
+)
+
+mila_platform(
+    name = "apple-ffi-clippy",
+    os = "macos",
+    steps = [{"argv": ["cargo", "clippy"] + _FFI_MANIFEST + ["--locked", "-p", "mila-ffi", "--all-targets", "--", "-D", "warnings"], "cwd": "."}],
+    require = ["cargo"],
+    srcs = _FFI_SRCS,
+    check = True,
+)
+
+# Swift package tests over the bundled catalogs and the host FFI.
+mila_platform(
+    name = "apple-swift-test",
+    os = "macos",
+    steps = [
+        {"argv": ["python3", "mila/localization/generate_catalogs.py", "--source", "mila/localization/catalogs", "--output", "mila/native/apple/Sources/MilaNativeUI/Resources"], "cwd": "."},
+        {"argv": ["swift", "test"], "cwd": "mila/native/apple"},
+    ],
+    path_env = {"MILA_FFI_LIB_DIR": ":apple-ffi"},
+    require = ["swift", "python3"],
+    srcs = _APPLE,
+    check = True,
+)
+
+# The dev apps (`mila-build <platform> dev`). Each builds its own FFI slice
+# with cargo; outputs land in mila/build/<platform>-dev as before.
+[mila_platform(
+    name = "{}-dev".format(platform),
+    os = "macos",
+    steps = [{"argv": ["mila/native/mila-build", platform, "dev"], "cwd": "."}],
+    outputs = {"Mila.app": "mila/build/{}-dev/Mila.app".format(platform)},
+    require = ["cargo", "xcrun"],
+    srcs = _APPLE,
+) for platform in ["macos", "ios"]]
+
+# Signed releases. build.sh reads MILA_VERSION and the MILA_APPLE_* signing
+# inputs from the daemon's environment: start the daemon in the step that
+# sets them (`tools/buck2 kill` first), as mila-release.yml does.
+[mila_platform(
+    name = "{}-release".format(platform),
+    os = "macos",
+    steps = [{"argv": ["mila/native/mila-build", platform, "release"], "cwd": "."}],
+    outputs = {"release": "mila/build/{}-release".format(platform)},
+    require = ["cargo", "xcrun"],
+    srcs = _APPLE,
+) for platform in ["macos", "ios"]]
+
+# --- Android (Linux; JDK, Gradle, the Android SDK/NDK and cargo-ndk from PATH). ---
+
+# Gradle resolves only artifacts listed in gradle/verification-metadata.xml.
+_GRADLE = ["gradle", "--no-daemon", "--stacktrace"]
+
+mila_platform(
+    name = "android-debug",
+    os = "linux",
+    steps = [{"argv": _GRADLE + ["assembleDebug", "assembleDebugAndroidTest", "testDebugUnitTest"], "cwd": "mila/native/android"}],
+    outputs = {
+        "app-debug.apk": "mila/native/android/app/build/outputs/apk/debug/app-debug.apk",
+        "app-debug-androidTest.apk": "mila/native/android/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk",
+    },
+    require = ["gradle", "java", "cargo", "cargo-ndk"],
+    srcs = _ANDROID,
+)
+
+mila_platform(
+    name = "android-release",
+    os = "linux",
+    steps = [{"argv": _GRADLE + ["assembleRelease"], "cwd": "mila/native/android"}],
+    outputs = {"app-release-unsigned.apk": "mila/native/android/app/build/outputs/apk/release/app-release-unsigned.apk"},
+    require = ["gradle", "java", "cargo", "cargo-ndk"],
+    srcs = _ANDROID,
+)
+
+# The library only: the test targets' dev-dependencies are host tools.
+# cargo-ndk reads cargo metadata from its working directory.
+mila_platform(
+    name = "android-ffi-clippy",
+    os = "linux",
+    steps = [{"argv": ["cargo", "ndk", "--platform", "26", "-t", "arm64-v8a", "clippy", "--locked", "-p", "mila-ffi", "--", "-D", "warnings"], "cwd": "mila/rust"}],
+    require = ["cargo", "cargo-ndk"],
+    srcs = _FFI_SRCS,
+    check = True,
+)
+
+# --- Windows (.NET 10 SDK, cargo and Python from PATH; tools/buck2 --no-nix). ---
+
+# The MSVC DLL, built with cargo in mila/rust/target as before.
+mila_platform(
+    name = "windows-ffi-msvc",
+    os = "windows",
+    steps = [{"argv": ["cargo", "build"] + _FFI_MANIFEST + ["--locked", "--target-dir", "mila/rust/target", "-p", "mila-ffi", "--release"], "cwd": "."}],
+    outputs = {"mila_ffi.dll": "mila/rust/target/release/mila_ffi.dll"},
+    require = ["cargo"],
+    srcs = _FFI_SRCS,
+)
+
+mila_platform(
+    name = "windows-ffi-msvc-clippy",
+    os = "windows",
+    steps = [{"argv": ["cargo", "clippy"] + _FFI_MANIFEST + ["--locked", "-p", "mila-ffi", "--all-targets", "--", "-D", "warnings"], "cwd": "."}],
+    require = ["cargo"],
+    srcs = _FFI_SRCS,
+    check = True,
+)
+
+# The WinUI client, restored in NuGet locked mode (packages.lock.json) and
+# built with the imported DLL staged as mila_native.dll.
+mila_platform(
+    name = "windows-dotnet",
+    os = "windows",
+    steps = [
+        {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet"},
+        {"argv": ["dotnet", "build", "--configuration", "Release", "--no-restore", "-p:MilaNativeDll=$MILA_FFI_DIR/mila_ffi.dll"], "cwd": "mila/windows-dotnet"},
+    ],
+    path_env = {"MILA_FFI_DIR": ":windows-ffi-msvc"},
+    outputs = {"win-x64": "mila/windows-dotnet/bin/Release/net10.0-windows10.0.19041.0/win-x64"},
+    require = ["dotnet", "python"],
+    srcs = _WINDOWS,
+)
+
+# The production .NET interop calling the staged Rust DLL.
+mila_platform(
+    name = "windows-smoke",
+    os = "windows",
+    steps = [
+        {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet-smoke"},
+        {"argv": ["dotnet", "run", "--project", ".", "--configuration", "Release", "-p:MilaNativeDll=$MILA_WINDOWS_DIR/win-x64/mila_native.dll"], "cwd": "mila/windows-dotnet-smoke"},
+    ],
+    path_env = {"MILA_WINDOWS_DIR": ":windows-dotnet"},
+    require = ["dotnet"],
+    srcs = _WINDOWS,
+    check = True,
+)

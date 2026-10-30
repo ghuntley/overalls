@@ -1,3 +1,13 @@
-load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:nix.bzl", "buck2_no_nix_kit", "nix_owned")
 
 nix_owned()
+
+# Kits for `tools/buck2 --no-nix` (ADR-0269 M9): CI builds the Windows one on
+# Linux and the Windows job sets OVERALLS_BUCK2_KIT to it; the Linux one runs
+# the same mode on a development host.
+[buck2_no_nix_kit(
+    name = "buck2-no-nix-" + os,
+    os = os,
+    kit = "toolchains//:buck2_no_nix_" + os,
+    visibility = ["PUBLIC"],
+) for os in ["windows", "linux"]]

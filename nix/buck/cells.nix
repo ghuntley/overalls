@@ -1,4 +1,4 @@
-{ pkgs, toolchain, buck2 ? pkgs.buck2, fixture ? null }:
+{ pkgs, toolchain ? null, buck2 ? pkgs.buck2, fixture ? null }:
 # @cc [owner:ghuntley,label:build] buck-cells-from-pins
 # Buck2's prelude and every toolchain path MUST come from this derivation,
 # built only from flake.lock-pinned nixpkgs and the dependency registry, so
@@ -6,6 +6,18 @@
 # from PATH (ADR-0269).
 let
   inherit (pkgs) lib;
+  system = pkgs.stdenv.hostPlatform.system;
+  # Only x86_64-linux builds hermetic targets. Elsewhere (aarch64-darwin, for
+  # the Mila Apple builds on macOS runners) the cells carry buck2, the
+  # prelude and the few tools the non_hermetic rules run; every other tool is
+  # a stub that fails when run, and the rust// cell is empty (ADR-0269 M9).
+  hermeticHost = system == "x86_64-linux";
+  hostTools = [ "bash" "coreutils" "python" "git" "jq" ];
+  unavailable = pkgs.writeShellScript "overalls-buck-unavailable" ''
+    echo "this tool is not in buckCells.${system}; build hermetic targets on x86_64-linux" >&2
+    exit 1
+  '';
+  noNix = import ./no-nix.nix { inherit pkgs buck2; };
   python = import ./python.nix { inherit pkgs; };
   # The one Rust toolchain (ADR-0273), shared with the Nix builds and devenv.
   rust = (import ../rust-toolchain.nix { inherit pkgs; }).toolchain;
@@ -45,8 +57,9 @@ let
   # their paths; every other tool and pinned input becomes `stub`, and the
   # rust// cell is empty (fixtures load no Rust targets), so the cells closure
   # stays small and nothing outside it is realised.
-  inputs = if fixture == null then pinnedInputs
-    else lib.mapAttrs (_: lib.mapAttrs (_: _: fixture.stub)) pinnedInputs;
+  inputs = if fixture != null then lib.mapAttrs (_: lib.mapAttrs (_: _: fixture.stub)) pinnedInputs
+    else if hermeticHost then pinnedInputs
+    else lib.mapAttrs (_: lib.mapAttrs (_: _: "${unavailable}")) pinnedInputs;
   allTools = lib.foldl' (acc: group: acc // group) {
     bash = "${pkgs.bash}/bin/bash";
     coreutils = "${pkgs.coreutils}/bin";
@@ -63,6 +76,18 @@ let
     # The single Rust toolchain root (rustc, rustdoc, clippy-driver, rustfmt,
     # cargo) and the binutils its links and archives use (M5).
     rust = "${rust}";
+    # Cargo-driven builds outside the prelude rules (the Mila Windows FFI
+    # cross-build, M9): the rust// cell's vendored root-lock crates, and
+    # cargo-zigbuild with zig as the windows-gnu linker.
+    rust_bin = "${rust}/bin";
+    rust_vendor = "${rustCell}/vendor";
+    cargo_zigbuild = "${pkgs.cargo-zigbuild}/bin";
+    cc_bin = "${pkgs.stdenv.cc}/bin";
+    zig = "${pkgs.zig}/bin";
+    # tools/buck2 --no-nix kits (M9): their derivations only, so the cells
+    # never fetch them; //tools:buck2-no-nix-<os> realises one on demand.
+    buck2_no_nix_windows = builtins.unsafeDiscardOutputDependency noNix.windows.drvPath;
+    buck2_no_nix_linux = builtins.unsafeDiscardOutputDependency noNix.linux.drvPath;
     bintools = "${pkgs.stdenv.cc.bintools.bintools}/bin";
     # The cc wrapper with an empty environment: it reads NIX_LDFLAGS and
     # friends, so a Buck2 daemon started in a dev shell would otherwise link
@@ -99,9 +124,10 @@ let
     unzip = "${pkgs.unzip}/bin";
     fonts_conf = "${pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; }}";
   } (lib.attrValues inputs);
-  tools = if fixture == null then allTools
-    else lib.mapAttrs (name: _: fixture.tools.${name} or fixture.stub) allTools;
-  rustCellPath = if fixture == null then rustCell else pkgs.emptyDirectory;
+  tools = if fixture != null then lib.mapAttrs (name: _: fixture.tools.${name} or fixture.stub) allTools
+    else if hermeticHost then allTools
+    else lib.mapAttrs (name: path: if lib.elem name hostTools then path else "${unavailable}") allTools;
+  rustCellPath = if fixture == null && hermeticHost then rustCell else pkgs.emptyDirectory;
   toolLines = lib.concatStrings (lib.mapAttrsToList (name: path: "  ${name} = ${path}\n") tools);
   # The identity of this cells closure for remote execution (ADR-0272):
   # every store path an action can name, so a worker advertising the same id

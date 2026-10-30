@@ -20,9 +20,13 @@ load("@prelude//cxx:headers.bzl", "HeaderMode")
 load("@prelude//linking:link_info.bzl", "LinkStyle")
 load("@prelude//linking:lto.bzl", "LtoMode")
 load("@prelude//rust:rust_toolchain.bzl", "PanicRuntime", "RustToolchainInfo")
+load(":nix.bzl", "NO_NIX")
 
 def _store_path(name: str) -> str:
     path = read_root_config("nix", name)
+    if NO_NIX:
+        # No Rust or C target builds without Nix; analysis of one fails.
+        return path or "/unavailable-without-nix"
     if not path or not path.startswith("/nix/store/"):
         fail("[nix] {} is not a store path; run tools/buck2".format(name))
     return path

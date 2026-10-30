@@ -95,3 +95,39 @@ nix_store_run = rule(
         "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
     },
 )
+
+def _buck2_no_nix_kit_impl(ctx: AnalysisContext) -> list[Provider]:
+    out = ctx.actions.declare_output(ctx.attrs.os, dir = True)
+    ctx.actions.run(
+        cmd_args(
+            ctx.attrs._bash[RunInfo],
+            "-c",
+            "kit=$(\"$2\" --realise \"$3\") && \"$1/cp\" -rL \"$kit\" \"$4\" && \"$1/chmod\" -R u+w \"$4\"",
+            "buck2_no_nix_kit",
+            ctx.attrs._coreutils[RunInfo],
+            ctx.attrs._nix_store[RunInfo],
+            ctx.attrs.kit[RunInfo],
+            out.as_output(),
+        ),
+        category = "buck2_no_nix_kit",
+        # A copy of a store path that exists only in the local store.
+        local_only = True,
+        allow_cache_upload = False,
+    )
+    return [DefaultInfo(default_output = out)]
+
+# Contract buck2-no-nix-mode: see tools/CONTRACTS.
+# The kit for `tools/buck2 --no-nix` (`OVERALLS_BUCK2_KIT`): buck2 for `os`,
+# the prelude and a non_hermetic-only toolchains.buckconfig. `kit` names the
+# kit's derivation (nix/buck/no-nix.nix); building it fetches the pinned
+# downloads and fails when they are not the buckCells buck2 and prelude.
+buck2_no_nix_kit = rule(
+    impl = _buck2_no_nix_kit_impl,
+    attrs = {
+        "kit": attrs.exec_dep(),
+        "os": attrs.string(),
+        "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
+        "_coreutils": attrs.default_only(attrs.exec_dep(default = "toolchains//:coreutils")),
+        "_nix_store": attrs.default_only(attrs.exec_dep(default = "toolchains//:nix_store")),
+    },
+)

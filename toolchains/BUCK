@@ -46,7 +46,20 @@ overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"]
     # Go, JavaScript, Python and script-check tools (M7).
     "chromium", "esbuild", "findutils", "fonts_conf", "gnugrep", "gnused",
     "git", "go", "node", "patch", "pwsh", "ruff", "strip", "ty", "unzip",
+    # Cargo-driven Mila Windows FFI cross-build and the no-Nix kits (M9).
+    "rust_bin", "rust_vendor", "cargo_zigbuild", "cc_bin", "zig",
+    "buck2_no_nix_windows", "buck2_no_nix_linux",
 ]]
+
+# Mila's Xcode, Gradle and .NET targets (buck/mila.bzl) need SDKs from the
+# daemon's PATH, so they are labelled non_hermetic and require this setting:
+# `-c overalls.non_hermetic=true`, which `tools/buck2 --no-nix` sets. Without
+# it `buck2 build //...` skips them (ADR-0269 M9).
+config_setting(
+    name = "non_hermetic_enabled",
+    values = {"overalls.non_hermetic": "true"},
+    visibility = ["PUBLIC"],
+)
 
 # Pinned third-party inputs: Nix-vendored Go modules, importNpmLock node_modules
 # and the Python static-check closures (the go/, npm/ and python/ cells).

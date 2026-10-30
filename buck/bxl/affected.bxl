@@ -44,6 +44,9 @@ def _main(ctx: bxl.Context) -> None:
         # A machine test's assembly runs as part of the test itself.
         if "machine_test_assembly" in labels:
             continue
+        # SDK builds on their own runners (mila-builds.yml), never in ci.yml.
+        if "non_hermetic" in labels:
+            continue
         entry = {"target": str(node.label), "labels": labels}
         if "machine_test" in labels:
             machine_tests.append(entry)

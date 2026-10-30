@@ -27,9 +27,20 @@ On a machine with Android SDK API 36, JDK 17, and Gradle 9:
 gradle --project-dir mila/native/android :app:assembleDebug
 ```
 
-The repository's Linux checks do not install a native Android SDK for this standalone scaffold. If
-Gradle or the SDK is unavailable, inspect the Kotlin and Gradle metadata and run the contract syntax
-check from the repository root.
+CI builds the APKs through Buck2 (ADR-0269):
+`tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug` (and `:android-release`,
+`:android-ffi-clippy`) runs the same Gradle tasks with the SDK, JDK, Gradle and cargo-ndk on the
+Buck2 daemon's `PATH`; see the buck2 skill. The repository's Linux checks do not install a native
+Android SDK. If Gradle or the SDK is unavailable, inspect the Kotlin and Gradle metadata and run the
+contract syntax check from the repository root.
+
+Gradle verifies every downloaded artifact against the SHA-256 checksums in
+`gradle/verification-metadata.xml`. After changing a plugin or dependency version, regenerate it
+with `gradle --write-verification-metadata sha256 help assembleDebug assembleDebugAndroidTest
+testDebugUnitTest assembleRelease` and review the diff. The `aapt2` `-osx` and `-windows` entries
+were added by hand from Google Maven; refresh them with each AGP bump. Robolectric's
+`android-all-instrumented` runtime jar is downloaded by Robolectric itself at test time, outside
+Gradle, so this file does not cover it.
 
 ## Release evidence
 
