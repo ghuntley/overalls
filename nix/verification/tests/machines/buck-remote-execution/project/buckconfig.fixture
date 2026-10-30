@@ -1,0 +1,28 @@
+[cells]
+  root = .
+  prelude = prelude
+  none = none
+
+[cell_aliases]
+  config = prelude
+  ovr_config = prelude
+  fbcode = none
+  fbsource = none
+  fbcode_macros = none
+  buck = none
+  toolchains = none
+
+[external_cells]
+  prelude = disabled
+
+[build]
+  execution_platforms = root//:platform
+
+[buck2]
+  digest_algorithms = SHA256
+
+[project]
+  ignore = prelude, none
+
+# The fixture cells' [nix] section, with the cells_id workers advertise.
+<file:cells.buckconfig>

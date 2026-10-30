@@ -940,7 +940,11 @@ Panterloons' mTLS `grpc://` store, and the pair substitute from each other over
 Panterloons also serves the Buck2 NativeLink cache
 ([ADR-0272](decisions/0272-nativelink-remote-cache-and-execution.md)) on its
 tailnet address: a read-only listener for host certificates and an upload
-listener for the CI certificate, each trusting its own CA.
+listener for the CI certificate, each trusting its own CA. Its remote-execution
+scheduler adds a developer execute listener and a worker listener, again one CA
+each, and NativeLink workers on Panterloons and Dungarees run actions in a
+pool-mount-free namespace (ADR-0144). Host updates read the cache and never
+execute remotely.
 
 The [Dungarees deployment review](reviews/2026-09-18-dungarees-provisioning.md)
 records the second physical Lilly worker, mirrored storage, separate enrollment

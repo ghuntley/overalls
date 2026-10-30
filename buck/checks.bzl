@@ -31,6 +31,8 @@ def check_providers(ctx: AnalysisContext, stamp: Artifact, sub_targets: dict = {
             type = "custom",
             command = [cmd_args(tool(ctx.attrs._coreutils) + "/cat"), stamp],
             labels = ctx.attrs.labels,
+            # Reading a stamp never goes remote (script-tests-run-locally).
+            default_executor = CommandExecutorConfig(local_enabled = True, remote_enabled = False, remote_cache_enabled = False),
         ),
     ]
 

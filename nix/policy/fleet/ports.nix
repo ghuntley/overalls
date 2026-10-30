@@ -24,9 +24,12 @@
     # Audi relay between gateway peers.
     audiRelay = 9445;
     # Buck2 NativeLink cache on the tailnet (ADR-0272): read-only host
-    # listener and CI upload listener.
+    # listener and CI upload listener, then the developer remote-execution
+    # listener and the worker API (M10).
     buckCacheRead = 50071;
     buckCacheUpload = 50072;
+    buckExecute = 50073;
+    buckWorker = 50074;
     # Per-host OpenTelemetry collector metrics.
     otelMetrics = 9464;
     # Independent per-host logging health metrics.

@@ -109,6 +109,10 @@
       "path": "secrets/panterloons-buck-re.enc.json"
     },
     {
+      "name": "panterloons-buck-re-worker",
+      "path": "secrets/panterloons-buck-re-worker.enc.json"
+    },
+    {
       "name": "panterloons-remote-builders",
       "path": "secrets/panterloons-remote-builders.enc.json"
     },

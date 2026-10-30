@@ -168,6 +168,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   fleet-builds = import ./machines/fleet-builds (service // { fleetModule = modules.fleetBuilds; });
   # The repository's Buck2 (buildPkgs), as tools/buck2 runs it (ADR-0272).
   buck-remote-cache = import ./machines/buck-remote-cache (service // { buck2 = buildPkgs.buck2; });
+  buck-remote-execution = import ./machines/buck-remote-execution (service // { buck2 = buildPkgs.buck2; });
   access = import ./machines/access { pkgs = testPkgs; module = modules.security.access; };
   access-configuration = import ./evaluation/access.nix {
     pkgs = testPkgs; inherit nixpkgs;

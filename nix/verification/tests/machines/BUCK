@@ -31,6 +31,7 @@ owned_set(
         "//nix/verification/tests/machines/brady-flow:srcs",
         "//nix/verification/tests/machines/brady-network:srcs",
         "//nix/verification/tests/machines/buck-remote-cache:srcs",
+        "//nix/verification/tests/machines/buck-remote-execution:srcs",
         "//nix/verification/tests/machines/clone-cancellation:srcs",
         "//nix/verification/tests/machines/clone-permutations:srcs",
         "//nix/verification/tests/machines/control-room:srcs",

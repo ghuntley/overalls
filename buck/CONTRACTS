@@ -99,7 +99,19 @@ The execution platform MUST query the remote cache only when a
 root's ~/.buckconfig.d file on a host, present only with its identity), so
 absent credentials mean plain local execution. Uploads MUST additionally
 require [buck2] default_allow_cache_upload = true; the server, not this flag,
-enforces that only the CI identity can write (ADR-0272).
+enforces that only the CI identity can write (ADR-0272). Every action
+MUST carry the platform property overalls-cells=<[nix] cells_id> whenever
+the cells define one, cached or executed, so cache-only hosts and executing
+clients compute the same action digests.
+
+@cc [owner:ghuntley,label:build;security] buck2-remote-execution-optional
+The execution platform MUST enable remote execution only on Linux x86_64,
+with a [buck2_re_client] address, a [nix] cells_id and an explicit
+[overalls] remote_execution = true; hosts' updater configuration sets it
+false. Remote execution MUST be remote-first with local fallback on
+infrastructure failure (limited hybrid with fallbacks), so an unreachable
+scheduler or an action no worker can run builds locally; local_only actions
+and test commands MUST never run remotely (ADR-0272).
 
 @cc [owner:ghuntley,label:verification] precommit-info-selection
 A precommit check's PrecommitInfo MUST list every repository path its default

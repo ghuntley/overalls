@@ -359,6 +359,108 @@ Verification performed for M4b:
 - `nix run .#secrets -- check` reports drift only for `fleet-tailscale`,
   which trunk already had before this change.
 
+## M10: remote-execution workers and host cache reads
+
+Scope: the NativeLink scheduler on Panterloons, workers on Panterloons and
+Dungarees, client and CI configuration, and the host updater reading the cache
+([ADR-0272](../decisions/0272-nativelink-remote-cache-and-execution.md),
+[ADR-0271](../decisions/0271-buck2-host-self-deployment.md) decision 3).
+
+- **Updater cache reads.** The M2 updater runs Buck2 with a private `HOME`,
+  so the M4b root `~/.buckconfig.d` file never reached it. Rather than a second
+  copy of that file, the updater receives the cache settings as typed
+  configuration and writes the section into the checkout's
+  `.buckconfig.local` per build. It probes the listener first (5 s): Buck2
+  already degrades a failed action-cache query to a miss, but a blackholed
+  tailnet would otherwise cost a connect timeout. The same file always
+  refuses uploads and remote execution, whatever the candidate's
+  `.buckconfig` says, and the read listener has neither write access nor an
+  execution service.
+- **Write split with execution.** NativeLink still cannot authorise per
+  certificate, so execution adds listeners, not identities on existing ones:
+  CI executes on its upload listener; developers get an execute listener whose
+  action cache is read-only (results come only from workers); workers get
+  their own listener for the worker API and result uploads. Each trusts one
+  new or existing CA. Two new CAs were issued and their keys discarded; the
+  worker identities are new per-host documents because the M4b documents
+  cannot be re-encrypted without a recovery identity.
+- **Fallback.** The OSS Buck2 RE client gets no queue estimate from
+  NativeLink, so `remote_execution_queue_time_threshold_s` would never fire.
+  Instead the scheduler fails an unmatched action (`unsatisfiable_action_timeout_s`
+  and `no_worker_action_timeout_s`, 15 s), and the platform is limited hybrid
+  with fallbacks, so Buck2 reruns it locally. Full hybrid (racing) would also
+  fall back but doubles every action's work. An unreachable scheduler is an
+  infrastructure error and falls back at once.
+- **Cells id instead of the wrapper key.** The plan put the wrapper's key on
+  actions. That key hashes the wrapper's input files in a locale-dependent
+  order, and a worker cannot recompute it without the source. `cells_id` is a
+  hash of every toolchain path, the rust cell and buck2, written into the
+  cells' own `toolchains.buckconfig`, so clients and workers read the same
+  value. It is also on cache-only actions, so hosts and executing clients
+  share digests. Adding it changed every action digest once.
+- **Which cells a worker holds.** Workers advertise one id (NativeLink keeps
+  one value per property): their host updater's deployed cells, realised from
+  Cachix by the updater's own `tools/buck2`. Clients on another cells
+  revision fall back after the timeout. Holding several revisions would need a
+  cells fetch keyed by revision; it was left out.
+- **Worker isolation.** The worker's start script unmounts every Lilly pool
+  inside its private mount namespace before dropping to an unprivileged user,
+  as nix-daemon does (ADR-0144); `InaccessiblePaths` alone would leave copies
+  of guest dataset mounts pinned underneath. It makes its namespace
+  `rprivate` first: the machine test showed a dataset mounted after start
+  still propagated in through the slave mount systemd sets up. The unit
+  reaches only loopback and the scheduler, has no devices, and cannot see the
+  secrets runtime, the SSH host identity, the updater's state or any Lilly
+  control, socket or Firecracker directory.
+- **Capacity.** Lilly reports capacity to Marshall every few seconds and
+  guests must not be starved, so the worker cgroup has hard caps besides low
+  weights: `CPUQuota` 100% per in-flight task (48 of 96 threads in the
+  fleet), `MemoryHigh` 20% and `MemoryMax` 25% of RAM, no swap, `TasksMax`
+  8192, and `OOMScoreAdjust` 1000 so it dies first. I/O has only weight
+  (`IOWeight` 20); a bandwidth cap needs per-device numbers.
+- **Who can submit actions.** Execution needs a client certificate from the
+  uploader CA (50072: CI and the recovery uploader) or the executor CA
+  (50073: recovery-only). The worker CA (50074) admits only workers. Hosts
+  (50071) cannot execute. All listeners bind only the tailnet address. CI
+  uses its identity only when the repository variable `BUCK_RE` is
+  `enabled`, both secrets exist and the run is a trunk push or dispatch in
+  this repository; ci.yml has no pull-request trigger, and the step
+  continues on error so the `ci` gate never waits on NativeLink.
+
+Residual risks:
+- Actions run as the worker user, which can read the worker identity and so
+  write the action cache through the worker listener. Executing remotely is
+  therefore as trusted as uploading: the CI identity was already an uploader,
+  and executor identities are recovery-only for operators. A per-action user
+  would need the worker to keep `CAP_SETUID`.
+- A compromised CI runner or executor could poison the action cache (as in
+  M4b); hosts trust it for updates.
+- Remote actions share a host with Lilly guests. The caps above bound the
+  impact, but Lilly's admission was not changed to account for the
+  worker's memory cap, and I/O is weighted, not capped.
+- The tailnet policy for `tag:buck-re-ci` is the operator's; until it is
+  set, mTLS alone separates CI from other listeners.
+
+Verification performed for M10 (2026-10-30, through `tools/buck2 test` and the
+repository gates):
+- `buck-remote-execution` passed all 12 subtests, including the sandbox and
+  cgroup-cap subtest, guest-dataset and Lilly-state hiding, the unmatched-cells
+  fallback (14.9 s) and the stopped-scheduler fallback (71.0 s).
+- `buck-remote-cache` (with the updater cached, unreachable,
+  identity-missing and identity-rejected paths, the last proving the cache
+  reads fail open), `auto-update`, `credential-rotation` and
+  `host-enrollment` passed. The updater also retries once without the cache
+  when an enabled build fails (unit-tested).
+- The rollout is single-host: Dungarees' worker stays disabled in a held
+  follow-up until Panterloons' worker has run healthy.
+- `check-auto-update-compatibility` and `check-auto-update-custody` passed;
+  Panterloons and Dungarees `:deployment[drv]` evaluate.
+- `tools/precommit --all`, `prek run --all-files`, the ADR check, contract
+  format and coverage, and `buck/machine_tests.py check` passed.
+
+Not verified: a deployment on Panterloons or Dungarees, CI with the secrets
+set, the tailnet policy, and precommit timings with remote execution.
+
 ## M8: precommit on Buck2 BXL
 
 This milestone implements the precommit part of ADR-0269 and shares

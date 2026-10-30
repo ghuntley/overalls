@@ -69,6 +69,7 @@ UPDATE_FIXTURE_INPUTS = (
 SUITE_INPUTS: Mapping[str, tuple[str, ...]] = {
     # The real Buck2 execution platform rule (ADR-0272).
     "buck-remote-cache": ("//buck:srcs",),
+    "buck-remote-execution": ("//buck:srcs",),
     "auto-update": UPDATE_FIXTURE_INPUTS,
     "credential-rotation": UPDATE_FIXTURE_INPUTS,
     "fleet": UPDATE_FIXTURE_INPUTS,

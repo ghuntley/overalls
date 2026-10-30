@@ -1,0 +1,20 @@
+load("//:platforms.bzl", "overalls_execution_platform")
+load("//:rules.bzl", "probe")
+
+overalls_execution_platform(name = "platform")
+
+probe(name = "ci_probe", text = "built by the CI identity")
+
+probe(name = "dev_probe", text = "built by a developer")
+
+probe(name = "worker_probe", text = "pinned to the second worker")
+
+probe(name = "scheduler_probe", text = "pinned to the scheduler's worker")
+
+probe(name = "unmatched_probe", text = "no worker holds these cells")
+
+probe(name = "unreachable_probe", text = "the scheduler is down")
+
+probe(name = "host_probe", text = "a host asks to execute")
+
+probe(name = "local_probe", text = "local only", local_only = True)

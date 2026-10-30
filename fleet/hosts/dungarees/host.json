@@ -53,6 +53,10 @@
       "path": "secrets/dungarees-buck-re.enc.json"
     },
     {
+      "name": "dungarees-buck-re-worker",
+      "path": "secrets/dungarees-buck-re-worker.enc.json"
+    },
+    {
       "name": "dungarees-remote-builders",
       "path": "secrets/dungarees-remote-builders.enc.json"
     },

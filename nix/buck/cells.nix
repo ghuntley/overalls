@@ -101,9 +101,16 @@ let
   } (lib.attrValues inputs);
   tools = if fixture == null then allTools
     else lib.mapAttrs (name: _: fixture.tools.${name} or fixture.stub) allTools;
+  rustCellPath = if fixture == null then rustCell else pkgs.emptyDirectory;
+  toolLines = lib.concatStrings (lib.mapAttrsToList (name: path: "  ${name} = ${path}\n") tools);
+  # The identity of this cells closure for remote execution (ADR-0272):
+  # every store path an action can name, so a worker advertising the same id
+  # holds the same toolchains. Actions carry it as overalls-cells, and the
+  # NativeLink worker reads it back from this file.
+  cellsId = builtins.hashString "sha256" (toolLines + "rust = ${rustCellPath}\nbuck2 = ${buck2}\n");
   buckconfig = pkgs.writeText "toolchains.buckconfig" (''
     [nix]
-  '' + lib.concatStrings (lib.mapAttrsToList (name: path: "  ${name} = ${path}\n") tools));
+  '' + toolLines + "  cells_id = ${cellsId}\n");
 in
 pkgs.runCommand "overalls-buck-cells" { } ''
   mkdir -p "$out/prelude" "$out/bin"
@@ -112,7 +119,7 @@ pkgs.runCommand "overalls-buck-cells" { } ''
     ln -s ${path} "$out/${cell}/${name}"
   '') group)) inputs)}
   ln -s ${buck2}/bin/buck2 "$out/bin/buck2"
-  ln -s ${if fixture == null then rustCell else pkgs.emptyDirectory} "$out/rust"
+  ln -s ${rustCellPath} "$out/rust"
   tar -xzf ${buck2.prelude} -C "$out/prelude" --strip-components=1
   cp ${buckconfig} "$out/toolchains.buckconfig"
 ''

@@ -1,0 +1,31 @@
+# Each probe records where it ran and what that machine's mount namespace
+# shows of the fixture Lilly pool and of Lilly, secret and host-identity state.
+_SCRIPT = """
+read -r host < /proc/sys/kernel/hostname
+printf '%s\\n' "$host" "$1" > "$2"
+if [ -e /srv/pool/guest/marker ]; then echo guest-visible; else echo guest-hidden; fi >> "$2"
+mounts=0
+while read -r _ _ _ _ point _; do
+  case "$point" in /srv/pool|/srv/pool/*) mounts=$((mounts + 1)) ;; esac
+done < /proc/self/mountinfo
+echo "$mounts" >> "$2"
+state=state-hidden
+for path in /run/lilly/marker /var/lib/lilly/marker /run/overalls-secrets/buck-re-worker /etc/ssh/ssh_host_ed25519_key; do
+  if [ -e "$path" ]; then state="state-visible $path"; fi
+done
+echo "$state" >> "$2"
+"""
+
+def _probe_impl(ctx: AnalysisContext) -> list[Provider]:
+    out = ctx.actions.declare_output("out.txt")
+    ctx.actions.run(
+        cmd_args("/bin/sh", "-c", _SCRIPT, "--", ctx.attrs.text, out.as_output()),
+        category = "probe",
+        local_only = ctx.attrs.local_only,
+    )
+    return [DefaultInfo(default_output = out)]
+
+probe = rule(impl = _probe_impl, attrs = {
+    "local_only": attrs.bool(default = False),
+    "text": attrs.string(),
+})

@@ -5,7 +5,7 @@
 let
   inventory = (import ../../platform/hosts/inventory.nix { inherit lib; }).secrets;
 in
-assert lib.assertMsg (lib.all (name: !(builtins.hasAttr name inventory.documents)) [ "git-bootstrap" "marshall-bootstrap" "crash-dump-bootstrap" "private-ca-recovery" "brady-ca-recovery" "ssh-host-ca-recovery" "logstore-ca-recovery" "service-ca-recovery" "buck-re-uploader-recovery" ]) "Bootstrap documents are reserved for recovery-only custody";
+assert lib.assertMsg (lib.all (name: !(builtins.hasAttr name inventory.documents)) [ "git-bootstrap" "marshall-bootstrap" "crash-dump-bootstrap" "private-ca-recovery" "brady-ca-recovery" "ssh-host-ca-recovery" "logstore-ca-recovery" "service-ca-recovery" "buck-re-uploader-recovery" "buck-re-executor-recovery" ]) "Bootstrap documents are reserved for recovery-only custody";
 inventory // {
   documents = inventory.documents // {
     ssh-host-ca-recovery = {
@@ -52,6 +52,14 @@ inventory // {
     # never delivered to a host; operators load it into CI.
     buck-re-uploader-recovery = {
       path = "secrets/buck-re-uploader-recovery.enc.json";
+      hosts = [];
+      recoveryOnly = true;
+    };
+    # The developer remote-execution identity for the Buck2 service
+    # (ADR-0272, M10). It is never delivered to a host; operators load it on
+    # their own machines.
+    buck-re-executor-recovery = {
+      path = "secrets/buck-re-executor-recovery.enc.json";
       hosts = [];
       recoveryOnly = true;
     };
