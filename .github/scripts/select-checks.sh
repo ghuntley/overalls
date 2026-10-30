@@ -56,6 +56,14 @@ jq -r '.[]' "$work/names.json" \
         jq -cn --arg attr "$attr" --rawfile error "$work/$attr.err" "{attr: \$attr, error: \$error}"
       fi' _ {} "$work" "$flake_checks" > "$meta"
 
+# The pass above leaves every machine test's guest and storage images in the
+# store, unrooted (over 90 GB of the 116 GB volume). Neither the build
+# selection nor the build needs them, and min-free collection alone could not
+# keep pace with the build's substitutions (ENOSPC in Build checks), so drop
+# them before anything else is realised.
+nix store gc >&2
+df -h /nix/store >&2 || true
+
 if [ "$kind" = build ]; then
   # A check whose meta.ci failed to evaluate stays in, so its error is reported.
   machines=$(jq -c -s 'map(select(.meta.ci.machine == true) | .attr)' "$meta")
