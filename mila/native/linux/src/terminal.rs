@@ -172,6 +172,9 @@ mod tests {
 /// A transport request bound to one authenticated session authority.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PtyAttachRequest {
+    /// The machine whose terminal session is attached.
+    pub machine_id: String,
+    /// A named terminal session; empty opens or rejoins the caller's own.
     pub session_id: String,
     pub from: u64,
     pub columns: u16,
@@ -259,11 +262,13 @@ impl<A: SessionAuthority, T: PtyTransport> AuthenticatedPty<A, T> {
 
     pub fn attach(&mut self, request: PtyAttachRequest) -> Result<u64, PtyError> {
         if !self.authority.is_authenticated()
-            || request.session_id.is_empty()
+            || request.machine_id.is_empty()
+            || request.machine_id.len() > 128
             || request.session_id.len() > 128
             || request
-                .session_id
+                .machine_id
                 .bytes()
+                .chain(request.session_id.bytes())
                 .any(|byte| byte.is_ascii_whitespace() || byte == 0)
         {
             return Err(PtyError::Unauthenticated);
@@ -586,6 +591,7 @@ mod transport_tests {
 
     fn request() -> PtyAttachRequest {
         PtyAttachRequest {
+            machine_id: "machine-1".to_owned(),
             session_id: "terminal-1".to_owned(),
             from: 0,
             columns: 80,

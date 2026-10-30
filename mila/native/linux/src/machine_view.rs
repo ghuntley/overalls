@@ -76,8 +76,93 @@ fn project_machine(
     })
 }
 
+/// Bounded size of the FFI listing JSON a refresh returns.
+const MAX_SNAPSHOT_BYTES: usize = 1024 * 1024;
+
+/// @cc [owner:ghuntley,label:security;desktop] linux-machine-snapshot-rows
+/// A refresh's FFI listing (`{"machines":[..],"has_more":bool}`, rows already
+/// validated by the Rust session) MUST be bounded and re-checked here: each
+/// row needs a non-empty id and name, and display text MUST be control-free.
+pub fn project_snapshot(bytes: &[u8]) -> Result<Vec<MachineRow>, MachineViewError> {
+    #[derive(serde::Deserialize)]
+    struct Row {
+        id: String,
+        name: String,
+        desired_state: String,
+        observed_state: Option<String>,
+        #[serde(default)]
+        pinned: bool,
+        #[serde(default)]
+        read: bool,
+        #[serde(default)]
+        write: bool,
+        #[serde(default)]
+        manage: bool,
+    }
+    #[derive(serde::Deserialize)]
+    struct Snapshot {
+        machines: Vec<Row>,
+    }
+    if bytes.len() > MAX_SNAPSHOT_BYTES {
+        return Err(MachineViewError::TooManyMachines);
+    }
+    let snapshot: Snapshot =
+        serde_json::from_slice(bytes).map_err(|_| MachineViewError::InvalidIdentifier)?;
+    if snapshot.machines.len() > MAX_UI_MACHINES {
+        return Err(MachineViewError::TooManyMachines);
+    }
+    snapshot
+        .machines
+        .into_iter()
+        .map(|row| {
+            if row.id.is_empty()
+                || row.id.len() > 64
+                || row
+                    .id
+                    .chars()
+                    .any(|ch| ch.is_control() || ch.is_whitespace())
+            {
+                return Err(MachineViewError::InvalidIdentifier);
+            }
+            if row.name.is_empty()
+                || row.name.chars().any(char::is_control)
+                || row.desired_state.chars().any(char::is_control)
+                || row
+                    .observed_state
+                    .as_deref()
+                    .is_some_and(|state| state.chars().any(char::is_control))
+            {
+                return Err(MachineViewError::UnsafeDisplayText);
+            }
+            Ok(MachineRow {
+                id: row.id,
+                name: row.name,
+                desired_state: row.desired_state,
+                observed_state: row.observed_state,
+                pinned: row.pinned,
+                can_read: row.read,
+                can_write: row.write,
+                can_manage: row.manage,
+            })
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn refresh_snapshot_rows_are_projected_and_bounded() {
+        // The shape `mila_session_listing` returns, as captured from the fixture.
+        let rows = super::project_snapshot(br#"{"has_more":false,"machines":[{"action_bits":80,"desired_state":"running","id":"ddb4630a-0827-4514-a575-515ba84b4f23","manage":true,"name":"vm-1","observed_state":"pending","owner":"self","pinned":false,"read":true,"write":true}]}"#).unwrap();
+        assert_eq!(rows.len(), 1);
+        assert_eq!(rows[0].name, "vm-1");
+        assert_eq!(rows[0].observed_state.as_deref(), Some("pending"));
+        assert!(rows[0].can_manage);
+        assert!(super::project_snapshot(br#"{"machines":[{"id":"x","name":"a\nb","desired_state":"running","observed_state":null}]}"#).is_err());
+        assert!(super::project_snapshot(br#"{"machines":[{"id":"","name":"a","desired_state":"running","observed_state":null}]}"#).is_err());
+        assert!(super::project_snapshot(b"{}").is_err());
+    }
+
     use super::{project_detail, project_listing, MachineViewError};
     use crate::adapter::decode_listing;
 

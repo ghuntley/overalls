@@ -59,11 +59,18 @@ impl<A: SessionAuthority, T: PtyTransport> TerminalSurface<A, T> {
 
     /// Attaches a new read-write channel. A live channel must be killed or
     /// reconnected first; the surface never opens a second concurrent one.
-    pub fn attach(&mut self, session_id: &str, columns: u16, rows: u16) -> Result<u64, PtyError> {
+    pub fn attach(
+        &mut self,
+        machine_id: &str,
+        session_id: &str,
+        columns: u16,
+        rows: u16,
+    ) -> Result<u64, PtyError> {
         if self.live.is_some() {
             return Err(PtyError::Transport);
         }
         let request = PtyAttachRequest {
+            machine_id: machine_id.to_owned(),
             session_id: session_id.to_owned(),
             from: self.pty.state().resume_cursor().unwrap_or(0),
             columns,
@@ -82,7 +89,12 @@ impl<A: SessionAuthority, T: PtyTransport> TerminalSurface<A, T> {
         if let Some(generation) = self.live.take() {
             self.pty.abandon(generation);
         }
-        self.attach(&request.session_id, request.columns, request.rows)
+        self.attach(
+            &request.machine_id,
+            &request.session_id,
+            request.columns,
+            request.rows,
+        )
     }
 
     /// Drains up to [`MAX_READS_PER_TICK`] chunks from the live generation.
@@ -241,7 +253,7 @@ mod tests {
     fn tick_renders_stream_until_end_of_stream() {
         let (mut surface, _, transport) = surface();
         assert_eq!(surface.tick(), TickOutcome::Detached);
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         transport
             .0
             .borrow_mut()
@@ -261,7 +273,7 @@ mod tests {
     #[test]
     fn tick_work_is_bounded() {
         let (mut surface, _, transport) = surface();
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         transport
             .0
             .borrow_mut()
@@ -278,7 +290,7 @@ mod tests {
             surface.send_key(TerminalKey::Enter),
             Err(PtyError::InvalidRequest)
         );
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         surface.send(b"ls").unwrap();
         surface.send_key(TerminalKey::Enter).unwrap();
         surface.send_key(TerminalKey::Control('c')).unwrap();
@@ -296,7 +308,7 @@ mod tests {
     #[test]
     fn lost_authority_fences_the_generation_and_stops_polling() {
         let (mut surface, authority, transport) = surface();
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         authority.0.set(false);
         assert_eq!(
             surface.tick(),
@@ -312,8 +324,11 @@ mod tests {
     #[test]
     fn reconnect_replaces_generation_and_refuses_stale_output() {
         let (mut surface, _, transport) = surface();
-        let first = surface.attach("session-1", 20, 4).unwrap();
-        assert_eq!(surface.attach("session-1", 20, 4), Err(PtyError::Transport));
+        let first = surface.attach("machine-1", "session-1", 20, 4).unwrap();
+        assert_eq!(
+            surface.attach("machine-1", "session-1", 20, 4),
+            Err(PtyError::Transport)
+        );
         let second = surface.reconnect().unwrap();
         assert!(second > first);
         assert_eq!(transport.0.borrow().attaches, 2);
@@ -325,13 +340,13 @@ mod tests {
     #[test]
     fn failed_kill_and_sign_out_still_fence() {
         let (mut surface, _, transport) = surface();
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         transport.0.borrow_mut().fail_kill = true;
         assert_eq!(surface.kill(), Err(PtyError::Transport));
         assert_eq!(surface.live_generation(), None);
         assert_eq!(surface.send(b"x"), Err(PtyError::InvalidRequest));
         transport.0.borrow_mut().fail_kill = false;
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         surface.sign_out();
         assert_eq!(surface.live_generation(), None);
         assert_eq!(surface.reconnect(), Err(PtyError::InvalidRequest));
@@ -340,7 +355,7 @@ mod tests {
     #[test]
     fn transport_failure_fences_and_reports() {
         let (mut surface, _, transport) = surface();
-        surface.attach("session-1", 20, 4).unwrap();
+        surface.attach("machine-1", "session-1", 20, 4).unwrap();
         transport
             .0
             .borrow_mut()

@@ -556,6 +556,24 @@ impl LiveSession {
         })
     }
 
+    /// Read one mutation receipt by its request id (`request show`).
+    pub fn request_show(&mut self, request_id: &str) -> Result<Vec<u8>, SessionError> {
+        if !valid_request_id(request_id) {
+            return Err(SessionError::InvalidInput);
+        }
+        let handle = self.handle()?;
+        copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_request_show(
+                handle,
+                request_id.as_bytes().as_ptr(),
+                request_id.len(),
+                out,
+                capacity,
+                written,
+            )
+        })
+    }
+
     /// Read a machine-bound web endpoint through the authenticated session.
     /// The response remains bounded and owned by the Rust adapter.
     pub fn web_show(&mut self, machine_id: &str) -> Result<Vec<u8>, SessionError> {
@@ -681,26 +699,94 @@ impl LiveSession {
         self.handle.map(SessionProbe)
     }
 
-    /// Open one authenticated PTY owned by this deployment session.
-    pub fn terminal_attach(&mut self, columns: u16, rows: u16) -> Result<u64, SessionError> {
+    /// Open one authenticated PTY on a named terminal session of `machine_id`.
+    /// Without `session_id`, `terminal new` first opens or rejoins the
+    /// caller's personal session; Porsche refuses an unnamed attach.
+    pub fn terminal_attach(
+        &mut self,
+        machine_id: &str,
+        session_id: Option<&str>,
+        columns: u16,
+        rows: u16,
+    ) -> Result<u64, SessionError> {
+        validate_session_identifier(machine_id)?;
         if !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) {
             return Err(SessionError::InvalidInput);
         }
         if self.terminal.is_some() {
             return Err(SessionError::Busy);
         }
+        let session_id = match session_id {
+            Some(session_id) => {
+                validate_session_identifier(session_id)?;
+                session_id.to_owned()
+            }
+            None => self.terminal_new(machine_id)?,
+        };
+        let handle = self.handle()?;
         let mut terminal = 0_u64;
-        let status = mila_ffi::session::mila_session_terminal_attach(
-            self.handle()?,
-            u32::from(columns),
-            u32::from(rows),
-            &mut terminal,
-        );
+        let status = unsafe {
+            mila_ffi::session::mila_session_terminal_attach_session(
+                handle,
+                machine_id.as_bytes().as_ptr(),
+                machine_id.len(),
+                session_id.as_bytes().as_ptr(),
+                session_id.len(),
+                u32::from(columns),
+                u32::from(rows),
+                &mut terminal,
+            )
+        };
         if status != mila_ffi::session::SessionStatus::Ok || terminal == 0 {
             return Err(status.into());
         }
         self.terminal = Some(terminal);
         Ok(terminal)
+    }
+
+    /// `terminal new MACHINE`: the id of the caller's personal session.
+    fn terminal_new(&mut self, machine_id: &str) -> Result<String, SessionError> {
+        let request_id = crate::adapter::new_request_id().ok_or(SessionError::Unavailable)?;
+        let handle = self.handle()?;
+        let bytes = copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_terminal_new(
+                handle,
+                machine_id.as_bytes().as_ptr(),
+                machine_id.len(),
+                request_id.as_bytes().as_ptr(),
+                request_id.len(),
+                out,
+                capacity,
+                written,
+            )
+        })?;
+        let result =
+            crate::porsche_results::result_value(&bytes).map_err(|_| SessionError::InvalidInput)?;
+        let session_id = result
+            .get("session_id")
+            .and_then(serde_json::Value::as_str)
+            .ok_or(SessionError::InvalidInput)?;
+        validate_session_identifier(session_id)?;
+        Ok(session_id.to_owned())
+    }
+
+    /// @cc [owner:ghuntley,label:security;protocol] linux-session-last-refusal
+    /// The most recent closed refusal code Porsche returned on this session.
+    /// Only a short lower-case identifier is returned; anything else is `None`.
+    pub fn last_refusal(&self) -> Option<String> {
+        let handle = self.handle().ok()?;
+        let bytes = copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_last_refusal(handle, out, capacity, written)
+        })
+        .ok()?;
+        let value: serde_json::Value = serde_json::from_slice(&bytes).ok()?;
+        let code = value.get("error")?.as_str()?;
+        (!code.is_empty()
+            && code.len() <= 64
+            && code
+                .bytes()
+                .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'))
+        .then(|| code.to_owned())
     }
 
     /// Poll a bounded output chunk from the authenticated PTY.
@@ -840,15 +926,25 @@ fn parse_whoami(bytes: &[u8]) -> Option<WhoamiOutcome> {
     if value.get("version").and_then(serde_json::Value::as_u64) != Some(1) {
         return None;
     }
+    // Porsche reports an approved key as the `succeeded` envelope with the
+    // account in `result.email`, and a pending key as `approval_required`
+    // with `approval_url`. The older `authenticated`/`account` and `url`
+    // spellings are still accepted.
     match value.get("status").and_then(serde_json::Value::as_str)? {
-        "authenticated" => {
-            let account = value.get("account").and_then(serde_json::Value::as_str)?;
+        "succeeded" | "authenticated" => {
+            let account = value
+                .pointer("/result/email")
+                .or_else(|| value.get("account"))
+                .and_then(serde_json::Value::as_str)?;
             (!account.is_empty() && account.len() <= 320).then(|| WhoamiOutcome::Authenticated {
                 account: account.to_owned(),
             })
         }
         "approval_required" => {
-            let url = value.get("url").and_then(serde_json::Value::as_str)?;
+            let url = value
+                .get("approval_url")
+                .or_else(|| value.get("url"))
+                .and_then(serde_json::Value::as_str)?;
             let fingerprint = value
                 .get("fingerprint")
                 .and_then(serde_json::Value::as_str)?;
@@ -871,20 +967,18 @@ impl Drop for LiveSession {
     }
 }
 
+/// @cc [owner:ghuntley,label:protocol;reliability] linux-session-single-call-output
+/// Many session FFI calls run their remote command on every invocation, so
+/// output MUST be copied with exactly one call into a buffer of the maximum
+/// bounded size; a size probe followed by a read would run a read twice and
+/// submit a mutation twice. A response larger than the bound fails.
 fn copy_output(
-    mut call: impl FnMut(*mut u8, usize, *mut usize) -> mila_ffi::session::SessionStatus,
+    call: impl FnOnce(*mut u8, usize, *mut usize) -> mila_ffi::session::SessionStatus,
 ) -> Result<Vec<u8>, SessionError> {
+    let mut bytes = vec![0_u8; MAX_LISTING_BYTES];
     let mut size = 0_usize;
-    let status = call(std::ptr::null_mut(), 0, &mut size);
-    if status != mila_ffi::session::SessionStatus::SmallBuffer
-        || size == 0
-        || size > MAX_LISTING_BYTES
-    {
-        return Err(status.into());
-    }
-    let mut bytes = vec![0_u8; size];
     let status = call(bytes.as_mut_ptr(), bytes.len(), &mut size);
-    if status != mila_ffi::session::SessionStatus::Ok || size > bytes.len() {
+    if status != mila_ffi::session::SessionStatus::Ok || size == 0 || size > bytes.len() {
         return Err(status.into());
     }
     bytes.truncate(size);
@@ -969,8 +1063,9 @@ impl crate::terminal::HostPtyBackend for SessionPtyBackend {
         if !live.is_open() {
             return Err(PtyError::Unauthenticated);
         }
+        let session = (!request.session_id.is_empty()).then_some(request.session_id.as_str());
         let channel = live
-            .terminal_attach(request.columns, request.rows)
+            .terminal_attach(&request.machine_id, session, request.columns, request.rows)
             .map_err(|error| match error {
                 SessionError::InvalidInput => PtyError::InvalidRequest,
                 _ => PtyError::Transport,
@@ -1581,6 +1676,34 @@ impl SignInFlow {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn output_is_copied_with_exactly_one_ffi_call() {
+        use mila_ffi::session::SessionStatus;
+        let mut calls = 0;
+        let bytes = super::copy_output(|out, capacity, written| {
+            calls += 1;
+            let data = b"{\"ok\":true}";
+            assert!(capacity >= data.len());
+            unsafe {
+                std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len());
+                *written = data.len();
+            }
+            SessionStatus::Ok
+        })
+        .unwrap();
+        assert_eq!(calls, 1);
+        assert_eq!(bytes, b"{\"ok\":true}");
+        // A response over the bound fails without a second (re-executing) call.
+        let mut calls = 0;
+        let refused = super::copy_output(|_, capacity, written| {
+            calls += 1;
+            unsafe { *written = capacity + 1 };
+            SessionStatus::SmallBuffer
+        });
+        assert!(refused.is_err());
+        assert_eq!(calls, 1);
+    }
+
     use super::*;
     use std::cell::RefCell;
     use std::fs;
@@ -2267,6 +2390,23 @@ mod tests {
         )
         .expect("approval envelope");
         assert!(matches!(approval, WhoamiOutcome::Approval { .. }));
+        // Porsche's own envelope: `succeeded` with the account in `result`,
+        // and `approval_url` while the key is pending.
+        assert_eq!(
+            parse_whoami(
+                br#"{"version":1,"status":"succeeded","result":{"id":"u1","email":"alice@example.test","public_key":"ecdsa-sha2-nistp256 AAAA"}}"#,
+            ),
+            Some(WhoamiOutcome::Authenticated {
+                account: "alice@example.test".into()
+            })
+        );
+        assert!(matches!(
+            parse_whoami(
+                br#"{"version":1,"status":"approval_required","approval_url":"https://example.test/ssh/approve/abc","fingerprint":"SHA256:test"}"#,
+            ),
+            Some(WhoamiOutcome::Approval { .. })
+        ));
+        assert!(parse_whoami(br#"{"version":1,"status":"succeeded","result":{}}"#).is_none());
         assert!(parse_whoami(br#"{"version":2,"status":"authenticated","account":"x"}"#).is_none());
         assert!(parse_whoami(br#"{"version":1,"status":"approval_required","url":"http://example.test","fingerprint":"x"}"#).is_none());
     }

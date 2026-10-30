@@ -12,8 +12,12 @@ use std::sync::{
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq)]
 pub struct SshKey {
     pub id: String,
+    #[serde(default)]
     pub label: String,
     pub fingerprint: String,
+    /// Seconds since the epoch, when the server reports it. Porsche reports
+    /// an ISO `inserted_at` instead, which the settings rows do not show.
+    #[serde(default)]
     pub added_at: u64,
 }
 
@@ -55,8 +59,10 @@ pub fn decode_ssh_keys(bytes: &[u8]) -> Result<Vec<SshKey>, RuntimeError> {
     struct Envelope {
         keys: Vec<SshKey>,
     }
+    // Porsche wraps the keys in its version-1 result envelope.
+    let bytes = crate::porsche_results::result_bytes(bytes)?;
     let envelope: Envelope =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
+        serde_json::from_slice(&bytes).map_err(|_| RuntimeError::InvalidInput)?;
     let mut ids = std::collections::HashSet::with_capacity(envelope.keys.len());
     if envelope.keys.len() > 256
         || envelope.keys.iter().any(|key| {
@@ -107,6 +113,9 @@ pub fn new_request_id() -> Option<String> {
 #[derive(Debug, Default)]
 pub struct RequestLedger {
     pending: std::collections::HashMap<String, String>,
+    /// The last settled id per key, so a caller can read the receipt of a
+    /// mutation it just made (`request show`). Never persisted.
+    settled: std::collections::HashMap<String, String>,
 }
 
 impl RequestLedger {
@@ -122,11 +131,21 @@ impl RequestLedger {
             self.pending.insert(key.to_owned(), id);
         } else {
             self.pending.remove(key);
+            if self.settled.len() >= 64 {
+                self.settled.clear();
+            }
+            self.settled.insert(key.to_owned(), id);
         }
+    }
+
+    /// The id of the last mutation under `key` whose outcome is known.
+    pub fn settled(&self, key: &str) -> Option<&str> {
+        self.settled.get(key).map(String::as_str)
     }
 
     pub fn clear(&mut self) {
         self.pending.clear();
+        self.settled.clear();
     }
 
     pub fn len(&self) -> usize {
@@ -152,6 +171,7 @@ mod request_ledger_tests {
         assert_ne!(ledger.id_for("stop:m").unwrap(), first);
         ledger.settle("start:m", first.clone(), false);
         assert!(ledger.is_empty());
+        assert_eq!(ledger.settled("start:m"), Some(first.as_str()));
         assert_ne!(ledger.id_for("start:m").unwrap(), first);
         ledger.settle("start:m", first, true);
         ledger.clear();
@@ -1399,6 +1419,18 @@ mod tests {
         .is_err());
         assert!(super::decode_ssh_keys(
             br#"{"keys":[{"id":"k1","label":"x","fingerprint":"SHA256:x","added_at":1},{"id":"k1","label":"y","fingerprint":"SHA256:y","added_at":2}]}"#
+        )
+        .is_err());
+    }
+
+    #[test]
+    fn ssh_keys_decode_porsche_result_envelope() {
+        // As captured from the hermetic fixture's Porsche.
+        let keys = crate::adapter::decode_ssh_keys(br#"{"result":{"keys":[{"algorithm":"ecdsa-sha2-nistp256","fingerprint":"SHA256:kDLmWBH0dfNc4+XSFS1eN+1xumEypCKO0NpqgzQq7h0","id":"be33a7f0-942a-4aae-8266-ba54278255f8","inserted_at":"2026-10-30T01:49:18.906471Z","label":""}]},"status":"succeeded","version":1}"#).unwrap();
+        assert_eq!(keys.len(), 1);
+        assert_eq!(keys[0].label, "");
+        assert!(crate::adapter::decode_ssh_keys(
+            br#"{"result":{"keys":[]},"status":"failed","version":1}"#
         )
         .is_err());
     }

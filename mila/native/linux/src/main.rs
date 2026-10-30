@@ -48,7 +48,7 @@ struct NativeState {
     sign_in_pumping: Rc<Cell<bool>>,
     sign_in_render: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
     session: Rc<RefCell<SessionBinding>>,
-    machine_listing: Rc<RefCell<Option<mila_session::MachineListing>>>,
+    machine_listing: Rc<RefCell<Option<Vec<mila_native_linux::machine_view::MachineRow>>>>,
     deployment_store: Option<DeploymentStore>,
     terminal: Rc<RefCell<Option<views::GtkTerminal>>>,
     terminal_polling: Rc<Cell<bool>>,
@@ -98,8 +98,7 @@ impl NativeState {
     /// authenticated session is bound. A transport or stale-handle error
     /// reports the session lost at once, so reconnect starts without
     /// waiting for the next heartbeat.
-    // @cc linux-page-action-loss: a page action's transport failure releases
-    // the session and advances the sign-in generation before it returns.
+    // See the `linux-page-action-loss` contract in CONTRACTS.
     fn with_live<T>(
         &self,
         op: impl FnOnce(&mut LiveSession) -> Result<T, SessionError>,
@@ -547,7 +546,7 @@ impl NativeState {
         // The terminal page binds the authenticated PTY (HostPtyTransport over
         // the session FFI) to a GTK text view through the library surface.
         // PTY bytes are decoded in the transport; GTK receives viewport text.
-        let terminal_session = views::build_terminal(self, &terminal_page, &content);
+        let terminal_session = views::build_terminal(self, &terminal_page, &machine_id, &content);
         let terminal_link_machine = machine_id.clone();
         let terminal_link_session = terminal_session.clone();
         terminal_page.append(&views::copy_link_button(self, &content, move || {
@@ -701,7 +700,7 @@ mod gtk_tests {
         let thread = Entry::new();
         let render = views::build_deployments(&state, &deployments_page, &deployment, &status);
         state.rerender.borrow_mut().push(render);
-        let terminal_session = views::build_terminal(&state, &terminal_page, &status);
+        let terminal_session = views::build_terminal(&state, &terminal_page, &machine, &status);
         let render_keys = views::build_ssh_keys(&state, &settings_page, &status);
         state.rerender.borrow_mut().push(render_keys);
         let machine_page_id = pages::build_machines(&state, &machines_page, &status);

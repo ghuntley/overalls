@@ -13,10 +13,10 @@ use super::NativeState;
 use gtk::prelude::*;
 use gtk::{gio, Align, Box, Button, DropDown, Entry, Label, ListBox, Orientation};
 use mila_native_linux::adapter::{
-    browser_endpoint_url, decode_listing, decode_share_listing, decode_web_endpoint,
-    format_machine_action, WebEndpoint,
+    browser_endpoint_url, decode_share_listing, decode_web_endpoint, format_machine_action,
+    WebEndpoint,
 };
-use mila_native_linux::machine_view::project_listing;
+use mila_native_linux::machine_view::project_snapshot;
 use mila_native_linux::porsche_results::{
     decode_machine_detail, decode_thread_detail, decode_thread_events, decode_thread_rows,
     ThreadDetail,
@@ -130,6 +130,21 @@ fn thread_event_message(kind: &str) -> M {
     }
 }
 
+/// Request-ledger key of a lifecycle action on one machine.
+pub(super) fn action_key(action: &str, machine: &str) -> String {
+    format!("{action}:{machine}")
+}
+
+/// Request-ledger key of a resize; `None` fields keep the current size.
+pub(super) fn resize_key(
+    machine: &str,
+    cpu: Option<u32>,
+    memory: Option<u64>,
+    disk: Option<u64>,
+) -> String {
+    format!("resize:{machine}:{cpu:?}:{memory:?}:{disk:?}")
+}
+
 /// The message for a finished mutation.
 pub(super) fn outcome_message<T>(result: &Option<Result<T, SessionError>>) -> M {
     match result {
@@ -195,9 +210,8 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             clear_list(&list);
             let rows = state.with_live(|live| {
                 let bytes = live.refresh()?;
-                let listing = decode_listing(&bytes).map_err(|_| SessionError::InvalidInput)?;
-                let rows = project_listing(&listing).map_err(|_| SessionError::InvalidInput)?;
-                *state.machine_listing.borrow_mut() = Some(listing);
+                let rows = project_snapshot(&bytes).map_err(|_| SessionError::InvalidInput)?;
+                *state.machine_listing.borrow_mut() = Some(rows.clone());
                 Ok(rows)
             });
             let rows = match rows {
@@ -318,7 +332,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                 );
                 return;
             }
-            let result = state.mutate(&format!("{action}:{machine}"), |live, request| {
+            let result = state.mutate(&action_key(action, &machine), |live, request| {
                 live.machine_action(&machine, action, request)
             });
             status.set_label(&strings::text(outcome_message(&result)));
@@ -331,7 +345,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
         let confirm_bar = confirm_bar.clone();
         confirm_button.connect_clicked(move |_| match confirm_bar.take() {
             Some(Pending::DeleteMachine(machine)) => {
-                let result = state.mutate(&format!("rm:{machine}"), |live, request| {
+                let result = state.mutate(&action_key("rm", &machine), |live, request| {
                     live.machine_action(&machine, "rm", request)
                 });
                 status.set_label(&strings::text(outcome_message(&result)));
@@ -396,7 +410,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             else {
                 return status.set_label(&strings::text(M::MachineFieldInvalid));
             };
-            let key = format!("resize:{machine}:{cpu:?}:{memory:?}:{disk:?}");
+            let key = resize_key(&machine, cpu, memory, disk);
             let result = state.mutate(&key, |live, request| {
                 // Empty fields keep the machine's current size, read now
                 // rather than from a possibly stale detail view.

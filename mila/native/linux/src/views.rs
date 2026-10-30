@@ -11,8 +11,8 @@ use gtk::prelude::*;
 use gtk::{gdk, glib, Align, Box, Button, Entry, Label, ListBox, Orientation, TextView};
 use mila_native_linux::deep_link::{present, LinkNotice, Page};
 use mila_native_linux::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
-use mila_native_linux::session::SessionPtyBackend;
 use mila_native_linux::session::{ApprovalInfo, SignInFailure, SignInPhase};
+use mila_native_linux::session::{LiveSession, SessionPtyBackend};
 use mila_native_linux::ssh_keys_view::{RevokeOutcome, SshKeySource, SshKeysStatus};
 use mila_native_linux::terminal::{HostPtyTransport, PtyError};
 use mila_native_linux::terminal_surface::{TerminalSurface, TickOutcome};
@@ -351,7 +351,14 @@ fn parse_dimensions(columns: &Entry, rows: &Entry) -> Option<(u16, u16)> {
 
 /// Terminal page: text view bound to the surface viewport plus lifecycle
 /// controls. Returns the session-id entry for deep-link pre-fill.
-pub(super) fn build_terminal(state: &NativeState, page: &Box, status: &Label) -> Entry {
+/// `machine` is the Machines page's machine-id entry; the terminal attaches
+/// to a session of that machine.
+pub(super) fn build_terminal(
+    state: &NativeState,
+    page: &Box,
+    machine: &Entry,
+    status: &Label,
+) -> Entry {
     page.append(&heading(&strings::text(strings::Message::TerminalsTitle)));
     let session = Entry::builder()
         .placeholder_text("Terminal session ID")
@@ -405,6 +412,7 @@ pub(super) fn build_terminal(state: &NativeState, page: &Box, status: &Label) ->
     {
         let state = state.clone();
         let session = session.clone();
+        let machine = machine.clone();
         let columns = columns.clone();
         let rows = rows.clone();
         let view = view.clone();
@@ -414,12 +422,13 @@ pub(super) fn build_terminal(state: &NativeState, page: &Box, status: &Label) ->
                 status.set_label(&strings::text(strings::Message::TerminalInvalid));
                 return;
             };
+            let machine_id = machine.text().trim().to_owned();
+            if machine_id.is_empty() {
+                status.set_label(&strings::text(strings::Message::MachineFieldInvalid));
+                return;
+            }
+            // An empty session id opens or rejoins this account's own session.
             let id = session.text().trim().to_owned();
-            let id = if id.is_empty() {
-                "mila-linux".to_owned()
-            } else {
-                id
-            };
             let result = {
                 let mut terminal = state.terminal.borrow_mut();
                 if terminal
@@ -442,7 +451,7 @@ pub(super) fn build_terminal(state: &NativeState, page: &Box, status: &Label) ->
                 terminal
                     .as_mut()
                     .ok_or(PtyError::InvalidRequest)
-                    .and_then(|surface| surface.attach(&id, width, height))
+                    .and_then(|surface| surface.attach(&machine_id, &id, width, height))
             };
             match result {
                 Ok(_) => {
@@ -451,7 +460,21 @@ pub(super) fn build_terminal(state: &NativeState, page: &Box, status: &Label) ->
                     view.grab_focus();
                     start_polling(&state, &view, &status);
                 }
-                Err(error) => status.set_label(&strings::text(terminal_error(error))),
+                Err(error) => {
+                    // A closed server refusal (for example no guest to attach
+                    // to) is the deployment's answer, not a local failure.
+                    let refused = state
+                        .session
+                        .borrow()
+                        .session()
+                        .and_then(LiveSession::last_refusal)
+                        .is_some();
+                    status.set_label(&strings::text(if refused {
+                        strings::Message::TerminalRefused
+                    } else {
+                        terminal_error(error)
+                    }))
+                }
             }
         });
     }
