@@ -46,8 +46,15 @@ _BUILD_OUTPUTS = [
 ]
 
 # The FFI crate and the Mila crates it links, with the root workspace
-# manifest and lock that pin them (ADR-0273).
-_FFI_SRCS = glob(["rust/**"], exclude = _BUILD_OUTPUTS) + ["//:workspace_files"]
+# manifest and lock that pin them (ADR-0273). A macOS or Windows checkout is
+# case-insensitive, so the root `BUCK` file and the `buck/` directory collide
+# and the root package does not exist there: those targets cannot depend on
+# it, and a root Cargo.toml or Cargo.lock change alone does not rerun them
+# (their actions are local_only and never cached, so CI always builds them).
+_FFI_SRCS = glob(["rust/**"], exclude = _BUILD_OUTPUTS) + select({
+    "DEFAULT": [],
+    "prelude//os:linux": ["//:workspace_files"],
+})
 _LOCALIZATION = glob(["localization/**"], exclude = _BUILD_OUTPUTS)
 _APPLE = glob(["native/apple/**", "native/mila-build"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
 _ANDROID = glob(["native/android/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
