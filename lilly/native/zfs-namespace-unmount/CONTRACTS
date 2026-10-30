@@ -7,7 +7,8 @@ forces, lazily detaches, kills a process or exposes path diagnostics: stdout
 carries exactly one fixed outcome line consumed by Lilly.
 
 @cc [owner:ghuntley,label:verification] namespace-unmount-hegel-properties
-Hegel properties MUST cover the dataset/path validators, octal mount-field
-decoding, mountinfo classification (exact/alias/descendant/duplicate/malformed)
-and sweep plan dedup/caps. Namespace-entering and real unmount authority remain
-with the disposable NixOS storage fixtures that drive production cleanup paths.
+Hegel properties MUST cover the dataset/path validators and their shared
+character class over arbitrary bytes, octal mount-field decoding, mountinfo
+classification (exact/alias/descendant/duplicate/malformed) and sweep plan
+dedup/caps. Namespace-entering and real unmount authority remain with the
+disposable NixOS storage fixtures that drive production cleanup paths.

@@ -56,7 +56,7 @@ fn the_c_self_test_matrix_is_preserved_verbatim() {
 /// @cc [owner:ghuntley,label:verification] hegel-validator-oracle
 /// Generated dataset/path strings MUST be classified by the independent
 /// character-class spec, not by the implementation's own parsing.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn dataset_and_path_validators_match_independent_spec(tc: TestCase) {
     // Valid shape ingredients, corrupted editions and outright foreign bytes.
     let mut words = vec![
@@ -105,7 +105,18 @@ fn dataset_and_path_validators_match_independent_spec(tc: TestCase) {
     assert_eq!(valid_path(&candidate), path_spec, "{candidate:?}");
 }
 
-#[hegel::test]
+/// @cc [owner:ghuntley,label:verification] hegel-name-character-class-oracle
+/// Arbitrary byte strings MUST pass the shared character-class check exactly
+/// when every byte is in the explicitly enumerated pool-local alphabet.
+#[hegel::test(test_cases = 200)]
+fn character_class_matches_enumerated_alphabet(tc: TestCase) {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-/.:@";
+    let bytes = tc.draw(gs::binary().max_size(64));
+    let expected = bytes.iter().all(|byte| ALPHABET.contains(byte));
+    assert_eq!(clean(&bytes), expected);
+}
+
+#[hegel::test(test_cases = 100)]
 fn octal_decoding_matches_independent_model(tc: TestCase) {
     let words = [
         "abc", r"\040", r"\011tab", "plain", r"\1short", r"\99x", "end\\",
@@ -162,7 +173,7 @@ fn shaped_line(root: &str, target: &str, fstype: &str, source: &str, id_salt: us
 /// Generated mountinfo lines MUST be classified by the independent model: only
 /// one exact "/" / target / dataset / zfs tuple, once; every other related row
 /// or repeat is UNSAFE; foreign rows are ABSENT.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn mountinfo_classification_matches_independent_model(tc: TestCase) {
     let target_suffix = tc.draw(gs::sampled_from(&["", "/child", "/deep/nest"]));
     let pick = |tc: &TestCase| -> (String, String, String, String, usize) {
@@ -228,7 +239,7 @@ fn mountinfo_classification_matches_independent_model(tc: TestCase) {
     }
 }
 
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn overlong_and_overpopulated_lines_are_inspect_errors(_tc: TestCase) {
     let long = os_line("/", TARGET, "zfs", DATASET) + &"x".repeat(MAX_LINE);
     assert_eq!(c_fixture("long", &long), MountState::InspectError);
@@ -240,7 +251,7 @@ fn overlong_and_overpopulated_lines_are_inspect_errors(_tc: TestCase) {
     assert_eq!(c_fixture("many", &line), MountState::InspectError);
 }
 
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn sweep_plan_dedups_and_caps_namespaces(tc: TestCase) {
     let count = tc.draw(gs::integers::<usize>().min_value(0).max_value(10));
     let mut observations = Vec::new();
@@ -298,7 +309,7 @@ fn sweep_plan_dedups_and_caps_namespaces(tc: TestCase) {
 /// Plans MUST contain every distinct exact namespace once up to the cap and
 /// fail closed above it. Duplicate descriptor observations MUST NOT consume
 /// distinct-namespace capacity; tests do not establish native unmount safety.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn exact_namespace_cap_preserves_all_targets(tc: TestCase) {
     let generated = tc.draw(
         gs::integers::<usize>()
@@ -344,7 +355,7 @@ fn exact_namespace_cap_preserves_all_targets(tc: TestCase) {
 /// The observation cap MUST include absent and duplicate namespace entries.
 /// An exact target MUST survive at the cap; one more observation MUST refuse
 /// the entire plan even when only one distinct target requires cleanup.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn observation_cap_counts_absent_and_duplicate_entries(tc: TestCase) {
     let generated = tc.draw(gs::sampled_from(&[
         0,
