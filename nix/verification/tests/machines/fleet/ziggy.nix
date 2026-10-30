@@ -35,8 +35,11 @@ in {
     # memory default.
     services.ziggy = { enable = true; secretsFile = "${root}/ziggy.enc.json"; cpuCores = 1; memoryMiB = 1024; agentEnable = agent; };
     services.galileo = { enable = true; secretsFile = "${root}/galileo.enc.json"; cpuCores = 1; memoryMiB = 512; };
+    # The driver seals each host's bundles in sequence and waits for the previous
+    # host's Ziggy first, so a boot-relative deadline expires on a loaded builder
+    # before a later host's delivery. The driver's own unit waits bound this gate.
     systemd.services.fleet-ziggy-credentials = {
-      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 600; };
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
       script = ''
         while [ ! -f ${root}/ziggy.enc.json ] || [ ! -f ${root}/galileo.enc.json ]; do sleep 1; done
       '';

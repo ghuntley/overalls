@@ -14,7 +14,7 @@
   # Keep the production boot target: later whole-host recovery must restart
   # Porsche too. Only initial fixture issuance waits for the real migration.
   systemd.services.fleet-porsche-credentials = {
-    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 900; };
+    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
     script = ''
       while [ ! -s /var/lib/overalls-fleet/porsche.token ]; do sleep 1; done
     '';

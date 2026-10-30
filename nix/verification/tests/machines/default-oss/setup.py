@@ -1,5 +1,6 @@
 """Typed shared fleet setup: boot, enrollment, private services and seeded users."""
 
+import base64
 import ipaddress
 import json
 import os
@@ -10,6 +11,7 @@ import uuid
 from collections.abc import Callable
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import TypedDict
 
 from test_driver.machine import QemuMachine as ProfileMachine
 
@@ -17,6 +19,32 @@ root = "/var/lib/overalls-fleet"
 browser_root = "/var/lib/fleet-default-oss"
 marshalls = [m1, m2, m3]
 provisioners = [l1, l2]
+
+
+class TransferEndpoint(TypedDict):
+    address: str
+    port: int
+    host_key: str
+
+
+def transfer_endpoint(machine: ProfileMachine, address: str) -> TransferEndpoint:
+    """@cc [owner:ghuntley,label:verification;security] default-oss-enrolled-transfer-identity
+    When `enroll_transfer_endpoints` is set, enrollment MUST pin the actual
+    host's Ed25519 public key and configured IPv4 transfer listener after its
+    service starts, and the persisted endpoint MUST equal that pin. Without an
+    enrolled endpoint Marshall refuses relocation as source_unavailable; missing
+    identity MUST fail setup rather than bypass admission.
+    """
+    assert str(ipaddress.IPv4Address(address)) == address
+    assert "inet " + address + "/24" in machine.succeed("ip -4 -o address show dev eth2")
+    machine.wait_for_unit("lilly-transfer-sshd.service")
+    machine.wait_for_open_port(2223)
+    public = machine.succeed("cat /etc/ssh/ssh_host_ed25519_key.pub").split()
+    assert len(public) >= 2 and public[0] == "ssh-ed25519"
+    blob = base64.b64decode(public[1], validate=True)
+    assert len(blob) == 51 and blob[:19] == b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20"
+    assert base64.b64encode(blob).decode("ascii") == public[1]
+    return {"address": address, "port": 2223, "host_key": " ".join(public[:2])}
 
 
 def object_fields(value: object) -> dict[str, object]:
@@ -294,6 +322,10 @@ with subtest("authenticated native observations supply admission capacity"):
                 )
             ],
         )
+        endpoint: TransferEndpoint | None = None
+        if enroll_transfer_endpoints:
+            endpoint = transfer_endpoint(machine, binding["ip"])
+            request["transfer_endpoint"] = endpoint
         envelope = root + "/" + machine.name + "-credential.json"
         operator(
             dict(
@@ -304,6 +336,15 @@ with subtest("authenticated native observations supply admission capacity"):
                 output=envelope,
             )
         )
+        if endpoint is not None:
+            persisted: object = json.loads(
+                sql(
+                    "SELECT transfer_endpoint::text FROM compute_hosts WHERE id='"
+                    + str(uuid.UUID(binding["host"]))
+                    + "'"
+                )
+            )
+            assert object_fields(persisted) == endpoint
         transfer(m1, envelope, machine, root + "/credential.json")
         transfer(db, root + "/ca.crt", machine, root + "/ca.crt")
         machine.wait_until_succeeds("test -s /etc/ssh/ssh_host_ed25519_key.pub")

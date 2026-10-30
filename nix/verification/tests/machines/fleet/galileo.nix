@@ -71,7 +71,7 @@ in {
       rootsFile = "${pki}/root.pem";
     };
     systemd.services.fleet-galileo-credentials = {
-      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 900; };
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
       # @cc [owner:ghuntley,label:verification;security;recovery] fleet-public-trust-survives-reboot
       # The public Audi root obtained from the real fixture issuer MUST survive
       # a host reboot and be restored before Galileo starts. Missing trust MUST

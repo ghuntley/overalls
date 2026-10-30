@@ -641,8 +641,12 @@ let
     systemd.tmpfiles.rules = [ "d ${root} 0700 root root -" ];
     # Credentials arrive through the test driver's private temporary directory.
     # The driver explicitly migrates before releasing the Marshall startup gate.
+    # Driver-delivery gates (this one and the Ziggy, Audi, Galileo, Porsche and
+    # Brady gates) carry no boot-relative deadline: the driver releases hosts in
+    # sequence, so on a loaded builder a fixed budget expired before a later
+    # host's delivery. The driver's own unit waits bound every gate instead.
     systemd.services.fleet-credentials = {
-      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 300; };
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
       script = ''
         while [ ! -f ${root}/ready ]; do sleep 1; done
       '';
@@ -1006,7 +1010,7 @@ let
       enable = true;
     };
     systemd.services.fleet-brady-credentials = lib.mkIf brady {
-      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 900; };
+      serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
       script = "while [ ! -f ${root}/brady-ready ]; do sleep 1; done";
     };
     services.lillyTransfer = lib.mkIf (relocation || porsche || cloneDestinationLoss || cloneMarshallRestart) {
@@ -1050,7 +1054,7 @@ let
         exec ${pkgs.systemd}/bin/systemd-run "$@"
       '')
     ]);
-    systemd.services.lilly-transfer-sshd = lib.mkIf (relocation || porsche || cloneDestinationLoss || cloneMarshallRestart) {
+    systemd.services.lilly-transfer-sshd = lib.mkIf (relocation || porsche || cloneDestinationLoss || cloneMarshallRestart || githubIntegration) {
       after = [ "fleet-storage.service" ];
       requires = [ "fleet-storage.service" ];
     };
@@ -1188,9 +1192,11 @@ let
       guestCpuCores = 6;
       guestMemoryMiB = fixtureGuestMemoryMiB;
       # Candidate admission is confined to these disposable memory-continuation,
-      # relocation and evacuation tests, including the Porsche lifecycle's
-      # running-VM relocate; it never promotes a production image.
-      checkpointImageIds = lib.optionals (suspension || relocation || maintenanceEvacuation || porsche) [ guestImageId ];
+      # relocation and evacuation tests, including the Porsche lifecycle's and
+      # the GitHub integration fleet's running-VM relocate (ADR-0199 refuses a
+      # running move as source_unavailable without it); it never promotes a
+      # production image.
+      checkpointImageIds = lib.optionals (suspension || relocation || maintenanceEvacuation || porsche || githubIntegration) [ guestImageId ];
       images = [ { path = "${guest}"; } ]
         ++ lib.optionals ubuntu [ { path = "${nixosGuest}"; } ];
       pools = [{
@@ -1778,6 +1784,7 @@ assert editorFamily == null || (editor && !ubuntu
     qemu_img = "${pkgs.qemu_kvm}/bin/qemu-img"
     host_bindings = ${builtins.toJSON hosts}
     fixture_guest_memory_bytes = ${toString (fixtureGuestMemoryMiB * 1024 * 1024)}
+    enroll_transfer_endpoints = False
     editor_guest_family = "${selectedEditorFamily}"
     editor_guest_memory_bytes = ${toString (fixtureGuestMemoryMiB * 1024 * 1024)}
     editor_browser_artifact = "${editorBrowser}"
@@ -1864,6 +1871,7 @@ assert editorFamily == null || (editor && !ubuntu
     qemu_img = "${pkgs.qemu_kvm}/bin/qemu-img"
     host_bindings = ${builtins.toJSON hosts}
     fixture_guest_memory_bytes = ${toString (fixtureGuestMemoryMiB * 1024 * 1024)}
+    enroll_transfer_endpoints = ${if githubIntegration then "True" else "False"}
   '' + builtins.readFile ../../support/transfer.py
      + builtins.readFile ../../support/guest-diagnostics.py
      + (if cloneCancellation then builtins.readFile ../clone-cancellation/driver.py

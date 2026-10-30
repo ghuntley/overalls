@@ -3,7 +3,7 @@
 let
   root = "/var/lib/overalls-fleet";
   gate = {
-    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = 900; };
+    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; TimeoutStartSec = "infinity"; };
     script = ''
       while [ ! -s ${root}/audi.token ]; do sleep 1; done
     '';

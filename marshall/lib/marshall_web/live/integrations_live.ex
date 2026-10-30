@@ -4,6 +4,8 @@ defmodule MarshallWeb.IntegrationsLive do
   on_mount({MarshallWeb.AuthenticationPrivacy, :default})
   on_mount({MarshallWeb.LiveUserAuth, :live_user_required})
 
+  @github_transient_phases [:revoking, :draining, :refreshing]
+
   @impl true
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def mount(_, _, socket) do
@@ -136,6 +138,12 @@ defmodule MarshallWeb.IntegrationsLive do
   def handle_event(_, _, socket),
     do: {:noreply, put_flash(socket, :error, dgettext("integrations", "Invalid request."))}
 
+  @impl true
+  @spec handle_info(:refresh_github, Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_info(:refresh_github, socket),
+    do: {:noreply, socket |> assign(github_poll_pending: false) |> refresh_github()}
+
   defp github_machine(socket, vm_id, excluded?) do
     case Marshall.GitHub.set_excluded(socket.assigns.current_user, vm_id, excluded?) do
       {:ok, _status} ->
@@ -165,16 +173,7 @@ defmodule MarshallWeb.IntegrationsLive do
     do: dgettext("integrations", "Could not update the GitHub connection.")
 
   defp refresh(socket) do
-    github =
-      case Marshall.GitHub.status(socket.assigns.current_user) do
-        {:ok, status} ->
-          status
-
-        {:error, _} ->
-          %{phase: :unavailable, github_login: nil, exclusions: [], configured: false}
-      end
-
-    socket = assign(socket, github: github)
+    socket = refresh_github(socket)
 
     case Galileo.list_integrations(%{}, actor: socket.assigns.current_user) do
       {:ok, integrations} ->
@@ -187,6 +186,35 @@ defmodule MarshallWeb.IntegrationsLive do
           :error,
           dgettext("integrations", "Integrations are temporarily unavailable.")
         )
+    end
+  end
+
+  # @cc [owner:ghuntley,label:product;observability] github-transient-phase-follows-settlement
+  # While the owner's GitHub phase is revoking, draining or refreshing, a
+  # connected view MUST re-read that status at most once per second, holding at
+  # most one pending timer, until the phase leaves those states, so Disconnect
+  # reaches "Disconnected" without a reload once the asynchronous revocation
+  # settles. Stable phases MUST NOT schedule re-reads, and the re-read MUST NOT
+  # reload the Galileo integration list or clear form state.
+  @spec refresh_github(Phoenix.LiveView.Socket.t()) :: Phoenix.LiveView.Socket.t()
+  defp refresh_github(socket) do
+    github =
+      case Marshall.GitHub.status(socket.assigns.current_user) do
+        {:ok, status} ->
+          status
+
+        {:error, _} ->
+          %{phase: :unavailable, github_login: nil, exclusions: [], configured: false}
+      end
+
+    socket = assign(socket, github: github)
+
+    if connected?(socket) and github.phase in @github_transient_phases and
+         not Map.get(socket.assigns, :github_poll_pending, false) do
+      Process.send_after(self(), :refresh_github, 1_000)
+      assign(socket, github_poll_pending: true)
+    else
+      socket
     end
   end
 
