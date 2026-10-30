@@ -369,6 +369,46 @@ fn arbitrary_stale_terminal_handles_refuse_without_writing(tc: hegel::TestCase) 
     assert_eq!(written, 17);
 }
 
+/// The bounded terminal read refuses undersized buffers and out-of-range waits
+/// before any handle lookup, and stale handles never write caller storage.
+#[hegel::test(test_cases = 128)]
+fn arbitrary_terminal_reads_refuse_before_consuming(tc: hegel::TestCase) {
+    let handle = tc.draw(hegel::generators::default::<u64>()) | (1_u64 << 63);
+    let wait = tc.draw(hegel::generators::default::<u32>());
+    let mut output = vec![0xA5_u8; MILA_TERMINAL_READ_CAPACITY];
+    let mut written = 17_usize;
+    let mut state = TerminalReadEvent::Closed;
+    let status = unsafe {
+        mila_session_terminal_read_within(
+            handle,
+            wait,
+            output.as_mut_ptr(),
+            output.len(),
+            &mut written,
+            &mut state,
+        )
+    };
+    if wait > 1_000 {
+        assert_eq!(status, SessionStatus::Invalid);
+    } else {
+        assert_eq!(status, SessionStatus::InvalidHandle);
+    }
+    let small = unsafe {
+        mila_session_terminal_read_within(
+            handle,
+            0,
+            output.as_mut_ptr(),
+            MILA_TERMINAL_READ_CAPACITY - 1,
+            &mut written,
+            &mut state,
+        )
+    };
+    assert_eq!(small, SessionStatus::Invalid);
+    assert!(output.iter().all(|byte| *byte == 0xA5));
+    assert_eq!(written, 17);
+    assert_eq!(state, TerminalReadEvent::Closed);
+}
+
 /// Dimension validation is stable across the full generated input space and
 /// does not perform a session lookup for malformed dimensions.
 #[hegel::test(test_cases = 128)]

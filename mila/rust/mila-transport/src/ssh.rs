@@ -237,6 +237,15 @@ impl SshSession {
 /// A bounded interactive PTY channel on an authenticated SSH session.
 /// The channel is deliberately owned by the caller so reads and writes cannot
 /// outlive the certificate-pinned connection that created them.
+/// One bounded PTY read result. `Idle` means the wait elapsed or a non-data
+/// channel message arrived while the channel remains open.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum PtyChunk {
+    Data(Vec<u8>),
+    Idle,
+    Closed,
+}
+
 pub struct PtySession {
     reader: russh::ChannelReadHalf,
     writer: russh::ChannelWriteHalf<russh::client::Msg>,
@@ -298,6 +307,32 @@ impl PtySession {
             }
             Some(ChannelMsg::Failure) => Err(SshError::Authentication),
             Some(_) => Ok(Vec::new()),
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:security;terminal] pty-read-within-distinguishes-close
+    /// A bounded read MUST distinguish data, an elapsed wait with the channel
+    /// still open, and channel close. Waiting MUST NOT exceed the session
+    /// timeout, and an elapsed wait MUST NOT mark the channel closed.
+    pub async fn read_within(&mut self, wait: Duration) -> Result<PtyChunk, SshError> {
+        if self.closed {
+            return Ok(PtyChunk::Closed);
+        }
+        let wait = wait.min(self.timeout);
+        let Ok(message) = tokio::time::timeout(wait, self.reader.wait()).await else {
+            return Ok(PtyChunk::Idle);
+        };
+        match message {
+            Some(ChannelMsg::Data { data }) if data.len() <= MAX_OUTPUT => {
+                Ok(PtyChunk::Data(data.to_vec()))
+            }
+            Some(ChannelMsg::Data { .. }) => Err(SshError::Bounds),
+            Some(ChannelMsg::Close) | None => {
+                self.closed = true;
+                Ok(PtyChunk::Closed)
+            }
+            Some(ChannelMsg::Failure) => Err(SshError::Authentication),
+            Some(_) => Ok(PtyChunk::Idle),
         }
     }
 

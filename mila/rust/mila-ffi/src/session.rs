@@ -2,7 +2,7 @@
 use mila_session::ApplicationSession;
 use mila_transport::{
     decode_trust_document,
-    ssh::{DeviceSigner, PtySession, SshError},
+    ssh::{DeviceSigner, PtyChunk, PtySession, SshError},
 };
 use std::{
     collections::HashMap,
@@ -921,6 +921,57 @@ pub unsafe extern "C" fn mila_session_terminal_read(
         };
         unsafe { output(&data, out, capacity, written)? };
         unsafe { *event = kind };
+        Ok(())
+    })
+}
+
+/// Smallest output buffer accepted by [`mila_session_terminal_read_within`].
+/// Data is consumed from the channel, so a buffer that could not hold one
+/// maximal chunk is refused before reading.
+pub const MILA_TERMINAL_READ_CAPACITY: usize = 1 << 20;
+
+/// @cc [owner:ghuntley,label:security;terminal] mila-session-terminal-read-states
+/// Read MUST wait at most `wait_ms` (bounded to 1000), shorter than the session
+/// timeout used by [`mila_session_terminal_read`], so a UI frame timer is not
+/// blocked, and report through `event` the same [`TerminalReadEvent`] codes.
+/// Undersized buffers and out-of-range waits MUST be refused before any
+/// channel data is consumed, and stale handles MUST NOT write output.
+/// # Safety
+/// `out` is writable for `capacity` bytes; `written` and `event` are writable.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_read_within(
+    terminal_handle: u64,
+    wait_ms: u32,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+    event: *mut TerminalReadEvent,
+) -> SessionStatus {
+    guarded(|| {
+        if out.is_null()
+            || written.is_null()
+            || event.is_null()
+            || wait_ms > 1_000
+            || capacity < MILA_TERMINAL_READ_CAPACITY
+        {
+            return Err(SessionStatus::Invalid);
+        }
+        let runtime = runtime()?;
+        let terminal = terminal_entry(terminal_handle)?;
+        let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let chunk = runtime
+            .block_on(terminal.read_within(Duration::from_millis(wait_ms.into())))
+            .map_err(|_| SessionStatus::Transport)?;
+        let (data, kind) = match chunk {
+            PtyChunk::Data(data) => (data, TerminalReadEvent::Data),
+            PtyChunk::Idle => (Vec::new(), TerminalReadEvent::Idle),
+            PtyChunk::Closed => (Vec::new(), TerminalReadEvent::Closed),
+        };
+        unsafe {
+            output(&data, out, capacity, written)?;
+            *event = kind;
+        }
         Ok(())
     })
 }

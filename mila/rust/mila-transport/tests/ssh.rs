@@ -1,6 +1,6 @@
 use base64::{engine::general_purpose::STANDARD, Engine};
 use mila_transport::{
-    ssh::{DeviceSigner, SshError, SshSession},
+    ssh::{DeviceSigner, PtyChunk, PtySession, SshError, SshSession},
     TrustDocument,
 };
 use russh::{
@@ -74,8 +74,40 @@ impl server::Handler for Handler {
         data: &[u8],
         session: &mut server::Session,
     ) -> Result<(), Self::Error> {
+        if data == b"terminal attach --json" {
+            session.channel_success(channel)?;
+            session.data(channel, b"ready\r\n".to_vec())?;
+            return Ok(());
+        }
         assert_eq!(data, b"images --json");
         session.channel_success(channel)?;
+        Ok(())
+    }
+    async fn pty_request(
+        &mut self,
+        channel: ChannelId,
+        _: &str,
+        _: u32,
+        _: u32,
+        _: u32,
+        _: u32,
+        _: &[(russh::Pty, u32)],
+        session: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        session.channel_success(channel)?;
+        Ok(())
+    }
+    async fn data(
+        &mut self,
+        channel: ChannelId,
+        data: &[u8],
+        session: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        if data == b"exit" {
+            session.exit_status_request(channel, 0)?;
+            session.eof(channel)?;
+            session.close(channel)?;
+        }
         Ok(())
     }
     async fn channel_eof(
@@ -227,4 +259,46 @@ fn elixir_host_certificate_fixtures_match() {
             f.valid
         );
     }
+}
+
+/// The bounded PTY read distinguishes data, an elapsed wait on an open channel
+/// and channel close over a real certificate-authenticated SSH connection.
+#[tokio::test]
+async fn pty_read_within_distinguishes_idle_from_close() {
+    let (trust, port, _auth, task) = endpoint("localhost", false, false).await;
+    let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
+    let session = SshSession::connect(trust, port, &public, signer, Duration::from_secs(5))
+        .await
+        .unwrap();
+    let mut pty = PtySession::open(&session, 80, 24).await.unwrap();
+    // Channel bookkeeping messages surface as `Idle`; the first data chunk
+    // must still arrive intact.
+    let mut first = PtyChunk::Idle;
+    for _ in 0..16 {
+        first = pty.read_within(Duration::from_secs(5)).await.unwrap();
+        if first != PtyChunk::Idle {
+            break;
+        }
+    }
+    assert_eq!(first, PtyChunk::Data(b"ready\r\n".to_vec()));
+    assert_eq!(
+        pty.read_within(Duration::from_millis(20)).await.unwrap(),
+        PtyChunk::Idle
+    );
+    pty.write(b"exit").await.unwrap();
+    let mut closed = false;
+    for _ in 0..16 {
+        if pty.read_within(Duration::from_secs(5)).await.unwrap() == PtyChunk::Closed {
+            closed = true;
+            break;
+        }
+    }
+    assert!(closed, "channel close must be reported");
+    assert_eq!(
+        pty.read_within(Duration::ZERO).await.unwrap(),
+        PtyChunk::Closed
+    );
+    assert!(matches!(pty.write(b"x").await, Err(SshError::Bounds)));
+    session.close().await.unwrap();
+    task.abort();
 }
