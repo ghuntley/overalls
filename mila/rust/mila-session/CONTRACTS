@@ -1,0 +1,14 @@
+@cc [owner:ghuntley,label:verification] mila-session-hegel-properties
+Hegel properties MUST cover the private `refusal_code` closed set against an
+independent byte-class oracle with totality on arbitrary bytes; the private
+`validate_ssh_keys` envelope, count and per-key field lattice, including its
+`Bounds` and `Refused` outcomes; `decode_listing` authority projection,
+malformed identity and authority refusal, duplicate ids, cursor preservation,
+and canonical row order independent of the server's order; and the command
+grammar bounds of `machine_create`, `machine_resize`, `device_register` and
+`thread_action`, observed through a fake Porsche endpoint that records each
+exec line and its stdin: accepted inputs send exactly one grammar-checked line
+with the expected command, arguments and options (and the push key only on
+stdin), and refused inputs send nothing. Pagination, refresh atomicity,
+sharing and machine reads stay with the scripted real-TCP russh tests; the
+fake endpoint does not verify Porsche's own authorization.

@@ -110,3 +110,50 @@ fn oversized_pages_and_names_fail_before_projection() {
     assert!(decode_listing(&envelope(vec![m], None)).is_err());
     assert!(decode_listing(&vec![b' '; (1 << 20) + 1]).is_err());
 }
+
+/// @cc [owner:ghuntley,label:verification;protocol] mila-session-listing-order
+/// A decoded listing MUST be ordered pinned first, then by name, then by id,
+/// whatever the server's row order, and MUST keep exactly the server's rows.
+#[hegel::test(test_cases = 128)]
+fn listing_order_is_canonical_and_independent_of_row_order(tc: TestCase) {
+    let count = tc.draw(gs::integers::<usize>().max_value(12));
+    let rows: Vec<Value> = (0..count)
+        .map(|index| {
+            let mut m = row(
+                u8::try_from(index).unwrap(),
+                false,
+                false,
+                false,
+                tc.draw(gs::booleans()),
+            );
+            m["name"] = json!(tc.draw(gs::text().alphabet("ab").min_size(1).max_size(2)));
+            m
+        })
+        .collect();
+    let keys = tc.draw(
+        gs::vecs(gs::default::<u32>())
+            .min_size(count)
+            .max_size(count),
+    );
+    let mut order: Vec<usize> = (0..count).collect();
+    order.sort_by_key(|index| keys[*index]);
+    let shuffled: Vec<Value> = order.iter().map(|index| rows[*index].clone()).collect();
+    let listing = decode_listing(&envelope(rows.clone(), None)).unwrap();
+    let reordered = decode_listing(&envelope(shuffled, None)).unwrap();
+    assert_eq!(listing.machines(), reordered.machines());
+    for pair in listing.machines().windows(2) {
+        let (first, second) = (&pair[0], &pair[1]);
+        assert!(first.pinned || !second.pinned);
+        if first.pinned == second.pinned {
+            assert!(first.name <= second.name);
+            if first.name == second.name {
+                assert!(first.id < second.id);
+            }
+        }
+    }
+    let mut decoded: Vec<&str> = listing.machines().iter().map(|m| m.id.as_str()).collect();
+    let mut sent: Vec<&str> = rows.iter().map(|m| m["id"].as_str().unwrap()).collect();
+    decoded.sort_unstable();
+    sent.sort_unstable();
+    assert_eq!(decoded, sent);
+}
