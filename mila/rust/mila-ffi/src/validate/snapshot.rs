@@ -35,18 +35,26 @@ pub unsafe extern "C" fn mila_snapshot_validate(
     if has_port > 1 {
         return MilaFfiStatus::InvalidRequest;
     }
-    let host = match CStr::from_ptr(host).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `host` is non-null and the caller guarantees a NUL-terminated string.
+    let Ok(host) = unsafe { CStr::from_ptr(host) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
-    let input = std::slice::from_raw_parts(bytes, length);
-    let snapshot = match MachineSnapshot::decode(input, host, (has_port == 1).then_some(port)) {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `bytes` is non-null and the caller guarantees `length` readable bytes.
+    let input = unsafe { std::slice::from_raw_parts(bytes, length) };
+    let Ok(snapshot) = MachineSnapshot::decode(input, host, (has_port == 1).then_some(port)) else {
+        return MilaFfiStatus::InvalidRequest;
     };
-    *out_summary = MilaSnapshotSummary {
-        machine_count: snapshot.machines.len() as u32,
-        saved_at: snapshot.saved_at,
-    };
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "decode refuses more than MAX_SNAPSHOT_MACHINES (500) machines"
+    )]
+    let machine_count = snapshot.machines.len() as u32;
+    // SAFETY: `out_summary` is non-null and the caller guarantees writable summary storage.
+    unsafe {
+        *out_summary = MilaSnapshotSummary {
+            machine_count,
+            saved_at: snapshot.saved_at,
+        };
+    }
     MilaFfiStatus::Ok
 }

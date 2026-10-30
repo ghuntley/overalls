@@ -28,17 +28,14 @@ pub unsafe extern "C" fn mila_snapshot_machine_actions(
     if bytes.is_null() || host.is_null() || out_actions.is_null() || has_port > 1 {
         return MilaFfiStatus::NullInput;
     }
-    let host = match CStr::from_ptr(host).to_str() {
-        Ok(v) => v,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `host` is non-null and the caller guarantees a NUL-terminated string.
+    let Ok(host) = unsafe { CStr::from_ptr(host) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
-    let snapshot = match MachineSnapshot::decode(
-        std::slice::from_raw_parts(bytes, length),
-        host,
-        (has_port == 1).then_some(port),
-    ) {
-        Ok(v) => v,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `bytes` is non-null and the caller guarantees `length` readable bytes.
+    let input = unsafe { std::slice::from_raw_parts(bytes, length) };
+    let Ok(snapshot) = MachineSnapshot::decode(input, host, (has_port == 1).then_some(port)) else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let Some(machine) = snapshot.machines.get(index as usize) else {
         return MilaFfiStatus::InvalidRequest;
@@ -47,6 +44,7 @@ pub unsafe extern "C" fn mila_snapshot_machine_actions(
         .available_actions()
         .into_iter()
         .fold(0u16, |bits, action| bits | (1 << action as u16));
-    *out_actions = MilaMachineActions { bits };
+    // SAFETY: `out_actions` is non-null and the caller guarantees writable storage.
+    unsafe { *out_actions = MilaMachineActions { bits } };
     MilaFfiStatus::Ok
 }

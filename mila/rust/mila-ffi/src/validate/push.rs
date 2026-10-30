@@ -20,12 +20,19 @@ pub unsafe extern "C" fn mila_push_registration_validate(
     deployment: *const c_char,
     endpoint: *const c_char,
 ) -> MilaFfiStatus {
-    match push_registration_request(provider, environment, token, app_id, deployment, endpoint) {
+    // SAFETY: the caller upholds this function's contract, which is the
+    // contract of `push_registration_request`.
+    match unsafe {
+        push_registration_request(provider, environment, token, app_id, deployment, endpoint)
+    } {
         Ok(_) => MilaFfiStatus::Ok,
         Err(status) => status,
     }
 }
 
+/// # Safety
+/// `token`, `app_id` and `deployment` must be null or valid NUL-terminated
+/// strings, and `endpoint` null or a valid NUL-terminated string.
 unsafe fn push_registration_request(
     provider: u8,
     environment: u8,
@@ -38,7 +45,9 @@ unsafe fn push_registration_request(
         return Err(MilaFfiStatus::NullInput);
     }
     let text = |value: *const c_char| {
-        CStr::from_ptr(value)
+        // SAFETY: only non-null arguments reach this closure, and the caller
+        // guarantees each is a NUL-terminated string.
+        unsafe { CStr::from_ptr(value) }
             .to_str()
             .map(str::to_owned)
             .map_err(|_| MilaFfiStatus::InvalidRequest)
@@ -67,18 +76,25 @@ unsafe fn push_registration_request(
 }
 
 /// Copies bytes into caller storage, reporting the required length first.
-unsafe fn write_output(bytes: &[u8], output: MilaRouteOutput) -> MilaFfiStatus {
+///
+/// # Safety
+/// Non-null `output` pointers must reference one writable `usize` and
+/// `capacity` writable bytes respectively.
+unsafe fn write_output(bytes: &[u8], output: &MilaRouteOutput) -> MilaFfiStatus {
     if output.written.is_null() {
         return MilaFfiStatus::NullInput;
     }
-    *output.written = bytes.len();
+    // SAFETY: `output.written` is non-null and the caller guarantees one writable `usize`.
+    unsafe { *output.written = bytes.len() };
     if bytes.len() > output.capacity {
         return MilaFfiStatus::OutputTooSmall;
     }
     if output.bytes.is_null() {
         return MilaFfiStatus::NullInput;
     }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len());
+    // SAFETY: `output.bytes` is non-null with `capacity` writable bytes and
+    // `bytes.len() <= capacity`; Rust-owned `bytes` cannot overlap caller storage.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len()) };
     MilaFfiStatus::Ok
 }
 
@@ -99,13 +115,15 @@ pub unsafe extern "C" fn mila_push_key_request_encode(
     endpoint: *const c_char,
     output: MilaRouteOutput,
 ) -> MilaFfiStatus {
-    let request =
-        match push_registration_request(provider, environment, token, app_id, deployment, endpoint)
-        {
-            Ok(request) => request,
-            Err(status) => return status,
-        };
-    write_output(&request.susan_body(), output)
+    // SAFETY: the caller upholds the string contract of `push_registration_request`.
+    let request = match unsafe {
+        push_registration_request(provider, environment, token, app_id, deployment, endpoint)
+    } {
+        Ok(request) => request,
+        Err(status) => return status,
+    };
+    // SAFETY: the caller guarantees `output` references writable caller storage.
+    unsafe { write_output(&request.susan_body(), &output) }
 }
 
 /// Validates a Susan push poke envelope without exposing its ciphertext to a UI.
@@ -124,12 +142,11 @@ pub unsafe extern "C" fn mila_push_poke_validate(
         return MilaFfiStatus::NullInput;
     }
     // SAFETY: callers provide a readable byte buffer of `length` bytes.
-    let bytes = std::slice::from_raw_parts(envelope, length);
-    let value = match serde_json::from_slice::<PokeEnvelope>(bytes) {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let bytes = unsafe { std::slice::from_raw_parts(envelope, length) };
+    let Ok(value) = serde_json::from_slice::<PokeEnvelope>(bytes) else {
+        return MilaFfiStatus::InvalidRequest;
     };
     value
         .validate(now)
-        .map_or(MilaFfiStatus::InvalidRequest, |_| MilaFfiStatus::Ok)
+        .map_or(MilaFfiStatus::InvalidRequest, |()| MilaFfiStatus::Ok)
 }

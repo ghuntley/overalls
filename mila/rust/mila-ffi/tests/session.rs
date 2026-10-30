@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::{
+    future::Future,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -33,7 +34,11 @@ fn machine(id: &str, name: &str) -> Value {
     json!({"id": id, "name": name, "desired_state": "running", "observed_state": "running",
         "owner": true, "pinned": false, "permissions": {"read": true, "write": true, "manage": true}})
 }
-fn page(items: Vec<Value>, cursor: Option<&str>) -> Vec<u8> {
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
+fn page(items: &[Value], cursor: Option<&str>) -> Vec<u8> {
     serde_json::to_vec(&json!({"version": 1, "status": "succeeded", "result": {"items": items, "next_cursor": cursor}})).unwrap()
 }
 fn reply(command: &str, bytes: Vec<u8>) -> Response {
@@ -46,13 +51,18 @@ fn reply(command: &str, bytes: Vec<u8>) -> Response {
 }
 
 impl DeviceSigner for HardwareStandIn {
-    async fn sign(&mut self, message: &[u8]) -> Result<[u8; 64], SshError> {
+    fn sign(&mut self, message: &[u8]) -> impl Future<Output = Result<[u8; 64], SshError>> + Send {
         use p256::ecdsa::signature::Signer;
         self.calls.fetch_add(1, Ordering::SeqCst);
         let signature: p256::ecdsa::Signature = self.key.sign(message);
-        Ok(signature.to_bytes().into())
+        std::future::ready(Ok(signature.to_bytes().into()))
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    clippy::cast_possible_truncation,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test, and the three SSH key fields are under 100 bytes"
+)]
 fn identity(calls: Arc<AtomicUsize>) -> (String, HardwareStandIn) {
     let key = p256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
     let mut blob = Vec::new();
@@ -84,13 +94,13 @@ struct Handler {
 }
 impl server::Handler for Handler {
     type Error = russh::Error;
-    async fn auth_publickey(
+    fn auth_publickey(
         &mut self,
         _: &str,
         _: &russh::keys::PublicKey,
-    ) -> Result<server::Auth, Self::Error> {
+    ) -> impl Future<Output = Result<server::Auth, Self::Error>> + Send {
         self.authentications.fetch_add(1, Ordering::SeqCst);
-        Ok(server::Auth::Accept)
+        std::future::ready(Ok(server::Auth::Accept))
     }
     async fn channel_open_session(
         &mut self,
@@ -101,12 +111,17 @@ impl server::Handler for Handler {
         reply.accept().await;
         Ok(())
     }
-    async fn exec_request(
+    #[expect(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "integration-test SSH server handler; a poisoned script or unexpected command must fail the calling test"
+    )]
+    fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         let response = self
             .responses
             .lock()
@@ -116,37 +131,46 @@ impl server::Handler for Handler {
         assert_eq!(data, response.command.as_bytes());
         self.pending = Some(response);
         self.received.clear();
-        session.channel_success(channel)?;
-        Ok(())
+        std::future::ready(session.channel_success(channel))
     }
-    async fn data(
+    fn data(
         &mut self,
         _: ChannelId,
         data: &[u8],
         _: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         self.received.extend_from_slice(data);
-        Ok(())
+        std::future::ready(Ok(()))
     }
-    async fn channel_eof(
+    #[expect(
+        clippy::unwrap_used,
+        reason = "integration-test SSH server handler; EOF without a pending command must fail the calling test"
+    )]
+    fn channel_eof(
         &mut self,
         channel: ChannelId,
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        session.extended_data(channel, 1, b"discard progress".to_vec())?;
-        let response = self.pending.take().unwrap();
-        if let Some(expected) = &response.stdin {
-            assert_eq!(&self.received, expected, "stdin payload");
-        }
-        session.data(channel, response.bytes)?;
-        if let Some(exit) = response.exit {
-            session.exit_status_request(channel, exit)?;
-        }
-        session.eof(channel)?;
-        session.close(channel)?;
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready((|| {
+            session.extended_data(channel, 1, b"discard progress".to_vec())?;
+            let response = self.pending.take().unwrap();
+            if let Some(expected) = &response.stdin {
+                assert_eq!(&self.received, expected, "stdin payload");
+            }
+            session.data(channel, response.bytes)?;
+            if let Some(exit) = response.exit {
+                session.exit_status_request(channel, exit)?;
+            }
+            session.eof(channel)?;
+            session.close(channel)?;
+            Ok(())
+        })())
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 async fn endpoint(
     responses: Arc<Mutex<VecDeque<Response>>>,
 ) -> (
@@ -215,13 +239,19 @@ async fn endpoint(
     (trust, port, authentications, task)
 }
 
+/// # Safety
+/// `context` is the address of a live `HardwareStandIn`, `message` references
+/// `len` readable bytes and `output` 64 writable bytes.
 unsafe extern "C" fn sign(context: usize, message: *const u8, len: usize, output: *mut u8) -> i32 {
     use p256::ecdsa::signature::Signer;
-    let signer = &*(context as *const HardwareStandIn);
+    // SAFETY: the tests pass the address of a `HardwareStandIn` that outlives connect.
+    let signer = unsafe { &*(context as *const HardwareStandIn) };
     signer.calls.fetch_add(1, Ordering::SeqCst);
-    let signature: p256::ecdsa::Signature =
-        signer.key.sign(std::slice::from_raw_parts(message, len));
-    std::ptr::copy_nonoverlapping(signature.to_bytes().as_ptr(), output, 64);
+    // SAFETY: the session ABI passes `len` readable message bytes.
+    let message = unsafe { std::slice::from_raw_parts(message, len) };
+    let signature: p256::ecdsa::Signature = signer.key.sign(message);
+    // SAFETY: a P-256 signature is 64 bytes and the session ABI passes 64 writable bytes.
+    unsafe { std::ptr::copy_nonoverlapping(signature.to_bytes().as_ptr(), output, 64) };
     0
 }
 #[test]
@@ -232,74 +262,74 @@ fn ffi_real_ssh_read_snapshot_and_close() {
         .build()
         .unwrap();
     let responses = Arc::new(Mutex::new(VecDeque::from([
-        reply("ls --json", page(vec![machine(FIRST, "live")], None)),
+        reply("ls --json", page(&[machine(FIRST, "live")], None)),
         reply("ls --json", b"malformed".to_vec()),
     ])));
     let (trust, port, auth, task) = runtime.block_on(endpoint(responses.clone()));
     let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
     let trust = serde_json::to_vec(&trust).unwrap();
     let mut handle = 0;
-    unsafe {
-        assert_eq!(
-            mila_session_connect(
-                trust.as_ptr(),
-                trust.len(),
-                b"localhost".as_ptr(),
-                9,
-                public.as_ptr(),
-                public.len(),
-                port,
-                5000,
-                Some(sign),
-                &signer as *const _ as usize,
-                &mut handle
-            ),
-            SessionStatus::Ok
-        );
-        assert_ne!(handle, 0);
-        assert_eq!(mila_session_read_machines(handle, 0), SessionStatus::Ok);
-        let mut required = 0;
-        assert_eq!(
-            mila_session_listing(handle, std::ptr::null_mut(), 0, &mut required),
-            SessionStatus::SmallBuffer
-        );
-        let mut data = vec![0; required];
-        assert_eq!(
-            mila_session_listing(handle, data.as_mut_ptr(), data.len(), &mut required),
-            SessionStatus::Ok
-        );
-        let value: Value = serde_json::from_slice(&data).unwrap();
-        assert_eq!(value["machines"][0]["name"], "live");
-        assert_eq!(
-            mila_session_read_machines(handle, 0),
-            SessionStatus::Transport
-        );
-        assert_eq!(
-            mila_session_snapshot(handle, 42, std::ptr::null_mut(), 0, &mut required),
-            SessionStatus::SmallBuffer
-        );
-        let mut snapshot = vec![0; required];
-        assert_eq!(
-            mila_session_snapshot(
-                handle,
-                42,
-                snapshot.as_mut_ptr(),
-                snapshot.len(),
-                &mut required
-            ),
-            SessionStatus::Ok
-        );
-        let decoded =
-            mila_runtime::MachineSnapshot::decode(&snapshot, "localhost", Some(port)).unwrap();
-        assert_eq!(decoded.machines[0].name, "live");
-        assert_eq!(decoded.saved_at, 42);
-        assert_eq!(mila_session_close(handle), SessionStatus::Ok);
-        assert_eq!(mila_session_close(handle), SessionStatus::InvalidHandle);
-        assert_eq!(
-            mila_session_listing(handle, data.as_mut_ptr(), data.len(), &mut required),
-            SessionStatus::InvalidHandle
-        );
-    }
+    // SAFETY: every pointer references a live local buffer of the stated length,
+    // and `sign` and the `signer` address outlive the synchronous connect.
+    let connected = unsafe {
+        mila_session_connect(
+            trust.as_ptr(),
+            trust.len(),
+            b"localhost".as_ptr(),
+            9,
+            public.as_ptr(),
+            public.len(),
+            port,
+            5000,
+            Some(sign),
+            &raw const signer as usize,
+            &raw mut handle,
+        )
+    };
+    assert_eq!(connected, SessionStatus::Ok);
+    assert_ne!(handle, 0);
+    assert_eq!(mila_session_read_machines(handle, 0), SessionStatus::Ok);
+    let mut required = 0;
+    // SAFETY: a null zero-capacity buffer only reports the size into `required`.
+    let probe = unsafe { mila_session_listing(handle, std::ptr::null_mut(), 0, &raw mut required) };
+    assert_eq!(probe, SessionStatus::SmallBuffer);
+    let mut data = vec![0; required];
+    // SAFETY: `data` is a live buffer of the stated length.
+    let listing =
+        unsafe { mila_session_listing(handle, data.as_mut_ptr(), data.len(), &raw mut required) };
+    assert_eq!(listing, SessionStatus::Ok);
+    let value: Value = serde_json::from_slice(&data).unwrap();
+    assert_eq!(value["machines"][0]["name"], "live");
+    assert_eq!(
+        mila_session_read_machines(handle, 0),
+        SessionStatus::Transport
+    );
+    // SAFETY: a null zero-capacity buffer only reports the size into `required`.
+    let probe =
+        unsafe { mila_session_snapshot(handle, 42, std::ptr::null_mut(), 0, &raw mut required) };
+    assert_eq!(probe, SessionStatus::SmallBuffer);
+    let mut snapshot = vec![0; required];
+    // SAFETY: `snapshot` is a live buffer of the stated length.
+    let copied = unsafe {
+        mila_session_snapshot(
+            handle,
+            42,
+            snapshot.as_mut_ptr(),
+            snapshot.len(),
+            &raw mut required,
+        )
+    };
+    assert_eq!(copied, SessionStatus::Ok);
+    let decoded =
+        mila_runtime::MachineSnapshot::decode(&snapshot, "localhost", Some(port)).unwrap();
+    assert_eq!(decoded.machines[0].name, "live");
+    assert_eq!(decoded.saved_at, 42);
+    assert_eq!(mila_session_close(handle), SessionStatus::Ok);
+    assert_eq!(mila_session_close(handle), SessionStatus::InvalidHandle);
+    // SAFETY: `data` is a live buffer of the stated length.
+    let stale =
+        unsafe { mila_session_listing(handle, data.as_mut_ptr(), data.len(), &raw mut required) };
+    assert_eq!(stale, SessionStatus::InvalidHandle);
     assert_eq!(signer.calls.load(Ordering::SeqCst), 1);
     assert_eq!(auth.load(Ordering::SeqCst), 1);
     assert!(responses.lock().unwrap().is_empty());
@@ -313,9 +343,10 @@ fn arbitrary_stale_handles_refuse_without_writing(tc: hegel::TestCase) {
     let handle = tc.draw(hegel::generators::default::<u64>()) | (1u64 << 63);
     let mut output = [0xA5; 32];
     let mut written = 123;
+    // SAFETY: `output` and `written` are live stack storage of the stated sizes.
     unsafe {
         assert_eq!(
-            mila_session_listing(handle, output.as_mut_ptr(), output.len(), &mut written),
+            mila_session_listing(handle, output.as_mut_ptr(), output.len(), &raw mut written),
             SessionStatus::InvalidHandle
         );
     }
@@ -329,6 +360,7 @@ fn machine_actions_reject_invalid_inputs_before_lookup() {
     let machine = b"not-an-id";
     let action = b"start";
     let request = b"porsche-00000000000000000000000000000000";
+    // SAFETY: every pointer references a live byte string of the stated length.
     let status = unsafe {
         mila_session_machine_action(
             u64::MAX,
@@ -351,16 +383,14 @@ fn arbitrary_stale_terminal_handles_refuse_without_writing(tc: hegel::TestCase) 
     let handle = tc.draw(hegel::generators::default::<u64>()) | (1_u64 << 63);
     let mut output = [0xA5; 64];
     let mut written = 17_usize;
-    unsafe {
-        assert_eq!(
-            mila_session_terminal_poll(handle, output.as_mut_ptr(), output.len(), &mut written),
-            SessionStatus::InvalidHandle
-        );
-        assert_eq!(
-            mila_session_terminal_input(handle, b"x".as_ptr(), 1),
-            SessionStatus::InvalidHandle
-        );
-    }
+    // SAFETY: `output` and `written` are live stack storage of the stated sizes.
+    let poll = unsafe {
+        mila_session_terminal_poll(handle, output.as_mut_ptr(), output.len(), &raw mut written)
+    };
+    assert_eq!(poll, SessionStatus::InvalidHandle);
+    // SAFETY: the input is a live one-byte string.
+    let input = unsafe { mila_session_terminal_input(handle, b"x".as_ptr(), 1) };
+    assert_eq!(input, SessionStatus::InvalidHandle);
     assert_eq!(
         mila_session_terminal_resize(handle, 80, 24),
         SessionStatus::InvalidHandle
@@ -383,14 +413,15 @@ fn arbitrary_terminal_reads_refuse_before_consuming(tc: hegel::TestCase) {
     let mut output = vec![0xA5_u8; MILA_TERMINAL_READ_CAPACITY];
     let mut written = 17_usize;
     let mut state = TerminalReadEvent::Closed;
+    // SAFETY: `output`, `written` and `state` are live storage of the stated sizes.
     let status = unsafe {
         mila_session_terminal_read_within(
             handle,
             wait,
             output.as_mut_ptr(),
             output.len(),
-            &mut written,
-            &mut state,
+            &raw mut written,
+            &raw mut state,
         )
     };
     if wait > 1_000 {
@@ -398,14 +429,15 @@ fn arbitrary_terminal_reads_refuse_before_consuming(tc: hegel::TestCase) {
     } else {
         assert_eq!(status, SessionStatus::InvalidHandle);
     }
+    // SAFETY: the stated capacity is smaller than the live `output` buffer.
     let small = unsafe {
         mila_session_terminal_read_within(
             handle,
             0,
             output.as_mut_ptr(),
             MILA_TERMINAL_READ_CAPACITY - 1,
-            &mut written,
-            &mut state,
+            &raw mut written,
+            &raw mut state,
         )
     };
     assert_eq!(small, SessionStatus::Invalid);
@@ -423,7 +455,7 @@ fn arbitrary_terminal_dimensions_are_bounded_before_lookup(tc: hegel::TestCase) 
     let rows = tc.draw(hegel::generators::default::<u32>());
     let valid = (1..=4096).contains(&columns) && (1..=512).contains(&rows);
     let mut terminal = 0_u64;
-    let status = mila_session_terminal_attach(u64::MAX, columns, rows, &mut terminal);
+    let status = mila_session_terminal_attach(u64::MAX, columns, rows, &raw mut terminal);
     if valid {
         assert_eq!(status, SessionStatus::InvalidHandle);
     } else {
@@ -435,6 +467,10 @@ fn arbitrary_terminal_dimensions_are_bounded_before_lookup(tc: hegel::TestCase) 
 const PUSH_KEY: &str = "c3VzYW4tc2VhbGVkLXB1c2gta2V5LWZvci13bnM";
 const ENC_PUBKEY: &str = "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU";
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn connect_scripted(
     runtime: &tokio::runtime::Runtime,
     responses: Arc<Mutex<VecDeque<Response>>>,
@@ -455,8 +491,8 @@ fn connect_scripted(
             port,
             5000,
             Some(sign),
-            &signer as *const _ as usize,
-            &mut handle,
+            &raw const signer as usize,
+            &raw mut handle,
         )
     };
     assert_eq!(status, SessionStatus::Ok);
@@ -539,28 +575,27 @@ fn terminal_read_refuses_stale_handles_and_null_outputs() {
     let mut out = [0u8; 8];
     let mut written = 0usize;
     let mut event = TerminalReadEvent::Data;
-    // SAFETY: valid stack storage; null pointers are the refused inputs.
-    unsafe {
-        assert_eq!(
-            mila_session_terminal_read(
-                u64::MAX,
-                out.as_mut_ptr(),
-                out.len(),
-                &mut written,
-                &mut event
-            ),
-            SessionStatus::InvalidHandle
-        );
-        assert_eq!(
-            mila_session_terminal_read(
-                1,
-                out.as_mut_ptr(),
-                out.len(),
-                &mut written,
-                std::ptr::null_mut()
-            ),
-            SessionStatus::Invalid
-        );
-    }
+    // SAFETY: `out`, `written` and `event` are live stack storage of the stated sizes.
+    let stale = unsafe {
+        mila_session_terminal_read(
+            u64::MAX,
+            out.as_mut_ptr(),
+            out.len(),
+            &raw mut written,
+            &raw mut event,
+        )
+    };
+    assert_eq!(stale, SessionStatus::InvalidHandle);
+    // SAFETY: valid stack storage; the null event pointer is the refused input.
+    let null_event = unsafe {
+        mila_session_terminal_read(
+            1,
+            out.as_mut_ptr(),
+            out.len(),
+            &raw mut written,
+            std::ptr::null_mut(),
+        )
+    };
+    assert_eq!(null_event, SessionStatus::Invalid);
     assert_eq!(event, TerminalReadEvent::Data);
 }

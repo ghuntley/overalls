@@ -21,13 +21,15 @@ fn formats_shared_route_fixture_vectors() {
         let expected = vector["canonical"].as_str().unwrap().as_bytes();
         let mut bytes = vec![0_u8; expected.len() + 1];
         let mut written = 0_usize;
+        // SAFETY: `input` is a live NUL-terminated CString and the output describes the live
+        // `bytes` buffer and `written` local.
         let status = unsafe {
             super::mila_route_format(
                 input.as_ptr(),
-                super::MilaRouteOutput {
+                MilaRouteOutput {
                     bytes: bytes.as_mut_ptr(),
                     capacity: bytes.len(),
-                    written: &mut written,
+                    written: &raw mut written,
                 },
             )
         };
@@ -42,15 +44,15 @@ fn exposes_stable_abi_version() {
     assert_eq!(mila_ffi_version(), 1);
     let mut version = MilaFfiAbiVersion { major: 0, minor: 0 };
     // SAFETY: version points to writable stack storage.
-    let status = unsafe { mila_ffi_get_version(&mut version) };
+    let status = unsafe { mila_ffi_get_version(&raw mut version) };
     assert_eq!(status, MilaFfiStatus::Ok);
     assert_eq!(version, MilaFfiAbiVersion { major: 1, minor: 0 });
 }
 
 #[test]
 fn rejects_missing_version_storage() {
-    // SAFETY: null is intentionally supplied to verify the C ABI guard.
     assert_eq!(
+        // SAFETY: null is intentionally supplied to verify the C ABI guard.
         unsafe { mila_ffi_get_version(std::ptr::null_mut()) },
         MilaFfiStatus::NullInput
     );
@@ -74,26 +76,32 @@ fn projects_thread_command_catalog_without_payloads() {
     let line = std::ffi::CString::new("thread ls").unwrap();
     let mut kind = MilaThreadCommandKind::Unknown;
     assert_eq!(
-        unsafe { mila_thread_command_kind(line.as_ptr(), &mut kind) },
+        // SAFETY: `line` is a live NUL-terminated CString and `kind` a writable local.
+        unsafe { mila_thread_command_kind(line.as_ptr(), &raw mut kind) },
         MilaFfiStatus::Ok
     );
     assert_eq!(kind, MilaThreadCommandKind::List);
     let unknown = std::ffi::CString::new("thread delete abc --json").unwrap();
     let mut kind = MilaThreadCommandKind::Unknown;
     assert_eq!(
-        unsafe { mila_thread_command_kind(unknown.as_ptr(), &mut kind) },
+        // SAFETY: `unknown` is a live NUL-terminated CString and `kind` a writable local.
+        unsafe { mila_thread_command_kind(unknown.as_ptr(), &raw mut kind) },
         MilaFfiStatus::InvalidRequest
     );
 }
 
 #[test]
-#[allow(clippy::single_element_loop)]
+#[expect(
+    clippy::single_element_loop,
+    reason = "a catalogue table with one row today; further rows are added to the same loop"
+)]
 fn projects_machine_management_catalog_without_payloads() {
     for (line, expected) in [("ls", MilaMachineCommandKind::List)] {
         let line = std::ffi::CString::new(line).unwrap();
         let mut kind = MilaMachineCommandKind::Unknown;
         assert_eq!(
-            unsafe { mila_machine_command_kind(line.as_ptr(), &mut kind) },
+            // SAFETY: `line` is a live NUL-terminated CString and `kind` a writable local.
+            unsafe { mila_machine_command_kind(line.as_ptr(), &raw mut kind) },
             MilaFfiStatus::Ok
         );
         assert_eq!(kind, expected);
@@ -176,7 +184,7 @@ fn exposes_only_a_watch_event_tag() {
     let line = br#"{"version":1,"event":"heartbeat"}"#;
     let mut kind = MilaWatchEventKind::Unknown;
     // SAFETY: line and kind are valid for the supplied lengths.
-    let status = unsafe { mila_watch_event_kind(line.as_ptr(), line.len(), &mut kind) };
+    let status = unsafe { mila_watch_event_kind(line.as_ptr(), line.len(), &raw mut kind) };
     assert_eq!(status, MilaFfiStatus::Ok);
     assert_eq!(kind, MilaWatchEventKind::Heartbeat);
 }
@@ -186,7 +194,7 @@ fn rejects_malformed_watch_lines() {
     let line = br#"{"version":1,"event":"heartbeat"}"#;
     let mut kind = MilaWatchEventKind::Unknown;
     // SAFETY: line and kind are valid; an excessive length must be rejected.
-    let status = unsafe { mila_watch_event_kind(line.as_ptr(), 65_537, &mut kind) };
+    let status = unsafe { mila_watch_event_kind(line.as_ptr(), 65_537, &raw mut kind) };
     assert_eq!(status, MilaFfiStatus::InvalidRequest);
 }
 
@@ -203,11 +211,13 @@ fn validates_watch_filter_bound() {
 fn validates_push_poke_without_returning_ciphertext() {
     let envelope = br#"{"deployment":"mila.example.test","push_key":"AAAAAAAAAAAAAAAA","delivery_id":"d1","collapse_id":"c1","kind":"refresh","issued_at":100,"nonce":"n1","ciphertext":"Y2lwaGVy"}"#;
     assert_eq!(
+        // SAFETY: `envelope` is a live byte string of the stated length.
         unsafe { super::mila_push_poke_validate(envelope.as_ptr(), envelope.len(), 100) },
         MilaFfiStatus::Ok
     );
     let expired = br#"{"deployment":"mila.example.test","push_key":"AAAAAAAAAAAAAAAA","delivery_id":"d1","collapse_id":"c1","kind":"refresh","issued_at":0,"nonce":"n1","ciphertext":"Y2lwaGVy"}"#;
     assert_eq!(
+        // SAFETY: `expired` is a live byte string of the stated length.
         unsafe { super::mila_push_poke_validate(expired.as_ptr(), expired.len(), 86_401) },
         MilaFfiStatus::InvalidRequest
     );
@@ -216,8 +226,8 @@ fn validates_push_poke_without_returning_ciphertext() {
 #[test]
 fn rejects_null_trust_document_inputs() {
     let host = std::ffi::CString::new("mgmt.example.test").unwrap();
-    // SAFETY: null document is intentional for the ABI guard test.
     assert_eq!(
+        // SAFETY: null document is intentional for the ABI guard test; `host` is a live CString.
         unsafe { super::mila_trust_document_validate(std::ptr::null(), 0, host.as_ptr(), 0) },
         MilaFfiStatus::NullInput
     );
@@ -243,6 +253,8 @@ fn reconciles_and_serializes_only_rust_selected_trust() {
     let mut output = vec![0_u8; 8192];
     let mut written = 0_usize;
     let host = std::ffi::CString::new("overalls.example").unwrap();
+    // SAFETY: `fetched` is a live Vec of the stated length, `host` a live CString, and the output
+    // describes the live `output` buffer and `written` local.
     let status = unsafe {
         mila_trust_document_reconcile(
             std::ptr::null(),
@@ -254,7 +266,7 @@ fn reconciles_and_serializes_only_rust_selected_trust() {
             MilaRouteOutput {
                 bytes: output.as_mut_ptr(),
                 capacity: output.len(),
-                written: &mut written,
+                written: &raw mut written,
             },
         )
     };
@@ -277,6 +289,8 @@ fn reconciliation_refuses_changed_authority_and_expired_fallback() {
     let mut output = vec![0_u8; 8192];
     let mut written = 0_usize;
     let host = std::ffi::CString::new("overalls.example").unwrap();
+    // SAFETY: the documents are live Vecs of the stated lengths, `host` a live CString, and the
+    // output describes the live `output` buffer and `written` local.
     let status = unsafe {
         mila_trust_document_reconcile(
             pinned.as_ptr(),
@@ -288,11 +302,14 @@ fn reconciliation_refuses_changed_authority_and_expired_fallback() {
             MilaRouteOutput {
                 bytes: output.as_mut_ptr(),
                 capacity: output.len(),
-                written: &mut written,
+                written: &raw mut written,
             },
         )
     };
     assert_eq!(status, MilaFfiStatus::InvalidRequest);
+    // SAFETY: `pinned` is a live Vec of the stated length, the fetched document is null with
+    // length zero, `host` a live CString, and the output describes the live `output` buffer and
+    // `written` local.
     let status = unsafe {
         mila_trust_document_reconcile(
             pinned.as_ptr(),
@@ -304,7 +321,7 @@ fn reconciliation_refuses_changed_authority_and_expired_fallback() {
             MilaRouteOutput {
                 bytes: output.as_mut_ptr(),
                 capacity: output.len(),
-                written: &mut written,
+                written: &raw mut written,
             },
         )
     };
@@ -322,6 +339,8 @@ fn validates_snapshot_and_returns_safe_summary() {
         machine_count: 9,
         saved_at: 0,
     };
+    // SAFETY: `snapshot` is a live Vec of the stated length, `host` a live CString and `summary` a
+    // writable local.
     let status = unsafe {
         super::mila_snapshot_validate(
             snapshot.as_ptr(),
@@ -329,7 +348,7 @@ fn validates_snapshot_and_returns_safe_summary() {
             host.as_ptr(),
             443,
             1,
-            &mut summary,
+            &raw mut summary,
         )
     };
     assert_eq!(status, MilaFfiStatus::Ok);
@@ -353,6 +372,8 @@ fn rejects_snapshot_for_wrong_deployment() {
         machine_count: 0,
         saved_at: 0,
     };
+    // SAFETY: `snapshot` is a live Vec of the stated length, `host` a live CString and `summary` a
+    // writable local.
     let status = unsafe {
         super::mila_snapshot_validate(
             snapshot.as_ptr(),
@@ -360,7 +381,7 @@ fn rejects_snapshot_for_wrong_deployment() {
             host.as_ptr(),
             0,
             0,
-            &mut summary,
+            &raw mut summary,
         )
     };
     assert_eq!(status, MilaFfiStatus::InvalidRequest);

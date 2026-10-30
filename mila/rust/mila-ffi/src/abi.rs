@@ -13,6 +13,7 @@ pub enum MilaFfiStatus {
 
 /// A fixed-size route description suitable for a caller-owned buffer.
 #[repr(C)]
+#[derive(Debug)]
 pub struct MilaRouteOutput {
     pub bytes: *mut u8,
     pub capacity: usize,
@@ -45,6 +46,6 @@ pub unsafe extern "C" fn mila_ffi_get_version(
         return MilaFfiStatus::NullInput;
     }
     // SAFETY: the caller supplied a non-null pointer to writable version storage.
-    *out_version = MilaFfiAbiVersion { major: 1, minor: 0 };
+    unsafe { *out_version = MilaFfiAbiVersion { major: 1, minor: 0 } };
     MilaFfiStatus::Ok
 }

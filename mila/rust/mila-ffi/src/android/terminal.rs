@@ -25,9 +25,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     ) else {
         return std::ptr::null_mut();
     };
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot,
+    // and every input pointer comes from a live Rust Vec (or is null) passed with its own length.
     jni_session_bytes(&mut env, |out, capacity, written| unsafe {
         session::mila_session_terminal_new(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             request_id.as_ptr(),
@@ -59,9 +61,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     ) else {
         return std::ptr::null_mut();
     };
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot,
+    // and every input pointer comes from a live Rust Vec passed with its own length.
     jni_session_bytes(&mut env, |out, capacity, written| unsafe {
         session::mila_session_terminal_end(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             terminal.as_ptr(),
@@ -95,20 +99,22 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         return 0;
     };
     let mut out = 0_u64;
+    // SAFETY: the machine and terminal ids are live Vecs passed with their lengths, and `out` is a
+    // writable local.
     let status = unsafe {
         session::mila_session_terminal_attach_session(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             terminal.as_ptr(),
             terminal.len(),
-            columns as u32,
-            rows as u32,
-            &mut out,
+            columns.cast_unsigned(),
+            rows.cast_unsigned(),
+            &raw mut out,
         )
     };
     if status == session::SessionStatus::Ok {
-        out as jni::sys::jlong
+        out.cast_signed()
     } else {
         0
     }
@@ -134,13 +140,13 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     }
     let mut terminal = 0_u64;
     let status = session::mila_session_terminal_attach(
-        handle as u64,
-        columns as u32,
-        rows as u32,
-        &mut terminal,
+        handle.cast_unsigned(),
+        columns.cast_unsigned(),
+        rows.cast_unsigned(),
+        &raw mut terminal,
     );
     if status == session::SessionStatus::Ok {
-        terminal as jni::sys::jlong
+        terminal.cast_signed()
     } else {
         0
     }
@@ -158,14 +164,18 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if terminal <= 0 || !(1..=65_536).contains(&capacity) {
         return std::ptr::null_mut();
     }
-    let mut output = vec![0_u8; capacity as usize];
+    let Ok(capacity) = usize::try_from(capacity) else {
+        return std::ptr::null_mut();
+    };
+    let mut output = vec![0_u8; capacity];
     let mut written = 0_usize;
+    // SAFETY: `output` is a live buffer of `output.len()` bytes and `written` a writable local.
     let status = unsafe {
         session::mila_session_terminal_poll(
-            terminal as u64,
+            terminal.cast_unsigned(),
             output.as_mut_ptr(),
             output.len(),
-            &mut written,
+            &raw mut written,
         )
     };
     if status != session::SessionStatus::Ok || written > output.len() {
@@ -188,12 +198,12 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if terminal <= 0 {
         return session::SessionStatus::Invalid as jni::sys::jint;
     }
-    let bytes = match env.convert_byte_array(&input) {
-        Ok(value) => value,
-        Err(_) => return session::SessionStatus::Invalid as jni::sys::jint,
+    let Ok(bytes) = env.convert_byte_array(&input) else {
+        return session::SessionStatus::Invalid as jni::sys::jint;
     };
+    // SAFETY: `bytes` is a live Vec passed with its length.
     let status = unsafe {
-        session::mila_session_terminal_input(terminal as u64, bytes.as_ptr(), bytes.len())
+        session::mila_session_terminal_input(terminal.cast_unsigned(), bytes.as_ptr(), bytes.len())
     };
     status as jni::sys::jint
 }
@@ -209,8 +219,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if terminal <= 0 || columns <= 0 || rows <= 0 {
         return session::SessionStatus::Invalid as jni::sys::jint;
     }
-    session::mila_session_terminal_resize(terminal as u64, columns as u32, rows as u32)
-        as jni::sys::jint
+    session::mila_session_terminal_resize(
+        terminal.cast_unsigned(),
+        columns.cast_unsigned(),
+        rows.cast_unsigned(),
+    ) as jni::sys::jint
 }
 
 #[no_mangle]
@@ -222,7 +235,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if terminal <= 0 {
         return session::SessionStatus::Invalid as jni::sys::jint;
     }
-    session::mila_session_terminal_kill(terminal as u64) as jni::sys::jint
+    session::mila_session_terminal_kill(terminal.cast_unsigned()) as jni::sys::jint
 }
 
 #[no_mangle]
@@ -237,16 +250,19 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
     if from < 0
         || columns < 0
         || rows < 0
-        || columns > u16::MAX as i32
-        || rows > u16::MAX as i32
+        || columns > i32::from(u16::MAX)
+        || rows > i32::from(u16::MAX)
         || read_write > 1
     {
         return -4;
     }
+    let (Ok(columns), Ok(rows)) = (u16::try_from(columns), u16::try_from(rows)) else {
+        return -4;
+    };
     terminal_status(mila_terminal_attach_validate(
-        from as u64,
-        columns as u16,
-        rows as u16,
+        from.cast_unsigned(),
+        columns,
+        rows,
         read_write,
     ))
 }
@@ -261,7 +277,10 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
     if length < 0 || read_write > 1 {
         return -4;
     }
-    terminal_status(mila_terminal_input_validate(length as usize, read_write))
+    let Ok(length) = usize::try_from(length) else {
+        return -4;
+    };
+    terminal_status(mila_terminal_input_validate(length, read_write))
 }
 
 #[no_mangle]
@@ -274,25 +293,24 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTermina
 ) -> jni::sys::jint {
     if columns < 0
         || rows < 0
-        || columns > u16::MAX as i32
-        || rows > u16::MAX as i32
+        || columns > i32::from(u16::MAX)
+        || rows > i32::from(u16::MAX)
         || read_write > 1
     {
         return -4;
     }
-    terminal_status(mila_terminal_resize_validate(
-        columns as u16,
-        rows as u16,
-        read_write,
-    ))
+    let (Ok(columns), Ok(rows)) = (u16::try_from(columns), u16::try_from(rows)) else {
+        return -4;
+    };
+    terminal_status(mila_terminal_resize_validate(columns, rows, read_write))
 }
 
 /// Session-scoped terminal validation. The PTY transport remains owned by the
 /// authenticated session; this JNI seam rejects detached or malformed requests.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalAttach(
-    _env: jni::JNIEnv<'_>,
-    _class: jni::objects::JClass<'_>,
+    env: jni::JNIEnv<'_>,
+    class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
     from: jni::sys::jlong,
     columns: jni::sys::jint,
@@ -303,14 +321,14 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         return -4;
     }
     Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTerminalAttach(
-        _env, _class, from, columns, rows, read_write,
+        env, class, from, columns, rows, read_write,
     )
 }
 
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalInput(
-    _env: jni::JNIEnv<'_>,
-    _class: jni::objects::JClass<'_>,
+    env: jni::JNIEnv<'_>,
+    class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
     length: jni::sys::jint,
     read_write: jni::sys::jboolean,
@@ -318,15 +336,13 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if handle <= 0 {
         return -4;
     }
-    Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTerminalInput(
-        _env, _class, length, read_write,
-    )
+    Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTerminalInput(env, class, length, read_write)
 }
 
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalResize(
-    _env: jni::JNIEnv<'_>,
-    _class: jni::objects::JClass<'_>,
+    env: jni::JNIEnv<'_>,
+    class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
     columns: jni::sys::jint,
     rows: jni::sys::jint,
@@ -336,6 +352,6 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         return -4;
     }
     Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeTerminalResize(
-        _env, _class, columns, rows, read_write,
+        env, class, columns, rows, read_write,
     )
 }

@@ -21,25 +21,29 @@ pub unsafe extern "C" fn mila_route_format(
     if input.is_null() || output.bytes.is_null() || output.written.is_null() {
         return MilaFfiStatus::NullInput;
     }
-    let input = match CStr::from_ptr(input).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRoute,
+    // SAFETY: `input` is non-null and the caller guarantees a NUL-terminated string.
+    let Ok(input) = unsafe { CStr::from_ptr(input) }.to_str() else {
+        return MilaFfiStatus::InvalidRoute;
     };
-    let route = match MilaRoute::parse(input) {
-        Ok(route) => route,
-        Err(_) => return MilaFfiStatus::InvalidRoute,
+    let Ok(route) = MilaRoute::parse(input) else {
+        return MilaFfiStatus::InvalidRoute;
     };
     let canonical = route.format();
     let bytes = canonical.as_bytes();
     if bytes.len() > output.capacity {
         return MilaFfiStatus::OutputTooSmall;
     }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len());
+    // SAFETY: `output.bytes` is non-null with `capacity` writable bytes and
+    // `bytes.len() <= capacity`; Rust-owned `bytes` cannot overlap caller storage.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len()) };
     if output.capacity > bytes.len() {
-        *output.bytes.add(bytes.len()) = 0;
+        // SAFETY: `bytes.len() < capacity`, so the offset stays inside the caller's buffer.
+        let terminator = unsafe { output.bytes.add(bytes.len()) };
+        // SAFETY: `terminator` addresses a writable byte inside the caller's buffer.
+        unsafe { *terminator = 0 };
     }
     // SAFETY: the caller supplied a valid writable `written` pointer.
-    *output.written = bytes.len();
+    unsafe { *output.written = bytes.len() };
     MilaFfiStatus::Ok
 }
 
@@ -64,7 +68,9 @@ pub unsafe extern "C" fn mila_session_command_format(
         return MilaFfiStatus::NullInput;
     }
     let text = |ptr: *const c_char| {
-        CStr::from_ptr(ptr)
+        // SAFETY: only non-null pointers reach this closure, and the caller
+        // guarantees each is a NUL-terminated string.
+        unsafe { CStr::from_ptr(ptr) }
             .to_str()
             .map(str::to_owned)
             .map_err(|_| MilaFfiStatus::InvalidRequest)
@@ -100,19 +106,24 @@ pub unsafe extern "C" fn mila_session_command_format(
         line.push_str(" --request-id=");
         line.push_str(&id);
     }
-    let command = match mila_protocol::Command::parse(&line).and_then(|c| c.format()) {
-        Ok(v) => v,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let Ok(command) = mila_protocol::Command::parse(&line).and_then(|c| c.format()) else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let bytes = command.as_bytes();
     if bytes.len() > output.capacity {
         return MilaFfiStatus::OutputTooSmall;
     }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len());
+    // SAFETY: `output.bytes` is non-null with `capacity` writable bytes and
+    // `bytes.len() <= capacity`; Rust-owned `bytes` cannot overlap caller storage.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len()) };
     if output.capacity > bytes.len() {
-        *output.bytes.add(bytes.len()) = 0;
+        // SAFETY: `bytes.len() < capacity`, so the offset stays inside the caller's buffer.
+        let terminator = unsafe { output.bytes.add(bytes.len()) };
+        // SAFETY: `terminator` addresses a writable byte inside the caller's buffer.
+        unsafe { *terminator = 0 };
     }
-    *output.written = bytes.len();
+    // SAFETY: `output.written` is non-null and the caller guarantees one writable `usize`.
+    unsafe { *output.written = bytes.len() };
     MilaFfiStatus::Ok
 }
 
@@ -164,9 +175,9 @@ pub unsafe extern "C" fn mila_machine_command_kind(
     if line.is_null() || out_kind.is_null() {
         return MilaFfiStatus::NullInput;
     }
-    let line = match CStr::from_ptr(line).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `line` is non-null and the caller guarantees a NUL-terminated string.
+    let Ok(line) = unsafe { CStr::from_ptr(line) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let command = match mila_protocol::Command::parse(line) {
         Ok(command) => command.command,
@@ -188,7 +199,8 @@ pub unsafe extern "C" fn mila_machine_command_kind(
         "web set" => MilaMachineCommandKind::WebSet,
         _ => return MilaFfiStatus::InvalidRequest,
     };
-    *out_kind = kind;
+    // SAFETY: `out_kind` is non-null and the caller guarantees writable storage for one value.
+    unsafe { *out_kind = kind };
     MilaFfiStatus::Ok
 }
 
@@ -206,13 +218,12 @@ pub unsafe extern "C" fn mila_thread_command_kind(
     if line.is_null() || out_kind.is_null() {
         return MilaFfiStatus::NullInput;
     }
-    let line = match CStr::from_ptr(line).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `line` is non-null and the caller guarantees a NUL-terminated string.
+    let Ok(line) = unsafe { CStr::from_ptr(line) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
-    let command = match mila_protocol::Command::parse(line) {
-        Ok(command) => command,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let Ok(command) = mila_protocol::Command::parse(line) else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let kind = match command.command.as_str() {
         "thread ls" => MilaThreadCommandKind::List,
@@ -226,6 +237,7 @@ pub unsafe extern "C" fn mila_thread_command_kind(
         "thread read" => MilaThreadCommandKind::Read,
         _ => return MilaFfiStatus::InvalidRequest,
     };
-    *out_kind = kind;
+    // SAFETY: `out_kind` is non-null and the caller guarantees writable storage for one value.
+    unsafe { *out_kind = kind };
     MilaFfiStatus::Ok
 }

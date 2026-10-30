@@ -19,7 +19,7 @@ const UNWRITTEN: usize = usize::MAX;
 const STABLE_STATUSES: [i32; 5] = [0, -1, -2, -3, -4];
 
 /// Result of one call into a validator that writes a caller-owned buffer.
-struct Written {
+struct Outcome {
     status: MilaFfiStatus,
     /// The buffer's first `capacity` bytes; the guard bytes were checked.
     bytes: Vec<u8>,
@@ -32,13 +32,13 @@ struct Written {
 fn call_with_output(
     capacity: usize,
     call: impl FnOnce(MilaRouteOutput) -> MilaFfiStatus,
-) -> Written {
+) -> Outcome {
     let mut buffer = vec![CANARY; capacity + GUARD];
     let mut written = UNWRITTEN;
     let status = call(MilaRouteOutput {
         bytes: buffer.as_mut_ptr(),
         capacity,
-        written: &mut written,
+        written: &raw mut written,
     });
     assert!(
         buffer[capacity..].iter().all(|byte| *byte == CANARY),
@@ -46,7 +46,7 @@ fn call_with_output(
     );
     assert!(STABLE_STATUSES.contains(&(status as i32)));
     buffer.truncate(capacity);
-    Written {
+    Outcome {
         status,
         bytes: buffer,
         written,
@@ -58,6 +58,10 @@ fn untouched(bytes: &[u8]) -> bool {
 }
 
 /// Arbitrary text without interior NULs, so it can cross as a C string.
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn c_text(tc: &TestCase, max_size: usize) -> CString {
     let bytes = tc.draw(gs::vecs(gs::default::<u8>()).max_size(max_size));
     let text: Vec<u8> = String::from_utf8_lossy(&bytes)
@@ -67,6 +71,10 @@ fn c_text(tc: &TestCase, max_size: usize) -> CString {
     CString::new(text).expect("NUL bytes were removed")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn accepted_routes() -> Vec<String> {
     let fixture = include_str!("../../../../protocol/test/fixtures/app_routes.json");
     let document: serde_json::Value = serde_json::from_str(fixture).expect("route fixture");
@@ -126,6 +134,10 @@ fn route_format_matches_parser_within_capacity(tc: TestCase) {
 
 const TRUST_HOST: &str = "overalls.example";
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn trust_document(ca: &str, retirement: u64) -> Vec<u8> {
     serde_json::to_vec(&serde_json::json!({
         "version": 1,
@@ -138,6 +150,10 @@ fn trust_document(ca: &str, retirement: u64) -> Vec<u8> {
 }
 
 /// Two distinct certificate authorities from the shared transport fixture.
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn fixture_authorities() -> (String, String) {
     let fixture = include_str!("../../mila-transport/tests/fixtures/ssh_host_certificates.json");
     let document: serde_json::Value = serde_json::from_str(fixture).expect("fixture");
@@ -166,7 +182,11 @@ fn draw_trust_input(tc: &TestCase, authorities: &(String, String)) -> Vec<u8> {
     }
 }
 
-fn reconcile(pinned: &[u8], fetched: &[u8], now: u64, capacity: usize) -> Written {
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
+fn reconcile(pinned: &[u8], fetched: &[u8], now: u64, capacity: usize) -> Outcome {
     let host = CString::new(TRUST_HOST).expect("host");
     let pointer = |bytes: &[u8]| {
         if bytes.is_empty() {
@@ -242,6 +262,10 @@ struct PushArguments {
     endpoint: Option<CString>,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn draw_push_arguments(tc: &TestCase) -> PushArguments {
     let provider = tc.draw(gs::integers::<u8>().max_value(3));
     if tc.draw(gs::booleans()) {
@@ -289,7 +313,7 @@ fn draw_push_arguments(tc: &TestCase) -> PushArguments {
     }
 }
 
-fn encode_push_key_request(arguments: &PushArguments, capacity: usize) -> Written {
+fn encode_push_key_request(arguments: &PushArguments, capacity: usize) -> Outcome {
     // SAFETY: every string argument is a live NUL-terminated C string or a
     // null endpoint, and the output storage is owned by `call_with_output`.
     call_with_output(capacity, |output| unsafe {
@@ -400,7 +424,7 @@ fn projections_are_total_and_leave_outputs_on_refusal(tc: TestCase) {
             host.as_ptr(),
             443,
             1,
-            &mut summary,
+            &raw mut summary,
         )
     };
     if !refused_or_ok(status) {
@@ -410,7 +434,7 @@ fn projections_are_total_and_leave_outputs_on_refusal(tc: TestCase) {
     let mut watch = MilaWatchEventKind::Session;
     // SAFETY: `bytes` is a live slice of the declared length and `watch` is
     // writable stack storage.
-    let status = unsafe { mila_watch_event_kind(bytes.as_ptr(), bytes.len(), &mut watch) };
+    let status = unsafe { mila_watch_event_kind(bytes.as_ptr(), bytes.len(), &raw mut watch) };
     if !refused_or_ok(status) {
         assert_eq!(watch, MilaWatchEventKind::Session);
     }
@@ -424,14 +448,14 @@ fn projections_are_total_and_leave_outputs_on_refusal(tc: TestCase) {
     };
     let mut machine = MilaMachineCommandKind::WebSet;
     // SAFETY: `line` is NUL-terminated and `machine` is writable stack storage.
-    let status = unsafe { mila_machine_command_kind(line.as_ptr(), &mut machine) };
+    let status = unsafe { mila_machine_command_kind(line.as_ptr(), &raw mut machine) };
     if !refused_or_ok(status) {
         assert_eq!(machine, MilaMachineCommandKind::WebSet);
     }
 
     let mut thread = MilaThreadCommandKind::Read;
     // SAFETY: `line` is NUL-terminated and `thread` is writable stack storage.
-    let status = unsafe { mila_thread_command_kind(line.as_ptr(), &mut thread) };
+    let status = unsafe { mila_thread_command_kind(line.as_ptr(), &raw mut thread) };
     if !refused_or_ok(status) {
         assert_eq!(thread, MilaThreadCommandKind::Read);
     }

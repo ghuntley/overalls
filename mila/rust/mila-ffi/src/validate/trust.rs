@@ -20,15 +20,13 @@ pub unsafe extern "C" fn mila_trust_document_validate(
         return MilaFfiStatus::NullInput;
     }
     // SAFETY: callers provide a readable byte buffer of `length` bytes.
-    let bytes = std::slice::from_raw_parts(document, length);
+    let bytes = unsafe { std::slice::from_raw_parts(document, length) };
     // SAFETY: caller provides a NUL-terminated host string.
-    let host = match CStr::from_ptr(origin_host).to_str() {
-        Ok(host) => host,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let Ok(host) = unsafe { CStr::from_ptr(origin_host) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
     mila_transport::decode_trust_document(bytes, host, now)
-        .map(|_| MilaFfiStatus::Ok)
-        .unwrap_or(MilaFfiStatus::InvalidRequest)
+        .map_or(MilaFfiStatus::InvalidRequest, |_| MilaFfiStatus::Ok)
 }
 
 /// @cc [owner:ghuntley,label:security] mila-trust-enrollment-reconciles
@@ -68,22 +66,24 @@ pub unsafe extern "C" fn mila_trust_document_reconcile(
     if pinned_len > 8192 || fetched_len > 8192 {
         return MilaFfiStatus::InvalidRequest;
     }
-    let host = match CStr::from_ptr(origin_host).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    // SAFETY: `origin_host` is non-null and the caller guarantees NUL-terminated UTF-8.
+    let Ok(host) = unsafe { CStr::from_ptr(origin_host) }.to_str() else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let pinned = if pinned_len == 0 {
         None
     } else {
         // A malformed local pin is discarded as unavailable. It never expands
         // authority; a valid fetched document can establish a new first pin.
-        let bytes = std::slice::from_raw_parts(pinned, pinned_len);
+        // SAFETY: `pinned` is non-null when `pinned_len > 0` and references that many bytes.
+        let bytes = unsafe { std::slice::from_raw_parts(pinned, pinned_len) };
         mila_transport::decode_trust_document(bytes, host, 0).ok()
     };
     let fetched = if fetched_len == 0 {
         None
     } else {
-        let bytes = std::slice::from_raw_parts(fetched, fetched_len);
+        // SAFETY: `fetched` is non-null when `fetched_len > 0` and references that many bytes.
+        let bytes = unsafe { std::slice::from_raw_parts(fetched, fetched_len) };
         match mila_transport::decode_trust_document(bytes, host, now) {
             Ok(document) => Some(document),
             Err(_) => return MilaFfiStatus::InvalidRequest,
@@ -96,14 +96,16 @@ pub unsafe extern "C" fn mila_trust_document_reconcile(
     let Some(selected) = selected else {
         return MilaFfiStatus::InvalidRequest;
     };
-    let bytes = match serde_json::to_vec(&selected) {
-        Ok(bytes) => bytes,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let Ok(bytes) = serde_json::to_vec(&selected) else {
+        return MilaFfiStatus::InvalidRequest;
     };
-    *output.written = bytes.len();
+    // SAFETY: `output.written` is non-null and the caller guarantees one writable `usize`.
+    unsafe { *output.written = bytes.len() };
     if bytes.len() > output.capacity {
         return MilaFfiStatus::OutputTooSmall;
     }
-    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len());
+    // SAFETY: `output.bytes` is non-null with `capacity` writable bytes, and
+    // `bytes.len() <= capacity`; a fresh Vec cannot overlap caller storage.
+    unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len()) };
     MilaFfiStatus::Ok
 }

@@ -23,7 +23,7 @@ pub extern "C" fn mila_terminal_validate(columns: u16, rows: u16, read_write: u8
     };
     request
         .validate()
-        .map_or(MilaFfiStatus::InvalidRequest, |_| MilaFfiStatus::Ok)
+        .map_or(MilaFfiStatus::InvalidRequest, |()| MilaFfiStatus::Ok)
 }
 
 /// Maximum terminal input accepted by the native boundary (bytes remain owned by the host).
@@ -50,7 +50,7 @@ pub extern "C" fn mila_terminal_attach_validate(
     };
     request
         .validate()
-        .map_or(MilaFfiStatus::InvalidRequest, |_| MilaFfiStatus::Ok)
+        .map_or(MilaFfiStatus::InvalidRequest, |()| MilaFfiStatus::Ok)
 }
 
 /// Validates a terminal input length and permission bit. Input bytes never cross this ABI.

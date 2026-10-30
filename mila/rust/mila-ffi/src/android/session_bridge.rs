@@ -13,21 +13,27 @@ struct AndroidSigner {
 /// @cc [owner:ghuntley,label:security] jni-android-signer-no-pending-exception
 /// The Android signer callback MUST return failure, never a pending Java exception, to the
 /// Rust thread that invoked it; a signing failure becomes a refused connect, not a crash.
+///
+/// # Safety
+/// `context` must be the address of a live `AndroidSigner`; non-null `message`
+/// must reference `length` readable bytes and non-null `output` 64 writable bytes.
 unsafe extern "C" fn android_sign(
     context: usize,
     message: *const u8,
     length: usize,
     output: *mut u8,
 ) -> i32 {
-    let state = &*(context as *const AndroidSigner);
-    let mut env = match state.vm.attach_current_thread() {
-        Ok(v) => v,
-        Err(_) => return -1,
+    // SAFETY: `nativeSessionConnect` passes the address of a boxed `AndroidSigner`
+    // that it frees only after the synchronous connect, and so this callback, returns.
+    let state = unsafe { &*(context as *const AndroidSigner) };
+    let Ok(mut env) = state.vm.attach_current_thread() else {
+        return -1;
     };
     let bytes = if message.is_null() || output.is_null() || length == 0 || length > 65_536 {
         return -1;
     } else {
-        std::slice::from_raw_parts(message, length)
+        // SAFETY: `message` is non-null and the session ABI passes `length` readable bytes.
+        unsafe { std::slice::from_raw_parts(message, length) }
     };
     let signature = android_sign_bytes(&mut env, &state.signer, bytes);
     // A Java exception left pending on this attached Rust thread would be dispatched as
@@ -38,7 +44,9 @@ unsafe extern "C" fn android_sign(
     }
     match signature {
         Some(signature) => {
-            std::ptr::copy_nonoverlapping(signature.as_ptr(), output, 64);
+            // SAFETY: `signature` holds exactly 64 bytes (checked by `android_sign_bytes`)
+            // and the session ABI passes 64 writable bytes in `output`.
+            unsafe { std::ptr::copy_nonoverlapping(signature.as_ptr(), output, 64) };
             0
         }
         None => -1,
@@ -76,12 +84,14 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     timeout_ms: jni::sys::jint,
     signer: jni::objects::JObject<'_>,
 ) -> jni::sys::jlong {
-    if port <= 0 || port > u16::MAX as i32 || timeout_ms <= 0 {
+    if port <= 0 || port > i32::from(u16::MAX) || timeout_ms <= 0 {
         return 0;
     }
-    let trust = match env.convert_byte_array(trust) {
-        Ok(v) => v,
-        Err(_) => return 0,
+    let Ok(port) = u16::try_from(port) else {
+        return 0;
+    };
+    let Ok(trust) = env.convert_byte_array(trust) else {
+        return 0;
     };
     let host = match env.get_string(&host) {
         Ok(v) => v.to_bytes().to_vec(),
@@ -91,17 +101,16 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return 0,
     };
-    let global = match env.new_global_ref(signer) {
-        Ok(v) => v,
-        Err(_) => return 0,
+    let Ok(global) = env.new_global_ref(signer) else {
+        return 0;
     };
-    let vm = match env.get_java_vm() {
-        Ok(v) => v,
-        Err(_) => return 0,
-    };
+    let Ok(vm) = env.get_java_vm() else { return 0 };
     let state = Box::new(AndroidSigner { vm, signer: global });
     let context = Box::into_raw(state) as usize;
     let mut handle = 0u64;
+    // SAFETY: the byte inputs are live Vecs passed with their lengths, `handle` is a writable
+    // local, `android_sign` meets the `SignCallback` contract, and `context` points to the boxed
+    // signer, which outlives this synchronous call.
     let status = unsafe {
         session::mila_session_connect(
             trust.as_ptr(),
@@ -110,18 +119,20 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
             host.len(),
             public_key.as_ptr(),
             public_key.len(),
-            port as u16,
-            timeout_ms as u32,
+            port,
+            timeout_ms.cast_unsigned(),
             Some(android_sign),
             context,
-            &mut handle,
+            &raw mut handle,
         )
     };
+    // SAFETY: `context` came from `Box::into_raw` above and the session ABI does not retain it
+    // after connect returns, so this reclaims the only owner exactly once.
     unsafe {
         drop(Box::from_raw(context as *mut AndroidSigner));
     }
     if status == session::SessionStatus::Ok {
-        handle as jni::sys::jlong
+        handle.cast_signed()
     } else {
         0
     }
@@ -134,7 +145,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     handle: jni::sys::jlong,
     more: jni::sys::jboolean,
 ) -> jni::sys::jint {
-    session::mila_session_read_machines(handle as u64, more) as jni::sys::jint
+    session::mila_session_read_machines(handle.cast_unsigned(), more) as jni::sys::jint
 }
 
 #[no_mangle]
@@ -158,9 +169,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_machine_action(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             action.as_ptr(),
@@ -190,14 +203,16 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_machine_resize(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
-            cpu as u32,
-            memory as u64,
-            disk as u64,
+            cpu.cast_unsigned(),
+            i64::from(memory).cast_unsigned(),
+            i64::from(disk).cast_unsigned(),
             request_id.as_ptr(),
             request_id.len(),
         ) as jni::sys::jint
@@ -231,14 +246,16 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_machine_create(
-            handle as u64,
+            handle.cast_unsigned(),
             name.as_ptr(),
             name.len(),
-            cpu as u32,
-            memory as u64,
-            disk as u64,
+            cpu.cast_unsigned(),
+            i64::from(memory).cast_unsigned(),
+            i64::from(disk).cast_unsigned(),
             request_id.as_ptr(),
             request_id.len(),
         ) as jni::sys::jint
@@ -280,9 +297,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_share_mutation(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             email.as_ptr(),
@@ -314,6 +333,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if !(0..=3).contains(&platform) || now < 0 {
         return std::ptr::null_mut();
     }
+    let Ok(platform) = u8::try_from(platform) else {
+        return std::ptr::null_mut();
+    };
     let (Some(reply), Some(enc)) = (
         jni_string_bytes(&mut env, &susan_reply),
         jni_string_bytes(&mut env, &enc_pubkey),
@@ -321,10 +343,12 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         return std::ptr::null_mut();
     };
     let label = jni_string_bytes(&mut env, &label).unwrap_or_default();
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot,
+    // and every input pointer comes from a live Rust Vec (or is null) passed with its own length.
     jni_session_bytes(&mut env, |out, capacity, written| unsafe {
         session::mila_session_device_register(
-            handle as u64,
-            platform as u8,
+            handle.cast_unsigned(),
+            platform,
             reply.as_ptr(),
             reply.len(),
             enc.as_ptr(),
@@ -335,7 +359,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
                 label.as_ptr()
             },
             label.len(),
-            now as u64,
+            now.cast_unsigned(),
             out,
             capacity,
             written,
@@ -350,8 +374,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot.
     jni_session_bytes(&mut env, |out, capacity, written| unsafe {
-        session::mila_session_last_refusal(handle as u64, out, capacity, written)
+        session::mila_session_last_refusal(handle.cast_unsigned(), out, capacity, written)
     })
 }
 
@@ -366,9 +391,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return std::ptr::null_mut(),
     };
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot,
+    // and every input pointer comes from a live Rust Vec (or is null) passed with its own length.
     jni_session_bytes_bounded(&mut env, 1 << 20, |out, capacity, written| unsafe {
         session::mila_session_web_show(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
             out,
@@ -392,6 +419,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     if !(1..=65535).contains(&port) || revision < 0 {
         return -4;
     }
+    let Ok(port) = u16::try_from(port) else {
+        return -4;
+    };
     let machine = match env.get_string(&machine) {
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
@@ -400,14 +430,16 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -4,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_web_set(
-            handle as u64,
+            handle.cast_unsigned(),
             machine.as_ptr(),
             machine.len(),
-            port as u16,
+            port,
             u8::from(public != 0),
-            revision as u64,
+            revision.cast_unsigned(),
             request_id.as_ptr(),
             request_id.len(),
         ) as jni::sys::jint
@@ -426,18 +458,18 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     request_id: jni::sys::jobject,
 ) -> jni::sys::jbyteArray {
     let mut text = |s: jni::objects::JString<'_>| env.get_string(&s).map(|v| v.to_bytes().to_vec());
-    let thread = match text(thread) {
-        Ok(v) => v,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(thread) = text(thread) else {
+        return std::ptr::null_mut();
     };
-    let command = match text(command) {
-        Ok(v) => v,
-        Err(_) => return std::ptr::null_mut(),
+    let Ok(command) = text(command) else {
+        return std::ptr::null_mut();
     };
     let mut optional = |obj: jni::sys::jobject| -> Option<Vec<u8>> {
         if obj.is_null() {
             None
         } else {
+            // SAFETY: `obj` is a non-null local reference the JVM passed for this call, and the
+            // Kotlin signature declares it a `String?`.
             env.get_string(&unsafe { jni::objects::JString::from_raw(obj) })
                 .ok()
                 .map(|v| v.to_bytes().to_vec())
@@ -446,18 +478,20 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     let secondary = optional(secondary);
     let input = optional(input);
     let request = optional(request_id);
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot,
+    // and every input pointer comes from a live Rust Vec (or is null) passed with its own length.
     jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
         session::mila_session_thread_action(
-            handle as u64,
+            handle.cast_unsigned(),
             thread.as_ptr(),
             thread.len(),
             command.as_ptr(),
             command.len(),
-            secondary.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
+            secondary.as_ref().map_or(std::ptr::null(), Vec::as_ptr),
             secondary.as_ref().map_or(0, Vec::len),
-            input.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
+            input.as_ref().map_or(std::ptr::null(), Vec::as_ptr),
             input.as_ref().map_or(0, Vec::len),
-            request.as_ref().map_or(std::ptr::null(), |v| v.as_ptr()),
+            request.as_ref().map_or(std::ptr::null(), Vec::as_ptr),
             request.as_ref().map_or(0, Vec::len),
             out,
             capacity,
@@ -474,8 +508,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot.
     jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
-        session::mila_session_ssh_keys(handle as u64, out, capacity, written)
+        session::mila_session_ssh_keys(handle.cast_unsigned(), out, capacity, written)
     })
 }
 
@@ -488,8 +523,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
     // `whoami` executes remotely, so it runs once into a bounded buffer.
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot.
     jni_session_bytes_bounded(&mut env, 64 * 1024, |out, capacity, written| unsafe {
-        session::mila_session_whoami(handle as u64, out, capacity, written)
+        session::mila_session_whoami(handle.cast_unsigned(), out, capacity, written)
     })
 }
 
@@ -512,9 +548,11 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(value) => value.to_bytes().to_vec(),
         Err(_) => return session::SessionStatus::Invalid as jni::sys::jint,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_ssh_key_revoke(
-            handle as u64,
+            handle.cast_unsigned(),
             key.as_ptr(),
             key.len(),
             request.as_ptr(),
@@ -526,11 +564,15 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
 fn session_copy(env: &mut jni::JNIEnv<'_>, handle: u64, snapshot: bool) -> jni::sys::jbyteArray {
     // One bounded call: a size probe followed by a read would execute the
     // listing/snapshot twice and could return a different second result.
-    jni_session_bytes_bounded(env, 8 * 1024 * 1024, |out, capacity, written| unsafe {
+    jni_session_bytes_bounded(env, 8 * 1024 * 1024, |out, capacity, written| {
         if snapshot {
-            session::mila_session_snapshot(handle, 0, out, capacity, written)
+            // SAFETY: `out`, `capacity` and `written` describe the helper's live
+            // buffer and length slot.
+            unsafe { session::mila_session_snapshot(handle, 0, out, capacity, written) }
         } else {
-            session::mila_session_listing(handle, out, capacity, written)
+            // SAFETY: `out`, `capacity` and `written` describe the helper's live
+            // buffer and length slot.
+            unsafe { session::mila_session_listing(handle, out, capacity, written) }
         }
     })
 }
@@ -541,7 +583,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
-    session_copy(&mut env, handle as u64, false)
+    session_copy(&mut env, handle.cast_unsigned(), false)
 }
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionSnapshot(
@@ -549,7 +591,7 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
-    session_copy(&mut env, handle as u64, true)
+    session_copy(&mut env, handle.cast_unsigned(), true)
 }
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceList(
@@ -557,8 +599,9 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jbyteArray {
+    // SAFETY: `out`, `capacity` and `written` describe the helper's live buffer and length slot.
     jni_session_bytes_bounded(&mut env, 256 * 1024, |out, capacity, written| unsafe {
-        session::mila_session_device_ls(handle as u64, out, capacity, written)
+        session::mila_session_device_ls(handle.cast_unsigned(), out, capacity, written)
     })
 }
 #[no_mangle]
@@ -572,8 +615,10 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -2,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
-        session::mila_session_device_rm(handle as u64, value.as_ptr(), value.len())
+        session::mila_session_device_rm(handle.cast_unsigned(), value.as_ptr(), value.len())
             as jni::sys::jint
     }
 }
@@ -589,12 +634,14 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         Ok(v) => v.to_bytes().to_vec(),
         Err(_) => return -2,
     };
+    // SAFETY: every input pointer comes from a live Rust Vec passed with its own length, as the C
+    // ABI requires.
     unsafe {
         session::mila_session_device_prefs(
-            handle as u64,
+            handle.cast_unsigned(),
             value.as_ptr(),
             value.len(),
-            if enabled == 0 { 0 } else { 1 },
+            u8::from(enabled != 0),
         ) as jni::sys::jint
     }
 }
@@ -604,5 +651,5 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     _class: jni::objects::JClass<'_>,
     handle: jni::sys::jlong,
 ) -> jni::sys::jint {
-    session::mila_session_close(handle as u64) as jni::sys::jint
+    session::mila_session_close(handle.cast_unsigned()) as jni::sys::jint
 }

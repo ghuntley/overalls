@@ -48,10 +48,9 @@ pub unsafe extern "C" fn mila_watch_event_kind(
         return MilaFfiStatus::NullInput;
     }
     // SAFETY: caller guarantees a readable byte slice of the supplied length.
-    let bytes = std::slice::from_raw_parts(line, length);
-    let event = match decode_watch_line(bytes) {
-        Ok(event) => event,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+    let bytes = unsafe { std::slice::from_raw_parts(line, length) };
+    let Ok(event) = decode_watch_line(bytes) else {
+        return MilaFfiStatus::InvalidRequest;
     };
     let kind = match event {
         WatchEvent::Unknown => MilaWatchEventKind::Unknown,
@@ -64,6 +63,6 @@ pub unsafe extern "C" fn mila_watch_event_kind(
         WatchEvent::Session { .. } => MilaWatchEventKind::Session,
     };
     // SAFETY: caller guarantees writable storage for one event tag.
-    *out_kind = kind;
+    unsafe { *out_kind = kind };
     MilaFfiStatus::Ok
 }

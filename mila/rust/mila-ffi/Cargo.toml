@@ -24,3 +24,6 @@ rand = "0.10"
 p256.workspace = true
 russh = { version = "=0.64.1", default-features = false, features = ["ring"] }
 hegeltest.workspace = true
+
+[lints]
+workspace = true

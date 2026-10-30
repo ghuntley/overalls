@@ -6,6 +6,7 @@ use mila_transport::{
 };
 use std::{
     collections::HashMap,
+    future::Future,
     sync::{Arc, Mutex, OnceLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
@@ -31,21 +32,24 @@ struct CallbackSigner {
     context: usize,
 }
 impl DeviceSigner for CallbackSigner {
-    async fn sign(&mut self, message: &[u8]) -> Result<[u8; 64], SshError> {
+    // The transport awaits the returned future immediately, so signing when
+    // `sign` is called is indistinguishable from signing on first poll.
+    fn sign(&mut self, message: &[u8]) -> impl Future<Output = Result<[u8; 64], SshError>> + Send {
         let mut signature = [0; 64];
         // SAFETY: connect caller guarantees the callback/context for its duration.
-        if unsafe {
+        let status = unsafe {
             (self.callback)(
                 self.context,
                 message.as_ptr(),
                 message.len(),
                 signature.as_mut_ptr(),
             )
-        } != 0
-        {
-            return Err(SshError::Signature);
-        }
-        Ok(signature)
+        };
+        std::future::ready(if status == 0 {
+            Ok(signature)
+        } else {
+            Err(SshError::Signature)
+        })
     }
 }
 struct Entry {
@@ -97,12 +101,12 @@ fn take_owned_terminals(owner: u64) -> Result<Vec<PtySession>, SessionStatus> {
         .collect::<Vec<_>>();
     let mut collected = Vec::with_capacity(candidates.len());
     for (handle, entry) in candidates {
-        let owned = entry
+        let is_owned = entry
             .try_lock()
             .map_err(|_| SessionStatus::Busy)?
             .as_ref()
             .is_some_and(|value| value.owner == owner);
-        if !owned {
+        if !is_owned {
             continue;
         }
         let removed = terminals()
@@ -138,11 +142,14 @@ fn guarded(f: impl FnOnce() -> Result<(), SessionStatus>) -> SessionStatus {
         r.err().unwrap_or(SessionStatus::Ok)
     })
 }
+/// # Safety
+/// A non-null `ptr` must reference `len` readable bytes that outlive `'a`.
 unsafe fn bytes<'a>(ptr: *const u8, len: usize, max: usize) -> Result<&'a [u8], SessionStatus> {
     if ptr.is_null() || len == 0 || len > max {
         return Err(SessionStatus::Invalid);
     }
-    Ok(std::slice::from_raw_parts(ptr, len))
+    // SAFETY: `ptr` is non-null and the caller guarantees `len` readable bytes.
+    Ok(unsafe { std::slice::from_raw_parts(ptr, len) })
 }
 fn entry(handle: u64) -> Result<Arc<Mutex<Option<Entry>>>, SessionStatus> {
     registry()
@@ -153,6 +160,9 @@ fn entry(handle: u64) -> Result<Arc<Mutex<Option<Entry>>>, SessionStatus> {
         .cloned()
         .ok_or(SessionStatus::InvalidHandle)
 }
+/// # Safety
+/// A non-null `written` must reference one writable `usize` and a non-null
+/// `out` must reference `capacity` writable bytes.
 unsafe fn output(
     data: &[u8],
     out: *mut u8,
@@ -162,21 +172,24 @@ unsafe fn output(
     if written.is_null() {
         return Err(SessionStatus::Invalid);
     }
-    *written = data.len();
+    // SAFETY: `written` is non-null and the caller guarantees one writable `usize`.
+    unsafe { *written = data.len() };
     if capacity < data.len() {
         return Err(SessionStatus::SmallBuffer);
     }
     if out.is_null() {
         return Err(SessionStatus::Invalid);
     }
-    std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len());
+    // SAFETY: `out` is non-null with `capacity` writable bytes and
+    // `data.len() <= capacity`; Rust-owned `data` cannot overlap caller storage.
+    unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len()) };
     Ok(())
 }
 /// @cc [owner:ghuntley,label:security] mila-session-ffi-authentication
 /// Connect MUST validate a bounded trust document and host certificate before invoking
 /// the external signer. It MUST NOT retain callback context after returning or expose private keys.
 /// # Safety
-/// Input pointers reference their declared readable lengths; out_handle is writable.
+/// Input pointers reference their declared readable lengths; `out_handle` is writable.
 /// Callback and context remain valid until return and must not unwind or retain message pointers.
 /// The caller supplies its previously pinned trust document, not unreviewed replacement trust.
 #[no_mangle]
@@ -197,19 +210,26 @@ pub unsafe extern "C" fn mila_session_connect(
         if out_handle.is_null() {
             return Err(SessionStatus::Invalid);
         }
-        *out_handle = 0;
+        // SAFETY: `out_handle` is non-null and the caller guarantees it is writable.
+        unsafe { *out_handle = 0 };
         if port == 0 || !(1..=120_000).contains(&timeout_ms) {
             return Err(SessionStatus::Invalid);
         }
         let host =
-            std::str::from_utf8(bytes(host, host_len, 180)?).map_err(|_| SessionStatus::Invalid)?;
-        let public = std::str::from_utf8(bytes(public_key, public_key_len, 1024)?)
+            // SAFETY: the caller guarantees each pointer references its declared readable length;
+            // `bytes` refuses null, empty and oversized input.
+            std::str::from_utf8(unsafe { bytes(host, host_len, 180) }?).map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let public = std::str::from_utf8(unsafe { bytes(public_key, public_key_len, 1024) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| SessionStatus::Internal)?
             .as_secs();
-        let trust = decode_trust_document(bytes(trust, trust_len, 8192)?, host, now)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let trust = decode_trust_document(unsafe { bytes(trust, trust_len, 8192) }?, host, now)
             .map_err(|_| SessionStatus::Invalid)?;
         let signer = CallbackSigner {
             callback: callback.ok_or(SessionStatus::Invalid)?,
@@ -237,7 +257,8 @@ pub unsafe extern "C" fn mila_session_connect(
         registry
             .entries
             .insert(id, Arc::new(Mutex::new(Some(Entry { session }))));
-        *out_handle = id;
+        // SAFETY: `out_handle` is non-null and the caller guarantees it is writable.
+        unsafe { *out_handle = id };
         Ok(())
     })
 }
@@ -283,11 +304,17 @@ pub unsafe extern "C" fn mila_session_machine_action(
     request_id_len: usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
-        let action = std::str::from_utf8(bytes(action, action_len, 32)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let action = std::str::from_utf8(unsafe { bytes(action, action_len, 32) }?)
             .map_err(|_| SessionStatus::Invalid)?;
-        let request_id = std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -297,7 +324,6 @@ pub unsafe extern "C" fn mila_session_machine_action(
             .block_on(session.machine_action(machine, action, request_id))
             .map_err(|error| match error {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
-                mila_session::SessionError::MutationRefused => SessionStatus::Invalid,
                 _ => SessionStatus::Invalid,
             })?;
         Ok(())
@@ -321,8 +347,12 @@ pub unsafe extern "C" fn mila_session_machine_create(
 ) -> SessionStatus {
     guarded(|| {
         let name =
-            std::str::from_utf8(bytes(name, name_len, 128)?).map_err(|_| SessionStatus::Invalid)?;
-        let request_id = std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+            // SAFETY: the caller guarantees each pointer references its declared readable length;
+            // `bytes` refuses null, empty and oversized input.
+            std::str::from_utf8(unsafe { bytes(name, name_len, 128) }?).map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -353,9 +383,13 @@ pub unsafe extern "C" fn mila_session_machine_resize(
     request_id_len: usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
-        let request_id = std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -365,7 +399,6 @@ pub unsafe extern "C" fn mila_session_machine_resize(
             .block_on(session.machine_resize(machine, cpu, memory, disk, request_id))
             .map_err(|error| match error {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
-                mila_session::SessionError::MutationRefused => SessionStatus::Invalid,
                 _ => SessionStatus::Invalid,
             })
     })
@@ -393,19 +426,27 @@ pub unsafe extern "C" fn mila_session_share_mutation(
         if add > 1 || (add == 0 && role_len != 0) {
             return Err(SessionStatus::Invalid);
         }
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
-        let email = std::str::from_utf8(bytes(email, email_len, 320)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let email = std::str::from_utf8(unsafe { bytes(email, email_len, 320) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let role = if role_len == 0 {
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(role, role_len, 32)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(role, role_len, 32) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
-        let request_id = std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -448,17 +489,23 @@ pub unsafe extern "C" fn mila_session_thread_action(
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(thread, thread_len, 128)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(thread, thread_len, 128) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
-        let command = std::str::from_utf8(bytes(command, command_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let command = std::str::from_utf8(unsafe { bytes(command, command_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let secondary = if secondary_len == 0 {
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(secondary, secondary_len, 128)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(secondary, secondary_len, 128) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
@@ -466,7 +513,9 @@ pub unsafe extern "C" fn mila_session_thread_action(
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(input, input_len, 64 * 1024)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(input, input_len, 64 * 1024) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
@@ -474,7 +523,9 @@ pub unsafe extern "C" fn mila_session_thread_action(
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
@@ -488,7 +539,9 @@ pub unsafe extern "C" fn mila_session_thread_action(
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -511,7 +564,9 @@ pub unsafe extern "C" fn mila_session_ssh_keys(
             mila_session::SessionError::Transport(_) => SessionStatus::Transport,
             _ => SessionStatus::Invalid,
         })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -536,7 +591,9 @@ pub unsafe extern "C" fn mila_session_whoami(
             mila_session::SessionError::Transport(_) => SessionStatus::Transport,
             _ => SessionStatus::Invalid,
         })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -553,8 +610,12 @@ pub unsafe extern "C" fn mila_session_ssh_key_revoke(
 ) -> SessionStatus {
     guarded(|| {
         let key =
-            std::str::from_utf8(bytes(key, key_len, 128)?).map_err(|_| SessionStatus::Invalid)?;
-        let request = std::str::from_utf8(bytes(request, request_len, 64)?)
+            // SAFETY: the caller guarantees each pointer references its declared readable length;
+            // `bytes` refuses null, empty and oversized input.
+            std::str::from_utf8(unsafe { bytes(key, key_len, 128) }?).map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request = std::str::from_utf8(unsafe { bytes(request, request_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -584,7 +645,9 @@ pub unsafe extern "C" fn mila_session_machine_show(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -596,7 +659,9 @@ pub unsafe extern "C" fn mila_session_machine_show(
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -614,7 +679,9 @@ pub unsafe extern "C" fn mila_session_share_show(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -626,7 +693,9 @@ pub unsafe extern "C" fn mila_session_share_show(
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -643,7 +712,9 @@ pub unsafe extern "C" fn mila_session_web_show(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -655,7 +726,9 @@ pub unsafe extern "C" fn mila_session_web_show(
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -677,9 +750,13 @@ pub unsafe extern "C" fn mila_session_web_set(
         if public > 1 {
             return Err(SessionStatus::Invalid);
         }
-        let machine = std::str::from_utf8(bytes(machine, machine_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
-        let request_id = std::str::from_utf8(bytes(request_id, request_id_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -714,7 +791,9 @@ pub unsafe extern "C" fn mila_session_device_ls(
             mila_session::SessionError::Transport(_) => SessionStatus::Transport,
             _ => SessionStatus::Invalid,
         })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -728,7 +807,6 @@ pub unsafe extern "C" fn mila_session_device_ls(
 /// Input pointers reference their declared readable lengths (`label` may be
 /// null when `label_len` is zero); `out`/`written` follow [`mila_session_listing`].
 #[no_mangle]
-#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn mila_session_device_register(
     handle: u64,
     platform: u8,
@@ -752,11 +830,15 @@ pub unsafe extern "C" fn mila_session_device_register(
             _ => return Err(SessionStatus::Invalid),
         };
         let reply = mila_runtime::PushRegistrationReply::decode_susan(
-            bytes(susan_reply, susan_reply_len, 4096)?,
+            // SAFETY: the caller guarantees each pointer references its declared readable length;
+            // `bytes` refuses null, empty and oversized input.
+            unsafe { bytes(susan_reply, susan_reply_len, 4096) }?,
             now,
         )
         .map_err(|_| SessionStatus::Invalid)?;
-        let enc_pubkey = std::str::from_utf8(bytes(enc_pubkey, enc_pubkey_len, 64)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let enc_pubkey = std::str::from_utf8(unsafe { bytes(enc_pubkey, enc_pubkey_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         if !mila_protocol::device_public_key_valid(enc_pubkey) {
             return Err(SessionStatus::Invalid);
@@ -765,7 +847,9 @@ pub unsafe extern "C" fn mila_session_device_register(
             None
         } else {
             Some(
-                std::str::from_utf8(bytes(label, label_len, 256)?)
+                // SAFETY: the caller guarantees each pointer references its declared readable
+                // length; `bytes` refuses null, empty and oversized input.
+                std::str::from_utf8(unsafe { bytes(label, label_len, 256) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
         };
@@ -779,7 +863,9 @@ pub unsafe extern "C" fn mila_session_device_register(
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
@@ -794,7 +880,9 @@ pub unsafe extern "C" fn mila_session_device_rm(
     device_len: usize,
 ) -> SessionStatus {
     guarded(|| {
-        let device = std::str::from_utf8(bytes(device, device_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let device = std::str::from_utf8(unsafe { bytes(device, device_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -827,7 +915,9 @@ pub unsafe extern "C" fn mila_session_device_prefs(
         if enabled > 1 {
             return Err(SessionStatus::Invalid);
         }
-        let device = std::str::from_utf8(bytes(device, device_len, 128)?)
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let device = std::str::from_utf8(unsafe { bytes(device, device_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
@@ -846,11 +936,19 @@ pub unsafe extern "C" fn mila_session_device_prefs(
     })
 }
 /// Decode one bounded UTF-8 argument.
+///
+/// # Safety
+/// As for `bytes`.
 unsafe fn text<'a>(ptr: *const u8, len: usize, max: usize) -> Result<&'a str, SessionStatus> {
-    std::str::from_utf8(bytes(ptr, len, max)?).map_err(|_| SessionStatus::Invalid)
+    // SAFETY: the caller guarantees each pointer references its declared readable length; `bytes`
+    // refuses null, empty and oversized input.
+    std::str::from_utf8(unsafe { bytes(ptr, len, max) }?).map_err(|_| SessionStatus::Invalid)
 }
 
 /// Run one JSON-returning session operation and copy its validated output.
+///
+/// # Safety
+/// `out` and `written` follow `output`.
 unsafe fn json_operation<F>(
     handle: u64,
     out: *mut u8,
@@ -862,7 +960,7 @@ where
     F: for<'s> FnOnce(
         &'s mut ApplicationSession,
     ) -> std::pin::Pin<
-        Box<dyn std::future::Future<Output = Result<Vec<u8>, mila_session::SessionError>> + 's>,
+        Box<dyn Future<Output = Result<Vec<u8>, mila_session::SessionError>> + 's>,
     >,
 {
     let runtime = runtime()?;
@@ -875,7 +973,9 @@ where
             mila_session::SessionError::Transport(_) => SessionStatus::Transport,
             _ => SessionStatus::Invalid,
         })?;
-    output(&data, out, capacity, written)
+    // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and one
+    // writable `usize`, as `output` requires.
+    unsafe { output(&data, out, capacity, written) }
 }
 
 /// Read one mutation receipt by its client request id (`request show`).
@@ -891,10 +991,16 @@ pub unsafe extern "C" fn mila_session_request_show(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let request_id = text(request_id, request_id_len, 64)?;
-        json_operation(handle, out, capacity, written, |session| {
-            Box::pin(session.request_show(request_id))
-        })
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let request_id = unsafe { text(request_id, request_id_len, 64) }?;
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe {
+            json_operation(handle, out, capacity, written, |session| {
+                Box::pin(session.request_show(request_id))
+            })
+        }
     })
 }
 
@@ -913,11 +1019,19 @@ pub unsafe extern "C" fn mila_session_terminal_new(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = text(machine, machine_len, 128)?;
-        let request_id = text(request_id, request_id_len, 64)?;
-        json_operation(handle, out, capacity, written, |session| {
-            Box::pin(session.terminal_new(machine, request_id))
-        })
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let machine = unsafe { text(machine, machine_len, 128) }?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let request_id = unsafe { text(request_id, request_id_len, 64) }?;
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe {
+            json_operation(handle, out, capacity, written, |session| {
+                Box::pin(session.terminal_new(machine, request_id))
+            })
+        }
     })
 }
 
@@ -925,7 +1039,6 @@ pub unsafe extern "C" fn mila_session_terminal_new(
 /// # Safety
 /// Inputs reference their declared readable lengths; out/written follow `output`.
 #[no_mangle]
-#[allow(clippy::too_many_arguments)]
 pub unsafe extern "C" fn mila_session_terminal_end(
     handle: u64,
     machine: *const u8,
@@ -939,12 +1052,22 @@ pub unsafe extern "C" fn mila_session_terminal_end(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let machine = text(machine, machine_len, 128)?;
-        let terminal = text(terminal, terminal_len, 64)?;
-        let request_id = text(request_id, request_id_len, 64)?;
-        json_operation(handle, out, capacity, written, |session| {
-            Box::pin(session.terminal_kill(machine, terminal, request_id))
-        })
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let machine = unsafe { text(machine, machine_len, 128) }?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let terminal = unsafe { text(terminal, terminal_len, 64) }?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let request_id = unsafe { text(request_id, request_id_len, 64) }?;
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe {
+            json_operation(handle, out, capacity, written, |session| {
+                Box::pin(session.terminal_kill(machine, terminal, request_id))
+            })
+        }
     })
 }
 
@@ -952,7 +1075,7 @@ pub unsafe extern "C" fn mila_session_terminal_end(
 /// returned terminal handle is owned by the parent session and is fenced when
 /// that session closes, exactly like `mila_session_terminal_attach`.
 /// # Safety
-/// Inputs reference their declared readable lengths; out_terminal_handle is writable.
+/// Inputs reference their declared readable lengths; `out_terminal_handle` is writable.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_terminal_attach_session(
     session_handle: u64,
@@ -971,8 +1094,12 @@ pub unsafe extern "C" fn mila_session_terminal_attach_session(
         {
             return Err(SessionStatus::Invalid);
         }
-        let machine = text(machine, machine_len, 128)?;
-        let terminal_id = text(terminal, terminal_len, 64)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let machine = unsafe { text(machine, machine_len, 128) }?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `text` refuses null, empty and oversized input.
+        let terminal_id = unsafe { text(terminal, terminal_len, 64) }?;
         let parent = entry(session_handle)?;
         let runtime = runtime()?;
         let mut parent_guard = parent.try_lock().map_err(|_| SessionStatus::Busy)?;
@@ -1000,7 +1127,8 @@ pub unsafe extern "C" fn mila_session_terminal_attach_session(
                 terminal,
             }))),
         );
-        *out_terminal_handle = id;
+        // SAFETY: `out_terminal_handle` is non-null and the caller guarantees it is writable.
+        unsafe { *out_terminal_handle = id };
         Ok(())
     })
 }
@@ -1022,14 +1150,16 @@ pub unsafe extern "C" fn mila_session_last_refusal(
         let session = &locked.as_ref().ok_or(SessionStatus::InvalidHandle)?.session;
         let data = serde_json::to_vec(&serde_json::json!({ "error": session.last_refusal() }))
             .map_err(|_| SessionStatus::Internal)?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
-/// Copy validated display JSON: {"machines":[snapshot rows],"has_more":bool}.
+/// Copy validated display JSON: {"machines":[snapshot rows],"`has_more":bool`}.
 /// # Safety
 /// out references capacity writable bytes; written is writable. Null out with zero
-/// capacity queries required size and returns SmallBuffer. No NUL terminator is added.
+/// capacity queries required size and returns `SmallBuffer`. No NUL terminator is added.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_listing(
     handle: u64,
@@ -1068,7 +1198,9 @@ pub unsafe extern "C" fn mila_session_listing(
             &serde_json::json!({"machines": machines, "has_more": listing.has_more()}),
         )
         .map_err(|_| SessionStatus::Internal)?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 /// Copy the existing offline snapshot schema; incomplete/unloaded listing refuses.
@@ -1093,12 +1225,17 @@ pub unsafe extern "C" fn mila_session_snapshot(
             .map_err(|_| SessionStatus::Invalid)?
             .ok_or(SessionStatus::NotLoaded)?;
         let data = snapshot.encode().map_err(|_| SessionStatus::Invalid)?;
-        output(&data, out, capacity, written)
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
+        // one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written) }
     })
 }
 
 /// Open a bounded interactive terminal attached to an authenticated session.
-#[allow(clippy::not_unsafe_ptr_arg_deref)]
+#[expect(
+    clippy::not_unsafe_ptr_arg_deref,
+    reason = "a safe export in the published C ABI; the handle pointer is null-checked before its single write"
+)]
 #[no_mangle]
 pub extern "C" fn mila_session_terminal_attach(
     session_handle: u64,
@@ -1141,10 +1278,8 @@ pub extern "C" fn mila_session_terminal_attach(
                 terminal,
             }))),
         );
-        // SAFETY: checked non-null above.
-        unsafe {
-            *out_terminal_handle = id;
-        }
+        // SAFETY: checked non-null above; the caller supplies writable handle storage.
+        unsafe { *out_terminal_handle = id };
         Ok(())
     })
 }
@@ -1168,6 +1303,8 @@ pub unsafe extern "C" fn mila_session_terminal_poll(
         let data = runtime
             .block_on(terminal.read())
             .map_err(|_| SessionStatus::Transport)?;
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
+        // bytes and one writable `usize`, as `output` requires.
         unsafe { output(&data, out, capacity, written) }
     })
 }
@@ -1211,7 +1348,10 @@ pub unsafe extern "C" fn mila_session_terminal_read(
             Ok(_) | Err(SshError::Timeout) => (Vec::new(), TerminalReadEvent::Idle),
             Err(_) => return Err(SessionStatus::Transport),
         };
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
+        // bytes and one writable `usize`, as `output` requires.
         unsafe { output(&data, out, capacity, written)? };
+        // SAFETY: `event` is non-null and the caller guarantees it is writable.
         unsafe { *event = kind };
         Ok(())
     })
@@ -1260,10 +1400,11 @@ pub unsafe extern "C" fn mila_session_terminal_read_within(
             PtyChunk::Idle => (Vec::new(), TerminalReadEvent::Idle),
             PtyChunk::Closed => (Vec::new(), TerminalReadEvent::Closed),
         };
-        unsafe {
-            output(&data, out, capacity, written)?;
-            *event = kind;
-        }
+        // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
+        // bytes and one writable `usize`, as `output` requires.
+        unsafe { output(&data, out, capacity, written)? };
+        // SAFETY: `event` is non-null and the caller guarantees it is writable.
+        unsafe { *event = kind };
         Ok(())
     })
 }
@@ -1279,6 +1420,8 @@ pub unsafe extern "C" fn mila_session_terminal_input(
     input_len: usize,
 ) -> SessionStatus {
     guarded(|| {
+        // SAFETY: the caller guarantees `input` references `input_len` readable bytes;
+        // `bytes` refuses null, empty and oversized input.
         let input = unsafe { bytes(input, input_len, 1 << 20)? };
         let runtime = runtime()?;
         let terminal = terminal_entry(terminal_handle)?;

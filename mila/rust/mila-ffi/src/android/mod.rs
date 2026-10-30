@@ -25,7 +25,7 @@ fn jni_session_bytes(
 /// into a caller-bounded buffer; a size probe followed by a read would run the
 /// Porsche command twice.
 ///
-/// [jni_session_bytes] with an explicit output bound.
+/// [`jni_session_bytes`] with an explicit output bound.
 fn jni_session_bytes_bounded(
     env: &mut jni::JNIEnv<'_>,
     bound: usize,
@@ -33,12 +33,14 @@ fn jni_session_bytes_bounded(
 ) -> jni::sys::jbyteArray {
     let mut data = vec![0u8; bound];
     let mut size = 0usize;
-    let status = call(data.as_mut_ptr(), data.len(), &mut size);
+    let status = call(data.as_mut_ptr(), data.len(), &raw mut size);
     if status != session::SessionStatus::Ok || size > data.len() {
         return std::ptr::null_mut();
     }
-    env.byte_array_from_slice(&data[..size])
-        .map_or(std::ptr::null_mut(), |a| a.into_raw())
+    env.byte_array_from_slice(&data[..size]).map_or(
+        std::ptr::null_mut(),
+        jni::objects::JPrimitiveArray::into_raw,
+    )
 }
 
 fn jni_string_bytes(

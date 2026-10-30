@@ -91,8 +91,11 @@ jobs:
         with:
           toolchain: 1.97.1
           targets: aarch64-apple-ios-sim
+          components: clippy
       - name: Build Rust FFI for Apple native tests
         run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+      - name: Clippy the Rust FFI
+        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Generate bundled locale catalogs
         run: |
           python3 mila/localization/generate_catalogs.py \
@@ -172,8 +175,11 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: 1.97.1
+          components: clippy
       - name: Build Rust Windows FFI
         run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+      - name: Clippy the Rust FFI
+        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Build native WinUI client (.NET 10)
         working-directory: mila/windows-dotnet
         shell: pwsh
@@ -245,6 +251,8 @@ jobs:
         with:
           toolchain: 1.97.1
           components: clippy, rustfmt
+      - name: Clippy the Rust FFI
+        run: cargo clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
       - name: Install GTK4 and libadwaita development libraries
         run: |
           sudo apt-get update
@@ -528,9 +536,13 @@ jobs:
         with:
           toolchain: 1.97.1
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          components: clippy
       - name: Install cargo-ndk
         timeout-minutes: 10
         run: cargo install cargo-ndk --locked
+      - name: Clippy the Rust FFI for Android
+        # The library only: the test targets' dev-dependencies are host tools.
+        run: cargo ndk --platform 26 -t arm64-v8a clippy --manifest-path mila/rust/Cargo.toml --locked -p mila-ffi -- -D warnings
       - name: Assemble native Compose APK
         timeout-minutes: 20
         working-directory: mila/native/android

@@ -8,13 +8,17 @@ const ACTIONS: [&str; 9] = [
     "show", "start", "stop", "pause", "resume", "unpause", "pin", "unpin", "rm",
 ];
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test helper outside #[test]; a failed fixture must abort the calling test"
+)]
 fn invoke(action: &str, request: Option<&str>, capacity: usize) -> (MilaFfiStatus, Vec<u8>, usize) {
     let action = CString::new(action).unwrap();
     let machine = CString::new(MACHINE).unwrap();
     let request = request.map(|s| CString::new(s).unwrap());
     let mut buffer = vec![0xa5; capacity + 8];
     let mut written = usize::MAX;
-    // All C strings and the caller-owned buffer remain live throughout the call.
+    // SAFETY: all C strings and the caller-owned buffer remain live throughout the call.
     let status = unsafe {
         mila_session_command_format(
             action.as_ptr(),
@@ -23,7 +27,7 @@ fn invoke(action: &str, request: Option<&str>, capacity: usize) -> (MilaFfiStatu
             MilaRouteOutput {
                 bytes: buffer.as_mut_ptr(),
                 capacity,
-                written: &mut written,
+                written: &raw mut written,
             },
         )
     };
