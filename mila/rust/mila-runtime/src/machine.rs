@@ -3,6 +3,10 @@ use serde::{Deserialize, Serialize};
 /// A closed, privacy-preserving machine representation suitable for caching.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "closed cached-machine schema: each flag mirrors one Porsche listing field across the FFI and snapshot format"
+)]
 pub struct SnapshotMachine {
     pub id: String,
     pub name: String,
@@ -17,7 +21,7 @@ pub struct SnapshotMachine {
 
 /// Mutations the native clients may present for a cached machine.
 ///
-/// This keeps action visibility identical across Swift, Kotlin, GTK and WinUI;
+/// This keeps action visibility identical across Swift, Kotlin, GTK and `WinUI`;
 /// clients must not reimplement permission or state rules in each UI toolkit.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[repr(u16)]

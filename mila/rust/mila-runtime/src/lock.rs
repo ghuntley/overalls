@@ -78,6 +78,7 @@ impl AppLock {
         !matches!(self.phase, LockPhase::Unlocked)
     }
     /// Applies one event; stale authentication results never unlock content.
+    #[must_use]
     pub fn apply(mut self, event: LockEvent) -> Self {
         match event {
             LockEvent::Availability(a) => {
@@ -91,7 +92,7 @@ impl AppLock {
                 if matches!(self.phase, LockPhase::Unlocked)
                     && matches!(self.availability, LockAvailability::Available) =>
             {
-                self.enabled = true
+                self.enabled = true;
             }
             LockEvent::Disable if matches!(self.phase, LockPhase::Unlocked) => self.enabled = false,
             LockEvent::Delay(d) if matches!(self.phase, LockPhase::Unlocked) => self.delay = d,

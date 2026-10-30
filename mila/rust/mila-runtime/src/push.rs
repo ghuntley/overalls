@@ -163,15 +163,15 @@ impl PushRegistrationReply {
     /// `{"push_key","key_id","expires_at"}` where `expires_at` is an ISO-8601
     /// UTC timestamp. Unknown members, non-UTC offsets and expired keys refuse.
     pub fn decode_susan(bytes: &[u8], now: u64) -> Result<Self, RuntimeError> {
-        if bytes.len() > 4096 {
-            return Err(RuntimeError::InvalidPushRegistration);
-        }
         #[derive(Deserialize)]
         #[serde(deny_unknown_fields)]
         struct Wire {
             push_key: String,
             key_id: String,
             expires_at: String,
+        }
+        if bytes.len() > 4096 {
+            return Err(RuntimeError::InvalidPushRegistration);
         }
         let wire: Wire =
             serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidPushRegistration)?;
@@ -185,6 +185,10 @@ impl PushRegistrationReply {
 }
 
 /// Parses `YYYY-MM-DDTHH:MM:SS[.fraction]Z` into Unix seconds.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the only cast indexes month_days with month - 1 after month is checked to be 1..=12"
+)]
 fn parse_utc_timestamp(value: &str) -> Option<u64> {
     let bytes = value.as_bytes();
     if !value.is_ascii() || bytes.len() < 20 || bytes.len() > 32 || *bytes.last()? != b'Z' {
@@ -206,11 +210,11 @@ fn parse_utc_timestamp(value: &str) -> Option<u64> {
     {
         return None;
     }
-    let fraction = &value[19..value.len() - 1];
+    let fraction = value.get(19..value.len() - 1)?;
     if !(fraction.is_empty()
         || (fraction.len() >= 2
             && fraction.starts_with('.')
-            && fraction[1..].bytes().all(|b| b.is_ascii_digit())))
+            && fraction.bytes().skip(1).all(|b| b.is_ascii_digit())))
     {
         return None;
     }
@@ -287,7 +291,7 @@ fn wns_channel_valid(value: &str) -> bool {
     {
         return false;
     }
-    let Some((host, path)) = value[8..].split_once('/') else {
+    let Some((host, path)) = value.get(8..).and_then(|rest| rest.split_once('/')) else {
         return false;
     };
     let Some(prefix) = host.strip_suffix(".notify.windows.com") else {

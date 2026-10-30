@@ -1,5 +1,9 @@
 use super::{MachineAction, SnapshotMachine};
 
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "test fixture mirrors the SnapshotMachine flags one-to-one"
+)]
 fn machine(
     state: Option<&str>,
     pinned: bool,

@@ -159,10 +159,10 @@ fn push_replies_never_accept_expired_or_unbounded_values(tc: TestCase) {
         String::from_utf8_lossy(&tc.draw(gs::vecs(gs::default::<u8>()).max_size(180))).into_owned();
     let now = tc.draw(gs::default::<u64>());
     let expires = tc.draw(gs::default::<u64>());
-    if let Ok(reply) = mila_runtime::PushRegistrationReply::new(push_key, key_id, expires, now) {
+    if let Ok(reply) = PushRegistrationReply::new(push_key, key_id, expires, now) {
         assert!(reply.expires_at > now);
         assert!((16..=700).contains(&reply.push_key.len()));
-        assert!(!reply.key_id.is_empty());
+        assert_ne!(reply.key_id, "");
         assert!(reply.key_id.len() <= 128);
     }
 }
@@ -376,7 +376,7 @@ fn lock_relocks_after_elapsed_background_delay() {
 #[hegel::test(test_cases = 64)]
 fn snapshot_persistence_never_replaces_newer_data(tc: TestCase) {
     let old = tc.draw(gs::default::<u64>());
-    let delta = tc.draw(gs::default::<u16>()) as u64;
+    let delta = u64::from(tc.draw(gs::default::<u16>()));
     let newer = old.saturating_add(delta);
     let store = MemoryStore::default();
     let cached =
@@ -405,10 +405,18 @@ fn snapshot_store_rejects_cross_deployment_bytes() {
     );
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; every generated suffix formats a valid request id"
+)]
 fn request_id(suffix: u64) -> RequestId {
     RequestId::parse(&format!("porsche-{suffix:032x}")).expect("request id")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; the formatted value is a canonical UUID"
+)]
 fn operation(value: u32) -> mila_model::Identifier {
     mila_model::Identifier::parse(&format!("{value:08x}-0000-4000-8000-000000000000"))
         .expect("identifier")
@@ -584,7 +592,7 @@ fn session_runtime_submits_once_and_polls_the_original_id(tc: TestCase) {
     };
     if tc.draw(gs::booleans()) {
         assert_eq!(runtime.poll(&mut backend), Err(RuntimeError::NotSubmitted));
-        assert!(backend.polls.is_empty());
+        assert_eq!(backend.polls, Vec::<RequestId>::new());
     }
     let submitted = runtime.submit(&mut backend);
     assert_eq!(backend.submits.len(), 1);
@@ -703,6 +711,10 @@ fn delay(tc: &TestCase) -> LockDelay {
 
 #[hegel::state_machine]
 impl LockMachine {
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn availability(&mut self, tc: TestCase) {
         let availability = tc.draw(gs::sampled_from(vec![
@@ -713,6 +725,10 @@ impl LockMachine {
         self.step(LockEvent::Availability(availability));
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn settings(&mut self, tc: TestCase) {
         let event = match tc.draw(gs::integers::<u8>().max_value(2)) {
@@ -723,6 +739,10 @@ impl LockMachine {
         self.step(event);
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn lifecycle(&mut self, tc: TestCase) {
         let at = tc.draw(gs::integers::<u64>().max_value(1_000_000));
@@ -739,6 +759,10 @@ impl LockMachine {
         self.step(LockEvent::UnlockRequested);
     }
 
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Hegel rules take TestCase by value; `expect` is unfulfillable on re-emitted rules"
+    )]
     #[rule]
     fn unlock_finished(&mut self, tc: TestCase) {
         let attempt = self.attempt(&tc);

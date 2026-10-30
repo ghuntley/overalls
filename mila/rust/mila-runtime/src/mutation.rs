@@ -45,7 +45,7 @@ impl MutationTracker {
             polls: 0,
             operation_id: None,
             error: None,
-            result: Value::Object(Default::default()),
+            result: Value::Object(serde_json::Map::default()),
         }
     }
 
