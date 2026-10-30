@@ -708,6 +708,19 @@ panic the connection thread, and under `hardened` (abort) all of hostd. The
 decoder must use checked `get(..)` with a decode error and gain a property
 test over truncated and oversized frames before `hardened` returns.
 
+**Mila C header.** The three copies of the C ABI had drifted: the Rust
+crate's header declared 32 of the 52 `mila_*` exports, Apple's 37 and the
+Windows scaffold's 26, and the Windows copy spelled the watch enumerators
+differently. cbindgen 0.29 cannot reproduce the enumerator names Swift
+imports, so the crate's header stays hand-written and becomes the only copy:
+it now declares all 52 exports, Apple's `include/mila_ffi.h` is a symlink to
+it, and the Windows header is deleted (.NET declares its imports in C# and
+never read it). `tests/header.rs` fails when an export is missing, extra or
+has a different arity, or when a C enumerator differs from its Rust
+discriminant; the Nix Mila check also compiles the header with
+`-Wall -Wextra -pedantic -Werror` as C and C++. Apple CI is the only
+consumer that can confirm the symlink.
+
 **Vendor leak (T2).** A panic location naming a vendored crate keeps the
 whole `importCargoLock` link farm in a closure. Lyra's main zigbuild phase had
 no remap, so `tool-lyra` carried 518 store paths, every crate included; it now

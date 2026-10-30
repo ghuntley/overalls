@@ -48,13 +48,20 @@ in
 
   # @cc [owner:ghuntley,label:verification] mila-rust-workspace-check
   # The Mila Rust check MUST format, test and lint every workspace member with
-  # the locked, vendored dependency set and warnings promoted to failures.
+  # the locked, vendored dependency set and warnings promoted to failures, and
+  # compile the C header as strict C and C++.
   check = workspace.rustPlatform.buildRustPackage (common // {
     pname = "mila-rust-check";
     doCheck = false;
     buildPhase = ''
       runHook preBuild
       cargo fmt ${packages} -- --check
+      # The one C header (mila-ffi-single-c-header) compiles as strict C and
+      # C++; tests/header.rs keeps its declarations equal to the exports.
+      for language in c c++; do
+        $CC -x "$language" -fsyntax-only -Wall -Wextra -pedantic -Werror \
+          mila/rust/mila-ffi/include/mila_ffi.h
+      done
       cargo test ${packages} --locked --offline
       cargo clippy ${packages} --all-targets --locked --offline -- -D warnings
       runHook postBuild

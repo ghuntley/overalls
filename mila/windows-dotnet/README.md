@@ -24,8 +24,10 @@ the Windows build workflow once that workflow stages the Rust library.
 `Interop/RustNative.cs` declares the typed ABI boundary with source-generated
 `LibraryImport`. `TryGetVersion` returns `Unavailable` while `mila_native.dll`
 is absent, so the scaffold can start before the native library is staged.
-`native/mila_native.h` is the C ABI that a Rust `#[repr(C)]` implementation
-must satisfy. The native library must be copied beside the executable as
+The C ABI the Rust `#[repr(C)]` implementation exports is described by the
+single hand-written header `mila/rust/mila-ffi/include/mila_ffi.h`, which
+`mila-ffi`'s `tests/header.rs` keeps equal to the crate's exports and enum
+discriminants; `RustNative.cs` must match it. The native library must be copied beside the executable as
 `mila_native.dll` by the Windows source-bundle build.
 
 The boundary currently exposes only a status and version. Device keys,

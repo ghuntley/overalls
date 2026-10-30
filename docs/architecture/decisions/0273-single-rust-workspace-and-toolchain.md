@@ -204,8 +204,7 @@ partial, in milestone M5.
   Since M2 (7ccb4f72a) a host's `:deployment` target carries the same
   `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too; the flake's
   Nix builds remain the fallback until M11. Remaining: terminald, the editor broker
-  and Lyra (musl and cross targets), Marshall's Cedar NIF, Mila and its
-  cbindgen header.
+  and Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.
@@ -220,7 +219,12 @@ partial, in milestone M5.
 - **Platform builds.** The Mila Apple script, the Android Gradle task and the
   `mila-builds`/`mila-release` workflows build `mila-ffi` through its own
   manifest inside the root workspace. Gradle also tracks the root lock as an
-  input.
+  input. `mila-ffi`'s C ABI has one hand-written header,
+  [`include/mila_ffi.h`](../../../mila/rust/mila-ffi/include/mila_ffi.h); Apple's
+  `MilaFFIShim` includes it through a symlink and the Windows copy is gone.
+  [`tests/header.rs`](../../../mila/rust/mila-ffi/tests/header.rs) keeps it
+  equal to the `#[no_mangle]` exports (names and arity) and the four C enums'
+  discriminants, and the Nix Mila check compiles it as strict C and C++.
 
 Remaining for this decision:
 

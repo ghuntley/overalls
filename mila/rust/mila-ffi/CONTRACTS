@@ -12,3 +12,12 @@ input bounds of the scalar validators, and refusal of stale session and PTY
 handles without writing caller storage. JNI exports are not exercised by
 properties; they need a JVM and are covered by the Android instrumentation
 tests.
+
+@cc [owner:ghuntley,label:architecture;verification] mila-ffi-single-c-header
+`include/mila_ffi.h` MUST be the only C description of the `mila_*` ABI. It is
+hand-written, and `tests/header.rs` MUST keep it equal to the crate: exactly
+the `#[no_mangle] extern "C"` `mila_*` exports, each with its Rust arity; the
+`MilaFfiStatus`, `MilaThreadCommandKind`, `MilaMachineCommandKind` and
+`MilaWatchEventKind` enumerators at the Rust discriminants; and every
+declaration inside the include guard. Apple's `MilaFFIShim` includes it
+through a symlink, never a copy.
