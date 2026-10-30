@@ -31,7 +31,7 @@ pub enum Outcome {
 /// @cc [owner:ghuntley,label:security] vm-watch-closed-arguments
 /// Only `<cgroup> <pid>` is accepted: an absolute, normalized UTF-8 path
 /// strictly below /sys/fs/cgroup with no `.`/`..` components or trailing
-/// slash, and a canonical decimal PID in 1..=PID_MAX. Anything else selects no
+/// slash, and a canonical decimal PID in `1..=PID_MAX`. Anything else selects no
 /// process and the helper reports `error`.
 pub fn parse_cli(arguments: &[OsString]) -> Option<Target> {
     let [cgroup, pid] = arguments else {
