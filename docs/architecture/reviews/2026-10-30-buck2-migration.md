@@ -581,8 +581,23 @@ use it. Two findings shaped it:
 - rust-overlay's illumos standard library links the guest's libc family;
   `autoPatchelf` fails on it, so it is added with those libraries ignored.
 
-The other `buildRustPackage` leaves still use nixpkgs 1.99 until their Buck2
-replacements become the only build.
+Every first-party Nix Rust leaf then moved to it (rustc 1.99 to 1.97.1):
+`cargo-workspace.nix` exports `rustPlatform`, `rustTools` and
+`buildStaticMusl`. `pkgsStatic.makeRustPlatform` over the overlay toolchain
+built build scripts that crashed with SIGSEGV, so `buildStaticMusl` links
+terminald and the editor broker as static-pie with rustc's self-contained
+musl CRT and `rust-lld`, still with the `release` profile they really used
+(873 KB and 1.31 MB, from 955 KB and 1.39 MB), and the broker's tests run in
+its check phase. The leaves now declare their profile with `buildType`; the
+exported `buildRustPackage` refuses the ignored `cargoBuildType` (the T2
+profile regression below).
+The host derivations changed on purpose (dungarees `pf1nr19` to `5zjw023`,
+panterloons `wxq0yzm` to `1g8i65r`, salopettes `w6xh09q` to `s1619s5`); each
+diff is the Rust leaves, their dependents (Lilly's release, host tools, guest
+images carrying terminald or the receiver, their units) and the toolchain's
+own derivations. The five parity tests pass against the 1.97.1 Nix builds.
+NativeLink, underclass, Marshall's Cedar NIF and lints and libhegel stay on
+nixpkgs Rust until M6.
 
 **Third-party crates.** reindeer cannot vendor from a lock it does not
 resolve, and committing its output would add a second pin. `nix/buck/rust.nix`
@@ -626,12 +641,12 @@ RUNPATH differs, when it needs a library the Nix
 build does not, or when any store path in its rpath or bytes is outside the
 closure of the import's declared references. Fewer NEEDED entries are allowed:
 Cargo's links also list `ld-linux-x86-64.so.2` (PT_INTERP loads it either way),
-and the Nix receiver and spool carry an unused `libm.so.6` from rustc 1.99.
+and the Nix receiver and spool carried an unused `libm.so.6` under rustc 1.99.
 It also fails on a `.debug_*` section the Nix build strips: the first
 Buck2 receiver binaries were five times larger because the prelude does not
 apply Cargo's implicit `strip = "debuginfo"` for `release`, which
 `buck/rust.bzl` now passes. Byte identity is not expected: the drivers
-differ, and the Nix leaves still use rustc 1.99.
+differ.
 
 | Leaf | Buck2 import | Parity and tests |
 | --- | --- | --- |

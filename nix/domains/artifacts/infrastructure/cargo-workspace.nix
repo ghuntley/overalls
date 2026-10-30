@@ -9,6 +9,11 @@
 # their source edits cannot change the build's inputs.
 let
   inherit (pkgs) lib;
+  rust = import ../../../rust-toolchain.nix { inherit pkgs; };
+  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
+    name = "overalls-cargo-vendor";
+    inherit lockFile;
+  };
   root = ../../../..;
   rootString = toString root;
   lockFile = root + "/Cargo.lock";
@@ -89,13 +94,71 @@ let
 in
 {
   inherit lockFile members source workspaceFile;
+  # @cc [owner:ghuntley,label:build] cargo-workspace-single-toolchain
+  # Every first-party buildRustPackage MUST use these platforms and tools,
+  # built from the one rust-overlay toolchain (nix/rust-toolchain.nix,
+  # ADR-0273 decision 2), never nixpkgs' rustPlatform, clippy or rustfmt.
+  rustPlatform = rust.rustPlatform // {
+    # @cc [owner:ghuntley,label:build] cargo-workspace-declared-profile
+    # A leaf MUST select its Cargo profile with buildRustPackage's `buildType`,
+    # the attribute that takes effect. `cargoBuildType` is refused: nixpkgs
+    # overwrites it from `buildType`, which is how T2 (a89cde0de) silently
+    # built the declared-`hardened` helpers with `release` (ADR-0273).
+    buildRustPackage = args:
+      if args ? cargoBuildType then
+        throw "${args.pname or "a Rust leaf"}: cargoBuildType is ignored by buildRustPackage; declare the profile with buildType"
+      else rust.rustPlatform.buildRustPackage args;
+  };
+  # @cc [owner:ghuntley,label:build;security] cargo-workspace-static-musl
+  # buildStaticMusl MUST produce x86_64 musl executables that link only
+  # rustc's self-contained musl CRT through rust-lld (no Nix libc and no store
+  # reference), with the Cargo profile `buildType` declares; with `check` it also
+  # runs the crate's host tests, rustfmt and clippy -D warnings. nixpkgs'
+  # pkgsStatic Rust cannot take this toolchain: its build scripts crashed.
+  buildStaticMusl = { pname, crate, binaries, buildType, features ? [ ], check ? false, meta ? { } }:
+    let
+      package = (manifestOf crate).package.name;
+      selection = "-p ${package}" + lib.optionalString (features != [ ]) " --features ${lib.concatStringsSep "," features}";
+    in
+    pkgs.stdenv.mkDerivation {
+      inherit pname meta;
+      version = "0.1.0";
+      src = source { name = "${pname}-source"; crates = [ crate ]; };
+      strictDeps = true;
+      nativeBuildInputs = [ rust.toolchain ];
+      dontConfigure = true;
+      dontStrip = true;
+      allowedReferences = [ ];
+      buildPhase = ''
+        runHook preBuild
+        export CARGO_HOME="$TMPDIR/cargo-home" CARGO_TARGET_DIR="$TMPDIR/target"
+        mkdir -p "$CARGO_HOME"
+        substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
+        export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_LINKER=rust-lld
+        export CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS="-Clinker-flavor=ld.lld --remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
+        cargo build --offline --locked --profile ${buildType} --target x86_64-unknown-linux-musl ${selection}
+        runHook postBuild
+      '';
+      doCheck = check;
+      checkPhase = ''
+        runHook preCheck
+        cargo test --offline --locked ${selection}
+        cargo fmt --check -p ${package}
+        cargo clippy --offline --locked --all-targets ${selection} -- -D warnings
+        runHook postCheck
+      '';
+      installPhase = ''
+        runHook preInstall
+        ${lib.concatMapStringsSep "\n" (binary: ''install -Dm755 "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/${buildType}/${binary}" "$out/bin/${binary}"'') binaries}
+        runHook postInstall
+      '';
+    };
+  # clippy-driver, cargo-clippy and rustfmt of the same release, for postCheck.
+  rustTools = rust.toolchain;
   # buildRustPackage attribute: the one vendored dependency set.
   cargoLock = { inherit lockFile; };
   # fetchCargoVendor layout (`@vendor@` placeholder) for hand-written builds.
-  vendor = import ./locked-cargo-vendor.nix { inherit pkgs; } {
-    name = "overalls-cargo-vendor";
-    inherit lockFile;
-  };
+  inherit vendor;
   # SHA-256 of the root lock, for build manifests that record their inputs.
   lockSha256 = builtins.hashFile "sha256" lockFile;
 }

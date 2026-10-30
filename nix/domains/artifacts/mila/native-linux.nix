@@ -10,13 +10,13 @@ let
     extraFiles = [ "mila/localization" "protocol/test/fixtures" ];
   };
 in
-pkgs.rustPlatform.buildRustPackage {
+workspace.rustPlatform.buildRustPackage {
   pname = "mila-native-linux";
   version = "0.1.0";
   src = source;
   inherit (workspace) cargoLock;
   buildAndTestSubdir = "mila/native/linux";
-  nativeBuildInputs = [ pkgs.pkg-config pkgs.python3 pkgs.clippy pkgs.rustfmt ];
+  nativeBuildInputs = [ pkgs.pkg-config pkgs.python3 workspace.rustTools ];
   buildInputs = [ pkgs.gtk4 pkgs.libadwaita ];
   # ADR-0265 gates: formatting and clippy over both feature sets.
   postCheck = ''

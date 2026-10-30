@@ -1,6 +1,8 @@
 { pkgs, hegel }:
 let
-  fixture = pkgs.runCommand "burn-webhook-fixture" { nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ]; } ''
+  # The repository's one Rust toolchain (ADR-0273), not nixpkgs rustc.
+  rust = import ../../../../rust-toolchain.nix { inherit pkgs; };
+  fixture = pkgs.runCommand "burn-webhook-fixture" { nativeBuildInputs = [ rust.toolchain pkgs.stdenv.cc ]; } ''
     mkdir -p $out/bin
     rustc --edition=2024 -D warnings ${./receiver.rs} -o $out/bin/burn-webhook
   '';

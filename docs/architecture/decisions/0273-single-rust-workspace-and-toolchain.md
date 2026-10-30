@@ -105,7 +105,10 @@ partial, in milestone M5.
   deployed helpers are the unwind builds, so the Buck2 helpers match them
   (`release`) until a later change restores `hardened` in Nix
   (`buildType = "hardened"`) and Buck2 together, after the panic paths that
-  abort would expose are found.
+  abort would expose are found. The leaves now declare that profile with the
+  effective `buildType = "release"`, and `cargoWorkspace.rustPlatform`'s
+  `buildRustPackage` refuses `cargoBuildType`, so a declared profile can no
+  longer be dropped silently.
 - **Nix.** [`cargo-workspace.nix`](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
   vendors the root lock once with `importCargoLock` (through
   [`locked-cargo-vendor.nix`](../../../nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix)).
@@ -151,9 +154,24 @@ partial, in milestone M5.
   (`//:rust-toolchain-literals`, a precommit check) refuses one that differs
   from the pinned version. Lyra, Lyra's tests, its Windows and native builds,
   terminald (musl, Windows and native) and the editor broker's Windows build
-  rebuilt under it; the musl terminald output is byte-identical (same store
-  path). Remaining: the other `buildRustPackage` leaves still use nixpkgs
-  `rustPlatform` (1.99).
+  rebuilt under it. Every first-party Nix Rust leaf now uses it too:
+  [`cargo-workspace.nix`](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
+  exports `rustPlatform` (`makeRustPlatform` over the single toolchain),
+  `rustTools` (its clippy and rustfmt) and `buildStaticMusl`, which builds a
+  static-pie musl binary with rustc's self-contained CRT and `rust-lld`
+  (`allowedReferences = [ ]`). The 13 Lilly helpers, Enrico's git owner,
+  the guest telemetry receiver, observability-runtimes, the trace spool,
+  terminald's checks and Mila's Rust and Linux builds use `rustPlatform`;
+  terminald's musl build and the editor broker use `buildStaticMusl`
+  with the profile the leaf declares through `buildType` (`release` for both,
+  as before; see the open T2 regression above). The exported
+  `buildRustPackage` refuses `cargoBuildType`, which nixpkgs ignores, so a
+  declared profile always takes effect. `pkgsStatic`'s
+  `makeRustPlatform` over this toolchain was rejected: its build scripts
+  crashed with SIGSEGV. The leaves' derivations, and so every host's
+  system derivation, changed on purpose; the closures differ only in those
+  leaves and their dependents. Third-party builds (NativeLink, underclass),
+  Marshall's Cedar NIF and lints and libhegel stay on nixpkgs Rust until M6.
 - **Buck2 builds (decision 3, partial).** [rust.nix](../../../nix/buck/rust.nix)
   generates the `rust//` cell in Nix from the root lock:
   [rust_cell.py](../../../nix/buck/rust_cell.py) writes a pseudo-package of
@@ -206,9 +224,9 @@ partial, in milestone M5.
 
 Remaining for this decision:
 
-- the remaining `buildRustPackage` leaves on nixpkgs Rust 1.99 (decision 2)
-  and the Buck2 builds of terminald, the broker, Lyra, the Cedar NIF and Mila
-  (decision 3), in M5;
+- Marshall's Cedar NIF, its lints and libhegel on nixpkgs Rust 1.99
+  (decision 2, M6), and the Buck2 builds of terminald, the broker, Lyra, the
+  Cedar NIF and Mila (decision 3), in M5;
 - per-consumer Nix source filters, until M5 deletes the `buildRustPackage`
   leaves.
 

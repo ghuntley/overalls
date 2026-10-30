@@ -49,7 +49,7 @@ let
     sed 's/6775657374/6f75746572/' ${./metric.hex} | xxd -r -p > $out
   '';
   traceFixture = pkgs.runCommand "otel-trace-replay-fixture" {
-    nativeBuildInputs = [ pkgs.rustc pkgs.stdenv.cc ];
+    nativeBuildInputs = [ packages.cargoWorkspace.rustTools pkgs.stdenv.cc ];
   } ''
     mkdir -p "$out/bin"
     rustc --edition=2021 -D warnings ${./trace_fixture.rs} -o "$out/bin/otel-trace-replay-fixture"

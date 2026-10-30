@@ -37,7 +37,7 @@ let
   });
   cutRecorder = recorderSource.overrideAttrs (previous: {
     pname = "overalls-request-recorder-commit-reply-fixture";
-    nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ pkgs.clippy ];
+    nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ packages.cargoWorkspace.rustTools ];
     postPatch = (previous.postPatch or "") + ''
       substituteInPlace nix/domains/system/otel-guest/receiver/src/request_recorder.rs --replace-fail \
         'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),' \

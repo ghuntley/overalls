@@ -2,21 +2,20 @@
 let
   workspace = import ./cargo-workspace.nix { inherit pkgs; };
 in
-pkgs.pkgsStatic.rustPlatform.buildRustPackage {
+# A static musl executable from the one toolchain (ADR-0273), linked by
+# rust-lld against rustc's self-contained musl CRT.
+(workspace.buildStaticMusl {
   pname = "lilly-terminald";
-  version = "0.1.0";
-  src = workspace.source { name = "lilly-terminald-source"; crates = [ "nix/domains/artifacts/terminald" ]; };
-  inherit (workspace) cargoLock;
-  buildAndTestSubdir = "nix/domains/artifacts/terminald";
-  # Cargo profiles live at the workspace root (ADR-0273); `hardened` keeps
-  # terminald's LTO, abort-on-panic release settings.
-  cargoBuildType = "hardened";
-  cargoBuildFlags = pkgs.lib.optionals antithesisObserver [ "--features" "antithesis-observer" ];
-  doCheck = false;
-  strictDeps = true;
+  crate = "nix/domains/artifacts/terminald";
+  binaries = [ "lilly-terminald" ];
+  # Declared `hardened`; built `release` (unwind) since T2 (a89cde0de), as
+  # hosts run it now: an open regression in ADR-0273, restored with Buck2.
+  buildType = "release";
+  features = pkgs.lib.optionals antithesisObserver [ "antithesis-observer" ];
   meta = {
     description = "Overalls guest terminal multiplexer over AF_VSOCK";
     platforms = [ "x86_64-linux" ];
   };
+}).overrideAttrs {
   passthru.native = import ./terminald-native.nix { inherit pkgs toolchain; };
 }

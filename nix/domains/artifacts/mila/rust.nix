@@ -25,7 +25,7 @@ let
     inherit (workspace) cargoLock;
     cargoBuildFlags = map (crate: "-p=${builtins.baseNameOf crate}") crates;
     strictDeps = true;
-    nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
+    nativeBuildInputs = [ workspace.rustTools ];
     meta.platforms = [ "x86_64-linux" ];
   };
 in
@@ -33,7 +33,7 @@ in
   # @cc [owner:ghuntley,label:build] mila-rust-source-build
   # The Mila Rust workspace MUST compile every tracked workspace member from
   # the root workspace Cargo.lock without reading build output or ambient sources.
-  package = pkgs.rustPlatform.buildRustPackage (common // {
+  package = workspace.rustPlatform.buildRustPackage (common // {
     pname = "mila-rust";
     doCheck = false;
     installPhase = ''
@@ -49,7 +49,7 @@ in
   # @cc [owner:ghuntley,label:verification] mila-rust-workspace-check
   # The Mila Rust check MUST format, test and lint every workspace member with
   # the locked, vendored dependency set and warnings promoted to failures.
-  check = pkgs.rustPlatform.buildRustPackage (common // {
+  check = workspace.rustPlatform.buildRustPackage (common // {
     pname = "mila-rust-check";
     doCheck = false;
     buildPhase = ''

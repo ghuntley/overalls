@@ -2,7 +2,7 @@
 let
   workspace = import ./cargo-workspace.nix { inherit pkgs; };
 in
-pkgs.rustPlatform.buildRustPackage {
+workspace.rustPlatform.buildRustPackage {
   pname = "lilly-terminald-native-checks";
   version = "0.1.0";
   src = workspace.source { name = "lilly-terminald-source"; crates = [ "nix/domains/artifacts/terminald" ]; };
@@ -10,7 +10,7 @@ pkgs.rustPlatform.buildRustPackage {
   buildAndTestSubdir = "nix/domains/artifacts/terminald";
   doCheck = false;
   strictDeps = true;
-  nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
+  nativeBuildInputs = [ workspace.rustTools ];
   TERMINALD_TEST_SHELL = "${pkgs.bash}/bin/bash";
   TERMINALD_TEST_HEAD = "${pkgs.coreutils}/bin/head";
   buildPhase = ''

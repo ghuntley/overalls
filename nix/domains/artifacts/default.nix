@@ -352,7 +352,11 @@ let
   # first-party builds from this set, never build their own copy. Patched
   # third-party nixpkgs packages (Fluent Bit) stay on the system's nixpkgs so
   # a host keeps the version its configuration was reviewed against.
-  otelReceiver = swapLeaf "otel-guest-receiver" (pkgs.callPackage ../system/otel-guest/receiver.nix { });
+  otelReceiver = swapLeaf "otel-guest-receiver" (pkgs.callPackage ../system/otel-guest/receiver.nix {
+    inherit (cargoWorkspace) rustPlatform;
+    clippy = cargoWorkspace.rustTools;
+    rustfmt = cargoWorkspace.rustTools;
+  });
   enricoGitOwner = swapLeaf "enrico-git-owner" (import ./applications/enrico-git-owner.nix { inherit pkgs; });
   observabilityRuntimes = swapLeaf "observability-runtimes" (import ../system/observability-runtimes.nix { inherit pkgs; });
   traceSpool = swapLeaf "trace-spool" (import ./infrastructure/trace-spool.nix { inherit pkgs; });
