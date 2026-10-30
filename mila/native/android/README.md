@@ -40,3 +40,34 @@ Rust dependencies (`cargo-ndk ... build --locked`). It publishes
 candidate. Signing remains a distribution concern while the native parity
 matrix is open; the artifact is installable for QA and provides repeatable
 build evidence.
+
+## Instrumentation and the hermetic journey
+
+`connectedDebugAndroidTest` runs on the API 35 emulator in the `android-native` CI job through
+[`scripts/run-instrumentation.sh`](scripts/run-instrumentation.sh). Besides packaged JNI smoke tests,
+`MilaAppLockDeviceTest` toggles the emulator's device credential with `locksettings` to exercise
+the real `BiometricManager`/`BiometricPrompt` unavailable and enrolled states; it always restores a
+credential-free device.
+
+`MilaJourneyTest` drives the production controllers over the packaged Rust session against the
+`mila-journey-fixture` Marshall+Porsche backend: sign-in with browser approval and reconnect,
+machine listing, session-bound create/resize, lifecycle, sharing, threads, terminal, web, SSH keys
+and notification-device listing. It is skipped unless the `milaJourneyDescriptor` instrumentation
+argument carries the base64 fixture descriptor (version 1):
+
+```json
+{
+  "version": 1,
+  "deployment": { "host": "localhost", "ssh_port": 2222, "https_port": 8443 },
+  "tls": { "ca_pem": "-----BEGIN CERTIFICATE-----…", "server_name": "localhost" },
+  "approver": { "url": "https://localhost:8443/…", "bearer_token": "…" },
+  "seed": { "machine_name": "…", "share_principal": "…" }
+}
+```
+
+CI starts the fixture beside the emulator only when the flake exposes
+`apps.<system>.mila-journey-fixture`, then `adb reverse`s its unprivileged ports so the emulator
+dials `deployment.host` exactly as written. `localhost` deployments are accepted only while an
+instrumentation test sets `MilaInstrumentationLoopback.allowed`; production input still requires a
+dotted DNS name. FCM delivery and server-side device registration need a real push token and are
+not part of the hermetic journey.

@@ -95,6 +95,22 @@ does not establish gettext conversion or native release acceptance. The native
 release replacement is authorized implementation work under this decision;
 platform journeys and release artifacts still require execution evidence.
 
+The Android client binds machine creation and sharing to the authenticated
+Rust session through dedicated JNI entry points
+([`mila-ffi`](../../../mila/rust/mila-ffi/src/lib.rs) `nativeSessionMachineCreate`
+and `nativeSessionShareMutation`); previously creation only echoed through the
+ABI probe and sharing reached the lifecycle seam, which Rust refused.
+[`MilaMachineFormController`](../../../mila/native/android/app/src/main/java/dev/overalls/mila/nativeui/MilaMachineCreate.kt)
+fences create/resize to the signed-in session generation, and
+[`MilaDeepLinks.kt`](../../../mila/native/android/app/src/main/java/dev/overalls/mila/nativeui/MilaDeepLinks.kt)
+completes VIEW/share-provider targets only for an authenticated session. JVM
+tests cover these controllers; emulator instrumentation covers the packaged JNI
+exports and BiometricPrompt unavailable/enrolled states. The
+[`MilaJourneyTest`](../../../mila/native/android/app/src/androidTest/java/dev/overalls/mila/nativeui/MilaJourneyTest.kt)
+suite against the hermetic Marshall+Porsche fixture is wired into CI but has no
+recorded passing execution until the fixture lands; FCM delivery is not
+hermetic and remains outside it.
+
 ## Open questions
 
 None blocking the direction; platform key-storage and release-signing details

@@ -5,12 +5,25 @@ import java.util.Locale
 /** Validated deployment entry shown by the native sign-in selector. */
 data class MilaDeployment(val host: String, val port: Int = 22, val label: String = host) {
     init {
-        require(host.matches(HOST)) { "invalid deployment host" }
+        require(host.matches(HOST) || MilaInstrumentationLoopback.permits(host)) { "invalid deployment host" }
         require(port in 1..65535)
         require(label.isNotBlank() && label.toByteArray(Charsets.UTF_8).size <= 128) { "invalid deployment label" }
         require(label.none { it.isISOControl() }) { "invalid deployment label" }
     }
     companion object { private val HOST = Regex("^(?=.{1,253}$)([a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)(\\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$") }
+}
+
+/**
+ * @cc [owner:ghuntley,label:security] android-loopback-instrumentation-only
+ * Production code MUST NOT set [allowed]; only instrumentation tests that reach a fixture through
+ * `adb reverse` enable it. While unset, `localhost` is refused exactly like any other single-label
+ * host, so user input and persisted deployments can never select a device-local endpoint.
+ *
+ * Loopback deployment allowance for the hermetic emulator journey only.
+ */
+internal object MilaInstrumentationLoopback {
+    @Volatile internal var allowed: Boolean = false
+    internal fun permits(host: String): Boolean = allowed && host == "localhost"
 }
 
 /**

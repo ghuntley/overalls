@@ -27,7 +27,7 @@ class MilaDeviceKey private constructor(private val alias: String) {
 
         /** Opens or creates the deployment identity; callers run this off the UI thread. */
         fun open(host: String): MilaDeviceKey {
-            require(hostPattern.matches(host)) { "invalid deployment host" }
+            require(hostPattern.matches(host) || MilaInstrumentationLoopback.permits(host)) { "invalid deployment host" }
             val alias = "dev.overalls.mila.device.$host"
             synchronized(creationLock) {
                 if (!keyStore().containsAlias(alias)) {

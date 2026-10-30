@@ -173,7 +173,7 @@ jobs:
 
   android-native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -237,8 +237,62 @@ jobs:
         run: |
           gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest testDebugUnitTest
           test -f app/build/outputs/apk/debug/app-debug.apk
+      # The hermetic Marshall+Porsche journey fixture runs beside the emulator on this runner.
+      # Every fixture step is gated on the flake exposing `apps.<system>.mila-journey-fixture`,
+      # so the job stays green (journey skipped) until the fixture lands.
+      - name: Detect hermetic journey fixture
+        id: journey
+        run: |
+          if grep -rqs 'mila-journey-fixture' flake.nix nix; then
+            echo "declared=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "declared=false" >> "$GITHUB_OUTPUT"
+            echo "mila-journey-fixture is not declared; journey skipped"
+          fi
+      - name: Install Nix for the journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Start hermetic journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        timeout-minutes: 30
+        run: |
+          set -euo pipefail
+          system="$(nix eval --impure --raw --expr builtins.currentSystem)"
+          if ! nix eval --raw ".#apps.${system}.mila-journey-fixture.program" >/dev/null 2>&1; then
+            echo "flake has no apps.${system}.mila-journey-fixture; journey skipped"
+            exit 0
+          fi
+          dir="$RUNNER_TEMP/mila-journey"
+          mkdir -p "$dir"
+          chmod 700 "$dir"
+          nohup nix run ".#mila-journey-fixture" -- --descriptor "$dir/descriptor.json" \
+            > "$dir/fixture.log" 2>&1 &
+          echo "$!" > "$dir/fixture.pid"
+          for _ in $(seq 1 1500); do
+            if python3 -I -c 'import json, sys; json.load(open(sys.argv[1], encoding="utf-8"))' "$dir/descriptor.json" 2>/dev/null; then
+              break
+            fi
+            if ! kill -0 "$(cat "$dir/fixture.pid")" 2>/dev/null; then
+              tail -n 100 "$dir/fixture.log" >&2
+              exit 1
+            fi
+            sleep 1
+          done
+          python3 -I - "$dir/descriptor.json" <<'PY'
+          import json
+          import sys
+
+          with open(sys.argv[1], encoding="utf-8") as handle:
+              document: object = json.load(handle)
+          approver = document.get("approver") if isinstance(document, dict) else None
+          token = approver.get("bearer_token") if isinstance(approver, dict) else None
+          if not isinstance(token, str) or not token:
+              raise SystemExit("journey descriptor lacks approver.bearer_token")
+          print(f"::add-mask::{token}")
+          PY
+          echo "MILA_JOURNEY_DESCRIPTOR=$dir/descriptor.json" >> "$GITHUB_ENV"
       - name: Invoke packaged Rust JNI on Android
-        timeout-minutes: 20
+        timeout-minutes: 45
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 35
@@ -252,7 +306,8 @@ jobs:
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           working-directory: mila/native/android
           disable-animations: true
-          script: gradle --no-daemon connectedDebugAndroidTest
+          # Runs the packaged suite, then the fixture journey when MILA_JOURNEY_DESCRIPTOR is set.
+          script: bash scripts/run-instrumentation.sh
 
   native-gate:
     name: Native platform gate
