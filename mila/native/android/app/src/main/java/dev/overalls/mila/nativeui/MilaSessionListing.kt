@@ -17,26 +17,29 @@ data class MilaSessionListing(val machines: List<MilaMachineRow>, val hasMore: B
             return candidate
         }
 
+        /**
+         * @cc [owner:ghuntley,label:protocol] android-listing-json-decode
+         * Android MUST decode the Rust session listing as JSON (object key order is not part of
+         * the contract; serde_json emits sorted keys) and refuse malformed or oversized rows.
+         * A row's status is its observed state, else its desired state.
+         */
         fun decode(bytes: ByteArray): MilaSessionListing {
             require(bytes.size <= 8 * 1024 * 1024) { "listing exceeds bound" }
-            val source = bytes.toString(Charsets.UTF_8)
-            require(source.startsWith("{\"machines\":[")) { "machines missing" }
-            val end = source.indexOf(']')
-            require(end >= 0) { "machines missing" }
-            val body = source.substring(13, end)
-            if (body.isBlank()) return MilaSessionListing(emptyList(), source.contains("\"has_more\":true"))
-            val rows = body.split("},{")
-            require(rows.size <= 10_000) { "too many machines" }
-            val machines = rows.map { raw ->
-                val row = raw.trim('{', '}')
-                fun field(name: String): String? = Regex("\\\"$name\\\":\\\"([^\\\"]*)\\\"").find(row)?.groupValues?.get(1)
-                val id = runCatching { UUID.fromString(field("id") ?: throw IllegalArgumentException("invalid machine id")) }.getOrElse { throw IllegalArgumentException("invalid machine id", it) }
+            val root = org.json.JSONObject(bytes.toString(Charsets.UTF_8))
+            val rows = root.optJSONArray("machines") ?: throw IllegalArgumentException("machines missing")
+            require(rows.length() <= 10_000) { "too many machines" }
+            val machines = (0 until minOf(rows.length(), 257)).map { index ->
+                val row = rows.optJSONObject(index) ?: throw IllegalArgumentException("invalid machine row")
+                fun field(name: String): String? = row.opt(name)?.takeIf { it is String } as String?
+                val id = runCatching { UUID.fromString(field("id") ?: throw IllegalArgumentException("invalid machine id")) }
+                    .getOrElse { throw IllegalArgumentException("invalid machine id", it) }
+                require(id.toString().equals(field("id"), ignoreCase = true)) { "invalid machine id" }
                 val name = boundedDisplay(field("name") ?: id.toString(), id.toString())
-                val status = boundedDisplay(field("status") ?: "unknown", "unknown")
+                val status = boundedDisplay(field("observed_state") ?: field("desired_state") ?: field("status") ?: "unknown", "unknown")
                 MilaMachineRow(id, name, status)
             }
-            val truncated = machines.size > 256
-            return MilaSessionListing(machines.take(256), source.contains("\"has_more\":true") || truncated)
+            val truncated = rows.length() > 256
+            return MilaSessionListing(machines.take(256), root.optBoolean("has_more", false) || truncated)
         }
     }
 }
