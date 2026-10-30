@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -30,6 +31,17 @@ def navigation_response(response: Response) -> None:
         )
         navigation.append({"route": route, "status": response.status})
         del navigation[:-12]
+
+
+def machine_detail(url: str) -> bool:
+    """True only for /machines/<uuid>, not the form or provisioning receipt."""
+    parts = urlsplit(url).path.split("/")
+    if len(parts) != 3 or parts[1] != "machines":
+        return False
+    try:
+        return str(uuid.UUID(parts[2])) == parts[2]
+    except ValueError:
+        return False
 
 
 # @cc [owner:ghuntley,label:verification;security] fleet-porsche-browser-key-authority
@@ -96,14 +108,11 @@ def run() -> None:
                         )
                     )
                     page.locator("#provision-submit").click()
-                    page.wait_for_url(
-                        lambda url: (
-                            urlsplit(url).path.startswith("/machines/")
-                            and urlsplit(url).path != "/machines/new"
-                        )
-                    )
+                    # Submission lands on the thread-keyed provisioning receipt,
+                    # which opens the machine detail once the thread binds it.
+                    page.wait_for_url(machine_detail, timeout=120000)
                     vm = urlsplit(page.url).path.split("/")[-1]
-                    assert str(__import__("uuid").UUID(vm)) == vm
+                    assert str(uuid.UUID(vm)) == vm
                     (root / "provisioned-vm").write_text(vm)
                     context.close()
                     continue

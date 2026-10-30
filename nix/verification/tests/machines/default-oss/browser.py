@@ -11,6 +11,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 ROOT = Path("/var/lib/fleet-default-oss")
 ORIGIN = "https://control.example.test"
 stage = "launch"
+page_state: dict[str, object] = {}
 
 
 def fields() -> dict[str, str]:
@@ -33,6 +34,17 @@ def fields() -> dict[str, str]:
     return result
 
 
+def machine_detail(url: str) -> bool:
+    """True only for /machines/<uuid>, not the form or provisioning receipt."""
+    parts = urlsplit(url).path.split("/")
+    if len(parts) != 3 or parts[1] != "machines":
+        return False
+    try:
+        return str(uuid.UUID(parts[2])) == parts[2]
+    except ValueError:
+        return False
+
+
 def connected(page: Page) -> None:
     expect(page.locator("[data-phx-main].phx-connected")).to_be_visible(timeout=20000)
 
@@ -50,11 +62,13 @@ def run() -> None:
         browser = playwright.chromium.launch(
             executable_path="/run/current-system/sw/bin/chromium", headless=True
         )
+        current: Page | None = None
         try:
             for role in ("owner", "member", "stranger"):
                 stage = role + " login"
                 context = browser.new_context()
                 page = context.new_page()
+                current = page
                 page.goto(ORIGIN + "/magic_link/" + users[role + "_token"])
                 connected(page)
                 page.wait_for_url("**/overview")
@@ -95,18 +109,29 @@ def run() -> None:
                     expect(page.locator("#machine_request_key")).to_have_value(key)
                     stage = "default OSS admission"
                     page.locator("#provision-submit").click()
-                    page.wait_for_url(
-                        lambda url: (
-                            urlsplit(url).path.startswith("/machines/")
-                            and urlsplit(url).path != "/machines/new"
-                        )
-                    )
+                    # Submission lands on the thread-keyed provisioning receipt,
+                    # which opens the machine detail once the thread binds it.
+                    page.wait_for_url(machine_detail, timeout=120000)
                     vm_id = urlsplit(page.url).path.split("/")[-1]
                     assert str(uuid.UUID(vm_id)) == vm_id
                     (ROOT / "browser-vm").write_text(vm_id)
                 context.close()
+        except Exception:
+            if current is not None and not current.is_closed():
+                observe(current)
+            raise
         finally:
             browser.close()
+
+
+def observe(page: Page) -> None:
+    """Record booleans and counts only: no URL, token or page text leaves the VM."""
+    page_state["on_settings"] = urlsplit(page.url).path == "/settings"
+    page_state["connected"] = page.locator("[data-phx-main].phx-connected").count() > 0
+    page_state["key_articles"] = page.locator("#ssh-keys article").count()
+    page_state["keys_empty"] = page.locator("#ssh-keys-empty").count() > 0
+    page_state["flash_error"] = page.locator("#flash-error").count() > 0
+    page_state["flash_info"] = page.locator("#flash-info").count() > 0
 
 
 def refusal() -> None:
@@ -181,15 +206,12 @@ try:
     else:
         run()
 except Exception as error:
-    print(
-        json.dumps(
-            {
-                "event": "default_profile_browser_failed",
-                "mode": mode,
-                "stage": stage,
-                "category": type(error).__name__,
-            }
-        ),
-        file=sys.stderr,
-    )
+    failure: dict[str, object] = {
+        "event": "default_profile_browser_failed",
+        "mode": mode,
+        "stage": stage,
+        "category": type(error).__name__,
+    }
+    failure.update(page_state)
+    print(json.dumps(failure), file=sys.stderr)
     sys.exit(1)
