@@ -37,6 +37,16 @@ let
   within = prefix: rel: rel == prefix || lib.hasPrefix (prefix + "/") rel;
   ancestorOf = rel: target: lib.hasPrefix (rel + "/") target;
 
+  # Whether a repository-relative path is workspace scaffolding that every
+  # consumer's source holds whatever crates it compiles: the root files, the
+  # member manifests and their directories, and the patched path dependencies.
+  # Callers that copy a repository subset for an in-guest build keep these.
+  workspaceFile = rel:
+    builtins.elem rel [ "Cargo.toml" "Cargo.lock" "clippy.toml" ]
+    || lib.any (anchor: ancestorOf rel anchor) (patches ++ members)
+    || lib.any (dir: within dir rel) patches
+    || lib.any (member: rel == member || rel == "${member}/Cargo.toml") members;
+
   defaultCrateFile = name: lib.hasSuffix ".rs" name || builtins.elem name [ "Cargo.toml" "CONTRACTS" ];
 
   # name: store name of the source tree.
@@ -50,7 +60,6 @@ let
     let
       unknown = builtins.filter (crate: !(builtins.elem crate members)) crates;
       kept = crates ++ patches ++ extraFiles;
-      anchors = kept ++ members;
       filtered = lib.cleanSourceWith {
         name = "${name}-filtered";
         src = root;
@@ -60,11 +69,10 @@ let
             fileName = builtins.baseNameOf path;
           in
           fileName != "target" && fileName != ".hegel" && (
-            builtins.elem rel [ "Cargo.toml" "Cargo.lock" "clippy.toml" ]
-            || lib.any (anchor: ancestorOf rel anchor) anchors
-            || lib.any (dir: within dir rel) (patches ++ extraFiles)
+            workspaceFile rel
+            || lib.any (anchor: ancestorOf rel anchor) kept
+            || lib.any (dir: within dir rel) extraFiles
             || lib.any (crate: within crate rel && (type == "directory" || crateFile fileName rel)) crates
-            || lib.any (member: rel == member || rel == "${member}/Cargo.toml") members
           );
       };
       stubs = lib.concatMap (member: map (path: "${member}/${path}") (stubPaths member))
@@ -80,7 +88,7 @@ let
     '';
 in
 {
-  inherit lockFile members source;
+  inherit lockFile members source workspaceFile;
   # buildRustPackage attribute: the one vendored dependency set.
   cargoLock = { inherit lockFile; };
   # fetchCargoVendor layout (`@vendor@` placeholder) for hand-written builds.

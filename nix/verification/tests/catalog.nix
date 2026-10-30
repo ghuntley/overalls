@@ -1,4 +1,4 @@
-{ buildPkgs, testPkgs, nixpkgs, packages, modules, fixtures, kexec, imageSource, diskoModule, diskoSource }:
+{ buildPkgs, testPkgs, nixpkgs, packages, modules, fixtures, kexec, imageSource, diskoModule, diskoSource, nixCompactSource }:
 let
   # Keep the application build input separate from the stable NixOS test input.
   service = { pkgs = testPkgs; module = modules.default; inherit packages; };
@@ -552,7 +552,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   };
   host-images = import ./machines/host-images { pkgs = testPkgs; images = fixtures.hetzner-uefi.config.system.build.overallsTestImages; };
   host-enrollment = import ./machines/host-enrollment {
-    pkgs = testPkgs; inherit nixpkgs packages diskoModule diskoSource imageSource; module = modules.default;
+    pkgs = testPkgs; inherit nixpkgs packages diskoModule diskoSource imageSource nixCompactSource; module = modules.default;
   };
   host-conversion = testPkgs.linkFarm "overalls-host-conversion" (map (sourceOS: {
     name = sourceOS;

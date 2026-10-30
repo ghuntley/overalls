@@ -39,6 +39,15 @@ host = create_machine(name="host", start_command=shlex.join(command))
 driver.machines_qemu.append(host)
 host.start()
 host.wait_for_unit("sshd.service")
+# A base system admits only Tailscale and the source its installation recorded
+# (ADR-0234). Record the installer source as `remote.py install-base-source`
+# would: QEMU user networking forwards the driver's SSH from 10.0.2.2.
+host.succeed(
+    "install -d -m 0700 /var/lib/overalls-host"
+    " && (umask 077; printf '10.0.2.2\\n' > /var/lib/overalls-host/base-source)"
+    " && systemctl start overalls-base-source.service"
+    " && systemctl restart overalls-runtime-firewall.service"
+)
 host.succeed("install -d -m 700 /root/enrollment-test")
 for source, destination in [
     (operator_key, "operator"),

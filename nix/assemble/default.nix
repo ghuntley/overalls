@@ -88,6 +88,7 @@ let
     diskoModule = disko.nixosModules.disko;
     diskoSource = disko.outPath;
     imageSource = nixos-images.outPath;
+    nixCompactSource = nix-compact.outPath;
   };
 in
 {

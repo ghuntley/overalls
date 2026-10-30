@@ -1,4 +1,4 @@
-{ pkgs, nixpkgs, module, packages, diskoModule, diskoSource, imageSource }:
+{ pkgs, nixpkgs, module, packages, diskoModule, diskoSource, imageSource, nixCompactSource }:
 let
   lib = pkgs.lib;
   key = imageSource + "/nix/kexec-installer/ssh-keys/id_ed25519";
@@ -12,6 +12,9 @@ let
       disks = lib.imap0 (i: d: d // { id = builtins.elemAt ids i; model = ""; size = 17179869184; }) original.inventory.disks;
     };
     storage = original.storage // { system = ids; };
+    # What `host plan` records from the installed uplink; enrolled profiles
+    # read the default route's interface (the fleet exporter's uplink).
+    discovery.routes = [ { dev = "eth0"; dst = "default"; } ];
   };
   common = pkgs.writeText "fixture-common.nix" ''
     { lib, modulesPath, ... }: {
@@ -27,12 +30,18 @@ let
       disko.devices.disk.system1.device = lib.mkForce "/dev/vdb";
     }
   '';
+  cargoWorkspace = import ../../../../domains/artifacts/infrastructure/cargo-workspace.nix { inherit pkgs; };
   source = lib.cleanSourceWith {
     src = ../../../../..;
     name = "overalls-host-enrollment-source";
     filter = path: _type:
       let relative = lib.removePrefix ((toString ../../../../..) + "/") (toString path);
       in toString path == toString ../../../../.. || relative == "nix" || relative == "fleet"
+        # The public root CAs that every enrolled host and its guests trust.
+        || relative == "secrets" || relative == "secrets/brady-root.pem"
+        || relative == "secrets/private-services-root.pem"
+        # Enrolled Rust services build from the root Cargo workspace (ADR-0273).
+        || (!builtins.elem (baseNameOf path) [ "target" ".hegel" ] && cargoWorkspace.workspaceFile relative)
         || lib.hasPrefix "fleet/" relative
         || (lib.hasPrefix "nix/" relative && relative != "nix/verification" && !lib.hasPrefix "nix/verification/tests/" relative);
   };
@@ -51,17 +60,26 @@ let
         nixpkgs = { type = "tarball"; url = "file://${nixpkgsArchive}"; flake = false; };
         project = { url = "path:${source}"; flake = false; };
         disko = { url = "path:${diskoSource}"; flake = false; };
+        nixCompact = { url = "path:${nixCompactSource}"; flake = false; };
         marshall = { url = "path:${pkgs.hello}"; flake = false; };
         lilly = { url = "path:${pkgs.hello}"; flake = false; };
         secretspec = { url = "path:${packages.secretTools.secretspec}"; flake = false; };
         sops = { url = "path:${packages.secretTools.sops}"; flake = false; };
         sshToAge = { url = "path:${packages.secretTools.ssh-to-age}"; flake = false; };
       };
-      outputs = { self, nixpkgs, project, disko, marshall, lilly, secretspec, sops, sshToAge }: {
+      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge }: {
         nixosConfigurations.fixture-enrollment = import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
           system = "x86_64-linux";
           modules = [
             (import (project.outPath + "/nix/domains/system/catalog.nix") {
+              # The flake's locked nix-compact, from its preloaded source: the
+              # default reads the root flake.lock and fetches from GitHub.
+              nixCompact = {
+                lib.mkPackage = import (nixCompact.outPath + "/package");
+                nixosModules.default = import (nixCompact.outPath + "/modules/nixos.nix") {
+                  packageForSystem = _: throw "the catalog selects the nix-compact package";
+                };
+              };
               packages = { marshall = marshall.outPath; lilly = lilly.outPath;
                 encrypted = { marshall = marshall.outPath; lilly = lilly.outPath; };
                 secretTools = { secretspec = secretspec.outPath; sops = sops.outPath; ssh-to-age = sshToAge.outPath; };
@@ -86,7 +104,44 @@ let
       };
     }
   '';
-  extraTools = [ nixpkgsArchive target.config.system.build.toplevel
+  # A real enrolled host substitutes the outputs its first published build
+  # shares with the fleet cache; this fixture is offline and has no cache. An
+  # enrolled build of the same catalog, profile and package stand-ins as the
+  # recipe stands in for it, so the in-VM build reuses those outputs (the
+  # enrolled-only nix-compact Nix, fleet exporter and their toolchains) and
+  # still evaluates and builds everything the publication itself changes.
+  cacheHost = host // {
+    identity = host.identity // { sshKeys = [ public ]; };
+    git = { repository = "ssh://tester@127.0.0.1/home/tester/public-fleet"; knownHosts = "127.0.0.1 ${public}\n"; };
+    # Any public file stands in for the ciphertext, whose bundle the recipe rebuilds.
+    credentials = [ { name = "${host.name}-git"; path = "secrets/brady-root.pem"; } ];
+  };
+  enrolled = nixpkgs.lib.nixosSystem {
+    system = "x86_64-linux";
+    modules = [
+      (import ../../../../domains/system/catalog.nix {
+        nixCompact = {
+          lib.mkPackage = import (nixCompactSource + "/package");
+          nixosModules.default = import (nixCompactSource + "/modules/nixos.nix") {
+            packageForSystem = _: throw "the catalog selects the nix-compact package";
+          };
+        };
+        packages = { marshall = pkgs.hello; lilly = pkgs.hello;
+          encrypted = { marshall = pkgs.hello; lilly = pkgs.hello; };
+          inherit (packages) secretTools;
+        };
+      })
+      (import ../../../../platform/hosts/profile.nix {
+        host = cacheHost; inherit diskoModule; enrolled = true; repositoryRoot = ../../../../..;
+      })
+      (toString common)
+      ({ pkgs, ... }: {
+        environment.systemPackages = [ pkgs.nix ];
+        nix.settings.substituters = [];
+      })
+    ];
+  };
+  extraTools = [ nixpkgsArchive target.config.system.build.toplevel enrolled.config.system.build.toplevel
     (pkgs.perl.withPackages (p: with p; [ ConfigIniFiles FileSlurp ]))
     pkgs.remarshal pkgs.cpio pkgs.zstd pkgs.nixos-rebuild pkgs.curl pkgs.jq
     pkgs.desktop-file-utils pkgs.getconf pkgs.texinfo pkgs.libxslt.bin pkgs.lndir ] ++ pkgs.bind.all;
@@ -102,7 +157,7 @@ let
       environment.systemPackages = [ (import ../../../../domains/artifacts/host { inherit pkgs; }) pkgs.git pkgs.nix pkgs.sops pkgs.ssh-to-age ];
       # Native builds change only public configuration. Preload their toolchain
       # and immutable source inputs so this isolated test needs no network cache.
-      system.extraDependencies = [ source nixpkgs.outPath diskoSource pkgs.hello
+      system.extraDependencies = [ source nixpkgs.outPath diskoSource nixCompactSource pkgs.hello
         packages.secretTools.secretspec packages.secretTools.sops packages.secretTools.ssh-to-age
         pkgs.stdenv pkgs.stdenvNoCC ];
       system.build.overallsEnrollmentImages = lib.overrideDerivation config.system.build.diskoImages (old: {
