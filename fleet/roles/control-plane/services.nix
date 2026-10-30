@@ -8,6 +8,10 @@ let
   service = addresses.files."${host.name}Service";
   # Roles whose credentials the deployment's own Marshall issues.
   issued = !host.bootstrap;
+  roster = import ../../../nix/policy/fleet/hosts.nix { inherit lib; };
+  fleetServices = (import ../../../nix/policy/fleet/services.nix { inherit lib; }).services;
+  inherit (roster) controlPlaneAddress;
+  ports = import ../../../nix/policy/fleet/ports.nix { };
 in
 {
   imports = [ ./image-catalog.nix ./porsche-authority.nix ./private-services.nix ];
@@ -86,7 +90,7 @@ in
   # Collector sources MUST exclude audit, firecracker and guest content.
   services.overallsLogStore = {
     enable = true;
-    address = "10.90.0.1";
+    address = controlPlaneAddress;
     certificateFile = "/run/overalls-secrets/logstore/tls.crt";
     keyFile = "/run/overalls-secrets/logstore/tls.key";
     insertPasswordFile = "/run/overalls-secrets/logstore/insert.password";
@@ -106,15 +110,12 @@ in
     outputs.logstore = {
       type = "native";
       plugin = "http";
-      sources = [
-        "marshall" "lilly" "porsche" "audi" "ziggy" "enrico" "brady" "galileo" "underclass"
-        "haproxy" "auth" "kernel" "storage" "mail" "operations" "system"
-      ];
+      sources = (import ../../../nix/policy/fleet/services.nix { inherit lib; }).logSources;
       queueBytes = 50331648;
       credentialFiles.http_passwd = "/run/overalls-secrets/logstore/insert.password";
       settings = {
-        host = "logs.fleet.internal";
-        port = 8443;
+        host = fleetServices.logStore.dnsName;
+        port = fleetServices.logStore.port;
         uri = "/insert/jsonline?_msg_field=message";
         format = "json_lines";
         http_user = "insert";
@@ -178,10 +179,10 @@ in
     memoryMiB = 4096;
     instances.overalls = {
       bindAddress = "127.0.0.1";
-      port = 4443;
+      port = ports.marshallBackend;
       terminalPeerUrl = "https://ghuntley.dev:5443";
       terminalPeerCAFile = "/etc/overalls/service-ca.crt";
-      fleetBindAddress = "10.90.0.1";
+      fleetBindAddress = controlPlaneAddress;
       fleetLoopback = true;
       certificateFile = "/run/overalls-secrets/backend-tls/tls.crt";
       keyFile = "/run/overalls-secrets/backend-tls/tls.key";
@@ -202,8 +203,8 @@ in
   };
   services.enrico = {
     enable = true;
-    bindAddress = "10.90.0.1";
-    port = 5445;
+    bindAddress = controlPlaneAddress;
+    port = fleetServices.enrico.port;
     cacheDataset = "zroot/enrico";
     cacheQuotaGiB = 100;
     tokenFile = "/run/overalls-secrets/enrico/token";
@@ -216,7 +217,7 @@ in
     requires = [ "wireguard-fleet0.service" ];
     partOf = [ "wireguard-fleet0.service" ];
   };
-  networking.hosts."10.90.0.1" = [ "enrico.fleet.internal" ];
+  networking.hosts.${controlPlaneAddress} = [ fleetServices.enrico.dnsName ];
   environment.etc."overalls/enrico-ca.crt".source = ./enrico-ca.crt;
   systemd.services.marshall-overalls = {
     after = [ "enrico.service" "wireguard-fleet0.service" ];
@@ -224,7 +225,7 @@ in
     requires = [ "wireguard-fleet0.service" ];
     partOf = [ "wireguard-fleet0.service" ];
     environment = {
-      MARSHALL_ENRICO_URL = "https://enrico.fleet.internal:5445";
+      MARSHALL_ENRICO_URL = "https://${fleetServices.enrico.dnsName}:${toString fleetServices.enrico.port}";
       MARSHALL_ENRICO_TOKEN_FILE = "/run/credentials/marshall-overalls.service/enrico-token";
       MARSHALL_ENRICO_CA_FILE = "/run/credentials/marshall-overalls.service/enrico-ca.crt";
     };
@@ -266,7 +267,7 @@ in
     backendCAFile = "/etc/overalls/service-ca.crt";
     backends.overalls = {
       address = "127.0.0.1";
-      port = 4443;
+      port = ports.marshallBackend;
       serverName = "ghuntley.dev";
     };
     acme = {
@@ -298,7 +299,7 @@ in
 
   # @cc [owner:ghuntley,label:security;deployment] overalls-audi-public-plane
   # Audi gateway and DNS listeners MUST bind the reserved explicit address
-  # OVERALLS_SERVICE_IPV4 and remain reachable from the public internet through the
+  # (the deployment's `<name>Service` fleet address) and remain reachable from the public internet through the
   # reviewed fleet-perimeter public service entry (TCP 22/80/443 and UDP/TCP
   # 53); ordinary per-service firewall openings stay suppressed by ADR-0075.
   # Wildcard binds MUST fail evaluation against Porsche's shared port. The
@@ -327,7 +328,7 @@ in
   };
 
   services.audi = lib.mkIf issued {
-    # Overalls is alone in its tunnel (ADR-0239); no gateway peer can relay.
+    # Relay only when the deployment's tunnel has a gateway peer (ADR-0239).
     relay.enable = host.audiRelay;
     enable = true;
     hostId = config.services.lilly.hostId;

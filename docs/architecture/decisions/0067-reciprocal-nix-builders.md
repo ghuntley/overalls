@@ -85,7 +85,9 @@ remote store connectivity, reciprocal substitution and updater health.
 - [Access policy](../../../nix/domains/system/access.nix) admits the account only when
   the remote-builder module is enabled.
 - [Fleet registry](../../../fleet/remote-builders.nix) derives pins and document
-  paths from authoritative inventory.
+  paths from authoritative inventory, and tailnet addresses, the administrative
+  SSH port and measured CPU counts from the [fleet host roster](../../../nix/policy/fleet/hosts.nix) and
+  [port roster](../../../nix/policy/fleet/ports.nix).
 - [Evaluation check](../../../nix/verification/tests/evaluation/remote-builders.nix) and
   [two-machine check](../../../nix/verification/tests/machines/remote-builders/default.nix)
   cover configuration and actual Nix/SSH behavior separately.

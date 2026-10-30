@@ -64,7 +64,7 @@ The operator directed both changes on 2026-10-20.
 
 ## Implementation evidence
 
-- [`fleet-network.nix`](../../../fleet/fleet-network.nix) (tunnel membership)
+- [`fleet-network.nix`](../../../fleet/fleet-network.nix) and the [fleet host roster](../../../nix/policy/fleet/hosts.nix) (tunnel membership)
   and [`nix/domains/system/fleet-network.nix`](../../../nix/domains/system/fleet-network.nix)
   (no-peer host).
 - [`overalls/configuration.nix`](../../../fleet/roles/control-plane/configuration.nix),

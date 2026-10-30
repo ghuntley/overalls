@@ -163,6 +163,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   fleet-monitor-configuration = import ./evaluation/fleet-monitor.nix { pkgs = testPkgs; module = modules.default; };
   remote-builders = import ./machines/remote-builders service;
   remote-builders-configuration = import ./evaluation/remote-builders.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
+  fleet-roster = import ./evaluation/fleet-roster.nix { pkgs = buildPkgs; };
   fleet-builds = import ./machines/fleet-builds (service // { fleetModule = modules.fleetBuilds; });
   access = import ./machines/access { pkgs = testPkgs; module = modules.security.access; };
   access-configuration = import ./evaluation/access.nix {

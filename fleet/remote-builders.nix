@@ -2,13 +2,15 @@
 let
   inventory = (import ../nix/platform/hosts/inventory.nix { inherit lib; }).hosts;
   keys = builtins.fromJSON (builtins.readFile ./builder-public-keys.json);
-  # CPU counts were measured with nproc --all over inventory-pinned
-  # administrative SSH: the replacement Dungarees and Panterloons on 2026-10-20. Guest budgets are not CPU discovery.
-  endpoints = {
-    # Builders are reached over Tailscale so no public address is evaluated.
-    dungarees = { address = "100.96.244.44"; port = 2222; logicalCpus = 96; };
-    panterloons = { address = "100.98.214.120"; port = 2222; logicalCpus = 96; };
-  };
+  roster = import ../nix/policy/fleet/hosts.nix { inherit lib; };
+  ports = import ../nix/policy/fleet/ports.nix { };
+  # Builders are reached over Tailscale on administrative SSH, so no public
+  # address is evaluated; CPU counts are the roster's measured observations.
+  endpoints = lib.mapAttrs (_: host: {
+    address = host.tailnetAddress;
+    port = ports.adminSsh;
+    inherit (host.builder) logicalCpus;
+  }) (lib.filterAttrs (_: host: host.builder != null) roster.hosts);
 in
 # @cc [owner:ghuntley,label:security] fleet-builder-authority
 # Host pins and encrypted document paths MUST derive from authoritative host

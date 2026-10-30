@@ -91,6 +91,8 @@ The operator directed this on 2026-10-20.
 
 - [`control-plane.nix`](../../../fleet/roles/control-plane/control-plane.nix) and
   [Panterloons' configuration](../../../fleet/hosts/panterloons/configuration.nix).
+- The [fleet host roster](../../../nix/policy/fleet/hosts.nix) supplies the control plane's administrative address and
+  telemetry worker defaults.
 - [Remote builders](../../../fleet/remote-builders.nix) and its
   [evaluation](../../../nix/verification/tests/evaluation/remote-builders.nix).
 - Remaining: activation, Lilly enrollment against Panterloons' own Marshall,

@@ -31,9 +31,9 @@ let
     in !result.success;
   fleet = import ../../../../fleet/remote-builders.nix { inherit lib; };
   inventory = (import ../../../platform/hosts/inventory.nix { inherit lib; }).hosts;
-  # nproc --all over pinned administrative SSH (Overalls 2026-09-18; the
-  # replacement Dungarees and Panterloons AX162 hosts 2026-10-20).
-  measuredCpus = { overalls = 32; dungarees = 96; panterloons = 96; };
+  # nproc --all over pinned administrative SSH (the replacement Dungarees and
+  # Panterloons AX162 hosts 2026-10-20), restated independently of the roster.
+  measuredCpus = { dungarees = 96; panterloons = 96; };
   cases = {
     fleet-inputs = lib.all (name: builtins.pathExists fleet.${name}.encryptedFile
       && fleet.${name}.hostPublicKey == builtins.head inventory.${name}.identity.sshKeys

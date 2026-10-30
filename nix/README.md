@@ -6,7 +6,7 @@ areas described here.
 
 | Directory | Responsibility |
 | --- | --- |
-| `policy/` | Reviewed public user, network-source and encrypted-document registries. |
+| `policy/` | Reviewed public user, network-source and encrypted-document registries, and the fleet host, service and port roster (`policy/fleet`). |
 | `platform/` | Host inventory/profile, shared Nix helpers, build foundations and patches. |
 | `domains/` | Domain-owned packages and NixOS modules for control-plane, provisioner, guest, ingress, observability, security and tooling behavior. |
 | `verification/` | Evaluation checks, NixOS machine suites, fixtures, support code and Hegel property testing. |

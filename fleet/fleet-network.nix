@@ -4,19 +4,11 @@ let
   publicKeys = builtins.fromJSON (builtins.readFile ./fleet-public-keys.json);
   # Physical endpoints are fleet address names (nix/policy/network/fleet-addresses.nix);
   # the values arrive only through the shared fleet-addresses SOPS document.
-  # Each deployment has its own tunnel; addresses repeat across tunnels and
-  # no peer may cross from one tunnel to another.
-  networks = {
-    panterloons = {
-      panterloons = { address = "10.90.0.1"; endpoint = "panterloonsPrimary"; peers = [ "dungarees" "salopettes" ]; };
-      dungarees = { address = "10.90.0.2"; endpoint = "dungareesPrimary"; peers = [ "panterloons" ]; };
-      # Salopettes reaches only Panterloons: Marshall delivers Susan pokes over fleet0.
-      salopettes = { address = "10.90.0.3"; endpoint = "salopettesPrimary"; peers = [ "panterloons" ]; };
-    };
-  };
+  # Tunnel membership, addresses and peers come from the fleet host roster.
+  roster = import ../nix/policy/fleet/hosts.nix { inherit lib; };
+  fleetServices = import ../nix/policy/fleet/services.nix { inherit lib; };
   name = config.networking.hostName;
-  network = lib.findFirst (members: members ? ${name})
-    (throw "Host is in no fleet network") (lib.attrValues networks);
+  network = (roster.deploymentOf name).tunnel;
   addresses = config.overalls.fleetAddresses;
   serviceCa = ./roles/control-plane/service-ca.crt;
   local = network.${name};
@@ -43,8 +35,7 @@ in {
     enable = true;
     privateKeyFile = "/run/overalls-secrets/fleet-network/private-key";
     secretUnits = [ "overalls-secrets-fleet-network.service" ];
-    tcpPorts = if local.address == "10.90.0.1" then [ 4317 5443 5445 8443 9464 9467 ]
-      else if name == "salopettes" then [ 443 9464 9467 ] else [ 9464 9467 ];
+    tcpPorts = fleetServices.tunnelPorts name;
     peers = lib.genAttrs local.peers (peer: {
       inherit (network.${peer}) address;
       endpointAddressFile = addresses.files.${network.${peer}.endpoint};
@@ -57,10 +48,10 @@ in {
   };
   environment.etc."overalls/service-ca.crt".source = serviceCa;
   environment.etc."overalls/logstore-ca.crt".source = ./roles/control-plane/logstore-ca.crt;
-  networking.hosts."10.90.0.1" = [ "logs.fleet.internal" ];
+  networking.hosts.${roster.controlPlaneAddress} = [ fleetServices.services.logStore.dnsName ];
   services.lilly = {
     controlPlaneCAFile = "/etc/overalls/service-ca.crt";
-    protectedCidrs = [ "10.90.0.0/24" ];
+    protectedCidrs = [ roster.prefix ];
   };
   # @cc [owner:ghuntley,label:recovery;security] service-ca-consumers-follow-bundle
   # Consumers copy the service CA bundle at start (LoadCredential) or load it

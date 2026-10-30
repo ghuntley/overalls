@@ -99,7 +99,8 @@ CA, and local builds with the hub or the scheduler's grpc daemon down.
 - [Flake inputs](../../../flake.nix) pin tribuchet `1a1002096f3c` and
   nix-grpc-store `17f4ff97a6fd`, both following the stable NixOS input.
 - [Module](../../../nix/domains/system/fleet-builds.nix) and
-  [registry](../../../fleet/fleet-builds.nix) configure the hub, workers, grpc
+  [registry](../../../fleet/fleet-builds.nix) (participants, scheduler and hub from the
+  [fleet host roster](../../../nix/policy/fleet/hosts.nix)) configure the hub, workers, grpc
   daemons, build machine, caches, credential bundle and assertions;
   [remote-builders](../../../nix/domains/system/remote-builders.nix) gains
   `substitutePeers`.

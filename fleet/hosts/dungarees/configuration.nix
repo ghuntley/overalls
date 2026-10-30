@@ -1,17 +1,22 @@
 { config, lib, overallsPackages, pkgs, ... }:
+let
+  fleetServices = import ../../../nix/policy/fleet/services.nix { inherit lib; };
+  roster = import ../../../nix/policy/fleet/hosts.nix { inherit lib; };
+  ports = import ../../../nix/policy/fleet/ports.nix { };
+in
 {
   imports = [ ../../fleet-network.nix ];
   services.overallsOtelFleet = {
     enable = true;
     role = "worker";
-    hosts = { central = "panterloons"; worker = "dungarees"; };
+    hosts = (roster.deploymentOf "dungarees").telemetry;
   };
   # Resolve public fleet names through DNS instead of the private fleet tunnel.
   networking.hosts."127.0.0.2" = lib.mkForce [];
   # Use this host's stable systemd offset rather than a shared calendar burst.
   services.overallsBackups.randomizedDelaySec = 300;
 
-  # Identical hardware to Overalls; see its reviewed thresholds rationale.
+  # Identical hardware to Panterloons; see the control-plane role's reviewed thresholds rationale.
   services.overallsNixGc = {
     interval = "1h";
     diskThresholdGiB = 200;
@@ -45,7 +50,7 @@
   } // import ../../fleet-builds.nix { inherit lib; };
   networking.enableIPv6 = false;
   overalls.tailscale.exitNode = true;
-  services.openssh.ports = [ 2222 ];
+  services.openssh.ports = [ ports.adminSsh ];
   # @cc [owner:ghuntley,label:deployment] dungarees-worker-only
   # Dungarees MUST use Panterloons' control plane (ADR-0246) and its own enrolled identities.
   # It MUST NOT enable a local Marshall, database, public proxy or Porsche gateway.
@@ -116,15 +121,12 @@
     outputs.logstore = {
       type = "native";
       plugin = "http";
-      sources = [
-        "marshall" "lilly" "porsche" "audi" "ziggy" "enrico" "brady" "galileo" "underclass"
-        "haproxy" "auth" "kernel" "storage" "mail" "operations" "system"
-      ];
+      sources = fleetServices.logSources;
       queueBytes = 50331648;
       credentialFiles.http_passwd = "/run/overalls-secrets/logstore/insert.password";
       settings = {
-        host = "logs.fleet.internal";
-        port = 8443;
+        host = fleetServices.services.logStore.dnsName;
+        port = fleetServices.services.logStore.port;
         uri = "/insert/jsonline?_msg_field=message";
         format = "json_lines";
         http_user = "insert";

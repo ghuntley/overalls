@@ -4,9 +4,9 @@
   # its own database, secrets and fleet tunnel; Dungarees is its worker.
   imports = [ ../../roles/control-plane/configuration.nix ];
   overalls.controlPlaneHost = {
+    # The administrative address and telemetry worker come from the fleet
+    # host roster (nix/policy/fleet/hosts.nix).
     name = "panterloons";
-    adminAddress = "100.98.214.120";
-    otelWorker = "dungarees";
     # Dungarees is a gateway peer in its tunnel, as it was for Overalls.
     audiRelay = true;
   };

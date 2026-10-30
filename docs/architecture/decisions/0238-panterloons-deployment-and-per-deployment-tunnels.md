@@ -88,7 +88,11 @@ secrets and an empty database, and Dungarees joins it.
 
 ## Implementation evidence
 
-- [`fleet-network.nix`](../../../fleet/fleet-network.nix) (per-deployment tunnels).
+- [`fleet-network.nix`](../../../fleet/fleet-network.nix) (per-deployment tunnels),
+  reading tunnel membership, addresses and peers from the [fleet host roster](../../../nix/policy/fleet/hosts.nix)
+  and tunnel ports from the [service roster](../../../nix/policy/fleet/services.nix);
+  the roster's assertions and the [`fleet-roster` check](../../../nix/verification/tests/evaluation/fleet-roster.nix)
+  enforce reciprocal same-tunnel peers and the `10.90.0.1` control plane.
 - [`fleet-addresses.nix`](../../../nix/policy/network/fleet-addresses.nix) and
   [`allowed-hosts.nix`](../../../nix/policy/network/allowed-hosts.nix).
 - [`otel-fleet/default.nix`](../../../nix/domains/system/otel-fleet/default.nix)
