@@ -17,6 +17,7 @@ use rustix::event::{PollFd, PollFlags};
 use rustix::io::Errno;
 use rustix::net::{AddressFamily, SocketType};
 use std::ffi::CString;
+use std::fmt::Write as _;
 use std::os::fd::{AsFd, OwnedFd};
 use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
@@ -39,10 +40,10 @@ pub const MAX_BRIDGES: usize = 1024;
 pub const START_TIMEOUT: Duration = Duration::from_secs(4);
 /// How long ending a bridge may wait for its scope to empty.
 pub const END_TIMEOUT: Duration = Duration::from_secs(10);
-/// A bridge's hard lifetime: its scope's RuntimeMaxSec.
+/// A bridge's hard lifetime: its scope's `RuntimeMaxSec`.
 pub const LIFETIME_SECONDS: u64 = 30 * 24 * 3600;
 
-/// Detached bridge configuration; absent, BridgeIngress is Unavailable.
+/// Detached bridge configuration; absent, `BridgeIngress` is Unavailable.
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct Config {
     /// The only uid whose connection may be a bridge's client (Audi).
@@ -56,7 +57,7 @@ pub struct Config {
 }
 
 /// @cc [owner:ghuntley,label:security] ingress-slice-name
-/// valid_slice MUST accept only a top-level slice name: 1 to 64 lowercase
+/// `valid_slice` MUST accept only a top-level slice name: 1 to 64 lowercase
 /// letters, digits or `_`, then `.slice`. A `-` would nest the slice, so the
 /// cgroup directory hostd lists and kills in would not be the one systemd uses.
 pub fn valid_slice(slice: &str) -> bool {
@@ -73,14 +74,15 @@ pub fn valid_slice(slice: &str) -> bool {
 pub fn unit(key: &[u8; KEY]) -> String {
     let mut name = String::from("lilly-ingress-");
     for byte in key {
-        name.push_str(&format!("{byte:02x}"));
+        // Writing to a String cannot fail.
+        let _ = write!(name, "{byte:02x}");
     }
     name.push_str(".scope");
     name
 }
 
 /// @cc [owner:ghuntley,label:security] ingress-scope-names-closed
-/// key_of MUST return a key only for exactly `lilly-ingress-` followed by 32
+/// `key_of` MUST return a key only for exactly `lilly-ingress-` followed by 32
 /// lowercase hexadecimal digits and `.scope`, the inverse of unit; hostd never
 /// lists or kills any other cgroup in the slice.
 pub fn key_of(name: &[u8]) -> Option<[u8; KEY]> {
@@ -134,7 +136,7 @@ pub fn live(config: &Config) -> Vec<[u8; KEY]> {
 /// end MUST kill every process in the key's scope cgroup (`cgroup.kill`) and
 /// return Ok only once `cgroup.events` reports `populated 0` or the scope is
 /// gone; an absent scope is already ended. It never removes the cgroup,
-/// which systemd owns. A scope still populated after END_TIMEOUT is
+/// which systemd owns. A scope still populated after `END_TIMEOUT` is
 /// Unavailable, and the caller retries.
 pub fn end(config: &Config, key: &[u8; KEY]) -> Result<(), Refusal> {
     let cgroup = config.cgroup.join(unit(key));
@@ -155,8 +157,8 @@ pub fn end(config: &Config, key: &[u8; KEY]) -> Result<(), Refusal> {
 }
 
 /// @cc [owner:ghuntley,label:security] ingress-client-is-audi
-/// client_kind MUST accept only a connected AF_UNIX stream socket that is not
-/// listening and whose SO_PEERCRED uid is the configured Audi uid; anything
+/// `client_kind` MUST accept only a connected `AF_UNIX` stream socket that is not
+/// listening and whose `SO_PEERCRED` uid is the configured Audi uid; anything
 /// else is Malformed and left untouched. hostd therefore bridges only Audi's
 /// own connection to Lilly's ingress socket, never a socket of Lilly's
 /// choosing to another local service.
@@ -224,7 +226,7 @@ pub struct Stage<'a> {
 }
 
 /// @cc [owner:ghuntley,label:security;protocol] ingress-guest-stage
-/// stage MUST write the whole preface to the guest within START_TIMEOUT and
+/// stage MUST write the whole preface to the guest within `START_TIMEOUT` and
 /// then, when an expected frame is given, read exactly its length from the
 /// guest within `ready` and require byte equality. It MUST NOT read one byte
 /// past the expected frame, so every later guest byte reaches the client
@@ -291,7 +293,7 @@ pub fn await_ready(control: &OwnedFd, deadline: Instant) -> bool {
         }
         match rustix::io::read(control, &mut byte) {
             Ok(1) => return byte[0] == READY,
-            Err(Errno::INTR) | Err(Errno::AGAIN) => {}
+            Err(Errno::INTR | Errno::AGAIN) => {}
             _ => return false,
         }
     }

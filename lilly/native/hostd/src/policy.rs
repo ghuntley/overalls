@@ -13,6 +13,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 
 /// What the grammar may refer to.
+#[derive(Debug)]
 pub struct Context<'a> {
     pub file_roots: &'a [PathBuf],
     pub scope: Scope<'a>,
@@ -116,6 +117,10 @@ fn unicast_local_mac(value: &[u8]) -> bool {
 /// EXE ...` where EXE's file name is ip, nft, sysctl or lilly-flow-label;
 /// that EXE is replaced by hostd's own path for the utility and the rest is
 /// checked by that utility's grammar in the namespace.
+#[expect(
+    clippy::match_same_arms,
+    reason = "one arm per accepted command shape keeps the security grammar reviewable"
+)]
 fn ip(argv: &[&[u8]], in_namespace: bool) -> bool {
     let reads = |rest: &[&[u8]]| {
         matches!(
@@ -136,10 +141,7 @@ fn ip(argv: &[&[u8]], in_namespace: bool) -> bool {
     match rest {
         [b"netns", b"list"] => true,
         [b"netns", b"pids" | b"add" | b"delete", ns] => !in_namespace && namespace(ns),
-        [b"link", b"show", ..]
-        | [b"addr", b"show", ..]
-        | [b"route", b"show", ..]
-        | [b"rule", b"show", ..] => true,
+        [b"link" | b"addr" | b"route" | b"rule", b"show", ..] => true,
         [b"link", b"add", uplink, b"type", b"veth", b"peer", b"name", b"uplink", b"netns", ns] => {
             !in_namespace && device(uplink) && namespace(ns)
         }
@@ -179,7 +181,7 @@ fn ip(argv: &[&[u8]], in_namespace: bool) -> bool {
 /// @cc [owner:ghuntley,label:security] sysctl-keys-lilly-networking
 /// sysctl MUST accept only `-n net.ipv4.ip_forward` and `-qw` writes of the
 /// IPv4/IPv6 per-device keys Lilly sets (forwarding, redirects, source
-/// routing, rp_filter, src_valid_mark, arp_ignore, arp_announce, disable_ipv6) to 0, 1 or
+/// routing, `rp_filter`, `src_valid_mark`, `arp_ignore`, `arp_announce`, `disable_ipv6`) to 0, 1 or
 /// 2; in the root namespace only for Lilly's uplink device.
 fn sysctl(argv: &[&[u8]], in_namespace: bool) -> bool {
     match argv {
@@ -240,6 +242,10 @@ fn nft(argv: &[&[u8]], roots: &[PathBuf]) -> bool {
 /// systemctl MUST accept only `show` and `list-units` queries of `lilly.slice`
 /// and `lilly-vm-*` units. Lifecycle stop/kill MUST target exactly one
 /// `lilly-vm-UUID.service`, never the shared slice or a wildcard.
+#[expect(
+    clippy::match_same_arms,
+    reason = "one arm per accepted command shape keeps the security grammar reviewable"
+)]
 fn systemctl(argv: &[&[u8]]) -> bool {
     let vm_unit = |name: &[u8]| {
         name.strip_prefix(b"lilly-vm-")
@@ -293,8 +299,12 @@ fn image_copy(argv: &[&[u8]], roots: &[PathBuf]) -> bool {
 /// `id_ed25519` beneath the file roots, `lilly-zfs-namespace-unmount DS PATH`,
 /// argument-free `lilly-kvm-probe`, and the read-only stat/findmnt/realpath
 /// and `lilly-resume-token`/`lilly-flow-label`, whose own parsers validate.
-pub fn check(utility: Utility, arguments: &[CString], context: &Context) -> Decision {
-    let argv: Vec<&[u8]> = arguments.iter().map(|a| a.as_bytes()).collect();
+#[expect(
+    clippy::match_same_arms,
+    reason = "the always-allowed utilities are listed apart from the refused wildcard on purpose"
+)]
+pub fn check(utility: Utility, arguments: &[CString], context: &Context<'_>) -> Decision {
+    let argv: Vec<&[u8]> = arguments.iter().map(CString::as_bytes).collect();
     let roots = context.file_roots;
     let allowed = match utility {
         Utility::Ip => match argv.as_slice() {
@@ -311,9 +321,7 @@ pub fn check(utility: Utility, arguments: &[CString], context: &Context) -> Deci
                     crate::nft_policy::checked_copy(path, roots, private, context.request)
                 });
                 return match copy.and_then(|copy| CString::new(copy.as_os_str().as_bytes()).ok()) {
-                    Some(copy) => {
-                        Decision::Rewrite(vec![CString::new("--file").expect("literal"), copy])
-                    }
+                    Some(copy) => Decision::Rewrite(vec![c"--file".to_owned(), copy]),
                     None => Decision::Refuse,
                 };
             }
@@ -367,11 +375,11 @@ fn namespaced(
     executable: &[u8],
     rest: &[&[u8]],
     arguments: &[CString],
-    context: &Context,
+    context: &Context<'_>,
 ) -> Decision {
     let name = Path::new(OsStr::from_bytes(executable))
         .file_name()
-        .map(|name| name.as_bytes());
+        .map(OsStrExt::as_bytes);
     let (inner, allowed) = match name {
         Some(b"ip") => (Utility::Ip, ip(rest, true)),
         Some(b"nft") => (Utility::Nft, nft(rest, context.file_roots)),

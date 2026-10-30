@@ -30,12 +30,16 @@ fn lilly_table(name: &str) -> bool {
 }
 
 /// @cc [owner:ghuntley,label:security] host-nft-own-tables-only
-/// host_rules MUST accept a host-namespace rule file only when every top-level
+/// `host_rules` MUST accept a host-namespace rule file only when every top-level
 /// statement is `add table FAMILY NAME`, `delete table FAMILY NAME` or a
 /// `table FAMILY NAME { ... }` block (braces balanced, content not
 /// interpreted), with FAMILY `inet` or `ip` and NAME one of Lilly's tables,
 /// and the text contains no `include` or `ruleset`. Comments and blank lines
 /// are ignored. Anything else is refused.
+#[expect(
+    clippy::match_same_arms,
+    reason = "one arm per accepted table declaration form keeps the grammar reviewable"
+)]
 pub fn host_rules(text: &str) -> bool {
     if text.contains("include") || text.contains("ruleset") {
         return false;

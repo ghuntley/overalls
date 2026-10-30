@@ -77,7 +77,7 @@ fn run_decoding_matches_independent_model(tc: TestCase) {
     // An unterminated empty last argument is the same bytes as no argument.
     let mut model_arguments = arguments.clone();
     let mut model_terminated = terminated || arguments.is_empty();
-    if !terminated && model_arguments.last().is_some_and(|last| last.is_empty()) {
+    if !terminated && model_arguments.last().is_some_and(Vec::is_empty) {
         model_arguments.pop();
         model_terminated = true;
     }
@@ -165,9 +165,15 @@ fn replies_round_trip(tc: TestCase) {
 fn utility_table_is_dense_and_mutations_marked() {
     for (index, utility) in Utility::ALL.iter().enumerate() {
         assert_eq!(usize::from(utility.index()), index);
-        assert_eq!(Utility::from_index(index as u8), Some(*utility));
+        assert_eq!(
+            Utility::from_index(u8::try_from(index).unwrap()),
+            Some(*utility)
+        );
     }
-    assert_eq!(Utility::from_index(Utility::ALL.len() as u8), None);
+    assert_eq!(
+        Utility::from_index(u8::try_from(Utility::ALL.len()).unwrap()),
+        None
+    );
     for utility in [
         Utility::ImageCopy,
         Utility::Mv,
@@ -1075,7 +1081,7 @@ fn vm_launch_refuses_out_of_policy_requests() {
     );
 }
 
-/// LaunchVm datagrams round-trip, and direct systemd-run requests are refused.
+/// `LaunchVm` datagrams round-trip, and direct systemd-run requests are refused.
 #[hegel::test]
 fn vm_launch_decoding_round_trips(tc: TestCase) {
     let mut request = launch(tc.draw(gs::booleans()));

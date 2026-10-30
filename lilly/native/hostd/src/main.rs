@@ -20,6 +20,10 @@ const EXIT_CGROUP: u8 = 72;
 const EXIT_REAPER: u8 = 73;
 const EXIT_SOCKET: u8 = 74;
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "the startup sequence maps each failure to its own exit code in one linear function"
+)]
 fn run() -> u8 {
     let arguments: Vec<_> = std::env::args_os().skip(1).collect();
     let Some(options) = parse_options(&arguments) else {
@@ -79,10 +83,10 @@ fn run() -> u8 {
     let mut daemon = Daemon::new(leases, utilities, custody, peer_uid, options.peer_cgroups);
     daemon.service_uid = service_uid;
     daemon.socket_roots = socket_roots;
-    daemon.vm_tools = options.vm_tools.clone();
+    daemon.vm_tools.clone_from(&options.vm_tools);
     daemon.ingress = ingress;
-    daemon.roots = options.roots.clone();
-    daemon.pool_datasets = options.pool_datasets.clone();
+    daemon.roots.clone_from(&options.roots);
+    daemon.pool_datasets.clone_from(&options.pool_datasets);
     daemon.pools = pools;
     daemon.private_dir = options.socket.parent().map(std::path::Path::to_path_buf);
     daemon.file_roots = if options.file_roots.is_empty() {
@@ -140,7 +144,7 @@ fn run() -> u8 {
                 let daemon = Arc::clone(&daemon);
                 std::thread::spawn(move || serve(daemon, connection));
             }
-            Err(rustix::io::Errno::INTR) | Err(rustix::io::Errno::CONNABORTED) => {}
+            Err(rustix::io::Errno::INTR | rustix::io::Errno::CONNABORTED) => {}
             Err(_) => return EXIT_SETUP,
         }
     }

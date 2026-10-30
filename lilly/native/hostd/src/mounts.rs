@@ -80,7 +80,7 @@ fn proc_path(file: &OwnedFd) -> PathBuf {
 /// calls name the opened descriptors, never the caller's path. Anything else
 /// is Setup with no effect; a failed system call is Failed.
 pub fn perform(utility: Utility, argv: &[CString], roots: &[PathBuf]) -> Status {
-    let argv: Vec<&[u8]> = argv.iter().map(|a| a.as_bytes()).collect();
+    let argv: Vec<&[u8]> = argv.iter().map(CString::as_bytes).collect();
     let result = match (utility, argv.as_slice()) {
         (Utility::Mount, [b"--bind", b"--", source, target]) => {
             let (Some(source), Some(target)) = (open(roots, source), open(roots, target)) else {
@@ -154,7 +154,7 @@ pub fn perform(utility: Utility, argv: &[CString], roots: &[PathBuf]) -> Status 
 /// `roots`. hostd performs the mount itself on the target's descriptor
 /// (`perform`); this predicate states the accepted shape.
 pub fn snapshot_mount_allowed(argv: &[CString], roots: &[PathBuf]) -> bool {
-    let argv: Vec<&[u8]> = argv.iter().map(|a| a.as_bytes()).collect();
+    let argv: Vec<&[u8]> = argv.iter().map(CString::as_bytes).collect();
     match argv.as_slice() {
         [b"-t", b"zfs", b"-o", b"ro,nodev,nosuid,noexec", snapshot, target] => {
             snapshot_name(snapshot) && valid_directory(target) && {

@@ -22,12 +22,12 @@ use std::time::{Duration, Instant};
 /// Requests one session may have in flight at once.
 pub const MAX_IN_FLIGHT: usize = 1024;
 /// How long a finished durable job's result stays attachable.
-pub const JOB_RETENTION: Duration = Duration::from_secs(600);
+pub const JOB_RETENTION: Duration = Duration::from_mins(10);
 /// Most finished job results retained.
 pub const MAX_FINISHED_JOBS: usize = 256;
 /// How long an ingress bridge may run: its lifetime is bounded by its peers'
 /// end of stream and by the session, this only by a month.
-pub const BRIDGE_LIFETIME: Duration = Duration::from_secs(30 * 24 * 3600);
+pub const BRIDGE_LIFETIME: Duration = Duration::from_hours(720);
 
 /// A durable job's state.
 enum Job {
@@ -62,14 +62,21 @@ pub struct Daemon {
     pub file_roots: Vec<std::path::PathBuf>,
     /// Lease roots, beneath which a VM state directory must lie.
     pub roots: Vec<std::path::PathBuf>,
-    /// Executables for typed VM launches; None refuses LaunchVm.
+    /// Executables for typed VM launches; None refuses `LaunchVm`.
     pub vm_tools: Option<crate::vm_launch::Tools>,
-    /// Detached ingress bridges (ADR-0187); None refuses BridgeIngress and
+    /// Detached ingress bridges (ADR-0187); None refuses `BridgeIngress` and
     /// lists no bridges.
     pub ingress: Option<crate::ingress::Config>,
     next_session: AtomicU64,
     jobs: Mutex<HashMap<[u8; JOB_KEY], Job>>,
     jobs_changed: Condvar,
+}
+
+impl std::fmt::Debug for Daemon {
+    /// Daemon state stays opaque: it holds the lease and job tables.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("Daemon").finish_non_exhaustive()
+    }
 }
 
 impl Daemon {
@@ -128,9 +135,9 @@ struct Session {
 }
 
 /// @cc [owner:ghuntley,label:security] hostd-peer-authenticated
-/// A session MUST be refused unless the peer's SO_PEERCRED uid equals the
+/// A session MUST be refused unless the peer's `SO_PEERCRED` uid equals the
 /// configured uid and, when peer cgroups are configured, the peer's cgroup
-/// (from /proc/<pid>/cgroup) is one of them. The first datagram MUST be a
+/// (from `/proc/<pid>/cgroup`) is one of them. The first datagram MUST be a
 /// Hello with this protocol version; anything else closes the session
 /// before any lease or command.
 pub fn serve(daemon: Arc<Daemon>, socket: OwnedFd) {
@@ -267,7 +274,7 @@ fn receive<'a>(socket: &OwnedFd, buffer: &'a mut [u8]) -> Option<(&'a [u8], Opti
 
 impl Session {
     fn admit(&self) -> bool {
-        let mut book = self.book.lock().expect("session book");
+        let mut book = crate::lock(&self.book, "session book");
         if book.in_flight >= MAX_IN_FLIGHT {
             return false;
         }
@@ -276,14 +283,14 @@ impl Session {
     }
 
     fn done(&self) {
-        let mut book = self.book.lock().expect("session book");
+        let mut book = crate::lock(&self.book, "session book");
         book.in_flight -= 1;
         self.idle.notify_all();
     }
 
     fn reply(&self, id: u64, reply: &Reply) {
         let datagram = encode_reply(id, reply);
-        let _guard = self.writer.lock().expect("session writer");
+        let _guard = crate::lock(&self.writer, "session writer");
         // A failed send means the peer is gone; the reader observes EOF.
         let _ = send(&self.socket, &datagram, SendFlags::NOSIGNAL);
     }
@@ -292,6 +299,10 @@ impl Session {
         self.reply(id, &Reply::Refused { reason });
     }
 
+    #[expect(
+        clippy::too_many_lines,
+        reason = "the request dispatcher keeps one arm per request kind in one reviewable match"
+    )]
     fn handle(self: &Arc<Self>, id: u64, request: Request, descriptor: Option<OwnedFd>) {
         match request {
             Request::Hello { .. } => self.refuse(id, Refusal::Malformed),
@@ -329,7 +340,7 @@ impl Session {
                 self.reply(id, &Reply::Released);
             }
             Request::Cancel { target } => {
-                let book = self.book.lock().expect("session book");
+                let book = crate::lock(&self.book, "session book");
                 if let Some(run) = book.runs.get(&target) {
                     run.cancelled.store(true, Ordering::SeqCst);
                 }
@@ -490,7 +501,7 @@ impl Session {
     /// A detached bridge MUST be refused (Unavailable) without ingress
     /// configuration or a resolved helper; its received descriptor MUST pass
     /// ingress-client-is-audi (else Malformed) before anything else; there
-    /// MUST be fewer than MAX_BRIDGES live bridges and none with this key.
+    /// MUST be fewer than `MAX_BRIDGES` live bridges and none with this key.
     /// hostd then dials the guest exactly as hostd-netns-connect, stages the
     /// guest connection through ingress-guest-stage (the preface written
     /// whole, the expected frame read exactly, else Unavailable with no
@@ -502,7 +513,7 @@ impl Session {
     /// the bridge's end of a fresh control socket at 5, keeping no copy of
     /// any. Connected is sent only after the bridge sent READY, the greeting
     /// was written whole to Audi's connection and GO was sent, all within
-    /// START_TIMEOUT; on any failure the bridge is killed through its pidfd
+    /// `START_TIMEOUT`; on any failure the bridge is killed through its pidfd
     /// and its scope, and Unavailable is sent. The bridge is no command of
     /// this session: Cancel and session close leave it running.
     fn bridge_ingress(
@@ -585,7 +596,7 @@ impl Session {
         }
         let cancelled = Arc::new(AtomicBool::new(false));
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             if self.closed.load(Ordering::SeqCst) {
                 cancelled.store(true, Ordering::SeqCst);
             }
@@ -616,7 +627,7 @@ impl Session {
             },
         );
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             book.runs.remove(&id);
             self.idle.notify_all();
         }
@@ -654,7 +665,7 @@ impl Session {
         };
         let cancelled = Arc::new(AtomicBool::new(false));
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             if lease != 0 {
                 if book.busy.contains(&lease) || book.releasing.contains(&lease) {
                     return self.refuse(id, Refusal::LeaseBusy);
@@ -679,7 +690,7 @@ impl Session {
             );
             drop(descriptor);
             {
-                let mut book = self.book.lock().expect("session book");
+                let mut book = crate::lock(&self.book, "session book");
                 book.runs.remove(&id);
                 book.busy.remove(&lease);
                 self.idle.notify_all();
@@ -736,7 +747,7 @@ impl Session {
         }
         drop(descriptor);
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             book.runs.remove(&id);
             book.busy.remove(&lease);
             self.idle.notify_all();
@@ -753,6 +764,10 @@ impl Session {
     /// (Setup) unless it printed exactly `ok`. A Succeeded or Failed result
     /// carries exactly one byte, the helper's exit code; every other status
     /// carries none.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one linear custody sequence: validate, lease, run, release"
+    )]
     fn transfer_stream(
         &self,
         id: u64,
@@ -802,7 +817,7 @@ impl Session {
         };
         let cancelled = Arc::new(AtomicBool::new(false));
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             if book.busy.contains(&lease) || book.releasing.contains(&lease) {
                 return self.refuse(id, Refusal::LeaseBusy);
             }
@@ -842,9 +857,7 @@ impl Session {
             }
             (Some(_), None) => false,
         };
-        let (status, bytes) = if !checked {
-            (Status::Setup, Vec::new())
-        } else {
+        let (status, bytes) = if checked {
             match exec::run_coded(
                 &Spec {
                     executable: helper,
@@ -865,11 +878,13 @@ impl Session {
                 (Status::Succeeded | Status::Failed, None, _) => (Status::Failed, vec![u8::MAX]),
                 (status, _, _) => (status, Vec::new()),
             }
+        } else {
+            (Status::Setup, Vec::new())
         };
         drop(progress);
         drop(descriptor);
         {
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             book.runs.remove(&id);
             book.busy.remove(&lease);
             self.idle.notify_all();
@@ -877,7 +892,7 @@ impl Session {
         self.reply_result(id, status, &bytes);
     }
 
-    /// Send a command result, chunked into datagrams of at most CHUNK_SIZE.
+    /// Send a command result, chunked into datagrams of at most `CHUNK_SIZE`.
     fn reply_result(&self, id: u64, status: Status, bytes: &[u8]) {
         let mut chunks = bytes.chunks(CHUNK_SIZE).peekable();
         if chunks.peek().is_none() {
@@ -917,7 +932,10 @@ impl Session {
     /// its lease is released then if its session has closed, and otherwise
     /// stays with the live session. Releasing the lease explicitly still
     /// cancels it first.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a durable run carries its request id, key, lease, utility, arguments and descriptors explicitly"
+    )]
     fn run_durable(
         self: &Arc<Self>,
         id: u64,
@@ -942,7 +960,7 @@ impl Session {
             return self.refuse(id, Refusal::Malformed);
         };
         {
-            let mut jobs = self.daemon.jobs.lock().expect("job table");
+            let mut jobs = crate::lock(&self.daemon.jobs, "job table");
             if matches!(jobs.get(&key), Some(Job::Running)) {
                 drop(jobs);
                 return self.refuse(id, Refusal::JobRunning);
@@ -956,7 +974,7 @@ impl Session {
                 drop(jobs);
                 return self.refuse(id, Refusal::Malformed);
             }
-            let mut book = self.book.lock().expect("session book");
+            let mut book = crate::lock(&self.book, "session book");
             if book.busy.contains(&lease) || book.releasing.contains(&lease) {
                 return self.refuse(id, Refusal::LeaseBusy);
             }
@@ -965,7 +983,7 @@ impl Session {
             jobs.insert(key, Job::Running);
         }
         let cancelled = Arc::new(AtomicBool::new(false));
-        self.book.lock().expect("session book").runs.insert(
+        crate::lock(&self.book, "session book").runs.insert(
             id,
             Run {
                 lease,
@@ -990,7 +1008,7 @@ impl Session {
                 ),
             };
             drop(descriptor);
-            session.daemon.jobs.lock().expect("job table").insert(
+            crate::lock(&session.daemon.jobs, "job table").insert(
                 key,
                 Job::Done {
                     status,
@@ -1000,7 +1018,7 @@ impl Session {
             );
             session.daemon.jobs_changed.notify_all();
             let closed = {
-                let mut book = session.book.lock().expect("session book");
+                let mut book = crate::lock(&session.book, "session book");
                 book.runs.remove(&id);
                 book.busy.remove(&lease);
                 book.durable.remove(&lease);
@@ -1017,11 +1035,11 @@ impl Session {
 
     /// @cc [owner:ghuntley,label:recovery] durable-job-attach
     /// attach MUST reply with a finished job's stored result, wait at most
-    /// wait_ms for a running one (refusing JobRunning when the wait ends or
-    /// the session closes), and refuse UnknownJob for any other key.
+    /// `wait_ms` for a running one (refusing `JobRunning` when the wait ends or
+    /// the session closes), and refuse `UnknownJob` for any other key.
     fn attach(&self, id: u64, key: [u8; JOB_KEY], wait_ms: u32) {
         let deadline = Instant::now() + Duration::from_millis(u64::from(wait_ms));
-        let mut jobs = self.daemon.jobs.lock().expect("job table");
+        let mut jobs = crate::lock(&self.daemon.jobs, "job table");
         loop {
             match jobs.get(&key) {
                 None => {
@@ -1039,12 +1057,12 @@ impl Session {
                         drop(jobs);
                         return self.refuse(id, Refusal::JobRunning);
                     }
-                    jobs = self
-                        .daemon
-                        .jobs_changed
-                        .wait_timeout(jobs, remaining.min(Duration::from_millis(50)))
-                        .expect("job table")
-                        .0;
+                    jobs = crate::wait_timeout(
+                        &self.daemon.jobs_changed,
+                        jobs,
+                        remaining.min(Duration::from_millis(50)),
+                        "job table",
+                    );
                 }
             }
         }
@@ -1084,13 +1102,13 @@ impl Session {
     /// command was killed and reaped before the descriptor is dropped, so no
     /// successor is granted while a utility of the old holder may still run.
     fn release(&self, lease: u64) {
-        let mut book = self.book.lock().expect("session book");
+        let mut book = crate::lock(&self.book, "session book");
         book.releasing.insert(lease);
         for run in book.runs.values().filter(|run| run.lease == lease) {
             run.cancelled.store(true, Ordering::SeqCst);
         }
         while book.busy.contains(&lease) {
-            book = self.idle.wait(book).expect("session book");
+            book = crate::wait(&self.idle, book, "session book");
         }
         book.releasing.remove(&lease);
         drop(book);
@@ -1107,7 +1125,7 @@ impl Session {
         self.closed.store(true, Ordering::SeqCst);
         self.daemon.leases.wake();
         self.daemon.jobs_changed.notify_all();
-        let mut book = self.book.lock().expect("session book");
+        let mut book = crate::lock(&self.book, "session book");
         let cancel = |book: &Book| {
             for run in book
                 .runs
@@ -1119,7 +1137,7 @@ impl Session {
         };
         cancel(&book);
         while book.in_flight > 0 {
-            book = self.idle.wait(book).expect("session book");
+            book = crate::wait(&self.idle, book, "session book");
             cancel(&book);
         }
         let durable = book.durable.clone();

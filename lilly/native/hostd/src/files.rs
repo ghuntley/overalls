@@ -27,6 +27,7 @@ const MODES: [u32; 4] = [0o400, 0o444, 0o600, 0o700];
 const MAX_SIZE: u64 = 16 << 40;
 
 /// Ownership policy for `chown`.
+#[derive(Debug)]
 pub struct Owners {
     /// The uid Lilly's state belongs to (its service user).
     pub service: u32,
@@ -47,10 +48,7 @@ pub fn native(utility: Utility) -> bool {
 }
 
 fn arguments(arguments: &[CString]) -> Vec<&[u8]> {
-    arguments
-        .iter()
-        .map(|argument| argument.as_bytes())
-        .collect()
+    arguments.iter().map(CString::as_bytes).collect()
 }
 
 /// @cc [owner:ghuntley,label:security] native-file-effects-beneath-roots
@@ -63,8 +61,8 @@ fn arguments(arguments: &[CString]) -> Vec<&[u8]> {
 /// `rm [--force] -- P`, `rm -rf --one-file-system -- P`,
 /// `truncate --size N -- P`, `mkfifo --mode=0600 -- P`, `sync -- P...`
 /// (sync, which only flushes, accepts any normalised absolute path).
-/// Every path is resolved from an open root with RESOLVE_BENEATH and
-/// RESOLVE_NO_SYMLINKS, and the final component is never followed.
+/// Every path is resolved from an open root with `RESOLVE_BENEATH` and
+/// `RESOLVE_NO_SYMLINKS`, and the final component is never followed.
 /// Success is Succeeded with empty output; a refused or failed effect is
 /// Failed, matching the utility's nonzero exit.
 pub fn perform(utility: Utility, argv: &[CString], roots: &[PathBuf], owners: &Owners) -> Status {
@@ -79,8 +77,7 @@ pub fn perform(utility: Utility, argv: &[CString], roots: &[PathBuf], owners: &O
                 _ => return Status::Setup,
             }
         }
-        (Utility::Chown, [owner, b"--", path])
-        | (Utility::Chown, [b"--no-dereference", owner, b"--", path]) => {
+        (Utility::Chown, [owner, b"--", path] | [b"--no-dereference", owner, b"--", path]) => {
             match owner_ids(owner, owners) {
                 Some(id) => chown(roots, path, id),
                 None => return Status::Setup,

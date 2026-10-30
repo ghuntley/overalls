@@ -93,16 +93,16 @@ impl Utility {
         self.mutating()
             || (self == Utility::Systemctl
                 && matches!(
-                    arguments.first().map(|argument| argument.as_bytes()),
+                    arguments.first().map(CString::as_bytes),
                     Some(b"stop" | b"kill")
                 ))
     }
 
     /// @cc [owner:ghuntley,label:security] typed-only-utilities
     /// systemd-run, lilly-transfer-stream, ssh, cmp and lilly-ingress-bridge
-    /// MUST be reachable only through the typed LaunchVm, TransferStream and
-    /// BridgeNetnsTcp and BridgeIngress requests, whose command lines hostd derives itself; a
-    /// generic Run or RunDurable naming one is malformed. Lilly's own utility
+    /// MUST be reachable only through the typed `LaunchVm`, `TransferStream` and
+    /// `BridgeNetnsTcp` and `BridgeIngress` requests, whose command lines hostd derives itself; a
+    /// generic Run or `RunDurable` naming one is malformed. Lilly's own utility
     /// list therefore omits them.
     pub const fn typed_only(self) -> bool {
         matches!(
@@ -155,6 +155,5 @@ impl Table {
 fn executable(path: &Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
     std::fs::metadata(path)
-        .map(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
-        .unwrap_or(false)
+        .is_ok_and(|metadata| metadata.is_file() && metadata.permissions().mode() & 0o111 != 0)
 }

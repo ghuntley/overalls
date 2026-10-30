@@ -25,6 +25,10 @@ fn text(path: &Path) -> String {
 
 /// Each accepted shape performs its effect natively.
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table-driven test walks every case of one grammar"
+)]
 fn native_file_effects_perform_lillys_shapes() {
     if crate::descriptor_resolution::unavailable("native_file_effects_perform_lillys_shapes") {
         return;

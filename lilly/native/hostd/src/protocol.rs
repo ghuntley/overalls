@@ -41,9 +41,9 @@ const OP_BRIDGE_NETNS_TCP: u8 = 13;
 const OP_BRIDGE_INGRESS: u8 = 14;
 const OP_LIST_INGRESS_BRIDGES: u8 = 15;
 const OP_END_INGRESS_BRIDGE: u8 = 16;
-/// Fixed TransferStream prefix: lease, timeout, rate, producer and consumer kinds.
+/// Fixed `TransferStream` prefix: lease, timeout, rate, producer and consumer kinds.
 const STREAM_FIXED: usize = 8 + 4 + 4 + 1 + 1;
-/// Most NUL-terminated TransferStream fields (an SSH pull into a receive).
+/// Most NUL-terminated `TransferStream` fields (an SSH pull into a receive).
 const MAX_STREAM_FIELDS: usize = 14;
 /// Length of a durable job key.
 pub const JOB_KEY: usize = 32;
@@ -97,7 +97,7 @@ pub enum Request {
         utility: Utility,
         arguments: Vec<CString>,
     },
-    /// Wait at most wait_ms for a durable job's result.
+    /// Wait at most `wait_ms` for a durable job's result.
     Attach {
         key: [u8; JOB_KEY],
         wait_ms: u32,
@@ -132,7 +132,7 @@ pub enum Request {
         namespace: Vec<u8>,
         device: Vec<u8>,
     },
-    /// Dial TCP inside a VM network namespace exactly as BridgeNetnsTcp and
+    /// Dial TCP inside a VM network namespace exactly as `BridgeNetnsTcp` and
     /// bridge it to Audi's connection, which travels with the request, in a
     /// detached bridge named by `key` that outlives hostd (ADR-0187). hostd
     /// first writes `preface` to the guest and, when `expect` is not empty,
@@ -226,14 +226,14 @@ pub enum Reply {
         status: Status,
         bytes: Vec<u8>,
     },
-    /// The caller's socket is now connected (ConnectUnix, BridgeNetnsTcp,
-    /// BridgeIngress).
+    /// The caller's socket is now connected (`ConnectUnix`, `BridgeNetnsTcp`,
+    /// `BridgeIngress`).
     Connected,
 }
 
 /// @cc [owner:ghuntley,label:protocol;security] hostd-descriptor-requests-only
-/// Exactly ConnectUnix, BridgeNetnsTcp and BridgeIngress carry one SCM_RIGHTS
-/// descriptor: the caller's own socket, or for BridgeIngress the Audi
+/// Exactly `ConnectUnix`, `BridgeNetnsTcp` and `BridgeIngress` carry one `SCM_RIGHTS`
+/// descriptor: the caller's own socket, or for `BridgeIngress` the Audi
 /// connection the BEAM accepted; every other request carries none. hostd
 /// never sends a descriptor: the BEAM cannot release one it did not create
 /// (ADR-0184).
@@ -261,19 +261,23 @@ fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
 /// output limits other than 65536 or 4194304, waits above 120000 ms, a
 /// directory that is not absolute or contains NUL or a `..` component, more
 /// than 127 arguments, unterminated arguments, an unknown or typed-only
-/// utility, or a TransferStream whose timeout is outside 1000..86400000 ms,
+/// utility, or a `TransferStream` whose timeout is outside 1000..86400000 ms,
 /// whose rate exceeds 1073741824, whose producer or consumer kind is unknown,
 /// or whose NUL-terminated field count differs from those kinds' count, a
-/// ConnectUnix or BridgeNetnsTcp whose timeout is outside 1..30000 ms, a
-/// ConnectUnix path that is not a valid directory, a BridgeNetnsTcp with
-/// port 0 or an empty namespace or device, a BridgeIngress whose greeting
+/// `ConnectUnix` or `BridgeNetnsTcp` whose timeout is outside 1..30000 ms, a
+/// `ConnectUnix` path that is not a valid directory, a `BridgeNetnsTcp` with
+/// port 0 or an empty namespace or device, a `BridgeIngress` whose greeting
 /// exceeds 256 bytes, whose preface exceeds 4096 bytes, whose expected guest
 /// frame exceeds 256 bytes, whose ready wait is not 0 for an empty expected
-/// frame and 1..=30000 ms otherwise, or whose target fails BridgeNetnsTcp's
+/// frame and 1..=30000 ms otherwise, or whose target fails `BridgeNetnsTcp`'s
 /// rules, or a
-/// ListIngressBridges or EndIngressBridge with any other body length.
+/// `ListIngressBridges` or `EndIngressBridge` with any other body length.
 /// The caller never names an executable: the utility is an index into the
 /// closed table that hostd resolves itself.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per wire request kind keeps the closed decoder in one reviewable match"
+)]
 pub fn decode(bytes: &[u8]) -> Option<Envelope> {
     if bytes.len() > REQUEST_LIMIT || bytes.len() < 9 {
         return None;
@@ -459,7 +463,7 @@ pub fn decode(bytes: &[u8]) -> Option<Envelope> {
 
 type RunBody = (u64, u32, u32, Utility, Vec<CString>);
 
-/// Fixed LaunchVm prefix: lease, placement, epoch, generation, uid, memory,
+/// Fixed `LaunchVm` prefix: lease, placement, epoch, generation, uid, memory,
 /// vCPUs, flags, the state directory length and the namespace length.
 const LAUNCH_FIXED: usize = 8 + 36 + 8 + 8 + 4 + 8 + 1 + 1 + 1 + 1;
 
@@ -478,7 +482,7 @@ fn sized(body: &[u8], maximum: usize) -> Option<(&[u8], &[u8])> {
     Some(rest.split_at(length))
 }
 
-/// A namespace TCP target as BridgeNetnsTcp and BridgeIngress carry it.
+/// A namespace TCP target as `BridgeNetnsTcp` and `BridgeIngress` carry it.
 struct NetnsTarget {
     mark: u32,
     destination: [u8; 4],
@@ -561,6 +565,14 @@ pub fn valid_directory(directory: &[u8]) -> bool {
 }
 
 /// Encode a request (used by tests and by documentation of the layout).
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per wire request kind mirrors decode"
+)]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the inverse of decode: requests that decode accepts fit the u8 and u16 length fields; any other length keeps the existing wire truncation"
+)]
 pub fn encode_request(envelope: &Envelope) -> Vec<u8> {
     let mut out = Vec::new();
     let op = match envelope.request {
@@ -729,6 +741,10 @@ pub fn encode_request(envelope: &Envelope) -> Vec<u8> {
 }
 
 /// Encode one reply datagram answering request `id`.
+#[expect(
+    clippy::match_same_arms,
+    reason = "one arm per reply kind mirrors decode_reply; merging would hide which kinds share a wire layout"
+)]
 pub fn encode_reply(id: u64, reply: &Reply) -> Vec<u8> {
     let mut out = Vec::with_capacity(16);
     let kind = match reply {

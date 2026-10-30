@@ -16,13 +16,13 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// @cc [owner:ghuntley,label:verification] hostd-ingress-decoding
-/// BridgeIngress datagrams MUST decode exactly when the greeting (at most
+/// `BridgeIngress` datagrams MUST decode exactly when the greeting (at most
 /// 256 bytes), preface (at most 4096) and expected frame (at most 256) fit
 /// their declared lengths, the ready wait is 0 for an empty expected frame
 /// and 1..=30000 ms otherwise, and the target that follows obeys
-/// BridgeNetnsTcp's rules; accepted datagrams carry a descriptor and
-/// re-encode to the same bytes. ListIngressBridges takes an empty body and
-/// EndIngressBridge exactly a 16-byte key, and neither carries a descriptor.
+/// `BridgeNetnsTcp`'s rules; accepted datagrams carry a descriptor and
+/// re-encode to the same bytes. `ListIngressBridges` takes an empty body and
+/// `EndIngressBridge` exactly a 16-byte key, and neither carries a descriptor.
 #[hegel::test]
 fn ingress_decoding_matches_model(tc: TestCase) {
     let key: Vec<u8> = tc.draw(gs::binary().min_size(KEY).max_size(KEY));
@@ -33,7 +33,7 @@ fn ingress_decoding_matches_model(tc: TestCase) {
     ));
     let expect = tc.draw(gs::binary().max_size(300));
     let declared = tc.draw(hegel::one_of!(
-        gs::just(greeting.len() as u16),
+        gs::just(u16::try_from(greeting.len()).unwrap()),
         gs::integers::<u16>().max_value(400),
     ));
     let ready = tc.draw(hegel::one_of!(
@@ -54,7 +54,7 @@ fn ingress_decoding_matches_model(tc: TestCase) {
     target.extend(port.to_be_bytes());
     target.extend([0, 0, 0, 0]);
     target.extend(timeout.to_be_bytes());
-    target.push(namespace.len() as u8);
+    target.push(u8::try_from(namespace.len()).unwrap());
     target.extend(&namespace);
     target.extend(&device);
     let mut body = vec![14_u8];
@@ -62,9 +62,9 @@ fn ingress_decoding_matches_model(tc: TestCase) {
     body.extend(&key);
     body.extend(declared.to_be_bytes());
     body.extend(&greeting);
-    body.extend((preface.len() as u16).to_be_bytes());
+    body.extend(u16::try_from(preface.len()).unwrap().to_be_bytes());
     body.extend(&preface);
-    body.extend((expect.len() as u16).to_be_bytes());
+    body.extend(u16::try_from(expect.len()).unwrap().to_be_bytes());
     body.extend(&expect);
     body.extend(ready.to_be_bytes());
     body.extend(&target);
@@ -122,7 +122,7 @@ fn ingress_decoding_matches_model(tc: TestCase) {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-ingress-scope-names
-/// unit and key_of MUST be inverse on every key, and key_of MUST refuse any
+/// unit and `key_of` MUST be inverse on every key, and `key_of` MUST refuse any
 /// name that is not exactly the lowercase form.
 #[hegel::test]
 fn scope_names_round_trip(tc: TestCase) {
@@ -246,7 +246,8 @@ fn bridges_are_listed_and_ended_through_their_cgroups() {
     watcher.join().unwrap();
     assert_eq!(std::fs::read(live.join("cgroup.kill")).unwrap(), b"1");
     assert!(live.is_dir(), "systemd owns the scope's cgroup");
-    assert!(ingress::live(&config).is_empty());
+    // Compare the count: bridge keys stay out of the failure message.
+    assert_eq!(ingress::live(&config).len(), 0);
 }
 
 fn pair() -> (OwnedFd, OwnedFd) {
@@ -260,7 +261,7 @@ fn pair() -> (OwnedFd, OwnedFd) {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-ingress-client-kind
-/// Only a connected, non-listening AF_UNIX stream socket whose peer is the
+/// Only a connected, non-listening `AF_UNIX` stream socket whose peer is the
 /// configured uid may be a detached bridge's client.
 #[test]
 fn only_audis_connected_stream_is_a_client() {

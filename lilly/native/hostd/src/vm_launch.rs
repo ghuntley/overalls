@@ -85,6 +85,10 @@ fn text(value: impl AsRef<[u8]>) -> Result<CString, Refusal> {
 /// /metadata.json` after the Firecracker configuration file. A non-zero
 /// service uid MUST be passed as the boot-log writer's `--reader-uid` and
 /// the launch guard's `--owner-uid`, and a zero service uid as neither.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the fixed launch command line is built in one auditable sequence"
+)]
 pub fn argv(
     tools: Option<&Tools>,
     roots: &[PathBuf],

@@ -35,7 +35,7 @@ fn path_model(path: &[u8]) -> bool {
 }
 
 /// @cc [owner:ghuntley,label:verification] hostd-connect-unix-decoding
-/// ConnectUnix datagrams MUST be accepted exactly when the timeout is in
+/// `ConnectUnix` datagrams MUST be accepted exactly when the timeout is in
 /// 1..=30000 ms and the path satisfies the directory model, and re-encode to
 /// the received bytes.
 #[hegel::test]
@@ -66,7 +66,7 @@ fn connect_unix_decoding_matches_model(tc: TestCase) {
 }
 
 /// @cc [owner:ghuntley,label:verification] hostd-bridge-decoding
-/// BridgeNetnsTcp datagrams MUST be accepted exactly when the port is
+/// `BridgeNetnsTcp` datagrams MUST be accepted exactly when the port is
 /// nonzero, the timeout is in 1..=30000 ms and both the namespace (its length
 /// byte) and the device that follows it are nonempty, and re-encode to the
 /// received bytes.
@@ -80,7 +80,7 @@ fn bridge_decoding_matches_model(tc: TestCase) {
     let namespace = tc.draw(gs::binary().max_size(5));
     let device = tc.draw(gs::binary().max_size(5));
     let declared = tc.draw(hegel::one_of!(
-        gs::just(namespace.len() as u8),
+        gs::just(u8::try_from(namespace.len()).unwrap()),
         gs::integers::<u8>().max_value(12),
     ));
     let mut body = vec![13_u8];
@@ -263,7 +263,7 @@ fn listener(root: &Path, name: &str) -> (UnixListener, PathBuf) {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-connects-callers-socket
-/// ConnectUnix MUST connect the caller's own non-blocking socket to a
+/// `ConnectUnix` MUST connect the caller's own non-blocking socket to a
 /// confined Firecracker socket and keep no copy: the caller's close alone
 /// MUST give the listener's peer end of stream.
 #[test]
@@ -288,11 +288,12 @@ fn connect_unix_connects_the_callers_socket_and_keeps_no_copy() {
     let mut rest = Vec::new();
     peer.read_to_end(&mut rest)
         .expect("end of stream once the caller closes: hostd kept no copy");
-    assert!(rest.is_empty());
+    // Compare lengths: the received bytes stay out of the failure message.
+    assert_eq!(rest.len(), 0);
 }
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-connect-refusals
-/// ConnectUnix MUST refuse a path outside the socket roots, another basename
+/// `ConnectUnix` MUST refuse a path outside the socket roots, another basename
 /// or a symbolic-link component (Unavailable), and a received descriptor
 /// that is connected, listening or not a stream socket (Malformed); each
 /// refused descriptor is closed by hostd.
@@ -352,7 +353,7 @@ fn connect_unix_refuses_paths_and_socket_kinds() {
 }
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-descriptor-count-rule
-/// A ConnectUnix without a descriptor, a request that must carry none but
+/// A `ConnectUnix` without a descriptor, a request that must carry none but
 /// does, and a datagram carrying two descriptors MUST each end the session.
 #[test]
 fn misplaced_descriptors_end_the_session() {
@@ -378,7 +379,7 @@ fn misplaced_descriptors_end_the_session() {
 // ---------------------------------------------------------------- bridge
 
 /// @cc [owner:ghuntley,label:verification;security] hostd-bridge-handoff-fixture
-/// bridge_handoff MUST connect the caller's socket to hostd's private
+/// `bridge_handoff` MUST connect the caller's socket to hostd's private
 /// listener, return the accepted end of exactly that connection and remove
 /// the listener's path.
 #[test]
@@ -407,7 +408,7 @@ fn bridge_handoff_returns_the_accepted_end_and_removes_its_listener() {
 }
 
 /// @cc [owner:ghuntley,label:verification;recovery] hostd-handoff-fixture
-/// run_handoff MUST give the child the handed-off descriptors at 3 and 4,
+/// `run_handoff` MUST give the child the handed-off descriptors at 3 and 4,
 /// signal its start once, and keep no copy: each peer sees end of stream when
 /// the child exits.
 #[test]

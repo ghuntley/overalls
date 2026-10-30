@@ -19,6 +19,8 @@ pub mod zfs_policy;
 use std::ffi::OsString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
+use std::sync::{Condvar, Mutex, MutexGuard};
+use std::time::Duration;
 
 /// Parsed command line.
 #[derive(Debug, Eq, PartialEq)]
@@ -48,7 +50,7 @@ pub struct Options {
 }
 
 /// @cc [owner:ghuntley,label:security] hostd-options-absolute
-/// parse_options MUST accept only absolute socket, root and cgroup paths,
+/// `parse_options` MUST accept only absolute socket, root and cgroup paths,
 /// at least one root, numeric peer and service uids, absolute peer cgroup paths and the
 /// bare `--stdin-lifetime` flag, and either all five absolute `--vm-*`
 /// paths or none of them, and either no `--pool-dataset` or exactly one per
@@ -83,19 +85,19 @@ pub fn parse_options(arguments: &[OsString]) -> Option<Options> {
             b"--root" if absolute => roots.push(PathBuf::from(value)),
             b"--cgroup" if cgroup.is_none() && value.as_bytes() == b"self" => cgroup = Some(None),
             b"--cgroup" if cgroup.is_none() && absolute => {
-                cgroup = Some(Some(PathBuf::from(value)))
+                cgroup = Some(Some(PathBuf::from(value)));
             }
             b"--peer-uid" if peer_uid.is_none() => {
-                peer_uid = Some(std::str::from_utf8(value.as_bytes()).ok()?.parse().ok()?)
+                peer_uid = Some(std::str::from_utf8(value.as_bytes()).ok()?.parse().ok()?);
             }
             b"--service-uid" if service_uid.is_none() => {
-                service_uid = Some(std::str::from_utf8(value.as_bytes()).ok()?.parse().ok()?)
+                service_uid = Some(std::str::from_utf8(value.as_bytes()).ok()?.parse().ok()?);
             }
             b"--peer-cgroup" if absolute => peer_cgroups.push(value.as_bytes().to_vec()),
             b"--socket-root" if absolute => socket_roots.push(PathBuf::from(value)),
             b"--file-root" if absolute => file_roots.push(PathBuf::from(value)),
             b"--pool-dataset" if !absolute && !value.is_empty() => {
-                pool_datasets.push(value.as_bytes().to_vec())
+                pool_datasets.push(value.as_bytes().to_vec());
             }
             b"--ingress-peer-user" if ingress_user.is_none() => {
                 let name = value.to_str()?;
@@ -172,7 +174,7 @@ fn valid_user(name: &str) -> bool {
 }
 
 /// @cc [owner:ghuntley,label:security] ingress-peer-uid-from-passwd
-/// passwd_uid MUST return the uid of exactly the line whose first field is
+/// `passwd_uid` MUST return the uid of exactly the line whose first field is
 /// `name` in passwd(5) text, and None when no line or more than one line
 /// names it, or the uid field is not a decimal u32. hostd resolves Audi's
 /// dynamic uid this way once at startup.
@@ -194,7 +196,7 @@ pub fn passwd_uid(passwd: &[u8], name: &str) -> Option<u32> {
 
 impl Options {
     /// Configured pools: each `--pool-dataset` with the `--socket-root` at
-    /// the same position (parse_options requires equal counts).
+    /// the same position (`parse_options` requires equal counts).
     pub fn pools(&self) -> Vec<(Vec<u8>, PathBuf)> {
         self.pool_datasets
             .iter()
@@ -212,6 +214,53 @@ const VM_FLAGS: [&[u8]; 5] = [
     b"--vm-jailer",
     b"--vm-firecracker",
 ];
+
+// Lock helpers. The release profile sets `panic = "abort"`, so no hostd thread
+// can unwind while holding a lock and poisoning is unobservable in production.
+// Test builds unwind; there a poisoned lock still panics with its label, as the
+// call sites' own `expect`s did before.
+
+/// Lock a mutex shared between hostd threads, panicking with `label` if it is
+/// poisoned.
+#[track_caller]
+#[expect(
+    clippy::expect_used,
+    reason = "panic = \"abort\" in release makes lock poisoning unobservable; tests keep the labelled panic"
+)]
+pub(crate) fn lock<'a, T>(mutex: &'a Mutex<T>, label: &str) -> MutexGuard<'a, T> {
+    mutex.lock().expect(label)
+}
+
+/// `Condvar::wait` on a hostd lock, panicking with `label` if it is
+/// poisoned.
+#[track_caller]
+#[expect(
+    clippy::expect_used,
+    reason = "panic = \"abort\" in release makes lock poisoning unobservable; tests keep the labelled panic"
+)]
+pub(crate) fn wait<'a, T>(
+    condvar: &Condvar,
+    guard: MutexGuard<'a, T>,
+    label: &str,
+) -> MutexGuard<'a, T> {
+    condvar.wait(guard).expect(label)
+}
+
+/// `Condvar::wait_timeout` on a hostd lock, panicking with `label` if it is
+/// poisoned; the timeout flag is discarded.
+#[track_caller]
+#[expect(
+    clippy::expect_used,
+    reason = "panic = \"abort\" in release makes lock poisoning unobservable; tests keep the labelled panic"
+)]
+pub(crate) fn wait_timeout<'a, T>(
+    condvar: &Condvar,
+    guard: MutexGuard<'a, T>,
+    timeout: Duration,
+    label: &str,
+) -> MutexGuard<'a, T> {
+    condvar.wait_timeout(guard, timeout).expect(label).0
+}
 
 /// The cgroup v2 directory of this process.
 pub fn own_cgroup() -> Option<PathBuf> {

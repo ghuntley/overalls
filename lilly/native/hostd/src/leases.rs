@@ -7,6 +7,7 @@
 use crate::protocol::{Mode, Refusal};
 use rustix::fs::{flock, fstat, openat2, FlockOperation, Mode as FileMode, OFlags, ResolveFlags};
 use rustix::io::Errno;
+use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
 use std::os::fd::OwnedFd;
 use std::path::{Path, PathBuf};
@@ -64,6 +65,16 @@ pub struct Leases {
     owner: Option<u32>,
 }
 
+impl std::fmt::Debug for Leases {
+    /// The lease table's state stays opaque; only the root count is shown.
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Leases")
+            .field("roots", &self.roots.len())
+            .finish_non_exhaustive()
+    }
+}
+
 impl Leases {
     /// Record the permitted roots. Each must be absolute; it need not exist yet.
     pub fn new(roots: &[PathBuf]) -> std::io::Result<Leases> {
@@ -86,14 +97,15 @@ impl Leases {
     }
 
     /// Hand lock inodes to `uid` when it differs from hostd's own uid.
+    #[must_use]
     pub fn with_owner(mut self, uid: u32) -> Leases {
         self.owner = (uid != rustix::process::geteuid().as_raw()).then_some(uid);
         self
     }
 
     /// @cc [owner:ghuntley,label:security] hostd-lock-inode-beneath-root
-    /// open_lock MUST resolve `<directory>/owner.lock` beneath one configured
-    /// root with RESOLVE_BENEATH and RESOLVE_NO_SYMLINKS, creating it 0600 if
+    /// `open_lock` MUST resolve `<directory>/owner.lock` beneath one configured
+    /// root with `RESOLVE_BENEATH` and `RESOLVE_NO_SYMLINKS`, creating it 0600 if
     /// absent, and MUST refuse a non-regular, multiply linked, wrong-owner or
     /// group/world-writable inode; the right owner is hostd's uid or, when a
     /// distinct service uid is admitted, that uid, to which hostd hands any
@@ -103,7 +115,7 @@ impl Leases {
     }
 
     /// Open (creating with `mode`) `<directory>/<name>` beneath its root and
-    /// apply open_lock's inode checks and ownership hand-over.
+    /// apply `open_lock`'s inode checks and ownership hand-over.
     fn open_private(&self, directory: &Path, name: &str, mode: u32) -> Result<OwnedFd, Refusal> {
         let root = self
             .roots
@@ -180,7 +192,11 @@ impl Leases {
             .queue
             .push_back((ticket, mode));
         loop {
-            let inode = state.inodes.get(&key).expect("queued inode present");
+            // Our queued ticket keeps the inode entry alive (`leave` and
+            // `release` remove it only once its queue is empty).
+            let Some(inode) = state.inodes.get(&key) else {
+                return Err(Refusal::Unavailable);
+            };
             let mut pause = deadline.saturating_duration_since(Instant::now());
             if eligible(inode, ticket, mode) {
                 let operation = match mode {
@@ -191,7 +207,9 @@ impl Leases {
                     Ok(()) => {
                         let id = state.next_lease;
                         state.next_lease += 1;
-                        let inode = state.inodes.get_mut(&key).expect("queued inode present");
+                        let Some(inode) = state.inodes.get_mut(&key) else {
+                            return Err(Refusal::Unavailable);
+                        };
                         inode.queue.retain(|(queued, _)| *queued != ticket);
                         match mode {
                             Mode::Exclusive => inode.exclusive = true,
@@ -256,7 +274,7 @@ impl Leases {
     /// session holds, resolved like the lock inode (beneath its root, no
     /// symbolic links, regular, singly linked, not group/world-writable,
     /// handed to the service uid), creating it 0644; anything else is
-    /// Unavailable or UnknownLease.
+    /// Unavailable or `UnknownLease`.
     pub fn progress(&self, session: u64, lease: u64) -> Result<OwnedFd, Refusal> {
         let directory = {
             let state = self.state.lock().map_err(|_| Refusal::Unavailable)?;
@@ -278,11 +296,10 @@ impl Leases {
         let Ok(mut state) = self.state.lock() else {
             return false;
         };
-        match state.held.get(&lease) {
-            Some(held) if held.session == session => {}
+        let held = match state.held.entry(lease) {
+            Entry::Occupied(held) if held.get().session == session => held.remove(),
             _ => return false,
-        }
-        let held = state.held.remove(&lease).expect("lease present");
+        };
         if let Some(inode) = state.inodes.get_mut(&held.key) {
             match held.mode {
                 Mode::Exclusive => inode.exclusive = false,
@@ -315,10 +332,9 @@ impl Leases {
     /// How many acquisitions are queued on all lock inodes (tests use it to
     /// establish arrival order without timing assumptions).
     pub fn waiting(&self) -> usize {
-        self.state
-            .lock()
-            .map(|state| state.inodes.values().map(|inode| inode.queue.len()).sum())
-            .unwrap_or(0)
+        self.state.lock().map_or(0, |state| {
+            state.inodes.values().map(|inode| inode.queue.len()).sum()
+        })
     }
 
     /// Wake every waiter (a session closed).

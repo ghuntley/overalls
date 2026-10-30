@@ -35,6 +35,7 @@ pub enum Custody {
 }
 
 /// One validated command.
+#[derive(Debug)]
 pub struct Spec<'a> {
     pub executable: &'a Path,
     pub arguments: &'a [CString],
@@ -73,34 +74,32 @@ fn reaper() -> &'static Reaper {
 fn reap_forever() {
     let reaper = reaper();
     loop {
-        match peek::exited() {
-            Some(pid) => {
-                let mut waiting = reaper.waiting.lock().expect("reaper registry");
-                let Some(target) = Pid::from_raw(pid) else {
-                    continue;
-                };
-                // None or an error: already reaped by a failed spawn.
-                if let Ok(Some((_, status))) =
-                    rustix::process::waitpid(Some(target), WaitOptions::NOHANG)
-                {
-                    if let Some(sender) = waiting.remove(&pid) {
-                        let _ = sender.send(status);
-                    }
+        if let Some(pid) = peek::exited() {
+            let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
+            let Some(target) = Pid::from_raw(pid) else {
+                continue;
+            };
+            // None or an error: already reaped by a failed spawn.
+            if let Ok(Some((_, status))) =
+                rustix::process::waitpid(Some(target), WaitOptions::NOHANG)
+            {
+                if let Some(sender) = waiting.remove(&pid) {
+                    let _ = sender.send(status);
                 }
             }
-            None => {
-                // No children: sleep until one is spawned.
-                let mut count = reaper.children.lock().expect("reaper count");
-                let seen = *count;
-                while *count == seen {
-                    count = reaper
-                        .spawned
-                        .wait_timeout(count, Duration::from_millis(500))
-                        .expect("reaper count")
-                        .0;
-                    if *count == seen {
-                        break;
-                    }
+        } else {
+            // No children: sleep until one is spawned.
+            let mut count = crate::lock(&reaper.children, "reaper count");
+            let seen = *count;
+            while *count == seen {
+                count = crate::wait_timeout(
+                    &reaper.spawned,
+                    count,
+                    Duration::from_millis(500),
+                    "reaper count",
+                );
+                if *count == seen {
+                    break;
                 }
             }
         }
@@ -140,7 +139,7 @@ pub fn prepare_cgroup(base: &Path) -> std::io::Result<()> {
 }
 
 /// @cc [owner:ghuntley,label:recovery] cgroup-kill-confirms-empty
-/// kill_cgroup MUST write `cgroup.kill` and return only after `cgroup.events`
+/// `kill_cgroup` MUST write `cgroup.kill` and return only after `cgroup.events`
 /// reports `populated 0`, then remove the cgroup. It waits as long as that
 /// takes: an unconfirmed tree keeps its lease held rather than releasing it.
 fn kill_cgroup(cgroup: &Path) {
@@ -165,7 +164,10 @@ fn populated(events: &[u8]) -> Option<bool> {
         .map(|value| value != b"0")
 }
 
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    reason = "waitid with WNOWAIT has no safe wrapper; this shim is the only unsafe surface for it"
+)]
 mod peek {
     /// Block until some child has exited and return its pid without reaping
     /// it; None when there are no children.
@@ -174,9 +176,14 @@ mod peek {
             // SAFETY: siginfo_t is plain data; waitid fills it and we read
             // si_pid only after a successful call with WEXITED.
             let mut info: libc::siginfo_t = unsafe { std::mem::zeroed() };
-            let result =
-                unsafe { libc::waitid(libc::P_ALL, 0, &mut info, libc::WEXITED | libc::WNOWAIT) };
+            // SAFETY: `info` is a live, writable siginfo_t for the whole call,
+            // which is all waitid writes through the pointer.
+            let result = unsafe {
+                libc::waitid(libc::P_ALL, 0, &raw mut info, libc::WEXITED | libc::WNOWAIT)
+            };
             if result == 0 {
+                // SAFETY: waitid succeeded with WEXITED, so the kernel filled
+                // `info` for a child-exit event, whose si_pid field is valid.
                 let pid = unsafe { info.si_pid() };
                 if pid > 0 {
                     return Some(pid);
@@ -184,16 +191,27 @@ mod peek {
                 continue;
             }
             match std::io::Error::last_os_error().raw_os_error() {
-                Some(libc::EINTR) => continue,
+                Some(libc::EINTR) => {}
                 _ => return None,
             }
         }
     }
 }
 
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    reason = "pre_exec and the raw descriptor calls in the forked child have no safe wrapper; this shim is the only unsafe surface for them"
+)]
 mod child {
     use super::HANDOFF_LIMIT;
+
+    /// Staged copies go at or above `3 + HANDOFF_LIMIT`, clear of every target.
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_possible_wrap,
+        reason = "HANDOFF_LIMIT is 3, far below i32::MAX"
+    )]
+    const STAGING_FLOOR: i32 = 3 + HANDOFF_LIMIT as i32;
     use rustix::process::{getppid, set_parent_process_death_signal, Pid, Signal};
     use std::os::fd::RawFd;
     use std::os::unix::process::CommandExt;
@@ -202,7 +220,7 @@ mod child {
     /// @cc [owner:ghuntley,label:recovery;security] hostd-child-pinned
     /// Before exec a utility MUST: die with its spawning thread (parent-death
     /// signal, verified against the recorded parent) unless it is a detached
-    /// ingress bridge (spawn_detached), which must outlive hostd, restore default SIGPIPE,
+    /// ingress bridge (`spawn_detached`), which must outlive hostd, restore default SIGPIPE,
     /// move itself into its command cgroup when one is given, and keep the
     /// lease descriptor and the request's inherited descriptors (and only
     /// those) across exec. Handed-off descriptors are placed at 3, 4, ... in
@@ -219,45 +237,56 @@ mod child {
         inherit: Vec<RawFd>,
         handoff: Vec<RawFd>,
     ) {
-        unsafe {
-            command.pre_exec(move || {
-                if let Some(parent) = parent {
-                    if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
-                        || getppid() != Some(parent)
-                    {
-                        return Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied));
-                    }
+        let setup = move || {
+            if let Some(parent) = parent {
+                if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
+                    || getppid() != Some(parent)
+                {
+                    return Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied));
                 }
-                libc::signal(libc::SIGPIPE, libc::SIG_DFL);
-                if let Some(procs) = cgroup_procs {
-                    if libc::write(procs, b"0".as_ptr().cast(), 1) != 1 {
-                        return Err(std::io::Error::last_os_error());
-                    }
+            }
+            // SAFETY: signal(2) is async-signal-safe and SIG_DFL installs no
+            // handler code.
+            unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+            if let Some(procs) = cgroup_procs {
+                // SAFETY: `procs` was opened before the fork and stays open in
+                // the child; the one-byte static buffer is valid for reads.
+                if unsafe { libc::write(procs, b"0".as_ptr().cast(), 1) } != 1 {
+                    return Err(std::io::Error::last_os_error());
                 }
-                for fd in lease.iter().chain(inherit.iter()) {
-                    if libc::fcntl(*fd, libc::F_SETFD, 0) != 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
+            }
+            for fd in lease.iter().chain(inherit.iter()) {
+                // SAFETY: fcntl(F_SETFD) only changes descriptor flags and
+                // touches no memory; a stale descriptor is an error return.
+                if unsafe { libc::fcntl(*fd, libc::F_SETFD, 0) } != 0 {
+                    return Err(std::io::Error::last_os_error());
                 }
-                // Copy every source above the targets first: a source that is
-                // itself 3 or 4 must not be overwritten before it is placed.
-                let mut staged = [0; HANDOFF_LIMIT];
-                for (slot, fd) in handoff.iter().enumerate() {
-                    let copy = libc::fcntl(*fd, libc::F_DUPFD_CLOEXEC, 3 + HANDOFF_LIMIT as i32);
-                    if copy < 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
-                    staged[slot] = copy;
+            }
+            // Copy every source above the targets first: a source that is
+            // itself 3 or 4 must not be overwritten before it is placed.
+            let mut staged = [0; HANDOFF_LIMIT];
+            for (slot, fd) in handoff.iter().enumerate() {
+                // SAFETY: fcntl(F_DUPFD_CLOEXEC) only creates a descriptor
+                // and touches no memory; a stale descriptor is an error return.
+                let copy = unsafe { libc::fcntl(*fd, libc::F_DUPFD_CLOEXEC, STAGING_FLOOR) };
+                if copy < 0 {
+                    return Err(std::io::Error::last_os_error());
                 }
-                for (slot, copy) in staged.iter().take(handoff.len()).enumerate() {
-                    // dup2 clears close-on-exec on the placed descriptor.
-                    if libc::dup2(*copy, 3 + slot as i32) < 0 {
-                        return Err(std::io::Error::last_os_error());
-                    }
+                staged[slot] = copy;
+            }
+            for (target, copy) in (3..).zip(staged.iter().take(handoff.len())) {
+                // SAFETY: dup2 only replaces a descriptor slot and touches no
+                // memory. It clears close-on-exec on the placed descriptor.
+                if unsafe { libc::dup2(*copy, target) } < 0 {
+                    return Err(std::io::Error::last_os_error());
                 }
-                Ok(())
-            })
+            }
+            Ok(())
         };
+        // SAFETY: the closure runs in the forked child before exec and makes
+        // only async-signal-safe system calls on descriptors opened before the
+        // fork; it allocates nothing and takes no lock.
+        unsafe { command.pre_exec(setup) };
     }
 }
 
@@ -266,7 +295,7 @@ mod child {
 /// observe are gone: in cgroup mode the command cgroup is unpopulated; in
 /// process-group mode the group was killed and the leader reaped. Timeout,
 /// output overflow and cancellation kill the tree first and report
-/// TimedOut, OutputLimit or Cancelled with no output. Normal exit still kills
+/// `TimedOut`, `OutputLimit` or Cancelled with no output. Normal exit still kills
 /// any remaining descendants before reporting.
 pub fn run(spec: &Spec<'_>, custody: &Custody, cancelled: &AtomicBool) -> (Status, Vec<u8>) {
     let (status, _, output) = run_coded(spec, custody, cancelled);
@@ -287,12 +316,12 @@ pub fn run_coded(
 pub const HANDOFF_LIMIT: usize = 3;
 
 /// @cc [owner:ghuntley,label:security;recovery] hostd-handoff-sole-owner
-/// run_handoff MUST place the handed-off descriptors at 3, 4, ... in the
+/// `run_handoff` MUST place the handed-off descriptors at 3, 4, ... in the
 /// child and close hostd's copies as soon as the child is spawned, so the
 /// child holds the only references and sees end of stream when its peers
 /// close. `started` runs once, after that, only when the spawn succeeded.
 /// Otherwise it obeys run: the tree is killed and reaped before it returns.
-/// A spec with a lease or inherited descriptors, or more than HANDOFF_LIMIT
+/// A spec with a lease or inherited descriptors, or more than `HANDOFF_LIMIT`
 /// descriptors, is a setup failure.
 pub fn run_handoff(
     spec: &Spec<'_>,
@@ -307,6 +336,10 @@ pub fn run_handoff(
     run_inner(spec, handoff, custody, cancelled, started)
 }
 
+#[expect(
+    clippy::similar_names,
+    reason = "receiver (status channel) and received (output bytes) are distinct roles"
+)]
 fn run_inner(
     spec: &Spec<'_>,
     handoff: Vec<OwnedFd>,
@@ -329,16 +362,15 @@ fn run_inner(
             if std::fs::create_dir(&path).is_err() {
                 return (Status::Setup, None, Vec::new());
             }
-            match rustix::fs::open(
+            if let Ok(procs) = rustix::fs::open(
                 path.join("cgroup.procs"),
                 OFlags::WRONLY | OFlags::CLOEXEC,
                 FileMode::empty(),
             ) {
-                Ok(procs) => Some((path, procs)),
-                Err(_) => {
-                    let _ = std::fs::remove_dir(&path);
-                    return (Status::Setup, None, Vec::new());
-                }
+                Some((path, procs))
+            } else {
+                let _ = std::fs::remove_dir(&path);
+                return (Status::Setup, None, Vec::new());
             }
         }
         Custody::ProcessGroup => None,
@@ -361,17 +393,17 @@ fn run_inner(
         &mut builder,
         Some(rustix::process::getpid()),
         cgroup.as_ref().map(|(_, procs)| procs.as_raw_fd()),
-        spec.lease.map(|fd| fd.as_raw_fd()),
+        spec.lease.map(AsRawFd::as_raw_fd),
         spec.inherit.iter().map(|fd| fd.as_raw_fd()).collect(),
-        handoff.iter().map(|fd| fd.as_raw_fd()).collect(),
+        handoff.iter().map(AsRawFd::as_raw_fd).collect(),
     );
     let (sender, receiver) = channel();
     let reaper = reaper();
     let spawned = {
-        let mut waiting = reaper.waiting.lock().expect("reaper registry");
+        let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
         match builder.spawn() {
             Ok(child) => {
-                let pid = child.id() as i32;
+                let pid = child.id().cast_signed();
                 waiting.insert(pid, sender);
                 Some(pid)
             }
@@ -383,7 +415,7 @@ fn run_inner(
         // The parent's copy keeps CLOEXEC; only the child cleared it.
         let _ = rustix::io::fcntl_setfd(fd.as_fd(), FdFlags::CLOEXEC);
     }
-    *reaper.children.lock().expect("reaper count") += 1;
+    *crate::lock(&reaper.children, "reaper count") += 1;
     reaper.spawned.notify_all();
     // The child has its own copies; hostd's close here (hostd-handoff-sole-owner).
     drop(handoff);
@@ -395,12 +427,12 @@ fn run_inner(
     };
     started();
     if rustix::fs::fcntl_setfl(&reader, OFlags::NONBLOCK).is_err() {
-        finish(pid, &cgroup, &receiver, true);
+        finish(pid, cgroup.as_ref(), &receiver, true);
         return (Status::Setup, None, Vec::new());
     }
     let outcome = supervise(spec, &reader, &receiver, cancelled);
     let exited = outcome.1;
-    finish(pid, &cgroup, &receiver, !exited);
+    finish(pid, cgroup.as_ref(), &receiver, !exited);
     let mut received = outcome.2;
     if outcome.0 == Status::Succeeded || outcome.0 == Status::Failed {
         // Bytes written between the last read and the exit.
@@ -416,6 +448,10 @@ fn run_inner(
 
 /// Watch output, deadline and cancellation. Returns the status, whether the
 /// leader already exited, and the output so far.
+#[expect(
+    clippy::similar_names,
+    reason = "receiver (status channel) and received (output bytes) are distinct roles"
+)]
 fn supervise(
     spec: &Spec<'_>,
     reader: &OwnedFd,
@@ -469,7 +505,7 @@ fn drain(reader: &OwnedFd, received: &mut Vec<u8>, limit: usize) -> bool {
     loop {
         let mut chunk = [0_u8; 8192];
         match rustix::io::read(reader, &mut chunk) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Err(_) | Ok(0) => return false,
             Ok(count) => {
                 if received.len() + count > limit {
@@ -484,7 +520,7 @@ fn drain(reader: &OwnedFd, received: &mut Vec<u8>, limit: usize) -> bool {
 /// Kill whatever remains of the command and wait for the leader's status.
 fn finish(
     pid: i32,
-    cgroup: &Option<(PathBuf, OwnedFd)>,
+    cgroup: Option<&(PathBuf, OwnedFd)>,
     receiver: &Receiver<WaitStatus>,
     leader_running: bool,
 ) {
@@ -506,6 +542,7 @@ fn finish(
 
 /// A detached child: its pid and a pidfd that names it even after hostd's
 /// reaper collected it, so a kill can never reach a reused pid.
+#[derive(Debug)]
 pub struct Detached {
     pub pid: i32,
     pub pidfd: OwnedFd,
@@ -519,13 +556,13 @@ impl Detached {
 }
 
 /// @cc [owner:ghuntley,label:recovery;security] hostd-detached-spawn
-/// spawn_detached MUST start the executable with the handed-off descriptors
+/// `spawn_detached` MUST start the executable with the handed-off descriptors
 /// at 3, 4, ... (as hostd-handoff-sole-owner, closing hostd's copies at once),
 /// stdio on /dev/null, a cleared environment, no lease, no command cgroup and
 /// no parent-death signal, so it can outlive hostd. The pid is registered with
 /// the single reaper and a pidfd opened before the registry lock is released,
 /// so the child is reaped exactly once and never killed by a reused pid. A
-/// spawn failure or more than HANDOFF_LIMIT descriptors returns None.
+/// spawn failure or more than `HANDOFF_LIMIT` descriptors returns None.
 pub fn spawn_detached(
     executable: &Path,
     arguments: &[CString],
@@ -554,15 +591,15 @@ pub fn spawn_detached(
         None,
         None,
         Vec::new(),
-        handoff.iter().map(|fd| fd.as_raw_fd()).collect(),
+        handoff.iter().map(AsRawFd::as_raw_fd).collect(),
     );
     let (sender, _status) = channel::<WaitStatus>();
     let reaper = reaper();
     let spawned = {
-        let mut waiting = reaper.waiting.lock().expect("reaper registry");
+        let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
         match builder.spawn() {
             Ok(child) => {
-                let pid = child.id() as i32;
+                let pid = child.id().cast_signed();
                 let pidfd = Pid::from_raw(pid).and_then(|pid| {
                     rustix::process::pidfd_open(pid, rustix::process::PidfdFlags::empty()).ok()
                 });
@@ -573,7 +610,7 @@ pub fn spawn_detached(
         }
     };
     drop(builder);
-    *reaper.children.lock().expect("reaper count") += 1;
+    *crate::lock(&reaper.children, "reaper count") += 1;
     reaper.spawned.notify_all();
     drop(handoff);
     match spawned {

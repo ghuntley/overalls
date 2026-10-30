@@ -29,6 +29,7 @@ const PROPERTIES: [(&str, Option<&[&str]>); 15] = [
 ];
 
 /// Where Lilly's datasets may live.
+#[derive(Debug)]
 pub struct Scope<'a> {
     /// Configured pool datasets (e.g. `zroot/lilly`); names must be beneath one.
     pub datasets: &'a [Vec<u8>],
@@ -45,7 +46,7 @@ fn component(part: &[u8]) -> bool {
 }
 
 /// A dataset (or, when `snapshot`, a dataset or snapshot) strictly beneath a pool dataset.
-fn name(value: &[u8], scope: &Scope, snapshot: bool) -> bool {
+fn name(value: &[u8], scope: &Scope<'_>, snapshot: bool) -> bool {
     let (dataset, tag) = match value.iter().position(|byte| *byte == b'@') {
         Some(at) if snapshot => (&value[..at], Some(&value[at + 1..])),
         Some(_) => return false,
@@ -61,7 +62,7 @@ fn name(value: &[u8], scope: &Scope, snapshot: bool) -> bool {
         })
 }
 
-fn property(value: &[u8], scope: &Scope) -> bool {
+fn property(value: &[u8], scope: &Scope<'_>) -> bool {
     let Some(equals) = value.iter().position(|byte| *byte == b'=') else {
         return false;
     };
@@ -98,7 +99,11 @@ fn property(value: &[u8], scope: &Scope) -> bool {
 /// `zpool status|get|iostat`, which cannot change state.
 /// A received snapshot MAY receive only the UUID `lilly:transfer_nonce` marker;
 /// this does not grant recursive mutation or arbitrary snapshot properties.
-pub fn mutation(argv: &[&[u8]], scope: &Scope) -> bool {
+#[expect(
+    clippy::match_same_arms,
+    reason = "one arm per accepted command shape keeps the security grammar reviewable"
+)]
+pub fn mutation(argv: &[&[u8]], scope: &Scope<'_>) -> bool {
     let options = |mut rest: &[&[u8]]| -> Option<usize> {
         let mut count = 0;
         while let [b"-o", value, tail @ ..] = rest {
@@ -111,7 +116,7 @@ pub fn mutation(argv: &[&[u8]], scope: &Scope) -> bool {
         Some(count)
     };
     match argv {
-        [b"create", rest @ ..] | [b"snapshot", rest @ ..] => {
+        [b"create" | b"snapshot", rest @ ..] => {
             let snapshot = argv[0] == b"snapshot";
             match options(rest) {
                 Some(count) if rest.len() == count + 1 => {
@@ -134,7 +139,7 @@ pub fn mutation(argv: &[&[u8]], scope: &Scope) -> bool {
             let (properties, target) = rest.split_at(rest.len() - 1);
             properties.iter().all(|value| property(value, scope)) && name(target[0], scope, false)
         }
-        [b"mount", target] | [b"unmount", target] => name(target, scope, false),
+        [b"mount" | b"unmount", target] => name(target, scope, false),
         [b"rename", from, to] => name(from, scope, false) && name(to, scope, false),
         [b"receive", b"-A", target] => name(target, scope, false),
         _ => false,
@@ -145,10 +150,6 @@ pub fn mutation(argv: &[&[u8]], scope: &Scope) -> bool {
 pub fn read(zpool: bool, argv: &[&[u8]]) -> bool {
     matches!(
         (zpool, argv.first()),
-        (false, Some(&b"list"))
-            | (false, Some(&b"get"))
-            | (true, Some(&b"status"))
-            | (true, Some(&b"get"))
-            | (true, Some(&b"iostat"))
+        (false, Some(&b"list" | &b"get")) | (true, Some(&b"status" | &b"get" | &b"iostat"))
     )
 }

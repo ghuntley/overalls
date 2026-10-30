@@ -288,7 +288,7 @@ fn real_openssh_resolves_the_fixed_restrictions() {
         *i = identity.to_str().unwrap().as_bytes().to_vec();
         *k = known_hosts.to_str().unwrap().as_bytes().to_vec();
     }
-    let (_bin, table) = self::table();
+    let (_bin, table) = table();
     let pools = pools();
     let helper = strings(
         &plan(
@@ -391,10 +391,14 @@ fn ssh_probe_compares_unprivileged() {
 /// one configured pair, and an SSH or compare side that would run as root
 /// MUST be refused before anything runs.
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table-driven test walks every case of one grammar"
+)]
 fn out_of_policy_streams_are_refused() {
     let (_bin, table) = table();
     let pools = pools();
-    let refused = |stream: Stream, context: &Context| {
+    let refused = |stream: Stream, context: &Context<'_>| {
         assert_eq!(
             plan(&stream, context, 10_000, 0, None),
             Err(Refusal::Malformed),
@@ -633,7 +637,7 @@ fn consumer(tc: &TestCase) -> Consumer {
 }
 
 /// @cc [owner:ghuntley,label:verification] hostd-transfer-stream-decoding
-/// Every TransferStream datagram within bounds MUST decode to exactly the
+/// Every `TransferStream` datagram within bounds MUST decode to exactly the
 /// encoded request, and removing or adding one field, or an out-of-range
 /// timeout or rate, MUST fail to decode.
 #[hegel::test]

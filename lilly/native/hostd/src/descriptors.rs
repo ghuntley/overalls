@@ -22,7 +22,7 @@ use std::time::{Duration, Instant};
 const SOCKET_NAMES: &[&str] = &["api.sock", "v.sock"];
 
 /// @cc [owner:ghuntley,label:security] hostd-unix-socket-confined
-/// confined_socket_path MUST accept only a Firecracker `api.sock` or `v.sock`
+/// `confined_socket_path` MUST accept only a Firecracker `api.sock` or `v.sock`
 /// whose absolute path, free of `.`, `..` and empty components, lies beneath
 /// one of the configured socket roots and has no symbolic link at any
 /// component below that root; every other path is Unavailable. hostd never
@@ -71,8 +71,8 @@ pub fn connect_unix(
 }
 
 /// @cc [owner:ghuntley,label:security] hostd-received-socket-kind
-/// connect_received MUST connect only a received descriptor that is an
-/// unconnected, non-listening AF_UNIX stream socket; anything else is
+/// `connect_received` MUST connect only a received descriptor that is an
+/// unconnected, non-listening `AF_UNIX` stream socket; anything else is
 /// Malformed and left untouched. The descriptor's file status flags are
 /// shared with the caller and MUST NOT be changed: a non-blocking connect
 /// that finds the listener's backlog full is retried until the timeout,
@@ -96,7 +96,7 @@ pub fn connect_received(
     loop {
         match connect(socket, address) {
             Ok(()) => return Ok(()),
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Err(Errno::AGAIN) if Instant::now() < deadline => {
                 std::thread::sleep(pause.min(deadline.saturating_duration_since(Instant::now())));
                 pause = (pause * 2).min(Duration::from_millis(50));
@@ -107,10 +107,10 @@ pub fn connect_received(
 }
 
 /// @cc [owner:ghuntley,label:security;isolation] hostd-bridge-handoff
-/// bridge_handoff MUST connect the caller's received socket only to a fresh
+/// `bridge_handoff` MUST connect the caller's received socket only to a fresh
 /// listener that hostd bound in its private directory under a name unique to
 /// the session and request, accept exactly that connection, and return the
-/// accepted end only when its SO_PEERCRED pid is hostd's own (hostd made the
+/// accepted end only when its `SO_PEERCRED` pid is hostd's own (hostd made the
 /// connection). The listener's path is removed and the listener closed
 /// before returning, on every path.
 pub fn bridge_handoff(
@@ -148,6 +148,7 @@ pub fn bridge_handoff(
 }
 
 /// A namespace TCP connection request.
+#[derive(Debug)]
 pub struct NetnsTcp {
     pub namespace: String,
     pub device: String,
@@ -159,7 +160,7 @@ pub struct NetnsTcp {
 }
 
 /// @cc [owner:ghuntley,label:security;isolation] hostd-netns-connect
-/// open_netns_tcp MUST create the socket on a dedicated thread that entered
+/// `open_netns_tcp` MUST create the socket on a dedicated thread that entered
 /// only `/run/netns/<namespace>` (a name of at most 64 letters, digits, `-`
 /// or `_`), so no other hostd thread changes namespace. The socket is bound
 /// to the named device (at most 15 such characters), carries the given
@@ -200,8 +201,7 @@ fn connect_in_namespace(request: &NetnsTcp) -> Result<OwnedFd, Refusal> {
     .map_err(|_| Refusal::Unavailable)?;
     raw::configure(&socket, &request.device, request.mark).map_err(|_| Refusal::Unavailable)?;
     if let Some(source) = request.source {
-        rustix::net::bind(&socket, &SocketAddrV4::new(source, 0))
-            .map_err(|_| Refusal::Unavailable)?;
+        bind(&socket, &SocketAddrV4::new(source, 0)).map_err(|_| Refusal::Unavailable)?;
     }
     match connect(
         &socket,
@@ -229,34 +229,47 @@ fn connect_in_namespace(request: &NetnsTcp) -> Result<OwnedFd, Refusal> {
     Ok(socket)
 }
 
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    reason = "rustix does not wrap SO_BINDTODEVICE or SO_MARK; this shim is the only unsafe surface"
+)]
 mod raw {
     use std::os::fd::{AsRawFd, OwnedFd};
 
-    /// Set SO_BINDTODEVICE and SO_MARK, which rustix does not wrap.
+    /// Set `SO_BINDTODEVICE` and `SO_MARK`, which rustix does not wrap.
     pub(super) fn configure(socket: &OwnedFd, device: &str, mark: u32) -> std::io::Result<()> {
         let fd = socket.as_raw_fd();
-        // SAFETY: fd is a live socket; the option buffers are valid for the
-        // lengths passed.
+        // The existing failure path: an unrepresentable length is an error.
+        let device_length = libc::socklen_t::try_from(device.len())
+            .map_err(|_| std::io::Error::from(std::io::ErrorKind::InvalidInput))?;
+        // SAFETY: fd is a live socket borrowed from `socket` for the call; the
+        // device bytes are valid for reads of `device_length` bytes.
         let device_result = unsafe {
             libc::setsockopt(
                 fd,
                 libc::SOL_SOCKET,
                 libc::SO_BINDTODEVICE,
                 device.as_ptr().cast(),
-                device.len() as libc::socklen_t,
+                device_length,
             )
         };
         if device_result != 0 {
             return Err(std::io::Error::last_os_error());
         }
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "size_of::<u32>() is 4, which every socklen_t holds"
+        )]
+        let mark_length = size_of::<u32>() as libc::socklen_t;
+        // SAFETY: fd is a live socket borrowed from `socket` for the call;
+        // `mark` is a live local u32, valid for reads of `mark_length` bytes.
         let mark_result = unsafe {
             libc::setsockopt(
                 fd,
                 libc::SOL_SOCKET,
                 libc::SO_MARK,
-                (&mark as *const u32).cast(),
-                std::mem::size_of::<u32>() as libc::socklen_t,
+                (&raw const mark).cast(),
+                mark_length,
             )
         };
         if mark_result != 0 {

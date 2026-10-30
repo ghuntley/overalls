@@ -63,13 +63,17 @@ fn ok(fixture: &Fixture, utility: Utility, argv: &[&str]) -> bool {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table-driven test walks every case of one grammar"
+)]
 fn lillys_shapes_are_accepted() {
-    let f = fixture();
     fn ns(rest: &[&'static str]) -> Vec<&'static str> {
         let mut argv = vec!["netns", "exec", NS, "/nix/store/x-iproute2/bin/ip"];
         argv.extend_from_slice(rest);
         argv
     }
+    let f = fixture();
     for argv in [
         vec!["netns", "list"],
         vec!["netns", "add", NS],
@@ -341,6 +345,10 @@ fn systemctl_lifecycle_cannot_expand_past_one_vm() {
 }
 
 #[test]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one table-driven test walks every case of one grammar"
+)]
 fn escapes_are_refused() {
     let f = fixture();
     let refused = |utility, argv: &[&str]| !ok(&f, utility, argv);

@@ -130,31 +130,32 @@ impl Stream {
         }
         let rest = fields.split_off(producer_fields);
         let mut p = fields.into_iter();
-        let mut next = || p.next().expect("counted field");
+        // The field count was checked above, so `next()??` never returns early.
+        let mut next = || p.next();
         let producer = match producer {
             PRODUCER_LOCAL_SEND => Producer::LocalSend {
-                dataset: next(),
-                placement: next(),
+                dataset: next()?,
+                placement: next()?,
             },
             PRODUCER_CHECKPOINT_SEND => Producer::CheckpointSend {
-                dataset: next(),
-                placement: next(),
-                slot: next(),
+                dataset: next()?,
+                placement: next()?,
+                slot: next()?,
             },
             PRODUCER_LOCAL_RESUME => Producer::LocalResume {
-                dataset: next(),
-                placement: next(),
-                to_guid: next(),
-                token: next(),
+                dataset: next()?,
+                placement: next()?,
+                to_guid: next()?,
+                token: next()?,
             },
             kind => {
                 let (address, port, source_host, relocation, identity, known_hosts) =
-                    (next(), next(), next(), next(), next(), next());
+                    (next()?, next()?, next()?, next()?, next()?, next()?);
                 let verb = match kind {
                     PRODUCER_SSH_EXPORT => Verb::Export,
                     PRODUCER_SSH_CHECKPOINT => Verb::Checkpoint,
-                    PRODUCER_SSH_RESUME => Verb::Resume { token: next() },
-                    _ => Verb::Probe { challenge: next() },
+                    PRODUCER_SSH_RESUME => Verb::Resume { token: next()? },
+                    _ => Verb::Probe { challenge: next()? },
                 };
                 Producer::Ssh {
                     address,
@@ -168,31 +169,35 @@ impl Stream {
             }
         };
         let mut c = rest.into_iter();
-        let mut next = || c.next().expect("counted field");
+        let mut next = || c.next();
         let consumer = match consumer {
             CONSUMER_RECEIVE => Consumer::Receive {
-                dataset: next(),
-                pool: next(),
-                placement: next(),
-                host: next(),
-                pool_id: next(),
-                nonce: next(),
+                dataset: next()?,
+                pool: next()?,
+                placement: next()?,
+                host: next()?,
+                pool_id: next()?,
+                nonce: next()?,
             },
             CONSUMER_CHECKPOINT_RECEIVE => Consumer::CheckpointReceive {
-                dataset: next(),
-                pool: next(),
-                placement: next(),
-                host: next(),
-                pool_id: next(),
-                nonce: next(),
-                memory_bytes: next(),
+                dataset: next()?,
+                pool: next()?,
+                placement: next()?,
+                host: next()?,
+                pool_id: next()?,
+                nonce: next()?,
+                memory_bytes: next()?,
             },
-            _ => Consumer::Compare { path: next() },
+            _ => Consumer::Compare { path: next()? },
         };
         Some(Stream { producer, consumer })
     }
 
     /// The wire kinds and fields (the inverse of decode).
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one arm per producer and consumer kind mirrors decode"
+    )]
     pub fn encode(&self) -> (u8, u8, Vec<Vec<u8>>) {
         let mut fields = Vec::new();
         let producer = match &self.producer {
@@ -302,6 +307,7 @@ impl Stream {
 }
 
 /// Where and as whom the stream runs.
+#[derive(Debug)]
 pub struct Context<'a> {
     /// Configured pools as (dataset, directory) pairs.
     pub pools: &'a [(Vec<u8>, PathBuf)],
@@ -319,7 +325,7 @@ pub struct Context<'a> {
 pub struct Plan {
     /// `lilly-resume-token` arguments that must print exactly `ok\n` first.
     pub resume_check: Option<Vec<CString>>,
-    /// The helper's arguments (its executable is the TransferStream utility).
+    /// The helper's arguments (its executable is the `TransferStream` utility).
     pub helper: Vec<CString>,
 }
 
@@ -422,7 +428,7 @@ fn concat(parts: &[&[u8]]) -> Vec<u8> {
     parts.concat()
 }
 
-fn executable(context: &Context, utility: Utility) -> Result<CString, Refusal> {
+fn executable(context: &Context<'_>, utility: Utility) -> Result<CString, Refusal> {
     let path = context.utilities.get(utility).ok_or(Refusal::Unavailable)?;
     text(path.as_os_str().as_bytes())
 }
@@ -444,7 +450,7 @@ fn dataset_name(value: &[u8]) -> bool {
 /// private daemon, which runs with its owner's privilege) accepts any
 /// well-formed dataset and normalised directory.
 fn pool(
-    context: &Context,
+    context: &Context<'_>,
     dataset: &[u8],
     directory: Option<&[u8]>,
 ) -> Result<(Vec<u8>, PathBuf), Refusal> {
@@ -548,9 +554,13 @@ const RECEIVE_PROPERTIES: [&str; 12] = [
 /// `@lilly-checkpoint`; checkpoint receive MUST be non-resumable, unmounted,
 /// sealed read-only, and target only destination slot a. Checkpoint SSH uses
 /// only `lilly-checkpoint-v1` with the validated relocation identity.
+#[expect(
+    clippy::too_many_lines,
+    reason = "the stream plan derives both command lines from one closed match per kind"
+)]
 pub fn plan(
     stream: &Stream,
-    context: &Context,
+    context: &Context<'_>,
     timeout_ms: u32,
     rate: u32,
     progress_fd: Option<i32>,
@@ -664,10 +674,10 @@ pub fn plan(
                 Verb::Export => argv.extend([text("lilly-export-v4")?, text(relocation)?]),
                 Verb::Checkpoint => argv.extend([text("lilly-checkpoint-v1")?, text(relocation)?]),
                 Verb::Resume { token: resume } if token(resume) => {
-                    argv.extend([text("lilly-resume-v4")?, text(relocation)?, text(resume)?])
+                    argv.extend([text("lilly-resume-v4")?, text(relocation)?, text(resume)?]);
                 }
                 Verb::Probe { challenge } if uuid(challenge) => {
-                    argv.extend([text("lilly-probe-v3")?, text(relocation)?, text(challenge)?])
+                    argv.extend([text("lilly-probe-v3")?, text(relocation)?, text(challenge)?]);
                 }
                 _ => return Err(Refusal::Malformed),
             }
