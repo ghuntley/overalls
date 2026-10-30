@@ -13,16 +13,17 @@ pkgs.rustPlatform.buildRustPackage {
   cargoLock.lockFile = ../terminald/Cargo.lock;
   doCheck = false;
   strictDeps = true;
-  nativeBuildInputs = [ pkgs.clippy ];
+  nativeBuildInputs = [ pkgs.clippy pkgs.rustfmt ];
   TERMINALD_TEST_SHELL = "${pkgs.bash}/bin/bash";
   TERMINALD_TEST_HEAD = "${pkgs.coreutils}/bin/head";
   buildPhase = ''
     runHook preBuild
-    cargo clippy --offline --all-targets -- -D warnings
+    cargo fmt --check
+    cargo clippy --all-targets --locked --offline -- -D warnings
     # Each generated PTY history owns concurrent sessions and workers. Isolate
     # those histories from other top-level properties so their finite CPU/process
     # budgets and generator health checks measure their own declared workload.
-    cargo test --offline -- --test-threads=1
+    cargo test --locked --offline -- --test-threads=1
     runHook postBuild
   '';
   installPhase = ''
