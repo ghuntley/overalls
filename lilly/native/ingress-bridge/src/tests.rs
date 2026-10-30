@@ -5,6 +5,10 @@ use rustix::io::Errno;
 use std::ffi::OsString;
 
 /// The independent command-line specification.
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "strict bounds descriptors to 3..=1023 and uids to 1..=4294967294"
+)]
 fn oracle(words: &[String]) -> Option<(Option<i32>, i32, i32, Option<u32>)> {
     let strict = |word: &str, low: u64, high: u64| -> Option<u64> {
         let canonical = !word.is_empty()
@@ -47,7 +51,7 @@ fn word(tc: &TestCase) -> String {
 }
 
 /// @cc [owner:ghuntley,label:verification] bridge-cli-oracle
-/// parse_cli MUST agree with an independent specification of the command line
+/// `parse_cli` MUST agree with an independent specification of the command line
 /// on arbitrary word lists, including leading zeros, padding and bounds.
 #[hegel::test(test_cases = 100)]
 fn command_line_matches_the_independent_oracle(tc: TestCase) {

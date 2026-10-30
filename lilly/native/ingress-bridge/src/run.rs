@@ -10,7 +10,7 @@ use std::os::fd::{AsFd, OwnedFd};
 
 /// @cc [owner:ghuntley,label:security;isolation] bridge-custody
 /// Before any byte moves, every descriptor MUST be a socket, and a given uid
-/// MUST be applied (no supplementary groups, that gid and uid, no_new_privs).
+/// MUST be applied (no supplementary groups, that gid and uid, `no_new_privs`).
 /// An attached bridge then sets the parent-death signal and verifies the
 /// recorded parent. A detached bridge (bridge-detached-handshake) sets none,
 /// so it outlives hostd. Bytes move only between the two sockets through this
@@ -72,14 +72,18 @@ pub fn run(request: &Request) -> u8 {
 /// privileges and has its pipes, send hostd exactly READY on the control
 /// socket and then move no byte until it reads exactly GO, which hostd sends
 /// only after writing the client's greeting. Any other byte, end of stream
-/// or error exits with EXIT_SETUP, so guest bytes can never precede the
+/// or error exits with `EXIT_SETUP`, so guest bytes can never precede the
 /// greeting and a bridge hostd abandoned mid-start never runs. The control
 /// socket is closed before any byte moves.
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "handshake takes ownership so the control socket closes before any byte moves"
+)]
 pub fn handshake(control: OwnedFd) -> bool {
     loop {
         match rustix::io::write(&control, &[READY]) {
             Ok(1) => break,
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             _ => return false,
         }
     }
@@ -87,7 +91,7 @@ pub fn handshake(control: OwnedFd) -> bool {
     loop {
         match rustix::io::read(&control, &mut answer) {
             Ok(1) => return answer[0] == GO,
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             _ => return false,
         }
     }
@@ -98,10 +102,14 @@ fn socket(descriptor: &OwnedFd) -> bool {
 }
 
 /// Move `room` or `pending` bytes; None is an error that ends the bridge.
+#[expect(
+    clippy::option_option,
+    reason = "the three splice outcomes (count, retry, fatal) are matched exhaustively at each call"
+)]
 pub(crate) fn moved(result: rustix::io::Result<usize>) -> Option<Option<usize>> {
     match result {
         Ok(count) => Some(Some(count)),
-        Err(Errno::AGAIN) | Err(Errno::INTR) => Some(None),
+        Err(Errno::AGAIN | Errno::INTR) => Some(None),
         Err(_) => None,
     }
 }

@@ -12,16 +12,17 @@ pub(super) fn adopt(fd: i32) -> Option<OwnedFd> {
 }
 
 /// Drop every supplementary group, then the gid and uid, then set
-/// no_new_privs. The process is single-threaded here, so the libc
+/// `no_new_privs`. The process is single-threaded here, so the libc
 /// wrappers change the whole process's credentials.
 pub(super) fn drop_to(uid: u32) -> std::io::Result<()> {
-    // SAFETY: plain credential system calls with valid arguments.
-    let failed = unsafe {
-        libc::setgroups(0, std::ptr::null()) != 0
-            || libc::setresgid(uid, uid, uid) != 0
-            || libc::setresuid(uid, uid, uid) != 0
-            || libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) != 0
-    };
+    // SAFETY: a zero count means setgroups reads nothing through the null list.
+    let failed = unsafe { libc::setgroups(0, std::ptr::null()) } != 0
+        // SAFETY: setresgid takes plain integer ids and no pointers.
+        || unsafe { libc::setresgid(uid, uid, uid) } != 0
+        // SAFETY: setresuid takes plain integer ids and no pointers.
+        || unsafe { libc::setresuid(uid, uid, uid) } != 0
+        // SAFETY: PR_SET_NO_NEW_PRIVS takes integer arguments and no pointers.
+        || unsafe { libc::prctl(libc::PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0) } != 0;
     if failed {
         Err(std::io::Error::last_os_error())
     } else {

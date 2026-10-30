@@ -25,6 +25,10 @@ struct Bridge {
     guest: UnixStream,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn pair() -> (OwnedFd, OwnedFd) {
     socketpair(
         AddressFamily::UNIX,
@@ -35,6 +39,10 @@ fn pair() -> (OwnedFd, OwnedFd) {
     .expect("socketpair")
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn spawn(extra: &[&str]) -> Bridge {
     let (lilly, bridge_client) = pair();
     let (bridge_guest, guest) = pair();
@@ -60,6 +68,10 @@ fn spawn(extra: &[&str]) -> Bridge {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn wait(child: &mut Child) -> ExitStatus {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
@@ -71,6 +83,10 @@ fn wait(child: &mut Child) -> ExitStatus {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn silent(child: &mut Child) {
     let mut out = Vec::new();
     child
@@ -91,6 +107,10 @@ fn silent(child: &mut Child) {
     );
 }
 
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the payload pattern deliberately wraps the index modulo 256"
+)]
 fn payload(length: usize, seed: u8) -> Vec<u8> {
     (0..length)
         .map(|index| (index as u8).wrapping_mul(31).wrapping_add(seed))
@@ -152,7 +172,7 @@ fn bytes_cross_both_ways_and_lilly_closing_ends_the_bridge() {
         .guest
         .read_to_end(&mut rest)
         .expect("guest sees end of stream");
-    assert!(rest.is_empty());
+    assert_eq!(rest, Vec::<u8>::new());
     assert!(wait(&mut bridge.child).success());
     silent(&mut bridge.child);
 }
@@ -214,7 +234,7 @@ fn bad_command_lines_and_non_sockets_are_refused() {
 
 /// @cc [owner:ghuntley,label:verification;security] bridge-drops-privileges
 /// Run as root with a uid, the bridge MUST run as that uid and gid with no
-/// supplementary groups and no_new_privs. Skipped without root.
+/// supplementary groups and `no_new_privs`. Skipped without root.
 #[test]
 fn root_bridge_runs_as_the_given_uid() {
     if !rustix::process::geteuid().is_root() {
@@ -238,7 +258,7 @@ fn root_bridge_runs_as_the_given_uid() {
     };
     assert_eq!(field("Uid:"), ["65534"; 4]);
     assert_eq!(field("Gid:"), ["65534"; 4]);
-    assert!(field("Groups:").is_empty());
+    assert_eq!(field("Groups:"), Vec::<&str>::new());
     assert_eq!(field("NoNewPrivs:"), ["1"]);
     drop(bridge.lilly);
     assert!(wait(&mut bridge.child).success());
@@ -250,6 +270,10 @@ struct Detached {
     control: UnixStream,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn spawn_detached() -> Detached {
     let (lilly, bridge_client) = pair();
     let (bridge_guest, guest) = pair();
