@@ -1,8 +1,7 @@
 defmodule Marshall.Artifacts.Authorization do
-  @moduledoc "Fresh artifact roles evaluated by Cedar on every decision. No permission cache."
-  alias Marshall.Accounts.{Security, User}
+  @moduledoc "Artifact decisions: the Cedar artifact policy over current rows. No permission cache."
+  alias Marshall.Accounts.User
   alias Marshall.Artifacts.{Artifact, Grant}
-  alias Marshall.Authorization.Cedar
   alias Marshall.Compute.Ledger
   require Ash.Query
 
@@ -31,29 +30,15 @@ defmodule Marshall.Artifacts.Authorization do
   @spec actions() :: [action()]
   def actions, do: Map.keys(@actions)
 
-  # @cc [owner:ghuntley,label:security] artifact-cedar-fresh
-  # Every artifact decision MUST evaluate Cedar over the immutable owner, the
-  # actor's current unarchived direct grant, the actor's grants through teams of
-  # which they are currently a member, and the artifact's current state. A
-  # retired or SCIM-inactive owner MUST deny every actor except moderation.
   @spec allowed?(Artifact.t(), term(), action()) :: boolean()
-  def allowed?(%Artifact{} = artifact, %User{} = actor, action)
-      when is_map_key(@actions, action) do
-    owner_current? =
-      match?(%User{deleted_at: nil, active: true}, Security.current(artifact.owner_id))
-
-    (owner_current? or action == :admin_delete) and
-      Cedar.allowed?(actor, Map.fetch!(@actions, action), entity(artifact, actor))
-  end
+  def allowed?(%Artifact{id: id}, %User{} = actor, action) when is_map_key(@actions, action),
+    do: Marshall.Authorization.allowed?(actor, Map.fetch!(@actions, action), Artifact.Cedar, id)
 
   def allowed?(_, _, _), do: false
 
   @doc "May the actor create artifacts at all?"
   @spec create_allowed?(term()) :: boolean()
-  def create_allowed?(%User{deleted_at: nil, active: true} = actor),
-    do: Cedar.allowed?(actor, "artifact_create", Cedar.entity("ControlPlane", "marshall"))
-
-  def create_allowed?(_), do: false
+  def create_allowed?(actor), do: Marshall.Authorization.control_plane?(actor, "artifact_create")
 
   @spec require!(Artifact.t(), term(), action()) :: :ok
   def require!(artifact, actor, action) do
@@ -68,12 +53,6 @@ defmodule Marshall.Artifacts.Authorization do
   def role(%Artifact{} = artifact, %User{} = actor) do
     roles = roles(artifact.id, actor.id)
     Enum.find([:owner, :writer, :viewer], &(&1 in roles))
-  end
-
-  @spec entity(Artifact.t(), User.t()) :: ExCedar.Entity.t()
-  defp entity(artifact, actor) do
-    grants = for role <- roles(artifact.id, actor.id), into: %{}, do: {role, [actor.id]}
-    Cedar.artifact(artifact.id, artifact.owner_id, grants, artifact.state == :active)
   end
 
   @spec roles(String.t(), String.t()) :: [role()]

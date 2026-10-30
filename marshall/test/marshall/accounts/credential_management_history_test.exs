@@ -534,6 +534,11 @@ defmodule Marshall.Accounts.CredentialManagementHistoryTest do
   @spec assert_refusal({:ok, term()} | {:error, term()}, atom()) :: :ok
   defp assert_refusal(result, reason) do
     case result do
+      # Cedar admission refuses an actor without a current login before the
+      # coordinator would report :unauthorized.
+      {:error, %Ash.Error.Forbidden{}} when reason == :unauthorized ->
+        :ok
+
       {:error, %Ash.Error.Unknown{errors: errors}} ->
         assert Enum.any?(errors, fn
                  %{error: "unknown error: " <> text} -> text == ":#{reason}"

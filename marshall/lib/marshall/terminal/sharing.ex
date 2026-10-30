@@ -5,12 +5,23 @@ defmodule Marshall.Terminal.Sharing do
   require Ash.Query
   require Marshall.Events
 
+  @doc "Whether Cedar lets `actor` use `session`: its owner or a current share."
   @spec allowed?(Session.t(), Marshall.Accounts.User.t()) :: boolean()
-  def allowed?(session, actor) do
-    session.owner_id == actor.id or
-      Ash.exists?(Grant |> Ash.Query.filter(session_id == ^session.id and user_id == ^actor.id),
-        authorize?: false
+  def allowed?(session, actor),
+    do: Marshall.Authorization.allowed?(actor, "terminal_session_use", Session.Cedar, session.id)
+
+  @doc "The sessions among `sessions` that `actor` may use, decided in one query."
+  @spec usable([Session.t()], Marshall.Accounts.User.t()) :: [Session.t()]
+  def usable(sessions, actor) do
+    permitted =
+      Marshall.Authorization.prefetch(
+        actor,
+        "terminal_session_use",
+        Session.Cedar,
+        Enum.map(sessions, & &1.id)
       )
+
+    Enum.filter(sessions, &Enum.member?(permitted, &1.id))
   end
 
   # @cc [owner:ghuntley,label:security;recovery] terminal-share-owner-current-vm
@@ -37,8 +48,11 @@ defmodule Marshall.Terminal.Sharing do
 
           recipient =
             Marshall.Accounts.User
+            |> Ash.Query.for_read(:internal_lookup, %{},
+              actor: Marshall.Authorization.SystemActor.compute()
+            )
             |> Ash.Query.filter(email == ^email and is_nil(deleted_at) and active == true)
-            |> Ash.read_one!(authorize?: false)
+            |> Ash.read_one!()
 
           unless not is_nil(recipient) and recipient.id != actor.id and
                    (kind == :revoked or
@@ -48,13 +62,13 @@ defmodule Marshall.Terminal.Sharing do
           query =
             Grant |> Ash.Query.filter(session_id == ^current.id and user_id == ^recipient.id)
 
-          existing = Ash.read_one!(query, authorize?: false)
+          existing = Ash.read_one!(query, actor: Marshall.Authorization.SystemActor.compute())
 
           changed =
             case {kind, existing} do
               {:shared, nil} ->
                 if Ash.count!(Grant |> Ash.Query.filter(session_id == ^current.id),
-                     authorize?: false
+                     actor: Marshall.Authorization.SystemActor.compute()
                    ) >= 64,
                    do: Ledger.rollback(:too_many_viewers)
 
@@ -85,7 +99,7 @@ defmodule Marshall.Terminal.Sharing do
                 kind: kind,
                 request_id: Ash.UUID.generate()
               },
-              authorize?: false
+              actor: Marshall.Authorization.SystemActor.compute()
             )
           end
 

@@ -22,6 +22,10 @@ defmodule Marshall.Artifacts.StorageEntry do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :put, :replace]
+  end
+
   actions do
     defaults [:read, :destroy]
 

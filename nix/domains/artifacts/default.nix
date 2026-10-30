@@ -163,9 +163,10 @@ let
 
   cedarCargo = pkgs.rustPlatform.fetchCargoVendor {
     name = "marshall-cedar";
-    src = "${dependencies.marshall}/ex_cedar/native/ex_cedar_native";
+    src = ../../../marshall/native/marshall_cedar;
     hash = hashes.cedarCargo;
   };
+  cedarLints = import ./applications/marshall-cedar-lints.nix { inherit pkgs cedarCargo; };
 
   # Every Mix application with fixed-output dependencies, keyed like
   # dependency-hashes.json; adding one to `dependencies` adds it here.
@@ -280,7 +281,6 @@ let
       } // lib.optionalAttrs (antithesisIntegratedHost && application == "lilly") {
         ANTITHESIS_INTEGRATED_HOST = "1";
       } // lib.optionalAttrs isMarshall {
-        EX_CEDAR_BUILD = "1";
         CARGO_NET_OFFLINE = "true";
         CARGO_BUILD_JOBS = "4";
       };
@@ -324,7 +324,7 @@ let
     };
 in
 rec {
-  inherit dependencies cedarCargo hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit dependencies cedarCargo cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;

@@ -12,6 +12,10 @@ defmodule Marshall.Redaction.Run do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :open, :start, :pause, :resume, :cancel, :complete, :progress, :fail]
+  end
+
   state_machine do
     initial_states [:queued]
     state_attribute :state

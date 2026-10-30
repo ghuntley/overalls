@@ -38,7 +38,7 @@ defmodule Marshall.Accounts.AdministratorsTest do
 
   test "admin guest access does not grant internal compute authority" do
     admin = user(true)
-    vm = Cedar.vm(Ash.UUID.generate(), Ash.UUID.generate())
+    vm = Marshall.CedarEntities.vm(Ash.UUID.generate(), Ash.UUID.generate())
     for action <- ~w(read write manage web), do: assert(Cedar.allowed?(admin, action, vm))
     refute Cedar.allowed?(admin, "coordinate", Cedar.entity("Internal", "test"))
   end

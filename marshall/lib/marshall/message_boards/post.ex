@@ -30,6 +30,10 @@ defmodule Marshall.MessageBoards.Post do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :post]
+  end
+
   actions do
     defaults [:read, :destroy]
 

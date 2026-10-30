@@ -3,7 +3,8 @@ defmodule Marshall.Galileo.PeerToken do
   use Ash.Resource,
     otp_app: :marshall,
     domain: Marshall.Galileo,
-    data_layer: AshPostgres.DataLayer
+    data_layer: AshPostgres.DataLayer,
+    authorizers: [Marshall.Authorization.AshAuthorizer]
 
   postgres do
     table "galileo_peer_tokens"
@@ -16,6 +17,10 @@ defmodule Marshall.Galileo.PeerToken do
       check_constraint :integration_name, "galileo_peer_tokens_name_size",
         check: "octet_length(integration_name) BETWEEN 1 AND 40"
     end
+  end
+
+  cedar do
+    internal [:read, :issue]
   end
 
   actions do

@@ -35,7 +35,9 @@ defmodule Marshall.Terminal.Tickets do
       expires_at: DateTime.add(DateTime.utc_now(), @ttl_seconds, :second)
     }
 
-    case Marshall.Terminal.create_ticket(attributes, authorize?: false) do
+    case Marshall.Terminal.create_ticket(attributes,
+           actor: Marshall.Authorization.SystemActor.compute()
+         ) do
       {:ok, _ticket} -> {:ok, token}
       {:error, reason} -> {:error, reason}
     end
@@ -50,9 +52,10 @@ defmodule Marshall.Terminal.Tickets do
           |> Ash.Query.filter(expr(token_hash == ^digest(token)))
           |> Ash.Query.lock("FOR UPDATE")
 
-        with {:ok, %Ticket{} = ticket} <- Ash.read_one(query, authorize?: false),
+        with {:ok, %Ticket{} = ticket} <-
+               Ash.read_one(query, actor: Marshall.Authorization.SystemActor.compute()),
              :gt <- DateTime.compare(ticket.expires_at, DateTime.utc_now()),
-             :ok <- Ash.destroy(ticket, authorize?: false) do
+             :ok <- Ash.destroy(ticket, actor: Marshall.Authorization.SystemActor.compute()) do
           %{
             session_id: ticket.session_id,
             actor_id: ticket.actor_id,

@@ -11,6 +11,10 @@ defmodule Marshall.Accounts.AdminBootstrap do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :complete]
+  end
+
   actions do
     defaults [:read]
 

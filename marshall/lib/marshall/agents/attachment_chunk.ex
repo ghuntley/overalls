@@ -24,6 +24,10 @@ defmodule Marshall.Agents.AttachmentChunk do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :store]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:bytes])

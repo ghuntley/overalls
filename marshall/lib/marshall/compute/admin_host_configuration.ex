@@ -2,7 +2,6 @@ defmodule Marshall.Compute.AdminHostConfiguration do
   @moduledoc "Current-administrator host admission and scheduler-margin configuration."
   use Ash.Resource.Actions.Implementation
   alias Marshall.Accounts.AdminEvent
-  alias Marshall.Authorization.Cedar
   alias Marshall.Compute.Ledger
 
   # @cc [owner:ghuntley,label:security;capacity;concurrency] admin-host-config-serialized
@@ -12,7 +11,7 @@ defmodule Marshall.Compute.AdminHostConfiguration do
   # fresh report; physical limits remain deployment-owned observations.
   @impl true
   def run(input, _, %{actor: actor}) do
-    unless Cedar.allowed?(actor, "admin_configure", Cedar.entity("ControlPlane", "marshall")),
+    unless Marshall.Authorization.control_plane?(actor, "admin_configure"),
       do: {:error, Ash.Error.Forbidden.exception([])},
       else: configure(input.arguments, actor)
   end

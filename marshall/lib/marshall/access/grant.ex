@@ -27,6 +27,13 @@ defmodule Marshall.Access.Grant do
     end
   end
 
+  cedar do
+    control_plane "admin_accounts", [:revoke_for_admin]
+    control_plane "admin_read", [:list_for_admin]
+    control_plane "provision", [:set_access, :list_grants]
+    internal [:read, :history, :grant, :mark_revoked, :revoke]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -39,6 +46,7 @@ defmodule Marshall.Access.Grant do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

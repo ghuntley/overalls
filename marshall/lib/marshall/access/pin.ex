@@ -26,6 +26,11 @@ defmodule Marshall.Access.Pin do
     end
   end
 
+  cedar do
+    control_plane "provision", [:pin_machine, :unpin_machine]
+    internal [:read, :history, :pin, :unpin, :repin, :remove]
+  end
+
   state_machine do
     initial_states [:pinned]
     default_initial_state :pinned
@@ -48,6 +53,7 @@ defmodule Marshall.Access.Pin do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

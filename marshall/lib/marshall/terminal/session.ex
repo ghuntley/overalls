@@ -28,6 +28,10 @@ defmodule Marshall.Terminal.Session do
     end
   end
 
+  cedar do
+    internal [:read, :request_kill, :confirm_kill, :retire_kill, :open, :close, :list_for_vm]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -40,6 +44,7 @@ defmodule Marshall.Terminal.Session do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:recovery] terminal-kill-durable-intent
@@ -132,5 +137,7 @@ defmodule Marshall.Terminal.Session do
       allow_nil? false
       attribute_writable? true
     end
+
+    has_many :grants, Marshall.Terminal.Grant, destination_attribute: :session_id
   end
 end

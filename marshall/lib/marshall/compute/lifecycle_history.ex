@@ -1,7 +1,7 @@
 defmodule Marshall.Compute.LifecycleHistory do
   @moduledoc "Bounded authenticated lifecycle history with immediate expiry."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.LifecycleEvent
   require Ash.Query
 
@@ -10,7 +10,7 @@ defmodule Marshall.Compute.LifecycleHistory do
   # events and exclude expired history even before retention cleanup executes.
   @impl true
   def run(input, _, %{actor: actor}) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       args = input.arguments
       query = LifecycleEvent |> Ash.Query.sort(id: :desc) |> Ash.Query.limit(args.limit + 1)
 

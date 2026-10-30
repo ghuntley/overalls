@@ -50,6 +50,10 @@ defmodule Marshall.Compute.Operation do
     end
   end
 
+  cedar do
+    internal [:read, :enqueue, :dispatch, :acknowledge, :complete, :cancel]
+  end
+
   oban do
     triggers do
       trigger :dispatch do

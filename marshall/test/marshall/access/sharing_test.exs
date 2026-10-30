@@ -239,7 +239,7 @@ defmodule Marshall.Access.SharingTest do
       assert {:error, _} = Ash.read(resource)
     end
 
-    assert {:ok, []} =
+    assert {:error, %Ash.Error.Forbidden{}} =
              Ash.read(Ash.Query.for_read(Marshall.Accounts.User, :internal_lookup),
                actor: context.owner
              )

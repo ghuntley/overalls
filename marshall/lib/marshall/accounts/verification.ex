@@ -4,12 +4,16 @@ defmodule Marshall.Accounts.Verification do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshOban]
 
   postgres do
     table "account_verifications"
     repo Marshall.Repo
+  end
+
+  cedar do
+    internal [:prune, :read, :destroy, :record, :verify]
   end
 
   oban do
@@ -45,12 +49,6 @@ defmodule Marshall.Accounts.Verification do
 
     update :verify do
       accept [:generation, :verified_at, :elevated_until, :credential_id]
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

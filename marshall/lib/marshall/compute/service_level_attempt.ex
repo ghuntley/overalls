@@ -36,6 +36,10 @@ defmodule Marshall.Compute.ServiceLevelAttempt do
     end
   end
 
+  cedar do
+    internal [:read, :admit, :finish, :check_pending]
+  end
+
   # @cc [owner:ghuntley,label:accounting;recovery] service-level-terminal-immutable
   # One operation/service admission MUST have at most one terminal result.
   # Only pending attempts may finish; no action may reopen or delete a result.

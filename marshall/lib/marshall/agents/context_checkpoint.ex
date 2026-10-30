@@ -15,6 +15,10 @@ defmodule Marshall.Agents.ContextCheckpoint do
     end
   end
 
+  cedar do
+    internal [:read, :install]
+  end
+
   actions do
     defaults [:read]
 

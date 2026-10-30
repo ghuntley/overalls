@@ -11,6 +11,11 @@ defmodule Marshall.Accounts.AdminEvent do
     repo Marshall.Repo
   end
 
+  cedar do
+    control_plane "admin_read", [:list_for_admin]
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

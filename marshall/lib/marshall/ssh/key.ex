@@ -13,6 +13,15 @@ defmodule Marshall.SSH.Key do
     identity_wheres_to_sql active_fingerprint: "archived_at IS NULL"
   end
 
+  cedar do
+    control_plane "admin_accounts", [:revoke_for_admin]
+    control_plane "admin_read", [:list_for_admin]
+
+    control_plane "provision", [:list_for_user, :add_for_user, :rename_for_user, :remove_for_user]
+
+    internal [:read, :history, :register, :relabel, :revoke]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -25,6 +34,7 @@ defmodule Marshall.SSH.Key do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at, :public_key, :label]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

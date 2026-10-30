@@ -20,6 +20,10 @@ defmodule Marshall.Artifacts.VersionFile do
     end
   end
 
+  cedar do
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

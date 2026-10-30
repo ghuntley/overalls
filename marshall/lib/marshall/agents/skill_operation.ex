@@ -16,6 +16,10 @@ defmodule Marshall.Agents.SkillOperation do
     end
   end
 
+  cedar do
+    internal [:read, :record, :dispatch, :finish]
+  end
+
   actions do
     defaults [:read]
 

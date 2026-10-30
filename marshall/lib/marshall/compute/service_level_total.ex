@@ -18,6 +18,10 @@ defmodule Marshall.Compute.ServiceLevelTotal do
     end
   end
 
+  cedar do
+    internal [:read, :initialize, :add]
+  end
+
   actions do
     defaults [:read]
 

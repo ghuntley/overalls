@@ -37,6 +37,10 @@ defmodule Marshall.Compute.RelocationRetry do
   # original stop authority. Historical activation references name a later
   # generation of that relocation; supersession grants no execution authority.
   # Current public actions MUST NOT create, activate or alter these records.
+  cedar do
+    internal [:read]
+  end
+
   actions do
     defaults [:read]
   end

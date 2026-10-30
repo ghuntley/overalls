@@ -40,6 +40,16 @@ defmodule Marshall.Ingress.WebLogin do
     end
   end
 
+  # @cc [owner:ghuntley,label:security] ingress-browser-exchange-internal-state
+  # Raw mutations MUST remain internal. Coordinators MUST serialize pending ->
+  # approved -> consumed with fresh service/execution and stored-login checks.
+  # Only hashes of ticket, code and browser state may persist. A pending or
+  # approved record MUST NOT independently authorize guest traffic.
+  cedar do
+    control_plane "provision", [:authorize_login]
+    internal [:read, :begin_login, :exchange_login, :record, :approve, :consume, :purge]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -50,13 +60,9 @@ defmodule Marshall.Ingress.WebLogin do
     sensitive_attributes :ignore
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
-  # @cc [owner:ghuntley,label:security] ingress-browser-exchange-internal-state
-  # Raw mutations MUST remain internal. Coordinators MUST serialize pending ->
-  # approved -> consumed with fresh service/execution and stored-login checks.
-  # Only hashes of ticket, code and browser state may persist. A pending or
-  # approved record MUST NOT independently authorize guest traffic.
   actions do
     defaults [:read]
 

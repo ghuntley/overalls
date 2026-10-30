@@ -28,7 +28,10 @@ defmodule Marshall.Terminal.TicketRetention do
         |> Ash.Query.lock("FOR UPDATE SKIP LOCKED")
         |> Ash.read!(actor: SystemActor.compute())
 
-      Enum.each(tickets, &Ash.destroy!(&1, action: :purge, authorize?: false))
+      Enum.each(
+        tickets,
+        &Ash.destroy!(&1, action: :purge, actor: Marshall.Authorization.SystemActor.compute())
+      )
 
       if length(tickets) == @batch do
         AshOban.schedule(Ticket, :prune, action_arguments: %{continuation: Ash.UUID.generate()})

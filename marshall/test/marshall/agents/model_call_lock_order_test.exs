@@ -10,7 +10,7 @@ defmodule Marshall.Agents.ModelCallLockOrderTest do
   ModelCall host foreign key) is the observed three-way deadlock.
   """
   use ExUnit.Case, async: false
-  require Marshall.CommittedFixtureCleanup, as: Cleanup
+  alias Marshall.CommittedFixtureCleanup, as: Cleanup
   alias Marshall.Agents.{ModelCall, ModelCalls}
   alias Marshall.AgentContextRecoveryFixture, as: Recovery
   alias Marshall.AgentRevocationFixture, as: Fixture

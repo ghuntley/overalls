@@ -1,6 +1,7 @@
 namespace Marshall {
-  entity User = { administrator: Bool, elevated: Bool };
+  entity User = { administrator: Bool, elevated: Bool, active: Bool };
   entity System;
+  entity Service = { enabled: Bool };
   entity ControlPlane;
   entity Internal;
   action "admin_read", "admin_accounts", "admin_operate", "admin_configure", "admin_jobs" appliesTo {
@@ -8,6 +9,10 @@ namespace Marshall {
   };
   entity VM = {
     owner: User,
+    owner_active: Bool,
+    sharing: Bool,
+    terminal: Bool,
+    web_enabled: Bool,
     web_users: Set<User>,
     viewers: Set<User>,
     operators: Set<User>,
@@ -22,6 +27,8 @@ namespace Marshall {
   };
   entity Thread = {
     owner: User,
+    owner_active: Bool,
+    sharing: Bool,
     viewers: Set<User>,
     operators: Set<User>,
     managers: Set<User>,
@@ -30,6 +37,7 @@ namespace Marshall {
   };
   entity Artifact = {
     owner: User,
+    owner_active: Bool,
     owners: Set<User>,
     writers: Set<User>,
     viewers: Set<User>,
@@ -37,13 +45,24 @@ namespace Marshall {
   };
   entity Integration = {
     owner: User,
+    live: Bool,
     managers: Set<User>
+  };
+  entity TerminalSession = {
+    owner: User,
+    viewers: Set<User>
+  };
+  action "account_self" appliesTo {
+    principal: [User], resource: [User], context: {}
   };
   action "provision" appliesTo {
     principal: [User], resource: [ControlPlane], context: {}
   };
   action "coordinate" appliesTo {
     principal: [System], resource: [Internal], context: {}
+  };
+  action "authenticate", "scim_provision" appliesTo {
+    principal: [Service], resource: [Internal], context: {}
   };
   action "read", "write", "manage" appliesTo {
     principal: [User], resource: [VM, Thread], context: {}
@@ -61,6 +80,9 @@ namespace Marshall {
   };
   action "artifact_create" appliesTo {
     principal: [User], resource: [ControlPlane], context: {}
+  };
+  action "terminal_session_use" appliesTo {
+    principal: [User], resource: [TerminalSession], context: {}
   };
   action "integration_read", "integration_manage" appliesTo {
     principal: [User], resource: [Integration], context: {}

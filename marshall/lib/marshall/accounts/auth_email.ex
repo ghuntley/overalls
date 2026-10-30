@@ -21,6 +21,10 @@ defmodule Marshall.Accounts.AuthEmail do
     end
   end
 
+  cedar do
+    internal [:read, :enqueue, :deliver, :purge]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:payload])

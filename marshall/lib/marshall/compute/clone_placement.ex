@@ -38,14 +38,15 @@ defmodule Marshall.Compute.ClonePlacement do
       Host |> Ledger.read!() |> Enum.sort_by(& &1.id) |> Enum.map(&Ledger.lock!(Host, &1.id))
 
     vm = Ledger.lock!(VirtualMachine, source.id) || Ledger.rollback(:vm_deleted)
-    actor = Ash.get!(Marshall.Accounts.User, request.requested_by_id, authorize?: false)
 
-    unless Marshall.Authorization.Cedar.allowed?(
-             actor,
-             "provision",
-             Marshall.Authorization.Cedar.entity("ControlPlane", "marshall")
-           ),
-           do: Ledger.rollback(:forbidden)
+    actor =
+      Ash.get!(Marshall.Accounts.User, request.requested_by_id,
+        action: :internal_lookup,
+        actor: Marshall.Authorization.SystemActor.compute()
+      )
+
+    unless Marshall.Authorization.control_plane?(actor, "provision"),
+      do: Ledger.rollback(:forbidden)
 
     Marshall.Access.Authorization.require!(vm, actor, "manage")
 

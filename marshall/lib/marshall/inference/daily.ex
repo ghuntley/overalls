@@ -16,6 +16,10 @@ defmodule Marshall.Inference.Daily do
     end
   end
 
+  cedar do
+    internal [:read, :record, :add, :purge]
+  end
+
   actions do
     defaults [:read]
 

@@ -16,6 +16,10 @@ defmodule Marshall.Terminal.Event do
     end
   end
 
+  cedar do
+    internal [:read, :record, :recent]
+  end
+
   actions do
     defaults [:read]
 

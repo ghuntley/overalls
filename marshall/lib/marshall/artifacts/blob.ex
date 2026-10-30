@@ -14,6 +14,10 @@ defmodule Marshall.Artifacts.Blob do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read]
+  end
+
   actions do
     defaults [:read]
   end

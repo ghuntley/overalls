@@ -27,6 +27,10 @@ defmodule Marshall.Compute.StoragePool do
     end
   end
 
+  cedar do
+    internal [:read, :enroll, :configure_overhead, :report, :extend_freshness]
+  end
+
   actions do
     defaults [:read]
 

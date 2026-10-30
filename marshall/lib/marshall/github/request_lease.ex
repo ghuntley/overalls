@@ -15,6 +15,10 @@ defmodule Marshall.GitHub.RequestLease do
     end
   end
 
+  cedar do
+    internal [:read, :record, :renew, :close, :purge]
+  end
+
   actions do
     defaults [:read]
 

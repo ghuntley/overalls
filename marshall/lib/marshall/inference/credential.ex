@@ -13,6 +13,10 @@ defmodule Marshall.Inference.Credential do
     identity_wheres_to_sql one_active_per_host: "revoked_at IS NULL"
   end
 
+  cedar do
+    internal [:read, :issue, :ensure, :revoke]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -21,6 +25,7 @@ defmodule Marshall.Inference.Credential do
     ignore_attributes [:secret_hash, :inserted_at, :updated_at]
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

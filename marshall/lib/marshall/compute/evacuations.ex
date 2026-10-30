@@ -1,6 +1,6 @@
 defmodule Marshall.Compute.Evacuations do
   @moduledoc "Host-serialized evacuation intent and bounded durable relocation scheduling."
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Accounts.{AdminEvent, User}
 
   alias Marshall.Compute.{
@@ -479,7 +479,7 @@ defmodule Marshall.Compute.Evacuations do
   end
 
   defp require_admin!(actor) do
-    unless Cedar.allowed?(actor, "admin_operate", Cedar.entity("ControlPlane", "marshall")),
+    unless Marshall.Authorization.control_plane?(actor, "admin_operate"),
       do: Ledger.rollback(:forbidden)
   end
 

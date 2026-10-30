@@ -4,7 +4,7 @@ defmodule Marshall.Accounts.Passkey do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Marshall.Authorization.AshAuthorizer]
 
   postgres do
     table "account_passkeys"
@@ -13,6 +13,10 @@ defmodule Marshall.Accounts.Passkey do
     custom_indexes do
       index [:user_id]
     end
+  end
+
+  cedar do
+    internal [:read, :destroy, :create, :update]
   end
 
   actions do
@@ -26,12 +30,6 @@ defmodule Marshall.Accounts.Passkey do
     update :update do
       primary? true
       accept [:sign_count, :label]
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

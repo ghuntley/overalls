@@ -30,6 +30,10 @@ defmodule Marshall.Artifacts.Grant do
     end
   end
 
+  cedar do
+    internal [:read, :history, :grant, :revoke]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -42,6 +46,7 @@ defmodule Marshall.Artifacts.Grant do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do
@@ -69,6 +74,8 @@ defmodule Marshall.Artifacts.Grant do
     belongs_to :artifact, Marshall.Artifacts.Artifact,
       allow_nil?: false,
       attribute_writable?: true
+
+    belongs_to :team, Marshall.Teams.Team, define_attribute?: false
   end
 
   identities do

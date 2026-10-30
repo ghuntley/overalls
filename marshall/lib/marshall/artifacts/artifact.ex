@@ -29,6 +29,10 @@ defmodule Marshall.Artifacts.Artifact do
     end
   end
 
+  cedar do
+    internal [:read, :create, :advance, :request_delete, :admin_delete, :finish_delete]
+  end
+
   state_machine do
     initial_states [:active]
     default_initial_state :active
@@ -48,6 +52,7 @@ defmodule Marshall.Artifacts.Artifact do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do
@@ -115,6 +120,11 @@ defmodule Marshall.Artifacts.Artifact do
 
     create_timestamp :inserted_at
     update_timestamp :updated_at
+  end
+
+  relationships do
+    belongs_to :owner, Marshall.Accounts.User, define_attribute?: false
+    has_many :grants, Marshall.Artifacts.Grant, destination_attribute: :artifact_id
   end
 
   @spec transitions() :: [atom()]

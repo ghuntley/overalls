@@ -22,6 +22,22 @@ defmodule Marshall.GitHub.Connection do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :register,
+      :authorize,
+      :connect,
+      :drain,
+      :start_refresh,
+      :refresh,
+      :require_reconnect,
+      :disconnect,
+      :revoked,
+      :invalidate_restored
+    ]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:credentials])

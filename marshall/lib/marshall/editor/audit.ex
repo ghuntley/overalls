@@ -1,7 +1,7 @@
 defmodule Marshall.Editor.Audit do
   @moduledoc "Bounded administrator projection of redacted editor transitions."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
 
   @type item :: %{
           id: String.t(),
@@ -15,7 +15,7 @@ defmodule Marshall.Editor.Audit do
 
   @impl true
   def run(_, _, %{actor: actor}) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       items =
         [
           {Marshall.Editor.Login.Version, :editor_login},

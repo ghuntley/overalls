@@ -27,6 +27,20 @@ defmodule Marshall.Compute.SourcePermitRequest do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :enqueue,
+      :dispatch,
+      :record_result,
+      :prepare_import,
+      :record_import,
+      :record_receive,
+      :dispatch_destination,
+      :supersede
+    ]
+  end
+
   oban do
     triggers do
       trigger :notify_destination do

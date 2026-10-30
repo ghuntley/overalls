@@ -28,6 +28,11 @@ defmodule Marshall.Teams.TeamMember do
     end
   end
 
+  cedar do
+    internal [:read, :history, :record, :replace_role, :remove]
+    service :scim, [:read, :scim_record, :scim_remove]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -40,6 +45,7 @@ defmodule Marshall.Teams.TeamMember do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

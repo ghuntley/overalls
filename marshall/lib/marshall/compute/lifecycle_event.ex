@@ -24,6 +24,11 @@ defmodule Marshall.Compute.LifecycleEvent do
     end
   end
 
+  cedar do
+    control_plane "admin_read", [:list_for_admin]
+    internal [:read, :record, :expire]
+  end
+
   oban do
     scheduled_actions do
       schedule :expire, "*/10 * * * *" do

@@ -17,6 +17,10 @@
     :ecto_sql,
     :phoenix
   ],
+  locals_without_parens: [control_plane: 2, internal: 1, service: 2, record: 3, refused: 1],
+  export: [
+    locals_without_parens: [control_plane: 2, internal: 1, service: 2, record: 3, refused: 1]
+  ],
   subdirectories: ["priv/*/migrations"],
   plugins: [Spark.Formatter, Phoenix.LiveView.HTMLFormatter],
   inputs: [

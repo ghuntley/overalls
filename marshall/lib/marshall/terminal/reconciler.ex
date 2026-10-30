@@ -78,7 +78,7 @@ defmodule Marshall.Terminal.Reconciler do
       Session
       |> Ash.Query.filter(vm_id == ^vm_id)
       |> Ash.Query.limit(64)
-      |> Ash.read!(authorize?: false)
+      |> Ash.read!(actor: Marshall.Authorization.SystemActor.compute())
 
     opening_query =
       Opening
@@ -91,7 +91,7 @@ defmodule Marshall.Terminal.Reconciler do
         do: Ash.Query.filter(opening_query, id > ^after_opening),
         else: opening_query
 
-    openings = Ash.read!(opening_query, authorize?: false)
+    openings = Ash.read!(opening_query, actor: Marshall.Authorization.SystemActor.compute())
 
     pending =
       sessions
@@ -105,7 +105,7 @@ defmodule Marshall.Terminal.Reconciler do
     query = VirtualMachine |> Ash.Query.filter(id == ^vm_id)
 
     result =
-      case Ash.read_one(query, authorize?: false) do
+      case Ash.read_one(query, actor: Marshall.Authorization.SystemActor.compute()) do
         {:ok, %VirtualMachine{desired_state: :deleted}} ->
           retire_authority(sessions, selected_openings)
 
@@ -203,8 +203,11 @@ defmodule Marshall.Terminal.Reconciler do
 
   defp current_host(vm) do
     with {:ok, %WorkloadPlacement{} = placement} <-
-           Ash.get(WorkloadPlacement, vm.current_placement_id, authorize?: false),
-         {:ok, %Host{} = host} <- Ash.get(Host, placement.host_id, authorize?: false),
+           Ash.get(WorkloadPlacement, vm.current_placement_id,
+             actor: Marshall.Authorization.SystemActor.compute()
+           ),
+         {:ok, %Host{} = host} <-
+           Ash.get(Host, placement.host_id, actor: Marshall.Authorization.SystemActor.compute()),
          true <-
            is_map(host.inventory) and host.inventory["terminal_protocol"] == 2 and
              Marshall.Compute.HostLiveness.authority?(

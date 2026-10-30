@@ -173,11 +173,8 @@ defmodule Marshall.Accounts.SecurityTest do
     actor = elevate(user(true))
     owner = user()
 
-    vm = %Marshall.Compute.VirtualMachine{
-      id: Ash.UUID.generate(),
-      owner_id: owner.id,
-      profile: :standard
-    }
+    _host = Marshall.ComputeFixtures.host_fixture()
+    {:ok, vm} = Marshall.Compute.provision(Marshall.ComputeFixtures.request(), actor: owner)
 
     maximum = DateTime.add(Ledger.now(), 1_200)
     deadline = Security.elevated_until(actor)
@@ -193,7 +190,7 @@ defmodule Marshall.Accounts.SecurityTest do
 
   test "revoked browser identity cannot retain ordinary ownership permissions" do
     {actor, token} = login(user())
-    resource = Cedar.vm(Ash.UUID.generate(), actor.id)
+    resource = Marshall.CedarEntities.vm(Ash.UUID.generate(), actor.id)
     assert Cedar.allowed?(actor, "read", resource)
     :ok = AshAuthentication.TokenResource.Actions.revoke(Marshall.Accounts.Token, token)
     refute Cedar.allowed?(actor, "read", resource)

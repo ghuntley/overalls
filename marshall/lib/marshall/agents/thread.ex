@@ -17,6 +17,11 @@ defmodule Marshall.Agents.Thread do
     end
   end
 
+  cedar do
+    control_plane "provision", [:submit_prompt]
+    internal [:read, :open, :advance, :set_mode, :set_context, :delete]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -25,6 +30,7 @@ defmodule Marshall.Agents.Thread do
     store_action_name? true
     ignore_attributes [:inserted_at, :next_event_sequence]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

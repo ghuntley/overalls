@@ -17,6 +17,10 @@ defmodule Marshall.Compute.HostCredential do
     identity_wheres_to_sql one_active_per_host: "archived_at IS NULL"
   end
 
+  cedar do
+    internal [:read, :history, :issue, :revoke]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:secret])
@@ -35,6 +39,7 @@ defmodule Marshall.Compute.HostCredential do
     ignore_attributes [:secret, :encrypted_secret, :inserted_at, :updated_at]
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

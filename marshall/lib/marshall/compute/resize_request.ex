@@ -16,6 +16,21 @@ defmodule Marshall.Compute.ResizeRequest do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :record,
+      :record_progress,
+      :stop,
+      :resize,
+      :restart,
+      :fence,
+      :complete,
+      :cancel,
+      :cancelled
+    ]
+  end
+
   # @cc [owner:ghuntley,label:recovery] workflow-named-transitions
   # Phase changes MUST use named transitions; progress writes cannot skip a
   # physical evidence boundary. Coordinators retain their receipt and lock guards.

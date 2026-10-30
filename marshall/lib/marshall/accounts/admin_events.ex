@@ -2,7 +2,7 @@ defmodule Marshall.Accounts.AdminEvents do
   @moduledoc "Bounded redacted administrator audit projection."
   use Ash.Resource.Actions.Implementation
   alias Marshall.Accounts.AdminEvent
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   require Ash.Query
 
   # @cc [owner:ghuntley,label:security;capacity] admin-audit-bounded-projection
@@ -11,7 +11,7 @@ defmodule Marshall.Accounts.AdminEvents do
   # Credentials, tokens, request payloads and terminal bytes MUST never escape.
   @impl true
   def run(input, _, %{actor: actor}) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       query =
         AdminEvent
         |> Ash.Query.sort(inserted_at: :desc, id: :desc)

@@ -1272,6 +1272,12 @@ defmodule Marshall.Events do
     metadata: [reason: :atom]
   )
 
+  defevent("cedar.filter_unsupported",
+    level: :error,
+    message: "Cedar residual could not be translated; the read filter denies",
+    metadata: [reason: :atom]
+  )
+
   # Mail
   defevent("mail.delivery_attempt",
     message: "Mail attempt finished",

@@ -1,7 +1,7 @@
 defmodule Marshall.Galileo.Configurations do
   @moduledoc "Transactional integration configuration: idempotent writes, attachments and views."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.{Ledger, VirtualMachine}
   alias Marshall.Galileo.{Attachment, Integration, IntegrationHeader}
   require Ash.Query
@@ -292,14 +292,11 @@ defmodule Marshall.Galileo.Configurations do
   defp list(actor, arguments) do
     require Ash.Query
 
-    integrations =
-      Integration
-      |> Ash.Query.filter(owner_id == ^actor.id or team_id in ^team_ids(actor))
-      |> Ash.Query.sort(inserted_at: :desc, id: :desc)
-      |> Ash.read!(actor: SystemActor.compute())
-
-    integrations
-    |> Enum.filter(&Marshall.Galileo.Ownership.live?/1)
+    # The list shows exactly the integrations Cedar lets the caller read.
+    Integration
+    |> Marshall.Authorization.filter(actor, "integration_read", Integration.Cedar)
+    |> Ash.Query.sort(inserted_at: :desc, id: :desc)
+    |> Ash.read!(actor: SystemActor.compute())
     |> Enum.map(fn integration ->
       headers =
         Ledger.read!(IntegrationHeader, integration_id: integration.id)
@@ -402,32 +399,32 @@ defmodule Marshall.Galileo.Configurations do
 
     Marshall.Teams.Fence.require_resources_open!(team)
 
-    unless Cedar.allowed?(actor, "team_manage_members", Cedar.team(team)),
-      do: Ledger.rollback(:forbidden)
+    unless Marshall.Authorization.allowed?(
+             actor,
+             "team_manage_members",
+             Marshall.Teams.Team.Cedar,
+             team.id
+           ),
+           do: Ledger.rollback(:forbidden)
   end
 
-  defp manager?(integration, actor) do
-    entity = Cedar.integration(integration)
+  defp manager?(integration, actor),
+    do:
+      Marshall.Authorization.allowed?(
+        actor,
+        "integration_manage",
+        Integration.Cedar,
+        integration.id
+      )
 
-    Marshall.Galileo.Ownership.live?(integration) and
-      Cedar.allowed?(actor, "integration_manage", entity)
-  end
-
-  defp reader?(integration, actor) do
-    entity = Cedar.integration(integration)
-
-    Marshall.Galileo.Ownership.live?(integration) and
-      Cedar.allowed?(actor, "integration_read", entity)
-  end
-
-  defp team_ids(actor) do
-    require Ash.Query
-
-    Marshall.Teams.TeamMember
-    |> Ash.Query.filter(user_id == ^actor.id)
-    |> Ash.read!(actor: SystemActor.compute())
-    |> Enum.map(& &1.team_id)
-  end
+  defp reader?(integration, actor),
+    do:
+      Marshall.Authorization.allowed?(
+        actor,
+        "integration_read",
+        Integration.Cedar,
+        integration.id
+      )
 
   defp live_integration!(name) do
     case Ledger.read!(Integration, name: name) do

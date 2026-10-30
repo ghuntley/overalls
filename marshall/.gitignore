@@ -36,3 +36,7 @@ marshall-*.tar
 # In case you use Node.js/npm, you want to ignore these.
 npm-debug.log
 /assets/node_modules/
+
+# Rustler build output for the Cedar NIF.
+/native/marshall_cedar/target/
+/priv/native/

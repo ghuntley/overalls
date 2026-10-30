@@ -2,7 +2,7 @@ defmodule Marshall.Accounts.Administrators do
   @moduledoc "Serialized, audited administrator membership changes."
   use Ash.Resource.Actions.Implementation
   alias Marshall.Accounts.{AdminBootstrap, AdminEvent, Security, User}
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.Ledger
   require Ash.Query
   require Marshall.Events
@@ -17,7 +17,7 @@ defmodule Marshall.Accounts.Administrators do
       Ledger.transaction(fn ->
         Ledger.lock!(AdminBootstrap, "installation") || Ledger.rollback(:forbidden)
 
-        unless Cedar.allowed?(actor, "admin_accounts", Cedar.entity("ControlPlane", "marshall")),
+        unless Marshall.Authorization.control_plane?(actor, "admin_accounts"),
           do: Ledger.rollback(:forbidden)
 
         %{user_id: id, administrator: enabled} = input.arguments

@@ -31,6 +31,12 @@ defmodule Marshall.Inference.Request do
     end
   end
 
+  cedar do
+    control_plane "admin_read", [:list_for_admin]
+    control_plane "provision", [:list_for_user]
+    internal [:read, :prune, :record, :renew, :complete, :purge]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -41,6 +47,7 @@ defmodule Marshall.Inference.Request do
     ignore_attributes [:inserted_at, :updated_at]
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   oban do

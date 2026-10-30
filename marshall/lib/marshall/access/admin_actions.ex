@@ -4,7 +4,7 @@ defmodule Marshall.Access.AdminActions do
 
   alias Marshall.Access.Grant
   alias Marshall.Accounts.{AdminEvent, User}
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.{Ledger, VirtualMachine}
   require Ash.Query
 
@@ -14,7 +14,7 @@ defmodule Marshall.Access.AdminActions do
       fn ->
         action = if options[:operation] == :revoke, do: "admin_accounts", else: "admin_read"
 
-        unless Cedar.allowed?(actor, action, Cedar.entity("ControlPlane", "marshall")),
+        unless Marshall.Authorization.control_plane?(actor, action),
           do: Ledger.rollback(:forbidden)
 
         case options[:operation] do

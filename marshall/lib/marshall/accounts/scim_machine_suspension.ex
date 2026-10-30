@@ -9,7 +9,7 @@ defmodule Marshall.Accounts.ScimMachineSuspension do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshStateMachine]
 
   @type t :: %__MODULE__{}
@@ -31,6 +31,10 @@ defmodule Marshall.Accounts.ScimMachineSuspension do
 
       index [:user_id, :state]
     end
+  end
+
+  cedar do
+    internal [:read, :record, :resume, :release]
   end
 
   state_machine do
@@ -62,12 +66,6 @@ defmodule Marshall.Accounts.ScimMachineSuspension do
       require_atomic? false
       change transition_state(:released)
       change set_attribute(:closed_at, &DateTime.utc_now/0)
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

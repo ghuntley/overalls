@@ -33,6 +33,22 @@ defmodule Marshall.Editor.Lease do
     end
   end
 
+  cedar do
+    control_plane "admin_read", [:audit]
+
+    internal [
+      :read,
+      :record,
+      :renew,
+      :close,
+      :purge,
+      :prune,
+      :open_editor,
+      :renew_editor,
+      :close_editor
+    ]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -43,6 +59,7 @@ defmodule Marshall.Editor.Lease do
     sensitive_attributes :ignore
     ignore_attributes [:inserted_at, :updated_at, :username, :editor_origin]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   oban do

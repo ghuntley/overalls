@@ -23,6 +23,10 @@ defmodule Marshall.Terminal.Opening do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :reserve, :complete, :fail, :begin_cancel, :reconcile]
+  end
+
   # @cc [owner:ghuntley,label:recovery;security] terminal-create-intent-is-metadata
   # A request ID MUST bind one actor, VM, placement/epoch and parameter digest.
   # Pending intent MUST precede guest creation, and completion MUST transact with

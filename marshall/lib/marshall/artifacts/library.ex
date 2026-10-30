@@ -1,11 +1,11 @@
 defmodule Marshall.Artifacts.Library do
   @moduledoc "Cedar-checked artifact reads, listings, deletion and moderation."
-  import Ecto.Query
   require Ash.Query
   require Marshall.Events
   alias Marshall.Accounts.User
   alias Marshall.Artifacts.{Artifact, Audit, Authorization, Blobs, Grant, Version, VersionFile}
   alias Marshall.Artifacts.ViewTicket
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.Ledger
 
   @type via :: :agent | :web | :admin
@@ -64,9 +64,9 @@ defmodule Marshall.Artifacts.Library do
   def page(%Version{page_sha256: sha}), do: Blobs.read!(sha)
 
   # @cc [owner:ghuntley,label:security] artifact-list-cedar
-  # Listings MUST contain only active artifacts the actor can read now: owned,
-  # directly granted, or granted to a team the actor currently belongs to, each
-  # rechecked with Cedar. The title search is literal.
+  # Listings MUST contain only active artifacts the actor can read now, decided
+  # in the same query by the Cedar `artifact_read` residual (owner, direct
+  # grants and grants to current unarchived teams). The title search is literal.
   @spec list(User.t(), %{
           optional(:query) => String.t() | nil,
           optional(:after) => String.t() | nil,
@@ -74,72 +74,37 @@ defmodule Marshall.Artifacts.Library do
         }) :: page()
   def list(%User{} = actor, options \\ %{}) do
     limit = min(options[:limit] || 50, 100)
-    team_ids = team_ids(actor.id)
 
-    query =
-      from(a in "artifacts",
-        as: :artifact,
-        where: a.state == "active",
-        where:
-          a.owner_id == type(^actor.id, :binary_id) or
-            exists(
-              from(g in "artifact_grants",
-                where:
-                  g.artifact_id == parent_as(:artifact).id and is_nil(g.archived_at) and
-                    (g.user_id == type(^actor.id, :binary_id) or
-                       g.team_id in type(^team_ids, {:array, :binary_id})),
-                select: 1
-              )
-            ),
-        order_by: [desc: a.updated_at, desc: a.id],
-        select: %{id: type(a.id, :binary_id), updated_at: a.updated_at}
-      )
+    rows =
+      Artifact
+      |> Ash.Query.for_read(:read, %{}, actor: SystemActor.compute())
+      |> Ash.Query.filter(state == :active)
+      |> Marshall.Authorization.filter(actor, "artifact_read", Artifact.Cedar)
       |> narrow_query(options[:query])
       |> after_cursor(options[:after])
+      |> Ash.Query.sort(updated_at: :desc, id: :desc)
+      |> Ash.Query.limit(limit + 1)
+      |> Ash.read!()
 
-    rows = Marshall.Repo.all(from(q in query, limit: ^(limit + 1)))
-    ids = rows |> Enum.take(limit) |> Enum.map(& &1.id)
-
-    by_id = Map.new(Ledger.read!(Artifact, id: [in: ids]), &{&1.id, &1})
-
-    items =
-      ids
-      |> Enum.map(&Map.get(by_id, &1))
-      |> Enum.filter(&(&1 && Authorization.allowed?(&1, actor, :read)))
-
-    %{items: items, next_cursor: if(length(rows) > limit, do: List.last(ids))}
-  end
-
-  @spec team_ids(String.t()) :: [String.t()]
-  defp team_ids(user_id) do
-    member = Ledger.read!(Marshall.Teams.TeamMember, user_id: user_id) |> Enum.map(& &1.team_id)
-    Ledger.read!(Marshall.Teams.Team, id: [in: member]) |> Enum.map(& &1.id)
+    items = Enum.take(rows, limit)
+    %{items: items, next_cursor: if(length(rows) > limit, do: List.last(items).id)}
   end
 
   defp narrow_query(query, nil), do: query
 
   defp narrow_query(query, text) do
     pattern = "%" <> Marshall.Threads.Coordinator.escape_like(text) <> "%"
-    from(a in query, where: fragment("? ILIKE ? ESCAPE '\\'", a.title, ^pattern))
+    Ash.Query.filter(query, ilike(title, ^pattern))
   end
 
   defp after_cursor(query, nil), do: query
 
   defp after_cursor(query, cursor) do
-    case Ecto.UUID.cast(cursor) do
-      {:ok, id} ->
-        case Ledger.read!(Artifact, id: id) do
-          [%Artifact{updated_at: at}] ->
-            from(a in query,
-              where: a.updated_at < ^at or (a.updated_at == ^at and a.id < type(^id, :binary_id))
-            )
-
-          _ ->
-            from(a in query, where: false)
-        end
-
-      :error ->
-        from(a in query, where: false)
+    with {:ok, id} <- Ecto.UUID.cast(cursor),
+         [%Artifact{updated_at: at}] <- Ledger.read!(Artifact, id: id) do
+      Ash.Query.filter(query, updated_at < ^at or (updated_at == ^at and id < ^id))
+    else
+      _ -> Ash.Query.filter(query, false)
     end
   end
 

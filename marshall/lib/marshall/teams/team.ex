@@ -22,6 +22,20 @@ defmodule Marshall.Teams.Team do
     identity_wheres_to_sql active_name: "archived_at IS NULL"
   end
 
+  cedar do
+    control_plane "provision", [
+      :create_team,
+      :list_for_user,
+      :list_all_for_user,
+      :set_member,
+      :list_members,
+      :list_transfers
+    ]
+
+    internal [:read, :history, :register, :archive, :mark_retiring]
+    service :scim, [:read, :scim_read, :scim_create, :scim_update, :scim_destroy]
+  end
+
   archive do
     exclude_read_actions([:history])
     # SCIM DELETE starts retirement; TeamRetirementWorker archives the row.
@@ -36,6 +50,7 @@ defmodule Marshall.Teams.Team do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:security;product] scim-group-hidden-owner

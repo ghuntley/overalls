@@ -2,7 +2,7 @@ defmodule Marshall.Administration.Jobs do
   @moduledoc "Cedar-authorized job views and retries with no raw job payload projection."
   use Ash.Resource.Actions.Implementation
   alias Marshall.Administration.{AuditEvent, JobEvent, JobSnapshot}
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.{Ledger, Operation, Relocation, HostDrain}
   require Ash.Query
   require Marshall.Events
@@ -42,7 +42,7 @@ defmodule Marshall.Administration.Jobs do
   @impl true
   def run(input, options, %{actor: %Marshall.Accounts.User{} = actor}) do
     Ledger.transaction(fn ->
-      unless Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")),
+      unless Marshall.Authorization.control_plane?(actor, "admin_read"),
         do: Ledger.rollback(:forbidden)
 
       if options[:operation] == :retry, do: require_admin!(actor)
@@ -202,7 +202,7 @@ defmodule Marshall.Administration.Jobs do
       )
 
   defp require_admin!(actor) do
-    unless Cedar.allowed?(actor, "admin_jobs", Cedar.entity("ControlPlane", "marshall")),
+    unless Marshall.Authorization.control_plane?(actor, "admin_jobs"),
       do: Ledger.rollback(:forbidden)
   end
 

@@ -11,12 +11,12 @@
 msgid ""
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:88
+#: lib/marshall_web/live/admin/redaction_live.ex:89
 #, elixir-autogen, elixir-format
 msgid "Thread redaction"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:89
+#: lib/marshall_web/live/admin/redaction_live.ex:90
 #, elixir-autogen, elixir-format
 msgid "Scrub inactive threads"
 msgstr ""
@@ -31,27 +31,27 @@ msgstr ""
 msgid "The scrub could not be queued."
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:95
+#: lib/marshall_web/live/admin/redaction_live.ex:96
 #, elixir-autogen, elixir-format
 msgid "Text in prompts, model output, and tool results is scrubbed in bounded background batches. Attachments are not inspected."
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:100
+#: lib/marshall_web/live/admin/redaction_live.ex:101
 #, elixir-autogen, elixir-format
 msgid "Redaction history is unavailable."
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:104
+#: lib/marshall_web/live/admin/redaction_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Processed %{count}"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:104
+#: lib/marshall_web/live/admin/redaction_live.ex:105
 #, elixir-autogen, elixir-format
 msgid "Changed %{count}"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:109
+#: lib/marshall_web/live/admin/redaction_live.ex:110
 #, elixir-autogen, elixir-format
 msgid "Profile %{digest}"
 msgstr ""
@@ -1052,27 +1052,27 @@ msgstr ""
 msgid "Workflow ID"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:125
+#: lib/marshall_web/live/admin/redaction_live.ex:126
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:113
+#: lib/marshall_web/live/admin/redaction_live.ex:114
 #, elixir-autogen, elixir-format
 msgid "Pause"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:41
+#: lib/marshall_web/live/admin/redaction_live.ex:42
 #, elixir-autogen, elixir-format
 msgid "Redaction run updated."
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:117
+#: lib/marshall_web/live/admin/redaction_live.ex:118
 #, elixir-autogen, elixir-format
 msgid "Resume"
 msgstr ""
 
-#: lib/marshall_web/live/admin/redaction_live.ex:48
+#: lib/marshall_web/live/admin/redaction_live.ex:49
 #, elixir-autogen, elixir-format
 msgid "The redaction run could not be updated."
 msgstr ""

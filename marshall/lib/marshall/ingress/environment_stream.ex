@@ -51,6 +51,24 @@ defmodule Marshall.Ingress.EnvironmentStream do
     end
   end
 
+  # @cc [owner:ghuntley,label:security] inception-stream-immutable-binding
+  # Renewal MUST change only expiry, retaining gateway, execution, host session,
+  # namespace generation, fixed service and SSH identities. Closed or expired
+  # rows MUST NOT revive. Raw resource mutations MUST remain internal only.
+  cedar do
+    internal [
+      :read,
+      :record,
+      :renew,
+      :close,
+      :purge,
+      :prune,
+      :open_nested,
+      :renew_nested,
+      :close_nested
+    ]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -61,6 +79,7 @@ defmodule Marshall.Ingress.EnvironmentStream do
     sensitive_attributes :ignore
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   oban do
@@ -76,10 +95,6 @@ defmodule Marshall.Ingress.EnvironmentStream do
     end
   end
 
-  # @cc [owner:ghuntley,label:security] inception-stream-immutable-binding
-  # Renewal MUST change only expiry, retaining gateway, execution, host session,
-  # namespace generation, fixed service and SSH identities. Closed or expired
-  # rows MUST NOT revive. Raw resource mutations MUST remain internal only.
   actions do
     defaults [:read]
 

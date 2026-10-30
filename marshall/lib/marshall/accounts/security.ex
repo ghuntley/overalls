@@ -108,12 +108,8 @@ defmodule Marshall.Accounts.Security do
 
   @spec require_admin!(User.t()) :: :ok
   def require_admin!(actor) do
-    unless Marshall.Authorization.Cedar.allowed?(
-             actor,
-             "admin_accounts",
-             Marshall.Authorization.Cedar.entity("ControlPlane", "marshall")
-           ),
-           do: Ledger.rollback(:mfa_required)
+    unless Marshall.Authorization.control_plane?(actor, "admin_accounts"),
+      do: Ledger.rollback(:mfa_required)
 
     :ok
   end

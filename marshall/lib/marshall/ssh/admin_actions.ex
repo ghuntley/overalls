@@ -2,7 +2,7 @@ defmodule Marshall.SSH.AdminActions do
   @moduledoc "Bounded administrator inventory and revocation for SSH authority."
   use Ash.Resource.Actions.Implementation
 
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.Ledger
   alias Marshall.Accounts.{AdminEvent, User}
   alias Marshall.SSH.{Gateway, Key, Session}
@@ -22,7 +22,7 @@ defmodule Marshall.SSH.AdminActions do
               do: "admin_read",
               else: "admin_accounts"
 
-          unless Cedar.allowed?(actor, action, Cedar.entity("ControlPlane", "marshall")),
+          unless Marshall.Authorization.control_plane?(actor, action),
             do: Ledger.rollback(:forbidden)
 
           perform(options[:operation], input.arguments, actor)

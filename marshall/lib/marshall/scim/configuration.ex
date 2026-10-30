@@ -4,12 +4,17 @@ defmodule Marshall.Scim.Configuration do
     otp_app: :marshall,
     domain: Marshall.Scim,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshStateMachine, AshArchival.Resource]
 
   postgres do
     table "scim_configurations"
     repo Marshall.Repo
+  end
+
+  cedar do
+    control_plane "admin_accounts", [:configure]
+    internal [:read, :create, :enable, :disable, :rotate_token, :save_oidc]
   end
 
   state_machine do
@@ -82,19 +87,6 @@ defmodule Marshall.Scim.Configuration do
 
       argument :clear_oidc_client_secret, :boolean, allow_nil?: false, default: false
       run Marshall.Scim.ConfigurationActions
-    end
-  end
-
-  policies do
-    policy action(:configure) do
-      authorize_if Marshall.Accounts.Checks.Administrator
-    end
-
-    # Every policy whose condition matches must pass, so the internal-lookup
-    # policy is scoped to record actions; an always() condition also matched
-    # :configure and refused every administrator.
-    policy action_type([:read, :create, :update, :destroy]) do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

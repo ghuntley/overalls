@@ -11,6 +11,10 @@ defmodule Marshall.GitHub.RestoreEpoch do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :record, :apply_epoch]
+  end
+
   actions do
     defaults [:read]
 

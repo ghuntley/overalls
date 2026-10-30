@@ -16,6 +16,10 @@ defmodule Marshall.Agents.CLISession do
     end
   end
 
+  cedar do
+    internal [:read, :approve, :expire]
+  end
+
   actions do
     defaults [:read]
 

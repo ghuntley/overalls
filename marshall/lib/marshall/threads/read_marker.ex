@@ -26,6 +26,11 @@ defmodule Marshall.Threads.ReadMarker do
     end
   end
 
+  cedar do
+    control_plane "provision", [:mark_read]
+    internal [:read, :record, :advance]
+  end
+
   actions do
     defaults [:read]
 

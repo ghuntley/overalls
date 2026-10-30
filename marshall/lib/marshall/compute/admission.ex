@@ -345,10 +345,11 @@ defmodule Marshall.Compute.Admission do
 
     Marshall.Teams.Fence.require_resources_open!(team)
 
-    unless Marshall.Authorization.Cedar.allowed?(
+    unless Marshall.Authorization.allowed?(
              actor,
              "team_manage_members",
-             Marshall.Authorization.Cedar.team(team)
+             Marshall.Teams.Team.Cedar,
+             team.id
            ),
            do: Ledger.rollback(:forbidden)
 

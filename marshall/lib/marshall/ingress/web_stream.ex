@@ -39,6 +39,26 @@ defmodule Marshall.Ingress.WebStream do
     end
   end
 
+  # @cc [owner:ghuntley,label:security] ingress-web-stream-binding
+  # Stream authority MUST bind immutable execution, policy revision and app port.
+  # Private browser streams retain credential identity; peer streams instead
+  # retain both source VM and integration identity for fresh policy checks.
+  # Renewal MUST NOT revive expired/closed streams or migrate their binding.
+  cedar do
+    internal [
+      :read,
+      :record,
+      :renew,
+      :close,
+      :purge,
+      :prune,
+      :open_web,
+      :open_peer_web,
+      :renew_web,
+      :close_web
+    ]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -49,6 +69,7 @@ defmodule Marshall.Ingress.WebStream do
     sensitive_attributes :ignore
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   oban do
@@ -64,11 +85,6 @@ defmodule Marshall.Ingress.WebStream do
     end
   end
 
-  # @cc [owner:ghuntley,label:security] ingress-web-stream-binding
-  # Stream authority MUST bind immutable execution, policy revision and app port.
-  # Private browser streams retain credential identity; peer streams instead
-  # retain both source VM and integration identity for fresh policy checks.
-  # Renewal MUST NOT revive expired/closed streams or migrate their binding.
   actions do
     defaults [:read]
 

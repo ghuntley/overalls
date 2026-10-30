@@ -16,6 +16,10 @@ defmodule Marshall.Galileo.Attachment do
     identity_wheres_to_sql current_pair: "archived_at IS NULL"
   end
 
+  cedar do
+    internal [:read, :history, :attach, :detach]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -28,6 +32,7 @@ defmodule Marshall.Galileo.Attachment do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

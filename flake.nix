@@ -306,6 +306,7 @@
           xargs -0 elixir scripts/check_rust_lints.exs --strict < "$TMPDIR/files"
           touch "$out"
         '';
+        marshall-cedar-lints = built.cedarLints;
         terminald = built.terminaldChecks;
         terminald-windows = built.terminaldWindows;
         overalls-install-ps1 = import ./nix/verification/tests/overalls-install-ps1.nix { inherit pkgs; };

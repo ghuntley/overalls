@@ -17,6 +17,10 @@ defmodule Marshall.Threads.Generation do
     end
   end
 
+  cedar do
+    internal [:read, :open, :bind, :state]
+  end
+
   actions do
     defaults [:read]
 

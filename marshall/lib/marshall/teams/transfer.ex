@@ -19,6 +19,10 @@ defmodule Marshall.Teams.Transfer do
     identity_wheres_to_sql one_pending: "archived_at IS NULL AND state = 'pending'"
   end
 
+  cedar do
+    internal [:read, :history, :offer, :accept, :decline, :cancel, :archive]
+  end
+
   state_machine do
     initial_states [:pending]
     default_initial_state :pending
@@ -42,6 +46,7 @@ defmodule Marshall.Teams.Transfer do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

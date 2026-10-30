@@ -16,6 +16,10 @@ defmodule Marshall.Agents.Executor do
     end
   end
 
+  cedar do
+    internal [:read, :register, :heartbeat, :invalidate]
+  end
+
   actions do
     defaults [:read]
 

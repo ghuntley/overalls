@@ -16,6 +16,10 @@ defmodule Marshall.Ingress.FleetCertificateInstallation do
     end
   end
 
+  cedar do
+    internal [:read, :record, :rebind_service]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -24,6 +28,7 @@ defmodule Marshall.Ingress.FleetCertificateInstallation do
     store_action_name? true
     ignore_attributes [:inserted_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

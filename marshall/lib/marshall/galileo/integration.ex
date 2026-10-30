@@ -26,6 +26,12 @@ defmodule Marshall.Galileo.Integration do
     end
   end
 
+  cedar do
+    control_plane "admin_read", [:list_for_admin]
+    control_plane "provision", [:configure, :remove, :attach, :detach, :show, :list_for_user]
+    internal [:read, :history, :register, :edit, :archive]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -38,6 +44,7 @@ defmodule Marshall.Galileo.Integration do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

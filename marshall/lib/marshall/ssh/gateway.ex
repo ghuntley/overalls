@@ -11,6 +11,10 @@ defmodule Marshall.SSH.Gateway do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :ready, :record, :rotate, :configure, :ensure, :disable]
+  end
+
   actions do
     defaults [:read]
 

@@ -264,7 +264,7 @@ defmodule MarshallWeb.MachinesLive do
       params["labels"] |> to_string() |> String.split(",", trim: true) |> Enum.map(&String.trim/1)
 
     case Compute.update_reflection_metadata(
-           %{id: socket.assigns.vm_id, labels: labels, comment: params["comment"] || ""},
+           %{vm_id: socket.assigns.vm_id, labels: labels, comment: params["comment"] || ""},
            actor: socket.assigns.current_user
          ) do
       {:ok, _} ->

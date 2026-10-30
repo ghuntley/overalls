@@ -11,6 +11,11 @@ defmodule Marshall.SSH.Approval do
     repo Marshall.Repo
   end
 
+  cedar do
+    control_plane "provision", [:inspect_approval, :approve_key]
+    internal [:read, :record, :consume, :purge]
+  end
+
   actions do
     defaults [:read]
 

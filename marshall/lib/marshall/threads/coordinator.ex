@@ -82,10 +82,8 @@ defmodule Marshall.Threads.Coordinator do
   end
 
   defp execute(:list, args, actor) do
-    case authorized_page(thread_query(actor), actor, args[:limit] || 100) do
-      {:ok, {items, _has_more?}} -> Enum.take(items, args[:limit] || 100)
-      {:error, reason} -> Ledger.rollback(reason)
-    end
+    {items, _has_more?} = authorized_page(thread_query(actor), args[:limit] || 100)
+    Enum.take(items, args[:limit] || 100)
   end
 
   # @cc [owner:ghuntley,label:security;durability] thread-list-keyset-page
@@ -105,15 +103,9 @@ defmodule Marshall.Threads.Coordinator do
 
     case page_query(query, args[:after], actor) do
       {:ok, query} ->
-        case authorized_page(query, actor, limit) do
-          {:ok, {rows, has_more?}} ->
-            items = Enum.take(rows, limit)
-
-            %{items: items, next_cursor: if(has_more?, do: List.last(items).id)}
-
-          {:error, reason} ->
-            Ledger.rollback(reason)
-        end
+        {rows, has_more?} = authorized_page(query, limit)
+        items = Enum.take(rows, limit)
+        %{items: items, next_cursor: if(has_more?, do: List.last(items).id)}
 
       :empty ->
         %{items: [], next_cursor: nil}
@@ -224,24 +216,13 @@ defmodule Marshall.Threads.Coordinator do
   defp execute(operation, args, actor),
     do: Marshall.Threads.Controls.execute(operation, args, actor)
 
+  # Retained (archived) threads stay listed; the Cedar read filter selects
+  # exactly the threads the caller may read.
   @spec thread_query(Marshall.Accounts.User.t()) :: Ash.Query.t()
   defp thread_query(actor) do
-    member_team_ids =
-      Ledger.read!(Marshall.Teams.TeamMember, user_id: actor.id)
-      |> Enum.map(& &1.team_id)
-
-    team_ids =
-      Marshall.Teams.Team
-      |> Ash.Query.filter(id in ^member_team_ids)
-      |> Ash.read!(actor: SystemActor.compute())
-      |> Enum.map(& &1.id)
-
     Thread
     |> Ash.Query.for_read(:history, %{}, actor: SystemActor.compute())
-    |> Ash.Query.filter(
-      creator_id == ^actor.id or team_id in ^team_ids or
-        exists(grants, user_id == ^actor.id and is_nil(archived_at))
-    )
+    |> Authorization.filter(actor, "read")
     |> Ash.Query.sort(inserted_at: :desc, id: :desc)
   end
 
@@ -294,69 +275,18 @@ defmodule Marshall.Threads.Coordinator do
 
   defp page_query(_query, _cursor, _actor), do: :empty
 
-  @page_batch 100
-  @max_page_scan 10_000
-
   # @cc [owner:ghuntley,label:security;durability] thread-authorized-page-bound
-  # Authorized thread pagination MUST continue past post-query authorization
-  # refusals so visible pages do not contain holes. It MUST stop after a fixed
-  # scan budget and return a closed error rather than silently truncating or
-  # exposing a cursor that could broaden the reader's scope.
-  @spec authorized_page(Ash.Query.t(), Marshall.Accounts.User.t(), pos_integer()) ::
-          {:ok, {[Thread.t()], boolean()}} | {:error, :authorization_scan_limit}
-  defp authorized_page(query, actor, limit) do
-    collect_authorized(query, actor, limit, [], 0)
-  end
-
-  @spec collect_authorized(
-          Ash.Query.t(),
-          Marshall.Accounts.User.t(),
-          pos_integer(),
-          [Thread.t()],
-          non_neg_integer()
-        ) :: {:ok, {[Thread.t()], boolean()}} | {:error, :authorization_scan_limit}
-  defp collect_authorized(query, actor, limit, collected, scanned) do
-    batch_size = min(@page_batch, limit + 1)
-
+  # A thread page MUST hold at most `limit` readable threads, selected by the
+  # Cedar read filter in the query itself, plus one look-ahead row that only
+  # reports whether more exist.
+  @spec authorized_page(Ash.Query.t(), pos_integer()) :: {[Thread.t()], boolean()}
+  defp authorized_page(query, limit) do
     rows =
       query
-      |> Ash.Query.limit(batch_size)
+      |> Ash.Query.limit(limit + 1)
       |> Ash.read!(actor: SystemActor.compute())
 
-    authorized = Enum.filter(rows, &Authorization.allowed?(&1, actor, "read"))
-    collected = collected ++ authorized
-    scanned = scanned + length(rows)
-
-    cond do
-      length(collected) > limit ->
-        {:ok, {Enum.take(collected, limit + 1), true}}
-
-      length(rows) < batch_size ->
-        {:ok, {collected, false}}
-
-      scanned >= @max_page_scan ->
-        {:error, :authorization_scan_limit}
-
-      true ->
-        last = List.last(rows)
-
-        collect_authorized(
-          after_thread(query, last),
-          actor,
-          limit,
-          collected,
-          scanned
-        )
-    end
-  end
-
-  @spec after_thread(Ash.Query.t(), Thread.t()) :: Ash.Query.t()
-  defp after_thread(query, %Thread{} = thread) do
-    Ash.Query.filter(
-      query,
-      inserted_at < ^thread.inserted_at or
-        (inserted_at == ^thread.inserted_at and id < ^thread.id)
-    )
+    {rows, length(rows) > limit}
   end
 
   @spec cancel_pending_question!(Thread.t()) :: :ok
@@ -494,10 +424,11 @@ defmodule Marshall.Threads.Coordinator do
 
     Marshall.Teams.Fence.require_resources_open!(team)
 
-    if Marshall.Authorization.Cedar.allowed?(
+    if Marshall.Authorization.allowed?(
          actor,
          "team_manage_members",
-         Marshall.Authorization.Cedar.team(team)
+         Marshall.Teams.Team.Cedar,
+         team.id
        ),
        do: :ok,
        else: Ledger.rollback(:forbidden)

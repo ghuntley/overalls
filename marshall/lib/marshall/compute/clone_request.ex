@@ -20,6 +20,29 @@ defmodule Marshall.Compute.CloneRequest do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :enqueue,
+      :record_progress,
+      :defer,
+      :prepare,
+      :stop_source,
+      :capture,
+      :confirm_capture,
+      :confirm_copy,
+      :publish,
+      :complete,
+      :complete_cleanup,
+      :request_cancel,
+      :cancel,
+      :fail,
+      :retry,
+      :schedule,
+      :reconcile
+    ]
+  end
+
   oban do
     triggers do
       trigger :reconcile do
@@ -55,6 +78,7 @@ defmodule Marshall.Compute.CloneRequest do
     ]
 
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:recovery] workflow-named-transitions

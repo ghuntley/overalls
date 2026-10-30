@@ -156,8 +156,12 @@ case application do
     {:error, :output_exists} = Marshall.Operations.CLI.run(["gateway-prepare", token_path])
     File.rm!(token_path)
     File.rmdir!(operator_dir)
-    version = apply(ExCedar.Native, :cedar_version, [])
-    if not is_binary(version) or version == "", do: raise("Cedar NIF did not execute")
+    cedar = Path.join(:code.priv_dir(:marshall), "cedar")
+    {:ok, _engine} =
+      Marshall.Authorization.Native.compile(
+        File.read!(Path.join(cedar, "compute.cedar")),
+        File.read!(Path.join(cedar, "schema.cedarschema"))
+      )
 
     priv = :code.priv_dir(:marshall) |> List.to_string()
     static = Path.join(priv, "static")

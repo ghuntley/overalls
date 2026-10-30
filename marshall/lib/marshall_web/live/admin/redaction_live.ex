@@ -13,7 +13,7 @@ defmodule MarshallWeb.Admin.RedactionLive do
   end
 
   @impl true
-  def handle_event("enqueue", _, socket) do
+  def handle_event("redaction-enqueue", _, socket) do
     case Marshall.Redaction.enqueue(:all_inactive, socket.assigns.current_user) do
       {:ok, _id} ->
         {:noreply,
@@ -27,7 +27,8 @@ defmodule MarshallWeb.Admin.RedactionLive do
     end
   end
 
-  def handle_event(action, %{"id" => id}, socket) when action in ["pause", "resume", "cancel"] do
+  def handle_event("redaction-" <> action, %{"id" => id}, socket)
+      when action in ["pause", "resume", "cancel"] do
     with {:ok, run} <-
            Ash.get(Marshall.Redaction.Run, id,
              actor: Marshall.Authorization.SystemActor.compute()
@@ -86,7 +87,7 @@ defmodule MarshallWeb.Admin.RedactionLive do
       <section id="admin-redaction" class="stack">
         <header class="row">
           <h1>{dgettext("admin_audit", "Thread redaction")}</h1>
-          <button id="redaction-enqueue" class="console-button primary" phx-click="enqueue">{dgettext(
+          <button id="redaction-enqueue" class="console-button primary" phx-click="redaction-enqueue">{dgettext(
             "admin_audit",
             "Scrub inactive threads"
           )}</button>
@@ -110,17 +111,17 @@ defmodule MarshallWeb.Admin.RedactionLive do
               digest: run.profile_digest
             )}</span>
             <span class="row">
-              <button :if={run.state == :running} phx-click="pause" phx-value-id={run.id}>{dgettext(
+              <button :if={run.state == :running} phx-click="redaction-pause" phx-value-id={run.id}>{dgettext(
                 "admin_audit",
                 "Pause"
               )}</button>
-              <button :if={run.state == :paused} phx-click="resume" phx-value-id={run.id}>{dgettext(
+              <button :if={run.state == :paused} phx-click="redaction-resume" phx-value-id={run.id}>{dgettext(
                 "admin_audit",
                 "Resume"
               )}</button>
               <button
                 :if={run.state in [:queued, :running, :paused]}
-                phx-click="cancel"
+                phx-click="redaction-cancel"
                 phx-value-id={run.id}
               >{dgettext("admin_audit", "Cancel")}</button>
             </span>

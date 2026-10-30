@@ -3,8 +3,27 @@ defmodule Marshall.Accounts.Token do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshAuthentication.TokenResource]
+
+  cedar do
+    service :ash_authentication, [
+      :read,
+      :expired,
+      :get_token,
+      :revoked?,
+      :revoke_token,
+      :revoke_jti,
+      :store_token,
+      :expunge_expired,
+      :revoke_all_stored_for_subject,
+      :read_expired,
+      :revoke_jti_insert,
+      :revoke_token_insert,
+      :get_confirmation_changes,
+      :store_confirmation_changes
+    ]
+  end
 
   postgres do
     table "tokens"
@@ -71,13 +90,6 @@ defmodule Marshall.Accounts.Token do
       accept [:extra_data]
       argument :subject, :string, allow_nil?: false, sensitive?: true
       change AshAuthentication.TokenResource.RevokeAllStoredForSubjectChange
-    end
-  end
-
-  policies do
-    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
-      description "AshAuthentication can interact with the token resource"
-      authorize_if always()
     end
   end
 

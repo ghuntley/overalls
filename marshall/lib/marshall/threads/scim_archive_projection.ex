@@ -4,21 +4,19 @@ defmodule Marshall.Threads.ScimArchiveProjection do
     otp_app: :marshall,
     domain: Marshall.Threads,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Marshall.Authorization.AshAuthorizer]
 
   postgres do
     table "scim_thread_archive_projections"
     repo Marshall.Repo
   end
 
-  actions do
-    defaults [:read]
+  cedar do
+    internal [:read]
   end
 
-  policies do
-    policy action_type(:read) do
-      authorize_if expr(actor.administrator == true and is_nil(actor.deleted_at))
-    end
+  actions do
+    defaults [:read]
   end
 
   attributes do

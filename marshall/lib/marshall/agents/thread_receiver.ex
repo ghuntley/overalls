@@ -28,6 +28,10 @@ defmodule Marshall.Agents.ThreadReceiver do
     end
   end
 
+  cedar do
+    internal [:read, :register, :activate, :deactivate, :acknowledge, :defer]
+  end
+
   # @cc [owner:ghuntley,label:durability;recovery] thread-receiver-cursor
   # Delivery acknowledgement MUST commit with the admitted notification turn.
   # Deactivation MUST retain identity and cursor; retries MUST NOT duplicate turns.

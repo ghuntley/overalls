@@ -25,6 +25,22 @@ defmodule Marshall.Ingress.Service do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :catalog,
+      :record,
+      :rotate,
+      :record_host_key,
+      :publish_host_key,
+      :configure,
+      :ensure,
+      :open_connection,
+      :disable,
+      :identity
+    ]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -33,6 +49,7 @@ defmodule Marshall.Ingress.Service do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at, :token_hash]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

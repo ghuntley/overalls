@@ -20,6 +20,52 @@ defmodule Marshall.Threads.Thread do
     end
   end
 
+  cedar do
+    control_plane "provision", [
+      :create_thread,
+      :list_for_user,
+      :list_page_for_user,
+      :get_for_user,
+      :submit_prompt,
+      :thread_controls,
+      :context_info,
+      :list_skills,
+      :set_collaboration_mode,
+      :answer_questions,
+      :implement_plan,
+      :compact_context,
+      :reload_context,
+      :install_skill,
+      :update_skill,
+      :set_skill_enabled,
+      :remove_skill,
+      :retry_provisioning,
+      :archive_thread,
+      :delete_thread,
+      :reopen_thread
+    ]
+
+    internal [
+      :read,
+      :history,
+      :open,
+      :record_admitted_machine,
+      :begin_provisioning,
+      :bind_agent,
+      :mark_ready,
+      :mark_failed,
+      :requeue,
+      :replace_generation,
+      :reopen,
+      :mark_deleting,
+      :mark_archived,
+      :set_title,
+      :set_collaboration_mode_state,
+      :touch_activity,
+      :archive
+    ]
+  end
+
   # @cc [owner:ghuntley,label:durability;recovery] thread-status-state-machine
   # Thread status MUST change only through the named transitions below; no
   # action may accept `:status`. Every committed transition MUST record its
@@ -58,6 +104,7 @@ defmodule Marshall.Threads.Thread do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at, :objective, :machine_spec]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do
@@ -469,5 +516,12 @@ defmodule Marshall.Threads.Thread do
 
   relationships do
     has_many :grants, Marshall.Threads.Grant, destination_attribute: :thread_id
+
+    belongs_to :creator, Marshall.Accounts.User do
+      define_attribute? false
+      source_attribute :creator_id
+    end
+
+    belongs_to :team, Marshall.Teams.Team, define_attribute?: false
   end
 end

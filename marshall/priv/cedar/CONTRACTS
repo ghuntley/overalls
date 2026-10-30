@@ -32,3 +32,10 @@ narrow prompt wake. Web admits private guest HTTP and WebSockets under the
 existing current-login and bounded lease checks. These use rights MUST NOT grant ordinary lifecycle, resize, clone,
 relocation or per-machine grant management. The Access boundary MUST retain
 Customer owner-only access before applying Cedar. See ADR-0077 and ADR-0110.
+
+@cc [owner:ghuntley,label:security] cedar-service-principals
+Library services MUST be distinct principals from users and the compute system:
+Service::"ash_authentication" may only authenticate and Service::"scim" may only
+scim_provision, each on Internal entities named by a resource's `cedar` service
+mapping, and SCIM only while its `enabled` attribute is true. Neither service
+may coordinate, provision or act on user-owned entities. See ADR-0268.

@@ -19,6 +19,10 @@ defmodule Marshall.Artifacts.StorageUsage do
     end
   end
 
+  cedar do
+    internal [:read, :open, :adjust]
+  end
+
   actions do
     defaults [:read]
 

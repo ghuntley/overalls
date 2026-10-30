@@ -28,6 +28,10 @@ defmodule Marshall.Compute.WorkloadPlacement do
     end
   end
 
+  cedar do
+    internal [:read, :allocate]
+  end
+
   actions do
     defaults [:read]
 

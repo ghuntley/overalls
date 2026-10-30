@@ -16,6 +16,20 @@ defmodule Marshall.GitHub.AuthorizationAttempt do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :record,
+      :exchange,
+      :consume,
+      :fail,
+      :cancel,
+      :stage_result,
+      :clear_result,
+      :purge
+    ]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:verifier, :issued_credentials])

@@ -16,6 +16,10 @@ defmodule Marshall.Administration.JobEvent do
     end
   end
 
+  cedar do
+    internal [:read]
+  end
+
   actions do
     defaults [:read]
   end

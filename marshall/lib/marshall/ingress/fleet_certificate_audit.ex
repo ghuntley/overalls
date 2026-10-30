@@ -1,7 +1,7 @@
 defmodule Marshall.Ingress.FleetCertificateAudit do
   @moduledoc "Administrator projection of certificate transitions and gateway receipts."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Ingress.{FleetCertificate, FleetCertificateAccount, FleetCertificateInstallation}
   require Ash.Query
 
@@ -14,7 +14,7 @@ defmodule Marshall.Ingress.FleetCertificateAudit do
   # Ciphertext, decrypted keys, DNS proofs and ACME URLs MUST never escape.
   @impl true
   def run(_, _, %{actor: actor}) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       certificates =
         FleetCertificate
         |> Ash.Query.sort(updated_at: :desc, id: :desc)

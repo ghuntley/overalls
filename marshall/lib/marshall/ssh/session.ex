@@ -17,6 +17,24 @@ defmodule Marshall.SSH.Session do
     end
   end
 
+  cedar do
+    control_plane "admin_accounts", [:revoke_for_admin]
+    control_plane "admin_read", [:list_for_admin]
+
+    internal [
+      :read,
+      :record,
+      :approve,
+      :close,
+      :purge,
+      :prune,
+      :open_session,
+      :session_status,
+      :close_session,
+      :watch_subscribe
+    ]
+  end
+
   oban do
     scheduled_actions do
       schedule :prune, "*/10 * * * *" do

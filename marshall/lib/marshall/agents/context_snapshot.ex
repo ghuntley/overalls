@@ -16,6 +16,10 @@ defmodule Marshall.Agents.ContextSnapshot do
     end
   end
 
+  cedar do
+    internal [:read, :capture]
+  end
+
   actions do
     defaults [:read]
 

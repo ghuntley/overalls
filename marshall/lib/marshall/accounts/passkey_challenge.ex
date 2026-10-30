@@ -4,7 +4,7 @@ defmodule Marshall.Accounts.PasskeyChallenge do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Marshall.Authorization.AshAuthorizer]
 
   postgres do
     table "account_passkey_challenges"
@@ -16,6 +16,10 @@ defmodule Marshall.Accounts.PasskeyChallenge do
     end
   end
 
+  cedar do
+    internal [:read, :destroy, :record, :consume]
+  end
+
   actions do
     defaults [:read, :destroy]
 
@@ -25,12 +29,6 @@ defmodule Marshall.Accounts.PasskeyChallenge do
 
     update :consume do
       accept [:consumed_at]
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

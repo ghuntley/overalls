@@ -1,7 +1,6 @@
 defmodule MarshallWeb.LiveAdminAuth do
   @moduledoc "Signed-in Control room reads and fresh administrator mutation checks."
   alias Marshall.Accounts.{Security, User}
-  alias Marshall.Authorization.Cedar
   alias MarshallWeb.AdminElevation
   use Gettext, backend: MarshallWeb.Gettext
   import Phoenix.Component
@@ -13,7 +12,7 @@ defmodule MarshallWeb.LiveAdminAuth do
                             {"admin_accounts",
                              ~w(set-role revoke-sessions revoke-key revoke-session revoke-grant invite delete-user reset-mfa register refresh remove)},
                             {"admin_operate",
-                             ~w(evacuate control approve replan lifecycle relocate rotate-certificate admin-override)},
+                             ~w(evacuate control approve replan lifecycle relocate rotate-certificate admin-override redaction-enqueue redaction-pause redaction-resume redaction-cancel)},
                             {"admin_configure", ~w(configure scim-configure)},
                             {"admin_jobs", ~w(retry)}
                           ],
@@ -127,11 +126,7 @@ defmodule MarshallWeb.LiveAdminAuth do
       not Security.recent?(socket.assigns.current_user) ->
         stage_intent(event, params, socket)
 
-      Cedar.allowed?(
-        socket.assigns.current_user,
-        action,
-        Cedar.entity("ControlPlane", "marshall")
-      ) ->
+      Marshall.Authorization.control_plane?(socket.assigns.current_user, action) ->
         {:cont, socket}
 
       true ->
@@ -213,10 +208,9 @@ defmodule MarshallWeb.LiveAdminAuth do
   @spec allowed?(String.t(), Phoenix.LiveView.Socket.t()) :: boolean()
   defp allowed?(event, socket) do
     socket.assigns.admin_authorized and
-      Cedar.allowed?(
+      Marshall.Authorization.control_plane?(
         socket.assigns.current_user,
-        Map.fetch!(@mutation_actions, event),
-        Cedar.entity("ControlPlane", "marshall")
+        Map.fetch!(@mutation_actions, event)
       )
   end
 
@@ -263,11 +257,7 @@ defmodule MarshallWeb.LiveAdminAuth do
   @spec check(Phoenix.LiveView.Socket.t()) :: hook_result()
   defp check(socket) do
     with true <-
-           Cedar.allowed?(
-             socket.assigns[:current_user],
-             "admin_read",
-             Cedar.entity("ControlPlane", "marshall")
-           ),
+           Marshall.Authorization.control_plane?(socket.assigns[:current_user], "admin_read"),
          %User{deleted_at: nil, active: true} = user <-
            Security.current(socket.assigns.current_user.id) do
       {:cont,

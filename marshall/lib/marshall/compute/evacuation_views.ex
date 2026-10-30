@@ -1,7 +1,7 @@
 defmodule Marshall.Compute.EvacuationViews do
   @moduledoc "Bounded current-administrator Lilly node and campaign projections."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Administration.JobSnapshot
 
   alias Marshall.Compute.{
@@ -40,7 +40,7 @@ defmodule Marshall.Compute.EvacuationViews do
   # selection. Progress MUST describe the linked relocation, not a newer VM move.
   @impl true
   def run(input, _, %{actor: actor}) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       case input.action.name do
         :nodes_for_admin -> nodes(input.arguments)
         :inspect_for_admin -> inspect_node(input.arguments)

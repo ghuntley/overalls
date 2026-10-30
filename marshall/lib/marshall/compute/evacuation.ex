@@ -17,6 +17,24 @@ defmodule Marshall.Compute.Evacuation do
     end
   end
 
+  cedar do
+    control_plane "admin_operate", [
+      :request_for_admin,
+      :control_for_admin,
+      :approve_for_admin,
+      :replan_for_admin
+    ]
+
+    control_plane "admin_read", [
+      :nodes_for_admin,
+      :capacity_for_admin,
+      :inspect_for_admin,
+      :timeline_for_admin
+    ]
+
+    internal [:read, :record, :pause, :continue, :confirm_ready, :resume, :retire, :advance]
+  end
+
   state_machine do
     state_attribute :status
     initial_states [:active]
@@ -55,6 +73,7 @@ defmodule Marshall.Compute.Evacuation do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

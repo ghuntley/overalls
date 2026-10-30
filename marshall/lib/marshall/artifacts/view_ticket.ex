@@ -27,6 +27,10 @@ defmodule Marshall.Artifacts.ViewTicket do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :issue, :expire, :revoke]
+  end
+
   state_machine do
     initial_states [:issued]
     default_initial_state :issued

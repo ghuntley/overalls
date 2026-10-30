@@ -4,11 +4,15 @@ defmodule Marshall.SSH.GuestLogin do
     otp_app: :marshall,
     domain: Marshall.SSH,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer]
+    authorizers: [Marshall.Authorization.AshAuthorizer]
 
   postgres do
     table "ssh_guest_logins"
     repo Marshall.Repo
+  end
+
+  cedar do
+    internal [:read, :record]
   end
 
   actions do
@@ -16,12 +20,6 @@ defmodule Marshall.SSH.GuestLogin do
 
     create :record do
       accept [:vm_id, :user_id, :key_id, :host_id, :placement_id, :execution_epoch]
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

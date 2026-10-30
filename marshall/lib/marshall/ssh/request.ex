@@ -11,6 +11,10 @@ defmodule Marshall.SSH.Request do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :record, :finish, :execute]
+  end
+
   actions do
     defaults [:read]
 

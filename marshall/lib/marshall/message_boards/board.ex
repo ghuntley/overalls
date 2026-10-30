@@ -18,6 +18,10 @@ defmodule Marshall.MessageBoards.Board do
     end
   end
 
+  cedar do
+    internal [:read, :open]
+  end
+
   actions do
     defaults [:read]
 

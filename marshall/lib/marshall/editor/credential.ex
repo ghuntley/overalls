@@ -25,6 +25,15 @@ defmodule Marshall.Editor.Credential do
     end
   end
 
+  # @cc [owner:ghuntley,label:security] editor-cookie-not-lease-authority
+  # A cookie MUST bind the authenticated user, original stored login, VM/account and
+  # gateway generation. The raw token MUST never persist. Cookie presence alone
+  # MUST NOT authorize a request: stream admission/renewal must recheck stored
+  # login, current write permission, account incarnation and execution. Revoked cookies cannot revive.
+  cedar do
+    internal [:read, :record, :revoke, :purge]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -35,13 +44,9 @@ defmodule Marshall.Editor.Credential do
     sensitive_attributes :ignore
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
-  # @cc [owner:ghuntley,label:security] editor-cookie-not-lease-authority
-  # A cookie MUST bind the authenticated user, original stored login, VM/account and
-  # gateway generation. The raw token MUST never persist. Cookie presence alone
-  # MUST NOT authorize a request: stream admission/renewal must recheck stored
-  # login, current write permission, account incarnation and execution. Revoked cookies cannot revive.
   actions do
     defaults [:read]
 

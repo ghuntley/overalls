@@ -16,6 +16,10 @@ defmodule Marshall.Ingress.FleetCertificateAccount do
     end
   end
 
+  cedar do
+    internal [:read, :register]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:private_key])
@@ -30,6 +34,7 @@ defmodule Marshall.Ingress.FleetCertificateAccount do
     store_action_name? true
     ignore_attributes [:private_key, :encrypted_private_key, :inserted_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

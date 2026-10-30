@@ -12,6 +12,10 @@ defmodule Marshall.Compute.CloneEffect do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :record, :offer, :complete, :record_unconfirmed]
+  end
+
   state_machine do
     state_attribute :status
     initial_states [:pending]

@@ -11,6 +11,10 @@ defmodule Marshall.Agents.SearchCache do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read]
+  end
+
   actions do
     defaults [:read]
   end

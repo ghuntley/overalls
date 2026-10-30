@@ -12,7 +12,7 @@ defmodule Marshall.Accounts.UserDeletion do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshOban, AshStateMachine]
 
   @type t :: %__MODULE__{}
@@ -24,6 +24,21 @@ defmodule Marshall.Accounts.UserDeletion do
     custom_indexes do
       index [:email, :inserted_at]
     end
+  end
+
+  cedar do
+    internal [
+      :read,
+      :record,
+      :schedule_scim,
+      :progress,
+      :cancel,
+      :reschedule,
+      :escalate,
+      :begin_finalization,
+      :complete,
+      :advance
+    ]
   end
 
   oban do
@@ -120,12 +135,6 @@ defmodule Marshall.Accounts.UserDeletion do
     action :advance, :map do
       argument :primary_key, :map, allow_nil?: false
       run Marshall.Accounts.DeleteUserMachines
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

@@ -12,6 +12,10 @@ defmodule Marshall.Agents.ToolMaintenance do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :queue, :reset, :claim, :start, :complete, :fail, :uncertain]
+  end
+
   state_machine do
     state_attribute :phase
     initial_states [:queued]

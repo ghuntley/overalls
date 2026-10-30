@@ -14,6 +14,10 @@ defmodule Marshall.Compute.HostSession do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :open]
+  end
+
   actions do
     defaults [:read]
 

@@ -15,6 +15,10 @@ defmodule Marshall.Agents.Event do
     end
   end
 
+  cedar do
+    internal [:read, :append]
+  end
+
   actions do
     defaults [:read]
 

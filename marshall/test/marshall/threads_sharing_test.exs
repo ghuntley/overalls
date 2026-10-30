@@ -489,8 +489,17 @@ defmodule Marshall.ThreadsSharingTest do
     assert {:ok, _} = share(%{context | thread: thread}, :manager)
     assert MachineAuthorization.allowed?(vm, context.member, "manage")
 
-    refute MachineAuthorization.allowed?(%{vm | owner_id: user().id}, context.member, "read")
-    refute MachineAuthorization.allowed?(%{vm | profile: :customer}, context.member, "read")
+    # Decisions read the current row, so a foreign owner or a non-sharing
+    # profile is written to the machine row itself and then restored.
+    with_machine_row(vm, "owner_id", Ecto.UUID.dump!(user().id), vm.owner_id, fn ->
+      refute MachineAuthorization.allowed?(vm, context.member, "read")
+    end)
+
+    with_machine_row(vm, "profile", "customer", to_string(vm.profile), fn ->
+      refute MachineAuthorization.allowed?(vm, context.member, "read")
+    end)
+
+    assert MachineAuthorization.allowed?(vm, context.member, "read")
     refute MachineAuthorization.allowed?(%{vm | id: Ash.UUID.generate()}, context.member, "read")
 
     Marshall.ThreadStateFixture.archived!(thread)
@@ -498,6 +507,25 @@ defmodule Marshall.ThreadsSharingTest do
 
     assert {:ok, %{status: :archived}} =
              Threads.get_thread(%{thread_id: thread.id}, actor: context.member)
+  end
+
+  @spec with_machine_row(map(), String.t(), term(), term(), (-> term())) :: term()
+  defp with_machine_row(vm, column, value, original, check) do
+    update = fn value ->
+      Ecto.Adapters.SQL.query!(
+        Marshall.Repo,
+        "UPDATE compute_virtual_machines SET #{column} = $1 WHERE id = $2",
+        [value, Ecto.UUID.dump!(vm.id)]
+      )
+    end
+
+    update.(value)
+
+    try do
+      check.()
+    after
+      update.(if column == "owner_id", do: Ecto.UUID.dump!(original), else: original)
+    end
   end
 
   @spec create_thread(User.t(), String.t() | nil) :: Thread.t()

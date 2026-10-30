@@ -24,6 +24,10 @@ defmodule Marshall.Compute.WakeRequest do
     end
   end
 
+  cedar do
+    internal [:read, :request, :advance]
+  end
+
   # @cc [owner:ghuntley,label:recovery;concurrency] wake-single-demand
   # One unfinished demand MUST exist per VM. Pending capacity survives process
   # loss; only fresh running evidence or an explicit terminal refusal finishes it.

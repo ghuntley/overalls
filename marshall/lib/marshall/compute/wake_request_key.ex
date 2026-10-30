@@ -19,6 +19,10 @@ defmodule Marshall.Compute.WakeRequestKey do
   # Every accepted keyed demand MUST retain its exact actor/VM/key to wake
   # mapping under the VM lock, even when joining another actor's active wake.
   # Completion or cancellation MUST NOT discard or redirect that identity.
+  cedar do
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

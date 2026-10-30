@@ -13,6 +13,14 @@ defmodule Marshall.Terminal.Grant do
     identity_wheres_to_sql current_viewer: "archived_at IS NULL"
   end
 
+  # @cc [owner:ghuntley,label:security] terminal-grants-view-only
+  # Grants MUST name exactly one terminal and account. They MUST confer only
+  # viewing, never guest input, resize or kill, even when VM access permits write.
+  # Revocation MUST retain its prior grant and audit history.
+  cedar do
+    internal [:read, :history, :grant, :revoke]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -25,12 +33,9 @@ defmodule Marshall.Terminal.Grant do
     store_action_name? true
     ignore_attributes [:inserted_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
-  # @cc [owner:ghuntley,label:security] terminal-grants-view-only
-  # Grants MUST name exactly one terminal and account. They MUST confer only
-  # viewing, never guest input, resize or kill, even when VM access permits write.
-  # Revocation MUST retain its prior grant and audit history.
   actions do
     defaults [:read]
     read :history

@@ -40,6 +40,10 @@ let
   ] ++ lib.optionals (application == "marshall") [
     ../../../../marshall/assets
     ../../../../marshall/priv
+    # Marshall's own Cedar NIF crate, compiled by Rustler at build time.
+    ../../../../marshall/native/marshall_cedar/Cargo.toml
+    ../../../../marshall/native/marshall_cedar/Cargo.lock
+    ../../../../marshall/native/marshall_cedar/src
     # Marshall's SCIM integration is vendored in-tree and referenced by path
     # from mix.exs; retain the source in release closures.
     ../../../../vendor/ash_scim
@@ -51,6 +55,7 @@ let
     (lib.fileset.maybeMissing ../../../../marshall/priv/static/assets)
     (lib.fileset.maybeMissing ../../../../marshall/priv/static/cache_manifest.json)
     (lib.fileset.maybeMissing ../../../../marshall/assets/node_modules)
+    (lib.fileset.maybeMissing ../../../../marshall/priv/native)
     (lib.fileset.fileFilter
       (file: file.hasExt "gz" || builtins.match ".*-[0-9a-f]{32}\\.[^.]+" file.name != null)
       ../../../../marshall/priv/static)

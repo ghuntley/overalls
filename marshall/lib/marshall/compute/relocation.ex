@@ -151,6 +151,42 @@ defmodule Marshall.Compute.Relocation do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :begin_copy,
+      :begin_import,
+      :confirm_import,
+      :confirm_readiness,
+      :fail_readiness,
+      :observe_activation,
+      :fail_activation,
+      :record,
+      :dispatch_key,
+      :record_key,
+      :schedule,
+      :advance,
+      :record_cancellation_stop,
+      :record_cancellation_start,
+      :record_source_restored,
+      :offer_source_snapshot_cleanup,
+      :record_source_snapshot_cleanup,
+      :offer_source_revocation,
+      :offer_destination_cleanup,
+      :record_destination_cleanup,
+      :offer_destination_revocation,
+      :record_destination_revocation,
+      :record_source_revocation,
+      :request_cancellation,
+      :request_deletion,
+      :complete,
+      :finish_cancellation,
+      :finish_deletion,
+      :record_commit,
+      :record_stop
+    ]
+  end
+
   oban do
     triggers do
       trigger :coordinate do

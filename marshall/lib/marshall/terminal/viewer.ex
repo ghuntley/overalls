@@ -393,7 +393,9 @@ defmodule Marshall.Terminal.Viewer do
   def terminate(_reason, _state), do: :ok
 
   defp claimed_session(claim, actor) do
-    case Ash.get(Marshall.Terminal.Session, claim.session_id, authorize?: false) do
+    case Ash.get(Marshall.Terminal.Session, claim.session_id,
+           actor: Marshall.Authorization.SystemActor.compute()
+         ) do
       {:ok, %Marshall.Terminal.Session{} = session} when claim.actor_id == actor.id ->
         case Marshall.Terminal.Authority.session_for(claim.session_id, actor) do
           {:ok, authorized} ->

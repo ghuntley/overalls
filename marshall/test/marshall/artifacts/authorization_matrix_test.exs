@@ -48,7 +48,7 @@ defmodule Marshall.Artifacts.AuthorizationMatrixTest do
     id = Ash.UUID.generate()
 
     for {kind, actor} <- users, action <- @actions, active? <- [true, false] do
-      entity = Cedar.artifact(id, owner.id, grants, active?)
+      entity = Marshall.CedarEntities.artifact(id, owner.id, grants, active?)
       expected = active? and action in Map.fetch!(@table, kind)
 
       assert Cedar.allowed?(actor, action, entity) == expected,
@@ -66,7 +66,7 @@ defmodule Marshall.Artifacts.AuthorizationMatrixTest do
     refute Cedar.allowed?(
              Marshall.Authorization.SystemActor.compute(),
              "artifact_read",
-             Cedar.artifact(Ash.UUID.generate(), Ash.UUID.generate(), %{}, true)
+             Marshall.CedarEntities.artifact(Ash.UUID.generate(), Ash.UUID.generate(), %{}, true)
            )
   end
 end

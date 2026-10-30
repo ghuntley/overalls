@@ -23,6 +23,10 @@ defmodule Marshall.Agents.AttachmentAudit do
   # Receipts MUST contain only identifiers, closed operation/outcome enums and time.
   # Receipt creation MUST share the transaction of the operation it records.
   # No update or destroy action may expose mutation of existing receipts.
+  cedar do
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

@@ -132,34 +132,18 @@ defmodule Marshall.Compute.Views do
   # current Cedar-readable VMs, and expose only the view field allowlist, the
   # current physical host name, the registered image display name, opaque
   # execution reference, finite editor image status, current permissions, the
-  # caller's own pin flag and bounded authorized operation summaries. The
-  # bounded SQL candidates MUST include current thread grants; every row still
-  # requires a fresh Cedar decision. The validated `exclude` list (at most the
+  # caller's own pin flag and bounded authorized operation summaries. Rows are
+  # selected by the Cedar-derived read filter for the current principal, so the
+  # page holds exactly the readable machines. The validated `exclude` list (at most the
   # pin limit) MUST remove those ids from the keyset page without changing its
   # order or cursor semantics. Internal host IDs, placements, reservations,
   # image manifests and other users' pins stay private.
   defp list(request, actor) do
     exclude = Map.get(request, :exclude, [])
-    {team_ids, shared_ids} = list_candidates(actor)
 
     query =
       VirtualMachine
-      |> Ash.Query.filter(
-        owner_id == ^actor.id or
-          (profile in [:standard, :oss, :inception] and
-             (exists(team.members, user_id == ^actor.id and is_nil(archived_at)) or
-                exists(
-                  access_grants,
-                  user_id == ^actor.id and is_nil(archived_at) and
-                    role in [:viewer, :operator, :manager]
-                ) or
-                exists(
-                  current_threads.grants,
-                  user_id == ^actor.id and is_nil(archived_at) and
-                    role in [:viewer, :operator, :manager]
-                )))
-      )
-      |> Ash.Query.filter(owner_id == ^actor.id or team_id in ^team_ids or id in ^shared_ids)
+      |> Authorization.filter(actor, "read")
       |> Ash.Query.sort(:id)
       |> Ash.Query.limit(request.limit + 1)
 
@@ -172,53 +156,10 @@ defmodule Marshall.Compute.Views do
     page = Enum.take(rows, request.limit)
     prefetch(page, actor)
 
-    items =
-      page
-      |> Enum.filter(&Authorization.allowed?(&1, actor, "read"))
-      |> Enum.map(&view(&1, actor))
-
     %{
-      items: items,
+      items: Enum.map(page, &view(&1, actor)),
       next_cursor: if(length(rows) > request.limit, do: Enum.at(rows, request.limit - 1).id)
     }
-  end
-
-  # @cc [owner:ghuntley,label:security;performance] views-list-candidates-superset
-  # The candidate team and machine ids MUST include every machine the exact list
-  # filter could admit through a team membership, machine grant or thread grant
-  # of the actor, so ANDing them with that filter changes no result. They come
-  # from the actor's unarchived rows only and never admit a row by themselves.
-  @spec list_candidates(map()) :: {[Ash.UUID.t()], [Ash.UUID.t()]}
-  defp list_candidates(actor) do
-    team_ids =
-      Marshall.Teams.TeamMember
-      |> Ash.Query.filter(user_id == ^actor.id and is_nil(archived_at))
-      |> Ash.read!(actor: SystemActor.compute())
-      |> Enum.map(& &1.team_id)
-
-    granted =
-      Marshall.Access.Grant
-      |> Ash.Query.filter(user_id == ^actor.id and is_nil(archived_at))
-      |> Ash.read!(actor: SystemActor.compute())
-      |> Enum.map(& &1.vm_id)
-
-    thread_ids =
-      Marshall.Threads.Grant
-      |> Ash.Query.filter(user_id == ^actor.id and is_nil(archived_at))
-      |> Ash.read!(actor: SystemActor.compute())
-      |> Enum.map(& &1.thread_id)
-
-    machines =
-      if thread_ids == [] do
-        []
-      else
-        Marshall.Threads.Thread
-        |> Ash.Query.filter(id in ^thread_ids and not is_nil(machine_id))
-        |> Ash.read!(actor: SystemActor.compute())
-        |> Enum.map(& &1.machine_id)
-      end
-
-    {Enum.uniq(team_ids), Enum.uniq(granted ++ machines)}
   end
 
   # @cc [owner:ghuntley,label:security;product] views-pinned-section-bounded
@@ -236,14 +177,15 @@ defmodule Marshall.Compute.Views do
         %{}
       else
         VirtualMachine
+        |> Ash.Query.for_read(:read, %{}, actor: SystemActor.compute())
         |> Ash.Query.filter(id in ^ids)
-        |> Ash.read!(actor: SystemActor.compute())
+        |> Authorization.filter(actor, "read")
+        |> Ash.read!()
         |> Map.new(&{&1.id, &1})
       end
 
-    candidates = Enum.flat_map(ids, &List.wrap(rows[&1]))
-    prefetch(candidates, actor)
-    readable = Enum.filter(candidates, &Authorization.allowed?(&1, actor, "read"))
+    readable = Enum.flat_map(ids, &List.wrap(rows[&1]))
+    prefetch(readable, actor)
 
     %{
       items: readable |> Enum.take(limit) |> Enum.map(&view(&1, actor)),

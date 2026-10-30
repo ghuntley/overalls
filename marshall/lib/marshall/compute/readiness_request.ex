@@ -30,6 +30,10 @@ defmodule Marshall.Compute.ReadinessRequest do
     end
   end
 
+  cedar do
+    internal [:read, :record, :offer, :ready, :fail]
+  end
+
   state_machine do
     state_attribute :status
     initial_states [:pending]

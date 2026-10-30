@@ -39,7 +39,7 @@ defmodule Marshall.Terminal.Creation do
             true ->
               slots =
                 Ash.count!(Session |> Ash.Query.filter(vm_id == ^vm.id and is_nil(archived_at)),
-                  authorize?: false
+                  actor: Marshall.Authorization.SystemActor.compute()
                 )
 
               pending =
@@ -50,7 +50,7 @@ defmodule Marshall.Terminal.Creation do
                       placement_id == ^vm.current_placement_id and
                       execution_epoch == ^vm.execution_epoch
                   ),
-                  authorize?: false
+                  actor: Marshall.Authorization.SystemActor.compute()
                 )
 
               if slots + pending >= 64, do: Ledger.rollback(:too_many_terminal_sessions)
@@ -66,7 +66,7 @@ defmodule Marshall.Terminal.Creation do
                   parameter_hash: digest,
                   expires_at: DateTime.add(Ledger.now(), 600)
                 },
-                authorize?: false
+                actor: Marshall.Authorization.SystemActor.compute()
               )
           end
         end,
@@ -144,10 +144,14 @@ defmodule Marshall.Terminal.Creation do
                   kind: :opened,
                   request_id: request.id
                 },
-                authorize?: false
+                actor: Marshall.Authorization.SystemActor.compute()
               )
 
-            Ash.update!(request, %{session_id: session.id}, action: :complete, authorize?: false)
+            Ash.update!(request, %{session_id: session.id},
+              action: :complete,
+              actor: Marshall.Authorization.SystemActor.compute()
+            )
+
             session
 
           _ ->
@@ -161,7 +165,7 @@ defmodule Marshall.Terminal.Creation do
 
   @spec receipt(Opening.t()) :: {:ok, Session.t()} | {:error, atom()}
   def receipt(request) do
-    case Ash.get(Session, request.session_id, authorize?: false) do
+    case Ash.get(Session, request.session_id, actor: Marshall.Authorization.SystemActor.compute()) do
       {:ok, %Session{} = session} -> {:ok, session}
       _ -> {:error, :unknown_session}
     end
@@ -174,7 +178,10 @@ defmodule Marshall.Terminal.Creation do
 
       case read_request(id) do
         %Opening{status: :pending} = request ->
-          Ash.update!(request, %{}, action: :begin_cancel, authorize?: false)
+          Ash.update!(request, %{},
+            action: :begin_cancel,
+            actor: Marshall.Authorization.SystemActor.compute()
+          )
 
         %Opening{status: :cancelling} = request ->
           request
@@ -192,7 +199,11 @@ defmodule Marshall.Terminal.Creation do
 
            case read_request(id) do
              %Opening{status: :cancelling} = request ->
-               Ash.update!(request, %{}, action: :fail, authorize?: false)
+               Ash.update!(request, %{},
+                 action: :fail,
+                 actor: Marshall.Authorization.SystemActor.compute()
+               )
+
                :changed
 
              %Opening{status: :failed} ->
@@ -225,10 +236,13 @@ defmodule Marshall.Terminal.Creation do
         request.execution_epoch == vm.execution_epoch
 
   defp read_request(id),
-    do: Opening |> Ash.Query.filter(id == ^id) |> Ash.read_one!(authorize?: false)
+    do:
+      Opening
+      |> Ash.Query.filter(id == ^id)
+      |> Ash.read_one!(actor: Marshall.Authorization.SystemActor.compute())
 
   defp session!(id) do
-    case Ash.get(Session, id, authorize?: false) do
+    case Ash.get(Session, id, actor: Marshall.Authorization.SystemActor.compute()) do
       {:ok, %Session{} = session} -> session
       _ -> Ledger.rollback(:unknown_session)
     end

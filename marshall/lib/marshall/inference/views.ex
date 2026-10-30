@@ -1,7 +1,7 @@
 defmodule Marshall.Inference.Views do
   @moduledoc "Bounded owner and authenticated fleet accounting views. Sharing does not change owner projections."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Inference.{Request, Daily}
   require Ash.Query
 
@@ -15,8 +15,8 @@ defmodule Marshall.Inference.Views do
 
     permitted =
       if admin,
-        do: Cedar.allowed?(user, "admin_read", Cedar.entity("ControlPlane", "marshall")),
-        else: Cedar.allowed?(user, "provision", Cedar.entity("ControlPlane", "marshall"))
+        do: Marshall.Authorization.control_plane?(user, "admin_read"),
+        else: Marshall.Authorization.control_plane?(user, "provision")
 
     with true <- permitted,
          {:ok, filters} <- filters(input.arguments.filters),

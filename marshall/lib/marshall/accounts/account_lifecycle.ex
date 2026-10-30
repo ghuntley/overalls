@@ -75,7 +75,7 @@ defmodule Marshall.Accounts.AccountLifecycle do
 
     User
     |> Ash.ActionInput.for_action(:request_magic_link, %{email: email},
-      context: %{private: %{ash_authentication?: true}}
+      actor: Marshall.Authorization.SystemActor.service(:ash_authentication)
     )
     |> Ash.run_action!()
 

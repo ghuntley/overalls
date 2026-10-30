@@ -16,6 +16,10 @@ defmodule Marshall.Agents.PlanningQuestion do
     end
   end
 
+  cedar do
+    internal [:read, :request, :resolve, :cancel]
+  end
+
   actions do
     defaults [:read]
 

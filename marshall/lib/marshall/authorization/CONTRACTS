@@ -7,3 +7,11 @@ into a SystemActor; external host credentials require separate authentication.
 Adding an Ash action MUST NOT implicitly authorize it. Public entry actions need
 explicit admission and fresh record-specific checks in their coordinators;
 internal actions require both the resource/action allowlist and Cedar permission.
+
+@cc [owner:ghuntley,label:security;performance] authorization-cedar-single-source
+Cedar policy and schema in `priv/cedar` MUST be the only place access rules
+live (ADR-0268). Every Ash resource MUST use this directory's authorizer with a
+`cedar` mapping for every action; record decisions and read filters MUST come
+from Cedar residuals translated through `Marshall.Authorization.Record`
+modules and evaluated in SQL. No Elixir check, Ash policy, library context flag
+or `authorize?: false` in Marshall code may make or skip a decision.

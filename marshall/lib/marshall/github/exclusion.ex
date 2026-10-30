@@ -11,6 +11,10 @@ defmodule Marshall.GitHub.Exclusion do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :exclude, :remove]
+  end
+
   actions do
     defaults [:read]
 

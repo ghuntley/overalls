@@ -106,8 +106,8 @@ defmodule Marshall.Accounts.TimeZoneTest do
 
     retired = user()
     Ledger.update!(retired, :security_state, %{deleted_at: DateTime.utc_now()})
-    assert {:error, error} = set(retired, "Europe/London")
-    assert Exception.message(error) =~ "unauthorized"
+    # Cedar admission refuses a retired account before the coordinator runs.
+    assert {:error, %Ash.Error.Forbidden{}} = set(retired, "Europe/London")
   end
 
   test "the change event carries the user id and never the zone text" do

@@ -18,6 +18,30 @@ defmodule Marshall.Ingress.FleetCertificate do
     end
   end
 
+  cedar do
+    control_plane "admin_operate", [:rotate_for_admin]
+    control_plane "admin_read", [:audit]
+
+    internal [
+      :read,
+      :deliver,
+      :acknowledge,
+      :enqueue,
+      :save_request,
+      :mark_order_attempt,
+      :bind_order,
+      :record_proof,
+      :refresh_proof,
+      :finish_issued,
+      :activate,
+      :retire,
+      :fail,
+      :fail_unknown_order,
+      :progress,
+      :ensure_due
+    ]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:csr_der, :private_key_pem, :chain_pem])
@@ -96,6 +120,7 @@ defmodule Marshall.Ingress.FleetCertificate do
 
     ignore_actions [:refresh_proof]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

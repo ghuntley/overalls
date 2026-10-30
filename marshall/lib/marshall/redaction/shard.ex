@@ -12,6 +12,10 @@ defmodule Marshall.Redaction.Shard do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :open, :transition, :start, :complete, :fail]
+  end
+
   state_machine do
     initial_states [:queued]
     state_attribute :state

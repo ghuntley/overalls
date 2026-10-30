@@ -20,6 +20,11 @@ defmodule Marshall.Compute.Host do
     end
   end
 
+  cedar do
+    control_plane "admin_configure", [:configure_for_admin]
+    internal [:read, :enroll, :configure, :maintenance, :connect, :disconnect, :report]
+  end
+
   actions do
     defaults [:read]
 

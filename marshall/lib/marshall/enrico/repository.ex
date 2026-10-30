@@ -12,6 +12,10 @@ defmodule Marshall.Enrico.Repository do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :register, :begin_refresh, :publish, :fail, :request_remove, :remove]
+  end
+
   # @cc [owner:ghuntley,label:recovery] enrico-published-state
   # A failed fetch MUST retain the previous published commit and browseability.
   state_machine do

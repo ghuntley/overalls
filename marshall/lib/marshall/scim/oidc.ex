@@ -200,9 +200,7 @@ defmodule Marshall.Scim.Oidc do
     with {:ok, user} <- authenticate(claims),
          {:ok, token, _claims} <- AshAuthentication.Jwt.token_for_user(user, %{"amr" => "oidc"}),
          :ok <-
-           Actions.store_token(Token, %{"token" => token, "purpose" => "user"},
-             context: %{private: %{ash_authentication?: true}}
-           ) do
+           Actions.store_token(Token, %{"token" => token, "purpose" => "user"}) do
       {:ok, user, token}
     end
   end

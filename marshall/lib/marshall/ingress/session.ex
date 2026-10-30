@@ -29,6 +29,21 @@ defmodule Marshall.Ingress.Session do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :record,
+      :renew,
+      :close,
+      :purge,
+      :prune,
+      :ssh_key_status,
+      :open_ssh,
+      :renew_ssh,
+      :close_ssh
+    ]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -39,6 +54,7 @@ defmodule Marshall.Ingress.Session do
     ignore_attributes [:token_hash, :inserted_at, :updated_at]
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   oban do

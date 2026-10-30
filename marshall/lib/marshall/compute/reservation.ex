@@ -34,6 +34,22 @@ defmodule Marshall.Compute.Reservation do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :reserve,
+      :hold_checkpoint,
+      :release_checkpoint,
+      :hold_temporary_disk,
+      :release_temporary_disk,
+      :resize_hold,
+      :hold_compute,
+      :settle_usage,
+      :release_compute,
+      :release_all
+    ]
+  end
+
   actions do
     defaults [:read]
 

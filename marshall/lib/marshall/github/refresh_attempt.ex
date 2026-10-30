@@ -12,6 +12,20 @@ defmodule Marshall.GitHub.RefreshAttempt do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [
+      :read,
+      :record,
+      :submit,
+      :stage,
+      :finish,
+      :fail,
+      :retain_result,
+      :clear_result,
+      :purge
+    ]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:result])

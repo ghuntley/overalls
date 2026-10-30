@@ -22,6 +22,10 @@ defmodule Marshall.Artifacts.PublishRequest do
     end
   end
 
+  cedar do
+    internal [:read, :open, :attach_stage, :commit, :refuse, :expire]
+  end
+
   state_machine do
     initial_states [:staging]
     default_initial_state :staging

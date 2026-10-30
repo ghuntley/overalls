@@ -3,7 +3,7 @@ defmodule Marshall.Compute.AdminViews do
   use Ash.Resource.Actions.Implementation
 
   alias Marshall.Accounts.User
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.{Ledger, VirtualMachine}
   require Ash.Query
 
@@ -12,7 +12,7 @@ defmodule Marshall.Compute.AdminViews do
   @impl true
   def run(input, _options, %{actor: %User{} = actor}) do
     Ledger.transaction(fn ->
-      unless Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")),
+      unless Marshall.Authorization.control_plane?(actor, "admin_read"),
         do: Ledger.rollback(:forbidden)
 
       list(input.arguments)

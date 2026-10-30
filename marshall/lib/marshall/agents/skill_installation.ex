@@ -15,6 +15,10 @@ defmodule Marshall.Agents.SkillInstallation do
     end
   end
 
+  cedar do
+    internal [:read, :register, :publish, :configure, :fail]
+  end
+
   actions do
     defaults [:read]
 

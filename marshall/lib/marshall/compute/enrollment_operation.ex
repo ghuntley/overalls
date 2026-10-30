@@ -11,6 +11,10 @@ defmodule Marshall.Compute.EnrollmentOperation do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

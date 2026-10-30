@@ -35,6 +35,10 @@ defmodule Marshall.Compute.WorkflowServiceLevelAttempt do
     end
   end
 
+  cedar do
+    internal [:read, :admit, :finish, :check_pending]
+  end
+
   # @cc [owner:ghuntley,label:accounting;recovery] workflow-slo-immutable-receipt
   # One canonical SSH receipt MUST admit at most one immutable measurement.
   # Only pending measurements may finish. Measurement deadlines MUST NOT

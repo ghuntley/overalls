@@ -16,6 +16,10 @@ defmodule Marshall.Agents.ModelCall do
     end
   end
 
+  cedar do
+    internal [:read, :queue, :transition]
+  end
+
   actions do
     defaults [:read]
 

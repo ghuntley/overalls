@@ -11,6 +11,10 @@ defmodule Marshall.Terminal.Location do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:destroy, :read, :publish, :renew]
+  end
+
   actions do
     defaults [:read, :destroy]
 

@@ -167,7 +167,7 @@ defmodule Marshall.Terminal.Termination do
       Session
       |> Ash.Query.filter(id == ^id)
       |> Ash.Query.lock(:for_update)
-      |> Ash.read_one!(authorize?: false)
+      |> Ash.read_one!(actor: Marshall.Authorization.SystemActor.compute())
 
   @spec closure_processed(Session.t(), atom()) :: :ok
   defp closure_processed(session, outcome) do
@@ -195,7 +195,7 @@ defmodule Marshall.Terminal.Termination do
         kind: kind,
         request_id: session.id
       },
-      authorize?: false
+      actor: Marshall.Authorization.SystemActor.compute()
     )
   end
 

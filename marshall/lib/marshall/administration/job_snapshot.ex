@@ -32,6 +32,12 @@ defmodule Marshall.Administration.JobSnapshot do
     end
   end
 
+  cedar do
+    control_plane "admin_jobs", [:retry_for_admin]
+    control_plane "admin_read", [:list_for_admin, :get_for_admin]
+    internal [:read, :expire]
+  end
+
   oban do
     scheduled_actions do
       schedule :expire, "*/5 * * * *" do

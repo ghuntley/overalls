@@ -2,7 +2,6 @@ defmodule Marshall.Ingress.RotateFleetCertificate do
   @moduledoc "Administrator request for an immediate public wildcard generation."
   use Ash.Resource.Actions.Implementation
   alias Marshall.Accounts.{AdminEvent, User}
-  alias Marshall.Authorization.Cedar
   alias Marshall.Compute.Ledger
   alias Marshall.Ingress.{EnsureFleetCertificate, Error}
 
@@ -40,5 +39,5 @@ defmodule Marshall.Ingress.RotateFleetCertificate do
 
   @spec allowed?(User.t()) :: boolean()
   defp allowed?(actor),
-    do: Cedar.allowed?(actor, "admin_operate", Cedar.entity("ControlPlane", "marshall"))
+    do: Marshall.Authorization.control_plane?(actor, "admin_operate")
 end

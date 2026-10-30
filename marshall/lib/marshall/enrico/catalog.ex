@@ -3,7 +3,6 @@ defmodule Marshall.Enrico.Catalog do
   alias Marshall.Enrico.{Repository, AuditEvent}
   alias Marshall.Enrico.EnricoSource
   alias Marshall.Authorization.SystemActor
-  alias Marshall.Authorization.Cedar
   alias Marshall.Compute.Ledger
   alias Marshall.Accounts.{Security, User}
   require Ash.Query
@@ -21,7 +20,7 @@ defmodule Marshall.Enrico.Catalog do
   @spec audit(User.t()) :: [AuditEvent.t()]
   def audit(%User{} = user) do
     if live?(user) and
-         Cedar.allowed?(user, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+         Marshall.Authorization.control_plane?(user, "admin_read") do
       AuditEvent
       |> Ash.Query.sort(inserted_at: :desc)
       |> Ash.Query.limit(100)

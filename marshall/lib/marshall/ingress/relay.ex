@@ -28,6 +28,10 @@ defmodule Marshall.Ingress.Relay do
   # Only hashes of the relay capability and inner stream ticket may persist.
   # The immutable binding MUST name one source, destination and exact stream;
   # consume may happen once, and renewal may change only its expiry.
+  cedar do
+    internal [:read, :record, :consume, :renew, :purge, :consume_connection, :renew_connection]
+  end
+
   actions do
     defaults [:read]
 

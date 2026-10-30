@@ -17,6 +17,10 @@ defmodule Marshall.Galileo.IntegrationHeader do
     end
   end
 
+  cedar do
+    internal [:read, :record, :remove]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:value])

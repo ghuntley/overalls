@@ -23,6 +23,20 @@ defmodule Marshall.Agents.Attachment do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :create_pending,
+      :begin_upload,
+      :touch_upload,
+      :publish,
+      :quarantine,
+      :fail,
+      :begin_delete,
+      :finish_delete
+    ]
+  end
+
   state_machine do
     state_attribute :state
     initial_states [:pending]

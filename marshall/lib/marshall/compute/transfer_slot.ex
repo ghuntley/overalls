@@ -28,6 +28,10 @@ defmodule Marshall.Compute.TransferSlot do
     end
   end
 
+  cedar do
+    internal [:read, :release, :occupy]
+  end
+
   actions do
     defaults [:read]
 

@@ -11,6 +11,10 @@ defmodule Marshall.Threads.AccessChange do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :record]
+  end
+
   actions do
     defaults [:read]
 

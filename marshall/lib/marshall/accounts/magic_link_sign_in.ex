@@ -59,9 +59,6 @@ defmodule Marshall.Accounts.MagicLinkSignIn do
 
   @spec revoke_unfenced(String.t()) :: :ok | {:error, term()}
   defp revoke_unfenced(token) do
-    AshAuthentication.TokenResource.Actions.revoke(Token, token,
-      store_all_tokens?: true,
-      context: %{private: %{ash_authentication?: true}}
-    )
+    AshAuthentication.TokenResource.Actions.revoke(Token, token, store_all_tokens?: true)
   end
 end

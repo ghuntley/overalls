@@ -28,7 +28,7 @@ defmodule Marshall.Terminal.Directory do
                  uri: uri(),
                  expires_at: DateTime.add(Marshall.Compute.Ledger.now(), 15)
                },
-               authorize?: false
+               actor: Marshall.Authorization.SystemActor.compute()
              ) do
         published(host_id)
         :ok
@@ -67,7 +67,7 @@ defmodule Marshall.Terminal.Directory do
 
   @spec lookup(String.t()) :: {:ok, Location.t()} | {:error, :stream_unavailable}
   def lookup(host_id) do
-    case Ash.get(Location, host_id, authorize?: false) do
+    case Ash.get(Location, host_id, actor: Marshall.Authorization.SystemActor.compute()) do
       {:ok, %Location{} = location} ->
         if DateTime.compare(location.expires_at, Marshall.Compute.Ledger.now()) == :gt,
           do: {:ok, location},
@@ -123,14 +123,14 @@ defmodule Marshall.Terminal.Directory do
                Location
                |> Ash.Query.filter(host_id == ^host_id)
                |> Ash.Query.lock(:for_update)
-               |> Ash.read_one!(authorize?: false)
+               |> Ash.read_one!(actor: Marshall.Authorization.SystemActor.compute())
 
              if location && location.nonce == nonce do
                Ash.update!(
                  location,
                  %{expires_at: DateTime.add(Marshall.Compute.Ledger.now(), 15)},
                  action: :renew,
-                 authorize?: false
+                 actor: Marshall.Authorization.SystemActor.compute()
                )
 
                :ok

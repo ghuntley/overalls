@@ -4,7 +4,7 @@ defmodule Marshall.Accounts.GuestAccount do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshPaperTrail.Resource]
 
   postgres do
@@ -18,13 +18,18 @@ defmodule Marshall.Accounts.GuestAccount do
     end
   end
 
+  cedar do
+    internal [:read, :allocate, :retire]
+  end
+
   paper_trail do
     sensitive_attributes :ignore
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
     change_tracking_mode :changes_only
     store_action_name? true
-    version_extensions authorizers: [Ash.Policy.Authorizer]
+    version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do
@@ -36,12 +41,6 @@ defmodule Marshall.Accounts.GuestAccount do
 
     update :retire do
       accept [:retired_at]
-    end
-  end
-
-  policies do
-    policy always() do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
     end
   end
 

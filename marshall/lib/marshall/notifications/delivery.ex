@@ -58,6 +58,22 @@ defmodule Marshall.Notifications.Delivery do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :history,
+      :enqueue,
+      :record_coalesced,
+      :begin_send,
+      :deliver,
+      :retry_later,
+      :fail_permanent,
+      :drop,
+      :prune,
+      :reconcile
+    ]
+  end
+
   oban do
     scheduled_actions do
       schedule :prune, "23 * * * *" do
@@ -94,6 +110,7 @@ defmodule Marshall.Notifications.Delivery do
     ignore_attributes [:route, :collapse_key, :inserted_at, :updated_at]
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:recovery;concurrency] notification-delivery-lifecycle

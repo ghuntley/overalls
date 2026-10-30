@@ -27,6 +27,10 @@ defmodule Marshall.Ingress.EnvironmentPublication do
     end
   end
 
+  cedar do
+    internal [:read, :record, :advance]
+  end
+
   actions do
     defaults [:read]
 

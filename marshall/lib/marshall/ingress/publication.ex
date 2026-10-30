@@ -15,6 +15,10 @@ defmodule Marshall.Ingress.Publication do
     end
   end
 
+  cedar do
+    internal [:read, :initialize, :advance, :snapshot]
+  end
+
   actions do
     defaults [:read]
 

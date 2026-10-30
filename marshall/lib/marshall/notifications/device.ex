@@ -54,6 +54,26 @@ defmodule Marshall.Notifications.Device do
     end
   end
 
+  cedar do
+    control_plane "provision", [
+      :register_for_user,
+      :list_for_user,
+      :remove_for_user,
+      :set_preference_for_user
+    ]
+
+    internal [
+      :read,
+      :history,
+      :register,
+      :activate,
+      :refresh,
+      :set_preference,
+      :invalidate,
+      :revoke
+    ]
+  end
+
   cloak do
     vault(Marshall.Vault)
     attributes([:push_key])
@@ -82,6 +102,7 @@ defmodule Marshall.Notifications.Device do
 
     sensitive_attributes :ignore
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:security;recovery] notification-device-lifecycle

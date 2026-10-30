@@ -1,7 +1,7 @@
 defmodule Marshall.Administration.Operations do
   @moduledoc "Bounded redacted operational status for the administrator console."
 
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.Image
   alias Marshall.Ingress.{Publication, Route, Service}
   alias Marshall.SSH.Gateway
@@ -10,7 +10,7 @@ defmodule Marshall.Administration.Operations do
 
   @spec snapshot(Marshall.Accounts.User.t()) :: {:ok, map()} | {:error, term()}
   def snapshot(actor) do
-    if Cedar.allowed?(actor, "admin_read", Cedar.entity("ControlPlane", "marshall")) do
+    if Marshall.Authorization.control_plane?(actor, "admin_read") do
       {:ok,
        %{
          images:

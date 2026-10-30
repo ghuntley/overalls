@@ -17,6 +17,10 @@ defmodule Marshall.Compute.ProbeRequest do
     end
   end
 
+  cedar do
+    internal [:read, :enqueue, :dispatch, :record_result]
+  end
+
   # @cc [owner:ghuntley,label:recovery;security] probe-outbox-retains-role-and-lease
   # Each relocation/revision/phase MUST have one immutable host-bound request.
   # Expired requests and receipts MUST remain for delayed-result correlation.

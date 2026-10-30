@@ -17,6 +17,10 @@ defmodule Marshall.Terminal.Ticket do
     end
   end
 
+  cedar do
+    internal [:destroy, :read, :create, :purge, :prune]
+  end
+
   oban do
     scheduled_actions do
       schedule :prune, "*/10 * * * *" do

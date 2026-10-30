@@ -73,7 +73,7 @@ defmodule Marshall.Compute do
       define :resize, action: :resize
       define :retry_resize, action: :retry_resize
       define :cancel_resize, action: :cancel_resize
-      define :update_reflection_metadata, action: :reflection_metadata
+      define :update_reflection_metadata, action: :set_reflection_metadata
       define :lifecycle, action: :lifecycle
       define :relocate, action: :relocate
       define :cancel_relocation, action: :cancel_relocation

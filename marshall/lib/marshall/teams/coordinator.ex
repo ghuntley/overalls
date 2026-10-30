@@ -1,7 +1,7 @@
 defmodule Marshall.Teams.Coordinator do
   @moduledoc "Transactional team creation, membership management and ownership transfer."
   use Ash.Resource.Actions.Implementation
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   alias Marshall.Compute.Ledger
   alias Marshall.Teams.{Fence, ServiceOwner, Team, TeamMember, Transfer}
   require Marshall.Events
@@ -134,8 +134,13 @@ defmodule Marshall.Teams.Coordinator do
     Fence.require_native!(team)
     member = current_member!(team.id, actor.id)
 
-    unless Cedar.allowed?(actor, "team_manage_members", Cedar.team(team)),
-      do: Ledger.rollback(:forbidden)
+    unless Marshall.Authorization.allowed?(
+             actor,
+             "team_manage_members",
+             Marshall.Teams.Team.Cedar,
+             team.id
+           ),
+           do: Ledger.rollback(:forbidden)
 
     if user.id == actor.id, do: Ledger.rollback(:owner_protected)
     if member.role != :owner and arguments.role == :admin, do: Ledger.rollback(:forbidden)
@@ -237,8 +242,13 @@ defmodule Marshall.Teams.Coordinator do
   defp list_members(arguments, actor) do
     team = live_team!(arguments.team_id)
 
-    unless Cedar.allowed?(actor, "team_read", Cedar.team(team)),
-      do: Ledger.rollback(:forbidden)
+    unless Marshall.Authorization.allowed?(
+             actor,
+             "team_read",
+             Marshall.Teams.Team.Cedar,
+             team.id
+           ),
+           do: Ledger.rollback(:forbidden)
 
     hidden = ServiceOwner.id()
     memberships = Enum.reject(Ledger.read!(TeamMember, team_id: team.id), &(&1.user_id == hidden))
@@ -269,8 +279,13 @@ defmodule Marshall.Teams.Coordinator do
   defp list_transfers(arguments, actor) do
     team = live_team!(arguments.team_id)
 
-    unless Cedar.allowed?(actor, "team_read", Cedar.team(team)),
-      do: Ledger.rollback(:forbidden)
+    unless Marshall.Authorization.allowed?(
+             actor,
+             "team_read",
+             Marshall.Teams.Team.Cedar,
+             team.id
+           ),
+           do: Ledger.rollback(:forbidden)
 
     transfers = Ledger.read!(Transfer, team_id: team.id, state: :pending)
 

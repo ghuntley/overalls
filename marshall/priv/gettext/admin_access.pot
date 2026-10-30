@@ -45,12 +45,12 @@ msgstr ""
 msgid "Added"
 msgstr ""
 
-#: lib/marshall_web/live_admin_auth.ex:142
+#: lib/marshall_web/live_admin_auth.ex:137
 #, elixir-autogen, elixir-format
 msgid "Administrative changes are not authorized."
 msgstr ""
 
-#: lib/marshall_web/live_admin_auth.ex:124
+#: lib/marshall_web/live_admin_auth.ex:123
 #, elixir-autogen, elixir-format
 msgid "Administrative changes require an administrator."
 msgstr ""
@@ -85,7 +85,7 @@ msgstr ""
 msgid "Expires"
 msgstr ""
 
-#: lib/marshall_web/live_admin_auth.ex:190
+#: lib/marshall_web/live_admin_auth.ex:185
 #, elixir-autogen, elixir-format
 msgid "Finish or cancel the current verification first."
 msgstr ""
@@ -100,7 +100,7 @@ msgstr ""
 msgid "Granted"
 msgstr ""
 
-#: lib/marshall_web/live_admin_auth.ex:208
+#: lib/marshall_web/live_admin_auth.ex:203
 #, elixir-autogen, elixir-format
 msgid "Invalid administrative request."
 msgstr ""

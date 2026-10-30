@@ -14,7 +14,10 @@ defmodule Marshall.Authorization.CedarTest do
         do: refute(Cedar.allowed?(%{user | administrator: true}, action, control_plane))
 
     for action <- ~w(read write manage web),
-        do: refute(Cedar.allowed?(user, action, Cedar.vm("other", Ash.UUID.generate())))
+        do:
+          refute(
+            Cedar.allowed?(user, action, Marshall.CedarEntities.vm("other", Ash.UUID.generate()))
+          )
 
     for actor <- [nil, %{id: user.id}, %User{id: Ash.UUID.generate()}, SystemActor.compute()],
         do: refute(Cedar.allowed?(actor, "admin_read", control_plane))
@@ -39,7 +42,8 @@ defmodule Marshall.Authorization.CedarTest do
         (role == :viewer and action == "read") or
         (role == :operator and action in ["read", "write"])
 
-    assert Cedar.allowed?(actor, action, Cedar.vm("vm", owner, grants)) == allowed
+    assert Cedar.allowed?(actor, action, Marshall.CedarEntities.vm("vm", owner, grants)) ==
+             allowed
   end
 
   property "the Cedar policy enforces the complete team membership matrix" do
@@ -52,16 +56,16 @@ defmodule Marshall.Authorization.CedarTest do
 
     team =
       Cedar.entity("Team", "team", %{
-        "owner" => Cedar.entity("User", if(role == :owner, do: actor_id, else: other)).uid,
+        "owner" => {"User", if(role == :owner, do: actor_id, else: other)},
         "admins" =>
           Enum.map(
             if(role in [:owner, :admin], do: [actor_id], else: []),
-            &Cedar.entity("User", &1).uid
+            &{"User", &1}
           ),
         "members" =>
           Enum.map(
             if(role == :stranger, do: [], else: [actor_id]),
-            &Cedar.entity("User", &1).uid
+            &{"User", &1}
           )
       })
 
@@ -81,11 +85,12 @@ defmodule Marshall.Authorization.CedarTest do
 
     integration =
       Cedar.entity("Integration", "integration", %{
-        "owner" => Cedar.entity("User", if(role == :owner, do: actor_id, else: "other")).uid,
+        "owner" => {"User", if(role == :owner, do: actor_id, else: "other")},
+        "live" => true,
         "managers" =>
           Enum.map(
             if(role == :manager, do: [actor_id], else: []),
-            &Cedar.entity("User", &1).uid
+            &{"User", &1}
           )
       })
 
@@ -109,7 +114,8 @@ defmodule Marshall.Authorization.CedarTest do
       (role == :team_admin and action in ["read", "write", "manage", "web"]) or
         (role == :team_member and action in ["read", "write", "web"])
 
-    assert Cedar.allowed?(actor, action, Cedar.vm("vm", stranger_owner, grants)) == allowed
+    assert Cedar.allowed?(actor, action, Marshall.CedarEntities.vm("vm", stranger_owner, grants)) ==
+             allowed
   end
 
   test "only typed actors can provision, and users cannot coordinate" do
@@ -122,7 +128,7 @@ defmodule Marshall.Authorization.CedarTest do
     internal = Cedar.entity("Internal", "test")
     assert Cedar.allowed?(SystemActor.compute(), "coordinate", internal)
     refute Cedar.allowed?(user, "coordinate", internal)
-    refute Cedar.allowed?(user, "undefined", Cedar.vm("vm", user.id))
+    refute Cedar.allowed?(user, "undefined", Marshall.CedarEntities.vm("vm", user.id))
 
     refute Cedar.allowed?(
              %User{id: Ash.UUID.generate(), administrator: true},
@@ -154,18 +160,19 @@ defmodule Marshall.Authorization.CedarTest do
     resource =
       case resource_kind do
         :vm ->
-          Cedar.vm("vm", owner.id)
+          Marshall.CedarEntities.vm("vm", owner.id)
 
         :team ->
           Cedar.entity("Team", "team", %{
-            "owner" => Cedar.entity("User", owner.id).uid,
+            "owner" => {"User", owner.id},
             "admins" => [],
             "members" => []
           })
 
         :integration ->
           Cedar.entity("Integration", "integration", %{
-            "owner" => Cedar.entity("User", owner.id).uid,
+            "owner" => {"User", owner.id},
+            "live" => true,
             "managers" => []
           })
       end
@@ -183,7 +190,7 @@ defmodule Marshall.Authorization.CedarTest do
       Ash.Seed.seed!(User, %{email: "#{Ash.UUID.generate()}@example.test", administrator: true})
       |> Marshall.PasskeyFixture.verified_session()
 
-    vm = Cedar.vm("vm", Ash.UUID.generate())
+    vm = Marshall.CedarEntities.vm("vm", Ash.UUID.generate())
 
     for action <- ~w(read write manage web),
         do: assert(Cedar.allowed?(admin, action, vm), "expected administrator #{action} access")

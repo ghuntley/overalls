@@ -38,6 +38,10 @@ defmodule Marshall.Compute.Image do
     repo Marshall.Repo
   end
 
+  cedar do
+    internal [:read, :register, :configure]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -46,6 +50,7 @@ defmodule Marshall.Compute.Image do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

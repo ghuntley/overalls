@@ -18,6 +18,10 @@ defmodule Marshall.Agents.Turn do
     end
   end
 
+  cedar do
+    internal [:read, :enqueue, :transition]
+  end
+
   actions do
     defaults [:read]
 

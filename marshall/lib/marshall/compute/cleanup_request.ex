@@ -26,6 +26,19 @@ defmodule Marshall.Compute.CleanupRequest do
     end
   end
 
+  cedar do
+    internal [
+      :read,
+      :record,
+      :offer,
+      :record_operation,
+      :request_key_retirement,
+      :offer_key_retirement,
+      :retire_key,
+      :complete
+    ]
+  end
+
   # @cc [owner:ghuntley,label:recovery;capacity] cleanup-one-source-obligation
   # One relocation MUST retain one immutable source descriptor/generation and
   # its physical deletion receipt. Request/offer/timeout alone release no holds.

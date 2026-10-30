@@ -22,6 +22,10 @@ defmodule Marshall.SSH.HostCertificate do
     end
   end
 
+  cedar do
+    internal [:read, :purge, :prune, :record, :issue, :retry, :fail, :supersede, :request]
+  end
+
   state_machine do
     state_attribute :status
     initial_states [:pending]

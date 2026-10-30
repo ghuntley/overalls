@@ -5,7 +5,7 @@ defmodule Marshall.Scim.Auth do
 
   @impl true
   @spec authenticate(Plug.Conn.t(), keyword()) ::
-          {:ok, Plug.Conn.t(), Marshall.Accounts.User.t()} | {:error, String.t()}
+          {:ok, Plug.Conn.t(), Marshall.Authorization.SystemActor.t()} | {:error, String.t()}
   def authenticate(conn, _opts) do
     with true <- Marshall.Scim.enabled?(),
          {:ok, token} <- bearer_token(conn),
@@ -13,7 +13,7 @@ defmodule Marshall.Scim.Auth do
          {:ok, config} <- configuration(),
          true <- is_binary(config.token_digest),
          true <- Plug.Crypto.secure_compare(digest(token), config.token_digest) do
-      {:ok, conn, service_owner()}
+      {:ok, conn, Marshall.Authorization.SystemActor.service(:scim)}
     else
       _ -> {:error, "invalid or unavailable SCIM credentials"}
     end
@@ -39,6 +39,4 @@ defmodule Marshall.Scim.Auth do
       _ -> {:error, :disabled}
     end
   end
-
-  defp service_owner, do: Marshall.Teams.ServiceOwner.get()
 end

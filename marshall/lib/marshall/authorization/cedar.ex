@@ -2,43 +2,37 @@ defmodule Marshall.Authorization.Cedar do
   @moduledoc "Cedar policy compilation at startup and fail-closed request evaluation."
   use GenServer
 
-  alias ExCedar.{
-    Authorizer,
-    Decision,
-    Entities,
-    Entity,
-    EntityUid,
-    PolicySet,
-    Request,
-    Schema,
-    Validator
-  }
-
   alias Marshall.Accounts.User
-  alias Marshall.Authorization.SystemActor
-  require Ash.Query
+  alias Marshall.Authorization.{DecisionSnapshot, Entity, Native, Principal, SystemActor}
   require Marshall.Events
 
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts, name: __MODULE__)
 
   # @cc [owner:ghuntley,label:security] cedar-startup-validation
-  # Startup MUST require policy/schema compilation and successful Cedar schema
-  # validation before publishing authorization state; invalid policy files MUST
-  # prevent this server from starting.
+  # Startup MUST require policy/schema compilation and strict Cedar validation
+  # with no errors or warnings before publishing authorization state; invalid
+  # policy files MUST prevent this server from starting.
   @impl true
   def init(_opts) do
     directory = Application.app_dir(:marshall, "priv/cedar")
 
-    with {:ok, schema} <- Schema.compile(File.read!(Path.join(directory, "schema.cedarschema"))),
-         {:ok, policies} <- PolicySet.compile(File.read!(Path.join(directory, "compute.cedar"))),
-         {:ok, %{validated?: true, errors: []}} <- Validator.validate(policies, schema) do
-      :persistent_term.put(__MODULE__, {policies, schema})
-      {:ok, nil}
-    else
-      _ -> {:stop, :invalid_cedar_policies}
+    case Native.compile(
+           File.read!(Path.join(directory, "compute.cedar")),
+           File.read!(Path.join(directory, "schema.cedarschema"))
+         ) do
+      {:ok, engine} ->
+        :persistent_term.put(__MODULE__, engine)
+        {:ok, nil}
+
+      {:error, _findings} ->
+        {:stop, :invalid_cedar_policies}
     end
   end
+
+  @doc "The compiled engine; nil before startup validation succeeds."
+  @spec engine() :: reference() | nil
+  def engine, do: :persistent_term.get(__MODULE__, nil)
 
   # @cc [owner:ghuntley,label:security] cedar-error-free-allow-only
   # Authorization MUST return true only for a recognized typed principal and an
@@ -46,29 +40,61 @@ defmodule Marshall.Authorization.Cedar do
   # incomplete entities, invalid principals and error-bearing decisions MUST deny.
   @spec allowed?(term(), String.t(), Entity.t()) :: boolean()
   def allowed?(actor, action, %Entity{} = resource) do
-    with %EntityUid{} = principal <- principal(actor),
-         {policies, schema} <- :persistent_term.get(__MODULE__, nil),
-         {:ok, principal_entity} <- principal_entity(actor, principal),
-         {:ok, entities} <- Entities.from_list([principal_entity, resource]) do
-      case Authorizer.authorize(
-             policies,
-             entities,
-             %Request{
-               principal: principal,
-               action: uid("Action", action),
-               resource: resource.uid,
-               context: %{}
-             },
-             schema: schema
-           ) do
-        {:ok, %Decision{decision: :allow, errors: []}} -> true
-        {:ok, %Decision{errors: []}} -> false
-        {:ok, %Decision{}} -> evaluation_error(:decision_errors)
-        {:error, _} -> evaluation_error(:evaluation_failed)
-      end
+    with engine when not is_nil(engine) <- engine(),
+         {:ok, principal} <- principal_entity(actor) do
+      decide(fn ->
+        Native.authorize(
+          engine,
+          Entity.terms([principal, resource]),
+          Entity.reference(principal),
+          action,
+          Entity.reference(resource)
+        )
+      end)
     else
       _ -> false
     end
+  end
+
+  @doc "One decision per resource for the same actor and action, in one engine call."
+  @spec allowed_many?(term(), String.t(), [Entity.t()]) :: [boolean()]
+  def allowed_many?(_actor, _action, []), do: []
+
+  def allowed_many?(actor, action, resources) do
+    deny = Enum.map(resources, fn _ -> false end)
+
+    with engine when not is_nil(engine) <- engine(),
+         {:ok, principal} <- principal_entity(actor) do
+      case decide(fn ->
+             Native.authorize_many(
+               engine,
+               Entity.terms([principal | resources]),
+               Entity.reference(principal),
+               action,
+               Enum.map(resources, &Entity.reference/1)
+             )
+           end) do
+        decisions when is_list(decisions) -> decisions
+        _ -> deny
+      end
+    else
+      _ -> deny
+    end
+  end
+
+  @doc "The actor's current Cedar principal, loaded once per decision scope."
+  @spec principal(term()) ::
+          {:ok, %{type: String.t(), id: String.t(), attributes: map()}} | {:error, atom()}
+  def principal(actor) do
+    with {:ok, %Entity{} = entity} <- principal_entity(actor),
+         do: {:ok, %{type: entity.type, id: entity.id, attributes: entity.attributes}}
+  end
+
+  defp decide(evaluate) do
+    evaluate.()
+  rescue
+    ErlangError -> evaluation_error(:evaluation_failed)
+    ArgumentError -> evaluation_error(:decision_errors)
   end
 
   defp evaluation_error(reason) do
@@ -77,126 +103,48 @@ defmodule Marshall.Authorization.Cedar do
   end
 
   @spec entity(String.t(), String.t(), map()) :: Entity.t()
-  def entity(type, id, attributes \\ %{}), do: %Entity{uid: uid(type, id), attributes: attributes}
-
-  @spec vm(String.t(), String.t(), map()) :: Entity.t()
-  def vm(id, owner_id, grants \\ %{}) do
-    entity("VM", id, %{
-      "owner" => uid("User", owner_id),
-      "web_users" => Enum.map(Map.get(grants, :web, []), &uid("User", &1)),
-      "viewers" => Enum.map(Map.get(grants, :viewer, []), &uid("User", &1)),
-      "operators" => Enum.map(Map.get(grants, :operator, []), &uid("User", &1)),
-      "managers" => Enum.map(Map.get(grants, :manager, []), &uid("User", &1)),
-      "team_admins" => Enum.map(Map.get(grants, :team_admins, []), &uid("User", &1)),
-      "team_members" => Enum.map(Map.get(grants, :team_members, []), &uid("User", &1))
-    })
-  end
-
-  @spec thread(String.t(), String.t(), map()) :: Entity.t()
-  def thread(id, creator_id, grants \\ %{}) do
-    entity("Thread", id, %{
-      "owner" => uid("User", creator_id),
-      "viewers" => Enum.map(Map.get(grants, :viewer, []), &uid("User", &1)),
-      "operators" => Enum.map(Map.get(grants, :operator, []), &uid("User", &1)),
-      "managers" => Enum.map(Map.get(grants, :manager, []), &uid("User", &1)),
-      "team_admins" => Enum.map(Map.get(grants, :team_admins, []), &uid("User", &1)),
-      "team_members" => Enum.map(Map.get(grants, :team_members, []), &uid("User", &1))
-    })
-  end
-
-  @doc "An artifact entity; role sets hold only the evaluated principal when it holds the role."
-  @spec artifact(String.t(), String.t(), map(), boolean()) :: Entity.t()
-  def artifact(id, owner_id, grants, active?) when is_boolean(active?) do
-    entity("Artifact", id, %{
-      "owner" => uid("User", owner_id),
-      "owners" => Enum.map(Map.get(grants, :owner, []), &uid("User", &1)),
-      "writers" => Enum.map(Map.get(grants, :writer, []), &uid("User", &1)),
-      "viewers" => Enum.map(Map.get(grants, :viewer, []), &uid("User", &1)),
-      "active" => active?
-    })
-  end
-
-  # @cc [owner:ghuntley,label:security] cedar-team-fresh-membership
-  # Team entities MUST be constructed from current unarchived memberships on
-  # every decision; owners are a single user and admins include the owner so
-  # ownership changes take effect on the next evaluation.
-  @spec team(Marshall.Teams.Team.t()) :: Entity.t()
-  def team(team) do
-    roles = Marshall.Teams.Coordinator.roles(team.id)
-
-    entity("Team", team.id, %{
-      "owner" => uid("User", roles.owner || ""),
-      "admins" => Enum.map(roles.admins, &uid("User", &1)),
-      "members" => Enum.map(roles.members, &uid("User", &1))
-    })
-  end
-
-  # @cc [owner:ghuntley,label:security] cedar-integration-fresh-managers
-  # Integration entities MUST derive managers from the owning team's current
-  # owner and admins, or from the user owner alone. Stored secrets never
-  # influence authorization.
-  @spec integration(Marshall.Galileo.Integration.t()) :: Entity.t()
-  def integration(integration) do
-    managers =
-      if is_binary(integration.team_id) do
-        Marshall.Teams.Coordinator.roles(integration.team_id).admins
-      else
-        []
-      end
-
-    entity("Integration", integration.id, %{
-      "owner" => uid("User", integration.owner_id || ""),
-      "managers" => Enum.map(managers, &uid("User", &1))
-    })
-  end
-
-  defp principal(%User{id: id}) when is_binary(id), do: uid("User", id)
-  defp principal(%SystemActor{purpose: :compute}), do: uid("System", "compute")
-  defp principal(_), do: nil
+  def entity(type, id, attributes \\ %{}), do: Entity.new(type, id, attributes)
 
   # @cc [owner:ghuntley,label:security] cedar-current-administrator
   # User administrator authority MUST come from the persisted account on each
   # decision, never the caller's struct, session claims or a permission cache.
   # Within one DecisionSnapshot batch the persisted principal MAY be read once
   # and reused, because every read in that snapshot returns the same rows; it
-  # MUST NOT outlive the batch. Missing users MUST deny; the system principal
-  # remains a separate entity type.
-  defp principal_entity(%User{id: id} = actor, principal) do
-    Marshall.Authorization.DecisionSnapshot.fetch(
-      {:cedar_principal, id, Marshall.Accounts.Security.jti(actor)},
-      fn -> persisted_principal(actor, principal) end
-    )
-  end
+  # MUST NOT outlive the batch. Missing users and a presented login that is no
+  # longer stored MUST deny; the system principal remains a separate entity type.
+  defp principal_entity(%User{id: id} = actor) when is_binary(id) do
+    jti = Marshall.Accounts.Security.jti(actor)
 
-  defp principal_entity(%SystemActor{}, principal), do: {:ok, %Entity{uid: principal}}
-
-  defp persisted_principal(%User{id: id} = actor, principal) do
-    query =
-      User
-      |> Ash.Query.for_read(:internal_lookup, %{}, actor: SystemActor.compute())
-      |> Ash.Query.filter(id == ^id)
-
-    case Ash.read_one(query) do
-      {:ok, %User{administrator: administrator, deleted_at: nil}} ->
-        login_jti = Marshall.Accounts.Security.jti(actor)
-
-        if is_nil(login_jti) or match?({:ok, _}, Marshall.Accounts.Login.present(login_jti, id)) do
-          {:ok,
-           %Entity{
-             uid: principal,
-             attributes: %{
-               "administrator" => administrator,
-               "elevated" => Marshall.Accounts.Security.recent?(actor)
-             }
-           }}
-        else
+    DecisionSnapshot.fetch({:cedar_principal, id, jti}, fn ->
+      case Principal.load(id, jti) do
+        %Principal{login: :absent} ->
           {:error, :unauthorized}
-        end
 
-      _ ->
-        {:error, :unknown_principal}
-    end
+        %Principal{} = principal ->
+          {:ok,
+           entity("User", id, %{
+             "administrator" => principal.administrator,
+             "elevated" => principal.elevated,
+             "active" => principal.active
+           })}
+
+        nil ->
+          {:error, :unknown_principal}
+      end
+    end)
   end
 
-  defp uid(type, id), do: EntityUid.new("Marshall::" <> type, id)
+  defp principal_entity(%SystemActor{purpose: :compute}), do: {:ok, entity("System", "compute")}
+
+  defp principal_entity(%SystemActor{purpose: :ash_authentication}),
+    do: {:ok, entity("Service", "ash_authentication", %{"enabled" => true})}
+
+  # SCIM's enablement is read per decision scope like any principal attribute.
+  defp principal_entity(%SystemActor{purpose: :scim}) do
+    DecisionSnapshot.fetch(:cedar_scim_principal, fn ->
+      {:ok, entity("Service", "scim", %{"enabled" => Marshall.Scim.enabled?()})}
+    end)
+  end
+
+  defp principal_entity(_), do: {:error, :unknown_principal}
 end

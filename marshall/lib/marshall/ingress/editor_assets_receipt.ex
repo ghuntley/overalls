@@ -23,6 +23,18 @@ defmodule Marshall.Ingress.EditorAssetsReceipt do
     end
   end
 
+  # @cc [owner:ghuntley,label:security;protocol] editor-assets-attested-readiness
+  # Only a freshly authenticated gateway may record assets readiness after local
+  # descriptor/listener verification. The receipt MUST bind its current service
+  # generation, host session and complete approved descriptor, so distinct
+  # configured targets can attest independently without replacing one another.
+  # Five-second readiness MUST expire without fresh authenticated announcements;
+  # refresh MUST retain every binding and alter only the expiry.
+  # Readiness MUST NOT authorize guest traffic or imply a browser probe passed.
+  cedar do
+    internal [:read, :report, :record, :refresh, :purge]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -32,16 +44,9 @@ defmodule Marshall.Ingress.EditorAssetsReceipt do
     store_action_name? true
     ignore_actions [:refresh, :purge]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
-  # @cc [owner:ghuntley,label:security;protocol] editor-assets-attested-readiness
-  # Only a freshly authenticated gateway may record assets readiness after local
-  # descriptor/listener verification. The receipt MUST bind its current service
-  # generation, host session and complete approved descriptor, so distinct
-  # configured targets can attest independently without replacing one another.
-  # Five-second readiness MUST expire without fresh authenticated announcements;
-  # refresh MUST retain every binding and alter only the expiry.
-  # Readiness MUST NOT authorize guest traffic or imply a browser probe passed.
   actions do
     defaults [:read]
 

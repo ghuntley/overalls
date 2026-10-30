@@ -13,6 +13,10 @@ defmodule Marshall.Compute.HostDrain do
     identity_wheres_to_sql one_open_drain: "closed_at IS NULL"
   end
 
+  cedar do
+    internal [:read, :request, :advance, :confirm, :resume, :retire]
+  end
+
   oban do
     triggers do
       trigger :advance do
@@ -37,6 +41,7 @@ defmodule Marshall.Compute.HostDrain do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   state_machine do

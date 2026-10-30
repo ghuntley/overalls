@@ -28,6 +28,11 @@ defmodule Marshall.Ingress.Endpoint do
     end
   end
 
+  cedar do
+    control_plane "provision", [:get_for_user, :get_for_ssh, :configure]
+    internal [:read, :record, :change_policy]
+  end
+
   paper_trail do
     metadata :actor_kind, :atom, allow_nil?: true
     metadata :actor_id, :uuid, allow_nil?: true
@@ -36,6 +41,7 @@ defmodule Marshall.Ingress.Endpoint do
     store_action_name? true
     ignore_attributes [:inserted_at, :updated_at]
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   actions do

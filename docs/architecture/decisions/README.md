@@ -1,5 +1,10 @@
 # Architecture decision records
 
+[ADR-0268](0268-cedar-single-authorization-source.md) makes Cedar Marshall's single
+authorization source: one Marshall-owned authorizer with per-resource Cedar
+mappings, record decisions and list filters translated from Cedar residuals into
+SQL, and no Ash.Policy, bypasses or dual paths (partial: Galileo machine eligibility remains).
+
 [ADR-0267](0267-single-dependency-pin-registry.md) pins every third-party
 input in `flake.lock`, `dependency-hashes.json` or a reviewed ecosystem lock
 file, enforced by the `pins` check.
@@ -1112,6 +1117,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0265](0265-rust-code-quality.md) | accepted | implemented | Rust code quality: module layout, lint policy and Hegel properties |
 | [ADR-0266](0266-anonymous-restored-guest-memory.md) | accepted | partial | Restored guest memory is anonymous |
 | [ADR-0267](0267-single-dependency-pin-registry.md) | accepted | partial | Single dependency pin registry |
+| [ADR-0268](0268-cedar-single-authorization-source.md) | accepted | partial | Cedar is Marshall's single authorization source |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

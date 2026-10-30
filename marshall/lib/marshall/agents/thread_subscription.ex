@@ -30,6 +30,10 @@ defmodule Marshall.Agents.ThreadSubscription do
     end
   end
 
+  cedar do
+    internal [:read, :subscribe, :activate, :deactivate, :revoke]
+  end
+
   # @cc [owner:ghuntley,label:durability;security] thread-subscription-transitions
   # Activate and deactivate MUST be idempotent state transitions retaining identity.
   # Revocation records lost read authority; only a fresh, authorized subscribe

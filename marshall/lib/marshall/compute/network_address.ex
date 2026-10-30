@@ -23,6 +23,10 @@ defmodule Marshall.Compute.NetworkAddress do
     end
   end
 
+  cedar do
+    internal [:read, :history, :reserve, :release]
+  end
+
   archive do
     exclude_read_actions([:history])
   end

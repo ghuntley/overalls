@@ -7,7 +7,7 @@ defmodule Marshall.Accounts.User do
     otp_app: :marshall,
     domain: Marshall.Accounts,
     data_layer: AshPostgres.DataLayer,
-    authorizers: [Ash.Policy.Authorizer],
+    authorizers: [Marshall.Authorization.AshAuthorizer],
     extensions: [AshAuthentication, AshScim.User]
 
   authentication do
@@ -41,6 +41,43 @@ defmodule Marshall.Accounts.User do
         cookie_name :"__Host-remember_me"
       end
     end
+  end
+
+  cedar do
+    control_plane "admin_accounts", [
+      :invite_user,
+      :delete_user,
+      :reset_mfa,
+      :set_administrator,
+      :revoke_sessions_for_admin
+    ]
+
+    control_plane "admin_read", [:list_admin_users]
+    control_plane "provision", [:security, :set_time_zone, :set_locale, :save_machine_defaults]
+    record "account_self", "User", [:git_settings, :dismiss_newsletter]
+
+    internal [
+      :internal_lookup,
+      :assign_administrator,
+      :security_state,
+      :scim_retirement_state,
+      :scim_finalize,
+      :store_time_zone,
+      :store_locale,
+      :store_machine_defaults
+    ]
+
+    service :ash_authentication, [
+      :read,
+      :get_by_subject,
+      :get_by_email,
+      :sign_in_with_remember_me,
+      :sign_in_with_magic_link,
+      :request_magic_link,
+      :log_out_everywhere
+    ]
+
+    service :scim, [:read, :scim_read, :scim_create, :scim_update, :scim_destroy]
   end
 
   postgres do
@@ -368,58 +405,6 @@ defmodule Marshall.Accounts.User do
       validate Marshall.Accounts.ScimMagicLinkDisabled
 
       run AshAuthentication.Strategy.MagicLink.Request
-    end
-  end
-
-  policies do
-    bypass AshScim.Checks.AshScimInteraction do
-      authorize_if always()
-    end
-
-    policy action([
-             :assign_administrator,
-             :security_state,
-             :scim_retirement_state,
-             :scim_finalize,
-             :store_time_zone,
-             :store_locale,
-             :store_machine_defaults
-           ]) do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
-    end
-
-    policy action([
-             :invite_user,
-             :delete_user,
-             :reset_mfa,
-             :set_administrator,
-             :revoke_sessions_for_admin
-           ]) do
-      authorize_if Marshall.Accounts.Checks.Administrator
-    end
-
-    policy action(:list_admin_users) do
-      authorize_if Marshall.Accounts.Checks.ControlRoomRead
-    end
-
-    policy action(:git_settings) do
-      authorize_if expr(id == ^actor(:id) and is_nil(deleted_at))
-    end
-
-    policy action(:dismiss_newsletter) do
-      authorize_if expr(id == ^actor(:id) and is_nil(deleted_at))
-    end
-
-    policy action([:security, :set_time_zone, :set_locale, :save_machine_defaults]) do
-      authorize_if actor_present()
-    end
-
-    policy action(:internal_lookup) do
-      authorize_if Marshall.Accounts.Checks.InternalLookup
-    end
-
-    bypass AshAuthentication.Checks.AshAuthenticationInteraction do
-      authorize_if always()
     end
   end
 

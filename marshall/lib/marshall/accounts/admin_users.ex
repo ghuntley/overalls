@@ -3,7 +3,7 @@ defmodule Marshall.Accounts.AdminUsers do
   use Ash.Resource.Actions.Implementation
   alias Marshall.Accounts.{AdminBootstrap, AdminEvent, Security, User}
   alias Marshall.Compute.Ledger
-  alias Marshall.Authorization.{Cedar, SystemActor}
+  alias Marshall.Authorization.SystemActor
   require Ash.Query
   require Marshall.Events
 
@@ -13,10 +13,9 @@ defmodule Marshall.Accounts.AdminUsers do
   # Tokens, authentication metadata and unbounded account reads MUST NOT escape.
   @impl true
   def run(input, _, %{actor: actor}) do
-    if Cedar.allowed?(
+    if Marshall.Authorization.control_plane?(
          actor,
-         if(input.action.name == :list_admin_users, do: "admin_read", else: "admin_accounts"),
-         Cedar.entity("ControlPlane", "marshall")
+         if(input.action.name == :list_admin_users, do: "admin_read", else: "admin_accounts")
        ) do
       case input.action.name do
         :list_admin_users -> list(input.arguments)

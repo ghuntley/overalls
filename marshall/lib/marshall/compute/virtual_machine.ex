@@ -33,6 +33,51 @@ defmodule Marshall.Compute.VirtualMachine do
     end
   end
 
+  cedar do
+    control_plane "admin_read", [:list_for_admin]
+
+    control_plane "provision", [
+      :set_reflection_metadata,
+      :get_for_user,
+      :resolve_for_user,
+      :list_for_user,
+      :pinned_for_user,
+      :catalog,
+      :repository_launch_request,
+      :clone,
+      :list_clones,
+      :get_clone,
+      :retry_clone,
+      :cancel_clone,
+      :resize,
+      :retry_resize,
+      :cancel_resize,
+      :relocate,
+      :cancel_relocation,
+      :retry_relocation,
+      :lifecycle,
+      :provision
+    ]
+
+    internal [
+      :read,
+      :history,
+      :allocate,
+      :handoff,
+      :restore_source,
+      :request_start,
+      :request_pause,
+      :idle_policy,
+      :reflection_metadata,
+      :checkpoint,
+      :request_stop,
+      :request_delete,
+      :apply_resize,
+      :observe,
+      :archive
+    ]
+  end
+
   archive do
     exclude_read_actions([:history])
   end
@@ -53,6 +98,7 @@ defmodule Marshall.Compute.VirtualMachine do
     ]
 
     version_extensions authorizers: [Marshall.Authorization.AshAuthorizer]
+    mixin Marshall.Authorization.VersionMapping
   end
 
   # @cc [owner:ghuntley,label:recovery] vm-deletion-terminal-intent
@@ -77,6 +123,13 @@ defmodule Marshall.Compute.VirtualMachine do
   actions do
     defaults [:read]
     read :history
+
+    action :set_reflection_metadata, :map do
+      argument :vm_id, :uuid, allow_nil?: false
+      argument :labels, {:array, :string}, allow_nil?: false, default: []
+      argument :comment, :string, allow_nil?: false, default: ""
+      run Marshall.Compute.ReflectionMetadata
+    end
 
     action :get_for_user, :map do
       argument :vm_id, :uuid, allow_nil?: false

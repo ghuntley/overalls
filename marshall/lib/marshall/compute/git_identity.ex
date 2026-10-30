@@ -8,7 +8,11 @@ defmodule Marshall.Compute.GitIdentity do
   # browser-supplied identity and later preference changes MUST NOT replace it.
   @spec snapshot!(String.t()) :: map()
   def snapshot!(user_id) do
-    user = Ash.get!(User, user_id, authorize?: false)
+    user =
+      Ash.get!(User, user_id,
+        action: :internal_lookup,
+        actor: Marshall.Authorization.SystemActor.compute()
+      )
 
     case OverallsProtocol.GitIdentity.validate(%{
            name: user.git_username,

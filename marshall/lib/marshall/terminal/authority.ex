@@ -232,7 +232,8 @@ defmodule Marshall.Terminal.Authority do
     with {:ok, vm} <- live_vm(vm.id, actor, "read"),
          {:ok, vm} <- ensure_awake(vm, actor, "read", mode),
          {:ok, host} <- capability(vm),
-         {:ok, registry_sessions} <- Terminal.list_for_vm(vm.id, actor: actor, authorize?: false),
+         {:ok, registry_sessions} <-
+           Terminal.list_for_vm(vm.id, actor: Marshall.Authorization.SystemActor.compute()),
          {:ok, %{type: :listed, sessions: sessions}} <-
            stream_control(host.id, listing_message(vm)) do
       sessions =
@@ -250,7 +251,7 @@ defmodule Marshall.Terminal.Authority do
       registry =
         registry_sessions
         |> Enum.filter(&current_session?(&1, vm))
-        |> Enum.filter(&Marshall.Terminal.Sharing.allowed?(&1, actor))
+        |> Marshall.Terminal.Sharing.usable(actor)
         |> Map.new(&{&1.guest_session_id, &1})
 
       {:ok,
@@ -304,7 +305,9 @@ defmodule Marshall.Terminal.Authority do
   @spec session_for(String.t(), map(), access_mode()) ::
           {:ok, Terminal.Session.t()} | {:error, atom()}
   def session_for(session_id, actor, mode \\ :observe) do
-    case Ash.get(Terminal.Session, session_id, actor: actor, authorize?: false) do
+    case Ash.get(Terminal.Session, session_id,
+           actor: Marshall.Authorization.SystemActor.compute()
+         ) do
       {:ok, %Terminal.Session{} = session} ->
         with {:ok, vm} <- live_vm(session.vm_id, actor, "read"),
              true <- Marshall.Terminal.Sharing.allowed?(session, actor) || {:error, :forbidden},
@@ -496,7 +499,7 @@ defmodule Marshall.Terminal.Authority do
              kind: kind,
              request_id: nil
            },
-           authorize?: false
+           actor: Marshall.Authorization.SystemActor.compute()
          ) do
       {:ok, _event} -> :ok
       {:error, reason} -> {:error, reason}
