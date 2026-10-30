@@ -3,7 +3,7 @@
 [ADR-0265](decisions/0265-rust-code-quality.md) gives every Rust crate one
 canonical lint policy enforced by clippy gates and a drift checker, keeps
 `lib.rs` files as module indexes, and makes Hegel the only Rust property engine.
-Crates adopt it one at a time with their fixes.
+Every crate has adopted it, and the checker refuses any crate that has not.
 
 [ADR-0266](decisions/0266-anonymous-restored-guest-memory.md) makes restored
 guest RAM an anonymous copy of the checkpoint memory file in the patched VMM, so

@@ -289,7 +289,7 @@
           export HOME="$TMPDIR"
           cd "$source"
           find . -type f -not -path './.git/*' \( -name Cargo.toml -o -name '*.rs' \) -print0 > "$TMPDIR/files"
-          xargs -0 elixir scripts/check_rust_lints.exs < "$TMPDIR/files"
+          xargs -0 elixir scripts/check_rust_lints.exs --strict < "$TMPDIR/files"
           touch "$out"
         '';
         terminald = built.terminaldChecks;

@@ -1,5 +1,6 @@
 # Architecture reviews
 
+- [Rust code quality (2026-10-30)](2026-10-30-rust-quality.md): ADR-0265 adoption across every Rust crate with `--strict` drift checking, pure-move `lib.rs` splits (mila-ffi symbols unchanged), proptest replaced by Hegel plus gap properties, and fatal clippy gates; Lyra/terminald unsafe confinement and three protocol/journey defects remain open.
 - [eMudhra distrust backout (2026-10-29)](2026-10-29-emudhra-distrust-backout.md): removal of the temporary fleet blacklist after the `nixos-26.05` distrust, the coordinated nixpkgs/devenv/nix-compact bump, Rust 1.99 lint fixes and the sandbox `openat2` test gap; `fleet-guest-trust` acceptance remains open.
 - [Mila Linux GTK parity (2026-10-30)](2026-10-30-mila-linux-gtk-parity.md): deployment list, terminal surface over `HostPtyTransport` with the additive `mila_session_terminal_read` FFI, SSH-key settings view and navigation-only deep-link/share presentation, plus the `mila-linux-journey` fixture driver; GTK live sign-in and a recorded fixture run remain open.
 - [Mila Apple host app and build targets (2026-10-29)](2026-10-29-mila-apple-host-app.md): `App` host and `mila-build`/`mila-run` for iOS and macOS under ADR-0235, the unreachable WebKit navigation guard, iOS compile and resource-bundle fixes, and the Darwin rust-overlay toolchain.

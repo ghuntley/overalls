@@ -230,7 +230,7 @@ in
       rust-lints = {
         enable = true;
         name = "rust-lints";
-        entry = "${toolchain.elixir}/bin/elixir scripts/check_rust_lints.exs";
+        entry = "${toolchain.elixir}/bin/elixir scripts/check_rust_lints.exs --strict";
         language = "system";
         files = "(Cargo\\.toml|clippy\\.toml|\\.rs|scripts/rust/.*)$";
         pass_filenames = false;

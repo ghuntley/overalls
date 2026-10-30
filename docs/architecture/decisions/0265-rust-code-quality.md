@@ -3,7 +3,7 @@
 - ID: ADR-0265
 - Date: 2026-10-30
 - Status: accepted
-- Implementation: partial
+- Implementation: implemented
 - Components: Lilly, Mila, diagnostics, Lyra, terminald, guest artifacts, verification
 - Supersedes: none
 - Superseded by: none
@@ -153,16 +153,18 @@ decision.
 
 ## Implementation evidence
 
-Partial.
-- **Present:**
-  - the canonical policy files [`scripts/rust/lints.toml`](../../../scripts/rust/lints.toml)
+Implemented. The [2026-10-30 review](../reviews/2026-10-30-rust-quality.md)
+records the verification run and the known gaps.
+- **Policy and guard:**
+  - the canonical files [`scripts/rust/lints.toml`](../../../scripts/rust/lints.toml)
     and [`scripts/rust/clippy.toml`](../../../scripts/rust/clippy.toml)
-  - the checker [`scripts/rust_lints.ex`](../../../scripts/rust_lints.ex) with its
-    Hegel regression properties in
-    [`marshall/test/architecture/rust_lints_test.exs`](../../../marshall/test/architecture/rust_lints_test.exs)
-  - the `rust-lints` hook in [`devenv.nix`](../../../devenv.nix) and the Nix check in
-    [`flake.nix`](../../../flake.nix)
-- **Adopted, with fixes, Hegel properties and Nix fmt and clippy gates:**
+  - the checker [`scripts/rust_lints.ex`](../../../scripts/rust_lints.ex), which judges
+    each source by its nearest enclosing manifest; its Hegel regression properties
+    are in [`marshall/test/architecture/rust_lints_test.exs`](../../../marshall/test/architecture/rust_lints_test.exs)
+  - `--strict` in the `rust-lints` hook in [`devenv.nix`](../../../devenv.nix) and in the
+    Nix check in [`flake.nix`](../../../flake.nix), so every non-vendored crate must carry
+    the canonical block
+- **Adopted, with fixes, Hegel properties and fmt and clippy gates:**
   - diagnostics spool: split into [`schema.rs`](../../../elixir/diagnostics/native/spool/src/schema.rs)
     and [`store.rs`](../../../elixir/diagnostics/native/spool/src/store.rs), with unsafe code
     confined to [`sys.rs`](../../../elixir/diagnostics/native/spool/src/sys.rs); gated in
@@ -189,18 +191,34 @@ Partial.
   - [Lyra](../../../lyra/Cargo.toml), gated in
     [`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix) under the pinned
     1.97.1 toolchain, including FreeBSD and illumos targets
+  - the Mila workspace through `[workspace.lints]` in
+    [`mila/rust/Cargo.toml`](../../../mila/rust/Cargo.toml), with every member opted in.
+    mila-ffi, mila-runtime, mila-session, mila-protocol, mila-transport and mila-model are
+    split; for example, the JNI exports live in
+    [`mila-ffi/src/android/`](../../../mila/rust/mila-ffi/src/android/mod.rs), and the
+    exported symbol set and `include/mila_ffi.h` are unchanged. Properties include
+    [`mila-ffi/tests/abi_properties.rs`](../../../mila/rust/mila-ffi/tests/abi_properties.rs),
+    [`mila-runtime/tests/properties.rs`](../../../mila/rust/mila-runtime/tests/properties.rs)
+    and the fake-endpoint command bounds in
+    [`mila-session/tests/commands.rs`](../../../mila/rust/mila-session/tests/commands.rs).
+    The `mila-builds` Apple, Windows, Linux and Android jobs run clippy for mila-ffi.
+  - the [Mila Linux client](../../../mila/native/linux/Cargo.toml), gated in
+    [`native-linux.nix`](../../../nix/domains/artifacts/mila/native-linux.nix) and the
+    linux-native CI job for both feature sets
 - **proptest is gone.** Spool, the broker and the receiver now use Hegel only.
-- **Remaining:**
-  - the Mila workspace and `mila/native/linux`: Hegel gap properties, the splits, adoption
-    and clippy in the Mila platform CI jobs. These wait for concurrent Mila work to land.
-  - running the checker with `--strict`, once every crate has adopted the policy
-  - confining unsafe code in Lyra and terminald (follow-up)
-  - a clippy gate in the native FreeBSD and illumos terminald derivation (follow-up)
+- **Follow-ups** (not part of this decision's acceptance):
+  - confining unsafe code in Lyra and terminald, so that `unsafe_code = "deny"` can
+    join the canonical block
+  - a clippy gate in the native FreeBSD and illumos terminald derivation
+  - splitting the large non-`lib.rs` files: `mila/native/linux/src/session.rs`,
+    `vscode-web-broker/src/windows.rs` and `lyra/src/agent/managed_skills.rs`
 
 ## Open questions
 
-- Can the Windows broker run cross-target clippy in Nix, or does a Windows CI
-  job need to host the gate?
+- Resolved: the Windows broker runs cross-target clippy in Nix
+  ([`windows.nix`](../../../nix/domains/artifacts/vscode-web-broker/windows.nix)).
+- A single root Cargo workspace (the Buck2 consolidation) would contradict the
+  rejected workspace-inheritance alternative and needs a superseding decision.
 - When should Lyra and terminald unsafe confinement be scheduled, so that
   `unsafe_code = "deny"` can join the canonical block?
 

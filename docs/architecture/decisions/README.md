@@ -1105,7 +1105,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0260](0260-underclass-egress-without-exit-node.md) | accepted | partial | Underclass egress proxy without an exit node |
 | [ADR-0261](0261-thread-feed-turn-notifications-and-subscription-revocation.md) | accepted | partial | Thread feed turn notifications and subscription revocation |
 | [ADR-0264](0264-hermetic-mila-journey-fixture.md) | accepted | partial | Hermetic Mila journey fixture |
-| [ADR-0265](0265-rust-code-quality.md) | accepted | partial | Rust code quality: module layout, lint policy and Hegel properties |
+| [ADR-0265](0265-rust-code-quality.md) | accepted | implemented | Rust code quality: module layout, lint policy and Hegel properties |
 | [ADR-0266](0266-anonymous-restored-guest-memory.md) | accepted | partial | Restored guest memory is anonymous |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
