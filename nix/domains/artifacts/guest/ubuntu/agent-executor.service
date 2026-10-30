@@ -8,7 +8,9 @@ ConditionKernelCommandLine=lilly.ipv4
 Type=simple
 ExecStart=/usr/local/bin/overalls agent-supervisor
 StateDirectory=overalls
-StateDirectoryMode=0700
+# Traverse-only for guest accounts: the public managed gh/git-lfs launcher
+# reads the root-written activation pointer below this root.
+StateDirectoryMode=0711
 RuntimeDirectory=overalls-agent
 RuntimeDirectoryMode=0700
 Restart=always

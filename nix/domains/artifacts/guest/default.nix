@@ -126,8 +126,13 @@ let
         serviceConfig = {
           Type = "simple";
           ExecStart = "${lyraLinux}/bin/overalls agent-supervisor";
+          # @cc [owner:ghuntley,label:security] guest-agent-state-traversal
+          # Ordinary guest accounts MUST be able to traverse, never list or
+          # write, the agent state root so the public managed gh/git-lfs
+          # launcher can read its root-written activation pointer. Private
+          # logs and update state keep their own owner-only directories.
           StateDirectory = "overalls";
-          StateDirectoryMode = "0700";
+          StateDirectoryMode = "0711";
           RuntimeDirectory = "overalls-agent";
           RuntimeDirectoryMode = "0700";
           Restart = "always";
