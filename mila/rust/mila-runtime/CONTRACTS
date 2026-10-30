@@ -1,0 +1,14 @@
+@cc [owner:ghuntley,label:verification] mila-runtime-hegel-properties
+Hegel properties MUST cover `MutationTracker` request and operation mismatch
+refusals that leave the tracker unchanged, status-to-phase mapping, terminal
+absorption and polling without a second request id; `SessionRuntime` command
+bounds, refusal to poll before submission, at most one submission whatever a
+scripted backend returns and polls only of the original id; the `AppLock`
+state machine under generated event histories through Hegel's stateful
+runner; Susan `expires_at` parsing against an independent civil calendar;
+the APNs, FCM and WNS registration lattices; deployment host validation shared
+by snapshots, registrations and pokes; snapshot decoding totality, encoding
+round-trip and newest-wins persistence; push reply and poke bounds; and the
+terminal attach reducer's generation, write-grant and retry rules. Platform
+key custody, real snapshot stores and native lifecycle delivery stay with the
+native clients.
