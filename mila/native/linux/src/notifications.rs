@@ -203,7 +203,7 @@ mod tests {
         restored.load_devices(&bytes).expect("load");
         assert_eq!(restored.devices(), &["desktop-a"]);
         restored.remove_device("desktop-a");
-        assert!(restored.devices().is_empty());
+        assert_eq!(restored.devices(), Vec::<String>::new());
     }
 
     #[test]

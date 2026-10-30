@@ -37,19 +37,18 @@ fn main() -> ExitCode {
             return ExitCode::from(2);
         }
     };
-    let workdir = match create_private_workdir(workdir) {
-        Ok(path) => path,
-        Err(_) => {
-            eprintln!("mila-linux-journey: work directory must be new and private");
-            return ExitCode::from(2);
-        }
+    let Ok(workdir) = create_private_workdir(workdir) else {
+        eprintln!("mila-linux-journey: work directory must be new and private");
+        return ExitCode::from(2);
     };
     let report = run(&descriptor, &workdir);
     let _ = std::fs::remove_dir_all(&workdir);
-    println!(
-        "{}",
-        serde_json::to_string(&report).expect("report serializes")
-    );
+    #[expect(
+        clippy::expect_used,
+        reason = "JourneyReport derives Serialize over integers, booleans and strings only, which serde_json always encodes"
+    )]
+    let encoded = serde_json::to_string(&report).expect("report serializes");
+    println!("{encoded}");
     if report.ok {
         ExitCode::SUCCESS
     } else {

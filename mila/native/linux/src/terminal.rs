@@ -111,6 +111,10 @@ impl TerminalRenderer {
         if self.cursor_column >= self.columns as usize {
             self.newline();
         }
+        #[expect(
+            clippy::expect_used,
+            reason = "`lines` starts with one entry and `newline` pushes before trimming to `rows` >= 1"
+        )]
         let line = self.lines.last_mut().expect("renderer always has one line");
         let byte_offset = line
             .char_indices()
@@ -250,6 +254,15 @@ pub struct AuthenticatedPty<A: SessionAuthority, T: PtyTransport> {
     renderer: TerminalRenderer,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<A: SessionAuthority, T: PtyTransport> std::fmt::Debug for AuthenticatedPty<A, T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AuthenticatedPty")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<A: SessionAuthority, T: PtyTransport> AuthenticatedPty<A, T> {
     pub fn new(authority: A, transport: T, columns: u16, rows: u16) -> Result<Self, RenderError> {
         Ok(Self {
@@ -260,6 +273,10 @@ impl<A: SessionAuthority, T: PtyTransport> AuthenticatedPty<A, T> {
         })
     }
 
+    #[expect(
+        clippy::needless_pass_by_value,
+        reason = "attach consumes the request so a refused attach cannot be retried with it"
+    )]
     pub fn attach(&mut self, request: PtyAttachRequest) -> Result<u64, PtyError> {
         if !self.authority.is_authenticated()
             || request.machine_id.is_empty()
@@ -410,6 +427,15 @@ pub struct PorschePtyBackend<C> {
     session_id: Option<String>,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<C> std::fmt::Debug for PorschePtyBackend<C> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PorschePtyBackend")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<C> PorschePtyBackend<C> {
     pub const fn new(client: C) -> Self {
         Self {
@@ -466,6 +492,15 @@ pub struct HostPtyTransport<B> {
     session_id: Option<String>,
     pending_channel: Option<u64>,
     active: Option<(u64, u64)>,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<B> std::fmt::Debug for HostPtyTransport<B> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("HostPtyTransport")
+            .finish_non_exhaustive()
+    }
 }
 
 impl<B> HostPtyTransport<B> {

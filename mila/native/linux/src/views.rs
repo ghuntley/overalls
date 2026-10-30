@@ -111,6 +111,10 @@ pub(super) fn heading(text: &str) -> Label {
 }
 
 /// Deployment list with Add, Open and confirmed Remove.
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear GTK page construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub(super) fn build_deployments(
     state: &NativeState,
     page: &Box,
@@ -121,7 +125,7 @@ pub(super) fn build_deployments(
     let (confirm_bar, confirm_button) = ConfirmBar::new();
     let list = ListBox::new();
     list.set_selection_mode(gtk::SelectionMode::None);
-    let render: Rc<RefCell<Option<Rc<dyn Fn()>>>> = Rc::new(RefCell::new(None));
+    let render: super::RenderSlot = Rc::new(RefCell::new(None));
 
     let render_impl = {
         let state = state.clone();
@@ -225,7 +229,7 @@ pub(super) fn build_deployments(
                     status.set_label(&strings::text(strings::Message::DeploymentForgotten));
                 }
                 Err(_) => {
-                    status.set_label(&strings::text(strings::Message::DeploymentForgetFailed))
+                    status.set_label(&strings::text(strings::Message::DeploymentForgetFailed));
                 }
             }
             render();
@@ -353,6 +357,10 @@ fn parse_dimensions(columns: &Entry, rows: &Entry) -> Option<(u16, u16)> {
 /// controls. Returns the session-id entry for deep-link pre-fill.
 /// `machine` is the Machines page's machine-id entry; the terminal attaches
 /// to a session of that machine.
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear GTK page construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub(super) fn build_terminal(
     state: &NativeState,
     page: &Box,
@@ -473,7 +481,7 @@ pub(super) fn build_terminal(
                         strings::Message::TerminalRefused
                     } else {
                         terminal_error(error)
-                    }))
+                    }));
                 }
             }
         });
@@ -662,7 +670,7 @@ pub(super) fn build_ssh_keys(state: &NativeState, page: &Box, status: &Label) ->
                 let mut binding = state.session.borrow_mut();
                 let source = binding
                     .session_mut()
-                    .map(|live| live as &mut dyn SshKeySource);
+                    .map(|live| -> &mut dyn SshKeySource { live });
                 state.ssh_keys.borrow_mut().refresh(source);
             }
             render();
@@ -681,7 +689,7 @@ pub(super) fn build_ssh_keys(state: &NativeState, page: &Box, status: &Label) ->
                 let mut binding = state.session.borrow_mut();
                 let source = binding
                     .session_mut()
-                    .map(|live| live as &mut dyn SshKeySource);
+                    .map(|live| -> &mut dyn SshKeySource { live });
                 state.ssh_keys.borrow_mut().revoke(
                     source,
                     &id,
@@ -855,6 +863,10 @@ pub(super) fn thread_target(thread: &Entry) -> Target {
 /// Sign-in page: Sign in, Open approval page, Reconnect and Sign out over the
 /// window's `SignInDriver`, plus the phase message, the approval fingerprint
 /// and the signed-in account. Returns the page renderer.
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear GTK page construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub(super) fn build_sign_in(
     state: &NativeState,
     sign_in_page: &Box,
@@ -897,10 +909,10 @@ pub(super) fn build_sign_in(
             let flow = driver.flow();
             let host = driver
                 .target()
-                .map(|target| target.https_authority())
+                .map(mila_native_linux::signin_driver::SignInTarget::https_authority)
                 .unwrap_or_default();
             let message = match (flow.phase, flow.failure) {
-                (SignInPhase::SignedOut, _) => None,
+                (SignInPhase::SignedOut | SignInPhase::SignedIn, _) => None,
                 (SignInPhase::Connecting, _) => Some(strings::format(
                     strings::Message::SignInConnecting,
                     &[("host", &host)],
@@ -908,7 +920,6 @@ pub(super) fn build_sign_in(
                 (SignInPhase::AwaitingApproval, _) => {
                     Some(strings::text(strings::Message::SignInApprove))
                 }
-                (SignInPhase::SignedIn, _) => None,
                 (SignInPhase::Disconnected, _) => {
                     Some(strings::text(strings::Message::SignInDisconnected))
                 }
@@ -976,7 +987,9 @@ pub(super) fn build_sign_in(
         // generation's HTTPS authority; validate again at the boundary.
         let approval = {
             let driver = approval_state.driver.borrow();
-            let authority = driver.target().map(|target| target.https_authority());
+            let authority = driver
+                .target()
+                .map(mila_native_linux::signin_driver::SignInTarget::https_authority);
             driver.flow().approval.clone().zip(authority)
         };
         if let Some((approval, authority)) = approval {

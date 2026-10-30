@@ -295,7 +295,7 @@ mod tests {
             br#"{"version":1,"status":"failed","result":{}}"#.as_slice(),
             br#"{"version":2,"status":"succeeded","result":{}}"#,
             br#"{"version":1,"status":"succeeded","result":[]}"#,
-            br#"[1]"#,
+            br"[1]",
             b"",
             b"{",
         ] {

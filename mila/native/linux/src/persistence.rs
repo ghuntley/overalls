@@ -108,6 +108,10 @@ impl Settings {
 
 #[derive(Debug)]
 pub(crate) enum PersistenceError {
+    #[expect(
+        dead_code,
+        reason = "the I/O cause is kept for the error's Debug output"
+    )]
     Io(io::Error),
     InvalidData,
     InvalidLocale,

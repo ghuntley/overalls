@@ -257,7 +257,7 @@ mod tests {
         assert_eq!(batch.rejected(), 1);
         let huge = "overalls://mila.example/machines\n".repeat(4_000);
         let refused = share_inbound(&huge);
-        assert!(refused.routes().is_empty());
+        assert_eq!(refused.routes(), []);
         assert_eq!(refused.rejected(), 1);
         let many = (0..100)
             .map(|index| format!("overalls://h{index}.example/machines"))

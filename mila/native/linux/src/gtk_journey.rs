@@ -70,20 +70,16 @@ pub(super) fn main(mut arguments: impl Iterator<Item = std::ffi::OsString>) -> g
             return glib::ExitCode::from(2);
         }
     };
-    let workdir = match create_private_workdir(workdir) {
-        Ok(path) => path,
-        Err(_) => {
-            eprintln!("mila-native-linux: work directory must be new and private");
-            return glib::ExitCode::from(2);
-        }
+    let Ok(workdir) = create_private_workdir(workdir) else {
+        eprintln!("mila-native-linux: work directory must be new and private");
+        return glib::ExitCode::from(2);
     };
-    let code = match prepare_environment(&descriptor, &workdir) {
-        Some(ca_path) => run_window(&descriptor, &workdir, &ca_path),
-        None => {
-            let mut report = JourneyReport::new();
-            report.record("gtk_environment", false, "unwritable");
-            print_report(&report)
-        }
+    let code = if let Some(ca_path) = prepare_environment(&descriptor, &workdir) {
+        run_window(&descriptor, &workdir, &ca_path)
+    } else {
+        let mut report = JourneyReport::new();
+        report.record("gtk_environment", false, "unwritable");
+        print_report(&report)
     };
     let _ = std::fs::remove_dir_all(&workdir);
     code
@@ -199,10 +195,12 @@ fn released(state: &NativeState) -> bool {
 }
 
 fn print_report(report: &JourneyReport) -> glib::ExitCode {
-    println!(
-        "{}",
-        serde_json::to_string(report).expect("report serializes")
-    );
+    #[expect(
+        clippy::expect_used,
+        reason = "JourneyReport derives Serialize over integers, booleans and strings only, which serde_json always encodes"
+    )]
+    let encoded = serde_json::to_string(report).expect("report serializes");
+    println!("{encoded}");
     if report.ok {
         glib::ExitCode::SUCCESS
     } else {
@@ -445,6 +443,10 @@ fn lifecycle(name: &'static str, message: M, desired: &'static str) -> PageStep 
 }
 
 /// Every page step, in the order the fixture admits them.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear table of every fixture page step, in admission order"
+)]
 fn page_steps() -> VecDeque<PageStep> {
     let mut steps = VecDeque::new();
     steps.push_back(step(
@@ -520,8 +522,7 @@ fn page_steps() -> VecDeque<PageStep> {
                     work.revision = endpoint.policy_revision;
                     Check::Pass("loaded")
                 }
-                Some(Ok(_)) => Check::Wait,
-                Some(Err(SessionError::Busy)) => Check::Wait,
+                Some(Ok(_) | Err(SessionError::Busy)) => Check::Wait,
                 _ => Check::Fail("read_refused"),
             }
         },
@@ -723,8 +724,7 @@ fn page_steps() -> VecDeque<PageStep> {
             });
             match listed {
                 Some(Ok(true)) if rows > 1 => Check::Pass("listed"),
-                Some(Ok(_)) => Check::Wait,
-                Some(Err(SessionError::Busy)) => Check::Wait,
+                Some(Ok(_) | Err(SessionError::Busy)) => Check::Wait,
                 _ => Check::Fail("read_refused"),
             }
         },
@@ -923,6 +923,14 @@ impl Script {
     }
 
     /// Advances one stage; `None` ends the journey.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one match arm per journey stage; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+    )]
+    #[expect(
+        clippy::similar_names,
+        reason = "`stage` (journey position) and `state` (window state) are distinct domain terms"
+    )]
     fn step(&mut self, state: &NativeState) -> Option<Stage> {
         let stage = self.stage.take()?;
         match stage {
@@ -1064,7 +1072,7 @@ impl Script {
                     .terminal
                     .borrow()
                     .as_ref()
-                    .and_then(|surface| surface.live_generation())
+                    .and_then(mila_native_linux::terminal_surface::TerminalSurface::live_generation)
                     .is_some();
                 if !clicked || !live {
                     let refusal = state
@@ -1086,9 +1094,10 @@ impl Script {
                     report.record("gtk_terminal", terminal_passed(code), code);
                     return Some(Stage::LoseOnAction);
                 }
-                let Some(marker) = mila_native_linux::adapter::new_request_id()
-                    .map(|id| format!("mila-gtk-journey-{}", &id[8..20]))
-                else {
+                let Some(marker) = mila_native_linux::adapter::new_request_id().and_then(|id| {
+                    id.get(8..20)
+                        .map(|suffix| format!("mila-gtk-journey-{suffix}"))
+                }) else {
                     report.record("gtk_terminal", false, "marker_unavailable");
                     return Some(Stage::LoseOnAction);
                 };
@@ -1230,7 +1239,7 @@ impl Script {
                     // The new session reads the deployment's listing.
                     let seed = self.work.seed();
                     let listed = state
-                        .with_live(|live| live.refresh())
+                        .with_live(LiveSession::refresh)
                         .and_then(Result::ok)
                         .is_some_and(|bytes| {
                             project_snapshot(&bytes)

@@ -423,11 +423,11 @@ fn valid_label(value: &str) -> bool {
         && value
             .as_bytes()
             .first()
-            .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            .is_some_and(u8::is_ascii_alphanumeric)
         && value
             .as_bytes()
             .last()
-            .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            .is_some_and(u8::is_ascii_alphanumeric)
         && value.bytes().all(|byte| {
             byte.is_ascii_alphanumeric() || byte == b'-' || byte == b'_' || byte == b'.'
         })
@@ -444,8 +444,8 @@ fn decode_component(value: &str) -> Option<String> {
             if index + 2 >= raw.len() {
                 return None;
             }
-            let high = (raw[index + 1] as char).to_digit(16)? as u8;
-            let low = (raw[index + 2] as char).to_digit(16)? as u8;
+            let high = u8::try_from((raw[index + 1] as char).to_digit(16)?).ok()?;
+            let low = u8::try_from((raw[index + 2] as char).to_digit(16)?).ok()?;
             bytes.push(high * 16 + low);
             index += 3;
         } else {
@@ -568,7 +568,7 @@ mod tests {
             "overalls://fleet.example/machines",
             "https://fleet.example/machines",
         ];
-        values.extend(std::iter::repeat("overalls://fleet.example/settings").take(65));
+        values.extend(std::iter::repeat_n("overalls://fleet.example/settings", 65));
         let batch = ActivationBatch::parse(values);
         assert_eq!(batch.routes().len(), 2);
         assert_eq!(batch.rejected(), 65);

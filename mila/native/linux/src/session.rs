@@ -5,9 +5,11 @@
 //! authority for an authenticated deployment connection.
 
 use crate::adapter::RuntimeError;
+use mila_ffi::session::TerminalReadEvent;
 use mila_ffi::{MilaFfiStatus, MilaRouteOutput};
 use p256::ecdsa::{signature::Signer, Signature, SigningKey};
 use std::collections::HashSet;
+use std::fmt::Write as _;
 
 const MAX_TRUST_BYTES: usize = 8192;
 const MAX_LISTING_BYTES: usize = 1 << 20;
@@ -30,6 +32,15 @@ pub trait DeviceSigner: Send + Sync {
 pub struct FileDeviceSigner {
     key: SigningKey,
     public_key: String,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for FileDeviceSigner {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FileDeviceSigner")
+            .finish_non_exhaustive()
+    }
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -78,14 +89,19 @@ unsafe extern "C" fn sign_trampoline<S: DeviceSigner>(
     if context == 0 || message.is_null() || signature.is_null() || length == 0 || length > 65_536 {
         return -1;
     }
-    // SAFETY: `mila_session_connect` invokes this callback synchronously and
-    // promises that the context and message remain valid for the call.
-    let signer = &*(context as *const S);
-    let message = std::slice::from_raw_parts(message, length);
+    // SAFETY: `mila_session_connect` invokes this callback synchronously with
+    // the non-zero context it was given, which is a live `&S` borrowed for the
+    // whole connect call.
+    let signer = unsafe { &*(context as *const S) };
+    // SAFETY: the caller promises `message` is non-null (checked above) and
+    // valid for `length` readable bytes for the duration of the callback.
+    let message = unsafe { std::slice::from_raw_parts(message, length) };
     let Ok(value) = signer.sign(message) else {
         return -1;
     };
-    std::slice::from_raw_parts_mut(signature, 64).copy_from_slice(&value);
+    // SAFETY: the caller promises `signature` is non-null (checked above) and
+    // points to a writable 64-byte buffer that does not alias `message`.
+    unsafe { std::slice::from_raw_parts_mut(signature, 64) }.copy_from_slice(&value);
     0
 }
 
@@ -137,9 +153,8 @@ impl From<mila_ffi::session::SessionStatus> for SessionError {
             S::Invalid => Self::InvalidInput,
             S::InvalidHandle => Self::StaleHandle,
             S::Busy => Self::Busy,
-            S::NotLoaded => Self::Unavailable,
+            S::NotLoaded | S::Ok | S::SmallBuffer => Self::Unavailable,
             S::Transport | S::Internal => Self::Transport,
-            S::Ok | S::SmallBuffer => Self::Unavailable,
         }
     }
 }
@@ -150,6 +165,15 @@ pub struct LiveSession {
     terminal: Option<u64>,
     submitted_mutations: HashSet<String>,
     read_buffer: Vec<u8>,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for LiveSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("LiveSession")
+            .finish_non_exhaustive()
+    }
 }
 
 /// One bounded terminal read. Bytes stay inside the host transport; the GTK
@@ -174,6 +198,10 @@ impl LiveSession {
             return Err(SessionError::InvalidInput);
         }
         let mut handle = 0_u64;
+        // SAFETY: every input pointer/length pair borrows a live Rust slice for this
+        // synchronous call and `handle` is a writable local. The callback context
+        // is `signer`, borrowed for the whole call; `mila_session_connect` invokes
+        // `sign_trampoline::<S>` only synchronously and retains neither.
         let status = unsafe {
             mila_ffi::session::mila_session_connect(
                 config.trust_document.as_ptr(),
@@ -185,8 +213,8 @@ impl LiveSession {
                 config.port,
                 config.timeout_ms,
                 Some(sign_trampoline::<S>),
-                signer as *const S as usize,
-                &mut handle,
+                std::ptr::from_ref::<S>(signer) as usize,
+                &raw mut handle,
             )
         };
         if status != mila_ffi::session::SessionStatus::Ok || handle == 0 {
@@ -211,6 +239,9 @@ impl LiveSession {
 
     pub fn listing(&self) -> Result<Vec<u8>, SessionError> {
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_listing(handle, out, capacity, written)
         })
@@ -220,6 +251,9 @@ impl LiveSession {
     /// the response bounded; callers must decode it with `decode_ssh_keys`.
     pub fn ssh_keys(&self) -> Result<Vec<u8>, SessionError> {
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_ssh_keys(handle, out, capacity, written)
         })
@@ -233,6 +267,8 @@ impl LiveSession {
             return Err(SessionError::Busy);
         }
         let handle = self.handle()?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_ssh_key_revoke(
                 handle,
@@ -253,6 +289,9 @@ impl LiveSession {
     /// untrusted JSON or decides whether approval is required.
     pub fn whoami(&self) -> Result<WhoamiOutcome, SessionError> {
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         let bytes = copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_whoami(handle, out, capacity, written)
         })?;
@@ -280,7 +319,7 @@ impl LiveSession {
         if !matches!(action, "start" | "stop" | "pause" | "resume" | "rm")
             || request_id.len() != 40
             || !request_id.starts_with("porsche-")
-            || !request_id[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+            || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
         {
             return Err(SessionError::InvalidInput);
         }
@@ -288,6 +327,8 @@ impl LiveSession {
             return Err(SessionError::Busy);
         }
         let handle = self.handle()?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_machine_action(
                 handle,
@@ -325,6 +366,8 @@ impl LiveSession {
         {
             return Err(SessionError::InvalidInput);
         }
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_machine_create(
                 self.handle()?,
@@ -359,6 +402,8 @@ impl LiveSession {
         {
             return Err(SessionError::InvalidInput);
         }
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_machine_resize(
                 self.handle()?,
@@ -396,12 +441,14 @@ impl LiveSession {
             || (!add && role.is_some())
             || request_id.len() != 40
             || !request_id.starts_with("porsche-")
-            || !request_id[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+            || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
         {
             return Err(SessionError::InvalidInput);
         }
         let handle = self.handle()?;
         let role_bytes = role.map(str::as_bytes).unwrap_or_default();
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_share_mutation(
                 handle,
@@ -443,10 +490,8 @@ impl LiveSession {
         if !ALLOWED_THREAD_COMMANDS.contains(&command) {
             return Err(SessionError::InvalidInput);
         }
-        for value in [thread, secondary] {
-            if let Some(value) = value {
-                validate_session_identifier(value)?;
-            }
+        for value in [thread, secondary].into_iter().flatten() {
+            validate_session_identifier(value)?;
         }
         if let Some(input) = input {
             if input.len() > 64 * 1024 || input.bytes().any(|byte| byte == 0) {
@@ -467,7 +512,7 @@ impl LiveSession {
         if let Some(request_id) = request_id {
             if request_id.len() != 40
                 || !request_id.starts_with("porsche-")
-                || !request_id[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+                || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
             {
                 return Err(SessionError::InvalidInput);
             }
@@ -489,6 +534,9 @@ impl LiveSession {
             input.map_or((empty, 0), |value| (value.as_bytes().as_ptr(), value.len()));
         let (request_ptr, request_len) =
             request_id.map_or((empty, 0), |value| (value.as_bytes().as_ptr(), value.len()));
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_thread_action(
                 handle,
@@ -513,7 +561,7 @@ impl LiveSession {
     fn validate_thread_plan_input(command: &str, input: Option<&str>) -> Result<(), SessionError> {
         match command {
             "thread plan approve" if input.is_some() => Err(SessionError::InvalidInput),
-            "thread plan revise" if input.is_none() || input.is_some_and(str::is_empty) => {
+            "thread plan revise" if input.is_none_or(str::is_empty) => {
                 Err(SessionError::InvalidInput)
             }
             _ => Ok(()),
@@ -544,6 +592,9 @@ impl LiveSession {
     ) -> Result<Vec<u8>, SessionError> {
         validate_session_identifier(machine_id)?;
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             read(
                 handle,
@@ -562,6 +613,9 @@ impl LiveSession {
             return Err(SessionError::InvalidInput);
         }
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_request_show(
                 handle,
@@ -579,6 +633,9 @@ impl LiveSession {
     pub fn web_show(&mut self, machine_id: &str) -> Result<Vec<u8>, SessionError> {
         validate_session_identifier(machine_id)?;
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_web_show(
                 handle,
@@ -605,11 +662,13 @@ impl LiveSession {
             || revision == 0
             || request_id.len() != 40
             || !request_id.starts_with("porsche-")
-            || !request_id[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+            || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
         {
             return Err(SessionError::InvalidInput);
         }
         let handle = self.handle()?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_web_set(
                 handle,
@@ -633,6 +692,9 @@ impl LiveSession {
     /// intentionally host-owned; this method covers list and preference CRUD.
     pub fn device_list(&mut self) -> Result<Vec<u8>, SessionError> {
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_device_ls(handle, out, capacity, written)
         })
@@ -641,6 +703,8 @@ impl LiveSession {
     pub fn device_remove(&mut self, device_id: &str) -> Result<(), SessionError> {
         validate_session_identifier(device_id)?;
         let handle = self.handle()?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_device_rm(
                 handle,
@@ -660,6 +724,8 @@ impl LiveSession {
     ) -> Result<(), SessionError> {
         validate_session_identifier(device_id)?;
         let handle = self.handle()?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_device_prefs(
                 handle,
@@ -725,6 +791,9 @@ impl LiveSession {
         };
         let handle = self.handle()?;
         let mut terminal = 0_u64;
+        // SAFETY: every input pointer/length pair borrows a live Rust slice for this
+        // synchronous call, each out-pointer is a writable local (or owned buffer
+        // of the declared length) that outlives it, and the C ABI retains none.
         let status = unsafe {
             mila_ffi::session::mila_session_terminal_attach_session(
                 handle,
@@ -734,7 +803,7 @@ impl LiveSession {
                 session_id.len(),
                 u32::from(columns),
                 u32::from(rows),
-                &mut terminal,
+                &raw mut terminal,
             )
         };
         if status != mila_ffi::session::SessionStatus::Ok || terminal == 0 {
@@ -748,6 +817,9 @@ impl LiveSession {
     fn terminal_new(&mut self, machine_id: &str) -> Result<String, SessionError> {
         let request_id = crate::adapter::new_request_id().ok_or(SessionError::Unavailable)?;
         let handle = self.handle()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         let bytes = copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_terminal_new(
                 handle,
@@ -775,6 +847,9 @@ impl LiveSession {
     /// Only a short lower-case identifier is returned; anything else is `None`.
     pub fn last_refusal(&self) -> Option<String> {
         let handle = self.handle().ok()?;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         let bytes = copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_last_refusal(handle, out, capacity, written)
         })
@@ -794,12 +869,15 @@ impl LiveSession {
         let terminal = self.terminal.ok_or(SessionError::StaleHandle)?;
         let mut output = vec![0_u8; 65_536];
         let mut written = 0_usize;
+        // SAFETY: every input pointer/length pair borrows a live Rust slice for this
+        // synchronous call, each out-pointer is a writable local (or owned buffer
+        // of the declared length) that outlives it, and the C ABI retains none.
         let status = unsafe {
             mila_ffi::session::mila_session_terminal_poll(
                 terminal,
                 output.as_mut_ptr(),
                 output.len(),
-                &mut written,
+                &raw mut written,
             )
         };
         if status != mila_ffi::session::SessionStatus::Ok || written > output.len() {
@@ -826,21 +904,23 @@ impl LiveSession {
             self.read_buffer = vec![0_u8; capacity];
         }
         let mut written = 0_usize;
-        let mut event = mila_ffi::session::TerminalReadEvent::Idle;
+        let mut event = TerminalReadEvent::Idle;
+        // SAFETY: every input pointer/length pair borrows a live Rust slice for this
+        // synchronous call, each out-pointer is a writable local (or owned buffer
+        // of the declared length) that outlives it, and the C ABI retains none.
         let status = unsafe {
             mila_ffi::session::mila_session_terminal_read_within(
                 terminal,
                 wait_ms,
                 self.read_buffer.as_mut_ptr(),
                 self.read_buffer.len(),
-                &mut written,
-                &mut event,
+                &raw mut written,
+                &raw mut event,
             )
         };
         if status != mila_ffi::session::SessionStatus::Ok || written > capacity {
             return Err(status.into());
         }
-        use mila_ffi::session::TerminalReadEvent;
         match event {
             TerminalReadEvent::Data if written > 0 => {
                 Ok(TerminalChunk::Data(self.read_buffer[..written].to_vec()))
@@ -858,6 +938,8 @@ impl LiveSession {
             return Err(SessionError::InvalidInput);
         }
         let terminal = self.terminal.ok_or(SessionError::StaleHandle)?;
+        // SAFETY: every pointer/length pair borrows a live Rust slice for this
+        // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
             mila_ffi::session::mila_session_terminal_input(terminal, input.as_ptr(), input.len())
         };
@@ -906,6 +988,9 @@ pub struct SessionProbe(u64);
 impl SessionProbe {
     pub fn whoami(&self) -> Result<WhoamiOutcome, SessionError> {
         let handle = self.0;
+        // SAFETY: `copy_output` passes `out` writable for `capacity` bytes and a
+        // writable `written`; every input pointer/length pair borrows a live Rust
+        // slice for this synchronous call, and the C ABI retains none of them.
         let bytes = copy_output(|out, capacity, written| unsafe {
             mila_ffi::session::mila_session_whoami(handle, out, capacity, written)
         })?;
@@ -977,7 +1062,7 @@ fn copy_output(
 ) -> Result<Vec<u8>, SessionError> {
     let mut bytes = vec![0_u8; MAX_LISTING_BYTES];
     let mut size = 0_usize;
-    let status = call(bytes.as_mut_ptr(), bytes.len(), &mut size);
+    let status = call(bytes.as_mut_ptr(), bytes.len(), &raw mut size);
     if status != mila_ffi::session::SessionStatus::Ok || size == 0 || size > bytes.len() {
         return Err(status.into());
     }
@@ -1000,7 +1085,7 @@ fn validate_session_identifier(value: &str) -> Result<(), SessionError> {
 fn valid_request_id(value: &str) -> bool {
     value.len() == 40
         && value.starts_with("porsche-")
-        && value[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+        && value.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
 }
 
 /// @cc [owner:ghuntley,label:security;terminal] linux-session-pty-backend
@@ -1015,6 +1100,15 @@ pub struct SessionPtyBackend {
     binding: std::rc::Rc<std::cell::RefCell<SessionBinding>>,
     decoder: crate::terminal_text::PtyTextDecoder,
     wait_ms: u32,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for SessionPtyBackend {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SessionPtyBackend")
+            .finish_non_exhaustive()
+    }
 }
 
 impl SessionPtyBackend {
@@ -1111,6 +1205,15 @@ pub struct SessionBinding {
     session: Option<LiveSession>,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for SessionBinding {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SessionBinding")
+            .finish_non_exhaustive()
+    }
+}
+
 impl SessionBinding {
     pub fn bind(&mut self, session: LiveSession) {
         self.clear();
@@ -1153,10 +1256,10 @@ impl XdgTrustStore {
                 std::env::var_os("HOME").map(|home| std::path::PathBuf::from(home).join(".config"))
             })
             .ok_or(RuntimeError::Unavailable)?;
-        let key = host
-            .bytes()
-            .map(|byte| format!("{byte:02x}"))
-            .collect::<String>();
+        let mut key = String::with_capacity(host.len() * 2);
+        for byte in host.bytes() {
+            write!(key, "{byte:02x}").map_err(|_| RuntimeError::Unavailable)?;
+        }
         Ok(root.join("mila").join("trust").join(key))
     }
 }
@@ -1326,6 +1429,15 @@ pub struct TrustEnrollment<S, F> {
     pub fetcher: F,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<S, F> std::fmt::Debug for TrustEnrollment<S, F> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TrustEnrollment")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<S: TrustStore, F: TrustFetcher> TrustEnrollment<S, F> {
     /// @cc [owner:ghuntley,label:security] linux-trust-enrollment-order
     /// Enrollment MUST reconcile fetched and pinned documents in Rust and persist
@@ -1343,6 +1455,9 @@ impl<S: TrustStore, F: TrustFetcher> TrustEnrollment<S, F> {
         let mut output = vec![0_u8; MAX_TRUST_BYTES];
         let mut written = 0_usize;
         let origin = std::ffi::CString::new(host).map_err(|_| RuntimeError::InvalidInput)?;
+        // SAFETY: the optional documents are live Rust slices or null with length
+        // zero, `origin` is NUL-terminated, and `output`/`written` are writable
+        // locals of the declared capacity that outlive this synchronous call.
         let status = unsafe {
             mila_ffi::mila_trust_document_reconcile(
                 pinned.as_deref().map_or(std::ptr::null(), <[u8]>::as_ptr),
@@ -1354,7 +1469,7 @@ impl<S: TrustStore, F: TrustFetcher> TrustEnrollment<S, F> {
                 MilaRouteOutput {
                     bytes: output.as_mut_ptr(),
                     capacity: output.len(),
-                    written: &mut written,
+                    written: &raw mut written,
                 },
             )
         };
@@ -1375,6 +1490,15 @@ impl<S: TrustStore, F: TrustFetcher> TrustEnrollment<S, F> {
 pub struct SignInCoordinator<S, T, F> {
     signer: S,
     enrollment: TrustEnrollment<T, F>,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<S, T, F> std::fmt::Debug for SignInCoordinator<S, T, F> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SignInCoordinator")
+            .finish_non_exhaustive()
+    }
 }
 
 impl<S: DeviceSigner, T: TrustStore, F: TrustFetcher> SignInCoordinator<S, T, F> {
@@ -1471,7 +1595,9 @@ impl ApprovalInfo {
     pub fn validate(url: &str, fingerprint: &str, issued_at: u64) -> Result<Self, RuntimeError> {
         let valid_url = url.len() <= 2048
             && approval_authority(url).is_some()
-            && !url[8..].contains(['@', '#', ' ', '\t', '\n', '\r']);
+            && url
+                .get(8..)
+                .is_some_and(|rest| !rest.contains(['@', '#', ' ', '\t', '\n', '\r']));
         if !valid_url
             || fingerprint.is_empty()
             || fingerprint.len() > 256
@@ -1580,6 +1706,7 @@ pub enum SignInEvent {
 }
 
 impl SignInFlow {
+    #[must_use]
     pub fn apply(mut self, event: SignInEvent) -> Self {
         match event {
             SignInEvent::Start
@@ -1592,7 +1719,7 @@ impl SignInFlow {
             }
             SignInEvent::Connected(g) if g == self.generation => {}
             SignInEvent::HostRejected(g) if g == self.generation => {
-                self.fail(SignInFailure::HostUntrusted)
+                self.fail(SignInFailure::HostUntrusted);
             }
             SignInEvent::Unreachable(g)
                 if g == self.generation
@@ -1601,12 +1728,12 @@ impl SignInFlow {
                         SignInPhase::Connecting | SignInPhase::AwaitingApproval
                     ) =>
             {
-                self.fail(SignInFailure::Unreachable)
+                self.fail(SignInFailure::Unreachable);
             }
             SignInEvent::DeviceKeyUnavailable(g)
                 if g == self.generation && self.phase == SignInPhase::Connecting =>
             {
-                self.fail(SignInFailure::DeviceKey)
+                self.fail(SignInFailure::DeviceKey);
             }
             SignInEvent::Disconnected(g) if g == self.generation => match self.phase {
                 SignInPhase::AwaitingApproval | SignInPhase::Connecting => {
@@ -1680,14 +1807,15 @@ mod tests {
     fn output_is_copied_with_exactly_one_ffi_call() {
         use mila_ffi::session::SessionStatus;
         let mut calls = 0;
-        let bytes = super::copy_output(|out, capacity, written| {
+        let bytes = copy_output(|out, capacity, written| {
             calls += 1;
             let data = b"{\"ok\":true}";
             assert!(capacity >= data.len());
-            unsafe {
-                std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len());
-                *written = data.len();
-            }
+            // SAFETY: `copy_output` passes `out` writable for `capacity` bytes,
+            // checked above to hold `data`, which is a distinct static buffer.
+            unsafe { std::ptr::copy_nonoverlapping(data.as_ptr(), out, data.len()) };
+            // SAFETY: `copy_output` passes a writable `written` local.
+            unsafe { *written = data.len() };
             SessionStatus::Ok
         })
         .unwrap();
@@ -1695,8 +1823,9 @@ mod tests {
         assert_eq!(bytes, b"{\"ok\":true}");
         // A response over the bound fails without a second (re-executing) call.
         let mut calls = 0;
-        let refused = super::copy_output(|_, capacity, written| {
+        let refused = copy_output(|_, capacity, written| {
             calls += 1;
+            // SAFETY: `copy_output` passes a writable `written` local.
             unsafe { *written = capacity + 1 };
             SessionStatus::SmallBuffer
         });
@@ -1775,7 +1904,7 @@ mod tests {
     }
 
     impl DeviceSigner for CountingSigner {
-        fn public_key(&self) -> &str {
+        fn public_key(&self) -> &'static str {
             "ssh-test-public-key"
         }
 
@@ -1807,15 +1936,18 @@ mod tests {
         .expect("trust document")
     }
 
-    fn coordinator(
-        pinned: Option<Vec<u8>>,
-        response: Result<Vec<u8>, RuntimeError>,
-    ) -> (
+    /// The coordinator under test plus its read, write and signer counters.
+    type CoordinatorHarness = (
         SignInCoordinator<CountingSigner, MemoryStore, StaticFetcher>,
         Rc<RefCell<usize>>,
         Rc<RefCell<Vec<Vec<u8>>>>,
         Arc<AtomicUsize>,
-    ) {
+    );
+
+    fn coordinator(
+        pinned: Option<Vec<u8>>,
+        response: Result<Vec<u8>, RuntimeError>,
+    ) -> CoordinatorHarness {
         let reads = Rc::new(RefCell::new(0));
         let writes = Rc::new(RefCell::new(Vec::new()));
         let calls = Rc::new(RefCell::new(0));

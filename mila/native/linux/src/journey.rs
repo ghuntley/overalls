@@ -147,10 +147,9 @@ impl JourneyDescriptor {
         {
             return Err(DescriptorError::InvalidField("tls.ca_pem"));
         }
-        if DeploymentHost::parse(&descriptor.tls.server_name)
-            .map(|name| name.as_str() != descriptor.tls.server_name || name.as_str().contains(':'))
-            .unwrap_or(true)
-        {
+        if DeploymentHost::parse(&descriptor.tls.server_name).map_or(true, |name| {
+            name.as_str() != descriptor.tls.server_name || name.as_str().contains(':')
+        }) {
             return Err(DescriptorError::InvalidField("tls.server_name"));
         }
         if !valid_approver_url(&descriptor.approver.url) {
@@ -293,16 +292,15 @@ impl Default for JourneyReport {
 /// random directory under the system temporary directory.
 pub fn create_private_workdir(requested: Option<PathBuf>) -> std::io::Result<PathBuf> {
     use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-    let path = match requested {
-        Some(path) => path,
-        None => {
-            let mut suffix = [0_u8; 8];
-            std::io::Read::read_exact(&mut std::fs::File::open("/dev/urandom")?, &mut suffix)?;
-            std::env::temp_dir().join(format!(
-                "mila-linux-journey-{:016x}",
-                u64::from_le_bytes(suffix)
-            ))
-        }
+    let path = if let Some(path) = requested {
+        path
+    } else {
+        let mut suffix = [0_u8; 8];
+        std::io::Read::read_exact(&mut std::fs::File::open("/dev/urandom")?, &mut suffix)?;
+        std::env::temp_dir().join(format!(
+            "mila-linux-journey-{:016x}",
+            u64::from_le_bytes(suffix)
+        ))
     };
     std::fs::DirBuilder::new().mode(0o700).create(&path)?;
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o700))?;
@@ -338,6 +336,15 @@ pub fn fixture_connection_profile(descriptor: &JourneyDescriptor, ca_path: &Path
 /// In-memory trust pin for one journey run.
 #[derive(Default)]
 pub struct MemoryTrustStore(RefCell<Option<Vec<u8>>>);
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for MemoryTrustStore {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("MemoryTrustStore")
+            .finish_non_exhaustive()
+    }
+}
 
 impl TrustStore for MemoryTrustStore {
     fn read(&self, _: &str) -> Result<Option<Vec<u8>>, RuntimeError> {
@@ -449,6 +456,15 @@ pub struct FixtureHook {
     ca_path: PathBuf,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for FixtureHook {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FixtureHook")
+            .finish_non_exhaustive()
+    }
+}
+
 impl FixtureHook {
     pub fn new(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) -> Self {
         Self {
@@ -458,7 +474,7 @@ impl FixtureHook {
         }
     }
 
-    fn action(&self, action: &str, body: serde_json::Value) -> Option<serde_json::Value> {
+    fn action(&self, action: &str, body: &serde_json::Value) -> Option<serde_json::Value> {
         let approver = &self.descriptor.approver;
         let url = match approver.fixture_url.as_deref() {
             Some(base) => format!("{}/{action}", base.trim_end_matches('/')),
@@ -467,7 +483,7 @@ impl FixtureHook {
                 approver.url.strip_suffix("/approve")?
             ),
         };
-        let bytes = post_hook(&self.descriptor, &self.workdir, &self.ca_path, &url, &body)?;
+        let bytes = post_hook(&self.descriptor, &self.workdir, &self.ca_path, &url, body)?;
         serde_json::from_slice(&bytes).ok()
     }
 
@@ -488,15 +504,15 @@ impl FixtureHook {
     /// Completes the machine's open operations and observes its requested
     /// state, as the provisioner would.
     pub fn observe(&self, machine: &str) -> bool {
-        self.action("observe", serde_json::json!({ "machine_id": machine }))
+        self.action("observe", &serde_json::json!({ "machine_id": machine }))
             .is_some()
     }
 
     /// Creates a thread for the account and waits until it is ready.
     pub fn create_thread(&self) -> Option<String> {
-        let created = self.action("thread-create", serde_json::json!({}))?;
+        let created = self.action("thread-create", &serde_json::json!({}))?;
         let thread = Self::identifier(&created, "thread_id")?;
-        self.action("thread-ready", serde_json::json!({ "thread_id": thread }))?;
+        self.action("thread-ready", &serde_json::json!({ "thread_id": thread }))?;
         Some(thread)
     }
 
@@ -504,7 +520,7 @@ impl FixtureHook {
     pub fn question(&self, thread: &str) -> Option<String> {
         let asked = self.action(
             "thread-question",
-            serde_json::json!({ "thread_id": thread }),
+            &serde_json::json!({ "thread_id": thread }),
         )?;
         Self::identifier(&asked, "question_id")
     }
@@ -513,7 +529,7 @@ impl FixtureHook {
     pub fn proposal(&self, thread: &str) -> Option<String> {
         let proposed = self.action(
             "thread-proposal",
-            serde_json::json!({ "thread_id": thread }),
+            &serde_json::json!({ "thread_id": thread }),
         )?;
         Self::identifier(&proposed, "plan_id")
     }
@@ -547,6 +563,10 @@ fn connect<S: DeviceSigner>(
 /// material, terminal text or any server response.
 ///
 /// Runs the Linux journey. `workdir` must be an empty owner-only directory.
+#[expect(
+    clippy::too_many_lines,
+    reason = "sequential journey steps sharing one session; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
     let mut report = JourneyReport::new();
     let host = descriptor.deployment.host.clone();
@@ -697,7 +717,7 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         keys.refresh(
             session
                 .session_mut()
-                .map(|live| live as &mut dyn SshKeySource),
+                .map(|live| -> &mut dyn SshKeySource { live }),
         )
     };
     let revoke = |keys: &mut SshKeysView, id: &str| {
@@ -705,7 +725,7 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         keys.revoke(
             session
                 .session_mut()
-                .map(|live| live as &mut dyn SshKeySource),
+                .map(|live| -> &mut dyn SshKeySource { live }),
             id,
             new_request_id,
         )
@@ -749,7 +769,8 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         let _ = second_session.close();
         refresh(&mut keys);
         let target = keys.rows().into_iter().find(|row| {
-            row.fingerprint == *second_fingerprint || row.fingerprint == second_fingerprint[7..]
+            row.fingerprint == *second_fingerprint
+                || second_fingerprint.get(7..) == Some(row.fingerprint.as_str())
         });
         let outcome = target.map(|row| revoke(&mut keys, &row.id));
         let reapproval = connect(descriptor, &trust, second_signer)
@@ -782,6 +803,15 @@ pub struct FixtureApprover {
     ca_path: PathBuf,
     opened: std::cell::Cell<u32>,
     failed: std::cell::Cell<bool>,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for FixtureApprover {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("FixtureApprover")
+            .finish_non_exhaustive()
+    }
 }
 
 impl FixtureApprover {
@@ -1004,6 +1034,10 @@ pub fn remove_journey_machine(hook: &FixtureHook, live: &mut LiveSession, machin
 
 /// Sharing, web, lifecycle and threads against the deployment; every step
 /// asserts its effect through a session read.
+#[expect(
+    clippy::too_many_lines,
+    reason = "sequential page journey steps sharing one session; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 fn run_pages(
     binding: &Rc<RefCell<SessionBinding>>,
     descriptor: &JourneyDescriptor,
@@ -1303,7 +1337,9 @@ fn run_terminal(binding: &Rc<RefCell<SessionBinding>>, machine: Option<&str>) ->
             None => "attach_failed",
         };
     }
-    let Some(marker) = new_request_id().map(|id| format!("mila-journey-{}", &id[8..20])) else {
+    let Some(marker) = new_request_id()
+        .and_then(|id| id.get(8..20).map(|suffix| format!("mila-journey-{suffix}")))
+    else {
         return "marker_unavailable";
     };
     if surface.send(format!("echo {marker}\r").as_bytes()).is_err() {
@@ -1412,12 +1448,11 @@ mod tests {
         ];
         for (pointer, value) in cases {
             let mut candidate = descriptor();
-            match candidate.pointer_mut(pointer) {
-                Some(slot) => *slot = value.clone(),
-                None => {
-                    let (parent, key) = pointer.rsplit_once('/').unwrap();
-                    candidate.pointer_mut(parent).unwrap()[key] = value.clone();
-                }
+            if let Some(slot) = candidate.pointer_mut(pointer) {
+                *slot = value.clone();
+            } else {
+                let (parent, key) = pointer.rsplit_once('/').unwrap();
+                candidate.pointer_mut(parent).unwrap()[key] = value.clone();
             }
             assert!(parse(&candidate).is_err(), "{pointer} = {value}");
         }

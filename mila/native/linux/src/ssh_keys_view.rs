@@ -72,6 +72,10 @@ pub enum RevokeOutcome {
 /// MUST reuse the pending request identifier for that key until the outcome
 /// is known so a retry is never a second submission, and MUST clear rows and
 /// pending requests whenever the session generation changes.
+#[expect(
+    clippy::empty_line_after_doc_comments,
+    reason = "code-contracts requires a blank line between the two @cc notes on this type"
+)]
 #[derive(Default)]
 pub struct SshKeysView {
     projection: SshKeyProjection,
@@ -79,6 +83,15 @@ pub struct SshKeysView {
     status: Option<SshKeysStatus>,
     pending: HashMap<String, String>,
     device_fingerprint: Option<String>,
+}
+
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for SshKeysView {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SshKeysView")
+            .finish_non_exhaustive()
+    }
 }
 
 impl SshKeysView {
@@ -166,15 +179,14 @@ impl SshKeysView {
         if self.device_fingerprint.as_deref() == Some(normalize(&key.fingerprint)) {
             return RevokeOutcome::ThisDevice;
         }
-        let request_id = match self.pending.get(key_id) {
-            Some(existing) => existing.clone(),
-            None => {
-                let Some(created) = new_request_id() else {
-                    return RevokeOutcome::Unavailable;
-                };
-                self.pending.insert(key_id.to_owned(), created.clone());
-                created
-            }
+        let request_id = if let Some(existing) = self.pending.get(key_id) {
+            existing.clone()
+        } else {
+            let Some(created) = new_request_id() else {
+                return RevokeOutcome::Unavailable;
+            };
+            self.pending.insert(key_id.to_owned(), created.clone());
+            created
         };
         let result = source.revoke_key(key_id, &request_id);
         self.refresh(Some(source));
@@ -184,12 +196,17 @@ impl SshKeysView {
                 self.pending.remove(key_id);
                 RevokeOutcome::Revoked
             }
-            Ok(()) | Err(SessionError::Transport | SessionError::Busy) => RevokeOutcome::Uncertain,
+            Ok(())
+            | Err(
+                SessionError::Transport
+                | SessionError::Busy
+                | SessionError::StaleHandle
+                | SessionError::Unavailable,
+            ) => RevokeOutcome::Uncertain,
             Err(SessionError::InvalidInput) => {
                 self.pending.remove(key_id);
                 RevokeOutcome::Refused
             }
-            Err(SessionError::StaleHandle | SessionError::Unavailable) => RevokeOutcome::Uncertain,
         }
     }
 
@@ -301,7 +318,7 @@ mod tests {
             view.revoke(Some(&mut server), "other", || Some(REQUEST_A.into())),
             RevokeOutcome::Unavailable
         );
-        assert!(server.revokes.is_empty());
+        assert_eq!(server.revokes, []);
         assert_eq!(
             view.revoke(Some(&mut server), "k1", || Some(REQUEST_A.into())),
             RevokeOutcome::Revoked
@@ -354,7 +371,7 @@ mod tests {
         );
         assert_eq!(server.revokes[1].1, REQUEST_B);
         view.sign_out();
-        assert!(view.rows().is_empty());
+        assert_eq!(view.rows(), []);
         assert_eq!(view.status(), SshKeysStatus::SignInRequired);
         assert_eq!(
             view.revoke(Some(&mut server), "k1", || Some(REQUEST_A.into())),
@@ -374,7 +391,7 @@ mod tests {
             view.revoke(Some(&mut server), "k1", || Some(REQUEST_A.into())),
             RevokeOutcome::ThisDevice
         );
-        assert!(server.revokes.is_empty());
+        assert_eq!(server.revokes, []);
         assert_eq!(
             view.revoke(Some(&mut server), "k2", || Some(REQUEST_A.into())),
             RevokeOutcome::Revoked
@@ -390,6 +407,6 @@ mod tests {
             view.revoke(None, "k1", || Some(REQUEST_A.into())),
             RevokeOutcome::Unavailable
         );
-        assert!(view.rows().is_empty());
+        assert_eq!(view.rows(), []);
     }
 }

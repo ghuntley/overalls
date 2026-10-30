@@ -7,6 +7,10 @@
 use mila_session::MachineListing;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "independent pin and permission flags mirrored from the authenticated listing"
+)]
 pub struct MachineRow {
     pub id: String,
     pub name: String,
@@ -85,6 +89,10 @@ const MAX_SNAPSHOT_BYTES: usize = 1024 * 1024;
 /// row needs a non-empty id and name, and display text MUST be control-free.
 pub fn project_snapshot(bytes: &[u8]) -> Result<Vec<MachineRow>, MachineViewError> {
     #[derive(serde::Deserialize)]
+    #[expect(
+        clippy::struct_excessive_bools,
+        reason = "serde shape of the listing's independent pin and permission flags"
+    )]
     struct Row {
         id: String,
         name: String,

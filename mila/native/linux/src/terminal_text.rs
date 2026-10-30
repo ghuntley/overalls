@@ -93,20 +93,21 @@ impl PtyTextDecoder {
                 }
                 Err(error) => {
                     let (valid, after) = rest.split_at(error.valid_up_to());
+                    #[expect(
+                        clippy::expect_used,
+                        reason = "`valid_up_to` bounds a prefix that `from_utf8` already validated"
+                    )]
                     push_display(
                         &mut output,
                         std::str::from_utf8(valid).expect("prefix is valid UTF-8"),
                     );
-                    match error.error_len() {
-                        Some(length) => {
-                            output.push(char::REPLACEMENT_CHARACTER);
-                            rest = &after[length..];
-                        }
-                        None => {
-                            // An incomplete trailing sequence is at most three bytes.
-                            self.pending = after.to_vec();
-                            break;
-                        }
+                    if let Some(length) = error.error_len() {
+                        output.push(char::REPLACEMENT_CHARACTER);
+                        rest = &after[length..];
+                    } else {
+                        // An incomplete trailing sequence is at most three bytes.
+                        self.pending = after.to_vec();
+                        break;
                     }
                 }
             }

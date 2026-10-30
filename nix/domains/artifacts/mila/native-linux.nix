@@ -16,8 +16,14 @@ pkgs.rustPlatform.buildRustPackage {
   src = source;
   sourceRoot = "mila-native-linux-source/mila/native/linux";
   cargoLock.lockFile = root + "/mila/native/linux/Cargo.lock";
-  nativeBuildInputs = [ pkgs.pkg-config pkgs.python3 ];
+  nativeBuildInputs = [ pkgs.pkg-config pkgs.python3 pkgs.clippy pkgs.rustfmt ];
   buildInputs = [ pkgs.gtk4 pkgs.libadwaita ];
+  # ADR-0265 gates: formatting and clippy over both feature sets.
+  postCheck = ''
+    cargo fmt --check
+    cargo clippy --all-targets --locked --offline -- -D warnings
+    cargo clippy --all-targets --locked --offline --features gtk-journey -- -D warnings
+  '';
   installPhase = ''
     runHook preInstall
     mkdir -p "$out/bin" "$out/share/applications"

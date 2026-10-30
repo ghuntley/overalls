@@ -63,10 +63,11 @@ impl PageContext {
     /// A context for a fresh machine name; `None` when the CSPRNG is
     /// unavailable.
     pub fn new(share_principal: &str) -> Option<Self> {
-        let suffix = crate::adapter::new_request_id()?;
+        let id = crate::adapter::new_request_id()?;
+        let suffix = id.get(8..20)?;
         Some(Self {
-            machine_name: format!("mila-journey-{}", &suffix[8..20]),
-            resize_machine_name: format!("mila-journey-{}-r", &suffix[8..20]),
+            machine_name: format!("mila-journey-{suffix}"),
+            resize_machine_name: format!("mila-journey-{suffix}-r"),
             share_principal: share_principal.to_owned(),
             ..Self::default()
         })

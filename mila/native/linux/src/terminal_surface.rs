@@ -48,6 +48,15 @@ pub struct TerminalSurface<A: SessionAuthority, T: PtyTransport> {
     request: Option<PtyAttachRequest>,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<A: SessionAuthority, T: PtyTransport> std::fmt::Debug for TerminalSurface<A, T> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("TerminalSurface")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<A: SessionAuthority, T: PtyTransport> TerminalSurface<A, T> {
     pub fn new(authority: A, transport: T, columns: u16, rows: u16) -> Result<Self, RenderError> {
         Ok(Self {
@@ -245,6 +254,10 @@ mod tests {
         (surface, authority, transport)
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "scripted PTY reads are queued as the transport's Result values"
+    )]
     fn text(value: &str) -> Result<PtyRead, PtyError> {
         Ok(PtyRead::Text(value.to_owned()))
     }

@@ -128,6 +128,15 @@ pub struct LiveConnector {
     timeout_ms: u32,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for LiveConnector {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("LiveConnector")
+            .finish_non_exhaustive()
+    }
+}
+
 impl LiveConnector {
     pub fn new(key_path: Option<PathBuf>, timeout_ms: u32) -> Self {
         Self {
@@ -266,6 +275,15 @@ pub struct SignInDriver<C: Connector> {
     next_heartbeat_ms: u64,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl<C: Connector> std::fmt::Debug for SignInDriver<C> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SignInDriver")
+            .finish_non_exhaustive()
+    }
+}
+
 impl<C: Connector> SignInDriver<C> {
     pub fn new(connector: Arc<C>, policy: SignInPolicy, execution: Execution) -> Self {
         let (sender, receiver) = mpsc::channel();
@@ -356,6 +374,10 @@ impl<C: Connector> SignInDriver<C> {
     }
 
     /// Applies finished jobs and runs any step that is due.
+    #[expect(
+        clippy::similar_names,
+        reason = "`now_s` and `now_ms` are the same instant in seconds and milliseconds"
+    )]
     pub fn poll(
         &mut self,
         now_ms: u64,
@@ -435,8 +457,7 @@ impl<C: Connector> SignInDriver<C> {
                 }
             }
             Output::Heartbeat(outcome) => match outcome {
-                Ok(WhoamiOutcome::Authenticated { .. })
-                | Ok(WhoamiOutcome::Unavailable)
+                Ok(WhoamiOutcome::Authenticated { .. } | WhoamiOutcome::Unavailable)
                 | Err(SessionError::Busy) => {}
                 Ok(WhoamiOutcome::Refused) => {
                     self.flow = self.flow.clone().apply(SignInEvent::Whoami {
@@ -456,6 +477,10 @@ impl<C: Connector> SignInDriver<C> {
         }
     }
 
+    #[expect(
+        clippy::similar_names,
+        reason = "`now_s` and `now_ms` are the same instant in seconds and milliseconds"
+    )]
     fn apply_whoami(
         &mut self,
         session: C::Session,
@@ -695,6 +720,10 @@ mod tests {
         }
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "scripted whoami outcomes are queued as the connector's Result values"
+    )]
     fn approval(url: &str) -> Result<WhoamiOutcome, SessionError> {
         Ok(WhoamiOutcome::Approval {
             url: url.to_owned(),
@@ -702,6 +731,10 @@ mod tests {
         })
     }
 
+    #[expect(
+        clippy::unnecessary_wraps,
+        reason = "scripted whoami outcomes are queued as the connector's Result values"
+    )]
     fn authenticated() -> Result<WhoamiOutcome, SessionError> {
         Ok(WhoamiOutcome::Authenticated {
             account: "ada@example.test".to_owned(),
@@ -834,7 +867,7 @@ mod tests {
         h.driver.sign_out();
         h.run(3);
         assert_eq!(h.driver.flow().phase, SignInPhase::SignedOut);
-        assert!(h.established.is_empty());
+        assert_eq!(h.established, Vec::<u64>::new());
         assert_eq!(h.live_sessions(), 0);
         h.driver.start(Harness::target());
         h.run(3);
@@ -982,6 +1015,10 @@ mod tests {
     /// only while signed in, and every session opened is either held by the
     /// host, pending in the driver, or closed.
     #[test]
+    #[expect(
+        clippy::similar_names,
+        reason = "`seen` (established generations) and `seed` (PRNG state) are unrelated"
+    )]
     fn operation_sequences_keep_generation_invariants() {
         let mut seed = 0x9e37_79b9_7f4a_7c15_u64;
         let mut next = |bound: u64| {

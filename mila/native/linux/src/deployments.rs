@@ -172,6 +172,10 @@ impl DeploymentList {
         }
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "StoredList holds only an integer and strings, which serde_json always encodes"
+    )]
     pub fn encode(&self) -> Vec<u8> {
         serde_json::to_vec(&StoredList {
             version: FORMAT_VERSION,

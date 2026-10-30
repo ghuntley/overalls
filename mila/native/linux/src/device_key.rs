@@ -57,6 +57,10 @@ pub fn openssh_identity(key: &p256::ecdsa::SigningKey) -> (String, String) {
         point.as_bytes(),
     ] {
         // Every field is far below u32::MAX bytes.
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "fields are a 19-byte name, an 8-byte curve and a 65-byte SEC1 point"
+        )]
         blob.extend_from_slice(&(field.len() as u32).to_be_bytes());
         blob.extend_from_slice(field);
     }

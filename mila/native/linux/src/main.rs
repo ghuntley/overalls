@@ -30,6 +30,11 @@ const SIGN_IN_FRAME: Duration = Duration::from_millis(100);
 /// SSH connect and per-command timeout for the live session.
 const SESSION_TIMEOUT_MS: u32 = 20_000;
 
+/// A shared, replaceable page re-render callback.
+type RenderSlot = Rc<RefCell<Option<Rc<dyn Fn()>>>>;
+/// The shared list of page re-render callbacks.
+type RenderList = Rc<RefCell<Vec<Rc<dyn Fn()>>>>;
+
 /// Opens approval links in the user's default browser.
 struct GioBrowser;
 
@@ -46,7 +51,7 @@ struct NativeState {
     browser: Rc<dyn ApprovalBrowser>,
     clock: Instant,
     sign_in_pumping: Rc<Cell<bool>>,
-    sign_in_render: Rc<RefCell<Option<Rc<dyn Fn()>>>>,
+    sign_in_render: RenderSlot,
     session: Rc<RefCell<SessionBinding>>,
     machine_listing: Rc<RefCell<Option<Vec<mila_native_linux::machine_view::MachineRow>>>>,
     deployment_store: Option<DeploymentStore>,
@@ -54,7 +59,7 @@ struct NativeState {
     terminal_polling: Rc<Cell<bool>>,
     ssh_keys: Rc<RefCell<SshKeysView>>,
     links: Rc<RefCell<Option<views::LinkTargets>>>,
-    rerender: Rc<RefCell<Vec<Rc<dyn Fn()>>>>,
+    rerender: RenderList,
     /// Request ids of page mutations whose outcome is unknown because the
     /// transport failed; a retry of the same action reuses the id so the
     /// deployment applies it at most once. Keyed by action and target only.
@@ -300,7 +305,11 @@ impl NativeState {
             targets.stack.set_visible_child_name(page.name());
         }
     }
-    fn ensure_window(&self, app: &adw::Application) -> ApplicationWindow {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "linear GTK window construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+    )]
+    fn ensure_window(&self, app: &Application) -> ApplicationWindow {
         if let Some(window) = app.active_window() {
             if let Ok(window) = window.downcast::<ApplicationWindow>() {
                 return window;
@@ -423,7 +432,7 @@ impl NativeState {
         }
         settings_page.append(&settings_actions);
         let locale = Entry::builder()
-            .placeholder_text(&strings::text(strings::Message::Locale))
+            .placeholder_text(strings::text(strings::Message::Locale))
             .text(&settings.locale)
             .max_length(35)
             .hexpand(true)
@@ -434,10 +443,10 @@ impl NativeState {
         let saved_appearance = settings.appearance;
         save_settings.connect_clicked(move |_| {
             match persistence::Settings::validate(saved_appearance, locale_input.text().as_str())
-                .and_then(|value| persistence::save_settings(&value).map(|_| value))
+                .and_then(|value| persistence::save_settings(&value).map(|()| value))
             {
                 Ok(value) => {
-                    settings_status.set_label(&format!("Settings saved: {}", value.locale))
+                    settings_status.set_label(&format!("Settings saved: {}", value.locale));
                 }
                 Err(_) => settings_status.set_label("Settings locale rejected by Rust policy."),
             }
@@ -446,7 +455,7 @@ impl NativeState {
         settings_page.append(&save_settings);
 
         let deployment = Entry::builder()
-            .placeholder_text(&strings::text(strings::Message::DeploymentSelect))
+            .placeholder_text(strings::text(strings::Message::DeploymentSelect))
             .hexpand(true)
             .build();
         if let Some(selected) = self
@@ -500,7 +509,7 @@ impl NativeState {
         });
         settings_page.append(&notification_button);
         let notification_id = Entry::builder()
-            .placeholder_text(&strings::text(strings::Message::NotificationDeviceId))
+            .placeholder_text(strings::text(strings::Message::NotificationDeviceId))
             .hexpand(true)
             .build();
         let notification_actions = Box::new(Orientation::Horizontal, 8);
@@ -578,13 +587,13 @@ impl NativeState {
         });
         window
     }
-    fn activate(&self, app: &adw::Application) {
+    fn activate(&self, app: &Application) {
         self.ensure_window(app).present();
     }
-    fn open(&self, app: &adw::Application, files: &[gio::File]) {
+    fn open(&self, app: &Application, files: &[gio::File]) {
         let window = self.ensure_window(app);
-        let uris = files.iter().map(|file| file.uri()).collect::<Vec<_>>();
-        let batch = ActivationBatch::parse(uris.iter().map(|uri| uri.as_str()));
+        let uris = files.iter().map(FileExt::uri).collect::<Vec<_>>();
+        let batch = ActivationBatch::parse(uris.iter().map(glib::GString::as_str));
         if let Some(status) = self.status.borrow().clone() {
             views::handle_batch(self, &batch, &status);
         }
@@ -599,11 +608,20 @@ fn main() -> glib::ExitCode {
             return gtk_journey::main(arguments);
         }
     }
-    adw::init().expect("GTK/libadwaita initialization failed");
+    if let Err(error) = adw::init() {
+        // Keep the exit status a failed startup assertion produced before.
+        eprintln!("GTK/libadwaita initialization failed: {error:?}");
+        return glib::ExitCode::from(101);
+    }
     let css = gtk::CssProvider::new();
     css.load_from_data("* { font-family: JetBrains Mono, monospace; font-size: 14px; } window, box { background: #fff; color: #000; } button, entry { border: 2px solid #000; border-radius: 0; background: #eee; color: #000; } button:hover { background: #000; color: #fff; } @media (prefers-color-scheme: dark) { window, box { background: #000; color: #fff; } button, entry { border-color: #fff; background: #111; color: #fff; } button:hover { background: #fff; color: #000; } } ");
+    let Some(display) = gtk::gdk::Display::default() else {
+        // Keep the exit status a failed startup assertion produced before.
+        eprintln!("display");
+        return glib::ExitCode::from(101);
+    };
     gtk::style_context_add_provider_for_display(
-        &gtk::gdk::Display::default().expect("display"),
+        &display,
         &css,
         gtk::STYLE_PROVIDER_PRIORITY_APPLICATION,
     );
@@ -668,6 +686,10 @@ mod gtk_tests {
     }
 
     #[test]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one GTK widget-lifecycle test that must share a single display and window"
+    )]
     fn gtk_pages_bind_deployments_links_terminal_and_ssh_keys() {
         if adw::init().is_err() {
             assert!(
@@ -810,11 +832,13 @@ mod gtk_tests {
         assert!(
             texts(&settings_page).contains(&strings::text(strings::Message::SshKeysSignInFirst))
         );
-        assert!(find(
-            &settings_page,
-            &strings::text(strings::Message::SshKeyRevoke)
-        )
-        .is_empty());
+        assert_eq!(
+            find(
+                &settings_page,
+                &strings::text(strings::Message::SshKeyRevoke)
+            ),
+            Vec::<Button>::new()
+        );
 
         // Machines and Threads: every control shows catalog text and refuses
         // without a bound session; Delete asks for confirmation first.

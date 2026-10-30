@@ -244,7 +244,7 @@ jobs:
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: 1.97.1
-          components: rustfmt
+          components: clippy, rustfmt
       - name: Install GTK4 and libadwaita development libraries
         run: |
           sudo apt-get update
@@ -265,6 +265,11 @@ jobs:
           GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
             MILA_GTK_TESTS_REQUIRED=1 cargo test --locked --features gtk-journey
           kill "$broadway"
+      - name: Clippy (ADR-0265)
+        working-directory: mila/native/linux
+        run: |
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo clippy --all-targets --locked --features gtk-journey -- -D warnings
       - name: Build the GTK journey window
         working-directory: mila/native/linux
         run: |

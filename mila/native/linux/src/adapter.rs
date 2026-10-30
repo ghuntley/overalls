@@ -2,6 +2,7 @@
 
 use serde::Deserialize;
 use std::ffi::{c_char, CString};
+use std::fmt::Write as _;
 use std::sync::{
     atomic::{AtomicU64, Ordering},
     Arc, Mutex,
@@ -29,6 +30,15 @@ pub struct SshKeyProjection {
     keys: Vec<SshKey>,
 }
 
+/// Opaque: fields may hold credentials, key material or terminal bytes.
+impl std::fmt::Debug for SshKeyProjection {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SshKeyProjection")
+            .finish_non_exhaustive()
+    }
+}
+
 impl SshKeyProjection {
     pub fn begin_generation(&mut self) -> u64 {
         self.generation = self.generation.saturating_add(1);
@@ -52,12 +62,12 @@ impl SshKeyProjection {
 /// Decode a bounded `ssh-key ls --json` response. Unknown fields are ignored,
 /// while missing fields and oversized lists fail closed before reaching GTK.
 pub fn decode_ssh_keys(bytes: &[u8]) -> Result<Vec<SshKey>, RuntimeError> {
-    if bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
     #[derive(Deserialize)]
     struct Envelope {
         keys: Vec<SshKey>,
+    }
+    if bytes.len() > 256 * 1024 {
+        return Err(RuntimeError::InvalidInput);
     }
     // Porsche wraps the keys in its version-1 result envelope.
     let bytes = crate::porsche_results::result_bytes(bytes)?;
@@ -99,7 +109,7 @@ pub fn new_request_id() -> Option<String> {
     let mut id = String::with_capacity(40);
     id.push_str("porsche-");
     for byte in bytes {
-        id.push_str(&format!("{byte:02x}"));
+        write!(id, "{byte:02x}").ok()?;
     }
     Some(id)
 }
@@ -186,7 +196,7 @@ pub fn format_ssh_key_revoke(key_id: &str, request_id: &str) -> Result<String, R
         || key_id.len() > 128
         || request_id.len() != 40
         || !request_id.starts_with("porsche-")
-        || !request_id[8..].bytes().all(|byte| byte.is_ascii_hexdigit())
+        || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
         || key_id
             .chars()
             .any(|character| character.is_control() || character.is_whitespace())
@@ -210,9 +220,6 @@ pub struct ShareGrant {
 
 /// Decode a bounded `share show --json` response before it reaches GTK.
 pub fn decode_share_listing(bytes: &[u8]) -> Result<(String, Vec<ShareGrant>), RuntimeError> {
-    if bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
     #[derive(Deserialize)]
     struct Owner {
         email: String,
@@ -221,6 +228,9 @@ pub fn decode_share_listing(bytes: &[u8]) -> Result<(String, Vec<ShareGrant>), R
     struct Envelope {
         owner: Owner,
         items: Vec<ShareGrant>,
+    }
+    if bytes.len() > 256 * 1024 {
+        return Err(RuntimeError::InvalidInput);
     }
     let bytes = crate::porsche_results::result_bytes(bytes)?;
     let envelope: Envelope =
@@ -279,7 +289,7 @@ pub fn format_share_command(
         || !valid_email(email)
         || request_id.len() != 40
         || !request_id.starts_with("porsche-")
-        || !request_id[8..].bytes().all(|b| b.is_ascii_hexdigit())
+        || !request_id.as_bytes()[8..].iter().all(u8::is_ascii_hexdigit)
     {
         return Err(RuntimeError::InvalidInput);
     }
@@ -318,11 +328,11 @@ pub fn canonical_route(value: &str) -> Result<String, RuntimeError> {
     let output = mila_ffi::MilaRouteOutput {
         bytes: bytes.as_mut_ptr(),
         capacity: bytes.len(),
-        written: &mut written,
+        written: &raw mut written,
     };
     // SAFETY: input is NUL terminated and output points to a writable buffer whose
     // capacity is declared to the bounded C ABI for the duration of this call.
-    let status = unsafe { mila_ffi::mila_route_format(input.as_ptr() as *const c_char, output) };
+    let status = unsafe { mila_ffi::mila_route_format(input.as_ptr().cast::<c_char>(), output) };
     if status != mila_ffi::MilaFfiStatus::Ok {
         return Err(match status {
             mila_ffi::MilaFfiStatus::InvalidRoute => RuntimeError::InvalidInput,
@@ -352,7 +362,7 @@ pub fn format_machine_action(
     let output = mila_ffi::MilaRouteOutput {
         bytes: bytes.as_mut_ptr(),
         capacity: bytes.len(),
-        written: &mut written,
+        written: &raw mut written,
     };
     // SAFETY: all strings are NUL terminated and output is writable for the call.
     let status = unsafe {
@@ -452,13 +462,13 @@ pub fn format_web_command(
         if port == 0 {
             return Err(RuntimeError::InvalidInput);
         }
-        line.push_str(&format!(" --port={port}"));
+        write!(line, " --port={port}").map_err(|_| RuntimeError::InvalidInput)?;
         line.push_str(if public { " --public" } else { " --private" });
         let request = request_id.ok_or(RuntimeError::InvalidInput)?;
         if request.len() != 40 || !request.starts_with("porsche-") {
             return Err(RuntimeError::InvalidInput);
         }
-        line.push_str(&format!(" --request-id={request}"));
+        write!(line, " --request-id={request}").map_err(|_| RuntimeError::InvalidInput)?;
     }
     mila_protocol::Command::parse(&line)
         .and_then(|command| command.format())
@@ -591,12 +601,12 @@ pub struct NotificationDevice {
 }
 
 pub fn decode_notification_devices(bytes: &[u8]) -> Result<Vec<NotificationDevice>, RuntimeError> {
-    if bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
     #[derive(Deserialize)]
     struct Envelope {
         items: Vec<NotificationDevice>,
+    }
+    if bytes.len() > 256 * 1024 {
+        return Err(RuntimeError::InvalidInput);
     }
     let envelope: Envelope =
         serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
@@ -677,6 +687,8 @@ pub fn validate_push_registration(
         .map(CString::new)
         .transpose()
         .map_err(|_| RuntimeError::InvalidInput)?;
+    // SAFETY: every pointer is a live NUL-terminated `CString` owned by this
+    // frame (or null for an absent endpoint) for this synchronous call.
     let status = unsafe {
         mila_ffi::mila_push_registration_validate(
             provider,
@@ -754,6 +766,10 @@ pub struct TerminalStream {
 }
 
 impl TerminalStream {
+    #[expect(
+        clippy::expect_used,
+        reason = "80x24 lies within TerminalRenderer's 1..=MAX_COLUMNS and 1..=MAX_ROWS bounds"
+    )]
     pub fn new() -> Self {
         Self {
             state: mila_runtime::TerminalAttach::initial(),
@@ -765,11 +781,11 @@ impl TerminalStream {
         &self.renderer
     }
     pub fn render_output(&mut self, generation: u64, text: &str) -> Result<(), RuntimeError> {
-        if !self
+        if self
             .state
             .output(generation, text.chars().count())
             .then_some(())
-            .is_some()
+            .is_none()
         {
             return Err(RuntimeError::InvalidInput);
         }
@@ -855,6 +871,12 @@ impl TerminalStream {
     }
 }
 
+impl Default for TerminalStream {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Operations the native UI may request from the generated runtime.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum RuntimeOperation {
@@ -922,9 +944,9 @@ mod request_id_tests {
         let second = new_request_id().expect("CSPRNG");
         assert_ne!(first, second);
         assert_eq!(first.len(), 40);
-        assert!(first[8..]
-            .bytes()
-            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+        assert!(first.as_bytes()[8..]
+            .iter()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(byte)));
         assert!(format_ssh_key_revoke("key-1", &first).is_ok());
     }
 }
@@ -1182,6 +1204,9 @@ impl RuntimeAdapter for InProcessRuntimeAdapter {
                     machine_count: 0,
                     saved_at: 0,
                 };
+                // SAFETY: `payload` is a live slice of its declared length, `host`
+                // is an owned NUL-terminated `CString`, and `summary` is a writable
+                // local; all outlive this synchronous call.
                 let status = unsafe {
                     mila_ffi::mila_snapshot_validate(
                         payload.as_ptr(),
@@ -1189,7 +1214,7 @@ impl RuntimeAdapter for InProcessRuntimeAdapter {
                         self.host.as_ptr(),
                         self.port.unwrap_or_default(),
                         u8::from(self.port.is_some()),
-                        &mut summary,
+                        &raw mut summary,
                     )
                 };
                 if status != mila_ffi::MilaFfiStatus::Ok {
@@ -1368,9 +1393,9 @@ mod tests {
         let bytes =
             br#"{"version":1,"status":"succeeded","result":{"items":[],"next_cursor":null}}"#;
         let listing = super::decode_listing(bytes).unwrap();
-        assert!(listing.machines().is_empty());
+        assert_eq!(listing.machines(), []);
         assert!(!listing.has_more());
-        assert!(super::decode_listing(br#"{}"#).is_err());
+        assert!(super::decode_listing(br"{}").is_err());
     }
 
     #[test]
@@ -1404,7 +1429,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(listing[0].id, "k1");
-        assert!(super::decode_ssh_keys(br#"{}"#).is_err());
+        assert!(super::decode_ssh_keys(br"{}").is_err());
         assert!(super::decode_ssh_keys(
             br#"{"keys":[{"id":"","label":"x","fingerprint":"y","added_at":1}]}"#
         )

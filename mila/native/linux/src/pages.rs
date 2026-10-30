@@ -146,12 +146,13 @@ pub(super) fn resize_key(
 }
 
 /// The message for a finished mutation.
-pub(super) fn outcome_message<T>(result: &Option<Result<T, SessionError>>) -> M {
+pub(super) fn outcome_message<T>(result: Option<&Result<T, SessionError>>) -> M {
     match result {
         None => M::SignInRequired,
         Some(Ok(_)) => M::RequestSucceeded,
-        Some(Err(SessionError::Transport | SessionError::StaleHandle)) => M::RequestWaiting,
-        Some(Err(SessionError::Busy)) => M::RequestWaiting,
+        Some(Err(SessionError::Transport | SessionError::StaleHandle | SessionError::Busy)) => {
+            M::RequestWaiting
+        }
         Some(Err(_)) => M::RequestRefused,
     }
 }
@@ -188,6 +189,10 @@ fn parse_size(cpu: &Entry, memory: &Entry, disk: &Entry) -> Option<SizeFields> {
 const CREATE_DEFAULTS: (u32, u64, u64) = (1, 1024, 10);
 
 /// Builds the Machines page and returns the machine-id entry deep links fill.
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear GTK page construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) -> Entry {
     let id = entry(M::MachineId, 64);
 
@@ -335,7 +340,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             let result = state.mutate(&action_key(action, &machine), |live, request| {
                 live.machine_action(&machine, action, request)
             });
-            status.set_label(&strings::text(outcome_message(&result)));
+            status.set_label(&strings::text(outcome_message(result.as_ref())));
         });
         actions.append(&button);
     }
@@ -348,14 +353,14 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                 let result = state.mutate(&action_key("rm", &machine), |live, request| {
                     live.machine_action(&machine, "rm", request)
                 });
-                status.set_label(&strings::text(outcome_message(&result)));
+                status.set_label(&strings::text(outcome_message(result.as_ref())));
             }
             Some(Pending::RemoveShare { machine, email }) => {
                 let result = state.mutate(
                     &format!("share-remove:{machine}:{email}"),
                     |live, request| live.share_mutation(&machine, &email, None, false, request),
                 );
-                status.set_label(&strings::text(outcome_message(&result)));
+                status.set_label(&strings::text(outcome_message(result.as_ref())));
             }
             _ => {}
         });
@@ -394,7 +399,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                 Some(Err(SessionError::InvalidInput)) if machine_name.is_empty() => {
                     M::MachineFieldInvalid
                 }
-                _ => outcome_message(&result),
+                _ => outcome_message(result.as_ref()),
             }));
         });
     }
@@ -428,17 +433,23 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                         .and_then(|detail| detail.vcpu)
                         .ok_or(SessionError::InvalidInput)?,
                 };
-                let memory = match memory {
-                    Some(memory) => memory,
-                    None => keep(current.as_ref().and_then(|detail| detail.memory_mib()))?,
-                };
-                let disk = match disk {
-                    Some(disk) => disk,
-                    None => keep(current.as_ref().and_then(|detail| detail.disk_gib()))?,
-                };
+                let memory =
+                    match memory {
+                        Some(memory) => memory,
+                        None => keep(current.as_ref().and_then(
+                            mila_native_linux::porsche_results::MachineDetail::memory_mib,
+                        ))?,
+                    };
+                let disk =
+                    match disk {
+                        Some(disk) => disk,
+                        None => keep(current.as_ref().and_then(
+                            mila_native_linux::porsche_results::MachineDetail::disk_gib,
+                        ))?,
+                    };
                 live.machine_resize(&machine, cpu, memory, disk, request)
             });
-            status.set_label(&strings::text(outcome_message(&result)));
+            status.set_label(&strings::text(outcome_message(result.as_ref())));
         });
     }
     size_actions.append(&create);
@@ -519,7 +530,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             let result = state.mutate(&key, |live, request| {
                 live.share_mutation(&machine, &address, Some(wire), true, request)
             });
-            status.set_label(&strings::text(outcome_message(&result)));
+            status.set_label(&strings::text(outcome_message(result.as_ref())));
         });
     }
     {
@@ -647,7 +658,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             status.set_label(&strings::text(if refused {
                 M::WebConflict
             } else {
-                outcome_message(&result)
+                outcome_message(result.as_ref())
             }));
         });
         web_actions.append(&button);
@@ -690,7 +701,18 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
 }
 
 /// Builds the Threads page and returns the thread-id entry deep links fill.
+#[expect(
+    clippy::too_many_lines,
+    reason = "linear GTK page construction; ADR-0265 keeps mila-linux lint-only, so splitting is deferred"
+)]
 pub(super) fn build_threads(state: &NativeState, page: &Box, status: &Label) -> Entry {
+    #[derive(Clone, Copy)]
+    enum Kind {
+        Prompt,
+        Answer,
+        Approve,
+        Revise,
+    }
     let id = entry(M::MachineId, 128);
     let list_section = section(page, THREAD_LIST, Some(M::Threads));
     let refresh = Button::with_label(&strings::text(M::Refresh));
@@ -843,13 +865,6 @@ pub(super) fn build_threads(state: &NativeState, page: &Box, status: &Label) -> 
     let revision = entry(M::ThreadPlanRevisionHint, i32::from(u16::MAX));
     let approve = Button::with_label(&strings::text(M::ThreadPlanApprove));
     let revise = Button::with_label(&strings::text(M::ThreadPlanRevise));
-    #[derive(Clone, Copy)]
-    enum Kind {
-        Prompt,
-        Answer,
-        Approve,
-        Revise,
-    }
     for (button, kind, input) in [
         (&send, Kind::Prompt, Some(composer.clone())),
         (&answer_send, Kind::Answer, Some(answer.clone())),
@@ -929,7 +944,7 @@ pub(super) fn build_threads(state: &NativeState, page: &Box, status: &Label) -> 
             status.set_label(&strings::text(if busy {
                 M::ThreadBusy
             } else {
-                outcome_message(&result)
+                outcome_message(result.as_ref())
             }));
             if matches!(result, Some(Ok(_))) {
                 if let Some(entry) = input.as_ref() {

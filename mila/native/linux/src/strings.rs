@@ -45,7 +45,15 @@ pub(crate) enum Message {
     SignInProfileInvalid,
     NotificationsTitle,
     NotificationsExplain,
+    #[expect(
+        dead_code,
+        reason = "catalog keys kept in step with the shared localization catalogs; Linux does not show them yet"
+    )]
     PushUnsupported,
+    #[expect(
+        dead_code,
+        reason = "catalog keys kept in step with the shared localization catalogs; Linux does not show them yet"
+    )]
     NotificationDevices,
     NotificationDeviceId,
     NotificationRefresh,
@@ -194,6 +202,10 @@ pub(crate) enum Message {
     WebPrivateExplain,
     WebVisibility,
 }
+#[expect(
+    clippy::too_many_lines,
+    reason = "one arm per catalog message keeps the closed identifier table auditable"
+)]
 fn id(message: Message) -> &'static str {
     match message {
         Message::AppName => "appTitle",
@@ -422,6 +434,11 @@ fn interpolate(form: &str, values: &[(&str, &str)]) -> String {
     output
 }
 
+#[expect(
+    clippy::too_many_lines,
+    clippy::match_same_arms,
+    reason = "one arm per catalog message keeps the closed fallback table auditable"
+)]
 fn fallback(message: Message) -> &'static str {
     match message {
         Message::AppName => "Mila",
@@ -828,7 +845,7 @@ mod tests {
     #[test]
     fn fallback_is_present() {
         assert_eq!(text(Message::AppName), "Mila");
-        assert!(!text(Message::LockUnavailable).is_empty());
+        assert_ne!(text(Message::LockUnavailable), "");
     }
 
     #[test]
