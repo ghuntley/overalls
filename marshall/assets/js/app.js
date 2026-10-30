@@ -62,7 +62,10 @@ function browserTimeZone() {
  * names referenced by server-rendered templates.
  */
 const liveSocket = new LiveSocket("/live", Socket, {
-  longPollFallbackMs: 2500,
+  // No long-poll fallback: replicas share no PubSub (Erlang distribution is
+  // off, ADR-0141) and the proxy balances requests round-robin, so a long-poll
+  // session cannot survive its next request. Phoenix memorizes a fallback in
+  // sessionStorage, so one slow ping would leave the tab unable to join.
   heartbeatIntervalMs: 5000,
   // A reconnecting mount may wait up to 40 s for the database (ADR-0140); a
   // shorter join timeout would turn that wait into a full page reload.

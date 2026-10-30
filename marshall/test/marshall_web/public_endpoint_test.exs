@@ -32,4 +32,18 @@ defmodule MarshallWeb.PublicEndpointTest do
     assert html_response(get(build_conn(), "https://localhost/sign-in"), 200) =~
              ~s(<meta name="robots" content="#{directive}">)
   end
+
+  # @cc [owner:ghuntley,label:verification] live-socket-has-no-long-poll
+  # The browser endpoint MUST NOT serve the LiveView long-poll transport:
+  # replicas share no PubSub, so a long-poll session cannot be resumed.
+  test "LiveView socket offers no long-poll transport" do
+    refute Enum.any?(MarshallWeb.Endpoint.__sockets__(), fn {path, _, opts} ->
+             path == "/live" and opts[:longpoll]
+           end)
+
+    for method <- [:get, :post] do
+      response = dispatch(build_conn(), MarshallWeb.Endpoint, method, "/live/longpoll", %{})
+      assert response.status == 404
+    end
+  end
 end

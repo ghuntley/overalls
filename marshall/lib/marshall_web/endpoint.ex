@@ -6,9 +6,13 @@ defmodule MarshallWeb.Endpoint do
   # probe that forges a session agree on the cookie name, salts and attributes.
   @session_options MarshallWeb.BrowserSession.options()
 
+  # @cc [owner:ghuntley,label:architecture;recovery] live-socket-websocket-only
+  # The LiveView socket MUST offer only the WebSocket transport. Marshall
+  # replicas share no PubSub (ADR-0141) behind a round-robin proxy, so a
+  # long-poll session is node-local and cannot be resumed by its next request.
   socket "/live", MarshallWeb.LiveSocket,
     websocket: [connect_info: [session: @session_options]],
-    longpoll: [connect_info: [session: @session_options]]
+    longpoll: false
 
   # @cc [owner:ghuntley,label:security] endpoint-privacy-before-diagnostics
   # AuthenticationPrivacy MUST run before request loggers, telemetry and body

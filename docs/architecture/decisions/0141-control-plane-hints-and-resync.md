@@ -104,6 +104,17 @@ which makes this its phase P0.
   [virtual_machine.ex](../../../marshall/lib/marshall/compute/virtual_machine.ex).
 - Viewer subscription in
   [viewer.ex](../../../marshall/lib/marshall/terminal/viewer.ex).
+- Node-local PubSub also bounds the browser LiveView transport. A long-poll
+  session lives in one node's PubSub, and the proxy balances each request
+  round-robin, so the session cannot be resumed by its next request. Phoenix
+  also memorizes a fallback per tab, so one ping slower than the 2.5-second
+  fallback threshold left loaded browsers on a transport that never joined.
+  The [endpoint](../../../marshall/lib/marshall_web/endpoint.ex) now offers
+  only the WebSocket transport and
+  [app.js](../../../marshall/assets/js/app.js) no longer falls back; the
+  [endpoint test](../../../marshall/test/marshall_web/public_endpoint_test.exs)
+  checks that long-poll is absent. This is a correction to match the
+  accepted topology, not a new decision.
 
 Remaining gaps:
 - No pushed consumer outside Marshall yet; the control WebSocket phases add
