@@ -27,13 +27,15 @@ on:
         required: false
         default: false
 
-# Every push runs to completion: the next push only covers its own range, so
-# cancelling would leave this one's change untested.
+# One run per ref: a newer push replaces a pending one, and a started run
+# finishes. A replaced push stays covered because a push run compares against
+# the newest earlier started, non-cancelled run, not against event.before.
 concurrency:
-  group: ci-${{ github.ref }}-${{ github.sha }}
+  group: ci-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
+  actions: read
   contents: read
 
 jobs:
@@ -59,10 +61,25 @@ jobs:
           BEFORE: ${{ github.event.before }}
           BASE: ${{ inputs.base }}
           ALL: ${{ inputs.all }}
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+          RUN_NUMBER: ${{ github.run_number }}
         run: |
           set -euo pipefail
           args=()
           if [ "$EVENT" = push ]; then
+            # Pending runs replaced under the concurrency group never ran, so
+            # start from the head of the newest earlier push run that started
+            # and was not cancelled; event.before is the fallback.
+            covered=$(curl -fsS -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$REPO/actions/workflows/ci.yml/runs?event=push&branch=$REF&per_page=50" \
+              | jq -r --argjson n "$RUN_NUMBER" '[.workflow_runs[] | select(.run_number < $n and .conclusion != "cancelled"
+                  and (.status | IN("queued", "pending", "waiting", "requested") | not))]
+                | sort_by(.run_number) | last | .head_sha // empty') || covered=""
+            if [ -n "$covered" ] && git merge-base --is-ancestor "$covered" HEAD 2>/dev/null; then
+              BEFORE=$covered
+            fi
             # A new branch or a force push has no usable base: select everything.
             if [ -z "$BEFORE" ] || [ "$BEFORE" = 0000000000000000000000000000000000000000 ] \
               || ! git merge-base --is-ancestor "$BEFORE" HEAD 2>/dev/null; then
