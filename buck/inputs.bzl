@@ -9,8 +9,11 @@ NIX_INPUTS = [
     "//fleet:srcs",
     "//nix:srcs",
     "//nix/domains/artifacts/guest/github:srcs",
-    # support/zfs-node.nix installs this suite's probe for every ZFS node.
+    # support/zfs-node.nix installs these suites' probes for every ZFS node.
     "//nix/verification/tests/machines/native-zfs:srcs",
+    "//nix/verification/tests/machines/zfs-lifecycle:srcs",
+    # support/native-role-node.nix seals the native role prerequisites.
+    "//nix/verification/tests/machines/service-roles:srcs",
     # The trace-spool module validates spans against the diagnostics schema.
     "//elixir:trace_schema",
     "//secrets:srcs",
