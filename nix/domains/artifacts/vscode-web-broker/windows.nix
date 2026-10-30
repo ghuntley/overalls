@@ -5,7 +5,7 @@ let
     src = ./.;
     filter = path: type:
       let name = builtins.baseNameOf path;
-      in name != "target" && (type == "directory" || lib.hasSuffix ".rs" name ||
+      in name != "target" && name != ".hegel" && (type == "directory" || lib.hasSuffix ".rs" name ||
         builtins.elem name [ "Cargo.toml" "Cargo.lock" "CONTRACTS" ]);
   };
   vendor = pkgs.rustPlatform.importCargoLock { lockFile = ./Cargo.lock; };

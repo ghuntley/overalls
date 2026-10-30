@@ -30,7 +30,7 @@ windows-sys = { version = "0.61", features = [
 ] }
 
 [dev-dependencies]
-proptest = "1"
+hegeltest = "=0.28.8"
 
 [profile.release]
 strip = true

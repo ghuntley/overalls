@@ -97,3 +97,16 @@ PID/creation/SYSTEM/executable identity before frames or streams are accepted.
 Custodian admission MUST independently validate execution, release and account.
 IPC instances and retired operations MUST share the existing 128 pipe budget;
 exhaustion MUST preserve custodian/worker ownership and refuse or backpressure.
+
+@cc [owner:ghuntley,label:verification] vscode-web-broker-hegel-properties
+Hegel properties MUST check uuid and hex against independent oracles,
+username against its accept/refuse lattice, dns_label and dns_name bounds,
+base32_uuid round-trips through uuid, Refusal::name injectivity, preface
+length and generation/epoch/UID/package refusal, profile gateway derivation
+and webview_template Origin refusal. Windows model properties MUST cover
+LocalPath, dos_device and WorkerPath lattices, command_line round-trips
+against a CommandLineToArgvW-style parser, LogonSession zero refusal and
+round-trip, the custodian-slot and pipe-slot limits, generation succession,
+receipt admission and prior-session drainage against a simulated process
+table. They run on Linux; native Windows custody, ACL and kernel behaviour
+remain outside this evidence.

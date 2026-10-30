@@ -702,7 +702,7 @@ pub fn command_line(arguments: &[String]) -> Result<Vec<u16>, Refusal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{TestCase, generators as gs};
 
     #[test]
     fn custody_map_retains_owner_after_stream_references_drop() {
@@ -747,24 +747,77 @@ mod tests {
         assert_eq!(*registry.slot(200000, || 0).unwrap().lock().unwrap(), 32);
     }
 
-    proptest! {
-        #[test]
-        fn full_custodian_registry_never_evicts_retained_accounts(uids in prop::collection::vec(0_u32..128, 1..256)) {
-            let registry = CustodianAccounts::default();
-            let mut accepted = std::collections::BTreeSet::new();
-            for uid in uids {
-                let result = registry.slot(uid, || uid);
-                if accepted.contains(&uid) || accepted.len() < CUSTODIAN_ACCOUNT_LIMIT {
-                    let slot = result.unwrap();
-                    prop_assert_eq!(*slot.lock().unwrap(), uid);
-                    accepted.insert(uid);
-                } else {
-                    prop_assert!(matches!(result, Err(Refusal::Capacity)));
-                }
+    /// @cc [owner:ghuntley,label:verification;capacity] broker-custodian-registry-retention
+    /// Every admission sequence MUST retain each accepted account's original
+    /// state and refuse new accounts with Capacity once 64 are retained.
+    #[hegel::test(test_cases = 64)]
+    fn full_custodian_registry_never_evicts_retained_accounts(tc: TestCase) {
+        let uids = tc.draw(
+            gs::vecs(gs::integers::<u32>().max_value(127))
+                .min_size(1)
+                .max_size(255),
+        );
+        let registry = CustodianAccounts::default();
+        let mut accepted = std::collections::BTreeSet::new();
+        for uid in uids {
+            let result = registry.slot(uid, || uid);
+            if accepted.contains(&uid) || accepted.len() < CUSTODIAN_ACCOUNT_LIMIT {
+                let slot = result.unwrap();
+                assert_eq!(*slot.lock().unwrap(), uid);
+                accepted.insert(uid);
+            } else {
+                assert!(matches!(result, Err(Refusal::Capacity)));
             }
-            for uid in accepted {
-                prop_assert_eq!(*registry.slot(uid, || u32::MAX).unwrap().lock().unwrap(), uid);
+        }
+        for uid in accepted {
+            assert_eq!(
+                *registry.slot(uid, || u32::MAX).unwrap().lock().unwrap(),
+                uid
+            );
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;capacity] broker-custodian-slot-limit
+    /// CustodianAccounts::slot MUST never hold more than 64 accounts, MUST
+    /// hold exactly the first 64 distinct admitted UIDs, and MUST accept a
+    /// request exactly when its UID is retained or capacity remains.
+    #[hegel::test(test_cases = 64)]
+    fn custodian_slots_stay_within_limit(tc: TestCase) {
+        let uids = tc.draw(gs::vecs(gs::integers::<u32>().max_value(199)).max_size(300));
+        let registry = CustodianAccounts::default();
+        let mut model = std::collections::BTreeSet::new();
+        for uid in uids {
+            let admit = model.contains(&uid) || model.len() < CUSTODIAN_ACCOUNT_LIMIT;
+            assert_eq!(registry.slot(uid, || ()).is_ok(), admit);
+            if admit {
+                model.insert(uid);
             }
+            let held = registry.entries.lock().unwrap().len();
+            assert!(held <= CUSTODIAN_ACCOUNT_LIMIT);
+            assert_eq!(held, model.len());
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;capacity] broker-pipe-slot-limit
+    /// PipeSlots::reserve MUST succeed exactly while fewer than 128
+    /// reservations are held, and the shared count MUST equal the held
+    /// reservations after every reserve and release.
+    #[hegel::test(test_cases = 64)]
+    fn pipe_slots_stay_within_limit(tc: TestCase) {
+        let operations = tc.draw(gs::vecs(gs::integers::<u8>().max_value(9)).max_size(400));
+        let slots = PipeSlots::new();
+        let mut held = Vec::new();
+        for operation in operations {
+            if operation < 8 {
+                let reservation = slots.reserve();
+                assert_eq!(reservation.is_some(), held.len() < PIPE_LIMIT);
+                held.extend(reservation);
+            } else {
+                held.pop();
+            }
+            let used = slots.used.load(Ordering::Acquire);
+            assert!(used <= PIPE_LIMIT);
+            assert_eq!(used, held.len());
         }
     }
 
@@ -847,61 +900,114 @@ mod tests {
         WorkerIdentity::admitted(&preface, &boot, &descriptor, sid).unwrap()
     }
 
-    proptest! {
-        #[test]
-        fn any_foreign_pid_or_creation_time_refuses(pid in 1_u32..u32::MAX, created in 1_u64..u64::MAX) {
-            let identity = identity();
-            let expected = ProcessIdentity { pid, created };
-            let mut peer = PipePeer { process: expected, sid: identity.sid.clone(), in_expected_job: true, exact_executable: true };
-            prop_assert_eq!(verify_peer(&identity, expected, &peer), Ok(()));
-            peer.process.pid = pid.wrapping_add(1);
-            prop_assert_eq!(verify_peer(&identity, expected, &peer), Err(Refusal::Custody));
-            peer.process = ProcessIdentity { pid, created: created.wrapping_add(1) };
-            prop_assert_eq!(verify_peer(&identity, expected, &peer), Err(Refusal::Custody));
-        }
+    /// @cc [owner:ghuntley,label:verification;security] broker-pipe-peer-exact-process
+    /// A pipe peer MUST verify only with the exact expected PID and creation
+    /// time; any other PID or creation time MUST refuse with Custody.
+    #[hegel::test(test_cases = 64)]
+    fn any_foreign_pid_or_creation_time_refuses(tc: TestCase) {
+        let pid = tc.draw(gs::integers::<u32>().min_value(1).max_value(u32::MAX - 1));
+        let created = tc.draw(gs::integers::<u64>().min_value(1).max_value(u64::MAX - 1));
+        let identity = identity();
+        let expected = ProcessIdentity { pid, created };
+        let mut peer = PipePeer {
+            process: expected,
+            sid: identity.sid.clone(),
+            in_expected_job: true,
+            exact_executable: true,
+        };
+        assert_eq!(verify_peer(&identity, expected, &peer), Ok(()));
+        peer.process.pid = pid.wrapping_add(1);
+        assert_eq!(
+            verify_peer(&identity, expected, &peer),
+            Err(Refusal::Custody)
+        );
+        peer.process = ProcessIdentity {
+            pid,
+            created: created.wrapping_add(1),
+        };
+        assert_eq!(
+            verify_peer(&identity, expected, &peer),
+            Err(Refusal::Custody)
+        );
+    }
 
-        #[test]
-        fn identity_changes_never_reuse_old_pipe_or_job(epoch in 2_u64..u64::MAX, rid in 1002_u32..u32::MAX) {
-            let first = identity();
-            let generation = CustodianGeneration::new(1).unwrap();
-            let mut next = first.clone(); next.execution_epoch = epoch;
-            prop_assert_ne!(first.pipe_name(generation), next.pipe_name(generation));
-            prop_assert_ne!(first.job_name(generation), next.job_name(generation));
-            next = first.clone(); next.sid = sid(rid);
-            prop_assert_ne!(first.key(), next.key());
-        }
+    /// @cc [owner:ghuntley,label:verification;security] broker-identity-kernel-names
+    /// A changed execution epoch MUST change pipe and job names, and a changed
+    /// account SID MUST change the identity key.
+    #[hegel::test(test_cases = 64)]
+    fn identity_changes_never_reuse_old_pipe_or_job(tc: TestCase) {
+        let epoch = tc.draw(gs::integers::<u64>().min_value(2).max_value(u64::MAX - 1));
+        let rid = tc.draw(
+            gs::integers::<u32>()
+                .min_value(1002)
+                .max_value(u32::MAX - 1),
+        );
+        let first = identity();
+        let generation = CustodianGeneration::new(1).unwrap();
+        let mut next = first.clone();
+        next.execution_epoch = epoch;
+        assert_ne!(first.pipe_name(generation), next.pipe_name(generation));
+        assert_ne!(first.job_name(generation), next.job_name(generation));
+        next = first.clone();
+        next.sid = sid(rid);
+        assert_ne!(first.key(), next.key());
+    }
 
-        #[test]
-        fn incomplete_recovery_custody_never_stops_workers(exact in any::<bool>(), peer in any::<bool>()) {
-            prop_assert_eq!(recovery_decision(true, false, exact, peer), RecoveryDecision::Refuse);
-            prop_assert_eq!(recovery_decision(true, exact, peer, false), RecoveryDecision::Refuse);
-        }
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-incomplete-recovery-refusal
+    /// An existing worker without SYSTEM job custody or without a proven peer
+    /// MUST refuse recovery regardless of the other facts.
+    #[hegel::test(test_cases = 16)]
+    fn incomplete_recovery_custody_never_stops_workers(tc: TestCase) {
+        let exact = tc.draw(gs::booleans());
+        let peer = tc.draw(gs::booleans());
+        assert_eq!(
+            recovery_decision(true, false, exact, peer),
+            RecoveryDecision::Refuse
+        );
+        assert_eq!(
+            recovery_decision(true, exact, peer, false),
+            RecoveryDecision::Refuse
+        );
+    }
 
-        #[test]
-        fn every_truncated_local_sid_refuses(length in 0_usize..28) {
-            prop_assert_eq!(AccountSid::parse(&sid(1001).as_bytes()[..length]), Err(Refusal::Account));
-        }
+    /// @cc [owner:ghuntley,label:verification;security] broker-truncated-sid-refusal
+    /// Every proper prefix of a valid local account SID MUST refuse.
+    #[hegel::test(test_cases = 32)]
+    fn every_truncated_local_sid_refuses(tc: TestCase) {
+        let length = tc.draw(gs::integers::<usize>().max_value(27));
+        assert_eq!(
+            AccountSid::parse(&sid(1001).as_bytes()[..length]),
+            Err(Refusal::Account)
+        );
+    }
 
-        #[test]
-        fn renewed_sessions_and_generations_retain_only_exact_stable_identity(generation in 1_u64..i64::MAX as u64) {
-            let (preface, boot, descriptor, sid) = admission_fixture();
-            let identity = WorkerIdentity::admitted(&preface, &boot, &descriptor, sid.clone()).unwrap();
-            let mut renewed = preface.clone();
-            renewed.binding.generation = generation;
-            renewed.binding.session_id = "33333333-3333-4333-8333-333333333333".to_owned();
-            let current = WorkerIdentity::admitted(&renewed, &boot, &descriptor, sid).unwrap();
-            prop_assert_eq!(&current, &identity);
-            prop_assert!(current.matches_retained_binding(&preface.binding, &boot, &descriptor));
-            let mut foreign = preface.binding.clone();
-            foreign.execution_epoch += 1;
-            prop_assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
-            foreign = preface.binding.clone();
-            foreign.guest_account_id = renewed.binding.session_id;
-            prop_assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
-            foreign = preface.binding;
-            foreign.editor_origin = foreign.editor_origin.replace("apps.test", "other.test");
-            prop_assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
-        }
+    /// @cc [owner:ghuntley,label:verification;security] broker-renewed-identity-stability
+    /// A renewed session or generation MUST yield the same stable identity,
+    /// while a foreign epoch, account or origin MUST NOT match it.
+    #[hegel::test(test_cases = 64)]
+    fn renewed_sessions_and_generations_retain_only_exact_stable_identity(tc: TestCase) {
+        let generation = tc.draw(
+            gs::integers::<u64>()
+                .min_value(1)
+                .max_value(i64::MAX.unsigned_abs() - 1),
+        );
+        let (preface, boot, descriptor, sid) = admission_fixture();
+        let identity = WorkerIdentity::admitted(&preface, &boot, &descriptor, sid.clone()).unwrap();
+        let mut renewed = preface.clone();
+        renewed.binding.generation = generation;
+        renewed.binding.session_id = "33333333-3333-4333-8333-333333333333".to_owned();
+        let current = WorkerIdentity::admitted(&renewed, &boot, &descriptor, sid).unwrap();
+        assert_eq!(&current, &identity);
+        assert!(current.matches_retained_binding(&preface.binding, &boot, &descriptor));
+        let mut foreign = preface.binding.clone();
+        foreign.execution_epoch += 1;
+        assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
+        foreign = preface.binding.clone();
+        foreign.guest_account_id = renewed.binding.session_id;
+        assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
+        foreign = preface.binding;
+        foreign.editor_origin = foreign.editor_origin.replace("apps.test", "other.test");
+        assert!(!current.matches_retained_binding(&foreign, &boot, &descriptor));
     }
 
     fn prior(generation: u64) -> PriorWorker {
@@ -957,141 +1063,477 @@ mod tests {
         }
     }
 
-    fn simulated() -> impl Strategy<Value = Simulated> {
-        (
-            1_u32..64,
-            prop_oneof![500_u64..1_000, 1_000_u64..2_000],
-            prop_oneof![Just(1001_u32), Just(1002_u32)],
-            prop_oneof![Just(0x1_0000_0042_u64), Just(0x1_0000_0043_u64)],
-            prop::bool::weighted(0.95),
-            prop::bool::weighted(0.95),
-            prop::bool::weighted(0.1),
-            0_u8..3,
-        )
-            .prop_map(
-                |(pid, created, rid, logon, observable, token_readable, stubborn, respawns)| {
-                    Simulated {
-                        pid,
-                        created,
-                        rid,
-                        logon,
-                        observable,
-                        token_readable,
-                        stubborn,
-                        respawns,
-                    }
-                },
-            )
+    fn simulated(tc: &TestCase) -> Simulated {
+        Simulated {
+            pid: tc.draw(gs::integers::<u32>().min_value(1).max_value(63)),
+            created: tc.draw(hegel::one_of!(
+                gs::integers::<u64>().min_value(500).max_value(999),
+                gs::integers::<u64>().min_value(1_000).max_value(1_999),
+            )),
+            rid: tc.draw(gs::sampled_from(vec![1001_u32, 1002])),
+            logon: tc.draw(gs::sampled_from(vec![0x1_0000_0042_u64, 0x1_0000_0043])),
+            observable: tc.draw(gs::integers::<u8>().max_value(99)) < 95,
+            token_readable: tc.draw(gs::integers::<u8>().max_value(99)) < 95,
+            stubborn: tc.draw(gs::integers::<u8>().max_value(99)) < 10,
+            respawns: tc.draw(gs::integers::<u8>().max_value(2)),
+        }
     }
 
-    proptest! {
-        #[test]
-        fn custodian_generations_strictly_increase_and_never_reuse(value in 1_u64..u64::MAX) {
-            let previous = CustodianGeneration::new(value).unwrap();
-            let next = CustodianGeneration::successor(Some(previous)).unwrap();
-            prop_assert!(next > previous);
-            let identity = identity();
-            prop_assert_ne!(identity.job_name(previous), identity.job_name(next));
-            prop_assert_ne!(identity.pipe_name(previous), identity.pipe_name(next));
-            let encoded = serde_json::to_vec(&next).unwrap();
-            prop_assert_eq!(serde_json::from_slice::<CustodianGeneration>(&encoded).unwrap(), next);
-        }
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-generation-successor
+    /// Every custodian generation successor MUST be strictly greater, name a
+    /// distinct job and pipe, and round-trip through its serialized form.
+    #[hegel::test(test_cases = 64)]
+    fn custodian_generations_strictly_increase_and_never_reuse(tc: TestCase) {
+        let value = tc.draw(gs::integers::<u64>().min_value(1).max_value(u64::MAX - 1));
+        let previous = CustodianGeneration::new(value).unwrap();
+        let next = CustodianGeneration::successor(Some(previous)).unwrap();
+        assert!(next > previous);
+        let identity = identity();
+        assert_ne!(identity.job_name(previous), identity.job_name(next));
+        assert_ne!(identity.pipe_name(previous), identity.pipe_name(next));
+        let encoded = serde_json::to_vec(&next).unwrap();
+        assert_eq!(
+            serde_json::from_slice::<CustodianGeneration>(&encoded).unwrap(),
+            next
+        );
+    }
 
-        #[test]
-        fn stale_or_current_generation_receipts_never_reach_recovery(
-            current in 1_u64..1_000,
-            recorded in 1_u64..1_000,
-            exact in any::<bool>(),
-            present in any::<bool>(),
-        ) {
-            let current = CustodianGeneration::new(current).unwrap();
-            let recorded = CustodianGeneration::new(recorded).unwrap();
-            let mut probed = false;
-            let decision = prior_receipt_admission(current, recorded, exact, || {
-                probed = true;
-                Ok(present)
-            });
-            if recorded < current && exact && !present {
-                prop_assert_eq!(decision, Ok(()));
-            } else {
-                prop_assert_eq!(decision, Err(Refusal::Custody));
-            }
-            // Stale/current generations and identity drift refuse before any
-            // kernel observation of the prior job namespace.
-            prop_assert_eq!(probed, recorded < current && exact);
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-prior-receipt-admission
+    /// A prior receipt MUST be admitted exactly when it is from a strictly
+    /// earlier generation, matches the identity and its job is absent; stale,
+    /// current or drifted receipts MUST refuse before probing the job.
+    #[hegel::test(test_cases = 128)]
+    fn stale_or_current_generation_receipts_never_reach_recovery(tc: TestCase) {
+        let current = tc.draw(gs::integers::<u64>().min_value(1).max_value(999));
+        let recorded = tc.draw(gs::integers::<u64>().min_value(1).max_value(999));
+        let exact = tc.draw(gs::booleans());
+        let present = tc.draw(gs::booleans());
+        let current = CustodianGeneration::new(current).unwrap();
+        let recorded = CustodianGeneration::new(recorded).unwrap();
+        let mut probed = false;
+        let decision = prior_receipt_admission(current, recorded, exact, || {
+            probed = true;
+            Ok(present)
+        });
+        if recorded < current && exact && !present {
+            assert_eq!(decision, Ok(()));
+        } else {
+            assert_eq!(decision, Err(Refusal::Custody));
         }
+        // Stale/current generations and identity drift refuse before any
+        // kernel observation of the prior job namespace.
+        assert_eq!(probed, recorded < current && exact);
+    }
 
-        #[test]
-        fn prior_session_drain_never_touches_other_accounts_or_sessions(
-            table in prop::collection::vec(simulated(), 0..24),
-        ) {
-            let prior = prior(1);
-            let mut live = table.clone();
-            let mut next_pid = 10_000;
-            let mut terminated = Vec::new();
-            let result = {
-                let live = std::cell::RefCell::new(&mut live);
-                drain_prior_session(
-                    &prior,
-                    PRIOR_SESSION_ROUNDS,
-                    || Ok(live.borrow().iter().map(Simulated::observation).collect()),
-                    |_, target| {
-                        let mut live = live.borrow_mut();
-                        let index = live
-                            .iter()
-                            .position(|entry| entry.pid == target.pid && entry.created == target.created)
-                            .ok_or(Refusal::Custody)?;
-                        terminated.push(live[index].clone());
-                        if live[index].stubborn {
-                            return Ok(());
-                        }
-                        let entry = live.remove(index);
-                        if entry.respawns > 0 {
-                            // A dying straggler may spawn a same-session child.
-                            next_pid += 1;
-                            live.push(Simulated { pid: next_pid, created: 3_000, respawns: entry.respawns - 1, stubborn: false, observable: true, token_readable: true, ..entry });
-                        }
-                        Ok(())
-                    },
-                )
-            };
-            // Only exact account and logon-session stragglers are ever terminated.
-            for entry in &terminated {
-                prop_assert!(entry.matches(&prior));
-            }
-            // Every unrelated original entry survives untouched.
-            for entry in table.iter().filter(|entry| !entry.matches(&prior) && (entry.observable && entry.token_readable || entry.created < prior.root.created)) {
-                prop_assert!(live.iter().any(|survivor| survivor.pid == entry.pid && survivor.created == entry.created));
-            }
-            let ambiguous = table.iter().any(|entry| {
-                (!entry.observable) || (!entry.token_readable && entry.created >= prior.root.created)
-            });
-            let stubborn = table.iter().any(|entry| entry.stubborn && entry.matches(&prior));
-            match result {
-                Ok(()) => {
-                    prop_assert!(!ambiguous && !stubborn);
-                    prop_assert!(live.iter().all(|entry| !entry.matches(&prior)));
-                }
-                Err(reason) => {
-                    prop_assert_eq!(reason, Refusal::Custody);
-                    prop_assert!(ambiguous || stubborn);
-                }
-            }
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-prior-session-drain
+    /// Draining a simulated process table MUST terminate only exact account
+    /// and logon-session stragglers, leave every unrelated entry, and succeed
+    /// only when no ambiguous or stubborn straggler remains.
+    #[hegel::test(test_cases = 128)]
+    fn prior_session_drain_never_touches_other_accounts_or_sessions(tc: TestCase) {
+        let count = tc.draw(gs::integers::<usize>().max_value(23));
+        let mut table = (0..count).map(|_| simulated(&tc)).collect::<Vec<_>>();
+        // A PID and creation time name at most one live process.
+        let mut seen = std::collections::BTreeSet::new();
+        table.retain(|entry| seen.insert((entry.pid, entry.created)));
+        let prior = prior(1);
+        let mut live = table.clone();
+        let mut next_pid = 10_000;
+        let mut terminated = Vec::new();
+        let result = {
+            let live = std::cell::RefCell::new(&mut live);
+            drain_prior_session(
+                &prior,
+                PRIOR_SESSION_ROUNDS,
+                || Ok(live.borrow().iter().map(Simulated::observation).collect()),
+                |_, target| {
+                    let mut live = live.borrow_mut();
+                    let index = live
+                        .iter()
+                        .position(|entry| {
+                            entry.pid == target.pid && entry.created == target.created
+                        })
+                        .ok_or(Refusal::Custody)?;
+                    terminated.push(live[index].clone());
+                    if live[index].stubborn {
+                        return Ok(());
+                    }
+                    let entry = live.remove(index);
+                    if entry.respawns > 0 {
+                        // A dying straggler may spawn a same-session child.
+                        next_pid += 1;
+                        live.push(Simulated {
+                            pid: next_pid,
+                            created: 3_000,
+                            respawns: entry.respawns - 1,
+                            stubborn: false,
+                            observable: true,
+                            token_readable: true,
+                            ..entry
+                        });
+                    }
+                    Ok(())
+                },
+            )
+        };
+        // Only exact account and logon-session stragglers are ever terminated.
+        for entry in &terminated {
+            assert!(entry.matches(&prior));
         }
-
-        #[test]
-        fn scan_and_termination_errors_refuse_replacement(reason_index in 0_usize..3) {
-            let reason = [Refusal::Custody, Refusal::Startup, Refusal::Capacity][reason_index];
-            let prior = prior(2);
-            prop_assert_eq!(drain_prior_session(&prior, PRIOR_SESSION_ROUNDS, || Err(reason), |_, _| panic!("no plan")), Err(reason));
-            let straggler = ProcessObservation::Opened {
-                process: ProcessIdentity { pid: 7, created: 2_000 },
-                token: TokenObservation::Account(TokenOwner { sid: prior.sid.clone(), logon: prior.logon }),
-            };
-            prop_assert_eq!(
-                drain_prior_session(&prior, PRIOR_SESSION_ROUNDS, || Ok(vec![straggler.clone()]), |_, _| Err(reason)),
-                Err(reason)
+        // Every unrelated original entry survives untouched.
+        for entry in table.iter().filter(|entry| {
+            !entry.matches(&prior)
+                && (entry.observable && entry.token_readable || entry.created < prior.root.created)
+        }) {
+            assert!(
+                live.iter()
+                    .any(|survivor| survivor.pid == entry.pid && survivor.created == entry.created)
             );
+        }
+        let ambiguous = table.iter().any(|entry| {
+            (!entry.observable) || (!entry.token_readable && entry.created >= prior.root.created)
+        });
+        let stubborn = table
+            .iter()
+            .any(|entry| entry.stubborn && entry.matches(&prior));
+        match result {
+            Ok(()) => {
+                assert!(!ambiguous && !stubborn);
+                assert!(live.iter().all(|entry| !entry.matches(&prior)));
+            }
+            Err(reason) => {
+                assert_eq!(reason, Refusal::Custody);
+                assert!(ambiguous || stubborn);
+            }
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-drain-error-propagation
+    /// Scan and termination errors MUST propagate unchanged and refuse
+    /// replacement.
+    #[hegel::test(test_cases = 16)]
+    fn scan_and_termination_errors_refuse_replacement(tc: TestCase) {
+        let reason = tc.draw(gs::sampled_from(vec![
+            Refusal::Custody,
+            Refusal::Startup,
+            Refusal::Capacity,
+        ]));
+        let prior = prior(2);
+        assert_eq!(
+            drain_prior_session(
+                &prior,
+                PRIOR_SESSION_ROUNDS,
+                || Err(reason),
+                |_, _| panic!("no plan")
+            ),
+            Err(reason)
+        );
+        let straggler = ProcessObservation::Opened {
+            process: ProcessIdentity {
+                pid: 7,
+                created: 2_000,
+            },
+            token: TokenObservation::Account(TokenOwner {
+                sid: prior.sid.clone(),
+                logon: prior.logon,
+            }),
+        };
+        assert_eq!(
+            drain_prior_session(
+                &prior,
+                PRIOR_SESSION_ROUNDS,
+                || Ok(vec![straggler.clone()]),
+                |_, _| Err(reason)
+            ),
+            Err(reason)
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;recovery] broker-logon-session-luid
+    /// LogonSession MUST refuse zero, and every nonzero LUID MUST combine
+    /// without sign extension into the little-endian (low, high) value that
+    /// round-trips through new, u64 and serialization.
+    #[hegel::test(test_cases = 128)]
+    fn logon_sessions_refuse_zero_and_round_trip(tc: TestCase) {
+        let low = tc.draw(hegel::one_of!(gs::just(0_u32), gs::integers::<u32>()));
+        let high = tc.draw(hegel::one_of!(
+            gs::sampled_from(vec![0_i32, -1, i32::MIN]),
+            gs::integers::<i32>(),
+        ));
+        let mut bytes = [0_u8; 8];
+        bytes[..4].copy_from_slice(&low.to_le_bytes());
+        bytes[4..].copy_from_slice(&high.to_le_bytes());
+        let combined = u64::from_le_bytes(bytes);
+        let session = LogonSession::from_luid(low, high);
+        assert_eq!(session, LogonSession::new(combined));
+        if combined == 0 {
+            assert_eq!(session, Err(Refusal::Custody));
+            assert!(LogonSession::try_from(0_u64).is_err());
+            assert!(serde_json::from_slice::<LogonSession>(b"0").is_err());
+        } else {
+            let session = session.unwrap();
+            assert_eq!(u64::from(session), combined);
+            assert_eq!(LogonSession::try_from(combined), Ok(session));
+            let encoded = serde_json::to_vec(&session).unwrap();
+            assert_eq!(
+                serde_json::from_slice::<LogonSession>(&encoded).unwrap(),
+                session
+            );
+        }
+    }
+
+    const DEVICES: [&str; 12] = [
+        "CON", "prn", "Aux", "nul", "COM1", "com9", "LPT5", "lpt²", "COM¹", "Lpt³", "CONIN$",
+        "conout$",
+    ];
+
+    /// @cc [owner:ghuntley,label:verification;security] broker-dos-device-lattice
+    /// dos_device MUST recognize every reserved DOS device name in any ASCII
+    /// case and with any extension, and MUST NOT recognize a device name with
+    /// any extra or missing base character.
+    #[hegel::test(test_cases = 128)]
+    fn dos_device_names_follow_the_reserved_lattice(tc: TestCase) {
+        let device = tc.draw(gs::sampled_from(DEVICES.as_slice()));
+        let extension = tc.draw(gs::sampled_from(vec!["", ".txt", ".a.b", "."]));
+        assert!(dos_device(&format!("{device}{extension}")));
+        assert!(dos_device(&format!(
+            "{}{extension}",
+            device.to_ascii_lowercase()
+        )));
+        let extra = tc.draw(gs::sampled_from(vec!["0", "x", "$", "1"]));
+        assert!(!dos_device(&format!("{device}{extra}{extension}")));
+        assert!(!dos_device(&format!("x{device}{extension}")));
+        let mut shortened = device.chars().collect::<Vec<_>>();
+        shortened.pop();
+        assert!(!dos_device(&format!(
+            "{}{extension}",
+            shortened.into_iter().collect::<String>()
+        )));
+    }
+
+    const POISON_COMPONENTS: [&str; 19] = [
+        "",
+        ".",
+        "..",
+        "a.",
+        "a ",
+        "NUL",
+        "con.txt",
+        "Com1",
+        "lpt²",
+        "CONIN$",
+        "conout$.log",
+        "aux",
+        "a:b",
+        "a/b",
+        "a\"b",
+        "a\rb",
+        "a\nb",
+        "a\0b",
+        "prn.x.y",
+    ];
+
+    /// A component that is never a device, dot form or forbidden character.
+    fn safe_component(tc: &TestCase) -> String {
+        let first = tc.draw(gs::sampled_from(vec![
+            'b', 'w', 'x', 'y', 'z', '0', '1', '9', '_',
+        ]));
+        let rest = tc.draw(gs::text().alphabet("abwxyz019_- ").max_size(7));
+        let rest = rest.trim_end_matches(' ');
+        format!("{first}{rest}")
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] broker-local-path-lattice
+    /// LocalPath::parse MUST accept a drive root or a drive-absolute path of at
+    /// most 4096 bytes exactly when every component is safe; any empty, dot,
+    /// trailing dot or space, device, stream, separator, quote or control
+    /// component, or a non-letter drive, MUST refuse.
+    #[hegel::test(test_cases = 192)]
+    fn local_paths_follow_the_component_lattice(tc: TestCase) {
+        let drive = tc.draw(gs::sampled_from(vec!['C', 'z', '1', ':', '\\', 'é']));
+        let count = tc.draw(gs::integers::<usize>().max_value(5));
+        let mut poisoned = false;
+        let mut components = Vec::new();
+        for _ in 0..count {
+            if tc.draw(gs::integers::<u8>().max_value(4)) == 0 {
+                poisoned = true;
+                components.push(
+                    tc.draw(gs::sampled_from(POISON_COMPONENTS.as_slice()))
+                        .to_owned(),
+                );
+            } else {
+                components.push(safe_component(&tc));
+            }
+        }
+        if tc.draw(gs::booleans()) {
+            components.push("x".repeat(tc.draw(gs::integers::<usize>().max_value(4200))));
+            poisoned |= components.last().is_some_and(String::is_empty);
+        }
+        let rest = components.join("\\");
+        let value = format!("{drive}:\\{rest}");
+        let expected =
+            drive.is_ascii_alphabetic() && (rest.is_empty() || !poisoned && value.len() <= 4096);
+        assert_eq!(LocalPath::parse(&value).is_ok(), expected);
+        if expected {
+            assert_eq!(LocalPath::parse(&value).unwrap().as_str(), value);
+        } else {
+            assert_eq!(LocalPath::parse(&value), Err(Refusal::Package));
+        }
+    }
+
+    const POISON_ENTRIES: [&str; 13] = [
+        "",
+        "relative",
+        "C:",
+        r"C:\a\..\b",
+        r"%SystemRoot%\x",
+        r"C:\a*",
+        r"C:\a?",
+        r"C:\a<b",
+        r"C:\a|b",
+        r"C:\Ö",
+        "C:\\a\tb",
+        r"\\server\share",
+        r"C:\NUL",
+    ];
+
+    /// @cc [owner:ghuntley,label:verification;security] broker-worker-path-lattice
+    /// WorkerPath::parse MUST accept exactly 1..=32 distinct safe local
+    /// directories; a poisoned entry, a case-insensitive duplicate or a 33rd
+    /// entry MUST refuse, and accepted paths MUST preserve value and order.
+    #[hegel::test(test_cases = 192)]
+    fn worker_paths_follow_the_entry_lattice(tc: TestCase) {
+        let count = tc.draw(gs::integers::<usize>().min_value(1).max_value(36));
+        let mut refused = count > 32;
+        let mut entries: Vec<String> = Vec::new();
+        for index in 0..count {
+            match tc.draw(gs::integers::<u8>().max_value(9)) {
+                0 => {
+                    refused = true;
+                    entries.push(
+                        tc.draw(gs::sampled_from(POISON_ENTRIES.as_slice()))
+                            .to_owned(),
+                    );
+                }
+                1 if index > 0 => {
+                    refused = true;
+                    let previous = tc.draw(gs::integers::<usize>().max_value(index - 1));
+                    entries.push(format!(r"C:\D{previous}"));
+                }
+                _ => entries.push(format!(r"C:\d{index}")),
+            }
+        }
+        let value = entries.join(";");
+        match WorkerPath::parse(&value) {
+            Ok(path) => {
+                assert!(!refused);
+                assert_eq!(path.as_str(), value);
+                assert!(
+                    path.directories()
+                        .iter()
+                        .map(LocalPath::as_str)
+                        .eq(entries.iter().map(String::as_str))
+                );
+            }
+            Err(reason) => {
+                assert!(refused);
+                assert_eq!(reason, Refusal::Package);
+            }
+        }
+    }
+
+    /// CommandLineToArgvW/msvcrt argument splitting: 2n backslashes and a
+    /// quote yield n backslashes and toggle quoting; 2n+1 yield n and a
+    /// literal quote; other backslashes are literal; unquoted blanks split.
+    fn argv_oracle(line: &str) -> Vec<String> {
+        let characters = line.chars().collect::<Vec<_>>();
+        let mut arguments = Vec::new();
+        let mut index = 0;
+        loop {
+            while characters
+                .get(index)
+                .is_some_and(|c| *c == ' ' || *c == '\t')
+            {
+                index += 1;
+            }
+            if index >= characters.len() {
+                return arguments;
+            }
+            let mut argument = String::new();
+            let mut quoted = false;
+            while let Some(&character) = characters.get(index) {
+                if !quoted && (character == ' ' || character == '\t') {
+                    break;
+                }
+                if character == '\\' {
+                    let mut slashes = 0;
+                    while characters.get(index) == Some(&'\\') {
+                        slashes += 1;
+                        index += 1;
+                    }
+                    if characters.get(index) == Some(&'"') {
+                        argument.extend(std::iter::repeat_n('\\', slashes / 2));
+                        if slashes % 2 == 1 {
+                            argument.push('"');
+                        } else {
+                            quoted = !quoted;
+                        }
+                        index += 1;
+                    } else {
+                        argument.extend(std::iter::repeat_n('\\', slashes));
+                    }
+                } else if character == '"' {
+                    quoted = !quoted;
+                    index += 1;
+                } else {
+                    argument.push(character);
+                    index += 1;
+                }
+            }
+            arguments.push(argument);
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] broker-command-line-roundtrip
+    /// command_line MUST refuse NUL-bearing or empty argument lists and lines
+    /// of 32767 or more UTF-16 units, and every accepted line MUST be
+    /// NUL-terminated and split back into exactly the original arguments by
+    /// an independent CommandLineToArgvW-style parser.
+    #[hegel::test(test_cases = 192)]
+    fn command_lines_round_trip_through_argv_oracle(tc: TestCase) {
+        let mut arguments = tc.draw(
+            gs::vecs(hegel::one_of!(
+                gs::text().alphabet("ab \\\"\té😀").max_size(12),
+                gs::text().alphabet("a\\\"\0").max_size(4),
+            ))
+            .max_size(5),
+        );
+        if tc.draw(gs::booleans()) {
+            let length = tc.draw(gs::integers::<usize>().max_value(40_000));
+            arguments.push("x\\".repeat(length / 2));
+        }
+        let nul = arguments.iter().any(|argument| argument.contains('\0'));
+        let raw: usize = arguments
+            .iter()
+            .map(|argument| argument.encode_utf16().count())
+            .sum();
+        let bound: usize = arguments
+            .iter()
+            .map(|argument| 2 * argument.encode_utf16().count() + 3)
+            .sum();
+        match command_line(&arguments) {
+            Ok(wide) => {
+                assert!(!nul && !arguments.is_empty() && raw < 32767);
+                assert_eq!(wide.last(), Some(&0));
+                assert!(wide.len() <= 32767);
+                let line = String::from_utf16(&wide[..wide.len() - 1]).unwrap();
+                assert!(!line.contains('\0'));
+                assert_eq!(argv_oracle(&line), arguments);
+            }
+            Err(reason) => {
+                assert_eq!(reason, Refusal::Package);
+                assert!(nul || arguments.is_empty() || bound >= 32767);
+            }
         }
     }
 
