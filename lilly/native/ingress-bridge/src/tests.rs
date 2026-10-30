@@ -1,5 +1,8 @@
 use super::*;
+use crate::run::moved;
 use hegel::{generators as gs, TestCase};
+use rustix::io::Errno;
+use std::ffi::OsString;
 
 /// The independent command-line specification.
 fn oracle(words: &[String]) -> Option<(Option<i32>, i32, i32, Option<u32>)> {
