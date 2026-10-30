@@ -4,7 +4,8 @@ defmodule Overalls.HegelFixtures do
   # @cc [owner:ghuntley,label:verification] hegel-supervised-fixture-custody
   # Case cleanup MUST stop and delete its own supervised child, including on
   # failure or replay. A reused child ID MUST NOT authorize stopping a different
-  # PID. Explicit earlier teardown is allowed; other cleanup failures MUST fail.
+  # PID. Explicit earlier teardown is allowed, as is the child exiting on its own
+  # between inspection and termination; other cleanup failures MUST fail.
   @spec start_supervised!(Supervisor.child_spec() | {module(), term()} | module(), keyword()) ::
           pid()
   def start_supervised!(child, options \\ []) do
@@ -33,13 +34,19 @@ defmodule Overalls.HegelFixtures do
         :ok
 
       {^id, ^expected, _, _} ->
-        :ok = Supervisor.terminate_child(supervisor, id)
+        case Supervisor.terminate_child(supervisor, id) do
+          :ok ->
+            # Temporary children remove their specification as part of termination.
+            case Supervisor.delete_child(supervisor, id) do
+              :ok -> :ok
+              {:error, :not_found} -> :ok
+              other -> raise "Hegel fixture specification cleanup failed: #{inspect(other)}"
+            end
 
-        # Temporary children remove their specification as part of termination.
-        case Supervisor.delete_child(supervisor, id) do
-          :ok -> :ok
-          {:error, :not_found} -> :ok
-          other -> raise "Hegel fixture specification cleanup failed: #{inspect(other)}"
+          # The child exited after which_children/1 and, being temporary, the
+          # supervisor already removed it; nothing of another PID was touched.
+          {:error, :not_found} ->
+            :ok
         end
 
       {^id, :undefined, _, _} ->
