@@ -48,13 +48,55 @@ harness uses for real guest execution.
    `nix run .#mila-journey-fixture` boots the same module as a KVM QEMU VM. It
    forwards the ports to `--bind` (default loopback) and prints the
    descriptor, so Android (`adb reverse`), Linux and local runs can reach it.
-6. macOS and Windows runners cannot reach a Linux runner's fixture without a
-   relay. The accepted route is a tunnelled fixture. Its implementation is
-   deferred until a tunnel credential (for example an ephemeral tagged
-   Tailscale key) is provisioned. No secret-free cross-runner route exists.
+6. macOS and Windows runners reach a Linux runner's fixture over a Tailscale
+   tailnet (the tunnelled fixture). The `journey-fixture-tailnet` job boots
+   the launcher with `--bind` on its tailnet address and serves only the
+   descriptor on port 8445. It stays up until this run's Apple and Windows
+   nodes have joined and left, or a deadline passes. The journey jobs join as
+   ephemeral `tag:mila-ci` nodes, download the descriptor and forward
+   `127.0.0.1:8443/2222/8444` to the fixture. `deployment.host` therefore
+   stays `localhost`, which the TLS SAN, trust management host and Porsche
+   certificate principal all name. Every tailnet step is skipped when the
+   `MILA_TAILSCALE_AUTHKEY` secret is absent.
+7. The approver also exposes `POST /fixture/<action>` under the same bearer
+   and TLS (`descriptor.approver.fixture_url`). It runs only the closed
+   stand-in actions `observe`, `thread-create`, `thread-ready`,
+   `thread-question` and `thread-proposal`, with canonical UUID inputs, so
+   platform journeys outside the VM can use them. Other input is refused with
+   a 4xx status.
+8. `checks.x86_64-linux.mila-journey-terminal` runs the same driver on the
+   fleet harness, which needs nested KVM. It enrolls a device key through
+   the browser approval page, then drives `terminal new`, a named attach,
+   output, input, resize, detach, reattach with replay and a server-side kill
+   on a real guest PTY. It reaches Porsche at the deployment's public host.
 
 Authorization: the hermetic-fixture and tunnelled-fixture choices in the Mila
-journey fixture request (2026-10-30).
+journey fixture request (2026-10-30); the Tailscale route was approved by the
+user on 2026-10-30.
+
+### Tailnet configuration
+
+Create these in the Tailscale admin console:
+
+- Tag owner and access policy (tailnet policy file):
+
+  ```json
+  {
+    "tagOwners": { "tag:mila-ci": ["autogroup:admin"] },
+    "grants": [
+      { "src": ["tag:mila-ci"], "dst": ["tag:mila-ci"],
+        "ip": ["tcp:8443", "tcp:2222", "tcp:8444", "tcp:8445"] }
+    ]
+  }
+  ```
+
+  Merge these into the existing policy. No other source or destination
+  needs access to `tag:mila-ci`.
+- An auth key that is **reusable**, **ephemeral** and **pre-approved**, with
+  tag `tag:mila-ci` and the longest expiry policy allows. Rotate it before
+  it expires. Store it as the repository secret `MILA_TAILSCALE_AUTHKEY`.
+- MagicDNS is not required. Peers are found by their tailnet host names,
+  `mila-{fixture,apple,windows}-<run id>-<attempt>`.
 
 ## Alternatives
 
@@ -98,8 +140,22 @@ must never be cited as evidence that the provisioner works.
   Approver: [`approver.py`](../../../nix/verification/tests/machines/mila-journey/approver.py).
 - Machine test: [`default.nix`](../../../nix/verification/tests/machines/mila-journey/default.nix)
   and [`driver.py`](../../../nix/verification/tests/machines/mila-journey/driver.py).
-  It was run locally on 2026-10-30 and all 16 subtests passed:
+  It was run locally on 2026-10-30 and all subtests passed, including the
+  fixture hooks and Marshall's closed `vm_busy` refusal:
   `nix build -L .#checks.x86_64-linux.mila-journey`.
+- Fleet terminal journey: [`mila-terminal.py`](../../../nix/verification/tests/machines/fleet/scenarios/mila-terminal.py)
+  on the [fleet harness](../../../nix/verification/tests/machines/fleet/default.nix)
+  (`milaTerminal`). It was run locally on 2026-10-30 with nested KVM and
+  passed: browser-approved enrollment, then terminal new, attach, output,
+  input, resize, reattach with replay and a kill confirmed in Marshall's
+  ledger, on a real guest:
+  `nix build -L .#checks.x86_64-linux.mila-journey-terminal`.
+- Tailnet route: [`mila-builds.yml`](../../../.github/workflows/mila-builds.yml)
+  (`journey-fixture-tailnet`, Apple and Windows tailnet steps) with
+  [`mila-tailnet-fixture.sh`](../../../.github/scripts/mila-tailnet-fixture.sh),
+  [`mila-tailnet-forward.py`](../../../.github/scripts/mila-tailnet-forward.py) and
+  [`mila-tailnet-peers.py`](../../../.github/scripts/mila-tailnet-peers.py).
+  The forwarder was smoke-tested locally; the route has not run in CI.
 - Launcher: [`launcher.nix`](../../../nix/verification/tests/machines/mila-journey/launcher.nix)
   (`apps.x86_64-linux.mila-journey-fixture`). It was booted locally with
   `--detach`. The host-side `mila-journey` then completed browser-approved
@@ -117,17 +173,17 @@ must never be cited as evidence that the provisioner works.
 Remaining gaps:
 
 - With no guest, `terminal new` returns Marshall's closed `terminal_unavailable`
-  refusal. Attach, output, input, resize, reconnect and kill over the PTY are
-  not exercised here.
+  refusal in the control fixture. The PTY path is covered only by
+  `mila-journey-terminal` on the nested-KVM fleet harness.
 - Pause records intent, but the synthetic host stores no checkpoint, so resume
   is asserted only as an admitted wake.
-- The tunnel for macOS and Windows is not implemented.
+- The tunnel for macOS and Windows has not run until the secret and policy
+  above exist.
 
 ## Open questions
 
-- Which tunnel credential to provision for the macOS and Windows jobs.
-- Whether a fleet-harness variant should drive `mila-journey` terminal steps
-  against a real guest PTY (nested KVM, so not on hosted runners).
+None. Recorded execution of the tunnel and the fleet terminal journey is tracked
+under implementation evidence.
 
 ## Related decisions
 
