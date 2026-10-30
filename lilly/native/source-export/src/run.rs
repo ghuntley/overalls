@@ -55,15 +55,19 @@ fn acquire_lock(path: &Path) -> Result<Held, u8> {
 }
 
 /// The custody-owned lock for the sweep's duration.
+#[derive(Debug)]
 pub struct Held {
-    #[allow(dead_code)]
+    #[expect(
+        dead_code,
+        reason = "never read: owning the descriptor holds the flock until Held drops"
+    )]
     descriptor: OwnedFd,
 }
 
 fn write_all(fd: BorrowedFd<'_>, mut buffer: &[u8]) -> Result<(), ()> {
     while !buffer.is_empty() {
         match rustix::io::write(fd, buffer) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Err(_) | Ok(0) => return Err(()),
             Ok(count) => buffer = &buffer[count..],
         }
@@ -103,9 +107,8 @@ pub fn run(request: &Request) -> u8 {
                 tv_nsec: 50_000_000,
             }),
         ) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) | Ok(0) => continue,
             Err(_) => return EXIT_IO,
-            Ok(0) => continue,
             Ok(_) => {}
         }
         let mut byte = [0_u8; 1];
@@ -135,16 +138,14 @@ fn run_sender(
     deadline: &mut Instant,
     startup_frame: &[u8],
 ) -> u8 {
-    let (diag_read, diag_write) = match pipe_with(PipeFlags::CLOEXEC) {
-        Err(_) => return EXIT_SETUP,
-        Ok(pair) => pair,
+    let Ok((diag_read, diag_write)) = pipe_with(PipeFlags::CLOEXEC) else {
+        return EXIT_SETUP;
     };
     if rustix::fs::fcntl_setfl(&diag_read, OFlags::NONBLOCK).is_err() {
         return EXIT_SETUP;
     }
-    let mut child = match spawn_sender(request, diag_write) {
-        Err(_) => return EXIT_SETUP,
-        Ok(child) => child,
+    let Ok(mut child) = spawn_sender(request, diag_write) else {
+        return EXIT_SETUP;
     };
     let Some(sender_pid) = i32::try_from(child.id()).ok().and_then(Pid::from_raw) else {
         return finish(&mut child, EXIT_SETUP);
@@ -184,7 +185,7 @@ fn run_sender(
             match rustix::io::read(control, &mut chunk) {
                 Ok(0) | Err(_) => return finish(&mut child, EXIT_REVOKED),
                 Ok(count) => {
-                    for byte in chunk[..count].iter() {
+                    for byte in &chunk[..count] {
                         if *byte == b'\n' {
                             match parse_control(&frame) {
                                 Some(Control::Renew(lease)) => {
@@ -206,7 +207,7 @@ fn run_sender(
         }
         let mut discard = [0_u8; 4096];
         match rustix::io::read(&diag_read, &mut discard) {
-            Err(Errno::AGAIN) | Err(Errno::INTR) => {}
+            Err(Errno::AGAIN | Errno::INTR) => {}
             Err(_) => return finish(&mut child, EXIT_DIAGNOSTICS),
             Ok(count) => {
                 diagnostics_total += count;
@@ -219,14 +220,10 @@ fn run_sender(
             WaitId::Pid(sender_pid),
             WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
         ) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) | Ok(None) => {}
             Err(_) => return finish(&mut child, EXIT_SENDER_FAILED),
             Ok(Some(status)) => {
-                let code = if status.exit_status() == Some(0) {
-                    0
-                } else {
-                    1
-                };
+                let code = u8::from(status.exit_status() != Some(0));
                 let finished = finish(&mut child, code);
                 // Writers are reaped; drain the remaining bounded diagnostics.
                 loop {
@@ -240,7 +237,6 @@ fn run_sender(
                 }
                 return finished;
             }
-            Ok(None) => {}
         }
     }
 }
@@ -263,9 +259,8 @@ fn spawn_sender(request: &Request, diag_write: OwnedFd) -> Result<std::process::
 /// unreaped until this point, preventing PID reuse. An uncertain reap MUST
 /// never confirm quiescence.
 fn finish(child: &mut std::process::Child, status: u8) -> u8 {
-    let pid = match i32::try_from(child.id()).ok().and_then(Pid::from_raw) {
-        Some(pid) => pid,
-        None => return EXIT_IO,
+    let Some(pid) = i32::try_from(child.id()).ok().and_then(Pid::from_raw) else {
+        return EXIT_IO;
     };
     let _ = kill_process_group(pid, Signal::KILL);
     let _ = child.kill();
@@ -275,10 +270,9 @@ fn finish(child: &mut std::process::Child, status: u8) -> u8 {
     // Subreaper adoption: every grandchild is ours until ECHILD.
     loop {
         match wait(WaitOptions::empty()) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) | Ok(_) => {}
             Err(Errno::CHILD) => return status,
             Err(_) => return EXIT_IO,
-            Ok(_) => continue,
         }
     }
 }

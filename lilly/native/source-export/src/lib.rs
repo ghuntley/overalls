@@ -48,13 +48,18 @@ extern "C" fn cancel_handler(_signal: libc::c_int) {
 /// the lease loop; libc's signal registration is unsafe-signatured, so this is
 /// the entire confinement surface. No data, sender pid or path crosses it.
 pub fn install_cancel_handlers() {
-    install_cancel_handlers_impl()
+    install_cancel_handlers_impl();
 }
 
-#[allow(unsafe_code)]
+#[expect(
+    unsafe_code,
+    reason = "three libc signal registrations for the cancel flag; the root's only unsafe"
+)]
 fn install_cancel_handlers_impl() {
     // signal() with a plain extern-C handler storing an AtomicBool is
     // async-signal-safe and bounded; no relocking, allocation or IO.
+    // SAFETY: cancel_handler is an extern "C" fn(c_int) that only stores to
+    // an AtomicBool.
     let lock = unsafe {
         libc::signal(
             libc::SIGTERM,
@@ -62,8 +67,10 @@ fn install_cancel_handlers_impl() {
         )
     };
     let _ = lock;
+    // SAFETY: SIG_IGN installs no handler; signal takes plain integers.
     let ignore = unsafe { libc::signal(libc::SIGPIPE, libc::SIG_IGN) };
     let _ = ignore;
+    // SAFETY: as for SIGTERM, the handler only stores to an AtomicBool.
     let cancel = unsafe {
         libc::signal(
             libc::SIGINT,

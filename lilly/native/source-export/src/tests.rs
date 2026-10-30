@@ -115,7 +115,7 @@ fn renewal_oracle(frame: &[u8]) -> Option<u32> {
 /// Arbitrary control frames MUST renew exactly when the independent digit-wise
 /// oracle accepts them, with the oracle's value; every other byte shape
 /// (non-`L` heads, empty, leading zero, non-digits, non-UTF-8, out of range)
-/// revokes. Frames are bounded to CONTROL_FRAME_LIMIT bytes.
+/// revokes. Frames are bounded to `CONTROL_FRAME_LIMIT` bytes.
 #[hegel::test(test_cases = 300)]
 fn control_frame_lattice_matches_independent_oracle(tc: TestCase) {
     let frame: Vec<u8> = match tc.draw(gs::integers::<u8>().min_value(0).max_value(3)) {

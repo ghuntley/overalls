@@ -1,7 +1,7 @@
 //!
 //! The Erlang port ABI puts the control channel at fd 3 and the ack channel at
-//! fd 4. std::process only maps stdio without an unsafe hook, so the tests use
-//! one reviewed pre_exec placement shim; the rest of this crate is safe.
+//! fd 4. `std::process` only maps stdio without an unsafe hook, so the tests use
+//! one reviewed `pre_exec` placement shim; the rest of this crate is safe.
 
 #![deny(unsafe_code)]
 
@@ -101,7 +101,7 @@ fn fixture_escaped_export_child() {
         std::process::id().to_string(),
     )
     .expect("complete escaped witness");
-    std::thread::sleep(Duration::from_secs(60));
+    std::thread::sleep(Duration::from_mins(1));
 }
 
 /// @cc [owner:ghuntley,label:verification;recovery] source-export-all-adopted-sessions
@@ -246,6 +246,14 @@ fn export_process_retired(pid: rustix::process::Pid) -> bool {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear failure-custody scenario: setup, trigger, witness and reap stay in order"
+)]
 fn failed_export_case(trigger: ExportFailure, count: usize) {
     use rustix::fs::{flock, FlockOperation};
     let (lock, directory) = start_pair();
@@ -386,6 +394,14 @@ fn failed_export_case(trigger: ExportFailure, count: usize) {
 struct Running(Child);
 
 impl Running {
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture helper: a failed poll must abort the test"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "integration-test fixture helper: an overdue helper fails the test"
+    )]
     fn wait_bounded(&mut self, timeout: Duration) -> std::process::ExitStatus {
         let deadline = Instant::now() + timeout;
         loop {
@@ -408,6 +424,10 @@ impl Drop for Running {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn harness() -> String {
     std::env::current_exe()
         .expect("harness path")
@@ -418,6 +438,10 @@ fn harness() -> String {
 /// Spawn the helper with the port ABI: control input on fd 3, ack on fd 4.
 /// Descriptor placement is the entire unsafe surface: two dup2 calls whose
 /// only externally visible effect is the documented ABI line-up.
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn spawn(
     lock: &Path,
     lease: &str,
@@ -449,7 +473,10 @@ fn spawn(
     )
 }
 
-#[allow(unsafe_code)]
+#[allow(
+    unsafe_code,
+    reason = "test-only placement of the port-ABI descriptors 3 and 4 in the child"
+)]
 mod abi_shim {
     use std::os::fd::AsRawFd;
     use std::os::unix::process::CommandExt as _;
@@ -465,10 +492,11 @@ mod abi_shim {
 
     impl Drop for Hoists {
         fn drop(&mut self) {
-            unsafe {
-                libc::close(self.0);
-                libc::close(self.1);
-            }
+            // SAFETY: both numbers are CLOEXEC duplicates this Hoists owns
+            // exclusively; nothing else closes or reuses them before drop.
+            unsafe { libc::close(self.0) };
+            // SAFETY: as above.
+            unsafe { libc::close(self.1) };
         }
     }
 
@@ -477,21 +505,35 @@ mod abi_shim {
         control_read: &C,
         ack_write: &A,
     ) -> Hoists {
+        // SAFETY: control_read is a live descriptor borrowed for the call;
+        // F_DUPFD_CLOEXEC only duplicates it.
         let hoisted_cr = unsafe { libc::fcntl(control_read.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 8) };
+        // SAFETY: as above, for ack_write.
         let hoisted_aw = unsafe { libc::fcntl(ack_write.as_raw_fd(), libc::F_DUPFD_CLOEXEC, 8) };
         assert!(hoisted_cr >= 8 && hoisted_aw >= 8);
-        unsafe {
-            command.pre_exec(move || {
-                if libc::dup2(hoisted_cr, 3) < 0 || libc::dup2(hoisted_aw, 4) < 0 {
-                    return Err(std::io::Error::from_raw_os_error(libc::EFAULT));
-                }
-                Ok(())
-            });
-        }
+        let hook = move || {
+            // SAFETY: dup2 on two descriptors this process owns is
+            // async-signal-safe and touches no memory.
+            if unsafe { libc::dup2(hoisted_cr, 3) } < 0 {
+                return Err(std::io::Error::from_raw_os_error(libc::EFAULT));
+            }
+            // SAFETY: as above.
+            if unsafe { libc::dup2(hoisted_aw, 4) } < 0 {
+                return Err(std::io::Error::from_raw_os_error(libc::EFAULT));
+            }
+            Ok(())
+        };
+        // SAFETY: the hook runs in the forked child before exec and makes only
+        // two async-signal-safe dup2 calls on captured integers.
+        unsafe { command.pre_exec(hook) };
         Hoists(hoisted_cr, hoisted_aw)
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn new_lock(directory: &tempfile::TempDir) -> std::path::PathBuf {
     use std::os::unix::fs::PermissionsExt as _;
     let path = directory.path().join("owner.lock");
@@ -500,12 +542,20 @@ fn new_lock(directory: &tempfile::TempDir) -> std::path::PathBuf {
     path
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn start_pair() -> (std::path::PathBuf, tempfile::TempDir) {
     let directory = tempfile::tempdir().expect("fixture directory");
     let lock = new_lock(&directory);
     (lock, directory)
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn startup(ack_read: &mut std::fs::File, control_write: &mut std::fs::File) {
     control_write
         .write_all(b"startup-nonce\n")
@@ -534,7 +584,7 @@ fn fixture_sender_sleeps() {
     if let Ok(path) = std::env::var("HX_PIDFILE") {
         std::fs::write(path, format!("{}", std::process::id())).expect("pidfile");
     }
-    std::thread::sleep(Duration::from_secs(60));
+    std::thread::sleep(Duration::from_mins(1));
 }
 
 #[test]
@@ -665,13 +715,10 @@ fn deadline_expiry_kills_and_reaps_the_sender() {
     assert_eq!(helper.wait_bounded(Duration::from_secs(15)).code(), Some(2));
     let proc = format!("/proc/{pid}");
     let deadline = Instant::now() + Duration::from_secs(10);
-    while std::path::Path::new(&proc).exists() && Instant::now() < deadline {
+    while Path::new(&proc).exists() && Instant::now() < deadline {
         std::thread::sleep(Duration::from_millis(20));
     }
-    assert!(
-        !std::path::Path::new(&proc).exists(),
-        "sender survived the deadline"
-    );
+    assert!(!Path::new(&proc).exists(), "sender survived the deadline");
 }
 
 #[test]

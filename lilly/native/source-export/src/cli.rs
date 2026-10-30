@@ -14,7 +14,7 @@ pub struct Request {
 
 fn duration(text: &OsStr) -> Option<u32> {
     let bytes = text.as_bytes();
-    if bytes.is_empty() || bytes[0] == b'0' || !bytes.iter().all(|b| b.is_ascii_digit()) {
+    if bytes.is_empty() || bytes[0] == b'0' || !bytes.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let text = std::str::from_utf8(bytes).ok()?;
