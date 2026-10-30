@@ -18,6 +18,9 @@ defmodule MarshallWeb.IntegrationsLiveTest do
     assert has_element?(view, "#github-com-state", "Disconnected")
     assert has_element?(view, "#github-com-integration", "owner's GitHub permissions")
 
+    # Re-renders after Detach/Attach must not close the panel the owner opened.
+    assert view |> element("#github-com-machines") |> render() =~ "ignore_attrs"
+
     view |> form("#github-com-detach", github_machine: %{vm_id: fixture.vm.id}) |> render_submit()
     assert has_element?(view, "#github-com-excluded-#{fixture.vm.id}")
     view |> element("#github-com-excluded-#{fixture.vm.id} button") |> render_click()

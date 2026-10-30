@@ -311,7 +311,8 @@ defmodule MarshallWeb.IntegrationsLive do
               {dgettext("integrations", "Disconnect GitHub")}
             </button>
           </div>
-          <details id="github-com-machines">
+          <%!-- Detach and Attach re-render the list; keep the owner's open panel. --%>
+          <details id="github-com-machines" phx-mounted={JS.ignore_attributes(["open"])}>
             <summary>
               {dgettext("integrations", "Machines excluded from your GitHub identity")}
             </summary>

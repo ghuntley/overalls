@@ -290,6 +290,23 @@ name refusals under ADR-0080. It adds no authentication or target authority.
 Focused DNS execution and the composed fleet result retain separate scope in
 the review; a DNS repair alone does not establish the owner integration journey.
 
+The NixOS fleet journey (2026-10-30) exposed three defects in the managed
+client path; each is corrected rather than relaxed. Adding the unpatched
+Nixpkgs `gh` to the [guest toolset](../../../nix/domains/artifacts/guest/configuration.nix)
+shadowed the managed client in the system profile, so the guest asked for
+`gh auth login`; the toolset again carries only the managed client, and the
+[guest-toolset evaluation](../../../nix/verification/tests/evaluation/guest-toolset.nix)
+refuses any unmanaged `gh`. The guest agent state root was owner-only, so the
+public `/usr/local/bin` launcher exited 127 for every ordinary account; the
+[NixOS](../../../nix/domains/artifacts/guest/default.nix) and
+[foreign Linux](../../../nix/domains/artifacts/guest/ubuntu/agent-executor.service)
+executor units now make it traverse-only (0711) while logs and update state
+keep their own owner-only directories. The
+[integrations page](../../../marshall/lib/marshall_web/live/integrations_live.ex)
+closed the excluded-machines panel on every Detach/Attach re-render; it now
+keeps the owner's open state. Foreign-image, FreeBSD and illumos launcher
+access for non-root accounts remains unexecuted.
+
 Retained native [tool setup](../../../lyra/src/agent/maintenance.rs) also migrates
 historical broad workspace Git trust only after validating a completed immutable
 source, preserving unrelated settings and configuration rollback. With no source
