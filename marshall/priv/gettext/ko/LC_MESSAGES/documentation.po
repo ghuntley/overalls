@@ -64,117 +64,117 @@ msgstr "## 연결"
 msgid "## Endpoints"
 msgstr "## 엔드포인트"
 
-#: lib/marshall/documentation_messages.ex:18
+#: lib/marshall/documentation_messages.ex:19
 #, elixir-autogen, elixir-format
 msgid "## First commands"
 msgstr "## 첫 번째 명령"
 
-#: lib/marshall/documentation_messages.ex:19
+#: lib/marshall/documentation_messages.ex:20
 #, elixir-autogen, elixir-format
 msgid "## Install the Overalls CLI"
 msgstr "## Overalls CLI 설치하기"
 
-#: lib/marshall/documentation_messages.ex:20
+#: lib/marshall/documentation_messages.ex:21
 #, elixir-autogen, elixir-format
 msgid "## Install the developer archive"
 msgstr "## 개발자 아카이브 설치하기"
 
-#: lib/marshall/documentation_messages.ex:21
+#: lib/marshall/documentation_messages.ex:22
 #, elixir-autogen, elixir-format
 msgid "## Metadata controls"
 msgstr "## 메타데이터 제어"
 
-#: lib/marshall/documentation_messages.ex:23
+#: lib/marshall/documentation_messages.ex:24
 #, elixir-autogen, elixir-format
 msgid "## Privacy and availability"
 msgstr "## 개인정보 보호 및 가용성"
 
-#: lib/marshall/documentation_messages.ex:24
+#: lib/marshall/documentation_messages.ex:25
 #, elixir-autogen, elixir-format
 msgid "## Register your key"
 msgstr "## 키 등록하기"
 
-#: lib/marshall/documentation_messages.ex:25
+#: lib/marshall/documentation_messages.ex:26
 #, elixir-autogen, elixir-format
 msgid "## Relocate a machine"
 msgstr "## 머신 재배치하기"
 
-#: lib/marshall/documentation_messages.ex:26
+#: lib/marshall/documentation_messages.ex:27
 #, elixir-autogen, elixir-format
 msgid "## Resize a machine"
 msgstr "## 머신 크기 변경하기"
 
-#: lib/marshall/documentation_messages.ex:27
+#: lib/marshall/documentation_messages.ex:28
 #, elixir-autogen, elixir-format
 msgid "## Results and completion"
 msgstr "## 결과 및 완료"
 
-#: lib/marshall/documentation_messages.ex:28
+#: lib/marshall/documentation_messages.ex:29
 #, elixir-autogen, elixir-format
 msgid "## Retry safely"
 msgstr "## 안전하게 재시도하기"
 
-#: lib/marshall/documentation_messages.ex:34
+#: lib/marshall/documentation_messages.ex:35
 #, elixir-autogen, elixir-format
 msgid "- Linux and macOS: the `curl … /bin/install.sh | bash` command.\n- Windows: run the Windows `powershell …` command under \"Install and connect\"\n  in PowerShell. Windows needs OpenSSH 9.6 or newer: the installer installs it\n  with winget when the built-in client is older and, after you approve the\n  administrator prompt, makes it the default `ssh` for new terminals."
 msgstr "- Linux 및 macOS: `curl … /bin/install.sh | bash` 명령. \n - Windows: PowerShell의 \"설치 및 연결\" \n에서 Windows `powershell …` 명령을 실행합니다. Windows에는 OpenSSH 9.6 이상이 필요합니다. 내장 클라이언트가 오래되면 설치 프로그램에서 Winget을 사용하여 \n를 설치하고, \n 관리자 프롬프트를 승인한 후 이를 새 터미널의 기본 `ssh`로 설정합니다."
 
-#: lib/marshall/documentation_messages.ex:42
+#: lib/marshall/documentation_messages.ex:43
 #, elixir-autogen, elixir-format
 msgid "- [Download for Chrome or Chromium](/bin/chrome.zip): extract the ZIP, open\n  `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.\n- [Download for Firefox](/bin/firefox.xpi): open `about:debugging`, choose\n  **This Firefox**, then **Load Temporary Add-on** and select the downloaded XPI."
 msgstr "- [Chrome 또는 Chromium ](/bin/chrome.zip)용 다운로드: ZIP 압축을 풀고 \n `chrome://extensions`를 열고 **개발자 모드** 를 활성화한 다음 **압축 해제된 로드** 를 선택합니다. \n - [Firefox ](/bin/firefox.xpi)용 다운로드: `about:debugging`를 열고 \n **This Firefox** 를 선택한 다음 **임시 추가 기능 로드** 를 선택하고 다운로드한 XPI를 선택합니다."
 
-#: lib/marshall/documentation_messages.ex:46
+#: lib/marshall/documentation_messages.ex:47
 #, elixir-autogen, elixir-format
 msgid "1. Open the extension's settings from the browser toolbar. If it is already\n   configured, use the toolbar's context menu and choose **Configure Overalls\n   server…** to change the server.\n2. Enter the HTTPS origin of this Overalls server. HTTP is supported only for\n   loopback development. The server origin is always selected explicitly; the\n   extension never guesses it from a page.\n3. Visit a supported repository page and click the Overalls toolbar button."
 msgstr "1. 브라우저 도구 모음에서 확장 프로그램의 설정을 엽니다. 이미 \n가 구성되어 있는 경우 도구 모음의 상황에 맞는 메뉴를 사용하고 **Overalls \n 서버 구성…** 을 선택하여 서버를 변경합니다. \n 2. 이 Overalls 서버의 HTTPS 원본을 입력합니다. HTTP는 \n 루프백 개발에만 지원됩니다. 서버 원본은 항상 명시적으로 선택됩니다. \n 확장 프로그램은 페이지에서 이를 추측하지 않습니다. \n 3. 지원되는 저장소 페이지를 방문하고 Overalls 도구 모음 버튼을 클릭합니다."
 
-#: lib/marshall/documentation_messages.ex:50
+#: lib/marshall/documentation_messages.ex:51
 #, elixir-autogen, elixir-format
 msgid "Accept a pending ownership offer."
 msgstr "대기 중인 소유권 제안을 수락합니다."
 
-#: lib/marshall/documentation_messages.ex:51
+#: lib/marshall/documentation_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "Add or change an admin or member."
 msgstr "관리자 또는 구성원을 추가하거나 변경합니다."
 
-#: lib/marshall/documentation_messages.ex:52
+#: lib/marshall/documentation_messages.ex:57
 #, elixir-autogen, elixir-format
 msgid "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
 msgstr "생략된 옵션은 현재 크기를 유지합니다. 크기 옵션이 없는 요청은 \n가 거부됩니다. 실행 중인 머신이 중지되고 크기를 적용한 후 다시 시작됩니다. 중지된 \n 시스템은 중지된 상태를 유지하고 다음 부팅 시 파일 시스템을 확장합니다. 영수증 \n는 ​​요청 단계를 따릅니다. `request cancel grow-1`는 \n 기계가 정지 중인 동안에만 허용됩니다. 즉, 원래 크기와 홀드가 유지되고 실행 중인 \n 기계가 변경되지 않고 다시 시작됩니다. `request retry grow-1`는 기록된 단계에서 \n 주의가 필요한 요청을 재개합니다.\n"
 
-#: lib/marshall/documentation_messages.ex:69
+#: lib/marshall/documentation_messages.ex:74
 #, elixir-autogen, elixir-format
 msgid "At the Porsche prompt, enter:"
 msgstr "Porsche 프롬프트에서 다음을 입력하세요:"
 
-#: lib/marshall/documentation_messages.ex:74
+#: lib/marshall/documentation_messages.ex:79
 #, elixir-autogen, elixir-format
 msgid "Automation"
 msgstr "자동화"
 
-#: lib/marshall/documentation_messages.ex:75
+#: lib/marshall/documentation_messages.ex:80
 #, elixir-autogen, elixir-format
 msgid "Browser extension"
 msgstr "브라우저 확장 프로그램"
 
-#: lib/marshall/documentation_messages.ex:76
+#: lib/marshall/documentation_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "Cancel an unpublished clone or uncommitted relocation request."
 msgstr "게시되지 않은 클론 또는 커밋되지 않은 재배치 요청을 취소합니다."
 
-#: lib/marshall/documentation_messages.ex:80
+#: lib/marshall/documentation_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Cancel your pending ownership offer."
 msgstr "대기 중인 내 소유권 제안을 취소합니다."
 
-#: lib/marshall/documentation_messages.ex:81
+#: lib/marshall/documentation_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Change a machine's CPU and memory; disk may only grow. A running machine stops and restarts."
 msgstr "기계의 CPU 및 메모리를 변경하십시오. 디스크만 커질 수 있습니다. 실행 중인 기계가 정지했다가 다시 시작됩니다."
 
-#: lib/marshall/documentation_messages.ex:89
+#: lib/marshall/documentation_messages.ex:94
 #, elixir-autogen, elixir-format
 msgid "Choose a stable, unique request ID for each intended mutation. Reuse it when\nretrying that same mutation after losing a reply. Request IDs contain 1–128 ASCII\nletters, digits, underscores, dots, colons or hyphens, and start with a letter or\ndigit. Do not reuse one ID for different operations."
 msgstr ""
@@ -183,37 +183,37 @@ msgstr ""
 "밑줄, 점, 콜론 또는 하이픈 1~128자로 이루어지며 문자나 숫자로\n"
 "시작합니다. 다른 작업에 같은 ID를 재사용하지 마세요."
 
-#: lib/marshall/documentation_messages.ex:93
+#: lib/marshall/documentation_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "Cloning is currently unavailable for the Inception multi-disk profile."
 msgstr "현재 Inception 다중 디스크 프로필에서는 복제를 사용할 수 없습니다."
 
-#: lib/marshall/documentation_messages.ex:98
+#: lib/marshall/documentation_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Close this interactive channel."
 msgstr "이 대화형 채널을 닫습니다."
 
-#: lib/marshall/documentation_messages.ex:99
+#: lib/marshall/documentation_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Command reference"
 msgstr "명령 참조"
 
-#: lib/marshall/documentation_messages.ex:100
+#: lib/marshall/documentation_messages.ex:105
 #, elixir-autogen, elixir-format
 msgid "Create a machine. Disk maximum: 500 GiB. --source clones a public GitHub, GitLab, Codeberg or Bitbucket repository in the guest."
 msgstr "기계를 만드세요. 디스크 최대: 500 GiB . --source는 게스트의 공용 GitHub , GitLab , Codeberg 또는 Bitbucket 저장소를 복제합니다."
 
-#: lib/marshall/documentation_messages.ex:104
+#: lib/marshall/documentation_messages.ex:109
 #, elixir-autogen, elixir-format
 msgid "Create a team you own."
 msgstr "내가 소유하는 팀을 만듭니다."
 
-#: lib/marshall/documentation_messages.ex:105
+#: lib/marshall/documentation_messages.ex:110
 #, elixir-autogen, elixir-format
 msgid "Create or replace a named integration at https://NAME.integration.internal."
 msgstr "https://NAME.integration.internal 에서 이름이 있는 통합을 만들거나 교체합니다."
 
-#: lib/marshall/documentation_messages.ex:109
+#: lib/marshall/documentation_messages.ex:114
 #, elixir-autogen, elixir-format
 msgid "Creation, start, stop, deletion, relocation and request controls wait up to 120\nseconds for the matching physical result. A request being accepted or acknowledged is not proof that the machine\nhas reached the requested state. `--no-wait` returns the accepted request without\nwaiting; `--timeout SECONDS` changes the wait limit. Timing out or disconnecting\ndoes not cancel accepted work."
 msgstr ""
@@ -223,17 +223,17 @@ msgstr ""
 "반환하며 `--timeout SECONDS`는 대기 한도를 바꿉니다. 시간 초과나 연결\n"
 "해제는 수락된 작업을 취소하지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:113
+#: lib/marshall/documentation_messages.ex:118
 #, elixir-autogen, elixir-format
 msgid "Decline a pending ownership offer."
 msgstr "대기 중인 소유권 제안을 거절합니다."
 
-#: lib/marshall/documentation_messages.ex:114
+#: lib/marshall/documentation_messages.ex:119
 #, elixir-autogen, elixir-format
 msgid "Delete a machine and its disk. Refused while its owner has it pinned."
 msgstr "머신과 해당 디스크를 삭제합니다. 소유자가 고정한 동안 거부되었습니다."
 
-#: lib/marshall/documentation_messages.ex:118
+#: lib/marshall/documentation_messages.ex:123
 #, elixir-autogen, elixir-format
 msgid "Different request IDs create separate copies, processed in order for each source.\nRepeating the same ID returns the same request. Each copy captures the source's\nfiles, specifications and power state when its turn begins. A running source stops\nfor snapshot capture and restarts while copying continues. The new machine belongs\nto you, is private, and has a fresh address; sharing is not copied. Guest files and\ncredentials stored inside the disk are copied. RAM is not copied."
 msgstr "서로 다른 요청 ID는 각 소스에 대해 순서대로 처리되는 별도의 복사본을 생성합니다. \n 동일한 ID를 반복하면 동일한 요청이 반환됩니다. 각 복사본은 차례가 시작될 때 소스의 \n 파일, 사양 및 전원 상태를 캡처합니다. 실행 중인 소스는 스냅샷 캡처를 위해 \n를 중지하고 복사가 계속되는 동안 다시 시작합니다. 새 가상 머신은 귀하의 \n에 속하며 비공개이며 새로운 주소를 갖습니다. 공유는 복사되지 않습니다. 디스크 내부에 저장된 게스트 파일 및 \n 자격 증명이 복사됩니다. RAM는 복사되지 않습니다."
@@ -243,7 +243,7 @@ msgstr "서로 다른 요청 ID는 각 소스에 대해 순서대로 처리되�
 msgid "Documentation"
 msgstr "문서"
 
-#: lib/marshall/documentation_messages.ex:122
+#: lib/marshall/documentation_messages.ex:127
 #, elixir-autogen, elixir-format
 msgid "Each machine's page shows the machine name, its state, its operating system and\nits machine ID (with a Copy button) at the top, followed by a \"Connect from your\ncomputer\" section with a one-line installer that sets up SSH and connects to\nthat machine:"
 msgstr ""
@@ -252,7 +252,7 @@ msgstr ""
 "설치 명령이 있는 \"내 컴퓨터에서 연결\" 섹션이\n"
 "표시됩니다:"
 
-#: lib/marshall/documentation_messages.ex:126
+#: lib/marshall/documentation_messages.ex:131
 #, elixir-autogen, elixir-format
 msgid "Every command accepts `--json`. Mutation commands accept `--request-id ID`.\nCreation, start, stop, deletion, relocation and request controls also accept `--timeout SECONDS` (1–3600,\ndefault 120) and `--no-wait`. Memory is in MiB and disk size is in GiB.\nImage identifiers are immutable `sha256:` digests returned by `images`.\nUse `--after UUID` with the returned cursor to fetch another list page."
 msgstr ""
@@ -262,12 +262,12 @@ msgstr ""
 "이미지 식별자는 `images`가 반환하는 불변 `sha256:` 다이제스트입니다.\n"
 "다음 목록 페이지는 반환된 커서와 `--after UUID`를 사용하세요."
 
-#: lib/marshall/documentation_messages.ex:130
+#: lib/marshall/documentation_messages.ex:135
 #, elixir-autogen, elixir-format
 msgid "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
 msgstr "실행 중인 모든 게스트는 `https://reflection.internal`를 쿼리하여 자신에 대한 제한된 \n 비밀 설명과 현재 사용 가능한 \n 실행에 사용 가능한 개인 서비스를 쿼리할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:134
+#: lib/marshall/documentation_messages.ex:143
 #, elixir-autogen, elixir-format
 msgid "Firefox temporary add-ons are removed when Firefox closes. Permanent Firefox\ninstallation requires Mozilla signing or an explicitly managed browser policy.\nOveralls does not currently publish either archive to a browser store."
 msgstr ""
@@ -275,59 +275,59 @@ msgstr ""
 "Mozilla 서명이나 명시적으로 관리되는 브라우저 정책이 필요합니다.\n"
 "Overalls는 현재 어느 아카이브도 브라우저 스토어에 게시하지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:138
+#: lib/marshall/documentation_messages.ex:147
 #, elixir-autogen, elixir-format
 msgid "For browser approval of an unknown key, start an interactive connection with\n`ssh YOUR_PORSCHE_HOST` and keep it open. Porsche gives you a short-lived approval\nlink after proving possession of the private key. Open it in your browser, sign\nin, compare the fingerprint and explicitly approve. Opening the link alone does\nnot register a key. Links expire after ten minutes and stop working when their\nSSH connection closes. The interactive prompt can continue after approval."
 msgstr "알 수 없는 키를 브라우저에서 승인하려면 \n `ssh YOUR_PORSCHE_HOST`와 대화형 연결을 시작하고 열어두세요. Porsche는 개인 키 보유를 증명한 후 단기 승인 \n 링크를 제공합니다. 브라우저에서 열고 \n에 로그인한 후 지문을 비교하고 명시적으로 승인하세요. 링크만 열면 \n가 키를 등록하지 않습니다. 링크는 10분 후에 만료되고 \n SSH 연결이 닫히면 작동이 중지됩니다. 승인 후 대화형 프롬프트를 계속할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:142
+#: lib/marshall/documentation_messages.ex:151
 #, elixir-autogen, elixir-format
 msgid "For one-shot exec commands, register the key on Marshall's SSH keys page first,\nor complete approval in an interactive connection before retrying the command."
 msgstr ""
 "일회성 exec 명령의 경우 먼저 Marshall의 SSH 키 페이지에서 키를 등록하거나\n"
 "대화형 연결에서 승인을 완료한 후 명령을 다시 시도하세요."
 
-#: lib/marshall/documentation_messages.ex:146
+#: lib/marshall/documentation_messages.ex:155
 #, elixir-autogen, elixir-format
 msgid "Getting started"
 msgstr "시작하기"
 
-#: lib/marshall/documentation_messages.ex:147
+#: lib/marshall/documentation_messages.ex:156
 #, elixir-autogen, elixir-format
 msgid "Grant viewer, operator or manager access."
 msgstr "뷰어, 운영자 또는 관리자 액세스 권한을 부여합니다."
 
-#: lib/marshall/documentation_messages.ex:148
+#: lib/marshall/documentation_messages.ex:157
 #, elixir-autogen, elixir-format
 msgid "Guest SSH and browser terminals use an automatically allocated Linux login such\nas `u200001`, with `/home/u200001` as its home. The login comes from a durable\naccount UID rather than your email address. It stays the same across machines and\nsame-account email changes. A new account registered after retirement receives a\ndifferent identity and does not inherit the former account's home or access.\nMarshall continues showing your email address; there is no username setting."
 msgstr "게스트 SSH와 브라우저 터미널은 `u200001`처럼 자동 할당되는 Linux 로그인 이름을 사용하며 홈 디렉터리는 `/home/u200001`입니다. 이 이름은 이메일 주소가 아니라 계정에 영구적으로 할당된 UID에서 정해집니다. 여러 가상 머신에서 같게 유지되며 같은 계정의 이메일을 바꿔도 달라지지 않습니다. 기존 계정이 폐기된 후 새로 등록된 계정은 다른 신원을 부여받으며 이전 계정의 홈 디렉터리나 접근 권한을 물려받지 않습니다. Marshall은 계속 이메일 주소를 표시하며 사용자 이름 설정은 없습니다."
 
-#: lib/marshall/documentation_messages.ex:152
+#: lib/marshall/documentation_messages.ex:161
 #, elixir-autogen, elixir-format
 msgid "Guest metadata includes the machine name and ID, profile, architecture,\noperating-system family, vCPU, memory and disk sizes, image identity,\ngeneration, owner email, team name, current Lilly node, labels, and comment.\nOperating-system values come from the validated image manifest."
 msgstr "게스트 메타데이터에는 시스템 이름 및 ID, 프로필, 아키텍처, \n 운영 체제 제품군, vCPU, 메모리 및 디스크 크기, 이미지 ID, \n 생성, 소유자 이메일, 팀 이름, 현재 Lilly 노드, 레이블 및 설명이 포함됩니다. \n 운영 체제 값은 검증된 이미지 매니페스트에서 나옵니다."
 
-#: lib/marshall/documentation_messages.ex:156
+#: lib/marshall/documentation_messages.ex:165
 #, elixir-autogen, elixir-format
 msgid "Inspect a machine by name or UUID."
 msgstr "이름 또는 UUID로 머신을 검사합니다."
 
-#: lib/marshall/documentation_messages.ex:157
+#: lib/marshall/documentation_messages.ex:166
 #, elixir-autogen, elixir-format
 msgid "Inspect a previously accepted request."
 msgstr "이전에 수락된 요청을 검사합니다."
 
-#: lib/marshall/documentation_messages.ex:159
+#: lib/marshall/documentation_messages.ex:168
 #, elixir-autogen, elixir-format
 msgid "Inspect an integration without secrets."
 msgstr "비밀 없이 통합을 검사합니다."
 
-#: lib/marshall/documentation_messages.ex:160
+#: lib/marshall/documentation_messages.ex:169
 #, elixir-autogen, elixir-format
 msgid "Integration entries describe the internal URL, useful paths, a short `help`\ncommand, a comment, and injected header names and kinds. Header values,\ncredentials, tokens, and upstream target URLs are never returned. The list\ncontains Reflection, LLM, and named integrations authorized for this exact\nmachine execution."
 msgstr "통합 항목은 내부 URL , 유용한 경로, 짧은 `help` \n 명령, 주석, 삽입된 헤더 이름 및 종류를 설명합니다. 헤더 값, \n 자격 증명, 토큰 및 업스트림 대상 URL은 반환되지 않습니다. \n 목록에는 이 정확한 \n 머신 실행에 대해 승인된 Reflection, LLM 및 명명된 통합이 포함되어 있습니다."
 
-#: lib/marshall/documentation_messages.ex:164
+#: lib/marshall/documentation_messages.ex:173
 #, elixir-autogen, elixir-format
 msgid "Key removal prevents subsequent commands and status polls from that session.\nAccepted jobs continue. Reconnect using another registered key, or use email login\nto manage your keys in Marshall. Do not put private keys or approval links in logs.\n"
 msgstr ""
@@ -335,67 +335,67 @@ msgstr ""
 "계속됩니다. 다른 등록 키로 다시 연결하거나 이메일 로그인으로 Marshall에서\n"
 "키를 관리하세요. 개인 키나 승인 링크를 로그에 넣지 마세요.\n"
 
-#: lib/marshall/documentation_messages.ex:169
+#: lib/marshall/documentation_messages.ex:178
 #, elixir-autogen, elixir-format
 msgid "List a team's members."
 msgstr "팀 구성원 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:171
+#: lib/marshall/documentation_messages.ex:180
 #, elixir-autogen, elixir-format
 msgid "List access grants."
 msgstr "접근 권한 부여 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:173
+#: lib/marshall/documentation_messages.ex:182
 #, elixir-autogen, elixir-format
 msgid "List available images."
 msgstr "사용 가능한 이미지 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:174
+#: lib/marshall/documentation_messages.ex:183
 #, elixir-autogen, elixir-format
 msgid "List machines you can access."
 msgstr "접근할 수 있는 머신 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:175
+#: lib/marshall/documentation_messages.ex:184
 #, elixir-autogen, elixir-format
 msgid "List your SSH keys."
 msgstr "내 SSH 키 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:176
+#: lib/marshall/documentation_messages.ex:185
 #, elixir-autogen, elixir-format
 msgid "List your integrations."
 msgstr "내 통합 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:178
+#: lib/marshall/documentation_messages.ex:187
 #, elixir-autogen, elixir-format
 msgid "List your teams and roles."
 msgstr "내 팀과 역할 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:179
+#: lib/marshall/documentation_messages.ex:188
 #, elixir-autogen, elixir-format
 msgid "Machine managers can edit labels and the machine comment from machine settings.\nLabels are limited to 32 entries and comments to 2 KiB. Integration managers\ncan edit an integration comment from the integrations page. Changes are\naudited without recording comment text or secret values."
 msgstr "기계 관리자는 기계 설정에서 라벨과 기계 설명을 편집할 수 있습니다. \n 레이블은 항목 32개로 제한되며 설명은 2KiB로 제한됩니다. 통합 관리자 \n는 통합 페이지에서 통합 설명을 편집할 수 있습니다. 변경 사항은 주석 텍스트나 비밀 값을 기록하지 않고 \n 감사됩니다."
 
-#: lib/marshall/documentation_messages.ex:183
+#: lib/marshall/documentation_messages.ex:192
 #, elixir-autogen, elixir-format
 msgid "Machine references accept names or UUIDs. Names are lowercase, begin with a letter,\nand contain letters, digits and single separating hyphens, up to 63 characters.\nUUID-shaped names are reserved for machine identifiers.\nCreation without a name generates one. Creation without an image selects the\noperator's default image. Creation without `--profile` selects OSS; use\n`--profile customer` for the restricted Customer environment. Omitted CPU,\nmemory and disk requests use defaults raised to the image minimum; explicitly\nundersized requests fail."
 msgstr "머신 참조는 이름이나 UUID를 허용합니다. 이름은 소문자이며 문자 \n로 시작하고 문자, 숫자 및 단일 구분 하이픈을 포함하며 최대 63자입니다. \n UUID 모양의 이름은 기계 식별자용으로 예약되어 있습니다. \n 이름 없이 생성하면 이름이 생성됩니다. 이미지 없이 생성하면 \n 운영자의 기본 이미지가 선택됩니다. `--profile` 없이 생성하면 OSS가 선택됩니다. 제한된 고객 환경에는 \n `--profile customer`를 사용하십시오. 생략된 CPU , \n 메모리 및 디스크 요청은 이미지 최소값으로 인상된 기본값을 사용합니다. 명시적으로 \n 크기가 작은 요청이 실패합니다."
 
-#: lib/marshall/documentation_messages.ex:187
+#: lib/marshall/documentation_messages.ex:196
 #, elixir-autogen, elixir-format
 msgid "Make an integration available to a machine."
 msgstr "머신에서 통합을 사용할 수 있도록 합니다."
 
-#: lib/marshall/documentation_messages.ex:197
+#: lib/marshall/documentation_messages.ex:206
 #, elixir-autogen, elixir-format
 msgid "Move a machine to an automatically selected host."
 msgstr "머신을 자동으로 선택된 호스트로 이동합니다."
 
-#: lib/marshall/documentation_messages.ex:206
+#: lib/marshall/documentation_messages.ex:215
 #, elixir-autogen, elixir-format
 msgid "Offer team ownership to an admin."
 msgstr "관리자에게 팀 소유권을 제안합니다."
 
-#: lib/marshall/documentation_messages.ex:207
+#: lib/marshall/documentation_messages.ex:216
 #, elixir-autogen, elixir-format
 msgid "On a supported repository page, clicking an unconfigured toolbar button opens\nsettings. Unsupported hosts show an **Unsupported page** state and do not send a\nURL. Marshall checks the launch request again before staging it and may require\nyou to sign in."
 msgstr ""
@@ -404,7 +404,7 @@ msgstr ""
 "표시하고 URL을 보내지 않습니다. Marshall은 준비 전에 실행 요청을 다시\n"
 "확인하며 로그인을 요구할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:211
+#: lib/marshall/documentation_messages.ex:220
 #, elixir-autogen, elixir-format
 msgid "Open a GitHub, GitLab, Codeberg or Bitbucket Cloud repository in Overalls with a\nsingle toolbar click. The extension carries only the provider origin and path to\nOveralls, so you can move from a repository page to a machine without copying a\nURL by hand."
 msgstr ""
@@ -413,29 +413,29 @@ msgstr ""
 "전달하므로 URL을 직접 복사하지 않고 저장소 페이지에서 머신으로\n"
 "이동할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:216
+#: lib/marshall/documentation_messages.ex:225
 #, elixir-autogen, elixir-format
 msgid "Options:"
 msgstr "옵션:"
 
-#: lib/marshall/documentation_messages.ex:217
+#: lib/marshall/documentation_messages.ex:226
 #, elixir-autogen, elixir-format
 msgid "Overalls documentation"
 msgstr "Overalls 문서"
 
-#: lib/marshall/documentation_messages.ex:218
+#: lib/marshall/documentation_messages.ex:227
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can change a machine's CPU and memory; disk may only grow,\nup to 500 GiB:"
 msgstr ""
 "소유자와 관리자는 머신의 CPU와 메모리를 변경할 수 있습니다. 디스크는 최대 500 GiB까지\n"
 "늘릴 수만 있습니다:"
 
-#: lib/marshall/documentation_messages.ex:222
+#: lib/marshall/documentation_messages.ex:231
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can queue an independent copy:"
 msgstr "소유자와 관리자는 독립적인 복사본을 대기열에 추가할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:223
+#: lib/marshall/documentation_messages.ex:232
 #, elixir-autogen, elixir-format
 msgid "Owners, managers and team admins can move a machine to another eligible physical\nhost. The destination and transfer strategy are always selected by Marshall and\ncannot be supplied through Porsche:"
 msgstr ""
@@ -443,7 +443,7 @@ msgstr ""
 "대상과 전송 전략은 항상 Marshall이 선택하며\n"
 "Porsche를 통해 지정할 수 없습니다:"
 
-#: lib/marshall/documentation_messages.ex:227
+#: lib/marshall/documentation_messages.ex:236
 #, elixir-autogen, elixir-format
 msgid "Permissions are checked at execution time. Access shown in a previous list is\nnot a guarantee that a later operation is allowed. Sharing roles are `viewer`,\n`operator` and `manager`; ownership and current permissions determine which\noperations you may perform. SSH key commands affect only your own keys."
 msgstr ""
@@ -452,12 +452,12 @@ msgstr ""
 "소유권과 현재 권한이 수행 가능한 작업을 결정합니다. SSH 키 명령은\n"
 "본인 키에만 영향을 줍니다."
 
-#: lib/marshall/documentation_messages.ex:231
+#: lib/marshall/documentation_messages.ex:240
 #, elixir-autogen, elixir-format
 msgid "Pin a machine to the top of your lists. Your owner pin wakes it, prevents automatic suspension, and prevents deletion."
 msgstr "목록 상단에 기계를 고정하세요. 소유자 핀이 활성화되어 자동 정지 및 삭제를 방지합니다."
 
-#: lib/marshall/documentation_messages.ex:235
+#: lib/marshall/documentation_messages.ex:244
 #, elixir-autogen, elixir-format
 msgid "Porsche manages machines; it does not provide a guest shell, guest file transfer,\nport forwarding or an SSH agent forwarding service. Machine console access is\navailable separately in Marshall's web interface, subject to account permissions.\n"
 msgstr ""
@@ -470,12 +470,12 @@ msgstr ""
 msgid "Public documentation for Overalls browser extensions and SSH machine management (Porsche v1)."
 msgstr "Overalls 브라우저 확장 및 SSH 시스템 관리(Porsche v1)에 대한 공개 문서입니다."
 
-#: lib/marshall/documentation_messages.ex:240
+#: lib/marshall/documentation_messages.ex:249
 #, elixir-autogen, elixir-format
 msgid "Queue an independent full-disk copy of a machine."
 msgstr "머신의 독립적인 전체 디스크 복사본을 대기열에 추가합니다."
 
-#: lib/marshall/documentation_messages.ex:241
+#: lib/marshall/documentation_messages.ex:250
 #, elixir-autogen, elixir-format
 msgid "Queued requests recheck your access before execution. Use `request cancel copy-1`\nbefore the destination is published; successful cancellation waits for any required\ncleanup. Use `request retry copy-1` to resume a failed request rather than create\nanother destination. Clone accepts `--timeout` and `--no-wait`; a client\ntimeout does not cancel accepted work."
 msgstr ""
@@ -485,116 +485,116 @@ msgstr ""
 "요청을 재개하세요. 복제는 `--timeout`과 `--no-wait`를 받으며 클라이언트\n"
 "시간 초과는 수락된 작업을 취소하지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:245
+#: lib/marshall/documentation_messages.ex:254
 #, elixir-autogen, elixir-format
 msgid "Reconnecting later is the same everywhere: `ssh HOST`. (On Windows, if you\ndeclined the administrator prompt, use `overalls ssh HOST` instead.)"
 msgstr ""
 "나중에 다시 연결하는 방법은 어디서나 같습니다: `ssh HOST`. (Windows에서 관리자\n"
 "프롬프트를 거절했다면 대신 `overalls ssh HOST`를 사용하세요.)"
 
-#: lib/marshall/documentation_messages.ex:249
+#: lib/marshall/documentation_messages.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reflection integration"
 msgstr "Reflection 연동"
 
-#: lib/marshall/documentation_messages.ex:250
+#: lib/marshall/documentation_messages.ex:259
 #, elixir-autogen, elixir-format
 msgid "Reflection is available only through the private network. Requests are bound to\nthe current VM, host, placement, and execution epoch; stopped, relocated,\nretired, stale, or unauthorized guests receive an unavailable response.\n"
 msgstr "Reflection은 사설 네트워크를 통해서만 사용할 수 있습니다. 요청은 현재 VM, 호스트, 배치 위치 및 실행 에포크에 바인딩됩니다. 중지되었거나 이동되었거나 폐기된 게스트, 실행 상태가 오래되었거나 권한이 없는 게스트에는 사용할 수 없다는 응답이 반환됩니다.\n"
 
-#: lib/marshall/documentation_messages.ex:258
+#: lib/marshall/documentation_messages.ex:267
 #, elixir-autogen, elixir-format
 msgid "Remove a machine's explicit availability."
 msgstr "머신의 명시적인 가용성을 제거합니다."
 
-#: lib/marshall/documentation_messages.ex:259
+#: lib/marshall/documentation_messages.ex:268
 #, elixir-autogen, elixir-format
 msgid "Remove a named integration."
 msgstr "이름으로 지정한 통합을 제거합니다."
 
-#: lib/marshall/documentation_messages.ex:260
+#: lib/marshall/documentation_messages.ex:269
 #, elixir-autogen, elixir-format
 msgid "Remove an account's membership."
 msgstr "계정의 멤버십을 제거합니다."
 
-#: lib/marshall/documentation_messages.ex:261
+#: lib/marshall/documentation_messages.ex:270
 #, elixir-autogen, elixir-format
 msgid "Remove your pin from a machine."
 msgstr "머신에서 내 고정을 해제합니다."
 
-#: lib/marshall/documentation_messages.ex:262
+#: lib/marshall/documentation_messages.ex:271
 #, elixir-autogen, elixir-format
 msgid "Resume a suspended machine's preserved memory."
 msgstr "일시중단된 머신의 보존된 메모리를 재개합니다."
 
-#: lib/marshall/documentation_messages.ex:263
+#: lib/marshall/documentation_messages.ex:272
 #, elixir-autogen, elixir-format
 msgid "Resume preserved memory, waiting for capacity or relocation."
 msgstr "보존된 메모리를 재개하고 용량 또는 재배치를 기다립니다."
 
-#: lib/marshall/documentation_messages.ex:267
+#: lib/marshall/documentation_messages.ex:276
 #, elixir-autogen, elixir-format
 msgid "Retry a failed clone or relocation request."
 msgstr "실패한 복제 또는 재배치 요청을 다시 시도합니다."
 
-#: lib/marshall/documentation_messages.ex:269
+#: lib/marshall/documentation_messages.ex:278
 #, elixir-autogen, elixir-format
 msgid "Revoke an account's shared access."
 msgstr "계정의 공유 접근 권한을 폐기합니다."
 
-#: lib/marshall/documentation_messages.ex:270
+#: lib/marshall/documentation_messages.ex:279
 #, elixir-autogen, elixir-format
 msgid "Revoke one of your SSH keys."
 msgstr "내 SSH 키 하나를 폐기합니다."
 
-#: lib/marshall/documentation_messages.ex:273
+#: lib/marshall/documentation_messages.ex:286
 #, elixir-autogen, elixir-format
 msgid "Show command help."
 msgstr "명령 도움말을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:274
+#: lib/marshall/documentation_messages.ex:287
 #, elixir-autogen, elixir-format
 msgid "Show the authenticated account."
 msgstr "인증된 계정을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:275
+#: lib/marshall/documentation_messages.ex:288
 #, elixir-autogen, elixir-format
 msgid "Sign in to Marshall using your email login and open\n[Account settings › SSH keys](/settings#ssh-keys). Paste one OpenSSH public key and optionally give it\na label. Paste the `.pub` file, never the private key. Supported public keys are\nEd25519, ECDSA and RSA (at least 2048 bits). Certificates and `authorized_keys`\noptions are not accepted."
 msgstr "이메일 로그인을 사용하여 Marshall에 로그인하고 \n [계정 설정 › SSH 키 ](/settings#ssh-keys) 를 엽니다. 하나의 OpenSSH 공개 키를 붙여넣고 선택적으로 \n 레이블을 지정합니다. 개인 키가 아닌 `.pub` 파일을 붙여넣습니다. 지원되는 공개 키는 \n Ed25519, ECDSA 및 RSA(최소 2048비트)입니다. 인증서 및 `authorized_keys` \n 옵션은 허용되지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:279
+#: lib/marshall/documentation_messages.ex:292
 #, elixir-autogen, elixir-format
 msgid "Start a machine."
 msgstr "머신을 시작합니다."
 
-#: lib/marshall/documentation_messages.ex:280
+#: lib/marshall/documentation_messages.ex:293
 #, elixir-autogen, elixir-format
 msgid "Stop a machine, retaining its disk and discarding suspended memory."
 msgstr "디스크를 유지하고 일시 중단된 메모리를 삭제하여 머신을 중지합니다."
 
-#: lib/marshall/documentation_messages.ex:284
+#: lib/marshall/documentation_messages.ex:297
 #, elixir-autogen, elixir-format
 msgid "Stop retains the disk. `rm MACHINE` deletes the machine and its disk. A name is\navailable for reuse only after cleanup is confirmed. Use `exit` to leave the prompt."
 msgstr ""
 "중지는 디스크를 보존합니다. `rm MACHINE`은 머신과 디스크를 삭제합니다. 정리가 확인된\n"
 "후에만 이름을 재사용할 수 있습니다. 프롬프트를 나가려면 `exit`를 사용하세요."
 
-#: lib/marshall/documentation_messages.ex:304
+#: lib/marshall/documentation_messages.ex:317
 #, elixir-autogen, elixir-format
 msgid "Suspend a machine, preserving its memory and disk."
 msgstr "메모리와 디스크를 보존하면서 머신을 일시 중단합니다."
 
-#: lib/marshall/documentation_messages.ex:306
+#: lib/marshall/documentation_messages.ex:319
 #, elixir-autogen, elixir-format
 msgid "The Overalls operator chooses whether these immutable archives are available. If\nthe deployment has disabled its browser extension package, the download links return an unavailable response.\nSee the browser distribution notes for package and build details.\n"
 msgstr "Overalls 운영자는 이러한 불변 아카이브를 사용할 수 있는지 여부를 선택합니다. \n 배포로 인해 브라우저 확장 패키지가 비활성화된 경우 다운로드 링크는 사용할 수 없는 응답을 반환합니다. \n 패키지 및 빌드 세부정보는 브라우저 배포 노트를 참조하세요.\n"
 
-#: lib/marshall/documentation_messages.ex:310
+#: lib/marshall/documentation_messages.ex:323
 #, elixir-autogen, elixir-format
 msgid "The accepted request retains its normalized command and resolved resources.\nRetrying cannot retarget a different machine after name reuse or silently select\na different default image. Query the original request after a lost response or\ntimeout. Request status remains subject to current account authorization, including\nafter the machine is archived."
 msgstr "수락된 요청은 정규화된 명령과 확인된 리소스를 유지합니다. \n 재시도는 이름 재사용 후 다른 시스템의 대상을 변경하거나 \n를 다른 기본 이미지로 자동 선택할 수 없습니다. 응답이 손실되거나 \n 시간이 초과된 후 원래 요청을 쿼리합니다. 요청 상태는 기계가 보관된 후에도 \n를 포함하여 현재 계정 인증에 따라 유지됩니다."
 
-#: lib/marshall/documentation_messages.ex:314
+#: lib/marshall/documentation_messages.ex:327
 #, elixir-autogen, elixir-format
 msgid "The browser extension opens supported repository pages in Overalls. The SSH guides\ndescribe Porsche v1; your operator supplies the SSH hostname for deployments\nwith Porsche enabled."
 msgstr ""
@@ -602,103 +602,103 @@ msgstr ""
 "Porsche v1을 설명하며, Porsche가 활성화된 배포에서는 운영자가\n"
 "SSH 호스트 이름을 제공합니다."
 
-#: lib/marshall/documentation_messages.ex:318
+#: lib/marshall/documentation_messages.ex:331
 #, elixir-autogen, elixir-format
 msgid "The extension opens Overalls with a source URL only after an explicit toolbar\nclick on the four supported HTTPS provider hosts. It sends the provider origin\nand path, strips query parameters and fragments, and never collects page\ncontents, credentials, history or telemetry."
 msgstr "확장은 명시적인 도구 모음 \n가 지원되는 4개의 HTTPS 공급자 호스트를 클릭한 후에만 소스 URL가 있는 Overalls를 엽니다. 공급자 원본 \n 및 경로를 보내고 쿼리 매개 변수 및 조각을 제거하며 페이지 \n 콘텐츠, 자격 증명, 기록 또는 원격 측정을 수집하지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:322
+#: lib/marshall/documentation_messages.ex:335
 #, elixir-autogen, elixir-format
 msgid "The machine keeps its identity, name, sharing, private address, image and requested\nshape. A running machine may have bounded downtime while final disk state and\nexecution authority move. `request cancel move-1` is available only before handoff\ncommits. If destination activation or readiness fails after commit,\n`request retry move-1` retries that retained destination. Both controls create\ntheir own durable request receipt; use a distinct `--request-id` for each control."
 msgstr "기계는 신원, 이름, 공유, 개인 주소, 이미지 및 요청된 \n 모양을 유지합니다. 실행 중인 머신은 최종 디스크 상태와 \n 실행 권한이 이동하는 동안 제한된 가동 중지 시간을 가질 수 있습니다. `request cancel move-1`는 \n 핸드오프가 커밋되기 전에만 사용할 수 있습니다. 커밋 후 대상 활성화 또는 준비가 실패하면 \n `request retry move-1`는 유지된 대상을 다시 시도합니다. 두 컨트롤 모두 \n 자체의 내구성 있는 요청 영수증을 생성합니다. 각 컨트롤마다 별도의 `--request-id`를 사용하세요."
 
-#: lib/marshall/documentation_messages.ex:326
+#: lib/marshall/documentation_messages.ex:339
 #, elixir-autogen, elixir-format
 msgid "The page shows each key's label, type, fingerprint and creation time. Remove a key\nto revoke its access. You may remove your last SSH key and continue using email\nlogin. Adding the same public key again creates a new registration; previous\nsessions remain revoked."
 msgstr "페이지에는 각 키의 레이블, 유형, 지문 및 생성 시간이 표시됩니다. 액세스 권한을 취소하려면 \n 키를 제거하세요. 마지막 SSH 키를 제거하고 이메일 \n 로그인을 계속 사용할 수 있습니다. 동일한 공개 키를 다시 추가하면 새 등록이 생성됩니다. 이전 \n 세션은 취소된 상태로 유지됩니다."
 
-#: lib/marshall/documentation_messages.ex:330
+#: lib/marshall/documentation_messages.ex:347
 #, elixir-autogen, elixir-format
 msgid "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
 msgstr ""
 "이 아카이브는 서명되지 않았으며 Overalls 배포에서 제공합니다. 브라우저에 맞는\n"
 "아카이브를 다운로드한 뒤 해당 개발자 설치 절차를 따르세요:"
 
-#: lib/marshall/documentation_messages.ex:334
+#: lib/marshall/documentation_messages.ex:351
 #, elixir-autogen, elixir-format
 msgid "These pages are public and contain no account or fleet data. Each page is available\nas HTML by removing `.md` from its URL. Language-model clients can start at\n[/llms.txt](/llms.txt) and follow the Markdown links."
 msgstr "이 페이지는 공개 페이지이며 계정이나 차량 데이터가 포함되어 있지 않습니다. 각 페이지는 URL에서 `.md`를 제거하여 \n를 HTML로 사용할 수 있습니다. 언어 모델 클라이언트는 \n [/llms.txt ](/llms.txt)에서 시작하고 Markdown 링크를 따라갈 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:338
+#: lib/marshall/documentation_messages.ex:355
 #, elixir-autogen, elixir-format
 msgid "This reference uses the same v1 command grammar as the SSH service."
 msgstr "이 참조는 SSH 서비스와 동일한 v1 명령 문법을 사용합니다."
 
-#: lib/marshall/documentation_messages.ex:343
+#: lib/marshall/documentation_messages.ex:364
 #, elixir-autogen, elixir-format
 msgid "Use Overalls from your browser or manage machines over SSH with Porsche. Marshall\nprovides the web interface and account permissions. Use the same account in both."
 msgstr ""
 "브라우저에서 Overalls를 사용하거나 Porsche로 SSH를 통해 머신을 관리하세요. Marshall은\n"
 "웹 인터페이스와 계정 권한을 제공합니다. 양쪽에서 같은 계정을 사용하세요."
 
-#: lib/marshall/documentation_messages.ex:347
+#: lib/marshall/documentation_messages.ex:368
 #, elixir-autogen, elixir-format
 msgid "Use Porsche to manage machines over SSH, with the same account and permissions\nas Marshall’s web interface."
 msgstr ""
 "Marshall 웹 인터페이스와 같은 계정 및 권한으로 Porsche를 사용하여\n"
 "SSH를 통해 머신을 관리하세요."
 
-#: lib/marshall/documentation_messages.ex:351
+#: lib/marshall/documentation_messages.ex:372
 #, elixir-autogen, elixir-format
 msgid "Use SSH exec commands and durable request IDs to automate machine management."
 msgstr "SSH exec 명령과 영속 요청 ID를 사용하여 머신 관리를 자동화하세요."
 
-#: lib/marshall/documentation_messages.ex:355
+#: lib/marshall/documentation_messages.ex:376
 #, elixir-autogen, elixir-format
 msgid "Use `--json` for machine-readable results. An exec invocation writes one result\nto standard output; progress goes to standard error. Check the SSH command's exit\nstatus as well as its result. A failed command exits nonzero."
 msgstr "기계가 읽을 수 있는 결과를 얻으려면 `--json`를 사용하세요. exec 호출은 하나의 결과 \n를 표준 출력에 기록합니다. 진행은 표준 오류로 진행됩니다. SSH 명령의 종료 \n 상태와 그 결과를 확인하세요. 실패한 명령은 0이 아닌 상태로 종료됩니다."
 
-#: lib/marshall/documentation_messages.ex:359
+#: lib/marshall/documentation_messages.ex:380
 #, elixir-autogen, elixir-format
 msgid "Use the Porsche hostname supplied by your operator. In a local terminal, run\n`ssh YOUR_PORSCHE_HOST help` for one command, or `ssh YOUR_PORSCHE_HOST` for an\ninteractive prompt. Verify the server host-key fingerprint using your operator's\ntrusted instructions. Management uses port 22."
 msgstr "운영자가 제공한 Porsche 호스트 이름을 사용하십시오. 로컬 터미널에서 하나의 명령에 대해 \n `ssh YOUR_PORSCHE_HOST help`를 실행하거나 \n 대화형 프롬프트에 대해 `ssh YOUR_PORSCHE_HOST`를 실행합니다. 운영자의 \n 신뢰할 수 있는 지침을 사용하여 서버 호스트 키 지문을 확인하십시오. 관리에서는 포트 22를 사용합니다."
 
-#: lib/marshall/documentation_messages.ex:363
+#: lib/marshall/documentation_messages.ex:384
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests."
 msgstr "VM 디스크의 최대 용량은 **500 GiB** (536,870,912,000바이트)입니다.\nPorsche `new --disk` 요청을 포함하여 이 한도를 넘는 생성 및\n크기 변경 요청은 거부됩니다."
 
-#: lib/marshall/documentation_messages.ex:367
+#: lib/marshall/documentation_messages.ex:388
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests.\n"
 msgstr "VM 디스크의 최대 용량은 **500 GiB** (536,870,912,000바이트)입니다.\nPorsche `new --disk` 요청을 포함하여 이 한도를 넘는 생성 및\n크기 변경 요청은 거부됩니다.\n"
 
-#: lib/marshall/documentation_messages.ex:371
+#: lib/marshall/documentation_messages.ex:392
 #, elixir-autogen, elixir-format
 msgid "When the extension has been configured for this exact Overalls origin and the\nbrowser has granted site access, it marks the open Overalls page as installed.\nThat local marker hides setup prompts on the home page; it does not sign you in,\ngrant access to machines, or change launch authorization. If site access is\nwithdrawn, configuration is missing, or detection is unavailable, setup remains\nvisible."
 msgstr "이 정확한 Overalls 원본에 대해 확장이 구성되고 \n 브라우저가 사이트 액세스를 허용하면 열린 Overalls 페이지가 설치된 것으로 표시됩니다. \n 해당 로컬 마커는 홈 페이지의 설정 프롬프트를 숨깁니다. 로그인하지 않거나 \n가 컴퓨터에 대한 액세스 권한을 부여하거나 실행 권한을 변경하지 않습니다. 사이트 액세스가 \n가 철회되거나 구성이 누락되거나 감지를 사용할 수 없는 경우 설정은 \n가 계속 표시됩니다."
 
-#: lib/marshall/documentation_messages.ex:375
+#: lib/marshall/documentation_messages.ex:396
 #, elixir-autogen, elixir-format
 msgid "With exec, place the same command after `ssh YOUR_PORSCHE_HOST` and quote it for\nyour local shell when needed. Porsche does not evaluate shell expressions,\npipelines or substitutions. Single and double quotes group command arguments."
 msgstr "exec를 사용하면 `ssh YOUR_PORSCHE_HOST` 뒤에 동일한 명령을 배치하고 필요할 때 로컬 쉘에 대해 \n에 대해 인용합니다. Porsche는 쉘 표현식, \n 파이프라인 또는 대체를 평가하지 않습니다. 작은따옴표와 큰따옴표는 명령 인수를 그룹화합니다."
 
-#: lib/marshall/documentation_messages.ex:384
+#: lib/marshall/documentation_messages.ex:405
 #, elixir-autogen, elixir-format
 msgid "`GET /` returns a versioned object containing `guest`, `integrations`, and the\navailable paths. `GET /guest` returns only guest metadata. `GET /integrations`\nreturns the integrations array directly, which makes it convenient for shell\nscripts and agents."
 msgstr "`GET /` 는 `guest` , `integrations` 및 \n 사용 가능한 경로를 포함하는 버전이 지정된 객체를 반환합니다. `GET /guest`는 게스트 메타데이터만 반환합니다. `GET /integrations` \n는 통합 배열을 직접 반환하므로 쉘 \n 스크립트 및 에이전트에 편리합니다."
 
-#: lib/marshall/documentation_messages.ex:392
+#: lib/marshall/documentation_messages.ex:413
 #, elixir-autogen, elixir-format
 msgid "`new` selects OSS when `--profile` is omitted, as does the browser creation form.\nUse `new --profile customer` to choose Customer explicitly. Customer machines\npermit only owner SSH and serial-terminal access. All outbound network\nconnections, workspace sharing, and web/port exposure are disabled.\nSSH reply traffic is allowed only on admitted owner connections. Choose an\nappropriate non-Customer profile when networking or collaboration is required."
 msgstr "`new`는 브라우저 생성 형태와 마찬가지로 `--profile`가 생략되면 OSS를 선택합니다. \n `new --profile customer`를 사용하여 고객을 명시적으로 선택합니다. 고객 시스템 \n는 소유자 SSH 및 직렬 터미널 액세스만 허용합니다. 모든 아웃바운드 네트워크 \n 연결, 작업 공간 공유 및 웹/포트 노출이 비활성화됩니다. \n SSH 응답 트래픽은 허용된 소유자 연결에서만 허용됩니다. 네트워킹이나 협업이 필요한 경우 적절한 비고객 프로파일을 \n 선택하십시오."
 
-#: lib/marshall/documentation_messages.ex:396
+#: lib/marshall/documentation_messages.ex:417
 #, elixir-autogen, elixir-format
 msgid "`pin MACHINE` keeps a machine at the top of your lists in the browser; `unpin\nMACHINE` removes your pin. Pins are personal, and you may hold up to twenty. While\nthe machine's owner has it pinned, nobody can delete it: `rm` answers\n`machine_pinned` until the owner runs `unpin MACHINE` or unpins it in the browser."
 msgstr "`pin MACHINE`는 브라우저 목록의 맨 위에 기계를 유지합니다. `unpin\nMACHINE`가 핀을 제거합니다. 핀은 개인용이며 최대 20개까지 보유할 수 있습니다. \n 머신 소유자가 고정한 동안에는 누구도 삭제할 수 없습니다. `rm`는 소유자가 `unpin MACHINE`를 실행하거나 브라우저에서 고정을 해제할 때까지 \n `machine_pinned`로 응답합니다."
 
-#: lib/marshall/documentation_messages.ex:400
+#: lib/marshall/documentation_messages.ex:421
 #, elixir-autogen, elixir-format
 msgid "`relocate MACHINE` moves the same machine and disk to another eligible physical\nhost. Porsche never accepts a destination: Marshall selects one from current\ncapacity, image availability and transfer readiness. The machine keeps its name,\nidentity, sharing and private address."
 msgstr "`relocate MACHINE`는 동일한 가상 머신과 디스크를 다른 적합한 물리적 \n 호스트로 이동합니다. Porsche는 대상을 절대 허용하지 않습니다. Marshall는 현재 \n 용량, 이미지 가용성 및 전송 준비 중에서 하나를 선택합니다. 가상 머신은 이름, \n ID, 공유 및 개인 주소를 유지합니다."
@@ -713,182 +713,182 @@ msgstr "# 푸시 알림"
 msgid "## Devices"
 msgstr "## 기기"
 
-#: lib/marshall/documentation_messages.ex:22
+#: lib/marshall/documentation_messages.ex:23
 #, elixir-autogen, elixir-format
 msgid "## Privacy"
 msgstr "## 개인정보 보호"
 
-#: lib/marshall/documentation_messages.ex:29
+#: lib/marshall/documentation_messages.ex:30
 #, elixir-autogen, elixir-format
 msgid "## Turning notifications off"
 msgstr "## 알림 끄기"
 
-#: lib/marshall/documentation_messages.ex:30
+#: lib/marshall/documentation_messages.ex:31
 #, elixir-autogen, elixir-format
 msgid "- An operator can disable notifications for the whole deployment with\n  `services.marshall.notifications.enable = false`. Registration is then\n  refused and nothing is sent to Susan.\n- You can pause a single device with `device prefs DEVICE_ID --enabled false`.\n- You can revoke a device with `device rm DEVICE_ID`."
 msgstr "- 운영자는 `services.marshall.notifications.enable = false`로 배포 전체의 알림을 비활성화할 수 있습니다. 그러면 등록이 거부되고 Susan에 아무것도 전송되지 않습니다.\n- `device prefs DEVICE_ID --enabled false`로 기기 하나를 일시 중지할 수 있습니다.\n- `device rm DEVICE_ID`로 기기를 취소할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:38
+#: lib/marshall/documentation_messages.ex:39
 #, elixir-autogen, elixir-format
 msgid "- [Browser extension](/docs/browser-extension.md): open supported repositories in Overalls.\n- [Getting started](/docs/quickstart.md): register a key and connect.\n- [Command reference](/docs/commands.md): syntax and available options.\n- [Automation](/docs/automation.md): JSON, retries and completion.\n- [Reflection integration](/docs/reflection.md): discover guest metadata and available private integrations.\n- [Push notifications](/docs/notifications.md): Mila notifications, devices and privacy."
 msgstr "- [브라우저 확장 프로그램](/docs/browser-extension.md): 지원되는 저장소를 Overalls에서 엽니다.\n- [시작하기](/docs/quickstart.md): 키를 등록하고 연결합니다.\n- [명령 참조](/docs/commands.md): 구문과 사용 가능한 옵션.\n- [자동화](/docs/automation.md): JSON, 재시도 및 완료.\n- [Reflection 연동](/docs/reflection.md): 게스트 메타데이터와 사용 가능한 비공개 연동을 확인합니다.\n- [푸시 알림](/docs/notifications.md): Mila 알림, 기기 및 개인정보 보호."
 
-#: lib/marshall/documentation_messages.ex:56
+#: lib/marshall/documentation_messages.ex:61
 #, elixir-autogen, elixir-format
 msgid "Answer a thread's pending question with JSON read from standard input."
 msgstr "표준 입력에서 읽은 JSON으로 스레드의 대기 중인 질문에 답합니다."
 
-#: lib/marshall/documentation_messages.ex:60
+#: lib/marshall/documentation_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "Apple and Google deliver notifications only to apps signed by the app's\npublisher, so every Overalls deployment sends notifications through one shared\nrelay, Susan, at `https://notifications.overalls.dev`. Your deployment cannot\nbe configured to use another relay."
 msgstr "Apple과 Google은 앱 게시자가 서명한 앱에만 알림을 전달하므로, 모든 Overalls 배포는 공유 릴레이인 Susan(`https://notifications.overalls.dev`)을 통해 알림을 보냅니다. 배포에서 다른 릴레이를 사용하도록 구성할 수 없습니다."
 
-#: lib/marshall/documentation_messages.ex:64
+#: lib/marshall/documentation_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "Approve a thread's latest plan and start implementing it."
 msgstr "스레드의 최신 계획을 승인하고 구현을 시작합니다."
 
-#: lib/marshall/documentation_messages.ex:65
+#: lib/marshall/documentation_messages.ex:70
 #, elixir-autogen, elixir-format
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "표준 입력에서 피드백을 읽어 수정된 계획을 요청합니다."
 
-#: lib/marshall/documentation_messages.ex:70
+#: lib/marshall/documentation_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "이 SSH 터미널을 공유 터미널 세션에 연결합니다. ssh -t가 필요합니다."
 
-#: lib/marshall/documentation_messages.ex:85
+#: lib/marshall/documentation_messages.ex:90
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "머신의 웹 포트 또는 공개 범위를 변경합니다. 필요하면 예상 리비전을 지정할 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:97
+#: lib/marshall/documentation_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "머신에서 내 터미널 세션 중 하나를 닫습니다."
 
-#: lib/marshall/documentation_messages.ex:158
+#: lib/marshall/documentation_messages.ex:167
 #, elixir-autogen, elixir-format
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "스레드와 대기 중인 질문, 최신 계획을 확인합니다."
 
-#: lib/marshall/documentation_messages.ex:168
+#: lib/marshall/documentation_messages.ex:177
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "열 수 있는 머신의 터미널 세션을 나열합니다."
 
-#: lib/marshall/documentation_messages.ex:170
+#: lib/marshall/documentation_messages.ex:179
 #, elixir-autogen, elixir-format
 msgid "List a thread's transcript events after a sequence number."
 msgstr "시퀀스 번호 이후의 스레드 기록 이벤트를 나열합니다."
 
-#: lib/marshall/documentation_messages.ex:172
+#: lib/marshall/documentation_messages.ex:181
 #, elixir-autogen, elixir-format
 msgid "List agent threads you can read, with unread counts."
 msgstr "읽을 수 있는 에이전트 스레드를 읽지 않은 개수와 함께 나열합니다."
 
-#: lib/marshall/documentation_messages.ex:177
+#: lib/marshall/documentation_messages.ex:186
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "푸시 알림 기기 목록을 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:188
+#: lib/marshall/documentation_messages.ex:197
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "기록 시퀀스 번호까지 스레드를 읽음으로 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:189
+#: lib/marshall/documentation_messages.ex:198
 #, elixir-autogen, elixir-format
 msgid "Mila registers your phone when you allow notifications. The registration is\nbound to the SSH key Mila uses, so removing that key from your account also\nrevokes the device. Each account can have up to ten active devices."
 msgstr "Mila는 알림을 허용하면 휴대폰을 등록합니다. 등록은 Mila가 사용하는 SSH 키에 연결되므로, 계정에서 해당 키를 제거하면 기기도 취소됩니다. 계정마다 활성 기기를 최대 10대까지 둘 수 있습니다."
 
-#: lib/marshall/documentation_messages.ex:193
+#: lib/marshall/documentation_messages.ex:202
 #, elixir-autogen, elixir-format
 msgid "Mila, the Overalls mobile app, can tell you when an agent needs your input:\nwhen a planning turn asks you a question or proposes a plan. A notification\nonly says that something needs attention; opening it takes you to the thread\nin Mila, which then fetches the details over your own SSH connection."
 msgstr "Overalls 모바일 앱인 Mila는 에이전트에 입력이 필요할 때, 즉 계획 턴에서 질문하거나 계획을 제안할 때 알려 줍니다. 알림은 확인이 필요한 일이 있다는 사실만 알립니다. 알림을 열면 Mila의 스레드로 이동하며, Mila는 사용자 자신의 SSH 연결을 통해 세부 정보를 가져옵니다."
 
-#: lib/marshall/documentation_messages.ex:198
+#: lib/marshall/documentation_messages.ex:207
 #, elixir-autogen, elixir-format
 msgid "Notifications are a convenience. While Mila is open, it follows your threads\nthrough its own live watch stream, which works even when notifications are\ndisabled or Susan is unavailable.\n"
 msgstr "알림은 편의 기능입니다. Mila가 열려 있는 동안에는 자체 실시간 감시 스트림으로 스레드를 따라가므로, 알림이 비활성화되었거나 Susan을 사용할 수 없을 때도 작동합니다.\n"
 
-#: lib/marshall/documentation_messages.ex:202
+#: lib/marshall/documentation_messages.ex:211
 #, elixir-autogen, elixir-format
 msgid "Notifications go to the devices of every person who can currently act on the\nthread, except the person whose action caused it. People with view-only\naccess are not notified."
 msgstr "알림은 현재 해당 스레드에서 작업할 수 있는 모든 사람의 기기로 전송됩니다. 단, 알림을 일으킨 작업을 한 사람은 제외됩니다. 보기 전용 액세스 권한이 있는 사람은 알림을 받지 않습니다."
 
-#: lib/marshall/documentation_messages.ex:215
+#: lib/marshall/documentation_messages.ex:224
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "머신에서 개인 터미널 세션을 엽니다."
 
-#: lib/marshall/documentation_messages.ex:239
+#: lib/marshall/documentation_messages.ex:248
 #, elixir-autogen, elixir-format
 msgid "Push notifications"
 msgstr "푸시 알림"
 
-#: lib/marshall/documentation_messages.ex:254
+#: lib/marshall/documentation_messages.ex:263
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "이 기기를 푸시 알림용으로 등록합니다. 푸시 키는 stdin에서 읽습니다."
 
-#: lib/marshall/documentation_messages.ex:268
+#: lib/marshall/documentation_messages.ex:277
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "푸시 알림 기기를 취소합니다."
 
-#: lib/marshall/documentation_messages.ex:271
+#: lib/marshall/documentation_messages.ex:284
 #, elixir-autogen, elixir-format
 msgid "Send a prompt read from standard input to a thread."
 msgstr "표준 입력에서 읽은 프롬프트를 스레드로 보냅니다."
 
-#: lib/marshall/documentation_messages.ex:272
+#: lib/marshall/documentation_messages.ex:285
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "머신의 웹 엔드포인트, 포트 및 공개 범위를 표시합니다."
 
-#: lib/marshall/documentation_messages.ex:288
+#: lib/marshall/documentation_messages.ex:301
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "머신, 스레드 및 이 세션의 JSON 변경 알림을 스트리밍합니다."
 
-#: lib/marshall/documentation_messages.ex:292
+#: lib/marshall/documentation_messages.ex:305
 #, elixir-autogen, elixir-format
 msgid "Susan keeps an append-only audit log of key issues, accepted and refused\nnotifications, rate limits and delivery outcomes. Each entry records only the\naction, reason, a fingerprint of the sending deployment, the push key ID, the\nprovider (Apple or Google), the outcome and a delivery ID. It does not record IP\naddresses, push tokens, keys or encrypted messages. Audit entries are deleted\nafter 90 days."
 msgstr "Susan은 키 발급, 수락 및 거부된 알림, 속도 제한, 전달 결과를 추가 전용 감사 로그에 기록합니다. 각 항목에는 작업, 사유, 발신 배포의 지문, 푸시 키 ID, 제공자(Apple 또는 Google), 결과, 전달 ID만 기록됩니다. IP 주소, 푸시 토큰, 키 또는 암호화된 메시지는 기록하지 않습니다. 감사 항목은 90일 후에 삭제됩니다."
 
-#: lib/marshall/documentation_messages.ex:296
+#: lib/marshall/documentation_messages.ex:309
 #, elixir-autogen, elixir-format
 msgid "Susan never sees your prompts, agent output, thread or machine names, email\naddress, SSH keys or any other account data."
 msgstr "Susan은 프롬프트, 에이전트 출력, 스레드나 머신 이름, 이메일 주소, SSH 키 또는 기타 계정 데이터를 전혀 볼 수 없습니다."
 
-#: lib/marshall/documentation_messages.ex:300
+#: lib/marshall/documentation_messages.ex:313
 #, elixir-autogen, elixir-format
 msgid "Susan sees the IP address of your deployment and when each notification is\nsent, an opaque push key issued to your device, an encrypted message and the\nnotification kind. The message is encrypted on your deployment to a key that\nonly your device holds, so Susan cannot read where the notification leads."
 msgstr "Susan은 배포의 IP 주소와 각 알림이 전송된 시각, 기기에 발급된 불투명 푸시 키, 암호화된 메시지, 알림 종류를 볼 수 있습니다. 메시지는 기기만 보유한 키로 배포에서 암호화되므로 Susan은 알림이 어디로 연결되는지 읽을 수 없습니다."
 
-#: lib/marshall/documentation_messages.ex:305
+#: lib/marshall/documentation_messages.ex:318
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "스레드를 plan 및 work 협업 모드 간에 전환합니다."
 
-#: lib/marshall/documentation_messages.ex:342
+#: lib/marshall/documentation_messages.ex:363
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "기기 하나의 푸시 알림을 켜거나 끕니다."
 
-#: lib/marshall/documentation_messages.ex:379
+#: lib/marshall/documentation_messages.ex:400
 #, elixir-autogen, elixir-format
 msgid "You can review and manage devices with Porsche:"
 msgstr "Porsche로 기기를 검토하고 관리할 수 있습니다:"
 
-#: lib/marshall/documentation_messages.ex:380
+#: lib/marshall/documentation_messages.ex:401
 #, elixir-autogen, elixir-format
 msgid "Your deployment keeps delivery records for seven days and stores only a digest\nof each push key in its audit history."
 msgstr "배포는 전달 기록을 7일 동안 보관하며, 감사 기록에는 각 푸시 키의 다이제스트만 저장합니다."
 
-#: lib/marshall/documentation_messages.ex:388
+#: lib/marshall/documentation_messages.ex:409
 #, elixir-autogen, elixir-format
 msgid "`device prefs` pauses or resumes notifications for one device. `device rm`\nrevokes it permanently; Mila registers again the next time you allow\nnotifications. Deleting or retiring your account revokes all its devices."
 msgstr "`device prefs`는 기기 하나의 알림을 일시 중지하거나 재개합니다. `device rm`은 기기를 영구적으로 취소합니다. 다음에 알림을 허용하면 Mila가 다시 등록합니다. 계정을 삭제하거나 사용 종료하면 모든 기기가 취소됩니다."
@@ -897,3 +897,33 @@ msgstr "`device prefs`는 기기 하나의 알림을 일시 중지하거나 재�
 #, elixir-autogen, elixir-format
 msgid "Documentation not found"
 msgstr "문서를 찾을 수 없습니다"
+
+#: lib/marshall/documentation_messages.ex:18
+#, elixir-autogen, elixir-format
+msgid "## Examples"
+msgstr "## 예시"
+
+#: lib/marshall/documentation_messages.ex:53
+#, elixir-autogen, elixir-format
+msgid "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+msgstr "사용 가능한 게스트는 HTTP `200`과 JSON 배열을 받습니다. 중지되었거나, 재배치되었거나, 폐기되었거나, 오래되었거나, 권한이 없는 게스트는 메타데이터 대신 사용 불가 응답을 받습니다. 호출자는 `2xx`가 아닌 모든 상태를 거부로 처리하고 다른 머신에 대해 재시도하지 않아야 합니다."
+
+#: lib/marshall/documentation_messages.ex:139
+#, elixir-autogen, elixir-format
+msgid "Fetch only the guest metadata when an agent does not need integration details:"
+msgstr "에이전트에 통합 세부 정보가 필요하지 않으면 게스트 메타데이터만 가져옵니다:"
+
+#: lib/marshall/documentation_messages.ex:280
+#, elixir-autogen, elixir-format
+msgid "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+msgstr "이 명령은 게스트 내부에서 실행합니다. `-sS` 플래그는 성공한 응답은 조용히 유지하면서 연결 오류는 계속 표시하고, `-H`는 JSON 표현을 요청합니다."
+
+#: lib/marshall/documentation_messages.ex:343
+#, elixir-autogen, elixir-format
+msgid "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+msgstr "응답은 버전이 지정된 객체입니다. 정상 게스트는 `guest`, `integrations`, `paths` 필드와 함께 HTTP `200`을 반환합니다:"
+
+#: lib/marshall/documentation_messages.ex:359
+#, elixir-autogen, elixir-format
+msgid "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
+msgstr "이 요청은 HTTP `200`과 위에 나열된 제한된 게스트 필드를 포함하는 JSON 객체를 반환합니다. 검색을 위해 통합 목록을 직접 가져오세요:"

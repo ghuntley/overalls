@@ -64,167 +64,167 @@ msgstr "## Haɗa"
 msgid "## Endpoints"
 msgstr "## Wuraren haɗi"
 
-#: lib/marshall/documentation_messages.ex:18
+#: lib/marshall/documentation_messages.ex:19
 #, elixir-autogen, elixir-format
 msgid "## First commands"
 msgstr "## Umarni na farko"
 
-#: lib/marshall/documentation_messages.ex:19
+#: lib/marshall/documentation_messages.ex:20
 #, elixir-autogen, elixir-format
 msgid "## Install the Overalls CLI"
 msgstr "## Sanya Overalls CLI"
 
-#: lib/marshall/documentation_messages.ex:20
+#: lib/marshall/documentation_messages.ex:21
 #, elixir-autogen, elixir-format
 msgid "## Install the developer archive"
 msgstr "## Sanya kunshin kayan masu haɓakawa"
 
-#: lib/marshall/documentation_messages.ex:21
+#: lib/marshall/documentation_messages.ex:22
 #, elixir-autogen, elixir-format
 msgid "## Metadata controls"
 msgstr "## Abubuwan sarrafa metadata"
 
-#: lib/marshall/documentation_messages.ex:23
+#: lib/marshall/documentation_messages.ex:24
 #, elixir-autogen, elixir-format
 msgid "## Privacy and availability"
 msgstr "## Keɓantawa da samuwa"
 
-#: lib/marshall/documentation_messages.ex:24
+#: lib/marshall/documentation_messages.ex:25
 #, elixir-autogen, elixir-format
 msgid "## Register your key"
 msgstr "## Yi rijistar maɓallin ku"
 
-#: lib/marshall/documentation_messages.ex:25
+#: lib/marshall/documentation_messages.ex:26
 #, elixir-autogen, elixir-format
 msgid "## Relocate a machine"
 msgstr "## Mayar da na'ura"
 
-#: lib/marshall/documentation_messages.ex:26
+#: lib/marshall/documentation_messages.ex:27
 #, elixir-autogen, elixir-format
 msgid "## Resize a machine"
 msgstr "## Gyara girman inji"
 
-#: lib/marshall/documentation_messages.ex:27
+#: lib/marshall/documentation_messages.ex:28
 #, elixir-autogen, elixir-format
 msgid "## Results and completion"
 msgstr "## Sakamako da kammalawa"
 
-#: lib/marshall/documentation_messages.ex:28
+#: lib/marshall/documentation_messages.ex:29
 #, elixir-autogen, elixir-format
 msgid "## Retry safely"
 msgstr "## Sake gwadawa lafiya"
 
-#: lib/marshall/documentation_messages.ex:34
+#: lib/marshall/documentation_messages.ex:35
 #, elixir-autogen, elixir-format
 msgid "- Linux and macOS: the `curl … /bin/install.sh | bash` command.\n- Windows: run the Windows `powershell …` command under \"Install and connect\"\n  in PowerShell. Windows needs OpenSSH 9.6 or newer: the installer installs it\n  with winget when the built-in client is older and, after you approve the\n  administrator prompt, makes it the default `ssh` for new terminals."
 msgstr "- Linux da macOS: umarnin `curl … /bin/install.sh | bash`. \n - Windows: gudanar da umarnin Windows `powershell …` a ƙarƙashin \"Shigar da haɗi\" \n a cikin PowerShell. Windows yana buƙatar OpenSSH 9.6 ko sabo: mai sakawa yana shigar da shi \n tare da winget lokacin da ginannen abokin ciniki ya tsufa kuma, bayan kun amince da mai gudanarwa na \n, ya sa ya zama tsohuwar `ssh` don sababbin tashoshi."
 
-#: lib/marshall/documentation_messages.ex:42
+#: lib/marshall/documentation_messages.ex:43
 #, elixir-autogen, elixir-format
 msgid "- [Download for Chrome or Chromium](/bin/chrome.zip): extract the ZIP, open\n  `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.\n- [Download for Firefox](/bin/firefox.xpi): open `about:debugging`, choose\n  **This Firefox**, then **Load Temporary Add-on** and select the downloaded XPI."
 msgstr "- [Zazzage don Chrome ko Chromium](/bin/chrome.zip): warware ZIP ɗin, buɗe\n  `chrome://extensions`, kunna **Yanayin masu haɓakawa**, sannan ka zaɓi **Loda wanda aka warware**.\n- [Zazzage don Firefox](/bin/firefox.xpi): buɗe `about:debugging`, zaɓi\n  **Wannan Firefox**, sannan **Loda ƙari na ɗan lokaci** kuma zaɓi XPI da ka zazzage."
 
-#: lib/marshall/documentation_messages.ex:46
+#: lib/marshall/documentation_messages.ex:47
 #, elixir-autogen, elixir-format
 msgid "1. Open the extension's settings from the browser toolbar. If it is already\n   configured, use the toolbar's context menu and choose **Configure Overalls\n   server…** to change the server.\n2. Enter the HTTPS origin of this Overalls server. HTTP is supported only for\n   loopback development. The server origin is always selected explicitly; the\n   extension never guesses it from a page.\n3. Visit a supported repository page and click the Overalls toolbar button."
 msgstr "1. Buɗe saitunan ƙarin daga sandar kayan aikin mai bincike. Idan an riga\n   an saita shi, yi amfani da menu na sandar kayan aiki sannan ka zaɓi **Saita uwar garken Overalls\n   …** don sauya uwar garken.\n2. Shigar da asalin HTTPS na wannan uwar garken Overalls. Ana tallafa wa HTTP ne kaɗai don\n   haɓakawa a na’ura guda. Ana zaɓar asalin uwar garken da gangan a ko da yaushe;\n   ƙarin ba ya taɓa yin hasashensa daga shafi.\n3. Ziyarci shafin ma’ajiyar lamba da ake tallafawa sannan ka danna maɓallin Overalls na sandar kayan aiki."
 
-#: lib/marshall/documentation_messages.ex:50
+#: lib/marshall/documentation_messages.ex:51
 #, elixir-autogen, elixir-format
 msgid "Accept a pending ownership offer."
 msgstr "Karɓi tayin mallakar mai jiran gado."
 
-#: lib/marshall/documentation_messages.ex:51
+#: lib/marshall/documentation_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "Add or change an admin or member."
 msgstr "Ƙara ko canza admin ko memba."
 
-#: lib/marshall/documentation_messages.ex:52
+#: lib/marshall/documentation_messages.ex:57
 #, elixir-autogen, elixir-format
 msgid "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
 msgstr "Zaɓin da aka tsallake yana kiyaye girman halin yanzu; \n an ƙi buƙatun ba tare da wani zaɓi mai girma ba. Na'ura mai gudana yana tsayawa, yana amfani da girman kuma yana sake farawa; injin \n ya tsaya yana tsayawa kuma yana girma tsarin fayil ɗin sa akan taya na gaba. Rasidin \n yana biye da matakan buƙatun. Ana karɓar `request cancel grow-1` kawai yayin da injin \n ke tsayawa: ana kiyaye girman asali da riƙon, kuma injin \n mai aiki yana sake farawa ba canzawa. `request retry grow-1` ya dawo da buƙatun da ke buƙatar kulawar \n daga lokacin rikodin sa.\n"
 
-#: lib/marshall/documentation_messages.ex:69
+#: lib/marshall/documentation_messages.ex:74
 #, elixir-autogen, elixir-format
 msgid "At the Porsche prompt, enter:"
 msgstr "A cikin faɗakarwar Porsche, shigar da:"
 
-#: lib/marshall/documentation_messages.ex:74
+#: lib/marshall/documentation_messages.ex:79
 #, elixir-autogen, elixir-format
 msgid "Automation"
 msgstr "Aiwatarwa ta atomatik"
 
-#: lib/marshall/documentation_messages.ex:75
+#: lib/marshall/documentation_messages.ex:80
 #, elixir-autogen, elixir-format
 msgid "Browser extension"
 msgstr "Ƙarin mai bincike"
 
-#: lib/marshall/documentation_messages.ex:76
+#: lib/marshall/documentation_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "Cancel an unpublished clone or uncommitted relocation request."
 msgstr "Soke buƙatun da ba a buga ba ko buƙatar ƙaura."
 
-#: lib/marshall/documentation_messages.ex:80
+#: lib/marshall/documentation_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Cancel your pending ownership offer."
 msgstr "Soke tayin mallakar ku mai jiran gado."
 
-#: lib/marshall/documentation_messages.ex:81
+#: lib/marshall/documentation_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Change a machine's CPU and memory; disk may only grow. A running machine stops and restarts."
 msgstr "Canja na'ura CPU da ƙwaƙwalwar ajiya; faifai na iya girma kawai. Injin gudu yana tsayawa kuma ya sake farawa."
 
-#: lib/marshall/documentation_messages.ex:89
+#: lib/marshall/documentation_messages.ex:94
 #, elixir-autogen, elixir-format
 msgid "Choose a stable, unique request ID for each intended mutation. Reuse it when\nretrying that same mutation after losing a reply. Request IDs contain 1–128 ASCII\nletters, digits, underscores, dots, colons or hyphens, and start with a letter or\ndigit. Do not reuse one ID for different operations."
 msgstr "Zaɓi tsayayye, ID ɗin buƙatu na musamman don kowane maye gurbi da aka yi niyya. Sake amfani da shi lokacin da \n ke sake gwada wannan maye gurbin bayan rasa amsa. ID na neman ya ƙunshi haruffa 1-128 ASCII \n, lambobi, ƙasan maƙasudi, dige-dige, ƙira ko sarƙaƙƙiya, kuma farawa da harafi ko lambar \n. Kada a sake amfani da ID ɗaya don ayyuka daban-daban."
 
-#: lib/marshall/documentation_messages.ex:93
+#: lib/marshall/documentation_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "Cloning is currently unavailable for the Inception multi-disk profile."
 msgstr "A halin yanzu babu cloning don bayanin martabar faifai da yawa."
 
-#: lib/marshall/documentation_messages.ex:98
+#: lib/marshall/documentation_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Close this interactive channel."
 msgstr "Rufe wannan tasha mai mu'amala."
 
-#: lib/marshall/documentation_messages.ex:99
+#: lib/marshall/documentation_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Command reference"
 msgstr "Maganar umarni"
 
-#: lib/marshall/documentation_messages.ex:100
+#: lib/marshall/documentation_messages.ex:105
 #, elixir-autogen, elixir-format
 msgid "Create a machine. Disk maximum: 500 GiB. --source clones a public GitHub, GitLab, Codeberg or Bitbucket repository in the guest."
 msgstr "Ƙirƙiri inji. Matsakaicin diski: 500 GiB. --source clones jama'a GitHub , GitLab , Codeberg ko Bitbucket ma'ajiya a cikin baƙo."
 
-#: lib/marshall/documentation_messages.ex:104
+#: lib/marshall/documentation_messages.ex:109
 #, elixir-autogen, elixir-format
 msgid "Create a team you own."
 msgstr "Ƙirƙiri ƙungiyar da kuka mallaka."
 
-#: lib/marshall/documentation_messages.ex:105
+#: lib/marshall/documentation_messages.ex:110
 #, elixir-autogen, elixir-format
 msgid "Create or replace a named integration at https://NAME.integration.internal."
 msgstr "Ƙirƙiri ko maye gurbin haɗin kai mai suna a https://NAME.integration.internal."
 
-#: lib/marshall/documentation_messages.ex:109
+#: lib/marshall/documentation_messages.ex:114
 #, elixir-autogen, elixir-format
 msgid "Creation, start, stop, deletion, relocation and request controls wait up to 120\nseconds for the matching physical result. A request being accepted or acknowledged is not proof that the machine\nhas reached the requested state. `--no-wait` returns the accepted request without\nwaiting; `--timeout SECONDS` changes the wait limit. Timing out or disconnecting\ndoes not cancel accepted work."
 msgstr "Ƙirƙiri, farawa, tsayawa, gogewa, ƙaura da buƙatun sarrafawa suna jira har zuwa daƙiƙa 120 \n don daidaitaccen sakamako na zahiri. Buƙatun da ake karɓa ko amincewa ba hujja ba ce cewa injin \n ya kai matsayin da ake buƙata. `--no-wait` yana dawo da buƙatun da aka karɓa ba tare da jira \n ba; `--timeout SECONDS` yana canza iyakar jira. Kashe lokaci ko cire haɗin \n baya soke aikin da aka karɓa."
 
-#: lib/marshall/documentation_messages.ex:113
+#: lib/marshall/documentation_messages.ex:118
 #, elixir-autogen, elixir-format
 msgid "Decline a pending ownership offer."
 msgstr "Ƙi tayin mallakar da ke jiran."
 
-#: lib/marshall/documentation_messages.ex:114
+#: lib/marshall/documentation_messages.ex:119
 #, elixir-autogen, elixir-format
 msgid "Delete a machine and its disk. Refused while its owner has it pinned."
 msgstr "Share inji da faifan sa. An ƙi yayin da mai shi ya liƙa shi."
 
-#: lib/marshall/documentation_messages.ex:118
+#: lib/marshall/documentation_messages.ex:123
 #, elixir-autogen, elixir-format
 msgid "Different request IDs create separate copies, processed in order for each source.\nRepeating the same ID returns the same request. Each copy captures the source's\nfiles, specifications and power state when its turn begins. A running source stops\nfor snapshot capture and restarts while copying continues. The new machine belongs\nto you, is private, and has a fresh address; sharing is not copied. Guest files and\ncredentials stored inside the disk are copied. RAM is not copied."
 msgstr "ID na neman daban-daban suna ƙirƙirar kwafi daban-daban, ana sarrafa su don kowane tushe. \n Maimaita ID iri ɗaya yana mayar da buƙatun iri ɗaya. Kowane kwafi yana ɗaukar fayilolin \n na tushen, ƙayyadaddun bayanai da yanayin wutar lantarki lokacin da ya fara. Wata hanyar da ke gudana tana dakatar da \n don ɗaukar hoto da sake farawa yayin da ake ci gaba da kwafi. Sabuwar injin naku \n ne, mai sirri ne, kuma yana da sabon adireshin; rabawa ba a kofe ba. Fayilolin baƙi da takaddun shaidar \n da aka adana a cikin faifai ana kwafi. RAM ba a kwafi ba."
@@ -234,187 +234,187 @@ msgstr "ID na neman daban-daban suna ƙirƙirar kwafi daban-daban, ana sarrafa s
 msgid "Documentation"
 msgstr "Takaddun bayanai"
 
-#: lib/marshall/documentation_messages.ex:122
+#: lib/marshall/documentation_messages.ex:127
 #, elixir-autogen, elixir-format
 msgid "Each machine's page shows the machine name, its state, its operating system and\nits machine ID (with a Copy button) at the top, followed by a \"Connect from your\ncomputer\" section with a one-line installer that sets up SSH and connects to\nthat machine:"
 msgstr "Kowane shafin na injin yana nuna sunan injin, yanayinsa, tsarin aiki da kuma \n ID ɗin injin ɗinsa (tare da maɓallin Copy) a sama, sai kuma sashin \"Haɗa daga kwamfutar \n ɗinku\" tare da mai sakawa mai layi ɗaya wanda ya saita SSH kuma ya haɗa zuwa \n waccan na'ura:"
 
-#: lib/marshall/documentation_messages.ex:126
+#: lib/marshall/documentation_messages.ex:131
 #, elixir-autogen, elixir-format
 msgid "Every command accepts `--json`. Mutation commands accept `--request-id ID`.\nCreation, start, stop, deletion, relocation and request controls also accept `--timeout SECONDS` (1–3600,\ndefault 120) and `--no-wait`. Memory is in MiB and disk size is in GiB.\nImage identifiers are immutable `sha256:` digests returned by `images`.\nUse `--after UUID` with the returned cursor to fetch another list page."
 msgstr "Kowane umarni yana karɓar `--json` . Umarnin maye gurbin suna karɓar `--request-id ID` . Ƙirƙirar \n, farawa, dakatarwa, gogewa, ƙaura da sarrafa buƙatun kuma sun karɓi `--timeout SECONDS` (1-3600, \n tsoho 120) da `--no-wait`. Ƙwaƙwalwar ajiya tana cikin MiB kuma girman diski yana cikin GiB . \n Masu gano Hoto ba su canzawa `sha256:` narkar da `images` ya dawo dasu. \n Yi amfani da `--after UUID` tare da siginan da aka dawo don ɗauko wani shafin jeri."
 
-#: lib/marshall/documentation_messages.ex:130
+#: lib/marshall/documentation_messages.ex:135
 #, elixir-autogen, elixir-format
 msgid "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
 msgstr "Kowane baƙo mai gudu na iya tambayar `https://reflection.internal` don iyaka, \n bayanin sirri mara-kyau da sabis na sirri da ake samu a halin yanzu \n don aiwatar da shi."
 
-#: lib/marshall/documentation_messages.ex:134
+#: lib/marshall/documentation_messages.ex:143
 #, elixir-autogen, elixir-format
 msgid "Firefox temporary add-ons are removed when Firefox closes. Permanent Firefox\ninstallation requires Mozilla signing or an explicitly managed browser policy.\nOveralls does not currently publish either archive to a browser store."
 msgstr "Ana cire add-ons na wucin gadi na Firefox lokacin da Firefox ta rufe. Shigar da Firefox \n na dindindin yana buƙatar sa hannun Mozilla ko manufar burauzar da aka sarrafa kai tsaye. \n Overalls a halin yanzu baya buga ko wanne rumbun adana bayanai zuwa shagon burauza."
 
-#: lib/marshall/documentation_messages.ex:138
+#: lib/marshall/documentation_messages.ex:147
 #, elixir-autogen, elixir-format
 msgid "For browser approval of an unknown key, start an interactive connection with\n`ssh YOUR_PORSCHE_HOST` and keep it open. Porsche gives you a short-lived approval\nlink after proving possession of the private key. Open it in your browser, sign\nin, compare the fingerprint and explicitly approve. Opening the link alone does\nnot register a key. Links expire after ten minutes and stop working when their\nSSH connection closes. The interactive prompt can continue after approval."
 msgstr "Don amincewar mashigar maɓalli na maɓallin da ba a sani ba, fara haɗin haɗin gwiwa tare da \n `ssh YOUR_PORSCHE_HOST` kuma ci gaba da buɗe shi. Porsche yana ba ku izini na ɗan gajeren lokaci \n hanyar haɗin gwiwa bayan tabbatar da mallakar maɓalli na sirri. Bude shi a cikin burauzar ku, sa hannu \n a ciki, kwatanta sawun yatsa da kuma yarda a sarari. Bude hanyar haɗin yanar gizo kadai \n baya yin rijistar maɓalli. Hanyoyin haɗi zasu ƙare bayan minti goma kuma suna daina aiki lokacin da haɗin \n SSH ya rufe. Sa'ar mu'amala zata iya ci gaba bayan amincewa."
 
-#: lib/marshall/documentation_messages.ex:142
+#: lib/marshall/documentation_messages.ex:151
 #, elixir-autogen, elixir-format
 msgid "For one-shot exec commands, register the key on Marshall's SSH keys page first,\nor complete approval in an interactive connection before retrying the command."
 msgstr "Don umarnin aiwatar da harbi sau ɗaya, yi rajistar maɓalli a shafin Marshall's SSH farko, \n ko cikakkiyar yarda a cikin haɗin haɗin gwiwa kafin sake gwada umarnin."
 
-#: lib/marshall/documentation_messages.ex:146
+#: lib/marshall/documentation_messages.ex:155
 #, elixir-autogen, elixir-format
 msgid "Getting started"
 msgstr "Farawa"
 
-#: lib/marshall/documentation_messages.ex:147
+#: lib/marshall/documentation_messages.ex:156
 #, elixir-autogen, elixir-format
 msgid "Grant viewer, operator or manager access."
 msgstr "Ba da damar mai duba, mai aiki ko mai sarrafa damar."
 
-#: lib/marshall/documentation_messages.ex:148
+#: lib/marshall/documentation_messages.ex:157
 #, elixir-autogen, elixir-format
 msgid "Guest SSH and browser terminals use an automatically allocated Linux login such\nas `u200001`, with `/home/u200001` as its home. The login comes from a durable\naccount UID rather than your email address. It stays the same across machines and\nsame-account email changes. A new account registered after retirement receives a\ndifferent identity and does not inherit the former account's home or access.\nMarshall continues showing your email address; there is no username setting."
 msgstr "Bako SSH da tashoshi masu bincike suna amfani da hanyar shiga Linux da aka ware ta atomatik kamar \n kamar `u200001` , tare da `/home/u200001` a matsayin gidan sa. Shigar ya fito ne daga UID asusun \n mai dorewa maimakon adireshin imel ɗin ku. Yana zama iri ɗaya a cikin injuna da canje-canjen imel ɗin asusu ɗaya na \n. Sabon asusun da aka yiwa rajista bayan yin ritaya yana karɓar \n daban-daban kuma baya gaji gidan tsohon asusun ko shiga. \n Marshall yana ci gaba da nuna adireshin imel ɗin ku; babu saitin sunan mai amfani."
 
-#: lib/marshall/documentation_messages.ex:152
+#: lib/marshall/documentation_messages.ex:161
 #, elixir-autogen, elixir-format
 msgid "Guest metadata includes the machine name and ID, profile, architecture,\noperating-system family, vCPU, memory and disk sizes, image identity,\ngeneration, owner email, team name, current Lilly node, labels, and comment.\nOperating-system values come from the validated image manifest."
 msgstr "Membobin baƙo sun haɗa da sunan injin da ID, bayanin martaba, gine-gine, dangin tsarin aiki na \n, vCPU, ƙwaƙwalwar ajiya da girman diski, asalin hoto, tsarar \n, imel ɗin mai shi, sunan ƙungiyar, kumburin Lilly na yanzu, lakabi, da sharhi. \n Ƙididdiga-tsarin aiki sun fito ne daga ingantattun bayanan hoton."
 
-#: lib/marshall/documentation_messages.ex:156
+#: lib/marshall/documentation_messages.ex:165
 #, elixir-autogen, elixir-format
 msgid "Inspect a machine by name or UUID."
 msgstr "Duba inji da suna ko UUID ."
 
-#: lib/marshall/documentation_messages.ex:157
+#: lib/marshall/documentation_messages.ex:166
 #, elixir-autogen, elixir-format
 msgid "Inspect a previously accepted request."
 msgstr "Bincika buƙatun da aka karɓa a baya."
 
-#: lib/marshall/documentation_messages.ex:159
+#: lib/marshall/documentation_messages.ex:168
 #, elixir-autogen, elixir-format
 msgid "Inspect an integration without secrets."
 msgstr "Bincika haɗin kai ba tare da sirri ba."
 
-#: lib/marshall/documentation_messages.ex:160
+#: lib/marshall/documentation_messages.ex:169
 #, elixir-autogen, elixir-format
 msgid "Integration entries describe the internal URL, useful paths, a short `help`\ncommand, a comment, and injected header names and kinds. Header values,\ncredentials, tokens, and upstream target URLs are never returned. The list\ncontains Reflection, LLM, and named integrations authorized for this exact\nmachine execution."
 msgstr "Bayanan haɗin gwiwa suna bayyana URL na ciki, hanyoyi masu amfani, gajeren umarnin `help`\nda sharhi, da sunaye da nau’ikan kanun da aka saka. Ba a taɓa mayar da ƙimar kanun,\nbayanan shiga, alamomin izini, ko URL na wuraren da ake turawa ba. Jerin\nya ƙunshi Reflection, LLM, da haɗin gwiwa masu suna waɗanda aka ba izini ga wannan\naiwatarwar injin kaɗai."
 
-#: lib/marshall/documentation_messages.ex:164
+#: lib/marshall/documentation_messages.ex:173
 #, elixir-autogen, elixir-format
 msgid "Key removal prevents subsequent commands and status polls from that session.\nAccepted jobs continue. Reconnect using another registered key, or use email login\nto manage your keys in Marshall. Do not put private keys or approval links in logs.\n"
 msgstr "Cire maɓalli yana hana umarni na gaba da zaɓen matsayi daga wancan zaman. \n Ayyukan da aka karɓa suna ci gaba. Sake haɗawa ta amfani da wani maɓalli mai rijista, ko amfani da shiga email \n don sarrafa maɓallan ku a cikin Marshall. Kar a sanya maɓallai masu zaman kansu ko hanyoyin haɗin gwiwa a cikin rajistan ayyukan.\n"
 
-#: lib/marshall/documentation_messages.ex:169
+#: lib/marshall/documentation_messages.ex:178
 #, elixir-autogen, elixir-format
 msgid "List a team's members."
 msgstr "Yi lissafin membobin ƙungiyar."
 
-#: lib/marshall/documentation_messages.ex:171
+#: lib/marshall/documentation_messages.ex:180
 #, elixir-autogen, elixir-format
 msgid "List access grants."
 msgstr "Tallafin shiga jeri."
 
-#: lib/marshall/documentation_messages.ex:173
+#: lib/marshall/documentation_messages.ex:182
 #, elixir-autogen, elixir-format
 msgid "List available images."
 msgstr "Jerin hotuna da ake da su."
 
-#: lib/marshall/documentation_messages.ex:174
+#: lib/marshall/documentation_messages.ex:183
 #, elixir-autogen, elixir-format
 msgid "List machines you can access."
 msgstr "Jerin injinan da zaku iya shiga."
 
-#: lib/marshall/documentation_messages.ex:175
+#: lib/marshall/documentation_messages.ex:184
 #, elixir-autogen, elixir-format
 msgid "List your SSH keys."
 msgstr "Jera maɓallan SSH naku."
 
-#: lib/marshall/documentation_messages.ex:176
+#: lib/marshall/documentation_messages.ex:185
 #, elixir-autogen, elixir-format
 msgid "List your integrations."
 msgstr "Yi lissafin haɗin kai."
 
-#: lib/marshall/documentation_messages.ex:178
+#: lib/marshall/documentation_messages.ex:187
 #, elixir-autogen, elixir-format
 msgid "List your teams and roles."
 msgstr "Yi lissafin ƙungiyoyin ku da matsayinku."
 
-#: lib/marshall/documentation_messages.ex:179
+#: lib/marshall/documentation_messages.ex:188
 #, elixir-autogen, elixir-format
 msgid "Machine managers can edit labels and the machine comment from machine settings.\nLabels are limited to 32 entries and comments to 2 KiB. Integration managers\ncan edit an integration comment from the integrations page. Changes are\naudited without recording comment text or secret values."
 msgstr "Manajojin inji na iya gyara lakabi da sharhin injin daga saitunan injin. Lambobin \n an iyakance su zuwa shigarwar 32 da sharhi zuwa 2 KiB. Manajojin haɗin kai \n na iya shirya sharhin haɗin kai daga shafin haɗin kai. Ana duba canje-canjen \n ba tare da yin rikodin rubutun sharhi ko ƙimar sirri ba."
 
-#: lib/marshall/documentation_messages.ex:183
+#: lib/marshall/documentation_messages.ex:192
 #, elixir-autogen, elixir-format
 msgid "Machine references accept names or UUIDs. Names are lowercase, begin with a letter,\nand contain letters, digits and single separating hyphens, up to 63 characters.\nUUID-shaped names are reserved for machine identifiers.\nCreation without a name generates one. Creation without an image selects the\noperator's default image. Creation without `--profile` selects OSS; use\n`--profile customer` for the restricted Customer environment. Omitted CPU,\nmemory and disk requests use defaults raised to the image minimum; explicitly\nundersized requests fail."
 msgstr "Ana iya amfani da sunaye ko UUID don ambaton injina. Sunaye suna amfani da ƙananan haruffa kuma suna farawa da harafi,\nsuna kuma ƙunshe da haruffa, lambobi da jan layi guda don raba kalmomi, har zuwa haruffa 63.\nAn keɓe sunaye masu siffar UUID don alamomin injina.\nƘirƙirar inji ba tare da suna ba yana samar da suna. Ƙirƙira ba tare da hoton tsarin ba yana zaɓar\nhoton tsarin da mai gudanarwa ya sa a matsayin tsoho. Ƙirƙira ba tare da `--profile` ba yana zaɓar OSS; yi amfani da\n`--profile customer` don muhallin Customer mai ƙuntatawa. Idan ba a nemi CPU,\nƙwaƙwalwa da faifai ba, ana amfani da tsoffin ƙimomi da aka ɗaga zuwa mafi ƙarancin abin da hoton tsarin yake buƙata; buƙatun\nda aka bayyana waɗanda suka yi ƙasa da iyakar suna gaza."
 
-#: lib/marshall/documentation_messages.ex:187
+#: lib/marshall/documentation_messages.ex:196
 #, elixir-autogen, elixir-format
 msgid "Make an integration available to a machine."
 msgstr "Yi haɗin kai ga na'ura."
 
-#: lib/marshall/documentation_messages.ex:197
+#: lib/marshall/documentation_messages.ex:206
 #, elixir-autogen, elixir-format
 msgid "Move a machine to an automatically selected host."
 msgstr "Matsar da na'ura zuwa wurin da aka zaɓa ta atomatik."
 
-#: lib/marshall/documentation_messages.ex:206
+#: lib/marshall/documentation_messages.ex:215
 #, elixir-autogen, elixir-format
 msgid "Offer team ownership to an admin."
 msgstr "Bayar da ikon ƙungiya ga mai gudanarwa."
 
-#: lib/marshall/documentation_messages.ex:207
+#: lib/marshall/documentation_messages.ex:216
 #, elixir-autogen, elixir-format
 msgid "On a supported repository page, clicking an unconfigured toolbar button opens\nsettings. Unsupported hosts show an **Unsupported page** state and do not send a\nURL. Marshall checks the launch request again before staging it and may require\nyou to sign in."
 msgstr "A kan shafin ma'ajiya da aka goyan baya, danna maɓallin kayan aiki mara tsari yana buɗe saitunan \n. Runduna mara tallafi suna nuna yanayin **Babu tallafi** kuma kar a aika \n URL . Marshall ya sake duba buƙatar ƙaddamarwa kafin tsara shi kuma yana iya buƙatar \n ka shiga."
 
-#: lib/marshall/documentation_messages.ex:211
+#: lib/marshall/documentation_messages.ex:220
 #, elixir-autogen, elixir-format
 msgid "Open a GitHub, GitLab, Codeberg or Bitbucket Cloud repository in Overalls with a\nsingle toolbar click. The extension carries only the provider origin and path to\nOveralls, so you can move from a repository page to a machine without copying a\nURL by hand."
 msgstr "Bude ma'ajiyar girgije GitHub, GitLab, Codeberg ko Bitbucket Cloud a cikin Overalls tare da danna maballin kayan aiki guda \n. Tsawaita yana ɗaukar asalin mai bayarwa da hanya zuwa \n Overalls , don haka zaku iya matsawa daga shafin ajiya zuwa na'ura ba tare da kwafin \n URL da hannu ba."
 
-#: lib/marshall/documentation_messages.ex:216
+#: lib/marshall/documentation_messages.ex:225
 #, elixir-autogen, elixir-format
 msgid "Options:"
 msgstr "Zabuka:"
 
-#: lib/marshall/documentation_messages.ex:217
+#: lib/marshall/documentation_messages.ex:226
 #, elixir-autogen, elixir-format
 msgid "Overalls documentation"
 msgstr "Takardar bayanan Overalls"
 
-#: lib/marshall/documentation_messages.ex:218
+#: lib/marshall/documentation_messages.ex:227
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can change a machine's CPU and memory; disk may only grow,\nup to 500 GiB:"
 msgstr "Masu mallaka da manajoji na iya canza CPU na inji da ƙwaƙwalwar ajiya; faifai na iya girma kawai, \n har zuwa 500 GiB:"
 
-#: lib/marshall/documentation_messages.ex:222
+#: lib/marshall/documentation_messages.ex:231
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can queue an independent copy:"
 msgstr "Masu mallaka da manajoji na iya yin layi na kwafi mai zaman kansa:"
 
-#: lib/marshall/documentation_messages.ex:223
+#: lib/marshall/documentation_messages.ex:232
 #, elixir-autogen, elixir-format
 msgid "Owners, managers and team admins can move a machine to another eligible physical\nhost. The destination and transfer strategy are always selected by Marshall and\ncannot be supplied through Porsche:"
 msgstr "Masu mallaka, manajoji da masu gudanarwa na ƙungiyar za su iya motsa injin zuwa wani babban masaukin \n na zahiri. Marshall yana zaɓar wurin da aka nufa da dabarun canja wuri koyaushe kuma ba za a iya ba da \n ta hanyar Porsche ba:"
 
-#: lib/marshall/documentation_messages.ex:227
+#: lib/marshall/documentation_messages.ex:236
 #, elixir-autogen, elixir-format
 msgid "Permissions are checked at execution time. Access shown in a previous list is\nnot a guarantee that a later operation is allowed. Sharing roles are `viewer`,\n`operator` and `manager`; ownership and current permissions determine which\noperations you may perform. SSH key commands affect only your own keys."
 msgstr "Ana duba izini a lokacin aiwatarwa. Samun shiga da aka nuna a jerin da ya gabata shine \n ba garantin cewa an ba da izinin aiki daga baya ba. Rarraba ayyukan su ne `viewer` , \n `operator` da `manager` ; ikon mallaka da izini na yanzu sun ƙayyade ayyukan \n da za ku iya yi. Umarnin maɓallin SSH yana shafar maɓallan ku kawai."
 
-#: lib/marshall/documentation_messages.ex:231
+#: lib/marshall/documentation_messages.ex:240
 #, elixir-autogen, elixir-format
 msgid "Pin a machine to the top of your lists. Your owner pin wakes it, prevents automatic suspension, and prevents deletion."
 msgstr "Mana inji zuwa saman jerin sunayen ku. Fitin mai mallakar ku yana tada shi, yana hana dakatarwa ta atomatik, kuma yana hana gogewa."
 
-#: lib/marshall/documentation_messages.ex:235
+#: lib/marshall/documentation_messages.ex:244
 #, elixir-autogen, elixir-format
 msgid "Porsche manages machines; it does not provide a guest shell, guest file transfer,\nport forwarding or an SSH agent forwarding service. Machine console access is\navailable separately in Marshall's web interface, subject to account permissions.\n"
 msgstr "Porsche yana sarrafa inji; baya bayar da harsashi baƙo, canja wurin fayil ɗin baƙo, tura tashar tashar \n ko sabis na isar da wakili na SSH. Samun damar na'ura mai kwakwalwa \n yana samuwa daban a cikin mahallin gidan yanar gizon Marshall, dangane da izinin asusu.\n"
@@ -424,217 +424,217 @@ msgstr "Porsche yana sarrafa inji; baya bayar da harsashi baƙo, canja wurin fay
 msgid "Public documentation for Overalls browser extensions and SSH machine management (Porsche v1)."
 msgstr "Takardun jama’a don ƙarin mai bincike na Overalls da sarrafa injina ta SSH (Porsche v1)."
 
-#: lib/marshall/documentation_messages.ex:240
+#: lib/marshall/documentation_messages.ex:249
 #, elixir-autogen, elixir-format
 msgid "Queue an independent full-disk copy of a machine."
 msgstr "Sanya kwafin injin mai cikakken faifai mai zaman kansa."
 
-#: lib/marshall/documentation_messages.ex:241
+#: lib/marshall/documentation_messages.ex:250
 #, elixir-autogen, elixir-format
 msgid "Queued requests recheck your access before execution. Use `request cancel copy-1`\nbefore the destination is published; successful cancellation waits for any required\ncleanup. Use `request retry copy-1` to resume a failed request rather than create\nanother destination. Clone accepts `--timeout` and `--no-wait`; a client\ntimeout does not cancel accepted work."
 msgstr "Buƙatun da aka jere suna sake duba damar ku kafin aiwatarwa. Yi amfani da `request cancel copy-1` \n kafin a buga inda ake nufi; nasarar sokewa yana jiran kowane tsaftacewar \n da ake buƙata. Yi amfani da `request retry copy-1` don ci gaba da buƙatar gazawar maimakon ƙirƙirar \n wata manufa. kwafi yana karɓar `--timeout` da `--no-wait`; lokacin karewa abokin ciniki \n baya soke aikin da aka karɓa."
 
-#: lib/marshall/documentation_messages.ex:245
+#: lib/marshall/documentation_messages.ex:254
 #, elixir-autogen, elixir-format
 msgid "Reconnecting later is the same everywhere: `ssh HOST`. (On Windows, if you\ndeclined the administrator prompt, use `overalls ssh HOST` instead.)"
 msgstr "Sake haɗawa daga baya iri ɗaya ne a ko'ina: `ssh HOST` . (A kan Windows, idan \n kuka ƙi faɗakarwar mai gudanarwa, yi amfani da `overalls ssh HOST` maimakon.)"
 
-#: lib/marshall/documentation_messages.ex:249
+#: lib/marshall/documentation_messages.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reflection integration"
 msgstr "Haɗin Reflection"
 
-#: lib/marshall/documentation_messages.ex:250
+#: lib/marshall/documentation_messages.ex:259
 #, elixir-autogen, elixir-format
 msgid "Reflection is available only through the private network. Requests are bound to\nthe current VM, host, placement, and execution epoch; stopped, relocated,\nretired, stale, or unauthorized guests receive an unavailable response.\n"
 msgstr "Reflection yana samuwa kawai ta hanyar sadarwar sirri. An daure buƙatun zuwa \n VM na yanzu, mai watsa shiri, jeri, da lokacin aiwatarwa; tsaya, ƙaura, \n mai ritaya, datti, ko baƙo mara izini suna karɓar amsa da babu.\n"
 
-#: lib/marshall/documentation_messages.ex:258
+#: lib/marshall/documentation_messages.ex:267
 #, elixir-autogen, elixir-format
 msgid "Remove a machine's explicit availability."
 msgstr "Cire kasancewar na'ura a sarari."
 
-#: lib/marshall/documentation_messages.ex:259
+#: lib/marshall/documentation_messages.ex:268
 #, elixir-autogen, elixir-format
 msgid "Remove a named integration."
 msgstr "Cire haɗin kai mai suna."
 
-#: lib/marshall/documentation_messages.ex:260
+#: lib/marshall/documentation_messages.ex:269
 #, elixir-autogen, elixir-format
 msgid "Remove an account's membership."
 msgstr "Cire membobin asusun."
 
-#: lib/marshall/documentation_messages.ex:261
+#: lib/marshall/documentation_messages.ex:270
 #, elixir-autogen, elixir-format
 msgid "Remove your pin from a machine."
 msgstr "Cire fil ɗin ku daga na'ura."
 
-#: lib/marshall/documentation_messages.ex:262
+#: lib/marshall/documentation_messages.ex:271
 #, elixir-autogen, elixir-format
 msgid "Resume a suspended machine's preserved memory."
 msgstr "Ci gaba da adanar ƙwaƙwalwar injin da aka dakatar."
 
-#: lib/marshall/documentation_messages.ex:263
+#: lib/marshall/documentation_messages.ex:272
 #, elixir-autogen, elixir-format
 msgid "Resume preserved memory, waiting for capacity or relocation."
 msgstr "Ci gaba da adanar ƙwaƙwalwar ajiya, jiran iya aiki ko ƙaura."
 
-#: lib/marshall/documentation_messages.ex:267
+#: lib/marshall/documentation_messages.ex:276
 #, elixir-autogen, elixir-format
 msgid "Retry a failed clone or relocation request."
 msgstr "Sake gwada abin rufe fuska ko buƙatun ƙaura."
 
-#: lib/marshall/documentation_messages.ex:269
+#: lib/marshall/documentation_messages.ex:278
 #, elixir-autogen, elixir-format
 msgid "Revoke an account's shared access."
 msgstr "Soke hanyar da aka raba asusu."
 
-#: lib/marshall/documentation_messages.ex:270
+#: lib/marshall/documentation_messages.ex:279
 #, elixir-autogen, elixir-format
 msgid "Revoke one of your SSH keys."
 msgstr "Soke ɗaya daga cikin maɓallan SSH."
 
-#: lib/marshall/documentation_messages.ex:273
+#: lib/marshall/documentation_messages.ex:286
 #, elixir-autogen, elixir-format
 msgid "Show command help."
 msgstr "Nuna taimakon umarni."
 
-#: lib/marshall/documentation_messages.ex:274
+#: lib/marshall/documentation_messages.ex:287
 #, elixir-autogen, elixir-format
 msgid "Show the authenticated account."
 msgstr "Nuna ingantattun asusun."
 
-#: lib/marshall/documentation_messages.ex:275
+#: lib/marshall/documentation_messages.ex:288
 #, elixir-autogen, elixir-format
 msgid "Sign in to Marshall using your email login and open\n[Account settings › SSH keys](/settings#ssh-keys). Paste one OpenSSH public key and optionally give it\na label. Paste the `.pub` file, never the private key. Supported public keys are\nEd25519, ECDSA and RSA (at least 2048 bits). Certificates and `authorized_keys`\noptions are not accepted."
 msgstr "Shiga Marshall ta hanyar imel ɗinka sannan ka buɗe\n[Saitunan asusu › Maɓallan SSH](/settings#ssh-keys). Manna maɓallin jama’a na OpenSSH guda ɗaya, kuma za ka iya ba shi\nlakabi. Manna fayil ɗin `.pub`, kada ka manna maɓallin sirri. Ana tallafa wa maɓallan jama’a na\nEd25519, ECDSA da RSA (aƙalla bit 2048). Ba a karɓar takardun shaida da zaɓuɓɓukan\n`authorized_keys`."
 
-#: lib/marshall/documentation_messages.ex:279
+#: lib/marshall/documentation_messages.ex:292
 #, elixir-autogen, elixir-format
 msgid "Start a machine."
 msgstr "Fara inji."
 
-#: lib/marshall/documentation_messages.ex:280
+#: lib/marshall/documentation_messages.ex:293
 #, elixir-autogen, elixir-format
 msgid "Stop a machine, retaining its disk and discarding suspended memory."
 msgstr "Tsaida na'ura, riƙe faifan faifan sa da zubar da ƙwaƙwalwar ajiyar da aka dakatar."
 
-#: lib/marshall/documentation_messages.ex:284
+#: lib/marshall/documentation_messages.ex:297
 #, elixir-autogen, elixir-format
 msgid "Stop retains the disk. `rm MACHINE` deletes the machine and its disk. A name is\navailable for reuse only after cleanup is confirmed. Use `exit` to leave the prompt."
 msgstr "Tsaya yana riƙe faifai. `rm MACHINE` yana goge injin da faifan ta. Ana samun suna \n don sake amfani da shi kawai bayan an tabbatar da tsaftacewa. Yi amfani da `exit` don barin faɗakarwa."
 
-#: lib/marshall/documentation_messages.ex:304
+#: lib/marshall/documentation_messages.ex:317
 #, elixir-autogen, elixir-format
 msgid "Suspend a machine, preserving its memory and disk."
 msgstr "Dakatar da na'ura, yana adana ƙwaƙwalwar ajiyarsa da faifai."
 
-#: lib/marshall/documentation_messages.ex:306
+#: lib/marshall/documentation_messages.ex:319
 #, elixir-autogen, elixir-format
 msgid "The Overalls operator chooses whether these immutable archives are available. If\nthe deployment has disabled its browser extension package, the download links return an unavailable response.\nSee the browser distribution notes for package and build details.\n"
 msgstr "Mai aiki da Overalls yana zaɓar ko ana samun waɗannan ma'ajin tarihi marasa canzawa. Idan \n tura ya kashe fakitin tsawo na burauzar sa, hanyoyin zazzagewa suna mayar da martanin da ba ya samuwa. \n Duba bayanin kula rarraba mai lilo don kunshin kuma gina cikakkun bayanai. Saukewa:\n"
 
-#: lib/marshall/documentation_messages.ex:310
+#: lib/marshall/documentation_messages.ex:323
 #, elixir-autogen, elixir-format
 msgid "The accepted request retains its normalized command and resolved resources.\nRetrying cannot retarget a different machine after name reuse or silently select\na different default image. Query the original request after a lost response or\ntimeout. Request status remains subject to current account authorization, including\nafter the machine is archived."
 msgstr "Buƙatun da aka karɓa yana riƙe da ingantaccen umarninsa da hanyoyin warware su. \n Sake gwadawa ba zai iya sake kunna na'ura daban ba bayan sake amfani da suna ko a shiru zaɓi \n wani hoton tsoho na daban. Nemi buƙatun asali bayan rasa amsa ko ƙarewar \n. Matsayin nema ya kasance ƙarƙashin izinin asusu na yanzu, gami da \n bayan an adana injin ɗin."
 
-#: lib/marshall/documentation_messages.ex:314
+#: lib/marshall/documentation_messages.ex:327
 #, elixir-autogen, elixir-format
 msgid "The browser extension opens supported repository pages in Overalls. The SSH guides\ndescribe Porsche v1; your operator supplies the SSH hostname for deployments\nwith Porsche enabled."
 msgstr "Tsawancin mai lilo yana buɗe shafukan ma'ajiya masu tallafi a cikin Overalls . SSH jagororin \n sun bayyana Porsche v1; afaretan ku yana ba da sunan mai masaukin SSH don turawa \n tare da kunna Porsche."
 
-#: lib/marshall/documentation_messages.ex:318
+#: lib/marshall/documentation_messages.ex:331
 #, elixir-autogen, elixir-format
 msgid "The extension opens Overalls with a source URL only after an explicit toolbar\nclick on the four supported HTTPS provider hosts. It sends the provider origin\nand path, strips query parameters and fragments, and never collects page\ncontents, credentials, history or telemetry."
 msgstr "Tsawaita yana buɗe Overalls tare da tushen URL kawai bayan madaidaicin kayan aiki \n danna kan rundunonin masu bada HTTPS huɗu masu goyan bayan. Yana aika asalin \n na mai badawa da hanya, yana zazzage sigogin tambaya da gutsuttsura, kuma baya tattara abubuwan shafi na \n, takaddun shaida, tarihi ko telemetry."
 
-#: lib/marshall/documentation_messages.ex:322
+#: lib/marshall/documentation_messages.ex:335
 #, elixir-autogen, elixir-format
 msgid "The machine keeps its identity, name, sharing, private address, image and requested\nshape. A running machine may have bounded downtime while final disk state and\nexecution authority move. `request cancel move-1` is available only before handoff\ncommits. If destination activation or readiness fails after commit,\n`request retry move-1` retries that retained destination. Both controls create\ntheir own durable request receipt; use a distinct `--request-id` for each control."
 msgstr "Na'urar tana adana asalinta, suna, rabawa, adireshin sirri, hotonta da siffar \n da ake nema. Na'urar da ke gudana ƙila ta daure ƙasa yayin da yanayin faifai na ƙarshe da ikon aiwatar da \n ke motsawa. `request cancel move-1` yana samuwa kawai kafin a kashe \n. Idan kunnawar wurin ko shirye-shiryen ya gaza bayan ƙaddamarwa, \n `request retry move-1` yana sake gwada wurin da aka riƙe. Dukansu sarrafawa sun ƙirƙiri \n nasu rasidin buƙatun dorewa; yi amfani da kebantaccen `--request-id` don kowane sarrafawa."
 
-#: lib/marshall/documentation_messages.ex:326
+#: lib/marshall/documentation_messages.ex:339
 #, elixir-autogen, elixir-format
 msgid "The page shows each key's label, type, fingerprint and creation time. Remove a key\nto revoke its access. You may remove your last SSH key and continue using email\nlogin. Adding the same public key again creates a new registration; previous\nsessions remain revoked."
 msgstr "Shafin yana nuna alamar kowane maɓalli, nau'in, sawun yatsa da lokacin ƙirƙira. Cire maɓalli \n don soke samun damarsa. Kuna iya cire maɓallin SSH ɗinku na ƙarshe kuma ku ci gaba da amfani da shiga imel ɗin \n. Ƙara maɓalli iri ɗaya na jama'a kuma yana haifar da sabuwar rajista; An soke zaman \n na baya."
 
-#: lib/marshall/documentation_messages.ex:330
+#: lib/marshall/documentation_messages.ex:347
 #, elixir-autogen, elixir-format
 msgid "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
 msgstr "Waɗannan ma'ajin tarihin ba su sa hannu kuma ana aika su ta hanyar tura Overalls. Zazzage \n rumbun adana bayanan burauzan ku, sannan ku bi kwararar masu haɓakawa:"
 
-#: lib/marshall/documentation_messages.ex:334
+#: lib/marshall/documentation_messages.ex:351
 #, elixir-autogen, elixir-format
 msgid "These pages are public and contain no account or fleet data. Each page is available\nas HTML by removing `.md` from its URL. Language-model clients can start at\n[/llms.txt](/llms.txt) and follow the Markdown links."
 msgstr "Waɗannan shafuka na jama'a ne kuma ba su ƙunshi asusu ko bayanan rundunar jiragen ruwa ba. Kowane shafi yana samuwa \n azaman HTML ta cire `.md` daga URL . Abokan samfurin-harshe na iya farawa a \n [/lms.txt ](/llms.txt) kuma bi hanyoyin haɗin Markdown."
 
-#: lib/marshall/documentation_messages.ex:338
+#: lib/marshall/documentation_messages.ex:355
 #, elixir-autogen, elixir-format
 msgid "This reference uses the same v1 command grammar as the SSH service."
 msgstr "Wannan tunani yana amfani da nahawu umarni v1 iri ɗaya kamar sabis ɗin SSH."
 
-#: lib/marshall/documentation_messages.ex:343
+#: lib/marshall/documentation_messages.ex:364
 #, elixir-autogen, elixir-format
 msgid "Use Overalls from your browser or manage machines over SSH with Porsche. Marshall\nprovides the web interface and account permissions. Use the same account in both."
 msgstr "Yi amfani da Overalls daga burauzar ku ko sarrafa injuna akan SSH tare da Porsche. Marshall \n yana ba da hanyar haɗin yanar gizo da izinin asusu. Yi amfani da asusun iri ɗaya a cikin duka."
 
-#: lib/marshall/documentation_messages.ex:347
+#: lib/marshall/documentation_messages.ex:368
 #, elixir-autogen, elixir-format
 msgid "Use Porsche to manage machines over SSH, with the same account and permissions\nas Marshall’s web interface."
 msgstr "Yi amfani da Porsche don sarrafa injuna akan SSH, tare da asusu ɗaya da izini \n azaman hanyar yanar gizo ta Marshall."
 
-#: lib/marshall/documentation_messages.ex:351
+#: lib/marshall/documentation_messages.ex:372
 #, elixir-autogen, elixir-format
 msgid "Use SSH exec commands and durable request IDs to automate machine management."
 msgstr "Yi amfani da umarnin SSH exec da ID ɗin buƙatun dorewa don sarrafa sarrafa injin."
 
-#: lib/marshall/documentation_messages.ex:355
+#: lib/marshall/documentation_messages.ex:376
 #, elixir-autogen, elixir-format
 msgid "Use `--json` for machine-readable results. An exec invocation writes one result\nto standard output; progress goes to standard error. Check the SSH command's exit\nstatus as well as its result. A failed command exits nonzero."
 msgstr "Yi amfani da `--json` don sakamako mai iya karanta na'ura. Kiran zartarwa yana rubuta sakamako ɗaya \n zuwa daidaitaccen fitarwa; ci gaba yana zuwa daidaitaccen kuskure. Duba matsayin SSH umarni na fita \n da sakamakonsa. Umarnin da ya gaza ya fita babu sifili."
 
-#: lib/marshall/documentation_messages.ex:359
+#: lib/marshall/documentation_messages.ex:380
 #, elixir-autogen, elixir-format
 msgid "Use the Porsche hostname supplied by your operator. In a local terminal, run\n`ssh YOUR_PORSCHE_HOST help` for one command, or `ssh YOUR_PORSCHE_HOST` for an\ninteractive prompt. Verify the server host-key fingerprint using your operator's\ntrusted instructions. Management uses port 22."
 msgstr "Yi amfani da sunan masaukin Porsche wanda afaretan ku ya kawo. A cikin tashoshi na gida, gudanar da \n `ssh YOUR_PORSCHE_HOST help` don umarni ɗaya, ko `ssh YOUR_PORSCHE_HOST` don saurin mu'amala na \n. Tabbatar da sawun yatsa mai masaukin uwar garke ta amfani da amintattun umarnin \n na afaretan ku. Gudanarwa yana amfani da tashar jiragen ruwa 22."
 
-#: lib/marshall/documentation_messages.ex:363
+#: lib/marshall/documentation_messages.ex:384
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests."
 msgstr "Faifan VM suna da iyakar ƙarfi na **500 GiB** (bait 536,870,912,000).\nAna ƙin buƙatun ƙirƙira da sauya girma da suka zarce wannan iyaka, har da buƙatun Porsche\n`new --disk`."
 
-#: lib/marshall/documentation_messages.ex:367
+#: lib/marshall/documentation_messages.ex:388
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests.\n"
 msgstr "Faifan VM suna da iyakar ƙarfi na **500 GiB** (bait 536,870,912,000).\nAna ƙin buƙatun ƙirƙira da sauya girma da suka zarce wannan iyaka, har da buƙatun Porsche\n`new --disk`.\n"
 
-#: lib/marshall/documentation_messages.ex:371
+#: lib/marshall/documentation_messages.ex:392
 #, elixir-autogen, elixir-format
 msgid "When the extension has been configured for this exact Overalls origin and the\nbrowser has granted site access, it marks the open Overalls page as installed.\nThat local marker hides setup prompts on the home page; it does not sign you in,\ngrant access to machines, or change launch authorization. If site access is\nwithdrawn, configuration is missing, or detection is unavailable, setup remains\nvisible."
 msgstr "Lokacin da aka saita tsawaita don ainihin asalin Overalls kuma mai binciken \n ya ba da damar shiga rukunin yanar gizon, yana nuna buɗaɗɗen shafin Overalls kamar yadda aka shigar. \n Wannan alamar gida tana ɓoye abubuwan saiti akan shafin gida; baya shigar da ku, \n yana ba da damar yin amfani da inji, ko canza izinin ƙaddamarwa. Idan an cire damar shiga rukunin yanar gizon \n, saitin ya ɓace, ko babu ganowa, saitin ya kasance a bayyane \n."
 
-#: lib/marshall/documentation_messages.ex:375
+#: lib/marshall/documentation_messages.ex:396
 #, elixir-autogen, elixir-format
 msgid "With exec, place the same command after `ssh YOUR_PORSCHE_HOST` and quote it for\nyour local shell when needed. Porsche does not evaluate shell expressions,\npipelines or substitutions. Single and double quotes group command arguments."
 msgstr "Tare da exec, sanya umarni iri ɗaya bayan `ssh YOUR_PORSCHE_HOST` kuma faɗi shi don \n harsashi na gida lokacin da ake buƙata. Porsche baya kimanta maganganun harsashi, bututun \n ko maye gurbinsu. Hujjojin umarni na rukuni guda ɗaya da ƙididdiga biyu."
 
-#: lib/marshall/documentation_messages.ex:384
+#: lib/marshall/documentation_messages.ex:405
 #, elixir-autogen, elixir-format
 msgid "`GET /` returns a versioned object containing `guest`, `integrations`, and the\navailable paths. `GET /guest` returns only guest metadata. `GET /integrations`\nreturns the integrations array directly, which makes it convenient for shell\nscripts and agents."
 msgstr "`GET /` yana dawo da sigar abu mai ɗauke da `guest` , `integrations` , da kuma hanyoyin \n da ake da su. `GET /guest` yana dawo da metadata baƙo kawai. `GET /integrations` \n yana dawo da tsararrun haɗin kai kai tsaye, wanda ya sa ya dace don rubutun \n harsashi da wakilai."
 
-#: lib/marshall/documentation_messages.ex:392
+#: lib/marshall/documentation_messages.ex:413
 #, elixir-autogen, elixir-format
 msgid "`new` selects OSS when `--profile` is omitted, as does the browser creation form.\nUse `new --profile customer` to choose Customer explicitly. Customer machines\npermit only owner SSH and serial-terminal access. All outbound network\nconnections, workspace sharing, and web/port exposure are disabled.\nSSH reply traffic is allowed only on admitted owner connections. Choose an\nappropriate non-Customer profile when networking or collaboration is required."
 msgstr "`new` yana zaɓar OSS lokacin da aka cire `--profile`, kamar yadda tsarin ƙirƙirar burauza yake. \n Yi amfani da `new --profile customer` don zaɓar Abokin ciniki a sarari. Injin abokin ciniki \n yana ba da izinin mai shi kawai SSH da shiga tasha. Duk hanyoyin sadarwa na \n mai fita waje, raba filin aiki, da faɗuwar yanar gizo/tashar ruwa an kashe su. Ana ba da izinin zirga-zirgar amsa \n SSH akan haɗin mai mallakar da aka shigar kawai. Zaɓi bayanin martaba na \n mai dacewa wanda ba Abokin ciniki ba lokacin da ake buƙatar sadarwar ko haɗin gwiwa."
 
-#: lib/marshall/documentation_messages.ex:396
+#: lib/marshall/documentation_messages.ex:417
 #, elixir-autogen, elixir-format
 msgid "`pin MACHINE` keeps a machine at the top of your lists in the browser; `unpin\nMACHINE` removes your pin. Pins are personal, and you may hold up to twenty. While\nthe machine's owner has it pinned, nobody can delete it: `rm` answers\n`machine_pinned` until the owner runs `unpin MACHINE` or unpins it in the browser."
 msgstr "`pin MACHINE` yana adana na'ura a saman jerin abubuwanku a cikin mai bincike; `unpin\nMACHINE` yana cire fil ɗin ku. Fil na sirri ne, kuma kuna iya ɗaukar har zuwa ashirin. Yayin da \n mai na'urar ke danne ta, babu wanda zai iya gogewa: `rm` yana amsawa \n `machine_pinned` har sai mai shi ya gudanar da `unpin MACHINE` ko ya cire shi a cikin mazuruftan."
 
-#: lib/marshall/documentation_messages.ex:400
+#: lib/marshall/documentation_messages.ex:421
 #, elixir-autogen, elixir-format
 msgid "`relocate MACHINE` moves the same machine and disk to another eligible physical\nhost. Porsche never accepts a destination: Marshall selects one from current\ncapacity, image availability and transfer readiness. The machine keeps its name,\nidentity, sharing and private address."
 msgstr "`relocate MACHINE` yana motsa injin iri ɗaya da faifai zuwa wani mai masaukin \n na zahiri. Porsche baya yarda da manufa: Marshall yana zaɓar ɗaya daga ƙarfin \n na yanzu, samuwan hoto da shirye-shiryen canja wuri. Na'urar tana adana sunanta, \n ainihi, rabawa da adireshin sirri."
@@ -649,182 +649,182 @@ msgstr "# Sanarwar turawa"
 msgid "## Devices"
 msgstr "## Na'urori"
 
-#: lib/marshall/documentation_messages.ex:22
+#: lib/marshall/documentation_messages.ex:23
 #, elixir-autogen, elixir-format
 msgid "## Privacy"
 msgstr "## Sirri"
 
-#: lib/marshall/documentation_messages.ex:29
+#: lib/marshall/documentation_messages.ex:30
 #, elixir-autogen, elixir-format
 msgid "## Turning notifications off"
 msgstr "## Kashe sanarwa"
 
-#: lib/marshall/documentation_messages.ex:30
+#: lib/marshall/documentation_messages.ex:31
 #, elixir-autogen, elixir-format
 msgid "- An operator can disable notifications for the whole deployment with\n  `services.marshall.notifications.enable = false`. Registration is then\n  refused and nothing is sent to Susan.\n- You can pause a single device with `device prefs DEVICE_ID --enabled false`.\n- You can revoke a device with `device rm DEVICE_ID`."
 msgstr "- Afareta zai iya kashe sanarwa ga dukkan turawar da `services.marshall.notifications.enable = false`. Daga nan za a ƙi yin rijista kuma ba za a aika komai zuwa Susan ba.\n- Za ka iya dakatar da na'ura ɗaya da `device prefs DEVICE_ID --enabled false`.\n- Za ka iya soke na'ura da `device rm DEVICE_ID`."
 
-#: lib/marshall/documentation_messages.ex:38
+#: lib/marshall/documentation_messages.ex:39
 #, elixir-autogen, elixir-format
 msgid "- [Browser extension](/docs/browser-extension.md): open supported repositories in Overalls.\n- [Getting started](/docs/quickstart.md): register a key and connect.\n- [Command reference](/docs/commands.md): syntax and available options.\n- [Automation](/docs/automation.md): JSON, retries and completion.\n- [Reflection integration](/docs/reflection.md): discover guest metadata and available private integrations.\n- [Push notifications](/docs/notifications.md): Mila notifications, devices and privacy."
 msgstr "- [Ƙarin mai bincike](/docs/browser-extension.md): buɗe ma'ajiyoyin da ake tallafawa a cikin Overalls.\n- [Farawa](/docs/quickstart.md): yi rijistar maɓalli kuma ka haɗa.\n- [Maganar umarni](/docs/commands.md): tsarin rubutu da zaɓuɓɓukan da ake da su.\n- [Aiwatarwa ta atomatik](/docs/automation.md): JSON, sake gwadawa da kammalawa.\n- [Haɗin Reflection](/docs/reflection.md): gano metadata na baƙo da haɗin kai na sirri da ake da su.\n- [Sanarwar turawa](/docs/notifications.md): sanarwar Mila, na'urori da sirri."
 
-#: lib/marshall/documentation_messages.ex:56
+#: lib/marshall/documentation_messages.ex:61
 #, elixir-autogen, elixir-format
 msgid "Answer a thread's pending question with JSON read from standard input."
 msgstr "Amsa tambayar zare da ke jira da JSON da aka karanta daga daidaitaccen shigarwa."
 
-#: lib/marshall/documentation_messages.ex:60
+#: lib/marshall/documentation_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "Apple and Google deliver notifications only to apps signed by the app's\npublisher, so every Overalls deployment sends notifications through one shared\nrelay, Susan, at `https://notifications.overalls.dev`. Your deployment cannot\nbe configured to use another relay."
 msgstr "Apple da Google suna isar da sanarwa ne kawai ga manhajojin da mawallafin manhajar ya sa wa hannu, don haka kowace turawar Overalls tana aika sanarwa ta hanyar mai isar da saƙo ɗaya da ake rabawa, Susan, a `https://notifications.overalls.dev`. Ba za a iya saita turawarka don amfani da wani mai isar da saƙo ba."
 
-#: lib/marshall/documentation_messages.ex:64
+#: lib/marshall/documentation_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "Approve a thread's latest plan and start implementing it."
 msgstr "Amince da sabon shirin zare kuma fara aiwatar da shi."
 
-#: lib/marshall/documentation_messages.ex:65
+#: lib/marshall/documentation_messages.ex:70
 #, elixir-autogen, elixir-format
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Nemi shirin da aka gyara, ana karanta ra'ayi daga daidaitaccen shigarwa."
 
-#: lib/marshall/documentation_messages.ex:70
+#: lib/marshall/documentation_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Haɗa wannan tashar SSH zuwa zaman tasha da aka raba; yana buƙatar ssh -t."
 
-#: lib/marshall/documentation_messages.ex:85
+#: lib/marshall/documentation_messages.ex:90
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Canja port na yanar gizo ko ganuwar inji, idan ana so a bitar da ake tsammani."
 
-#: lib/marshall/documentation_messages.ex:97
+#: lib/marshall/documentation_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Rufe ɗaya daga cikin zaman tasharka a kan inji."
 
-#: lib/marshall/documentation_messages.ex:158
+#: lib/marshall/documentation_messages.ex:167
 #, elixir-autogen, elixir-format
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Duba zare, tambayarsa da ke jira da sabon shirinsa."
 
-#: lib/marshall/documentation_messages.ex:168
+#: lib/marshall/documentation_messages.ex:177
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Jera zaman tasha na inji da za ka iya buɗewa."
 
-#: lib/marshall/documentation_messages.ex:170
+#: lib/marshall/documentation_messages.ex:179
 #, elixir-autogen, elixir-format
 msgid "List a thread's transcript events after a sequence number."
 msgstr "Jera abubuwan rubutun zare bayan lambar jeri."
 
-#: lib/marshall/documentation_messages.ex:172
+#: lib/marshall/documentation_messages.ex:181
 #, elixir-autogen, elixir-format
 msgid "List agent threads you can read, with unread counts."
 msgstr "Jera zaren wakili da za ka iya karantawa, tare da adadin waɗanda ba a karanta ba."
 
-#: lib/marshall/documentation_messages.ex:177
+#: lib/marshall/documentation_messages.ex:186
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Jera na'urorin sanarwar turawa naka."
 
-#: lib/marshall/documentation_messages.ex:188
+#: lib/marshall/documentation_messages.ex:197
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Yi wa zare alamar an karanta har zuwa lambar jerin rubutu."
 
-#: lib/marshall/documentation_messages.ex:189
+#: lib/marshall/documentation_messages.ex:198
 #, elixir-autogen, elixir-format
 msgid "Mila registers your phone when you allow notifications. The registration is\nbound to the SSH key Mila uses, so removing that key from your account also\nrevokes the device. Each account can have up to ten active devices."
 msgstr "Mila tana yin rijistar wayarka lokacin da ka ba da izinin sanarwa. Rijistar tana daure da maɓallin SSH da Mila ke amfani da shi, don haka cire wannan maɓalli daga asusunka yana soke na'urar ma. Kowane asusu zai iya samun na'urori masu aiki har guda goma."
 
-#: lib/marshall/documentation_messages.ex:193
+#: lib/marshall/documentation_messages.ex:202
 #, elixir-autogen, elixir-format
 msgid "Mila, the Overalls mobile app, can tell you when an agent needs your input:\nwhen a planning turn asks you a question or proposes a plan. A notification\nonly says that something needs attention; opening it takes you to the thread\nin Mila, which then fetches the details over your own SSH connection."
 msgstr "Mila, manhajar wayar hannu ta Overalls, za ta iya sanar da kai lokacin da wakili ke buƙatar shigarwarka: lokacin da zagayen tsarawa ya yi maka tambaya ko ya gabatar da shiri. Sanarwa tana faɗin kawai cewa wani abu yana buƙatar kulawa; buɗe ta yana kai ka zuwa zaren a cikin Mila, wadda daga nan take ɗauko bayanan ta hanyar haɗin SSH naka."
 
-#: lib/marshall/documentation_messages.ex:198
+#: lib/marshall/documentation_messages.ex:207
 #, elixir-autogen, elixir-format
 msgid "Notifications are a convenience. While Mila is open, it follows your threads\nthrough its own live watch stream, which works even when notifications are\ndisabled or Susan is unavailable.\n"
 msgstr "Sanarwa sauƙaƙawa ce kawai. Yayin da Mila take buɗe, tana bin zarenka ta hanyar rafin kallo kai tsaye nata, wanda yake aiki ko da an kashe sanarwa ko kuma babu Susan.\n"
 
-#: lib/marshall/documentation_messages.ex:202
+#: lib/marshall/documentation_messages.ex:211
 #, elixir-autogen, elixir-format
 msgid "Notifications go to the devices of every person who can currently act on the\nthread, except the person whose action caused it. People with view-only\naccess are not notified."
 msgstr "Ana aika sanarwa zuwa na'urorin duk wanda zai iya yin aiki a kan zaren a halin yanzu, sai dai wanda aikinsa ya jawo ta. Ba a sanar da mutanen da ke da damar kallo kawai ba."
 
-#: lib/marshall/documentation_messages.ex:215
+#: lib/marshall/documentation_messages.ex:224
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Buɗe zaman tasharka na kanka a kan inji."
 
-#: lib/marshall/documentation_messages.ex:239
+#: lib/marshall/documentation_messages.ex:248
 #, elixir-autogen, elixir-format
 msgid "Push notifications"
 msgstr "Sanarwar turawa"
 
-#: lib/marshall/documentation_messages.ex:254
+#: lib/marshall/documentation_messages.ex:263
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Yi rijistar wannan na'ura don sanarwar turawa. Ana karanta maɓallin turawa daga stdin."
 
-#: lib/marshall/documentation_messages.ex:268
+#: lib/marshall/documentation_messages.ex:277
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Soke na'urar sanarwar turawa."
 
-#: lib/marshall/documentation_messages.ex:271
+#: lib/marshall/documentation_messages.ex:284
 #, elixir-autogen, elixir-format
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Aika buƙatar da aka karanta daga daidaitaccen shigarwa zuwa zare."
 
-#: lib/marshall/documentation_messages.ex:272
+#: lib/marshall/documentation_messages.ex:285
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Nuna wurin haɗin yanar gizo, port da ganuwar inji."
 
-#: lib/marshall/documentation_messages.ex:288
+#: lib/marshall/documentation_messages.ex:301
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Watsa sanarwar canji ta JSON don injina, zare da wannan zaman."
 
-#: lib/marshall/documentation_messages.ex:292
+#: lib/marshall/documentation_messages.ex:305
 #, elixir-autogen, elixir-format
 msgid "Susan keeps an append-only audit log of key issues, accepted and refused\nnotifications, rate limits and delivery outcomes. Each entry records only the\naction, reason, a fingerprint of the sending deployment, the push key ID, the\nprovider (Apple or Google), the outcome and a delivery ID. It does not record IP\naddresses, push tokens, keys or encrypted messages. Audit entries are deleted\nafter 90 days."
 msgstr "Susan tana ajiye rajistan binciken ayyuka wanda ake ƙara masa kawai, na bayar da maɓallai, sanarwar da aka karɓa da waɗanda aka ƙi, iyakokin yawan aikawa, da sakamakon isarwa. Kowace shigarwa tana rubuta aikin kawai, dalili, hoton yatsa na turawar da ta aika, ID na maɓallin turawa, mai bayarwa (Apple ko Google), sakamako da ID na isarwa. Ba ta rubuta adiresoshin IP, alamomin turawa, maɓallai ko saƙonnin da aka ɓoye. Ana share shigarwar binciken bayan kwanaki 90."
 
-#: lib/marshall/documentation_messages.ex:296
+#: lib/marshall/documentation_messages.ex:309
 #, elixir-autogen, elixir-format
 msgid "Susan never sees your prompts, agent output, thread or machine names, email\naddress, SSH keys or any other account data."
 msgstr "Susan ba ta taɓa ganin buƙatunka, fitowar wakili, sunayen zare ko inji, adireshin imel, maɓallan SSH ko wasu bayanan asusu."
 
-#: lib/marshall/documentation_messages.ex:300
+#: lib/marshall/documentation_messages.ex:313
 #, elixir-autogen, elixir-format
 msgid "Susan sees the IP address of your deployment and when each notification is\nsent, an opaque push key issued to your device, an encrypted message and the\nnotification kind. The message is encrypted on your deployment to a key that\nonly your device holds, so Susan cannot read where the notification leads."
 msgstr "Susan tana ganin adireshin IP na turawarka da lokacin da aka aika kowace sanarwa, maɓallin turawa marar ma'ana da aka ba na'urarka, saƙo da aka ɓoye da nau'in sanarwa. Ana ɓoye saƙon a kan turawarka da maɓallin da na'urarka kaɗai ke riƙe da shi, don haka Susan ba za ta iya karanta inda sanarwar take kaiwa ba."
 
-#: lib/marshall/documentation_messages.ex:305
+#: lib/marshall/documentation_messages.ex:318
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Canja zare tsakanin haɗin gwiwar plan da work."
 
-#: lib/marshall/documentation_messages.ex:342
+#: lib/marshall/documentation_messages.ex:363
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "Kunna ko kashe sanarwar turawa ga na'ura ɗaya."
 
-#: lib/marshall/documentation_messages.ex:379
+#: lib/marshall/documentation_messages.ex:400
 #, elixir-autogen, elixir-format
 msgid "You can review and manage devices with Porsche:"
 msgstr "Za ka iya dubawa da sarrafa na'urori da Porsche:"
 
-#: lib/marshall/documentation_messages.ex:380
+#: lib/marshall/documentation_messages.ex:401
 #, elixir-autogen, elixir-format
 msgid "Your deployment keeps delivery records for seven days and stores only a digest\nof each push key in its audit history."
 msgstr "Turawarka tana ajiye bayanan isarwa na kwanaki bakwai kuma tana adana taƙaitaccen hash na kowane maɓallin turawa kawai a cikin tarihin bincikenta."
 
-#: lib/marshall/documentation_messages.ex:388
+#: lib/marshall/documentation_messages.ex:409
 #, elixir-autogen, elixir-format
 msgid "`device prefs` pauses or resumes notifications for one device. `device rm`\nrevokes it permanently; Mila registers again the next time you allow\nnotifications. Deleting or retiring your account revokes all its devices."
 msgstr "`device prefs` yana dakatarwa ko ci gaba da sanarwa ga na'ura ɗaya. `device rm` yana soke ta na dindindin; Mila za ta sake yin rijista a lokaci na gaba da ka ba da izinin sanarwa. Share ko ritayar asusunka yana soke dukkan na'urorinsa."
@@ -833,3 +833,33 @@ msgstr "`device prefs` yana dakatarwa ko ci gaba da sanarwa ga na'ura ɗaya. `de
 #, elixir-autogen, elixir-format
 msgid "Documentation not found"
 msgstr "Ba a sami takaddun ba"
+
+#: lib/marshall/documentation_messages.ex:18
+#, elixir-autogen, elixir-format
+msgid "## Examples"
+msgstr "## Misalai"
+
+#: lib/marshall/documentation_messages.ex:53
+#, elixir-autogen, elixir-format
+msgid "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+msgstr "Baƙo da ke akwai yana karɓar HTTP `200` da jerin JSON. Baƙo da aka tsayar, aka sauya wa\nwuri, aka yi ritaya, wanda ya tsufa, ko wanda ba shi da izini yana karɓar amsar rashin\nsamuwa maimakon metadata; ya kamata masu kira su ɗauki duk wani matsayi da ba `2xx` ba a\nmatsayin ƙin yarda, kuma su guji sake gwadawa a kan wata na'ura daban."
+
+#: lib/marshall/documentation_messages.ex:139
+#, elixir-autogen, elixir-format
+msgid "Fetch only the guest metadata when an agent does not need integration details:"
+msgstr "Ɗauko metadata na baƙo kawai idan wakili ba ya buƙatar bayanan haɗin kai:"
+
+#: lib/marshall/documentation_messages.ex:280
+#, elixir-autogen, elixir-format
+msgid "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+msgstr "Gudanar da waɗannan umarnin daga cikin baƙon. Tutocin `-sS` suna sa amsoshin da suka yi\nnasara su yi shiru amma har yanzu suna nuna kurakuran haɗi, kuma `-H` yana neman sigar JSON."
+
+#: lib/marshall/documentation_messages.ex:343
+#, elixir-autogen, elixir-format
+msgid "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+msgstr "Amsar abu ne mai siga. Baƙo mai lafiya yana dawo da HTTP `200` tare da filayen\n`guest`, `integrations` da `paths`:"
+
+#: lib/marshall/documentation_messages.ex:359
+#, elixir-autogen, elixir-format
+msgid "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
+msgstr "Wannan yana dawo da HTTP `200` da abin JSON mai ɗauke da ƙayyadaddun filayen baƙo da aka\nlissafa a sama. Ɗauko jerin haɗin kai kai tsaye don ganowa:"

@@ -64,167 +64,167 @@ msgstr "## 连接"
 msgid "## Endpoints"
 msgstr "## 端点"
 
-#: lib/marshall/documentation_messages.ex:18
+#: lib/marshall/documentation_messages.ex:19
 #, elixir-autogen, elixir-format
 msgid "## First commands"
 msgstr "## 常用命令"
 
-#: lib/marshall/documentation_messages.ex:19
+#: lib/marshall/documentation_messages.ex:20
 #, elixir-autogen, elixir-format
 msgid "## Install the Overalls CLI"
 msgstr "## 安装 Overalls CLI"
 
-#: lib/marshall/documentation_messages.ex:20
+#: lib/marshall/documentation_messages.ex:21
 #, elixir-autogen, elixir-format
 msgid "## Install the developer archive"
 msgstr "## 安装开发者安装包"
 
-#: lib/marshall/documentation_messages.ex:21
+#: lib/marshall/documentation_messages.ex:22
 #, elixir-autogen, elixir-format
 msgid "## Metadata controls"
 msgstr "## 元数据控制"
 
-#: lib/marshall/documentation_messages.ex:23
+#: lib/marshall/documentation_messages.ex:24
 #, elixir-autogen, elixir-format
 msgid "## Privacy and availability"
 msgstr "## 隐私与可用性"
 
-#: lib/marshall/documentation_messages.ex:24
+#: lib/marshall/documentation_messages.ex:25
 #, elixir-autogen, elixir-format
 msgid "## Register your key"
 msgstr "## 注册密钥"
 
-#: lib/marshall/documentation_messages.ex:25
+#: lib/marshall/documentation_messages.ex:26
 #, elixir-autogen, elixir-format
 msgid "## Relocate a machine"
 msgstr "## 迁移虚拟机"
 
-#: lib/marshall/documentation_messages.ex:26
+#: lib/marshall/documentation_messages.ex:27
 #, elixir-autogen, elixir-format
 msgid "## Resize a machine"
 msgstr "## 调整虚拟机资源"
 
-#: lib/marshall/documentation_messages.ex:27
+#: lib/marshall/documentation_messages.ex:28
 #, elixir-autogen, elixir-format
 msgid "## Results and completion"
 msgstr "## 结果与完成状态"
 
-#: lib/marshall/documentation_messages.ex:28
+#: lib/marshall/documentation_messages.ex:29
 #, elixir-autogen, elixir-format
 msgid "## Retry safely"
 msgstr "## 安全重试"
 
-#: lib/marshall/documentation_messages.ex:34
+#: lib/marshall/documentation_messages.ex:35
 #, elixir-autogen, elixir-format
 msgid "- Linux and macOS: the `curl … /bin/install.sh | bash` command.\n- Windows: run the Windows `powershell …` command under \"Install and connect\"\n  in PowerShell. Windows needs OpenSSH 9.6 or newer: the installer installs it\n  with winget when the built-in client is older and, after you approve the\n  administrator prompt, makes it the default `ssh` for new terminals."
 msgstr "- Linux 和 macOS：运行 `curl … /bin/install.sh | bash` 命令。\n- Windows：在 PowerShell 中运行“安装并连接”下的 Windows `powershell …` 命令。Windows 需要 OpenSSH 9.6 或更新版本：如果系统内置客户端版本较旧，安装程序会通过 winget 安装新版。在您批准管理员权限提示后，新版客户端会成为新终端默认使用的 `ssh`。"
 
-#: lib/marshall/documentation_messages.ex:42
+#: lib/marshall/documentation_messages.ex:43
 #, elixir-autogen, elixir-format
 msgid "- [Download for Chrome or Chromium](/bin/chrome.zip): extract the ZIP, open\n  `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.\n- [Download for Firefox](/bin/firefox.xpi): open `about:debugging`, choose\n  **This Firefox**, then **Load Temporary Add-on** and select the downloaded XPI."
 msgstr "- [下载 Chrome 或 Chromium 版本](/bin/chrome.zip)：解压 ZIP，打开 `chrome://extensions`，启用 **开发者模式** ，然后选择 **加载已解压的扩展程序** 。\n- [下载 Firefox 版本](/bin/firefox.xpi)：打开 `about:debugging`，选择 **此 Firefox** ，然后选择 **临时载入附加组件** 并选中下载的 XPI 文件。"
 
-#: lib/marshall/documentation_messages.ex:46
+#: lib/marshall/documentation_messages.ex:47
 #, elixir-autogen, elixir-format
 msgid "1. Open the extension's settings from the browser toolbar. If it is already\n   configured, use the toolbar's context menu and choose **Configure Overalls\n   server…** to change the server.\n2. Enter the HTTPS origin of this Overalls server. HTTP is supported only for\n   loopback development. The server origin is always selected explicitly; the\n   extension never guesses it from a page.\n3. Visit a supported repository page and click the Overalls toolbar button."
 msgstr "1. 从浏览器工具栏打开扩展设置。如果已经完成配置，请打开工具栏按钮的右键菜单，选择 **配置 Overalls 服务器…** 来更换服务器。\n2. 输入此 Overalls 服务器的 HTTPS 源站地址。仅限回环地址的开发环境支持 HTTP。服务器源站必须由您明确选择；扩展不会根据页面猜测地址。\n3. 访问受支持的代码仓库页面，点击工具栏中的 Overalls 按钮。"
 
-#: lib/marshall/documentation_messages.ex:50
+#: lib/marshall/documentation_messages.ex:51
 #, elixir-autogen, elixir-format
 msgid "Accept a pending ownership offer."
 msgstr "接受待处理的所有权转让邀请。"
 
-#: lib/marshall/documentation_messages.ex:51
+#: lib/marshall/documentation_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "Add or change an admin or member."
 msgstr "添加或更改管理员或成员。"
 
-#: lib/marshall/documentation_messages.ex:52
+#: lib/marshall/documentation_messages.ex:57
 #, elixir-autogen, elixir-format
 msgid "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
 msgstr "省略某项资源选项会保留该资源的当前大小；不指定任何资源选项的请求会被拒绝。运行中的虚拟机会先停止，应用新的资源配置，然后重新启动；已停止的虚拟机会保持停止状态，并在下次启动时扩展文件系统。回执会跟踪请求的各个阶段。仅当虚拟机仍处于停止过程中时，才接受 `request cancel grow-1`：原有资源大小和预留保持不变，原先运行的虚拟机会按原配置重新启动。`request retry grow-1` 会从记录的阶段继续执行需要处理的请求。\n"
 
-#: lib/marshall/documentation_messages.ex:69
+#: lib/marshall/documentation_messages.ex:74
 #, elixir-autogen, elixir-format
 msgid "At the Porsche prompt, enter:"
 msgstr "在 Porsche 提示符下输入："
 
-#: lib/marshall/documentation_messages.ex:74
+#: lib/marshall/documentation_messages.ex:79
 #, elixir-autogen, elixir-format
 msgid "Automation"
 msgstr "自动化"
 
-#: lib/marshall/documentation_messages.ex:75
+#: lib/marshall/documentation_messages.ex:80
 #, elixir-autogen, elixir-format
 msgid "Browser extension"
 msgstr "浏览器扩展"
 
-#: lib/marshall/documentation_messages.ex:76
+#: lib/marshall/documentation_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "Cancel an unpublished clone or uncommitted relocation request."
 msgstr "取消尚未发布的克隆请求或尚未提交的迁移请求。"
 
-#: lib/marshall/documentation_messages.ex:80
+#: lib/marshall/documentation_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Cancel your pending ownership offer."
 msgstr "取消您待处理的所有权转让邀请。"
 
-#: lib/marshall/documentation_messages.ex:81
+#: lib/marshall/documentation_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Change a machine's CPU and memory; disk may only grow. A running machine stops and restarts."
 msgstr "调整虚拟机的 CPU 和内存；磁盘只能扩容。运行中的虚拟机会先停止再重新启动。"
 
-#: lib/marshall/documentation_messages.ex:89
+#: lib/marshall/documentation_messages.ex:94
 #, elixir-autogen, elixir-format
 msgid "Choose a stable, unique request ID for each intended mutation. Reuse it when\nretrying that same mutation after losing a reply. Request IDs contain 1–128 ASCII\nletters, digits, underscores, dots, colons or hyphens, and start with a letter or\ndigit. Do not reuse one ID for different operations."
 msgstr "为每次计划执行的修改选择一个固定且唯一的请求 ID。如果响应丢失，重试同一修改时请重复使用该 ID。请求 ID 由 1–128 个 ASCII 字母、数字、下划线、点、冒号或连字符组成，且必须以字母或数字开头。不同操作不得使用同一个 ID。"
 
-#: lib/marshall/documentation_messages.ex:93
+#: lib/marshall/documentation_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "Cloning is currently unavailable for the Inception multi-disk profile."
 msgstr "目前不支持克隆采用 Inception 多磁盘配置的虚拟机。"
 
-#: lib/marshall/documentation_messages.ex:98
+#: lib/marshall/documentation_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Close this interactive channel."
 msgstr "关闭此交互式通道。"
 
-#: lib/marshall/documentation_messages.ex:99
+#: lib/marshall/documentation_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Command reference"
 msgstr "命令参考"
 
-#: lib/marshall/documentation_messages.ex:100
+#: lib/marshall/documentation_messages.ex:105
 #, elixir-autogen, elixir-format
 msgid "Create a machine. Disk maximum: 500 GiB. --source clones a public GitHub, GitLab, Codeberg or Bitbucket repository in the guest."
 msgstr "创建虚拟机。磁盘最大为 500 GiB。--source 会将公共 GitHub、GitLab、Codeberg 或 Bitbucket 代码仓库克隆到客户机中。"
 
-#: lib/marshall/documentation_messages.ex:104
+#: lib/marshall/documentation_messages.ex:109
 #, elixir-autogen, elixir-format
 msgid "Create a team you own."
 msgstr "创建归您所有的团队。"
 
-#: lib/marshall/documentation_messages.ex:105
+#: lib/marshall/documentation_messages.ex:110
 #, elixir-autogen, elixir-format
 msgid "Create or replace a named integration at https://NAME.integration.internal."
 msgstr "在 https://NAME.integration.internal 创建或替换一个命名集成。"
 
-#: lib/marshall/documentation_messages.ex:109
+#: lib/marshall/documentation_messages.ex:114
 #, elixir-autogen, elixir-format
 msgid "Creation, start, stop, deletion, relocation and request controls wait up to 120\nseconds for the matching physical result. A request being accepted or acknowledged is not proof that the machine\nhas reached the requested state. `--no-wait` returns the accepted request without\nwaiting; `--timeout SECONDS` changes the wait limit. Timing out or disconnecting\ndoes not cancel accepted work."
 msgstr "创建、启动、停止、删除、迁移和请求控制命令会等待对应的实际结果，最长 120 秒。请求被接受或确认收到，并不表示虚拟机已达到所请求的状态。`--no-wait` 会直接返回已接受的请求，不等待完成；`--timeout SECONDS` 可更改等待时限。超时或断开连接不会取消已接受的工作。"
 
-#: lib/marshall/documentation_messages.ex:113
+#: lib/marshall/documentation_messages.ex:118
 #, elixir-autogen, elixir-format
 msgid "Decline a pending ownership offer."
 msgstr "拒绝待处理的所有权转让邀请。"
 
-#: lib/marshall/documentation_messages.ex:114
+#: lib/marshall/documentation_messages.ex:119
 #, elixir-autogen, elixir-format
 msgid "Delete a machine and its disk. Refused while its owner has it pinned."
 msgstr "删除虚拟机及其磁盘。如果所有者将其置顶，则拒绝删除。"
 
-#: lib/marshall/documentation_messages.ex:118
+#: lib/marshall/documentation_messages.ex:123
 #, elixir-autogen, elixir-format
 msgid "Different request IDs create separate copies, processed in order for each source.\nRepeating the same ID returns the same request. Each copy captures the source's\nfiles, specifications and power state when its turn begins. A running source stops\nfor snapshot capture and restarts while copying continues. The new machine belongs\nto you, is private, and has a fresh address; sharing is not copied. Guest files and\ncredentials stored inside the disk are copied. RAM is not copied."
 msgstr "不同的请求 ID 会创建独立的副本，同一源虚拟机的克隆按顺序处理。重复使用同一个 ID 会返回同一个请求。每个副本在轮到其执行时，才会获取源虚拟机的文件、资源配置和运行状态。运行中的源虚拟机会停止以获取快照，然后在复制继续进行时重新启动。新虚拟机归您所有，默认为私有，并获得新的地址；共享权限不会复制。客户机文件和磁盘内保存的凭据会被复制，内存不会复制。"
@@ -234,187 +234,187 @@ msgstr "不同的请求 ID 会创建独立的副本，同一源虚拟机的克�
 msgid "Documentation"
 msgstr "文档"
 
-#: lib/marshall/documentation_messages.ex:122
+#: lib/marshall/documentation_messages.ex:127
 #, elixir-autogen, elixir-format
 msgid "Each machine's page shows the machine name, its state, its operating system and\nits machine ID (with a Copy button) at the top, followed by a \"Connect from your\ncomputer\" section with a one-line installer that sets up SSH and connects to\nthat machine:"
 msgstr "每台虚拟机的页面顶部会显示名称、状态、操作系统和虚拟机 ID（附带复制按钮）。下方的“从您的电脑连接”区域提供一行安装命令，用来配置 SSH 并连接该虚拟机："
 
-#: lib/marshall/documentation_messages.ex:126
+#: lib/marshall/documentation_messages.ex:131
 #, elixir-autogen, elixir-format
 msgid "Every command accepts `--json`. Mutation commands accept `--request-id ID`.\nCreation, start, stop, deletion, relocation and request controls also accept `--timeout SECONDS` (1–3600,\ndefault 120) and `--no-wait`. Memory is in MiB and disk size is in GiB.\nImage identifiers are immutable `sha256:` digests returned by `images`.\nUse `--after UUID` with the returned cursor to fetch another list page."
 msgstr "所有命令均接受 `--json`。修改状态的命令接受 `--request-id ID`。创建、启动、停止、删除、迁移和请求控制命令还接受 `--timeout SECONDS`（1–3600，默认 120）和 `--no-wait`。内存以 MiB 为单位，磁盘大小以 GiB 为单位。镜像标识符是 `images` 返回的不可变 `sha256:` 摘要。使用 `--after UUID` 和返回的游标获取下一页列表。"
 
-#: lib/marshall/documentation_messages.ex:130
+#: lib/marshall/documentation_messages.ex:135
 #, elixir-autogen, elixir-format
 msgid "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
 msgstr "每台运行中的客户机都可以查询 `https://reflection.internal`，获取范围有限且不含秘密信息的自身描述，以及当前允许其执行环境使用的私有服务信息。"
 
-#: lib/marshall/documentation_messages.ex:134
+#: lib/marshall/documentation_messages.ex:143
 #, elixir-autogen, elixir-format
 msgid "Firefox temporary add-ons are removed when Firefox closes. Permanent Firefox\ninstallation requires Mozilla signing or an explicitly managed browser policy.\nOveralls does not currently publish either archive to a browser store."
 msgstr "Firefox 关闭时会移除临时附加组件。永久安装 Firefox 扩展需要 Mozilla 签名或明确配置的浏览器管理策略。Overalls 目前未在浏览器扩展商店发布这两种安装包。"
 
-#: lib/marshall/documentation_messages.ex:138
+#: lib/marshall/documentation_messages.ex:147
 #, elixir-autogen, elixir-format
 msgid "For browser approval of an unknown key, start an interactive connection with\n`ssh YOUR_PORSCHE_HOST` and keep it open. Porsche gives you a short-lived approval\nlink after proving possession of the private key. Open it in your browser, sign\nin, compare the fingerprint and explicitly approve. Opening the link alone does\nnot register a key. Links expire after ten minutes and stop working when their\nSSH connection closes. The interactive prompt can continue after approval."
 msgstr "若要在浏览器中批准未知密钥，请使用 `ssh YOUR_PORSCHE_HOST` 启动交互式连接并保持连接。在验证您持有私钥后，Porsche 会提供一个短期有效的批准链接。请在浏览器中打开链接，登录、核对指纹并明确批准。仅打开链接不会注册密钥。链接在十分钟后过期，其关联的 SSH 连接关闭时也会立即失效。批准后可以继续使用交互式提示符。"
 
-#: lib/marshall/documentation_messages.ex:142
+#: lib/marshall/documentation_messages.ex:151
 #, elixir-autogen, elixir-format
 msgid "For one-shot exec commands, register the key on Marshall's SSH keys page first,\nor complete approval in an interactive connection before retrying the command."
 msgstr "对于一次性执行的 exec 命令，请先在 Marshall 的 SSH 密钥页面注册密钥，或先在交互式连接中完成批准，再重试命令。"
 
-#: lib/marshall/documentation_messages.ex:146
+#: lib/marshall/documentation_messages.ex:155
 #, elixir-autogen, elixir-format
 msgid "Getting started"
 msgstr "入门指南"
 
-#: lib/marshall/documentation_messages.ex:147
+#: lib/marshall/documentation_messages.ex:156
 #, elixir-autogen, elixir-format
 msgid "Grant viewer, operator or manager access."
 msgstr "授予查看者、操作员或管理者权限。"
 
-#: lib/marshall/documentation_messages.ex:148
+#: lib/marshall/documentation_messages.ex:157
 #, elixir-autogen, elixir-format
 msgid "Guest SSH and browser terminals use an automatically allocated Linux login such\nas `u200001`, with `/home/u200001` as its home. The login comes from a durable\naccount UID rather than your email address. It stays the same across machines and\nsame-account email changes. A new account registered after retirement receives a\ndifferent identity and does not inherit the former account's home or access.\nMarshall continues showing your email address; there is no username setting."
 msgstr "客户机 SSH 和浏览器终端使用自动分配的 Linux 登录名，例如 `u200001`，其主目录为 `/home/u200001`。登录名来自账户持久保存的 UID，而不是邮箱地址。它在不同虚拟机之间保持一致，同一账户更改邮箱后也不会变化。旧账户注销后新注册的账户会获得不同身份，不会继承旧账户的主目录或访问权限。Marshall 仍然显示您的邮箱地址；系统没有用户名设置。"
 
-#: lib/marshall/documentation_messages.ex:152
+#: lib/marshall/documentation_messages.ex:161
 #, elixir-autogen, elixir-format
 msgid "Guest metadata includes the machine name and ID, profile, architecture,\noperating-system family, vCPU, memory and disk sizes, image identity,\ngeneration, owner email, team name, current Lilly node, labels, and comment.\nOperating-system values come from the validated image manifest."
 msgstr "客户机元数据包含虚拟机名称和 ID、配置类型、架构、操作系统系列、vCPU 数、内存和磁盘大小、镜像身份、代次、所有者邮箱、团队名称、当前 Lilly 节点、标签和备注。操作系统值来自已验证的镜像清单。"
 
-#: lib/marshall/documentation_messages.ex:156
+#: lib/marshall/documentation_messages.ex:165
 #, elixir-autogen, elixir-format
 msgid "Inspect a machine by name or UUID."
 msgstr "按名称或 UUID 查看虚拟机详情。"
 
-#: lib/marshall/documentation_messages.ex:157
+#: lib/marshall/documentation_messages.ex:166
 #, elixir-autogen, elixir-format
 msgid "Inspect a previously accepted request."
 msgstr "查看先前已接受的请求。"
 
-#: lib/marshall/documentation_messages.ex:159
+#: lib/marshall/documentation_messages.ex:168
 #, elixir-autogen, elixir-format
 msgid "Inspect an integration without secrets."
 msgstr "查看集成详情，不显示秘密信息。"
 
-#: lib/marshall/documentation_messages.ex:160
+#: lib/marshall/documentation_messages.ex:169
 #, elixir-autogen, elixir-format
 msgid "Integration entries describe the internal URL, useful paths, a short `help`\ncommand, a comment, and injected header names and kinds. Header values,\ncredentials, tokens, and upstream target URLs are never returned. The list\ncontains Reflection, LLM, and named integrations authorized for this exact\nmachine execution."
 msgstr "集成条目描述内部 URL、实用路径、简短的 `help` 命令、备注，以及注入标头的名称和类型。系统绝不会返回标头值、凭据、令牌或上游目标 URL。列表包含获准用于此虚拟机当前执行环境的 Reflection、LLM 和命名集成。"
 
-#: lib/marshall/documentation_messages.ex:164
+#: lib/marshall/documentation_messages.ex:173
 #, elixir-autogen, elixir-format
 msgid "Key removal prevents subsequent commands and status polls from that session.\nAccepted jobs continue. Reconnect using another registered key, or use email login\nto manage your keys in Marshall. Do not put private keys or approval links in logs.\n"
 msgstr "移除密钥会阻止该会话后续的命令和状态轮询。已接受的任务仍会继续。请使用另一个已注册密钥重新连接，或使用邮箱登录 Marshall 管理密钥。请勿将私钥或批准链接写入日志。\n"
 
-#: lib/marshall/documentation_messages.ex:169
+#: lib/marshall/documentation_messages.ex:178
 #, elixir-autogen, elixir-format
 msgid "List a team's members."
 msgstr "列出团队成员。"
 
-#: lib/marshall/documentation_messages.ex:171
+#: lib/marshall/documentation_messages.ex:180
 #, elixir-autogen, elixir-format
 msgid "List access grants."
 msgstr "列出访问授权。"
 
-#: lib/marshall/documentation_messages.ex:173
+#: lib/marshall/documentation_messages.ex:182
 #, elixir-autogen, elixir-format
 msgid "List available images."
 msgstr "列出可用镜像。"
 
-#: lib/marshall/documentation_messages.ex:174
+#: lib/marshall/documentation_messages.ex:183
 #, elixir-autogen, elixir-format
 msgid "List machines you can access."
 msgstr "列出您可以访问的虚拟机。"
 
-#: lib/marshall/documentation_messages.ex:175
+#: lib/marshall/documentation_messages.ex:184
 #, elixir-autogen, elixir-format
 msgid "List your SSH keys."
 msgstr "列出您的 SSH 密钥。"
 
-#: lib/marshall/documentation_messages.ex:176
+#: lib/marshall/documentation_messages.ex:185
 #, elixir-autogen, elixir-format
 msgid "List your integrations."
 msgstr "列出您的集成。"
 
-#: lib/marshall/documentation_messages.ex:178
+#: lib/marshall/documentation_messages.ex:187
 #, elixir-autogen, elixir-format
 msgid "List your teams and roles."
 msgstr "列出您的团队和角色。"
 
-#: lib/marshall/documentation_messages.ex:179
+#: lib/marshall/documentation_messages.ex:188
 #, elixir-autogen, elixir-format
 msgid "Machine managers can edit labels and the machine comment from machine settings.\nLabels are limited to 32 entries and comments to 2 KiB. Integration managers\ncan edit an integration comment from the integrations page. Changes are\naudited without recording comment text or secret values."
 msgstr "虚拟机管理者可以在虚拟机设置中编辑标签和备注。标签最多为 32 项，备注大小不超过 2 KiB。集成管理者可以在集成页面编辑集成备注。更改会被审计，但不会记录备注文本或秘密值。"
 
-#: lib/marshall/documentation_messages.ex:183
+#: lib/marshall/documentation_messages.ex:192
 #, elixir-autogen, elixir-format
 msgid "Machine references accept names or UUIDs. Names are lowercase, begin with a letter,\nand contain letters, digits and single separating hyphens, up to 63 characters.\nUUID-shaped names are reserved for machine identifiers.\nCreation without a name generates one. Creation without an image selects the\noperator's default image. Creation without `--profile` selects OSS; use\n`--profile customer` for the restricted Customer environment. Omitted CPU,\nmemory and disk requests use defaults raised to the image minimum; explicitly\nundersized requests fail."
 msgstr "虚拟机可以通过名称或 UUID 指定。名称使用小写字母，以字母开头，仅包含字母、数字和单个分隔连字符，长度最多为 63 个字符。形似 UUID 的名称保留给虚拟机标识符使用。创建时不指定名称会自动生成名称，不指定镜像会选择运营方设置的默认镜像，不指定 `--profile` 会选择 OSS；使用 `--profile customer` 可选择受限的 Customer 环境。省略 CPU、内存或磁盘参数时，系统使用默认值，并按镜像的最低要求提高资源大小；显式指定低于最低要求的值会失败。"
 
-#: lib/marshall/documentation_messages.ex:187
+#: lib/marshall/documentation_messages.ex:196
 #, elixir-autogen, elixir-format
 msgid "Make an integration available to a machine."
 msgstr "允许虚拟机使用某个集成。"
 
-#: lib/marshall/documentation_messages.ex:197
+#: lib/marshall/documentation_messages.ex:206
 #, elixir-autogen, elixir-format
 msgid "Move a machine to an automatically selected host."
 msgstr "将虚拟机迁移到自动选择的宿主机。"
 
-#: lib/marshall/documentation_messages.ex:206
+#: lib/marshall/documentation_messages.ex:215
 #, elixir-autogen, elixir-format
 msgid "Offer team ownership to an admin."
 msgstr "向管理员发出团队所有权转让邀请。"
 
-#: lib/marshall/documentation_messages.ex:207
+#: lib/marshall/documentation_messages.ex:216
 #, elixir-autogen, elixir-format
 msgid "On a supported repository page, clicking an unconfigured toolbar button opens\nsettings. Unsupported hosts show an **Unsupported page** state and do not send a\nURL. Marshall checks the launch request again before staging it and may require\nyou to sign in."
 msgstr "在受支持的代码仓库页面中，点击尚未配置的工具栏按钮会打开设置。对于不支持的主机，扩展会显示 **不支持的页面** 状态，且不会发送 URL。Marshall 在准备启动请求前会再次验证该请求，并可能要求您登录。"
 
-#: lib/marshall/documentation_messages.ex:211
+#: lib/marshall/documentation_messages.ex:220
 #, elixir-autogen, elixir-format
 msgid "Open a GitHub, GitLab, Codeberg or Bitbucket Cloud repository in Overalls with a\nsingle toolbar click. The extension carries only the provider origin and path to\nOveralls, so you can move from a repository page to a machine without copying a\nURL by hand."
 msgstr "在工具栏中点击一次，即可在 Overalls 中打开 GitHub、GitLab、Codeberg 或 Bitbucket Cloud 代码仓库。扩展仅将提供方的源站地址和路径传给 Overalls，因此您无需手动复制 URL，就能从代码仓库页面进入虚拟机。"
 
-#: lib/marshall/documentation_messages.ex:216
+#: lib/marshall/documentation_messages.ex:225
 #, elixir-autogen, elixir-format
 msgid "Options:"
 msgstr "选项："
 
-#: lib/marshall/documentation_messages.ex:217
+#: lib/marshall/documentation_messages.ex:226
 #, elixir-autogen, elixir-format
 msgid "Overalls documentation"
 msgstr "Overalls 文档"
 
-#: lib/marshall/documentation_messages.ex:218
+#: lib/marshall/documentation_messages.ex:227
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can change a machine's CPU and memory; disk may only grow,\nup to 500 GiB:"
 msgstr "所有者和管理者可以调整虚拟机的 CPU 和内存；磁盘只能扩容，最大为 500 GiB："
 
-#: lib/marshall/documentation_messages.ex:222
+#: lib/marshall/documentation_messages.ex:231
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can queue an independent copy:"
 msgstr "所有者和管理者可以将独立副本的创建加入队列："
 
-#: lib/marshall/documentation_messages.ex:223
+#: lib/marshall/documentation_messages.ex:232
 #, elixir-autogen, elixir-format
 msgid "Owners, managers and team admins can move a machine to another eligible physical\nhost. The destination and transfer strategy are always selected by Marshall and\ncannot be supplied through Porsche:"
 msgstr "所有者、管理者和团队管理员可以将虚拟机迁移到其他符合条件的物理宿主机。目标和传输方式始终由 Marshall 选择，不能通过 Porsche 指定："
 
-#: lib/marshall/documentation_messages.ex:227
+#: lib/marshall/documentation_messages.ex:236
 #, elixir-autogen, elixir-format
 msgid "Permissions are checked at execution time. Access shown in a previous list is\nnot a guarantee that a later operation is allowed. Sharing roles are `viewer`,\n`operator` and `manager`; ownership and current permissions determine which\noperations you may perform. SSH key commands affect only your own keys."
 msgstr "权限在执行时检查。先前列表中显示的访问权限不保证后续操作仍被允许。共享角色为 `viewer`、`operator` 和 `manager`；所有权和当前权限决定您可以执行哪些操作。SSH 密钥命令只影响您自己的密钥。"
 
-#: lib/marshall/documentation_messages.ex:231
+#: lib/marshall/documentation_messages.ex:240
 #, elixir-autogen, elixir-format
 msgid "Pin a machine to the top of your lists. Your owner pin wakes it, prevents automatic suspension, and prevents deletion."
 msgstr "将虚拟机置于您的列表顶部。所有者将虚拟机置顶会唤醒它，并阻止自动挂起和删除。"
 
-#: lib/marshall/documentation_messages.ex:235
+#: lib/marshall/documentation_messages.ex:244
 #, elixir-autogen, elixir-format
 msgid "Porsche manages machines; it does not provide a guest shell, guest file transfer,\nport forwarding or an SSH agent forwarding service. Machine console access is\navailable separately in Marshall's web interface, subject to account permissions.\n"
 msgstr "Porsche 用于管理虚拟机，不提供客户机 shell、客户机文件传输、端口转发或 SSH 代理转发服务。虚拟机控制台通过 Marshall 的网页界面另行提供，并受账户权限控制。\n"
@@ -424,217 +424,217 @@ msgstr "Porsche 用于管理虚拟机，不提供客户机 shell、客户机文�
 msgid "Public documentation for Overalls browser extensions and SSH machine management (Porsche v1)."
 msgstr "Overalls 浏览器扩展及 SSH 虚拟机管理（Porsche v1）的公开文档。"
 
-#: lib/marshall/documentation_messages.ex:240
+#: lib/marshall/documentation_messages.ex:249
 #, elixir-autogen, elixir-format
 msgid "Queue an independent full-disk copy of a machine."
 msgstr "将虚拟机的独立完整磁盘副本创建任务加入队列。"
 
-#: lib/marshall/documentation_messages.ex:241
+#: lib/marshall/documentation_messages.ex:250
 #, elixir-autogen, elixir-format
 msgid "Queued requests recheck your access before execution. Use `request cancel copy-1`\nbefore the destination is published; successful cancellation waits for any required\ncleanup. Use `request retry copy-1` to resume a failed request rather than create\nanother destination. Clone accepts `--timeout` and `--no-wait`; a client\ntimeout does not cancel accepted work."
 msgstr "队列中的请求在执行前会再次检查您的访问权限。在目标发布之前可使用 `request cancel copy-1`；取消成功需要等待必要的清理完成。使用 `request retry copy-1` 可以继续失败的请求，而不创建另一个目标。克隆命令接受 `--timeout` 和 `--no-wait`；客户端超时不会取消已接受的工作。"
 
-#: lib/marshall/documentation_messages.ex:245
+#: lib/marshall/documentation_messages.ex:254
 #, elixir-autogen, elixir-format
 msgid "Reconnecting later is the same everywhere: `ssh HOST`. (On Windows, if you\ndeclined the administrator prompt, use `overalls ssh HOST` instead.)"
 msgstr "以后重新连接时，各平台的命令都一样：`ssh HOST`。（在 Windows 上，如果您拒绝了管理员权限提示，请改用 `overalls ssh HOST`。）"
 
-#: lib/marshall/documentation_messages.ex:249
+#: lib/marshall/documentation_messages.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reflection integration"
 msgstr "Reflection 集成"
 
-#: lib/marshall/documentation_messages.ex:250
+#: lib/marshall/documentation_messages.ex:259
 #, elixir-autogen, elixir-format
 msgid "Reflection is available only through the private network. Requests are bound to\nthe current VM, host, placement, and execution epoch; stopped, relocated,\nretired, stale, or unauthorized guests receive an unavailable response.\n"
 msgstr "Reflection 仅通过私有网络提供。请求与当前虚拟机、宿主机、放置位置和执行纪元绑定；已停止、已迁移、已退役、状态过期或未经授权的客户机会收到不可用响应。\n"
 
-#: lib/marshall/documentation_messages.ex:258
+#: lib/marshall/documentation_messages.ex:267
 #, elixir-autogen, elixir-format
 msgid "Remove a machine's explicit availability."
 msgstr "移除对某台虚拟机的显式可用性授权。"
 
-#: lib/marshall/documentation_messages.ex:259
+#: lib/marshall/documentation_messages.ex:268
 #, elixir-autogen, elixir-format
 msgid "Remove a named integration."
 msgstr "移除一个命名集成。"
 
-#: lib/marshall/documentation_messages.ex:260
+#: lib/marshall/documentation_messages.ex:269
 #, elixir-autogen, elixir-format
 msgid "Remove an account's membership."
 msgstr "移除账户的团队成员资格。"
 
-#: lib/marshall/documentation_messages.ex:261
+#: lib/marshall/documentation_messages.ex:270
 #, elixir-autogen, elixir-format
 msgid "Remove your pin from a machine."
 msgstr "取消您对虚拟机的置顶。"
 
-#: lib/marshall/documentation_messages.ex:262
+#: lib/marshall/documentation_messages.ex:271
 #, elixir-autogen, elixir-format
 msgid "Resume a suspended machine's preserved memory."
 msgstr "从保留的内存恢复已挂起的虚拟机。"
 
-#: lib/marshall/documentation_messages.ex:263
+#: lib/marshall/documentation_messages.ex:272
 #, elixir-autogen, elixir-format
 msgid "Resume preserved memory, waiting for capacity or relocation."
 msgstr "从保留的内存恢复，必要时等待容量或迁移。"
 
-#: lib/marshall/documentation_messages.ex:267
+#: lib/marshall/documentation_messages.ex:276
 #, elixir-autogen, elixir-format
 msgid "Retry a failed clone or relocation request."
 msgstr "重试失败的克隆或迁移请求。"
 
-#: lib/marshall/documentation_messages.ex:269
+#: lib/marshall/documentation_messages.ex:278
 #, elixir-autogen, elixir-format
 msgid "Revoke an account's shared access."
 msgstr "撤销账户的共享访问权限。"
 
-#: lib/marshall/documentation_messages.ex:270
+#: lib/marshall/documentation_messages.ex:279
 #, elixir-autogen, elixir-format
 msgid "Revoke one of your SSH keys."
 msgstr "撤销您的一个 SSH 密钥。"
 
-#: lib/marshall/documentation_messages.ex:273
+#: lib/marshall/documentation_messages.ex:286
 #, elixir-autogen, elixir-format
 msgid "Show command help."
 msgstr "显示命令帮助。"
 
-#: lib/marshall/documentation_messages.ex:274
+#: lib/marshall/documentation_messages.ex:287
 #, elixir-autogen, elixir-format
 msgid "Show the authenticated account."
 msgstr "显示已认证的账户。"
 
-#: lib/marshall/documentation_messages.ex:275
+#: lib/marshall/documentation_messages.ex:288
 #, elixir-autogen, elixir-format
 msgid "Sign in to Marshall using your email login and open\n[Account settings › SSH keys](/settings#ssh-keys). Paste one OpenSSH public key and optionally give it\na label. Paste the `.pub` file, never the private key. Supported public keys are\nEd25519, ECDSA and RSA (at least 2048 bits). Certificates and `authorized_keys`\noptions are not accepted."
 msgstr "使用邮箱登录 Marshall，并打开[账户设置 › SSH 密钥](/settings#ssh-keys)。粘贴一个 OpenSSH 公钥，并可为其添加标签。请粘贴 `.pub` 文件，切勿粘贴私钥。支持的公钥类型为 Ed25519、ECDSA 和 RSA（至少 2048 位）。不接受证书或 `authorized_keys` 选项。"
 
-#: lib/marshall/documentation_messages.ex:279
+#: lib/marshall/documentation_messages.ex:292
 #, elixir-autogen, elixir-format
 msgid "Start a machine."
 msgstr "启动虚拟机。"
 
-#: lib/marshall/documentation_messages.ex:280
+#: lib/marshall/documentation_messages.ex:293
 #, elixir-autogen, elixir-format
 msgid "Stop a machine, retaining its disk and discarding suspended memory."
 msgstr "停止虚拟机，保留磁盘并丢弃挂起时保存的内存。"
 
-#: lib/marshall/documentation_messages.ex:284
+#: lib/marshall/documentation_messages.ex:297
 #, elixir-autogen, elixir-format
 msgid "Stop retains the disk. `rm MACHINE` deletes the machine and its disk. A name is\navailable for reuse only after cleanup is confirmed. Use `exit` to leave the prompt."
 msgstr "停止操作会保留磁盘。`rm MACHINE` 会删除虚拟机及其磁盘。只有确认清理完成后，其名称才可再次使用。使用 `exit` 离开提示符。"
 
-#: lib/marshall/documentation_messages.ex:304
+#: lib/marshall/documentation_messages.ex:317
 #, elixir-autogen, elixir-format
 msgid "Suspend a machine, preserving its memory and disk."
 msgstr "挂起虚拟机，保留其内存和磁盘。"
 
-#: lib/marshall/documentation_messages.ex:306
+#: lib/marshall/documentation_messages.ex:319
 #, elixir-autogen, elixir-format
 msgid "The Overalls operator chooses whether these immutable archives are available. If\nthe deployment has disabled its browser extension package, the download links return an unavailable response.\nSee the browser distribution notes for package and build details.\n"
 msgstr "这些不可变安装包是否可用由 Overalls 运营方决定。如果部署禁用了浏览器扩展安装包，下载链接会返回不可用响应。有关安装包和构建的详细信息，请参阅浏览器分发说明。\n"
 
-#: lib/marshall/documentation_messages.ex:310
+#: lib/marshall/documentation_messages.ex:323
 #, elixir-autogen, elixir-format
 msgid "The accepted request retains its normalized command and resolved resources.\nRetrying cannot retarget a different machine after name reuse or silently select\na different default image. Query the original request after a lost response or\ntimeout. Request status remains subject to current account authorization, including\nafter the machine is archived."
 msgstr "已接受的请求会保留规范化后的命令和已确定的资源。即使名称被重新使用，重试也不会转而操作另一台虚拟机，或在不提示的情况下选择不同的默认镜像。响应丢失或超时后，请查询原始请求。请求状态始终受账户当前权限控制，即使虚拟机已归档也一样。"
 
-#: lib/marshall/documentation_messages.ex:314
+#: lib/marshall/documentation_messages.ex:327
 #, elixir-autogen, elixir-format
 msgid "The browser extension opens supported repository pages in Overalls. The SSH guides\ndescribe Porsche v1; your operator supplies the SSH hostname for deployments\nwith Porsche enabled."
 msgstr "浏览器扩展会在 Overalls 中打开受支持的代码仓库页面。SSH 指南介绍的是 Porsche v1；对于启用了 Porsche 的部署，运营方会提供 SSH 主机名。"
 
-#: lib/marshall/documentation_messages.ex:318
+#: lib/marshall/documentation_messages.ex:331
 #, elixir-autogen, elixir-format
 msgid "The extension opens Overalls with a source URL only after an explicit toolbar\nclick on the four supported HTTPS provider hosts. It sends the provider origin\nand path, strips query parameters and fragments, and never collects page\ncontents, credentials, history or telemetry."
 msgstr "只有在四个受支持的 HTTPS 提供方主机上明确点击工具栏按钮后，扩展才会携带源 URL 打开 Overalls。它仅发送提供方的源站地址和路径，去除查询参数和片段，绝不收集页面内容、凭据、历史记录或遥测数据。"
 
-#: lib/marshall/documentation_messages.ex:322
+#: lib/marshall/documentation_messages.ex:335
 #, elixir-autogen, elixir-format
 msgid "The machine keeps its identity, name, sharing, private address, image and requested\nshape. A running machine may have bounded downtime while final disk state and\nexecution authority move. `request cancel move-1` is available only before handoff\ncommits. If destination activation or readiness fails after commit,\n`request retry move-1` retries that retained destination. Both controls create\ntheir own durable request receipt; use a distinct `--request-id` for each control."
 msgstr "虚拟机会保留其身份、名称、共享权限、私有地址、镜像和请求的资源配置。运行中的虚拟机在最终磁盘状态和执行权限转移时可能会短暂停机。`request cancel move-1` 仅在交接提交前可用。如果提交后目标激活或就绪检查失败，`request retry move-1` 会在保留的同一目标上重试。这两种控制操作都会创建各自的持久请求回执；请为每个控制操作使用不同的 `--request-id`。"
 
-#: lib/marshall/documentation_messages.ex:326
+#: lib/marshall/documentation_messages.ex:339
 #, elixir-autogen, elixir-format
 msgid "The page shows each key's label, type, fingerprint and creation time. Remove a key\nto revoke its access. You may remove your last SSH key and continue using email\nlogin. Adding the same public key again creates a new registration; previous\nsessions remain revoked."
 msgstr "页面会显示每个密钥的标签、类型、指纹和创建时间。移除密钥可撤销其访问权限。即使移除最后一个 SSH 密钥，您仍可通过邮箱登录。再次添加相同公钥会创建新的注册记录；之前的会话仍保持已撤销状态。"
 
-#: lib/marshall/documentation_messages.ex:330
+#: lib/marshall/documentation_messages.ex:347
 #, elixir-autogen, elixir-format
 msgid "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
 msgstr "这些安装包未经签名，由 Overalls 部署提供。请下载适合您浏览器的安装包，然后按照浏览器的开发者安装流程操作："
 
-#: lib/marshall/documentation_messages.ex:334
+#: lib/marshall/documentation_messages.ex:351
 #, elixir-autogen, elixir-format
 msgid "These pages are public and contain no account or fleet data. Each page is available\nas HTML by removing `.md` from its URL. Language-model clients can start at\n[/llms.txt](/llms.txt) and follow the Markdown links."
 msgstr "这些页面公开可见，不包含账户或集群数据。从 URL 中移除 `.md` 即可获取对应的 HTML 页面。语言模型客户端可以从 [/llms.txt](/llms.txt) 开始，沿 Markdown 链接浏览。"
 
-#: lib/marshall/documentation_messages.ex:338
+#: lib/marshall/documentation_messages.ex:355
 #, elixir-autogen, elixir-format
 msgid "This reference uses the same v1 command grammar as the SSH service."
 msgstr "本参考使用与 SSH 服务相同的 v1 命令语法。"
 
-#: lib/marshall/documentation_messages.ex:343
+#: lib/marshall/documentation_messages.ex:364
 #, elixir-autogen, elixir-format
 msgid "Use Overalls from your browser or manage machines over SSH with Porsche. Marshall\nprovides the web interface and account permissions. Use the same account in both."
 msgstr "您可以通过浏览器使用 Overalls，也可以通过 SSH 使用 Porsche 管理虚拟机。Marshall 提供网页界面和账户权限管理。两者请使用同一个账户。"
 
-#: lib/marshall/documentation_messages.ex:347
+#: lib/marshall/documentation_messages.ex:368
 #, elixir-autogen, elixir-format
 msgid "Use Porsche to manage machines over SSH, with the same account and permissions\nas Marshall’s web interface."
 msgstr "通过 SSH 使用 Porsche 管理虚拟机，其账户和权限与 Marshall 网页界面相同。"
 
-#: lib/marshall/documentation_messages.ex:351
+#: lib/marshall/documentation_messages.ex:372
 #, elixir-autogen, elixir-format
 msgid "Use SSH exec commands and durable request IDs to automate machine management."
 msgstr "使用 SSH exec 命令和持久请求 ID 实现虚拟机管理自动化。"
 
-#: lib/marshall/documentation_messages.ex:355
+#: lib/marshall/documentation_messages.ex:376
 #, elixir-autogen, elixir-format
 msgid "Use `--json` for machine-readable results. An exec invocation writes one result\nto standard output; progress goes to standard error. Check the SSH command's exit\nstatus as well as its result. A failed command exits nonzero."
 msgstr "使用 `--json` 获取机器可读的结果。一次 exec 调用会将一个结果写入标准输出，将进度写入标准错误。除了结果之外，还应检查 SSH 命令的退出状态。命令失败时会返回非零退出状态。"
 
-#: lib/marshall/documentation_messages.ex:359
+#: lib/marshall/documentation_messages.ex:380
 #, elixir-autogen, elixir-format
 msgid "Use the Porsche hostname supplied by your operator. In a local terminal, run\n`ssh YOUR_PORSCHE_HOST help` for one command, or `ssh YOUR_PORSCHE_HOST` for an\ninteractive prompt. Verify the server host-key fingerprint using your operator's\ntrusted instructions. Management uses port 22."
 msgstr "请使用运营方提供的 Porsche 主机名。在本地终端运行 `ssh YOUR_PORSCHE_HOST help` 执行单个命令，或运行 `ssh YOUR_PORSCHE_HOST` 进入交互式提示符。请按照运营方提供的可信说明验证服务器主机密钥指纹。管理服务使用端口 22。"
 
-#: lib/marshall/documentation_messages.ex:363
+#: lib/marshall/documentation_messages.ex:384
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests."
 msgstr "虚拟机磁盘容量上限为 **500 GiB** （536,870,912,000 字节）。超过此上限的创建和调整大小请求都会被拒绝，包括 Porsche 的 `new --disk` 请求。"
 
-#: lib/marshall/documentation_messages.ex:367
+#: lib/marshall/documentation_messages.ex:388
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests.\n"
 msgstr "虚拟机磁盘容量上限为 **500 GiB** （536,870,912,000 字节）。超过此上限的创建和调整大小请求都会被拒绝，包括 Porsche 的 `new --disk` 请求。\n"
 
-#: lib/marshall/documentation_messages.ex:371
+#: lib/marshall/documentation_messages.ex:392
 #, elixir-autogen, elixir-format
 msgid "When the extension has been configured for this exact Overalls origin and the\nbrowser has granted site access, it marks the open Overalls page as installed.\nThat local marker hides setup prompts on the home page; it does not sign you in,\ngrant access to machines, or change launch authorization. If site access is\nwithdrawn, configuration is missing, or detection is unavailable, setup remains\nvisible."
 msgstr "扩展针对当前 Overalls 源站完成配置，且浏览器已授予网站访问权限后，会在打开的 Overalls 页面上标记扩展已安装。该本地标记用于隐藏首页的安装提示，不会登录账户、授予虚拟机访问权限或更改启动授权。如果网站访问权限被撤销、配置缺失或无法检测，安装提示仍会显示。"
 
-#: lib/marshall/documentation_messages.ex:375
+#: lib/marshall/documentation_messages.ex:396
 #, elixir-autogen, elixir-format
 msgid "With exec, place the same command after `ssh YOUR_PORSCHE_HOST` and quote it for\nyour local shell when needed. Porsche does not evaluate shell expressions,\npipelines or substitutions. Single and double quotes group command arguments."
 msgstr "使用 exec 时，将同样的命令放在 `ssh YOUR_PORSCHE_HOST` 之后，并根据本地 shell 的需要添加引号。Porsche 不会求值 shell 表达式、管道或替换。单引号和双引号用于将命令参数分组。"
 
-#: lib/marshall/documentation_messages.ex:384
+#: lib/marshall/documentation_messages.ex:405
 #, elixir-autogen, elixir-format
 msgid "`GET /` returns a versioned object containing `guest`, `integrations`, and the\navailable paths. `GET /guest` returns only guest metadata. `GET /integrations`\nreturns the integrations array directly, which makes it convenient for shell\nscripts and agents."
 msgstr "`GET /` 返回带版本的对象，包含 `guest`、`integrations` 和可用路径。`GET /guest` 仅返回客户机元数据。`GET /integrations` 直接返回集成数组，方便 shell 脚本和代理使用。"
 
-#: lib/marshall/documentation_messages.ex:392
+#: lib/marshall/documentation_messages.ex:413
 #, elixir-autogen, elixir-format
 msgid "`new` selects OSS when `--profile` is omitted, as does the browser creation form.\nUse `new --profile customer` to choose Customer explicitly. Customer machines\npermit only owner SSH and serial-terminal access. All outbound network\nconnections, workspace sharing, and web/port exposure are disabled.\nSSH reply traffic is allowed only on admitted owner connections. Choose an\nappropriate non-Customer profile when networking or collaboration is required."
 msgstr "与浏览器中的创建表单一样，省略 `--profile` 时，`new` 会选择 OSS。使用 `new --profile customer` 可明确选择 Customer。Customer 虚拟机仅允许所有者通过 SSH 和串行终端访问。所有出站网络连接、工作区共享以及 Web 或端口暴露均被禁用。SSH 响应流量仅允许通过已获准的所有者连接发送。如果需要联网或协作，请选择合适的非 Customer 配置。"
 
-#: lib/marshall/documentation_messages.ex:396
+#: lib/marshall/documentation_messages.ex:417
 #, elixir-autogen, elixir-format
 msgid "`pin MACHINE` keeps a machine at the top of your lists in the browser; `unpin\nMACHINE` removes your pin. Pins are personal, and you may hold up to twenty. While\nthe machine's owner has it pinned, nobody can delete it: `rm` answers\n`machine_pinned` until the owner runs `unpin MACHINE` or unpins it in the browser."
 msgstr "`pin MACHINE` 会将虚拟机置于浏览器列表顶部；`unpin\nMACHINE` 会取消您的置顶。置顶属于个人设置，每人最多可置顶二十台虚拟机。只要虚拟机所有者仍将其置顶，任何人都无法删除它：`rm` 会返回 `machine_pinned`，直到所有者执行 `unpin MACHINE` 或在浏览器中取消置顶。"
 
-#: lib/marshall/documentation_messages.ex:400
+#: lib/marshall/documentation_messages.ex:421
 #, elixir-autogen, elixir-format
 msgid "`relocate MACHINE` moves the same machine and disk to another eligible physical\nhost. Porsche never accepts a destination: Marshall selects one from current\ncapacity, image availability and transfer readiness. The machine keeps its name,\nidentity, sharing and private address."
 msgstr "`relocate MACHINE` 会将同一台虚拟机及其磁盘迁移到其他符合条件的物理宿主机。Porsche 不接受指定目标：Marshall 会根据当前容量、镜像可用性和传输就绪情况选择目标。虚拟机会保留名称、身份、共享权限和私有地址。"
@@ -649,182 +649,182 @@ msgstr "# 推送通知"
 msgid "## Devices"
 msgstr "## 设备"
 
-#: lib/marshall/documentation_messages.ex:22
+#: lib/marshall/documentation_messages.ex:23
 #, elixir-autogen, elixir-format
 msgid "## Privacy"
 msgstr "## 隐私"
 
-#: lib/marshall/documentation_messages.ex:29
+#: lib/marshall/documentation_messages.ex:30
 #, elixir-autogen, elixir-format
 msgid "## Turning notifications off"
 msgstr "## 关闭通知"
 
-#: lib/marshall/documentation_messages.ex:30
+#: lib/marshall/documentation_messages.ex:31
 #, elixir-autogen, elixir-format
 msgid "- An operator can disable notifications for the whole deployment with\n  `services.marshall.notifications.enable = false`. Registration is then\n  refused and nothing is sent to Susan.\n- You can pause a single device with `device prefs DEVICE_ID --enabled false`.\n- You can revoke a device with `device rm DEVICE_ID`."
 msgstr "- 操作员可以通过 `services.marshall.notifications.enable = false` 为整个部署禁用通知。此后注册会被拒绝，也不会向 Susan 发送任何内容。\n- 您可以使用 `device prefs DEVICE_ID --enabled false` 暂停单个设备。\n- 您可以使用 `device rm DEVICE_ID` 撤销设备。"
 
-#: lib/marshall/documentation_messages.ex:38
+#: lib/marshall/documentation_messages.ex:39
 #, elixir-autogen, elixir-format
 msgid "- [Browser extension](/docs/browser-extension.md): open supported repositories in Overalls.\n- [Getting started](/docs/quickstart.md): register a key and connect.\n- [Command reference](/docs/commands.md): syntax and available options.\n- [Automation](/docs/automation.md): JSON, retries and completion.\n- [Reflection integration](/docs/reflection.md): discover guest metadata and available private integrations.\n- [Push notifications](/docs/notifications.md): Mila notifications, devices and privacy."
 msgstr "- [浏览器扩展](/docs/browser-extension.md)：在 Overalls 中打开受支持的仓库。\n- [入门指南](/docs/quickstart.md)：注册密钥并连接。\n- [命令参考](/docs/commands.md)：语法和可用选项。\n- [自动化](/docs/automation.md)：JSON、重试和完成。\n- [Reflection 集成](/docs/reflection.md)：发现客户机元数据和可用的私有集成。\n- [推送通知](/docs/notifications.md)：Mila 通知、设备和隐私。"
 
-#: lib/marshall/documentation_messages.ex:56
+#: lib/marshall/documentation_messages.ex:61
 #, elixir-autogen, elixir-format
 msgid "Answer a thread's pending question with JSON read from standard input."
 msgstr "使用从标准输入读取的 JSON 回答线程的待回答问题。"
 
-#: lib/marshall/documentation_messages.ex:60
+#: lib/marshall/documentation_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "Apple and Google deliver notifications only to apps signed by the app's\npublisher, so every Overalls deployment sends notifications through one shared\nrelay, Susan, at `https://notifications.overalls.dev`. Your deployment cannot\nbe configured to use another relay."
 msgstr "Apple 和 Google 只会向由应用发布者签名的应用投递通知，因此每个 Overalls 部署都通过同一个共享中继 Susan（`https://notifications.overalls.dev`）发送通知。您的部署无法配置为使用其他中继。"
 
-#: lib/marshall/documentation_messages.ex:64
+#: lib/marshall/documentation_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "Approve a thread's latest plan and start implementing it."
 msgstr "批准线程的最新计划并开始实施。"
 
-#: lib/marshall/documentation_messages.ex:65
+#: lib/marshall/documentation_messages.ex:70
 #, elixir-autogen, elixir-format
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "请求修订计划，从标准输入读取反馈。"
 
-#: lib/marshall/documentation_messages.ex:70
+#: lib/marshall/documentation_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "将此 SSH 终端连接到共享终端会话；需要 ssh -t。"
 
-#: lib/marshall/documentation_messages.ex:85
+#: lib/marshall/documentation_messages.ex:90
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "更改机器的 Web 端口或可见性，可选择在预期修订版本上进行。"
 
-#: lib/marshall/documentation_messages.ex:97
+#: lib/marshall/documentation_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "关闭您在机器上的某个终端会话。"
 
-#: lib/marshall/documentation_messages.ex:158
+#: lib/marshall/documentation_messages.ex:167
 #, elixir-autogen, elixir-format
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "查看线程、其待回答的问题和最新计划。"
 
-#: lib/marshall/documentation_messages.ex:168
+#: lib/marshall/documentation_messages.ex:177
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "列出您可以打开的机器终端会话。"
 
-#: lib/marshall/documentation_messages.ex:170
+#: lib/marshall/documentation_messages.ex:179
 #, elixir-autogen, elixir-format
 msgid "List a thread's transcript events after a sequence number."
 msgstr "列出线程在某个序列号之后的记录事件。"
 
-#: lib/marshall/documentation_messages.ex:172
+#: lib/marshall/documentation_messages.ex:181
 #, elixir-autogen, elixir-format
 msgid "List agent threads you can read, with unread counts."
 msgstr "列出您可以读取的代理线程及其未读数量。"
 
-#: lib/marshall/documentation_messages.ex:177
+#: lib/marshall/documentation_messages.ex:186
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "列出你的推送通知设备。"
 
-#: lib/marshall/documentation_messages.ex:188
+#: lib/marshall/documentation_messages.ex:197
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "将线程标记为已读，直到某个记录序列号。"
 
-#: lib/marshall/documentation_messages.ex:189
+#: lib/marshall/documentation_messages.ex:198
 #, elixir-autogen, elixir-format
 msgid "Mila registers your phone when you allow notifications. The registration is\nbound to the SSH key Mila uses, so removing that key from your account also\nrevokes the device. Each account can have up to ten active devices."
 msgstr "当您允许通知时，Mila 会注册您的手机。注册绑定到 Mila 使用的 SSH 密钥，因此从账户中移除该密钥也会撤销该设备。每个账户最多可以有十台活动设备。"
 
-#: lib/marshall/documentation_messages.ex:193
+#: lib/marshall/documentation_messages.ex:202
 #, elixir-autogen, elixir-format
 msgid "Mila, the Overalls mobile app, can tell you when an agent needs your input:\nwhen a planning turn asks you a question or proposes a plan. A notification\nonly says that something needs attention; opening it takes you to the thread\nin Mila, which then fetches the details over your own SSH connection."
 msgstr "Mila 是 Overalls 的移动应用，可以在代理需要您输入时通知您：即规划轮次向您提问或提出计划时。通知只说明有事项需要处理；打开通知会进入 Mila 中的线程，Mila 随后通过您自己的 SSH 连接获取详细信息。"
 
-#: lib/marshall/documentation_messages.ex:198
+#: lib/marshall/documentation_messages.ex:207
 #, elixir-autogen, elixir-format
 msgid "Notifications are a convenience. While Mila is open, it follows your threads\nthrough its own live watch stream, which works even when notifications are\ndisabled or Susan is unavailable.\n"
 msgstr "通知只是一种便利功能。Mila 打开时会通过自己的实时监视流跟踪您的线程，即使通知被禁用或 Susan 不可用也能正常工作。\n"
 
-#: lib/marshall/documentation_messages.ex:202
+#: lib/marshall/documentation_messages.ex:211
 #, elixir-autogen, elixir-format
 msgid "Notifications go to the devices of every person who can currently act on the\nthread, except the person whose action caused it. People with view-only\naccess are not notified."
 msgstr "通知会发送到当前可以对该线程执行操作的每个人的设备上，但触发该通知的操作者本人除外。仅有查看权限的人不会收到通知。"
 
-#: lib/marshall/documentation_messages.ex:215
+#: lib/marshall/documentation_messages.ex:224
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "在机器上打开您的个人终端会话。"
 
-#: lib/marshall/documentation_messages.ex:239
+#: lib/marshall/documentation_messages.ex:248
 #, elixir-autogen, elixir-format
 msgid "Push notifications"
 msgstr "推送通知"
 
-#: lib/marshall/documentation_messages.ex:254
+#: lib/marshall/documentation_messages.ex:263
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "为推送通知注册此设备。推送密钥从 stdin 读取。"
 
-#: lib/marshall/documentation_messages.ex:268
+#: lib/marshall/documentation_messages.ex:277
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "撤销一个推送通知设备。"
 
-#: lib/marshall/documentation_messages.ex:271
+#: lib/marshall/documentation_messages.ex:284
 #, elixir-autogen, elixir-format
 msgid "Send a prompt read from standard input to a thread."
 msgstr "将从标准输入读取的提示发送到线程。"
 
-#: lib/marshall/documentation_messages.ex:272
+#: lib/marshall/documentation_messages.ex:285
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "显示机器的 Web 端点、端口和可见性。"
 
-#: lib/marshall/documentation_messages.ex:288
+#: lib/marshall/documentation_messages.ex:301
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "以流的形式输出机器、线程和此会话的 JSON 变更通知。"
 
-#: lib/marshall/documentation_messages.ex:292
+#: lib/marshall/documentation_messages.ex:305
 #, elixir-autogen, elixir-format
 msgid "Susan keeps an append-only audit log of key issues, accepted and refused\nnotifications, rate limits and delivery outcomes. Each entry records only the\naction, reason, a fingerprint of the sending deployment, the push key ID, the\nprovider (Apple or Google), the outcome and a delivery ID. It does not record IP\naddresses, push tokens, keys or encrypted messages. Audit entries are deleted\nafter 90 days."
 msgstr "Susan 会在仅追加的审计日志中记录密钥签发、已接受和已拒绝的通知、速率限制以及投递结果。每条记录只包含操作、原因、发送部署的指纹、推送密钥 ID、提供方（Apple 或 Google）、结果和投递 ID。它不会记录 IP 地址、推送令牌、密钥或加密消息。审计记录会在 90 天后删除。"
 
-#: lib/marshall/documentation_messages.ex:296
+#: lib/marshall/documentation_messages.ex:309
 #, elixir-autogen, elixir-format
 msgid "Susan never sees your prompts, agent output, thread or machine names, email\naddress, SSH keys or any other account data."
 msgstr "Susan 永远看不到您的提示、代理输出、线程或机器名称、电子邮件地址、SSH 密钥或任何其他账户数据。"
 
-#: lib/marshall/documentation_messages.ex:300
+#: lib/marshall/documentation_messages.ex:313
 #, elixir-autogen, elixir-format
 msgid "Susan sees the IP address of your deployment and when each notification is\nsent, an opaque push key issued to your device, an encrypted message and the\nnotification kind. The message is encrypted on your deployment to a key that\nonly your device holds, so Susan cannot read where the notification leads."
 msgstr "Susan 能看到您部署的 IP 地址和每条通知的发送时间、签发给您设备的不透明推送密钥、一条加密消息以及通知类型。消息在您的部署上使用只有您的设备持有的密钥加密，因此 Susan 无法读取通知指向的内容。"
 
-#: lib/marshall/documentation_messages.ex:305
+#: lib/marshall/documentation_messages.ex:318
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "在 plan 和 work 协作模式之间切换线程。"
 
-#: lib/marshall/documentation_messages.ex:342
+#: lib/marshall/documentation_messages.ex:363
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "为单个设备开启或关闭推送通知。"
 
-#: lib/marshall/documentation_messages.ex:379
+#: lib/marshall/documentation_messages.ex:400
 #, elixir-autogen, elixir-format
 msgid "You can review and manage devices with Porsche:"
 msgstr "您可以使用 Porsche 查看和管理设备："
 
-#: lib/marshall/documentation_messages.ex:380
+#: lib/marshall/documentation_messages.ex:401
 #, elixir-autogen, elixir-format
 msgid "Your deployment keeps delivery records for seven days and stores only a digest\nof each push key in its audit history."
 msgstr "您的部署会将投递记录保留七天，并且在审计历史中只存储每个推送密钥的摘要。"
 
-#: lib/marshall/documentation_messages.ex:388
+#: lib/marshall/documentation_messages.ex:409
 #, elixir-autogen, elixir-format
 msgid "`device prefs` pauses or resumes notifications for one device. `device rm`\nrevokes it permanently; Mila registers again the next time you allow\nnotifications. Deleting or retiring your account revokes all its devices."
 msgstr "`device prefs` 暂停或恢复单个设备的通知。`device rm` 永久撤销该设备；下次您允许通知时，Mila 会重新注册。删除或停用您的账户会撤销其所有设备。"
@@ -833,3 +833,33 @@ msgstr "`device prefs` 暂停或恢复单个设备的通知。`device rm` 永久
 #, elixir-autogen, elixir-format
 msgid "Documentation not found"
 msgstr "未找到文档"
+
+#: lib/marshall/documentation_messages.ex:18
+#, elixir-autogen, elixir-format
+msgid "## Examples"
+msgstr "## 示例"
+
+#: lib/marshall/documentation_messages.ex:53
+#, elixir-autogen, elixir-format
+msgid "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+msgstr "可用的客户机会收到 HTTP `200` 和一个 JSON 数组。已停止、已迁移、已退役、已过时或未经授权的客户机会收到不可用响应，而不是元数据；调用方应将任何非 `2xx` 状态视为拒绝，并避免改向其他机器重试。"
+
+#: lib/marshall/documentation_messages.ex:139
+#, elixir-autogen, elixir-format
+msgid "Fetch only the guest metadata when an agent does not need integration details:"
+msgstr "当代理不需要集成详情时，只获取客户机元数据："
+
+#: lib/marshall/documentation_messages.ex:280
+#, elixir-autogen, elixir-format
+msgid "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+msgstr "请在客户机内部运行这些命令。`-sS` 标志让成功的响应保持安静，同时仍显示连接错误；`-H` 请求 JSON 表示形式。"
+
+#: lib/marshall/documentation_messages.ex:343
+#, elixir-autogen, elixir-format
+msgid "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+msgstr "响应是一个带版本的对象。健康的客户机返回 HTTP `200`，并带有 `guest`、`integrations` 和 `paths` 字段："
+
+#: lib/marshall/documentation_messages.ex:359
+#, elixir-autogen, elixir-format
+msgid "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
+msgstr "这会返回 HTTP `200` 以及包含上述有限客户机字段的 JSON 对象。如需发现，请直接获取集成列表："

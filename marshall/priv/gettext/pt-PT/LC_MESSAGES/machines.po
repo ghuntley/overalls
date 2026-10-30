@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: lib/marshall_web/live/machines_live.ex:1465
+#: lib/marshall_web/live/machines_live.ex:1467
 #, elixir-autogen, elixir-format
 msgid " and counting"
 msgstr " e aumentando"
 
-#: lib/marshall_web/live/machines_live.ex:1461
+#: lib/marshall_web/live/machines_live.ex:1463
 #, elixir-autogen, elixir-format
 msgid "%{seconds} seconds%{suffix}"
 msgstr "%{seconds} segundos%{suffix}"
@@ -29,8 +29,8 @@ msgstr "%{seconds} segundos%{suffix}"
 msgid "%{value1} CPU"
 msgstr "%{value1} CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1229
-#: lib/marshall_web/live/machines_live.ex:1232
+#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1234
 #: lib/marshall_web/live/overview_live.ex:351
 #: lib/marshall_web/live/overview_live.ex:356
 #: lib/marshall_web/live/resize_live.ex:322
@@ -43,20 +43,20 @@ msgstr "%{value1} GiB"
 msgid "%{value1} MiB"
 msgstr "%{value1} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:1226
+#: lib/marshall_web/live/machines_live.ex:1228
 #: lib/marshall_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU"
 msgstr "%{value1} vCPU"
 
 #: lib/marshall_web/live/admin/workloads_live.ex:160
-#: lib/marshall_web/live/machines_live.ex:948
+#: lib/marshall_web/live/machines_live.ex:950
 #: lib/marshall_web/live/overview_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB de disco"
 
-#: lib/marshall_web/live/machines_live.ex:1171
+#: lib/marshall_web/live/machines_live.ex:1173
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} MiB memory · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} MiB de memória · %{value3} GiB de disco"
@@ -79,18 +79,18 @@ msgstr "%{value1} → %{value2} GiB"
 msgid "%{value1} → %{value2} MiB"
 msgstr "%{value1} → %{value2} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:890
+#: lib/marshall_web/live/machines_live.ex:892
 #: lib/marshall_web/live/overview_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "+ Create machine"
 msgstr "+ Criar máquina"
 
-#: lib/marshall_web/live/machines_live.ex:1533
+#: lib/marshall_web/live/machines_live.ex:1535
 #, elixir-autogen, elixir-format
 msgid "+ Queue clone"
 msgstr "+ Enfileirar clonagem"
 
-#: lib/marshall_web/live/machines_live.ex:721
+#: lib/marshall_web/live/machines_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "A Overalls development environment for nested machines. It uses a dedicated image, an extra 256 GiB data disk, and higher resource minimums. Its AI agent can start child agents."
 msgstr ""
@@ -110,9 +110,9 @@ msgstr ""
 "Uma pequena prévia. Todas as máquinas às quais o utilizador tem acesso estão"
 " em"
 
-#: lib/marshall_web/live/machines_live.ex:924
-#: lib/marshall_web/live/machines_live.ex:962
-#: lib/marshall_web/live/machines_live.ex:1265
+#: lib/marshall_web/live/machines_live.ex:926
+#: lib/marshall_web/live/machines_live.ex:964
+#: lib/marshall_web/live/machines_live.ex:1267
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "Acesso"
@@ -122,9 +122,9 @@ msgstr "Acesso"
 msgid "Access updated."
 msgstr "Acesso atualizado."
 
-#: lib/marshall_web/live/machines_live.ex:1279
-#: lib/marshall_web/live/machines_live.ex:1286
-#: lib/marshall_web/live/machines_live.ex:1305
+#: lib/marshall_web/live/machines_live.ex:1281
+#: lib/marshall_web/live/machines_live.ex:1288
+#: lib/marshall_web/live/machines_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "Conta"
@@ -143,14 +143,14 @@ msgstr ""
 "A verificação administrativa expirou. Seu rascunho de redimensionamento "
 "permanece no endereço desta página."
 
-#: lib/marshall_web/live/machines_live.ex:864
+#: lib/marshall_web/live/machines_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "All retained copies deleted"
 msgstr "Todas as cópias retidas foram eliminadas"
 
-#: lib/marshall_web/live/machines_live.ex:1281
-#: lib/marshall_web/live/machines_live.ex:1298
-#: lib/marshall_web/live/machines_live.ex:1317
+#: lib/marshall_web/live/machines_live.ex:1283
+#: lib/marshall_web/live/machines_live.ex:1300
+#: lib/marshall_web/live/machines_live.ex:1319
 #, elixir-autogen, elixir-format
 msgid "Allows"
 msgstr "Permite"
@@ -194,7 +194,7 @@ msgstr ""
 "Traga um repositório do GitHub, GitLab, Codeberg ou Bitbucket para o "
 "Overalls com a extensão do Chrome ou Firefox."
 
-#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1227
 #: lib/marshall_web/live/overview_live.ex:347
 #: lib/marshall_web/live/resize_live.ex:315
 #: lib/marshall_web/live/resize_live.ex:359
@@ -204,7 +204,7 @@ msgstr ""
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1141
+#: lib/marshall_web/live/machines_live.ex:1143
 #, elixir-autogen, elixir-format
 msgid "CPU (vCPU)"
 msgstr "CPU (vCPU)"
@@ -217,7 +217,7 @@ msgstr ""
 "aumentar."
 
 #: lib/marshall_web/components/clone_components.ex:116
-#: lib/marshall_web/live/machines_live.ex:1193
+#: lib/marshall_web/live/machines_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Cancelar"
@@ -229,7 +229,7 @@ msgstr ""
 "Não foi possível aceitar o cancelamento. Os tamanhos já estão sendo "
 "aplicados ou o estado da máquina não está confirmado."
 
-#: lib/marshall_web/live/machines_live.ex:1479
+#: lib/marshall_web/live/machines_live.ex:1481
 #, elixir-autogen, elixir-format
 msgid "Cancel move"
 msgstr "Cancelar transferência"
@@ -261,7 +261,7 @@ msgstr "Cancelado antes do início da instantânea."
 msgid "Cancelling"
 msgstr "Cancelando"
 
-#: lib/marshall_web/live/machines_live.ex:859
+#: lib/marshall_web/live/machines_live.ex:861
 #, elixir-autogen, elixir-format
 msgid "Cancelling and restoring the source"
 msgstr "Cancelando e restaurando a origem"
@@ -285,7 +285,7 @@ msgstr ""
 "Cancelando: aguardando confirmação da parada; os tamanhos permanecem "
 "inalterados."
 
-#: lib/marshall_web/live/machines_live.ex:1477
+#: lib/marshall_web/live/machines_live.ex:1479
 #, elixir-autogen, elixir-format
 msgid "Cancelling…"
 msgstr "Cancelando…"
@@ -308,27 +308,27 @@ msgstr ""
 msgid "Check your inbox and click the link to confirm your subscription."
 msgstr "Verifique a sua caixa de entrada e clique na ligação para confirmar a sua subscrição."
 
-#: lib/marshall_web/live/machines_live.ex:854
+#: lib/marshall_web/live/machines_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Checking destination readiness"
 msgstr "Verificando a prontidão do destino"
 
-#: lib/marshall_web/live/machines_live.ex:849
+#: lib/marshall_web/live/machines_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Checking transfer connectivity"
 msgstr "Verificando a conectividade da transferência"
 
-#: lib/marshall_web/live/machines_live.ex:1082
+#: lib/marshall_web/live/machines_live.ex:1084
 #, elixir-autogen, elixir-format
 msgid "Choose an image"
 msgstr "Escolha uma imagem"
 
-#: lib/marshall_web/live/machines_live.ex:1020
+#: lib/marshall_web/live/machines_live.ex:1022
 #, elixir-autogen, elixir-format
 msgid "Choose an image and the resources for your environment."
 msgstr "Escolha uma imagem e os recursos para seu ambiente."
 
-#: lib/marshall_web/live/machines_live.ex:1075
+#: lib/marshall_web/live/machines_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Choose your environment"
 msgstr "Escolha seu ambiente"
@@ -343,7 +343,7 @@ msgstr "Clonagem cancelada"
 msgid "Clone complete"
 msgstr "Clonagem concluída"
 
-#: lib/marshall_web/live/machines_live.ex:1499
+#: lib/marshall_web/live/machines_live.ex:1501
 #, elixir-autogen, elixir-format
 msgid "Clone machine"
 msgstr "Clonar máquina"
@@ -358,12 +358,12 @@ msgstr "A clonagem precisa de atenção"
 msgid "Clone queued. You can queue another copy."
 msgstr "Clonagem enfileirada. O utilizador pode enfileirar outra cópia."
 
-#: lib/marshall_web/live/machines_live.ex:1550
+#: lib/marshall_web/live/machines_live.ex:1552
 #, elixir-autogen, elixir-format
 msgid "Clone requests"
 msgstr "Solicitações de clonagem"
 
-#: lib/marshall_web/live/machines_live.ex:1561
+#: lib/marshall_web/live/machines_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "Clone requests are temporarily unavailable. Retrying automatically."
 msgstr ""
@@ -375,7 +375,7 @@ msgstr ""
 msgid "Clone stages"
 msgstr "Etapas da clonagem"
 
-#: lib/marshall_web/live/machines_live.ex:1403
+#: lib/marshall_web/live/machines_live.ex:1405
 #, elixir-autogen, elixir-format
 msgid "Comment"
 msgstr "Comentário"
@@ -390,8 +390,8 @@ msgstr "Concluído"
 msgid "Confirmed resources"
 msgstr "Recursos confirmados"
 
-#: lib/marshall_web/live/machines_live.ex:925
-#: lib/marshall_web/live/machines_live.ex:976
+#: lib/marshall_web/live/machines_live.ex:927
+#: lib/marshall_web/live/machines_live.ex:978
 #, elixir-autogen, elixir-format
 msgid "Connect"
 msgstr "Conectar"
@@ -411,7 +411,7 @@ msgstr "Copiando"
 msgid "Copying files"
 msgstr "Copiando ficheiros"
 
-#: lib/marshall_web/live/machines_live.ex:851
+#: lib/marshall_web/live/machines_live.ex:853
 #, elixir-autogen, elixir-format
 msgid "Copying the stopped disks"
 msgstr "Copiando os discos parados"
@@ -421,7 +421,7 @@ msgstr "Copiando os discos parados"
 msgid "Create a machine"
 msgstr "Criar uma máquina"
 
-#: lib/marshall_web/live/machines_live.ex:1507
+#: lib/marshall_web/live/machines_live.ex:1509
 #, elixir-autogen, elixir-format
 msgid "Create a private, independent copy of this machine. Running machines stop briefly for each snapshot, then restart while copying continues. Copies are processed in order and match the source's power state when their turn begins."
 msgstr ""
@@ -431,8 +431,8 @@ msgstr ""
 "energia da origem quando chega sua vez."
 
 #: lib/marshall_web/live/machines_live.ex:106
-#: lib/marshall_web/live/machines_live.ex:1019
-#: lib/marshall_web/live/machines_live.ex:1191
+#: lib/marshall_web/live/machines_live.ex:1021
+#: lib/marshall_web/live/machines_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Create machine"
 msgstr "Criar máquina"
@@ -454,18 +454,18 @@ msgstr ""
 msgid "Creating cloned machine"
 msgstr "Criando máquina clonada"
 
-#: lib/marshall_web/live/machines_live.ex:1189
+#: lib/marshall_web/live/machines_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Creating…"
 msgstr "Criando…"
 
-#: lib/marshall_web/live/machines_live.ex:904
+#: lib/marshall_web/live/machines_live.ex:906
 #, elixir-autogen, elixir-format
 msgid "Current headroom is temporarily unavailable."
 msgstr "A margem atual está temporariamente indisponível."
 
-#: lib/marshall_web/live/machines_live.ex:896
-#: lib/marshall_web/live/machines_live.ex:1038
+#: lib/marshall_web/live/machines_live.ex:898
+#: lib/marshall_web/live/machines_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Current headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
 msgstr ""
@@ -477,13 +477,12 @@ msgstr ""
 msgid "Current provisioning headroom"
 msgstr "Margem atual de provisionamento"
 
-#: lib/marshall_web/live/machines_live.ex:687
-#: lib/marshall_web/live/machines_live.ex:775
+#: lib/marshall_web/live/machines_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr "Cliente"
 
-#: lib/marshall_web/live/machines_live.ex:1251
+#: lib/marshall_web/live/machines_live.ex:1253
 #, elixir-autogen, elixir-format
 msgid "Customer machines allow only owner SSH and terminal access. Outbound networking, workspace sharing, and web service exposure are disabled."
 msgstr ""
@@ -491,42 +490,42 @@ msgstr ""
 "proprietário. Rede de saída, partilhamento do espaço de trabalho e exposição"
 " de serviços web estão desativados."
 
-#: lib/marshall_web/live/machines_live.ex:1605
+#: lib/marshall_web/live/machines_live.ex:1607
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Eliminar"
 
-#: lib/marshall_web/live/machines_live.ex:1588
+#: lib/marshall_web/live/machines_live.ex:1590
 #, elixir-autogen, elixir-format
 msgid "Delete machine"
 msgstr "Eliminar máquina"
 
-#: lib/marshall_web/live/machines_live.ex:1602
+#: lib/marshall_web/live/machines_live.ex:1604
 #, elixir-autogen, elixir-format
 msgid "Delete this machine and its disk? This cannot be undone."
 msgstr "Eliminar esta máquina e seu disco? Isso não pode ser desfeito."
 
-#: lib/marshall_web/live/machines_live.ex:779
+#: lib/marshall_web/live/machines_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Deleting"
 msgstr "A eliminar"
 
-#: lib/marshall_web/live/machines_live.ex:861
+#: lib/marshall_web/live/machines_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Deleting retained copies"
 msgstr "A eliminar cópias retidas"
 
-#: lib/marshall_web/live/machines_live.ex:855
+#: lib/marshall_web/live/machines_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Destination boot failed; source copy retained"
 msgstr "Falha na inicialização do destino; cópia de origem retida"
 
-#: lib/marshall_web/live/machines_live.ex:857
+#: lib/marshall_web/live/machines_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Destination readiness failed; source copy retained"
 msgstr "Falha na prontidão do destino; cópia de origem retida"
 
-#: lib/marshall_web/live/machines_live.ex:858
+#: lib/marshall_web/live/machines_live.ex:860
 #, elixir-autogen, elixir-format
 msgid "Destination ready; cleaning up the source"
 msgstr "Destino pronto; limpando a origem"
@@ -538,12 +537,12 @@ msgstr ""
 "Reinicialização do destino solicitada. A cópia de origem permanece retida "
 "até a prontidão ser confirmada."
 
-#: lib/marshall_web/live/machines_live.ex:1268
+#: lib/marshall_web/live/machines_live.ex:1270
 #, elixir-autogen, elixir-format
 msgid "Direct machine grants"
 msgstr "Permissões diretas da máquina"
 
-#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1233
 #: lib/marshall_web/live/overview_live.ex:355
 #: lib/marshall_web/live/resize_live.ex:321
 #: lib/marshall_web/live/resize_live.ex:375
@@ -552,7 +551,7 @@ msgstr "Permissões diretas da máquina"
 msgid "Disk"
 msgstr "Disco"
 
-#: lib/marshall_web/live/machines_live.ex:1160
+#: lib/marshall_web/live/machines_live.ex:1162
 #, elixir-autogen, elixir-format
 msgid "Disk (GiB)"
 msgstr "Disco (GiB)"
@@ -577,7 +576,7 @@ msgstr "Endereço de e-mail"
 msgid "Enable JavaScript to open a repository link, or"
 msgstr "Ative o JavaScript para abrir um link de repositório ou"
 
-#: lib/marshall_web/live/machines_live.ex:772
+#: lib/marshall_web/live/machines_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Ends that person's access to this machine."
 msgstr "Encerra o acesso dessa pessoa a esta máquina."
@@ -592,7 +591,7 @@ msgstr "Introduza um endereço de correio eletrónico válido."
 msgid "Enter whole numbers for CPU, memory and disk size."
 msgstr "Insira números inteiros para CPU, memória e tamanho do disco."
 
-#: lib/marshall_web/live/machines_live.ex:1299
+#: lib/marshall_web/live/machines_live.ex:1301
 #, elixir-autogen, elixir-format
 msgid "Everything; cannot be changed here."
 msgstr "Tudo; não pode ser alterado aqui."
@@ -602,12 +601,12 @@ msgstr "Tudo; não pode ser alterado aqui."
 msgid "Explore your usage ↗"
 msgstr "Explore seu uso ↗"
 
-#: lib/marshall_web/live/machines_live.ex:1500
+#: lib/marshall_web/live/machines_live.ex:1502
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy"
 msgstr "Ficheiros e credenciais armazenadas estão incluídos na cópia"
 
-#: lib/marshall_web/live/machines_live.ex:1540
+#: lib/marshall_web/live/machines_live.ex:1542
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy."
 msgstr "Ficheiros e credenciais armazenadas estão incluídos na cópia."
@@ -632,12 +631,12 @@ msgstr "Concluindo"
 msgid "Get tips, tricks and updates about Overalls and AI by email."
 msgstr "Receba dicas, truques e novidades sobre Overalls e IA por correio eletrónico."
 
-#: lib/marshall_web/live/machines_live.ex:1135
+#: lib/marshall_web/live/machines_live.ex:1137
 #, elixir-autogen, elixir-format
 msgid "Give it room to grow"
 msgstr "Dê espaço para crescer"
 
-#: lib/marshall_web/live/machines_live.ex:1337
+#: lib/marshall_web/live/machines_live.ex:1339
 #, elixir-autogen, elixir-format
 msgid "Grant, change or remove access"
 msgstr "Conceder, alterar ou remover acesso"
@@ -652,27 +651,27 @@ msgstr "Expandir o sistema de ficheiros na próxima inicialização"
 msgid "Headroom is temporarily unavailable."
 msgstr "A margem está temporariamente indisponível."
 
-#: lib/marshall_web/live/machines_live.ex:923
-#: lib/marshall_web/live/machines_live.ex:958
-#: lib/marshall_web/live/machines_live.ex:1234
+#: lib/marshall_web/live/machines_live.ex:925
+#: lib/marshall_web/live/machines_live.ex:960
+#: lib/marshall_web/live/machines_live.ex:1236
 #, elixir-autogen, elixir-format
 msgid "Host"
 msgstr "Host"
 
-#: lib/marshall_web/live/machines_live.ex:1081
+#: lib/marshall_web/live/machines_live.ex:1083
 #, elixir-autogen, elixir-format
 msgid "Image"
 msgstr "Imagem"
 
-#: lib/marshall_web/live/machines_live.ex:1024
+#: lib/marshall_web/live/machines_live.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Images and capacity are temporarily unavailable. Your choices are retained."
 msgstr ""
 "As imagens e a capacidade estão temporariamente indisponíveis. Suas escolhas"
 " foram mantidas."
 
-#: lib/marshall_web/live/machines_live.ex:693
-#: lib/marshall_web/live/machines_live.ex:776
+#: lib/marshall_web/live/machines_live.ex:695
+#: lib/marshall_web/live/machines_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Inception"
 msgstr "Inception"
@@ -682,7 +681,7 @@ msgstr "Inception"
 msgid "Invalid request."
 msgstr "Solicitação inválida."
 
-#: lib/marshall_web/live/machines_live.ex:1397
+#: lib/marshall_web/live/machines_live.ex:1399
 #, elixir-autogen, elixir-format
 msgid "Labels"
 msgstr "Etiquetas"
@@ -708,12 +707,12 @@ msgstr "Iniciando"
 msgid "Launching repository"
 msgstr "Iniciando repositório"
 
-#: lib/marshall_web/live/machines_live.ex:1523
+#: lib/marshall_web/live/machines_live.ex:1525
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name"
 msgstr "Deixe em branco para gerar um nome"
 
-#: lib/marshall_web/live/machines_live.ex:1537
+#: lib/marshall_web/live/machines_live.ex:1539
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name."
 msgstr "Deixe em branco para gerar um nome."
@@ -725,7 +724,7 @@ msgstr "Deixe em branco para gerar um nome."
 msgid "Leave stopped"
 msgstr "Manter parada"
 
-#: lib/marshall_web/live/machines_live.ex:919
+#: lib/marshall_web/live/machines_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Machine"
 msgstr "Máquina"
@@ -735,7 +734,7 @@ msgstr "Máquina"
 msgid "Machine metadata saved."
 msgstr "Metadados da máquina guardados."
 
-#: lib/marshall_web/live/machines_live.ex:1005
+#: lib/marshall_web/live/machines_live.ex:1007
 #, elixir-autogen, elixir-format
 msgid "Machine pages"
 msgstr "Páginas de máquinas"
@@ -746,7 +745,7 @@ msgid "Machine update requested."
 msgstr "Atualização da máquina solicitada."
 
 #: lib/marshall_web/live/machines_live.ex:121
-#: lib/marshall_web/live/machines_live.ex:885
+#: lib/marshall_web/live/machines_live.ex:887
 #: lib/marshall_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Machines"
@@ -765,7 +764,7 @@ msgid "Machines couldn’t be loaded. Refresh to try again."
 msgstr ""
 "Não foi possível carregar as máquinas. Atualize para tentar novamente."
 
-#: lib/marshall_web/live/machines_live.ex:1118
+#: lib/marshall_web/live/machines_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Make it yours"
 msgstr "Deixe do seu jeito"
@@ -775,27 +774,27 @@ msgstr "Deixe do seu jeito"
 msgid "Make yourself at home"
 msgstr "Sinta-se em casa"
 
-#: lib/marshall_web/live/machines_live.ex:1248
+#: lib/marshall_web/live/machines_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Management access is required to change the remaining settings."
 msgstr ""
 "É necessário acesso de gestão para alterar as configurações restantes."
 
-#: lib/marshall_web/live/machines_live.ex:759
-#: lib/marshall_web/live/machines_live.ex:1360
-#: lib/marshall_web/live/machines_live.ex:1369
+#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:1362
+#: lib/marshall_web/live/machines_live.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "Gestor"
 
-#: lib/marshall_web/live/machines_live.ex:1455
+#: lib/marshall_web/live/machines_live.ex:1457
 #, elixir-autogen, elixir-format
 msgid "Measured between control-plane stop and readiness observations; guest availability may differ."
 msgstr ""
 "Medido entre as observações de parada e prontidão do plano de controle; a "
 "disponibilidade do convidado pode ser diferente."
 
-#: lib/marshall_web/live/machines_live.ex:1228
+#: lib/marshall_web/live/machines_live.ex:1230
 #: lib/marshall_web/live/overview_live.ex:350
 #: lib/marshall_web/live/resize_live.ex:318
 #: lib/marshall_web/live/resize_live.ex:365
@@ -804,35 +803,35 @@ msgstr ""
 msgid "Memory"
 msgstr "Memória"
 
-#: lib/marshall_web/live/machines_live.ex:1149
+#: lib/marshall_web/live/machines_live.ex:1151
 #: lib/marshall_web/live/resize_live.ex:455
 #, elixir-autogen, elixir-format
 msgid "Memory (MiB)"
 msgstr "Memória (MiB)"
 
-#: lib/marshall_web/live/machines_live.ex:1443
+#: lib/marshall_web/live/machines_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "Modo"
 
-#: lib/marshall_web/live/machines_live.ex:862
+#: lib/marshall_web/live/machines_live.ex:864
 #, elixir-autogen, elixir-format
 msgid "Move cancelled; cleanup complete"
 msgstr "Transferência cancelada; limpeza concluída"
 
-#: lib/marshall_web/live/machines_live.ex:863
+#: lib/marshall_web/live/machines_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Move complete"
 msgstr "Transferência concluída"
 
-#: lib/marshall_web/live/machines_live.ex:1423
+#: lib/marshall_web/live/machines_live.ex:1425
 #, elixir-autogen, elixir-format
 msgid "Move this machine to an automatically selected host? The machine may be briefly unavailable."
 msgstr ""
 "Transferir esta máquina para um host selecionado automaticamente? A máquina "
 "pode ficar brevemente indisponível."
 
-#: lib/marshall_web/live/machines_live.ex:1429
+#: lib/marshall_web/live/machines_live.ex:1431
 #, elixir-autogen, elixir-format
 msgid "Move to another host"
 msgstr "Transferir para outro host"
@@ -843,7 +842,7 @@ msgstr "Transferir para outro host"
 msgid "Needs attention"
 msgstr "Precisa de atenção"
 
-#: lib/marshall_web/live/machines_live.ex:1522
+#: lib/marshall_web/live/machines_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "New machine name (optional)"
 msgstr "Novo nome da máquina (opcional)"
@@ -853,8 +852,8 @@ msgstr "Novo nome da máquina (opcional)"
 msgid "New sizes"
 msgstr "Novos tamanhos"
 
-#: lib/marshall_web/live/machines_live.ex:1010
-#: lib/marshall_web/live/machines_live.ex:1332
+#: lib/marshall_web/live/machines_live.ex:1012
+#: lib/marshall_web/live/machines_live.ex:1334
 #, elixir-autogen, elixir-format
 msgid "Next page →"
 msgstr "Próxima página →"
@@ -864,19 +863,19 @@ msgstr "Próxima página →"
 msgid "Next steps"
 msgstr "Próximos passos"
 
-#: lib/marshall_web/live/machines_live.ex:1555
+#: lib/marshall_web/live/machines_live.ex:1557
 #, elixir-autogen, elixir-format
 msgid "No clone requests yet. Queue a copy and follow its progress here."
 msgstr ""
 "Ainda não há solicitações de clonagem. Enfileire uma cópia e acompanhe seu "
 "progresso aqui."
 
-#: lib/marshall_web/live/machines_live.ex:1325
+#: lib/marshall_web/live/machines_live.ex:1327
 #, elixir-autogen, elixir-format
 msgid "No direct machine grants."
 msgstr "Nenhuma permissão direta da máquina."
 
-#: lib/marshall_web/live/machines_live.ex:1035
+#: lib/marshall_web/live/machines_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "No images are available on ready hosts right now."
 msgstr "Nenhuma imagem disponível em hosts prontos no momento."
@@ -888,14 +887,14 @@ msgstr ""
 "Ainda não há máquinas nesta prévia. Crie uma ou peça a um proprietário que "
 "partilhe o acesso."
 
-#: lib/marshall_web/live/machines_live.ex:910
+#: lib/marshall_web/live/machines_live.ex:912
 #, elixir-autogen, elixir-format
 msgid "No machines on this page. Create a machine or ask an owner to share access."
 msgstr ""
 "Nenhuma máquina nesta página. Crie uma máquina ou peça a um proprietário que"
 " partilhe o acesso."
 
-#: lib/marshall_web/live/machines_live.ex:828
+#: lib/marshall_web/live/machines_live.ex:830
 #, elixir-autogen, elixir-format
 msgid "No registered account matches that email address."
 msgstr "Nenhuma conta registada corresponde a esse e-mail."
@@ -906,7 +905,7 @@ msgstr "Nenhuma conta registada corresponde a esse e-mail."
 msgid "No relocation is available."
 msgstr "Nenhuma realocação disponível."
 
-#: lib/marshall_web/live/machines_live.ex:1451
+#: lib/marshall_web/live/machines_live.ex:1453
 #, elixir-autogen, elixir-format
 msgid "Observed downtime"
 msgstr "Interrupção observada"
@@ -928,12 +927,12 @@ msgstr "Abrir clone"
 msgid "Open repositories from your browser"
 msgstr "Abra repositórios pelo navegador"
 
-#: lib/marshall_web/live/machines_live.ex:989
+#: lib/marshall_web/live/machines_live.ex:991
 #, elixir-autogen, elixir-format
 msgid "Open terminal"
 msgstr "Abrir terminal"
 
-#: lib/marshall_web/live/machines_live.ex:987
+#: lib/marshall_web/live/machines_live.ex:989
 #, elixir-autogen, elixir-format
 msgid "Open terminal for %{value1}"
 msgstr "Abrir terminal para %{value1}"
@@ -943,24 +942,24 @@ msgstr "Abrir terminal para %{value1}"
 msgid "Open terminal ↗"
 msgstr "Abrir terminal ↗"
 
-#: lib/marshall_web/live/machines_live.ex:764
+#: lib/marshall_web/live/machines_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "Open this machine's web apps. No terminal."
 msgstr "Abra os aplicações web desta máquina. Sem terminal."
 
-#: lib/marshall_web/live/machines_live.ex:1221
+#: lib/marshall_web/live/machines_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Operating system"
 msgstr "Sistema operacional"
 
-#: lib/marshall_web/live/machines_live.ex:758
-#: lib/marshall_web/live/machines_live.ex:1359
-#: lib/marshall_web/live/machines_live.ex:1368
+#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:1361
+#: lib/marshall_web/live/machines_live.ex:1370
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "Operador"
 
-#: lib/marshall_web/live/machines_live.ex:707
+#: lib/marshall_web/live/machines_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Outbound connections, sharing, web apps, SSH, terminal, and AI agent tools. The agent cannot start child agents."
 msgstr ""
@@ -972,9 +971,9 @@ msgstr ""
 msgid "Overview"
 msgstr "Visão geral"
 
-#: lib/marshall_web/live/machines_live.ex:964
-#: lib/marshall_web/live/machines_live.ex:1122
-#: lib/marshall_web/live/machines_live.ex:1296
+#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1298
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "Proprietário"
@@ -986,7 +985,7 @@ msgstr "Proprietário"
 msgid "Pending"
 msgstr "Pendente"
 
-#: lib/marshall_web/live/machines_live.ex:1615
+#: lib/marshall_web/live/machines_live.ex:1617
 #, elixir-autogen, elixir-format
 msgid "Permanently remove this machine and its disk. This cannot be undone."
 msgstr ""
@@ -998,13 +997,13 @@ msgstr ""
 msgid "Permission to clone this machine is no longer available."
 msgstr "A permissão para clonar esta máquina não está mais disponível."
 
-#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1126
 #: lib/marshall_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr "Pessoal"
 
-#: lib/marshall_web/live/machines_live.ex:1440
+#: lib/marshall_web/live/machines_live.ex:1442
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "Fase"
@@ -1035,7 +1034,7 @@ msgid "Preparing space and checking the source before taking a snapshot."
 msgstr ""
 "Preparando espaço e verificando a origem antes de criar uma instantânea."
 
-#: lib/marshall_web/live/machines_live.ex:848
+#: lib/marshall_web/live/machines_live.ex:850
 #, elixir-autogen, elixir-format
 msgid "Preparing transfer"
 msgstr "Preparando transferência"
@@ -1050,22 +1049,22 @@ msgstr "Preparando sua máquina…"
 msgid "Preparing your repository…"
 msgstr "Preparando seu repositório…"
 
-#: lib/marshall_web/live/machines_live.ex:700
+#: lib/marshall_web/live/machines_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Private and owner-only. SSH and terminal access; no outbound connections, sharing, web apps, or AI agent."
 msgstr ""
 "Privado e exclusivo do proprietário. Acesso SSH e de terminal; sem ligações "
 "de saída, partilhamento, aplicações web ou agente de IA."
 
-#: lib/marshall_web/live/machines_live.ex:922
-#: lib/marshall_web/live/machines_live.ex:954
-#: lib/marshall_web/live/machines_live.ex:1097
-#: lib/marshall_web/live/machines_live.ex:1237
+#: lib/marshall_web/live/machines_live.ex:924
+#: lib/marshall_web/live/machines_live.ex:956
+#: lib/marshall_web/live/machines_live.ex:1099
+#: lib/marshall_web/live/machines_live.ex:1239
 #, elixir-autogen, elixir-format
 msgid "Profile"
 msgstr "Perfil"
 
-#: lib/marshall_web/live/machines_live.ex:1103
+#: lib/marshall_web/live/machines_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Profiles choose access and agent features. Machines remain isolated from one another."
 msgstr ""
@@ -1084,12 +1083,12 @@ msgstr "Posição na fila %{value1}"
 msgid "Queued"
 msgstr "Enfileirado"
 
-#: lib/marshall_web/live/machines_live.ex:1531
+#: lib/marshall_web/live/machines_live.ex:1533
 #, elixir-autogen, elixir-format
 msgid "Queuing…"
 msgstr "Enfileirando…"
 
-#: lib/marshall_web/live/machines_live.ex:766
+#: lib/marshall_web/live/machines_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Read and write in the terminal."
 msgstr "Ler e escrever no terminal."
@@ -1099,17 +1098,17 @@ msgstr "Ler e escrever no terminal."
 msgid "Read the field notes ↗"
 msgstr "Leia as notas de campo ↗"
 
-#: lib/marshall_web/live/machines_live.ex:765
+#: lib/marshall_web/live/machines_live.ex:767
 #, elixir-autogen, elixir-format
 msgid "Read the terminal."
 msgstr "Ler o terminal."
 
-#: lib/marshall_web/live/machines_live.ex:1169
+#: lib/marshall_web/live/machines_live.ex:1171
 #, elixir-autogen, elixir-format
 msgid "Ready when you are"
 msgstr "Pronto quando o utilizador estiver"
 
-#: lib/marshall_web/live/machines_live.ex:1394
+#: lib/marshall_web/live/machines_live.ex:1396
 #, elixir-autogen, elixir-format
 msgid "Reflection metadata"
 msgstr "Metadados de reflexão"
@@ -1124,7 +1123,7 @@ msgstr "Atualizar"
 msgid "Refreshing…"
 msgstr "Atualizando…"
 
-#: lib/marshall_web/live/machines_live.ex:1349
+#: lib/marshall_web/live/machines_live.ex:1351
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "E-mail registado"
@@ -1134,7 +1133,7 @@ msgstr "E-mail registado"
 msgid "Registering the copied disk as your private machine."
 msgstr "A registar o disco copiado como sua máquina privada."
 
-#: lib/marshall_web/live/machines_live.ex:1412
+#: lib/marshall_web/live/machines_live.ex:1414
 #, elixir-autogen, elixir-format
 msgid "Relocate machine"
 msgstr "Realocar máquina"
@@ -1150,8 +1149,8 @@ msgid "Remains stopped; the filesystem grows on the next boot"
 msgstr ""
 "Permanece parada; o sistema de ficheiros cresce na próxima inicialização"
 
-#: lib/marshall_web/live/machines_live.ex:1361
-#: lib/marshall_web/live/machines_live.ex:1370
+#: lib/marshall_web/live/machines_live.ex:1363
+#: lib/marshall_web/live/machines_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "Remove access"
 msgstr "Remover acesso"
@@ -1166,7 +1165,7 @@ msgstr "Solicitando cancelamento…"
 msgid "Requesting resize…"
 msgstr "Solicitando redimensionamento…"
 
-#: lib/marshall_web/live/machines_live.ex:1485
+#: lib/marshall_web/live/machines_live.ex:1487
 #, elixir-autogen, elixir-format
 msgid "Requesting restart…"
 msgstr "Solicitando reinicialização…"
@@ -1176,12 +1175,12 @@ msgstr "Solicitando reinicialização…"
 msgid "Requesting retry…"
 msgstr "Solicitando nova tentativa…"
 
-#: lib/marshall_web/live/machines_live.ex:1421
+#: lib/marshall_web/live/machines_live.ex:1423
 #, elixir-autogen, elixir-format
 msgid "Requesting…"
 msgstr "Solicitando…"
 
-#: lib/marshall_web/live/machines_live.ex:1217
+#: lib/marshall_web/live/machines_live.ex:1219
 #: lib/marshall_web/live/resize_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "Resize"
@@ -1238,9 +1237,9 @@ msgstr "Etapas do redimensionamento"
 msgid "Resizing"
 msgstr "Redimensionando"
 
-#: lib/marshall_web/live/machines_live.ex:921
-#: lib/marshall_web/live/machines_live.ex:947
-#: lib/marshall_web/live/machines_live.ex:1208
+#: lib/marshall_web/live/machines_live.ex:923
+#: lib/marshall_web/live/machines_live.ex:949
+#: lib/marshall_web/live/machines_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Resources"
 msgstr "Recursos"
@@ -1284,7 +1283,7 @@ msgstr ""
 "Não foi possível aceitar a nova tentativa. A capacidade ou o estado da "
 "máquina podem ter mudado."
 
-#: lib/marshall_web/live/machines_live.ex:1487
+#: lib/marshall_web/live/machines_live.ex:1489
 #, elixir-autogen, elixir-format
 msgid "Retry destination boot"
 msgstr "Tentar inicialização do destino novamente"
@@ -1301,15 +1300,15 @@ msgstr ""
 "Volte às cargas de trabalho da frota e verifique sua chave de acesso para "
 "reabrir a máquina →"
 
-#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Revogado"
 
-#: lib/marshall_web/live/machines_live.ex:1280
-#: lib/marshall_web/live/machines_live.ex:1295
-#: lib/marshall_web/live/machines_live.ex:1314
-#: lib/marshall_web/live/machines_live.ex:1355
+#: lib/marshall_web/live/machines_live.ex:1282
+#: lib/marshall_web/live/machines_live.ex:1297
+#: lib/marshall_web/live/machines_live.ex:1316
+#: lib/marshall_web/live/machines_live.ex:1357
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Função"
@@ -1324,7 +1323,7 @@ msgstr "Espaço para sua próxima ideia"
 msgid "Room to grow"
 msgstr "Espaço para crescer"
 
-#: lib/marshall_web/live/machines_live.ex:1159
+#: lib/marshall_web/live/machines_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Root disk (GiB)"
 msgstr "Disco raiz (GiB)"
@@ -1334,22 +1333,22 @@ msgstr "Disco raiz (GiB)"
 msgid "Running"
 msgstr "Em execução"
 
-#: lib/marshall_web/live/machines_live.ex:1378
+#: lib/marshall_web/live/machines_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "Guardar acesso"
 
-#: lib/marshall_web/live/machines_live.ex:1409
+#: lib/marshall_web/live/machines_live.ex:1411
 #, elixir-autogen, elixir-format
 msgid "Save metadata"
 msgstr "Guardar metadados"
 
-#: lib/marshall_web/live/machines_live.ex:1376
+#: lib/marshall_web/live/machines_live.ex:1378
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Guardando…"
 
-#: lib/marshall_web/live/machines_live.ex:749
+#: lib/marshall_web/live/machines_live.ex:751
 #, elixir-autogen, elixir-format
 msgid "Selected image unavailable"
 msgstr "Imagem selecionada indisponível"
@@ -1364,12 +1363,12 @@ msgstr "Configure a extensão do navegador ↗"
 msgid "Shared"
 msgstr "Partilhado"
 
-#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Shared by"
 msgstr "Partilhado por"
 
-#: lib/marshall_web/live/machines_live.ex:1406
+#: lib/marshall_web/live/machines_live.ex:1408
 #, elixir-autogen, elixir-format
 msgid "Short description for agents"
 msgstr "Descrição breve para agentes"
@@ -1414,7 +1413,7 @@ msgstr "A recuperação da origem precisa de atenção."
 msgid "Source recovery retry requested."
 msgstr "Nova tentativa de recuperação da origem solicitada."
 
-#: lib/marshall_web/live/machines_live.ex:860
+#: lib/marshall_web/live/machines_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "Source restored; destination cleanup pending"
 msgstr "Origem restaurada; limpeza do destino pendente"
@@ -1435,13 +1434,13 @@ msgstr ""
 msgid "Source was stopped when this request began."
 msgstr "A origem estava parada quando esta solicitação começou."
 
-#: lib/marshall_web/live/machines_live.ex:688
-#: lib/marshall_web/live/machines_live.ex:777
+#: lib/marshall_web/live/machines_live.ex:690
+#: lib/marshall_web/live/machines_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr "Predefinido"
 
-#: lib/marshall_web/live/machines_live.ex:785
+#: lib/marshall_web/live/machines_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "Starting"
 msgstr "Iniciando"
@@ -1451,8 +1450,8 @@ msgstr "Iniciando"
 msgid "Starting the machine with its new resources."
 msgstr "Iniciando a máquina com seus novos recursos."
 
-#: lib/marshall_web/live/machines_live.ex:920
-#: lib/marshall_web/live/machines_live.ex:939
+#: lib/marshall_web/live/machines_live.ex:922
+#: lib/marshall_web/live/machines_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Estado"
@@ -1484,7 +1483,7 @@ msgstr "Parar a máquina"
 msgid "Stopped"
 msgstr "Parado"
 
-#: lib/marshall_web/live/machines_live.ex:782
+#: lib/marshall_web/live/machines_live.ex:784
 #: lib/marshall_web/live/resize_live.ex:536
 #, elixir-autogen, elixir-format
 msgid "Stopping"
@@ -1507,7 +1506,7 @@ msgstr ""
 msgid "Stopping the machine so its resources can change safely."
 msgstr "Parando a máquina para alterar seus recursos com segurança."
 
-#: lib/marshall_web/live/machines_live.ex:850
+#: lib/marshall_web/live/machines_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Stopping the source"
 msgstr "Parando a origem"
@@ -1517,7 +1516,7 @@ msgstr "Parando a origem"
 msgid "Subscribe"
 msgstr "Inscrever-se"
 
-#: lib/marshall_web/live/machines_live.ex:853
+#: lib/marshall_web/live/machines_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Switching placement"
 msgstr "Alterando alocação"
@@ -1527,19 +1526,19 @@ msgstr "Alterando alocação"
 msgid "Taking snapshot"
 msgstr "Criando instantânea"
 
-#: lib/marshall_web/live/machines_live.ex:1270
+#: lib/marshall_web/live/machines_live.ex:1272
 #, elixir-autogen, elixir-format
 msgid "Team membership and thread sharing can also grant machine access."
 msgstr ""
 "A associação a uma equipa e o partilhamento de tópicos também podem conceder"
 " acesso à máquina."
 
-#: lib/marshall_web/live/machines_live.ex:996
+#: lib/marshall_web/live/machines_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Terminal unavailable"
 msgstr "Terminal indisponível"
 
-#: lib/marshall_web/live/machines_live.ex:769
+#: lib/marshall_web/live/machines_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Terminal, lifecycle, resize, clone and sharing."
 msgstr "Terminal, ciclo de vida, redimensionamento, clonagem e partilhamento."
@@ -1564,7 +1563,7 @@ msgstr "Esse espaço de nomes do repositório não é válido."
 msgid "That repository reference cannot be launched."
 msgstr "Essa referência de repositório não pode ser iniciada."
 
-#: lib/marshall_web/live/machines_live.ex:1339
+#: lib/marshall_web/live/machines_live.ex:1341
 #, elixir-autogen, elixir-format
 msgid "The account must already be registered. Saving a role replaces that person's direct machine role; choose Remove access to remove that direct grant."
 msgstr ""
@@ -1624,7 +1623,7 @@ msgstr ""
 "A máquina mudou desde a criação deste rascunho. Revise os recursos "
 "confirmados acima."
 
-#: lib/marshall_web/live/machines_live.ex:1433
+#: lib/marshall_web/live/machines_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on an automatically selected host. Our development fleet uses a 1 Gbit/s connection between hosts, so a move can take a little longer; moves are expected to be much faster when Overalls runs on AWS in production."
 msgstr ""
@@ -1634,12 +1633,12 @@ msgstr ""
 "transferências muito mais rápidas quando o Overalls executar na AWS em "
 "produção."
 
-#: lib/marshall_web/live/machines_live.ex:1445
+#: lib/marshall_web/live/machines_live.ex:1447
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on the destination."
 msgstr "A máquina é parada, copiada uma vez e iniciada no destino."
 
-#: lib/marshall_web/live/machines_live.ex:829
+#: lib/marshall_web/live/machines_live.ex:831
 #, elixir-autogen, elixir-format
 msgid "The owner's access cannot be changed."
 msgstr "O acesso do proprietário não pode ser alterado."
@@ -1656,7 +1655,7 @@ msgstr ""
 "A cópia anterior desta máquina ainda está liberando sua instantânea. Tente "
 "novamente em breve."
 
-#: lib/marshall_web/live/machines_live.ex:839
+#: lib/marshall_web/live/machines_live.ex:841
 #, elixir-autogen, elixir-format
 msgid "The request could not be completed. Check the values and try again."
 msgstr ""
@@ -1677,15 +1676,15 @@ msgstr ""
 "O redimensionamento terminou; esta página é atualizada com os tamanhos "
 "confirmados."
 
-#: lib/marshall_web/live/machines_live.ex:714
+#: lib/marshall_web/live/machines_live.ex:716
 #, elixir-autogen, elixir-format
 msgid "The same network and access options as Standard, with AI agents that can start child agents."
 msgstr ""
 "As mesmas opções de rede e acesso do Predefinido, com agentes de IA que "
 "podem iniciar agentes filhos."
 
-#: lib/marshall_web/live/machines_live.ex:808
-#: lib/marshall_web/live/machines_live.ex:825
+#: lib/marshall_web/live/machines_live.ex:810
+#: lib/marshall_web/live/machines_live.ex:827
 #, elixir-autogen, elixir-format
 msgid "The selected image needs more memory or disk space."
 msgstr "A imagem selecionada precisa de mais memória ou espaço em disco."
@@ -1722,7 +1721,7 @@ msgid "There is not enough available capacity for a new machine right now."
 msgstr ""
 "Não há capacidade disponível suficiente para uma nova máquina no momento."
 
-#: lib/marshall_web/live/machines_live.ex:818
+#: lib/marshall_web/live/machines_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "There is not enough available capacity for this machine."
 msgstr "Não há capacidade disponível suficiente para esta máquina."
@@ -1734,8 +1733,8 @@ msgstr ""
 "Não há capacidade suficiente para esta cópia. Tente novamente quando houver "
 "espaço."
 
-#: lib/marshall_web/live/machines_live.ex:805
-#: lib/marshall_web/live/machines_live.ex:820
+#: lib/marshall_web/live/machines_live.ex:807
+#: lib/marshall_web/live/machines_live.ex:822
 #, elixir-autogen, elixir-format
 msgid "This image is no longer available. Refresh and choose another image."
 msgstr ""
@@ -1761,7 +1760,7 @@ msgstr "Este link de inicialização expirou. Abra-o novamente."
 msgid "This machine is being deleted and cannot be pinned."
 msgstr "Esta máquina está sendo eliminada e não pode ser fixada."
 
-#: lib/marshall_web/live/machines_live.ex:831
+#: lib/marshall_web/live/machines_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "This machine is being deleted."
 msgstr "Esta máquina está sendo eliminada."
@@ -1778,7 +1777,7 @@ msgstr ""
 msgid "This machine is unavailable or your access has ended."
 msgstr "Esta máquina está indisponível ou seu acesso terminou."
 
-#: lib/marshall_web/live/machines_live.ex:826
+#: lib/marshall_web/live/machines_live.ex:828
 #, elixir-autogen, elixir-format
 msgid "This machine's host is currently unavailable."
 msgstr "O host desta máquina está indisponível no momento."
@@ -1795,7 +1794,7 @@ msgstr ""
 "Esta solicitação não pôde terminar. Revise o problema abaixo e as ações "
 "disponíveis."
 
-#: lib/marshall_web/live/machines_live.ex:834
+#: lib/marshall_web/live/machines_live.ex:836
 #, elixir-autogen, elixir-format
 msgid "This request has already been used. Refresh before trying again."
 msgstr "Esta solicitação já foi usada. Atualize antes de tentar novamente."
@@ -1805,24 +1804,24 @@ msgstr "Esta solicitação já foi usada. Atualize antes de tentar novamente."
 msgid "This request has ended without publishing a clone."
 msgstr "Esta solicitação terminou sem publicar um clone."
 
-#: lib/marshall_web/live/machines_live.ex:960
-#: lib/marshall_web/live/machines_live.ex:1223
-#: lib/marshall_web/live/machines_live.ex:1235
+#: lib/marshall_web/live/machines_live.ex:962
+#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1237
 #, elixir-autogen, elixir-format
 msgid "Unavailable"
 msgstr "Indisponível"
 
-#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:763
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Desconhecido"
 
-#: lib/marshall_web/live/machines_live.ex:832
+#: lib/marshall_web/live/machines_live.ex:834
 #, elixir-autogen, elixir-format
 msgid "Unpin this machine before deleting it."
 msgstr "Desafixe esta máquina antes de eliminá-la."
 
-#: lib/marshall_web/live/machines_live.ex:1609
+#: lib/marshall_web/live/machines_live.ex:1611
 #, elixir-autogen, elixir-format
 msgid "Unpin to delete. While you have this machine pinned, nothing can delete it."
 msgstr ""
@@ -1839,7 +1838,7 @@ msgstr "Cancele a subscrição a qualquer momento."
 msgid "Updated"
 msgstr "Atualizado"
 
-#: lib/marshall_web/live/machines_live.ex:1551
+#: lib/marshall_web/live/machines_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "Updates automatically"
 msgstr "Atualiza automaticamente"
@@ -1849,7 +1848,7 @@ msgstr "Atualiza automaticamente"
 msgid "Use current machine state, keeping these sizes"
 msgstr "Usar o estado atual da máquina, mantendo estes tamanhos"
 
-#: lib/marshall_web/live/machines_live.ex:852
+#: lib/marshall_web/live/machines_live.ex:854
 #, elixir-autogen, elixir-format
 msgid "Verifying the destination disks"
 msgstr "Verificando os discos de destino"
@@ -1859,9 +1858,9 @@ msgstr "Verificando os discos de destino"
 msgid "View all →"
 msgstr "Ver tudo →"
 
-#: lib/marshall_web/live/machines_live.ex:757
-#: lib/marshall_web/live/machines_live.ex:1358
-#: lib/marshall_web/live/machines_live.ex:1367
+#: lib/marshall_web/live/machines_live.ex:759
+#: lib/marshall_web/live/machines_live.ex:1360
+#: lib/marshall_web/live/machines_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "Espectador"
@@ -1905,13 +1904,13 @@ msgstr "Não foi possível aceder ao serviço de newsletter. Tente novamente mai
 msgid "We couldn't launch that repository"
 msgstr "Não foi possível iniciar esse repositório"
 
-#: lib/marshall_web/live/machines_live.ex:756
+#: lib/marshall_web/live/machines_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "Aplicações web"
 
-#: lib/marshall_web/live/machines_live.ex:1357
-#: lib/marshall_web/live/machines_live.ex:1366
+#: lib/marshall_web/live/machines_live.ex:1359
+#: lib/marshall_web/live/machines_live.ex:1368
 #, elixir-autogen, elixir-format
 msgid "Web apps only"
 msgstr "Somente aplicações web"
@@ -1921,7 +1920,7 @@ msgstr "Somente aplicações web"
 msgid "What happens"
 msgstr "O que acontece"
 
-#: lib/marshall_web/live/machines_live.ex:1266
+#: lib/marshall_web/live/machines_live.ex:1268
 #, elixir-autogen, elixir-format
 msgid "Who can reach this machine, and what each role allows."
 msgstr "Quem pode acessar esta máquina e o que cada função permite."
@@ -1933,7 +1932,7 @@ msgstr ""
 "O utilizador pode fixar até %{value1} máquinas. Desafixe uma antes de fixar "
 "outra."
 
-#: lib/marshall_web/live/machines_live.ex:830
+#: lib/marshall_web/live/machines_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "You no longer have permission for this action."
 msgstr "O utilizador não tem mais permissão para esta ação."
@@ -1943,17 +1942,17 @@ msgstr "O utilizador não tem mais permissão para esta ação."
 msgid "Your account cannot create machines."
 msgstr "Sua conta não pode criar máquinas."
 
-#: lib/marshall_web/live/machines_live.ex:886
+#: lib/marshall_web/live/machines_live.ex:888
 #, elixir-autogen, elixir-format
 msgid "Your development environments, personal and shared."
 msgstr "Seus ambientes de desenvolvimento, pessoais e partilhados."
 
-#: lib/marshall_web/live/machines_live.ex:1240
+#: lib/marshall_web/live/machines_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Your disk is retained when the machine is stopped."
 msgstr "Seu disco é mantido quando a máquina está parada."
 
-#: lib/marshall_web/live/machines_live.ex:1178
+#: lib/marshall_web/live/machines_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Your disk stays with you when the machine is stopped."
 msgstr "Seu disco permanece com o utilizador quando a máquina está parada."
@@ -1999,18 +1998,18 @@ msgstr "Seu espaço de trabalho, com um pouco de espaço para respirar."
 msgid "continue to Overalls"
 msgstr "continuar para o Overalls"
 
-#: lib/marshall_web/live/machines_live.ex:1399
+#: lib/marshall_web/live/machines_live.ex:1401
 #, elixir-autogen, elixir-format
 msgid "production, project-name"
 msgstr "produção, nome-do-projeto"
 
-#: lib/marshall_web/live/machines_live.ex:1006
-#: lib/marshall_web/live/machines_live.ex:1329
+#: lib/marshall_web/live/machines_live.ex:1008
+#: lib/marshall_web/live/machines_live.ex:1331
 #, elixir-autogen, elixir-format
 msgid "← First page"
 msgstr "← Primeira página"
 
-#: lib/marshall_web/live/machines_live.ex:1017
+#: lib/marshall_web/live/machines_live.ex:1019
 #, elixir-autogen, elixir-format
 msgid "← Machines"
 msgstr "← Máquinas"
@@ -2104,12 +2103,12 @@ msgstr "Confirmar"
 msgid "A new machine will clone the repository when it boots."
 msgstr "A nova máquina clonará o repositório ao arrancar."
 
-#: lib/marshall_web/live/machines_live.ex:742
+#: lib/marshall_web/live/machines_live.ex:744
 #, elixir-autogen, elixir-format
 msgid "Android (API 36)"
 msgstr "Android (API 36)"
 
-#: lib/marshall_web/live/machines_live.ex:1069
+#: lib/marshall_web/live/machines_live.ex:1071
 #, elixir-autogen, elixir-format
 msgid "Leave this blank to create the machine without making setup changes."
 msgstr "Deixe em branco para criar a máquina sem fazer alterações de configuração."
@@ -2124,7 +2123,7 @@ msgstr "Máquina e tópico de configuração pedidos."
 msgid "Provisioning is in progress. This page will open the machine when it is ready."
 msgstr "O aprovisionamento está em curso. Esta página abrirá a máquina quando estiver pronta."
 
-#: lib/marshall_web/live/machine_provisioning_live.ex:70
+#: lib/marshall_web/live/machine_provisioning_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Provisioning request unavailable."
 msgstr "Pedido de aprovisionamento indisponível."
@@ -2144,12 +2143,12 @@ msgstr "Tentar novamente a configuração"
 msgid "Setting up your machine"
 msgstr "A configurar a sua máquina"
 
-#: lib/marshall_web/live/machines_live.ex:1059
+#: lib/marshall_web/live/machines_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "The machine agent will execute this instruction automatically in Work mode."
 msgstr "O agente da máquina executará esta instrução automaticamente no modo Trabalhar."
 
-#: lib/marshall_web/live/machines_live.ex:1057
+#: lib/marshall_web/live/machines_live.ex:1059
 #, elixir-autogen, elixir-format
 msgid "What should this machine do when it is ready?"
 msgstr "O que deve esta máquina fazer quando estiver pronta?"

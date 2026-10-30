@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: lib/marshall_web/live/machines_live.ex:1465
+#: lib/marshall_web/live/machines_live.ex:1467
 #, elixir-autogen, elixir-format
 msgid " and counting"
 msgstr " và vẫn đang tăng"
 
-#: lib/marshall_web/live/machines_live.ex:1461
+#: lib/marshall_web/live/machines_live.ex:1463
 #, elixir-autogen, elixir-format
 msgid "%{seconds} seconds%{suffix}"
 msgstr "%{seconds} giây%{suffix}"
@@ -29,8 +29,8 @@ msgstr "%{seconds} giây%{suffix}"
 msgid "%{value1} CPU"
 msgstr "%{value1} CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1229
-#: lib/marshall_web/live/machines_live.ex:1232
+#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1234
 #: lib/marshall_web/live/overview_live.ex:351
 #: lib/marshall_web/live/overview_live.ex:356
 #: lib/marshall_web/live/resize_live.ex:322
@@ -43,20 +43,20 @@ msgstr "%{value1} GiB"
 msgid "%{value1} MiB"
 msgstr "%{value1} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:1226
+#: lib/marshall_web/live/machines_live.ex:1228
 #: lib/marshall_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU"
 msgstr "%{value1} vCPU"
 
 #: lib/marshall_web/live/admin/workloads_live.ex:160
-#: lib/marshall_web/live/machines_live.ex:948
+#: lib/marshall_web/live/machines_live.ex:950
 #: lib/marshall_web/live/overview_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB đĩa"
 
-#: lib/marshall_web/live/machines_live.ex:1171
+#: lib/marshall_web/live/machines_live.ex:1173
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} MiB memory · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} MiB bộ nhớ · %{value3} GiB đĩa"
@@ -79,18 +79,18 @@ msgstr "%{value1} → %{value2} GiB"
 msgid "%{value1} → %{value2} MiB"
 msgstr "%{value1} → %{value2} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:890
+#: lib/marshall_web/live/machines_live.ex:892
 #: lib/marshall_web/live/overview_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "+ Create machine"
 msgstr "+ Tạo máy"
 
-#: lib/marshall_web/live/machines_live.ex:1533
+#: lib/marshall_web/live/machines_live.ex:1535
 #, elixir-autogen, elixir-format
 msgid "+ Queue clone"
 msgstr "+ Xếp bản sao vào hàng đợi"
 
-#: lib/marshall_web/live/machines_live.ex:721
+#: lib/marshall_web/live/machines_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "A Overalls development environment for nested machines. It uses a dedicated image, an extra 256 GiB data disk, and higher resource minimums. Its AI agent can start child agents."
 msgstr ""
@@ -108,9 +108,9 @@ msgstr "Một ngày đẹp để tạo điều gì đó."
 msgid "A small preview. All your accessible machines are in"
 msgstr "Bản xem trước nhỏ. Tất cả máy bạn truy cập được nằm trong"
 
-#: lib/marshall_web/live/machines_live.ex:924
-#: lib/marshall_web/live/machines_live.ex:962
-#: lib/marshall_web/live/machines_live.ex:1265
+#: lib/marshall_web/live/machines_live.ex:926
+#: lib/marshall_web/live/machines_live.ex:964
+#: lib/marshall_web/live/machines_live.ex:1267
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "Truy cập"
@@ -120,9 +120,9 @@ msgstr "Truy cập"
 msgid "Access updated."
 msgstr "Đã cập nhật quyền truy cập."
 
-#: lib/marshall_web/live/machines_live.ex:1279
-#: lib/marshall_web/live/machines_live.ex:1286
-#: lib/marshall_web/live/machines_live.ex:1305
+#: lib/marshall_web/live/machines_live.ex:1281
+#: lib/marshall_web/live/machines_live.ex:1288
+#: lib/marshall_web/live/machines_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "Tài khoản"
@@ -141,14 +141,14 @@ msgstr ""
 "Xác minh quản trị đã hết hạn. Bản nháp đổi kích thước được giữ trong địa chỉ"
 " trang này."
 
-#: lib/marshall_web/live/machines_live.ex:864
+#: lib/marshall_web/live/machines_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "All retained copies deleted"
 msgstr "Đã xóa mọi bản sao được giữ lại"
 
-#: lib/marshall_web/live/machines_live.ex:1281
-#: lib/marshall_web/live/machines_live.ex:1298
-#: lib/marshall_web/live/machines_live.ex:1317
+#: lib/marshall_web/live/machines_live.ex:1283
+#: lib/marshall_web/live/machines_live.ex:1300
+#: lib/marshall_web/live/machines_live.ex:1319
 #, elixir-autogen, elixir-format
 msgid "Allows"
 msgstr "Cho phép"
@@ -190,7 +190,7 @@ msgstr "Tạm dừng nguồn trong chốc lát để chụp đĩa an toàn."
 msgid "Bring a GitHub, GitLab, Codeberg or Bitbucket repository into Overalls with the Chrome or Firefox extension."
 msgstr "Đưa kho GitHub, GitLab, Codeberg hoặc Bitbucket vào Overalls bằng tiện ích Chrome hoặc Firefox."
 
-#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1227
 #: lib/marshall_web/live/overview_live.ex:347
 #: lib/marshall_web/live/resize_live.ex:315
 #: lib/marshall_web/live/resize_live.ex:359
@@ -200,7 +200,7 @@ msgstr "Đưa kho GitHub, GitLab, Codeberg hoặc Bitbucket vào Overalls bằng
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1141
+#: lib/marshall_web/live/machines_live.ex:1143
 #, elixir-autogen, elixir-format
 msgid "CPU (vCPU)"
 msgstr "CPU (vCPU)"
@@ -211,7 +211,7 @@ msgid "CPU and memory can increase or decrease. Disk size can only grow."
 msgstr "CPU và bộ nhớ có thể tăng hoặc giảm. Kích thước đĩa chỉ có thể tăng."
 
 #: lib/marshall_web/components/clone_components.ex:116
-#: lib/marshall_web/live/machines_live.ex:1193
+#: lib/marshall_web/live/machines_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Hủy"
@@ -221,7 +221,7 @@ msgstr "Hủy"
 msgid "Cancel could not be accepted. Sizes are already being applied or the machine state is unconfirmed."
 msgstr "Không thể chấp nhận hủy. Kích thước đang được áp dụng hoặc trạng thái máy chưa được xác nhận."
 
-#: lib/marshall_web/live/machines_live.ex:1479
+#: lib/marshall_web/live/machines_live.ex:1481
 #, elixir-autogen, elixir-format
 msgid "Cancel move"
 msgstr "Hủy di chuyển"
@@ -253,7 +253,7 @@ msgstr "Đã hủy trước khi bắt đầu chụp nhanh."
 msgid "Cancelling"
 msgstr "Đang hủy"
 
-#: lib/marshall_web/live/machines_live.ex:859
+#: lib/marshall_web/live/machines_live.ex:861
 #, elixir-autogen, elixir-format
 msgid "Cancelling and restoring the source"
 msgstr "Đang hủy và khôi phục nguồn"
@@ -273,7 +273,7 @@ msgstr "Đang hủy: chờ xác nhận dừng rồi khởi động lại với k
 msgid "Cancelling: waiting for the stop to confirm; the sizes stay unchanged."
 msgstr "Đang hủy: chờ xác nhận dừng; kích thước không đổi."
 
-#: lib/marshall_web/live/machines_live.ex:1477
+#: lib/marshall_web/live/machines_live.ex:1479
 #, elixir-autogen, elixir-format
 msgid "Cancelling…"
 msgstr "Đang hủy…"
@@ -293,27 +293,27 @@ msgstr "Đang chụp đĩa nguồn. Việc sao chép bắt đầu khi bản ch�
 msgid "Check your inbox and click the link to confirm your subscription."
 msgstr "Kiểm tra hộp thư đến và nhấp vào liên kết để xác nhận đăng ký."
 
-#: lib/marshall_web/live/machines_live.ex:854
+#: lib/marshall_web/live/machines_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Checking destination readiness"
 msgstr "Đang kiểm tra đích sẵn sàng"
 
-#: lib/marshall_web/live/machines_live.ex:849
+#: lib/marshall_web/live/machines_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Checking transfer connectivity"
 msgstr "Đang kiểm tra kết nối truyền"
 
-#: lib/marshall_web/live/machines_live.ex:1082
+#: lib/marshall_web/live/machines_live.ex:1084
 #, elixir-autogen, elixir-format
 msgid "Choose an image"
 msgstr "Chọn ảnh"
 
-#: lib/marshall_web/live/machines_live.ex:1020
+#: lib/marshall_web/live/machines_live.ex:1022
 #, elixir-autogen, elixir-format
 msgid "Choose an image and the resources for your environment."
 msgstr "Chọn ảnh và tài nguyên cho môi trường của bạn."
 
-#: lib/marshall_web/live/machines_live.ex:1075
+#: lib/marshall_web/live/machines_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Choose your environment"
 msgstr "Chọn môi trường của bạn"
@@ -328,7 +328,7 @@ msgstr "Đã hủy nhân bản"
 msgid "Clone complete"
 msgstr "Đã hoàn tất nhân bản"
 
-#: lib/marshall_web/live/machines_live.ex:1499
+#: lib/marshall_web/live/machines_live.ex:1501
 #, elixir-autogen, elixir-format
 msgid "Clone machine"
 msgstr "Nhân bản máy"
@@ -343,12 +343,12 @@ msgstr "Nhân bản cần được xử lý"
 msgid "Clone queued. You can queue another copy."
 msgstr "Đã xếp hàng nhân bản. Bạn có thể xếp thêm bản sao."
 
-#: lib/marshall_web/live/machines_live.ex:1550
+#: lib/marshall_web/live/machines_live.ex:1552
 #, elixir-autogen, elixir-format
 msgid "Clone requests"
 msgstr "Yêu cầu nhân bản"
 
-#: lib/marshall_web/live/machines_live.ex:1561
+#: lib/marshall_web/live/machines_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "Clone requests are temporarily unavailable. Retrying automatically."
 msgstr "Yêu cầu nhân bản tạm thời không khả dụng. Đang tự động thử lại."
@@ -358,7 +358,7 @@ msgstr "Yêu cầu nhân bản tạm thời không khả dụng. Đang tự đ�
 msgid "Clone stages"
 msgstr "Giai đoạn nhân bản"
 
-#: lib/marshall_web/live/machines_live.ex:1403
+#: lib/marshall_web/live/machines_live.ex:1405
 #, elixir-autogen, elixir-format
 msgid "Comment"
 msgstr "Bình luận"
@@ -373,8 +373,8 @@ msgstr "Hoàn tất"
 msgid "Confirmed resources"
 msgstr "Tài nguyên đã xác nhận"
 
-#: lib/marshall_web/live/machines_live.ex:925
-#: lib/marshall_web/live/machines_live.ex:976
+#: lib/marshall_web/live/machines_live.ex:927
+#: lib/marshall_web/live/machines_live.ex:978
 #, elixir-autogen, elixir-format
 msgid "Connect"
 msgstr "Kết nối"
@@ -394,7 +394,7 @@ msgstr "Đang sao chép"
 msgid "Copying files"
 msgstr "Đang sao chép tệp"
 
-#: lib/marshall_web/live/machines_live.ex:851
+#: lib/marshall_web/live/machines_live.ex:853
 #, elixir-autogen, elixir-format
 msgid "Copying the stopped disks"
 msgstr "Đang sao chép các đĩa đã dừng"
@@ -404,14 +404,14 @@ msgstr "Đang sao chép các đĩa đã dừng"
 msgid "Create a machine"
 msgstr "Tạo một máy"
 
-#: lib/marshall_web/live/machines_live.ex:1507
+#: lib/marshall_web/live/machines_live.ex:1509
 #, elixir-autogen, elixir-format
 msgid "Create a private, independent copy of this machine. Running machines stop briefly for each snapshot, then restart while copying continues. Copies are processed in order and match the source's power state when their turn begins."
 msgstr "Tạo bản sao riêng, độc lập của máy này. Máy đang chạy tạm dừng cho mỗi bản chụp nhanh rồi khởi động lại trong khi sao chép tiếp tục. Các bản sao được xử lý theo thứ tự và khớp với trạng thái nguồn lúc đến lượt."
 
 #: lib/marshall_web/live/machines_live.ex:106
-#: lib/marshall_web/live/machines_live.ex:1019
-#: lib/marshall_web/live/machines_live.ex:1191
+#: lib/marshall_web/live/machines_live.ex:1021
+#: lib/marshall_web/live/machines_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Create machine"
 msgstr "Tạo máy"
@@ -431,18 +431,18 @@ msgstr "Đang tạo đĩa độc lập từ bản chụp nhanh. Nguồn được
 msgid "Creating cloned machine"
 msgstr "Đang tạo máy nhân bản"
 
-#: lib/marshall_web/live/machines_live.ex:1189
+#: lib/marshall_web/live/machines_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Creating…"
 msgstr "Đang tạo…"
 
-#: lib/marshall_web/live/machines_live.ex:904
+#: lib/marshall_web/live/machines_live.ex:906
 #, elixir-autogen, elixir-format
 msgid "Current headroom is temporarily unavailable."
 msgstr "Dung lượng còn trống hiện tại tạm thời không khả dụng."
 
-#: lib/marshall_web/live/machines_live.ex:896
-#: lib/marshall_web/live/machines_live.ex:1038
+#: lib/marshall_web/live/machines_live.ex:898
+#: lib/marshall_web/live/machines_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Current headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
 msgstr "Dung lượng còn trống: %{value1} vCPU · %{value2} GiB bộ nhớ · %{value3} GiB đĩa"
@@ -452,53 +452,52 @@ msgstr "Dung lượng còn trống: %{value1} vCPU · %{value2} GiB bộ nhớ �
 msgid "Current provisioning headroom"
 msgstr "Dung lượng cấp phát còn trống hiện tại"
 
-#: lib/marshall_web/live/machines_live.ex:687
-#: lib/marshall_web/live/machines_live.ex:775
+#: lib/marshall_web/live/machines_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr "Khách hàng"
 
-#: lib/marshall_web/live/machines_live.ex:1251
+#: lib/marshall_web/live/machines_live.ex:1253
 #, elixir-autogen, elixir-format
 msgid "Customer machines allow only owner SSH and terminal access. Outbound networking, workspace sharing, and web service exposure are disabled."
 msgstr "Máy khách hàng chỉ cho phép chủ sở hữu truy cập SSH và thiết bị đầu cuối. Mạng ra ngoài, chia sẻ không gian làm việc và công khai dịch vụ web bị vô hiệu hóa."
 
-#: lib/marshall_web/live/machines_live.ex:1605
+#: lib/marshall_web/live/machines_live.ex:1607
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Xóa"
 
-#: lib/marshall_web/live/machines_live.ex:1588
+#: lib/marshall_web/live/machines_live.ex:1590
 #, elixir-autogen, elixir-format
 msgid "Delete machine"
 msgstr "Xóa máy"
 
-#: lib/marshall_web/live/machines_live.ex:1602
+#: lib/marshall_web/live/machines_live.ex:1604
 #, elixir-autogen, elixir-format
 msgid "Delete this machine and its disk? This cannot be undone."
 msgstr "Xóa máy này và đĩa của nó? Không thể hoàn tác."
 
-#: lib/marshall_web/live/machines_live.ex:779
+#: lib/marshall_web/live/machines_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Deleting"
 msgstr "Đang xóa"
 
-#: lib/marshall_web/live/machines_live.ex:861
+#: lib/marshall_web/live/machines_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Deleting retained copies"
 msgstr "Đang xóa các bản sao giữ lại"
 
-#: lib/marshall_web/live/machines_live.ex:855
+#: lib/marshall_web/live/machines_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Destination boot failed; source copy retained"
 msgstr "Đích khởi động thất bại; giữ lại bản sao nguồn"
 
-#: lib/marshall_web/live/machines_live.ex:857
+#: lib/marshall_web/live/machines_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Destination readiness failed; source copy retained"
 msgstr "Đích không sẵn sàng; giữ lại bản sao nguồn"
 
-#: lib/marshall_web/live/machines_live.ex:858
+#: lib/marshall_web/live/machines_live.ex:860
 #, elixir-autogen, elixir-format
 msgid "Destination ready; cleaning up the source"
 msgstr "Đích sẵn sàng; đang dọn nguồn"
@@ -508,12 +507,12 @@ msgstr "Đích sẵn sàng; đang dọn nguồn"
 msgid "Destination restart requested. The source copy remains retained until readiness succeeds."
 msgstr "Đã yêu cầu khởi động lại đích. Bản sao nguồn được giữ đến khi kiểm tra sẵn sàng thành công."
 
-#: lib/marshall_web/live/machines_live.ex:1268
+#: lib/marshall_web/live/machines_live.ex:1270
 #, elixir-autogen, elixir-format
 msgid "Direct machine grants"
 msgstr "Quyền máy được cấp trực tiếp"
 
-#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1233
 #: lib/marshall_web/live/overview_live.ex:355
 #: lib/marshall_web/live/resize_live.ex:321
 #: lib/marshall_web/live/resize_live.ex:375
@@ -522,7 +521,7 @@ msgstr "Quyền máy được cấp trực tiếp"
 msgid "Disk"
 msgstr "Đĩa"
 
-#: lib/marshall_web/live/machines_live.ex:1160
+#: lib/marshall_web/live/machines_live.ex:1162
 #, elixir-autogen, elixir-format
 msgid "Disk (GiB)"
 msgstr "Đĩa (GiB)"
@@ -547,7 +546,7 @@ msgstr "Địa chỉ email"
 msgid "Enable JavaScript to open a repository link, or"
 msgstr "Bật JavaScript để mở liên kết kho, hoặc"
 
-#: lib/marshall_web/live/machines_live.ex:772
+#: lib/marshall_web/live/machines_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Ends that person's access to this machine."
 msgstr "Chấm dứt quyền truy cập máy này của người đó."
@@ -562,7 +561,7 @@ msgstr "Nhập địa chỉ email hợp lệ."
 msgid "Enter whole numbers for CPU, memory and disk size."
 msgstr "Nhập số nguyên cho CPU, bộ nhớ và kích thước đĩa."
 
-#: lib/marshall_web/live/machines_live.ex:1299
+#: lib/marshall_web/live/machines_live.ex:1301
 #, elixir-autogen, elixir-format
 msgid "Everything; cannot be changed here."
 msgstr "Mọi quyền; không thể đổi tại đây."
@@ -572,12 +571,12 @@ msgstr "Mọi quyền; không thể đổi tại đây."
 msgid "Explore your usage ↗"
 msgstr "Khám phá mức sử dụng ↗"
 
-#: lib/marshall_web/live/machines_live.ex:1500
+#: lib/marshall_web/live/machines_live.ex:1502
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy"
 msgstr "Bản sao gồm tệp và thông tin xác thực đã lưu"
 
-#: lib/marshall_web/live/machines_live.ex:1540
+#: lib/marshall_web/live/machines_live.ex:1542
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy."
 msgstr "Bản sao gồm tệp và thông tin xác thực đã lưu."
@@ -602,12 +601,12 @@ msgstr "Đang hoàn thiện"
 msgid "Get tips, tricks and updates about Overalls and AI by email."
 msgstr "Nhận mẹo, thủ thuật và tin cập nhật về Overalls và AI qua email."
 
-#: lib/marshall_web/live/machines_live.ex:1135
+#: lib/marshall_web/live/machines_live.ex:1137
 #, elixir-autogen, elixir-format
 msgid "Give it room to grow"
 msgstr "Dành chỗ để phát triển"
 
-#: lib/marshall_web/live/machines_live.ex:1337
+#: lib/marshall_web/live/machines_live.ex:1339
 #, elixir-autogen, elixir-format
 msgid "Grant, change or remove access"
 msgstr "Cấp, đổi hoặc xóa quyền truy cập"
@@ -622,25 +621,25 @@ msgstr "Mở rộng hệ thống tệp ở lần khởi động tới"
 msgid "Headroom is temporarily unavailable."
 msgstr "Dung lượng còn trống tạm thời không khả dụng."
 
-#: lib/marshall_web/live/machines_live.ex:923
-#: lib/marshall_web/live/machines_live.ex:958
-#: lib/marshall_web/live/machines_live.ex:1234
+#: lib/marshall_web/live/machines_live.ex:925
+#: lib/marshall_web/live/machines_live.ex:960
+#: lib/marshall_web/live/machines_live.ex:1236
 #, elixir-autogen, elixir-format
 msgid "Host"
 msgstr "Máy chủ"
 
-#: lib/marshall_web/live/machines_live.ex:1081
+#: lib/marshall_web/live/machines_live.ex:1083
 #, elixir-autogen, elixir-format
 msgid "Image"
 msgstr "Ảnh máy"
 
-#: lib/marshall_web/live/machines_live.ex:1024
+#: lib/marshall_web/live/machines_live.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Images and capacity are temporarily unavailable. Your choices are retained."
 msgstr "Ảnh máy và dung lượng tạm thời không khả dụng. Lựa chọn của bạn được giữ lại."
 
-#: lib/marshall_web/live/machines_live.ex:693
-#: lib/marshall_web/live/machines_live.ex:776
+#: lib/marshall_web/live/machines_live.ex:695
+#: lib/marshall_web/live/machines_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Inception"
 msgstr "Inception"
@@ -650,7 +649,7 @@ msgstr "Inception"
 msgid "Invalid request."
 msgstr "Yêu cầu không hợp lệ."
 
-#: lib/marshall_web/live/machines_live.ex:1397
+#: lib/marshall_web/live/machines_live.ex:1399
 #, elixir-autogen, elixir-format
 msgid "Labels"
 msgstr "Nhãn"
@@ -676,12 +675,12 @@ msgstr "Đang khởi chạy"
 msgid "Launching repository"
 msgstr "Đang khởi chạy kho"
 
-#: lib/marshall_web/live/machines_live.ex:1523
+#: lib/marshall_web/live/machines_live.ex:1525
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name"
 msgstr "Để trống để tạo tên tự động"
 
-#: lib/marshall_web/live/machines_live.ex:1537
+#: lib/marshall_web/live/machines_live.ex:1539
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name."
 msgstr "Để trống để tạo tên tự động."
@@ -693,7 +692,7 @@ msgstr "Để trống để tạo tên tự động."
 msgid "Leave stopped"
 msgstr "Giữ trạng thái dừng"
 
-#: lib/marshall_web/live/machines_live.ex:919
+#: lib/marshall_web/live/machines_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Machine"
 msgstr "Máy"
@@ -703,7 +702,7 @@ msgstr "Máy"
 msgid "Machine metadata saved."
 msgstr "Đã lưu siêu dữ liệu máy."
 
-#: lib/marshall_web/live/machines_live.ex:1005
+#: lib/marshall_web/live/machines_live.ex:1007
 #, elixir-autogen, elixir-format
 msgid "Machine pages"
 msgstr "Trang máy"
@@ -714,7 +713,7 @@ msgid "Machine update requested."
 msgstr "Đã yêu cầu cập nhật máy."
 
 #: lib/marshall_web/live/machines_live.ex:121
-#: lib/marshall_web/live/machines_live.ex:885
+#: lib/marshall_web/live/machines_live.ex:887
 #: lib/marshall_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Machines"
@@ -732,7 +731,7 @@ msgstr "Máy tạm thời không khả dụng."
 msgid "Machines couldn’t be loaded. Refresh to try again."
 msgstr "Không thể tải máy. Làm mới để thử lại."
 
-#: lib/marshall_web/live/machines_live.ex:1118
+#: lib/marshall_web/live/machines_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Make it yours"
 msgstr "Tùy chỉnh theo ý bạn"
@@ -742,24 +741,24 @@ msgstr "Tùy chỉnh theo ý bạn"
 msgid "Make yourself at home"
 msgstr "Hãy tự nhiên như ở nhà"
 
-#: lib/marshall_web/live/machines_live.ex:1248
+#: lib/marshall_web/live/machines_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Management access is required to change the remaining settings."
 msgstr "Cần quyền quản lý để đổi các thiết lập còn lại."
 
-#: lib/marshall_web/live/machines_live.ex:759
-#: lib/marshall_web/live/machines_live.ex:1360
-#: lib/marshall_web/live/machines_live.ex:1369
+#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:1362
+#: lib/marshall_web/live/machines_live.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "Người quản lý"
 
-#: lib/marshall_web/live/machines_live.ex:1455
+#: lib/marshall_web/live/machines_live.ex:1457
 #, elixir-autogen, elixir-format
 msgid "Measured between control-plane stop and readiness observations; guest availability may differ."
 msgstr "Đo giữa các quan sát dừng và sẵn sàng của mặt phẳng điều khiển; mức khả dụng của máy khách có thể khác."
 
-#: lib/marshall_web/live/machines_live.ex:1228
+#: lib/marshall_web/live/machines_live.ex:1230
 #: lib/marshall_web/live/overview_live.ex:350
 #: lib/marshall_web/live/resize_live.ex:318
 #: lib/marshall_web/live/resize_live.ex:365
@@ -768,33 +767,33 @@ msgstr "Đo giữa các quan sát dừng và sẵn sàng của mặt phẳng đi
 msgid "Memory"
 msgstr "Bộ nhớ"
 
-#: lib/marshall_web/live/machines_live.ex:1149
+#: lib/marshall_web/live/machines_live.ex:1151
 #: lib/marshall_web/live/resize_live.ex:455
 #, elixir-autogen, elixir-format
 msgid "Memory (MiB)"
 msgstr "Bộ nhớ (MiB)"
 
-#: lib/marshall_web/live/machines_live.ex:1443
+#: lib/marshall_web/live/machines_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "Chế độ"
 
-#: lib/marshall_web/live/machines_live.ex:862
+#: lib/marshall_web/live/machines_live.ex:864
 #, elixir-autogen, elixir-format
 msgid "Move cancelled; cleanup complete"
 msgstr "Đã hủy di chuyển; dọn dẹp hoàn tất"
 
-#: lib/marshall_web/live/machines_live.ex:863
+#: lib/marshall_web/live/machines_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Move complete"
 msgstr "Di chuyển hoàn tất"
 
-#: lib/marshall_web/live/machines_live.ex:1423
+#: lib/marshall_web/live/machines_live.ex:1425
 #, elixir-autogen, elixir-format
 msgid "Move this machine to an automatically selected host? The machine may be briefly unavailable."
 msgstr "Di chuyển máy này đến máy chủ được chọn tự động? Máy có thể tạm thời không khả dụng."
 
-#: lib/marshall_web/live/machines_live.ex:1429
+#: lib/marshall_web/live/machines_live.ex:1431
 #, elixir-autogen, elixir-format
 msgid "Move to another host"
 msgstr "Di chuyển sang máy chủ khác"
@@ -805,7 +804,7 @@ msgstr "Di chuyển sang máy chủ khác"
 msgid "Needs attention"
 msgstr "Cần xử lý"
 
-#: lib/marshall_web/live/machines_live.ex:1522
+#: lib/marshall_web/live/machines_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "New machine name (optional)"
 msgstr "Tên máy mới (tùy chọn)"
@@ -815,8 +814,8 @@ msgstr "Tên máy mới (tùy chọn)"
 msgid "New sizes"
 msgstr "Kích thước mới"
 
-#: lib/marshall_web/live/machines_live.ex:1010
-#: lib/marshall_web/live/machines_live.ex:1332
+#: lib/marshall_web/live/machines_live.ex:1012
+#: lib/marshall_web/live/machines_live.ex:1334
 #, elixir-autogen, elixir-format
 msgid "Next page →"
 msgstr "Trang tiếp →"
@@ -826,17 +825,17 @@ msgstr "Trang tiếp →"
 msgid "Next steps"
 msgstr "Bước tiếp theo"
 
-#: lib/marshall_web/live/machines_live.ex:1555
+#: lib/marshall_web/live/machines_live.ex:1557
 #, elixir-autogen, elixir-format
 msgid "No clone requests yet. Queue a copy and follow its progress here."
 msgstr "Chưa có yêu cầu nhân bản. Xếp hàng bản sao và theo dõi tiến độ tại đây."
 
-#: lib/marshall_web/live/machines_live.ex:1325
+#: lib/marshall_web/live/machines_live.ex:1327
 #, elixir-autogen, elixir-format
 msgid "No direct machine grants."
 msgstr "Không có quyền máy được cấp trực tiếp."
 
-#: lib/marshall_web/live/machines_live.ex:1035
+#: lib/marshall_web/live/machines_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "No images are available on ready hosts right now."
 msgstr "Hiện không có ảnh trên máy chủ sẵn sàng."
@@ -846,12 +845,12 @@ msgstr "Hiện không có ảnh trên máy chủ sẵn sàng."
 msgid "No machines in this preview yet. Create one or ask an owner to share access."
 msgstr "Chưa có máy trong bản xem trước. Tạo máy hoặc nhờ chủ sở hữu chia sẻ quyền truy cập."
 
-#: lib/marshall_web/live/machines_live.ex:910
+#: lib/marshall_web/live/machines_live.ex:912
 #, elixir-autogen, elixir-format
 msgid "No machines on this page. Create a machine or ask an owner to share access."
 msgstr "Không có máy trên trang này. Tạo máy hoặc nhờ chủ sở hữu chia sẻ quyền truy cập."
 
-#: lib/marshall_web/live/machines_live.ex:828
+#: lib/marshall_web/live/machines_live.ex:830
 #, elixir-autogen, elixir-format
 msgid "No registered account matches that email address."
 msgstr "Không có tài khoản đăng ký khớp địa chỉ email đó."
@@ -862,7 +861,7 @@ msgstr "Không có tài khoản đăng ký khớp địa chỉ email đó."
 msgid "No relocation is available."
 msgstr "Không có lượt di chuyển khả dụng."
 
-#: lib/marshall_web/live/machines_live.ex:1451
+#: lib/marshall_web/live/machines_live.ex:1453
 #, elixir-autogen, elixir-format
 msgid "Observed downtime"
 msgstr "Thời gian ngừng quan sát được"
@@ -882,12 +881,12 @@ msgstr "Mở bản nhân bản"
 msgid "Open repositories from your browser"
 msgstr "Mở kho từ trình duyệt"
 
-#: lib/marshall_web/live/machines_live.ex:989
+#: lib/marshall_web/live/machines_live.ex:991
 #, elixir-autogen, elixir-format
 msgid "Open terminal"
 msgstr "Mở thiết bị đầu cuối"
 
-#: lib/marshall_web/live/machines_live.ex:987
+#: lib/marshall_web/live/machines_live.ex:989
 #, elixir-autogen, elixir-format
 msgid "Open terminal for %{value1}"
 msgstr "Mở thiết bị đầu cuối cho %{value1}"
@@ -897,24 +896,24 @@ msgstr "Mở thiết bị đầu cuối cho %{value1}"
 msgid "Open terminal ↗"
 msgstr "Mở thiết bị đầu cuối ↗"
 
-#: lib/marshall_web/live/machines_live.ex:764
+#: lib/marshall_web/live/machines_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "Open this machine's web apps. No terminal."
 msgstr "Mở ứng dụng web của máy này. Không có thiết bị đầu cuối."
 
-#: lib/marshall_web/live/machines_live.ex:1221
+#: lib/marshall_web/live/machines_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Operating system"
 msgstr "Hệ điều hành"
 
-#: lib/marshall_web/live/machines_live.ex:758
-#: lib/marshall_web/live/machines_live.ex:1359
-#: lib/marshall_web/live/machines_live.ex:1368
+#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:1361
+#: lib/marshall_web/live/machines_live.ex:1370
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "Người vận hành"
 
-#: lib/marshall_web/live/machines_live.ex:707
+#: lib/marshall_web/live/machines_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Outbound connections, sharing, web apps, SSH, terminal, and AI agent tools. The agent cannot start child agents."
 msgstr "Kết nối ra ngoài, chia sẻ, ứng dụng web, SSH, thiết bị đầu cuối và công cụ tác tử AI. Tác tử không thể khởi tạo tác tử con."
@@ -924,9 +923,9 @@ msgstr "Kết nối ra ngoài, chia sẻ, ứng dụng web, SSH, thiết bị đ
 msgid "Overview"
 msgstr "Tổng quan"
 
-#: lib/marshall_web/live/machines_live.ex:964
-#: lib/marshall_web/live/machines_live.ex:1122
-#: lib/marshall_web/live/machines_live.ex:1296
+#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1298
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "Chủ sở hữu"
@@ -938,7 +937,7 @@ msgstr "Chủ sở hữu"
 msgid "Pending"
 msgstr "Đang chờ"
 
-#: lib/marshall_web/live/machines_live.ex:1615
+#: lib/marshall_web/live/machines_live.ex:1617
 #, elixir-autogen, elixir-format
 msgid "Permanently remove this machine and its disk. This cannot be undone."
 msgstr "Xóa vĩnh viễn máy này và đĩa của nó. Không thể hoàn tác."
@@ -948,13 +947,13 @@ msgstr "Xóa vĩnh viễn máy này và đĩa của nó. Không thể hoàn tác
 msgid "Permission to clone this machine is no longer available."
 msgstr "Quyền nhân bản máy này không còn khả dụng."
 
-#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1126
 #: lib/marshall_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr "Cá nhân"
 
-#: lib/marshall_web/live/machines_live.ex:1440
+#: lib/marshall_web/live/machines_live.ex:1442
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "Giai đoạn"
@@ -984,7 +983,7 @@ msgstr "Đang chuẩn bị bản nhân bản"
 msgid "Preparing space and checking the source before taking a snapshot."
 msgstr "Đang chuẩn bị không gian và kiểm tra nguồn trước khi chụp nhanh."
 
-#: lib/marshall_web/live/machines_live.ex:848
+#: lib/marshall_web/live/machines_live.ex:850
 #, elixir-autogen, elixir-format
 msgid "Preparing transfer"
 msgstr "Đang chuẩn bị truyền"
@@ -999,20 +998,20 @@ msgstr "Đang chuẩn bị máy của bạn…"
 msgid "Preparing your repository…"
 msgstr "Đang chuẩn bị kho của bạn…"
 
-#: lib/marshall_web/live/machines_live.ex:700
+#: lib/marshall_web/live/machines_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Private and owner-only. SSH and terminal access; no outbound connections, sharing, web apps, or AI agent."
 msgstr "Riêng tư, chỉ chủ sở hữu. Truy cập SSH và thiết bị đầu cuối; không kết nối ra ngoài, chia sẻ, ứng dụng web hay tác tử AI."
 
-#: lib/marshall_web/live/machines_live.ex:922
-#: lib/marshall_web/live/machines_live.ex:954
-#: lib/marshall_web/live/machines_live.ex:1097
-#: lib/marshall_web/live/machines_live.ex:1237
+#: lib/marshall_web/live/machines_live.ex:924
+#: lib/marshall_web/live/machines_live.ex:956
+#: lib/marshall_web/live/machines_live.ex:1099
+#: lib/marshall_web/live/machines_live.ex:1239
 #, elixir-autogen, elixir-format
 msgid "Profile"
 msgstr "Hồ sơ"
 
-#: lib/marshall_web/live/machines_live.ex:1103
+#: lib/marshall_web/live/machines_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Profiles choose access and agent features. Machines remain isolated from one another."
 msgstr "Hồ sơ chọn tính năng truy cập và tác tử. Các máy vẫn được cách ly với nhau."
@@ -1029,12 +1028,12 @@ msgstr "Vị trí hàng đợi %{value1}"
 msgid "Queued"
 msgstr "Đã xếp hàng"
 
-#: lib/marshall_web/live/machines_live.ex:1531
+#: lib/marshall_web/live/machines_live.ex:1533
 #, elixir-autogen, elixir-format
 msgid "Queuing…"
 msgstr "Đang xếp hàng…"
 
-#: lib/marshall_web/live/machines_live.ex:766
+#: lib/marshall_web/live/machines_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Read and write in the terminal."
 msgstr "Đọc và ghi trong thiết bị đầu cuối."
@@ -1044,17 +1043,17 @@ msgstr "Đọc và ghi trong thiết bị đầu cuối."
 msgid "Read the field notes ↗"
 msgstr "Đọc ghi chú thực địa ↗"
 
-#: lib/marshall_web/live/machines_live.ex:765
+#: lib/marshall_web/live/machines_live.ex:767
 #, elixir-autogen, elixir-format
 msgid "Read the terminal."
 msgstr "Đọc thiết bị đầu cuối."
 
-#: lib/marshall_web/live/machines_live.ex:1169
+#: lib/marshall_web/live/machines_live.ex:1171
 #, elixir-autogen, elixir-format
 msgid "Ready when you are"
 msgstr "Sẵn sàng khi bạn sẵn sàng"
 
-#: lib/marshall_web/live/machines_live.ex:1394
+#: lib/marshall_web/live/machines_live.ex:1396
 #, elixir-autogen, elixir-format
 msgid "Reflection metadata"
 msgstr "Siêu dữ liệu phản ánh"
@@ -1069,7 +1068,7 @@ msgstr "Làm mới"
 msgid "Refreshing…"
 msgstr "Đang làm mới…"
 
-#: lib/marshall_web/live/machines_live.ex:1349
+#: lib/marshall_web/live/machines_live.ex:1351
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "Email đã đăng ký"
@@ -1079,7 +1078,7 @@ msgstr "Email đã đăng ký"
 msgid "Registering the copied disk as your private machine."
 msgstr "Đang đăng ký đĩa đã sao chép thành máy riêng của bạn."
 
-#: lib/marshall_web/live/machines_live.ex:1412
+#: lib/marshall_web/live/machines_live.ex:1414
 #, elixir-autogen, elixir-format
 msgid "Relocate machine"
 msgstr "Di chuyển máy"
@@ -1094,8 +1093,8 @@ msgstr "Đã yêu cầu di chuyển. Đích đến được chọn tự động.
 msgid "Remains stopped; the filesystem grows on the next boot"
 msgstr "Vẫn dừng; hệ thống tệp sẽ mở rộng trong lần khởi động tiếp theo"
 
-#: lib/marshall_web/live/machines_live.ex:1361
-#: lib/marshall_web/live/machines_live.ex:1370
+#: lib/marshall_web/live/machines_live.ex:1363
+#: lib/marshall_web/live/machines_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "Remove access"
 msgstr "Xóa quyền truy cập"
@@ -1110,7 +1109,7 @@ msgstr "Đang yêu cầu hủy…"
 msgid "Requesting resize…"
 msgstr "Đang yêu cầu đổi kích thước…"
 
-#: lib/marshall_web/live/machines_live.ex:1485
+#: lib/marshall_web/live/machines_live.ex:1487
 #, elixir-autogen, elixir-format
 msgid "Requesting restart…"
 msgstr "Đang yêu cầu khởi động lại…"
@@ -1120,12 +1119,12 @@ msgstr "Đang yêu cầu khởi động lại…"
 msgid "Requesting retry…"
 msgstr "Đang yêu cầu thử lại…"
 
-#: lib/marshall_web/live/machines_live.ex:1421
+#: lib/marshall_web/live/machines_live.ex:1423
 #, elixir-autogen, elixir-format
 msgid "Requesting…"
 msgstr "Đang yêu cầu…"
 
-#: lib/marshall_web/live/machines_live.ex:1217
+#: lib/marshall_web/live/machines_live.ex:1219
 #: lib/marshall_web/live/resize_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "Resize"
@@ -1178,9 +1177,9 @@ msgstr "Các giai đoạn đổi kích thước"
 msgid "Resizing"
 msgstr "Đang đổi kích thước"
 
-#: lib/marshall_web/live/machines_live.ex:921
-#: lib/marshall_web/live/machines_live.ex:947
-#: lib/marshall_web/live/machines_live.ex:1208
+#: lib/marshall_web/live/machines_live.ex:923
+#: lib/marshall_web/live/machines_live.ex:949
+#: lib/marshall_web/live/machines_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Resources"
 msgstr "Tài nguyên"
@@ -1222,7 +1221,7 @@ msgstr "Thử lại"
 msgid "Retry could not be accepted. Capacity or machine state may have changed."
 msgstr "Không thể chấp nhận yêu cầu thử lại. Dung lượng hoặc trạng thái máy có thể đã thay đổi."
 
-#: lib/marshall_web/live/machines_live.ex:1487
+#: lib/marshall_web/live/machines_live.ex:1489
 #, elixir-autogen, elixir-format
 msgid "Retry destination boot"
 msgstr "Thử khởi động đích lại"
@@ -1237,15 +1236,15 @@ msgstr "Thử đổi kích thước lại"
 msgid "Return to Fleet workloads and verify your passkey to reopen the machine →"
 msgstr "Quay lại khối lượng công việc của đội máy và xác minh khóa truy cập để mở lại máy →"
 
-#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Đã thu hồi"
 
-#: lib/marshall_web/live/machines_live.ex:1280
-#: lib/marshall_web/live/machines_live.ex:1295
-#: lib/marshall_web/live/machines_live.ex:1314
-#: lib/marshall_web/live/machines_live.ex:1355
+#: lib/marshall_web/live/machines_live.ex:1282
+#: lib/marshall_web/live/machines_live.ex:1297
+#: lib/marshall_web/live/machines_live.ex:1316
+#: lib/marshall_web/live/machines_live.ex:1357
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Vai trò"
@@ -1260,7 +1259,7 @@ msgstr "Không gian cho ý tưởng tiếp theo"
 msgid "Room to grow"
 msgstr "Không gian để phát triển"
 
-#: lib/marshall_web/live/machines_live.ex:1159
+#: lib/marshall_web/live/machines_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Root disk (GiB)"
 msgstr "Đĩa gốc (GiB)"
@@ -1270,22 +1269,22 @@ msgstr "Đĩa gốc (GiB)"
 msgid "Running"
 msgstr "Đang chạy"
 
-#: lib/marshall_web/live/machines_live.ex:1378
+#: lib/marshall_web/live/machines_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "Lưu quyền truy cập"
 
-#: lib/marshall_web/live/machines_live.ex:1409
+#: lib/marshall_web/live/machines_live.ex:1411
 #, elixir-autogen, elixir-format
 msgid "Save metadata"
 msgstr "Lưu siêu dữ liệu"
 
-#: lib/marshall_web/live/machines_live.ex:1376
+#: lib/marshall_web/live/machines_live.ex:1378
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Đang lưu…"
 
-#: lib/marshall_web/live/machines_live.ex:749
+#: lib/marshall_web/live/machines_live.ex:751
 #, elixir-autogen, elixir-format
 msgid "Selected image unavailable"
 msgstr "Ảnh hệ thống đã chọn không khả dụng"
@@ -1300,12 +1299,12 @@ msgstr "Thiết lập tiện ích trình duyệt ↗"
 msgid "Shared"
 msgstr "Đã chia sẻ"
 
-#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Shared by"
 msgstr "Được chia sẻ bởi"
 
-#: lib/marshall_web/live/machines_live.ex:1406
+#: lib/marshall_web/live/machines_live.ex:1408
 #, elixir-autogen, elixir-format
 msgid "Short description for agents"
 msgstr "Mô tả ngắn cho tác nhân"
@@ -1350,7 +1349,7 @@ msgstr "Cần xử lý việc khôi phục nguồn."
 msgid "Source recovery retry requested."
 msgstr "Đã yêu cầu thử khôi phục nguồn lại."
 
-#: lib/marshall_web/live/machines_live.ex:860
+#: lib/marshall_web/live/machines_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "Source restored; destination cleanup pending"
 msgstr "Đã khôi phục nguồn; đang chờ dọn dẹp đích"
@@ -1370,13 +1369,13 @@ msgstr "Nguồn được giữ ở trạng thái dừng, giống lúc yêu cầu
 msgid "Source was stopped when this request began."
 msgstr "Nguồn đang dừng khi yêu cầu này bắt đầu."
 
-#: lib/marshall_web/live/machines_live.ex:688
-#: lib/marshall_web/live/machines_live.ex:777
+#: lib/marshall_web/live/machines_live.ex:690
+#: lib/marshall_web/live/machines_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr "Tiêu chuẩn"
 
-#: lib/marshall_web/live/machines_live.ex:785
+#: lib/marshall_web/live/machines_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "Starting"
 msgstr "Đang khởi động"
@@ -1386,8 +1385,8 @@ msgstr "Đang khởi động"
 msgid "Starting the machine with its new resources."
 msgstr "Đang khởi động máy với tài nguyên mới."
 
-#: lib/marshall_web/live/machines_live.ex:920
-#: lib/marshall_web/live/machines_live.ex:939
+#: lib/marshall_web/live/machines_live.ex:922
+#: lib/marshall_web/live/machines_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Tình trạng"
@@ -1419,7 +1418,7 @@ msgstr "Dừng máy"
 msgid "Stopped"
 msgstr "Đã dừng"
 
-#: lib/marshall_web/live/machines_live.ex:782
+#: lib/marshall_web/live/machines_live.ex:784
 #: lib/marshall_web/live/resize_live.ex:536
 #, elixir-autogen, elixir-format
 msgid "Stopping"
@@ -1440,7 +1439,7 @@ msgstr "Đang dừng sao chép và xóa tài nguyên tạm. Việc khôi phục 
 msgid "Stopping the machine so its resources can change safely."
 msgstr "Đang dừng máy để thay đổi tài nguyên an toàn."
 
-#: lib/marshall_web/live/machines_live.ex:850
+#: lib/marshall_web/live/machines_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Stopping the source"
 msgstr "Đang dừng nguồn"
@@ -1450,7 +1449,7 @@ msgstr "Đang dừng nguồn"
 msgid "Subscribe"
 msgstr "Đăng ký"
 
-#: lib/marshall_web/live/machines_live.ex:853
+#: lib/marshall_web/live/machines_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Switching placement"
 msgstr "Đang chuyển vị trí triển khai"
@@ -1460,17 +1459,17 @@ msgstr "Đang chuyển vị trí triển khai"
 msgid "Taking snapshot"
 msgstr "Đang chụp nhanh"
 
-#: lib/marshall_web/live/machines_live.ex:1270
+#: lib/marshall_web/live/machines_live.ex:1272
 #, elixir-autogen, elixir-format
 msgid "Team membership and thread sharing can also grant machine access."
 msgstr "Tư cách thành viên nhóm và chia sẻ luồng cũng có thể cấp quyền truy cập máy."
 
-#: lib/marshall_web/live/machines_live.ex:996
+#: lib/marshall_web/live/machines_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Terminal unavailable"
 msgstr "Thiết bị đầu cuối không khả dụng"
 
-#: lib/marshall_web/live/machines_live.ex:769
+#: lib/marshall_web/live/machines_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Terminal, lifecycle, resize, clone and sharing."
 msgstr "Thiết bị đầu cuối, vòng đời, đổi kích thước, nhân bản và chia sẻ."
@@ -1495,7 +1494,7 @@ msgstr "Không gian tên kho mã đó không hợp lệ."
 msgid "That repository reference cannot be launched."
 msgstr "Không thể khởi chạy tham chiếu kho mã đó."
 
-#: lib/marshall_web/live/machines_live.ex:1339
+#: lib/marshall_web/live/machines_live.ex:1341
 #, elixir-autogen, elixir-format
 msgid "The account must already be registered. Saving a role replaces that person's direct machine role; choose Remove access to remove that direct grant."
 msgstr "Tài khoản phải được đăng ký trước. Lưu vai trò sẽ thay thế vai trò trực tiếp của người đó đối với máy; chọn Xóa quyền truy cập để xóa quyền trực tiếp ấy."
@@ -1540,17 +1539,17 @@ msgstr "Không thể cập nhật máy. Hãy làm mới và thử lại."
 msgid "The machine has changed since this draft was created. Review the confirmed resources above."
 msgstr "Máy đã thay đổi kể từ khi tạo bản nháp này. Hãy xem lại tài nguyên đã xác nhận ở trên."
 
-#: lib/marshall_web/live/machines_live.ex:1433
+#: lib/marshall_web/live/machines_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on an automatically selected host. Our development fleet uses a 1 Gbit/s connection between hosts, so a move can take a little longer; moves are expected to be much faster when Overalls runs on AWS in production."
 msgstr "Máy được dừng, sao chép một lần và khởi động trên máy chủ được chọn tự động. Đội máy phát triển dùng kết nối 1 Gbit/s giữa các máy chủ nên việc di chuyển có thể lâu hơn một chút; dự kiến sẽ nhanh hơn nhiều khi Overalls chạy chính thức trên AWS."
 
-#: lib/marshall_web/live/machines_live.ex:1445
+#: lib/marshall_web/live/machines_live.ex:1447
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on the destination."
 msgstr "Máy được dừng, sao chép một lần và khởi động ở đích."
 
-#: lib/marshall_web/live/machines_live.ex:829
+#: lib/marshall_web/live/machines_live.ex:831
 #, elixir-autogen, elixir-format
 msgid "The owner's access cannot be changed."
 msgstr "Không thể thay đổi quyền truy cập của chủ sở hữu."
@@ -1565,7 +1564,7 @@ msgstr "Không thể thay đổi trạng thái ghim. Hãy làm mới và thử l
 msgid "The previous copy of this machine is still releasing its snapshot. Retry shortly."
 msgstr "Bản sao trước của máy vẫn đang giải phóng ảnh chụp nhanh. Hãy thử lại sau giây lát."
 
-#: lib/marshall_web/live/machines_live.ex:839
+#: lib/marshall_web/live/machines_live.ex:841
 #, elixir-autogen, elixir-format
 msgid "The request could not be completed. Check the values and try again."
 msgstr "Không thể hoàn tất yêu cầu. Kiểm tra các giá trị và thử lại."
@@ -1580,13 +1579,13 @@ msgstr "Yêu cầu gặp sự cố. Dùng các thao tác hiện có để khôi 
 msgid "The resize has completed; this page refreshes with the confirmed sizes."
 msgstr "Đã đổi kích thước xong; trang này sẽ làm mới với kích thước đã xác nhận."
 
-#: lib/marshall_web/live/machines_live.ex:714
+#: lib/marshall_web/live/machines_live.ex:716
 #, elixir-autogen, elixir-format
 msgid "The same network and access options as Standard, with AI agents that can start child agents."
 msgstr "Cùng tùy chọn mạng và quyền truy cập như Tiêu chuẩn, với tác nhân AI có thể khởi chạy tác nhân con."
 
-#: lib/marshall_web/live/machines_live.ex:808
-#: lib/marshall_web/live/machines_live.ex:825
+#: lib/marshall_web/live/machines_live.ex:810
+#: lib/marshall_web/live/machines_live.ex:827
 #, elixir-autogen, elixir-format
 msgid "The selected image needs more memory or disk space."
 msgstr "Ảnh hệ thống đã chọn cần thêm bộ nhớ hoặc dung lượng đĩa."
@@ -1616,7 +1615,7 @@ msgstr "Nguồn đang bận hoặc đã thay đổi trước khi bắt đầu nh
 msgid "There is not enough available capacity for a new machine right now."
 msgstr "Hiện không đủ năng lực khả dụng cho máy mới."
 
-#: lib/marshall_web/live/machines_live.ex:818
+#: lib/marshall_web/live/machines_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "There is not enough available capacity for this machine."
 msgstr "Không đủ năng lực khả dụng cho máy này."
@@ -1626,8 +1625,8 @@ msgstr "Không đủ năng lực khả dụng cho máy này."
 msgid "There is not enough capacity for this copy. Retry when space is available."
 msgstr "Không đủ dung lượng cho bản sao này. Hãy thử lại khi có chỗ trống."
 
-#: lib/marshall_web/live/machines_live.ex:805
-#: lib/marshall_web/live/machines_live.ex:820
+#: lib/marshall_web/live/machines_live.ex:807
+#: lib/marshall_web/live/machines_live.ex:822
 #, elixir-autogen, elixir-format
 msgid "This image is no longer available. Refresh and choose another image."
 msgstr "Ảnh hệ thống này không còn khả dụng. Làm mới và chọn ảnh khác."
@@ -1652,7 +1651,7 @@ msgstr "Liên kết khởi chạy này đã hết hạn. Hãy mở lại."
 msgid "This machine is being deleted and cannot be pinned."
 msgstr "Máy này đang bị xóa và không thể ghim."
 
-#: lib/marshall_web/live/machines_live.ex:831
+#: lib/marshall_web/live/machines_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "This machine is being deleted."
 msgstr "Máy này đang bị xóa."
@@ -1667,7 +1666,7 @@ msgstr "Máy này không khả dụng hoặc bạn không còn quyền quản l�
 msgid "This machine is unavailable or your access has ended."
 msgstr "Máy này không khả dụng hoặc quyền truy cập của bạn đã kết thúc."
 
-#: lib/marshall_web/live/machines_live.ex:826
+#: lib/marshall_web/live/machines_live.ex:828
 #, elixir-autogen, elixir-format
 msgid "This machine's host is currently unavailable."
 msgstr "Máy chủ của máy này hiện không khả dụng."
@@ -1682,7 +1681,7 @@ msgstr "Không thể khởi chạy từ liên kết kho mã này. Hãy mở lạ
 msgid "This request could not finish. Review the issue below and the available actions."
 msgstr "Yêu cầu này không thể hoàn tất. Xem vấn đề bên dưới và các thao tác hiện có."
 
-#: lib/marshall_web/live/machines_live.ex:834
+#: lib/marshall_web/live/machines_live.ex:836
 #, elixir-autogen, elixir-format
 msgid "This request has already been used. Refresh before trying again."
 msgstr "Yêu cầu này đã được sử dụng. Làm mới trước khi thử lại."
@@ -1692,24 +1691,24 @@ msgstr "Yêu cầu này đã được sử dụng. Làm mới trước khi thử
 msgid "This request has ended without publishing a clone."
 msgstr "Yêu cầu này đã kết thúc mà không công bố bản nhân bản."
 
-#: lib/marshall_web/live/machines_live.ex:960
-#: lib/marshall_web/live/machines_live.ex:1223
-#: lib/marshall_web/live/machines_live.ex:1235
+#: lib/marshall_web/live/machines_live.ex:962
+#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1237
 #, elixir-autogen, elixir-format
 msgid "Unavailable"
 msgstr "Không khả dụng"
 
-#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:763
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Không xác định"
 
-#: lib/marshall_web/live/machines_live.ex:832
+#: lib/marshall_web/live/machines_live.ex:834
 #, elixir-autogen, elixir-format
 msgid "Unpin this machine before deleting it."
 msgstr "Bỏ ghim máy này trước khi xóa."
 
-#: lib/marshall_web/live/machines_live.ex:1609
+#: lib/marshall_web/live/machines_live.ex:1611
 #, elixir-autogen, elixir-format
 msgid "Unpin to delete. While you have this machine pinned, nothing can delete it."
 msgstr "Bỏ ghim để xóa. Khi bạn ghim máy này, không gì có thể xóa máy."
@@ -1724,7 +1723,7 @@ msgstr "Hủy đăng ký bất cứ lúc nào."
 msgid "Updated"
 msgstr "Đã cập nhật"
 
-#: lib/marshall_web/live/machines_live.ex:1551
+#: lib/marshall_web/live/machines_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "Updates automatically"
 msgstr "Tự động cập nhật"
@@ -1734,7 +1733,7 @@ msgstr "Tự động cập nhật"
 msgid "Use current machine state, keeping these sizes"
 msgstr "Dùng trạng thái máy hiện tại và giữ các kích thước này"
 
-#: lib/marshall_web/live/machines_live.ex:852
+#: lib/marshall_web/live/machines_live.ex:854
 #, elixir-autogen, elixir-format
 msgid "Verifying the destination disks"
 msgstr "Đang xác minh đĩa đích"
@@ -1744,9 +1743,9 @@ msgstr "Đang xác minh đĩa đích"
 msgid "View all →"
 msgstr "Xem tất cả →"
 
-#: lib/marshall_web/live/machines_live.ex:757
-#: lib/marshall_web/live/machines_live.ex:1358
-#: lib/marshall_web/live/machines_live.ex:1367
+#: lib/marshall_web/live/machines_live.ex:759
+#: lib/marshall_web/live/machines_live.ex:1360
+#: lib/marshall_web/live/machines_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "Người xem"
@@ -1786,13 +1785,13 @@ msgstr "Không thể liên hệ với dịch vụ bản tin. Hãy thử lại sa
 msgid "We couldn't launch that repository"
 msgstr "Không thể khởi chạy kho mã đó"
 
-#: lib/marshall_web/live/machines_live.ex:756
+#: lib/marshall_web/live/machines_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "Ứng dụng web"
 
-#: lib/marshall_web/live/machines_live.ex:1357
-#: lib/marshall_web/live/machines_live.ex:1366
+#: lib/marshall_web/live/machines_live.ex:1359
+#: lib/marshall_web/live/machines_live.ex:1368
 #, elixir-autogen, elixir-format
 msgid "Web apps only"
 msgstr "Chỉ ứng dụng web"
@@ -1802,7 +1801,7 @@ msgstr "Chỉ ứng dụng web"
 msgid "What happens"
 msgstr "Điều sẽ xảy ra"
 
-#: lib/marshall_web/live/machines_live.ex:1266
+#: lib/marshall_web/live/machines_live.ex:1268
 #, elixir-autogen, elixir-format
 msgid "Who can reach this machine, and what each role allows."
 msgstr "Ai có thể truy cập máy này và mỗi vai trò cho phép điều gì."
@@ -1812,7 +1811,7 @@ msgstr "Ai có thể truy cập máy này và mỗi vai trò cho phép điều g
 msgid "You can pin up to %{value1} machines. Unpin one before pinning another."
 msgstr "Bạn có thể ghim tối đa %{value1} máy. Bỏ ghim một máy trước khi ghim máy khác."
 
-#: lib/marshall_web/live/machines_live.ex:830
+#: lib/marshall_web/live/machines_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "You no longer have permission for this action."
 msgstr "Bạn không còn quyền thực hiện thao tác này."
@@ -1822,17 +1821,17 @@ msgstr "Bạn không còn quyền thực hiện thao tác này."
 msgid "Your account cannot create machines."
 msgstr "Tài khoản của bạn không thể tạo máy."
 
-#: lib/marshall_web/live/machines_live.ex:886
+#: lib/marshall_web/live/machines_live.ex:888
 #, elixir-autogen, elixir-format
 msgid "Your development environments, personal and shared."
 msgstr "Môi trường phát triển cá nhân và dùng chung của bạn."
 
-#: lib/marshall_web/live/machines_live.ex:1240
+#: lib/marshall_web/live/machines_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Your disk is retained when the machine is stopped."
 msgstr "Đĩa được giữ lại khi máy dừng."
 
-#: lib/marshall_web/live/machines_live.ex:1178
+#: lib/marshall_web/live/machines_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Your disk stays with you when the machine is stopped."
 msgstr "Đĩa vẫn thuộc về bạn khi máy dừng."
@@ -1872,18 +1871,18 @@ msgstr "Không gian làm việc của bạn với thêm chút khoảng trống t
 msgid "continue to Overalls"
 msgstr "tiếp tục đến Overalls"
 
-#: lib/marshall_web/live/machines_live.ex:1399
+#: lib/marshall_web/live/machines_live.ex:1401
 #, elixir-autogen, elixir-format
 msgid "production, project-name"
 msgstr "sản-xuất, tên-dự-án"
 
-#: lib/marshall_web/live/machines_live.ex:1006
-#: lib/marshall_web/live/machines_live.ex:1329
+#: lib/marshall_web/live/machines_live.ex:1008
+#: lib/marshall_web/live/machines_live.ex:1331
 #, elixir-autogen, elixir-format
 msgid "← First page"
 msgstr "← Trang đầu"
 
-#: lib/marshall_web/live/machines_live.ex:1017
+#: lib/marshall_web/live/machines_live.ex:1019
 #, elixir-autogen, elixir-format
 msgid "← Machines"
 msgstr "← Máy"
@@ -1977,12 +1976,12 @@ msgstr "Xác nhận"
 msgid "A new machine will clone the repository when it boots."
 msgstr "Máy mới sẽ sao chép kho mã khi khởi động."
 
-#: lib/marshall_web/live/machines_live.ex:742
+#: lib/marshall_web/live/machines_live.ex:744
 #, elixir-autogen, elixir-format
 msgid "Android (API 36)"
 msgstr "Android (API 36)"
 
-#: lib/marshall_web/live/machines_live.ex:1069
+#: lib/marshall_web/live/machines_live.ex:1071
 #, elixir-autogen, elixir-format
 msgid "Leave this blank to create the machine without making setup changes."
 msgstr "Để trống để tạo máy mà không thay đổi thiết lập."
@@ -1997,7 +1996,7 @@ msgstr "Đã yêu cầu máy và cuộc hội thoại thiết lập."
 msgid "Provisioning is in progress. This page will open the machine when it is ready."
 msgstr "Đang cấp phát. Trang này sẽ mở máy khi máy sẵn sàng."
 
-#: lib/marshall_web/live/machine_provisioning_live.ex:70
+#: lib/marshall_web/live/machine_provisioning_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Provisioning request unavailable."
 msgstr "Yêu cầu cấp phát không khả dụng."
@@ -2017,12 +2016,12 @@ msgstr "Thử thiết lập lại"
 msgid "Setting up your machine"
 msgstr "Đang thiết lập máy của bạn"
 
-#: lib/marshall_web/live/machines_live.ex:1059
+#: lib/marshall_web/live/machines_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "The machine agent will execute this instruction automatically in Work mode."
 msgstr "Tác tử của máy sẽ tự động thực hiện chỉ dẫn này ở chế độ Công việc."
 
-#: lib/marshall_web/live/machines_live.ex:1057
+#: lib/marshall_web/live/machines_live.ex:1059
 #, elixir-autogen, elixir-format
 msgid "What should this machine do when it is ready?"
 msgstr "Máy này nên làm gì khi sẵn sàng?"

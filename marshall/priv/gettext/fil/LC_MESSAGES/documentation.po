@@ -64,169 +64,169 @@ msgstr "## Kumonekta"
 msgid "## Endpoints"
 msgstr "## Mga Endpoint"
 
-#: lib/marshall/documentation_messages.ex:18
+#: lib/marshall/documentation_messages.ex:19
 #, elixir-autogen, elixir-format
 msgid "## First commands"
 msgstr "## Mga unang utos"
 
-#: lib/marshall/documentation_messages.ex:19
+#: lib/marshall/documentation_messages.ex:20
 #, elixir-autogen, elixir-format
 msgid "## Install the Overalls CLI"
 msgstr "## I-install ang Overalls CLI"
 
-#: lib/marshall/documentation_messages.ex:20
+#: lib/marshall/documentation_messages.ex:21
 #, elixir-autogen, elixir-format
 msgid "## Install the developer archive"
 msgstr "## I-install ang archive ng developer"
 
-#: lib/marshall/documentation_messages.ex:21
+#: lib/marshall/documentation_messages.ex:22
 #, elixir-autogen, elixir-format
 msgid "## Metadata controls"
 msgstr "## Mga kontrol sa metadata"
 
-#: lib/marshall/documentation_messages.ex:23
+#: lib/marshall/documentation_messages.ex:24
 #, elixir-autogen, elixir-format
 msgid "## Privacy and availability"
 msgstr "## Privacy at availability"
 
-#: lib/marshall/documentation_messages.ex:24
+#: lib/marshall/documentation_messages.ex:25
 #, elixir-autogen, elixir-format
 msgid "## Register your key"
 msgstr "## Irehistro ang iyong susi"
 
-#: lib/marshall/documentation_messages.ex:25
+#: lib/marshall/documentation_messages.ex:26
 #, elixir-autogen, elixir-format
 msgid "## Relocate a machine"
 msgstr "## Maglipat ng makina"
 
-#: lib/marshall/documentation_messages.ex:26
+#: lib/marshall/documentation_messages.ex:27
 #, elixir-autogen, elixir-format
 msgid "## Resize a machine"
 msgstr "## Baguhin ang laki ng isang makina"
 
-#: lib/marshall/documentation_messages.ex:27
+#: lib/marshall/documentation_messages.ex:28
 #, elixir-autogen, elixir-format
 msgid "## Results and completion"
 msgstr "## Mga resulta at pagkumpleto"
 
-#: lib/marshall/documentation_messages.ex:28
+#: lib/marshall/documentation_messages.ex:29
 #, elixir-autogen, elixir-format
 msgid "## Retry safely"
 msgstr "## Subukan muli nang ligtas"
 
-#: lib/marshall/documentation_messages.ex:34
+#: lib/marshall/documentation_messages.ex:35
 #, elixir-autogen, elixir-format
 msgid "- Linux and macOS: the `curl … /bin/install.sh | bash` command.\n- Windows: run the Windows `powershell …` command under \"Install and connect\"\n  in PowerShell. Windows needs OpenSSH 9.6 or newer: the installer installs it\n  with winget when the built-in client is older and, after you approve the\n  administrator prompt, makes it the default `ssh` for new terminals."
 msgstr "- Linux at macOS: ang `curl … /bin/install.sh | bash` command. \n - Windows: patakbuhin ang Windows `powershell …` command sa ilalim ng \"I-install at ikonekta\" \n sa PowerShell. Kailangan ng Windows ang OpenSSH 9.6 o mas bago: ini-install ito ng installer ng \n gamit ang winget kapag mas luma na ang built-in na client at, pagkatapos mong aprubahan ang prompt ng administrator ng \n, ginagawa itong default na `ssh` para sa mga bagong terminal."
 
-#: lib/marshall/documentation_messages.ex:42
+#: lib/marshall/documentation_messages.ex:43
 #, elixir-autogen, elixir-format
 msgid "- [Download for Chrome or Chromium](/bin/chrome.zip): extract the ZIP, open\n  `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.\n- [Download for Firefox](/bin/firefox.xpi): open `about:debugging`, choose\n  **This Firefox**, then **Load Temporary Add-on** and select the downloaded XPI."
 msgstr "- [I-download para sa Chrome o Chromium ](/bin/chrome.zip) : i-extract ang ZIP, buksan ang \n `chrome://extensions` , i-enable ang **Developer mode** , at piliin ang **Load unpacked** . \n - [I-download para sa Firefox ](/bin/firefox.xpi) : buksan ang `about:debugging` , piliin ang \n **Itong Firefox** , pagkatapos **Mag-load ng Pansamantalang Add-on** at piliin ang na-download na XPI."
 
-#: lib/marshall/documentation_messages.ex:46
+#: lib/marshall/documentation_messages.ex:47
 #, elixir-autogen, elixir-format
 msgid "1. Open the extension's settings from the browser toolbar. If it is already\n   configured, use the toolbar's context menu and choose **Configure Overalls\n   server…** to change the server.\n2. Enter the HTTPS origin of this Overalls server. HTTP is supported only for\n   loopback development. The server origin is always selected explicitly; the\n   extension never guesses it from a page.\n3. Visit a supported repository page and click the Overalls toolbar button."
 msgstr "1. Buksan ang mga setting ng extension mula sa toolbar ng browser. Kung \n na ang naka-configure, gamitin ang menu ng konteksto ng toolbar at piliin ang **I-configure ang Overalls \n server...** upang baguhin ang server. \n 2. Ipasok ang HTTPS pinanggalingan ng Overalls server na ito. Ang HTTP ay sinusuportahan lamang para sa \n loopback development. Ang pinanggalingan ng server ay palaging pinipili nang tahasan; hindi ito hinuhulaan ng extension ng \n mula sa isang pahina. \n 3. Bisitahin ang isang sinusuportahang pahina ng repositoryo at i-click ang Overalls toolbar na button."
 
-#: lib/marshall/documentation_messages.ex:50
+#: lib/marshall/documentation_messages.ex:51
 #, elixir-autogen, elixir-format
 msgid "Accept a pending ownership offer."
 msgstr "Tanggapin ang isang nakabinbing alok ng pagmamay-ari."
 
-#: lib/marshall/documentation_messages.ex:51
+#: lib/marshall/documentation_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "Add or change an admin or member."
 msgstr "Magdagdag o magpalit ng admin o miyembro."
 
-#: lib/marshall/documentation_messages.ex:52
+#: lib/marshall/documentation_messages.ex:57
 #, elixir-autogen, elixir-format
 msgid "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
 msgstr "Pinapanatili ng isang tinanggal na opsyon ang kasalukuyang laki; isang kahilingan na walang pagpipilian sa laki ay tinanggihan ng \n. Humihinto ang isang tumatakbong makina, inilalapat ang mga sukat at nagre-restart; ang isang tumigil na \n machine ay nananatiling huminto at lumalaki ang filesystem nito sa susunod na boot. Ang resibo na \n ay sumusunod sa mga yugto ng kahilingan. Ang `request cancel grow-1` ay tinatanggap lamang habang ang \n na makina ay humihinto pa rin: ang mga orihinal na laki at hawak ay pinananatili, at ang isang tumatakbong \n na makina ay nagre-restart nang hindi nagbabago. Ipinagpapatuloy ng `request retry grow-1` ang isang kahilingan na nangangailangan ng pansin ng \n mula sa naitalang yugto nito.\n"
 
-#: lib/marshall/documentation_messages.ex:69
+#: lib/marshall/documentation_messages.ex:74
 #, elixir-autogen, elixir-format
 msgid "At the Porsche prompt, enter:"
 msgstr "Sa prompt ng Porsche, ilagay ang:"
 
-#: lib/marshall/documentation_messages.ex:74
+#: lib/marshall/documentation_messages.ex:79
 #, elixir-autogen, elixir-format
 msgid "Automation"
 msgstr "Awtomasyon"
 
-#: lib/marshall/documentation_messages.ex:75
+#: lib/marshall/documentation_messages.ex:80
 #, elixir-autogen, elixir-format
 msgid "Browser extension"
 msgstr "Extension ng browser"
 
-#: lib/marshall/documentation_messages.ex:76
+#: lib/marshall/documentation_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "Cancel an unpublished clone or uncommitted relocation request."
 msgstr "Kanselahin ang isang hindi na-publish na clone o hindi naka-commit na kahilingan sa relokasyon."
 
-#: lib/marshall/documentation_messages.ex:80
+#: lib/marshall/documentation_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Cancel your pending ownership offer."
 msgstr "Kanselahin ang iyong nakabinbing alok sa pagmamay-ari."
 
-#: lib/marshall/documentation_messages.ex:81
+#: lib/marshall/documentation_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Change a machine's CPU and memory; disk may only grow. A running machine stops and restarts."
 msgstr "Baguhin ang CPU at memorya ng makina; maaaring lumaki lamang ang disk. Humihinto ang isang tumatakbong makina at nagre-restart."
 
-#: lib/marshall/documentation_messages.ex:89
+#: lib/marshall/documentation_messages.ex:94
 #, elixir-autogen, elixir-format
 msgid "Choose a stable, unique request ID for each intended mutation. Reuse it when\nretrying that same mutation after losing a reply. Request IDs contain 1–128 ASCII\nletters, digits, underscores, dots, colons or hyphens, and start with a letter or\ndigit. Do not reuse one ID for different operations."
 msgstr "Pumili ng matatag at natatanging request ID para sa bawat nilalayong mutation. Muling gamitin ito kapag muling sinusubukan ng \n ang parehong mutation pagkatapos mawalan ng tugon. Ang mga Request ID ay naglalaman ng 1–128 ASCII \n na mga titik, digit, underscore, tuldok, tutuldok o gitling, at nagsisimula sa isang titik o \n digit. Huwag muling gumamit ng isang ID para sa iba't ibang mga operasyon."
 
-#: lib/marshall/documentation_messages.ex:93
+#: lib/marshall/documentation_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "Cloning is currently unavailable for the Inception multi-disk profile."
 msgstr ""
 "Kasalukuyang hindi magagamit ang cloning para sa Inception multi-disk "
 "profile."
 
-#: lib/marshall/documentation_messages.ex:98
+#: lib/marshall/documentation_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Close this interactive channel."
 msgstr "Isara ang interactive na channel na ito."
 
-#: lib/marshall/documentation_messages.ex:99
+#: lib/marshall/documentation_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Command reference"
 msgstr "Sanggunian ng command"
 
-#: lib/marshall/documentation_messages.ex:100
+#: lib/marshall/documentation_messages.ex:105
 #, elixir-autogen, elixir-format
 msgid "Create a machine. Disk maximum: 500 GiB. --source clones a public GitHub, GitLab, Codeberg or Bitbucket repository in the guest."
 msgstr "Lumikha ng isang makina. Pinakamataas na disk: 500 GiB . --pinag-clone ng source ang isang pampublikong GitHub , GitLab , Codeberg o Bitbucket repository sa bisita."
 
-#: lib/marshall/documentation_messages.ex:104
+#: lib/marshall/documentation_messages.ex:109
 #, elixir-autogen, elixir-format
 msgid "Create a team you own."
 msgstr "Lumikha ng isang koponan na pagmamay-ari mo."
 
-#: lib/marshall/documentation_messages.ex:105
+#: lib/marshall/documentation_messages.ex:110
 #, elixir-autogen, elixir-format
 msgid "Create or replace a named integration at https://NAME.integration.internal."
 msgstr "Gumawa o palitan ang isang pinangalanang integration sa https://NAME.integration.internal."
 
-#: lib/marshall/documentation_messages.ex:109
+#: lib/marshall/documentation_messages.ex:114
 #, elixir-autogen, elixir-format
 msgid "Creation, start, stop, deletion, relocation and request controls wait up to 120\nseconds for the matching physical result. A request being accepted or acknowledged is not proof that the machine\nhas reached the requested state. `--no-wait` returns the accepted request without\nwaiting; `--timeout SECONDS` changes the wait limit. Timing out or disconnecting\ndoes not cancel accepted work."
 msgstr "Ang paggawa, pagsisimula, paghinto, pagtanggal, paglilipat at mga kontrol sa kahilingan ay maghihintay ng hanggang 120 \n segundo para sa tumutugmang pisikal na resulta. Ang isang kahilingan na tinatanggap o tinatanggap ay hindi patunay na ang makina \n ay umabot sa hiniling na estado. Ibinabalik ng `--no-wait` ang tinanggap na kahilingan nang walang \n na naghihintay; Binabago ng `--timeout SECONDS` ang limitasyon sa paghihintay. Ang pag-time out o pagdiskonekta sa \n ay hindi makakansela sa tinatanggap na trabaho."
 
-#: lib/marshall/documentation_messages.ex:113
+#: lib/marshall/documentation_messages.ex:118
 #, elixir-autogen, elixir-format
 msgid "Decline a pending ownership offer."
 msgstr "Tanggihan ang isang nakabinbing alok ng pagmamay-ari."
 
-#: lib/marshall/documentation_messages.ex:114
+#: lib/marshall/documentation_messages.ex:119
 #, elixir-autogen, elixir-format
 msgid "Delete a machine and its disk. Refused while its owner has it pinned."
 msgstr "Tanggalin ang isang makina at ang disk nito. Tinanggihan habang naka-pin ito ng may-ari."
 
-#: lib/marshall/documentation_messages.ex:118
+#: lib/marshall/documentation_messages.ex:123
 #, elixir-autogen, elixir-format
 msgid "Different request IDs create separate copies, processed in order for each source.\nRepeating the same ID returns the same request. Each copy captures the source's\nfiles, specifications and power state when its turn begins. A running source stops\nfor snapshot capture and restarts while copying continues. The new machine belongs\nto you, is private, and has a fresh address; sharing is not copied. Guest files and\ncredentials stored inside the disk are copied. RAM is not copied."
 msgstr "Ang iba't ibang mga request ID ay gumagawa ng hiwalay na mga kopya, na pinoproseso sa pagkakasunud-sunod para sa bawat pinagmulan. \n Ang pag-uulit ng parehong ID ay nagbabalik ng parehong kahilingan. Kinukuha ng bawat kopya ang \n file ng source, mga detalye at estado ng kapangyarihan kapag nagsimula ang turn nito. Ihihinto ng tumatakbong source ang \n para sa pagkuha ng snapshot at magre-restart habang nagpapatuloy ang pagkopya. Ang bagong makina ay pagmamay-ari ng \n sa iyo, pribado, at may bagong address; ang pagbabahagi ay hindi kinokopya. Ang mga file ng bisita at mga kredensyal ng \n na nakaimbak sa loob ng disk ay kinokopya. Ang RAM ay hindi kinopya."
@@ -236,22 +236,22 @@ msgstr "Ang iba't ibang mga request ID ay gumagawa ng hiwalay na mga kopya, na p
 msgid "Documentation"
 msgstr "Dokumentasyon"
 
-#: lib/marshall/documentation_messages.ex:122
+#: lib/marshall/documentation_messages.ex:127
 #, elixir-autogen, elixir-format
 msgid "Each machine's page shows the machine name, its state, its operating system and\nits machine ID (with a Copy button) at the top, followed by a \"Connect from your\ncomputer\" section with a one-line installer that sets up SSH and connects to\nthat machine:"
 msgstr "Ipinapakita ng page ng bawat machine ang pangalan ng machine, estado nito, operating system nito at \n machine ID nito (na may Copy button) sa itaas, na sinusundan ng seksyong \"Kumonekta mula sa iyong \n computer\" na may one-line installer na nagse-set up ng SSH at kumokonekta sa \n na machine:"
 
-#: lib/marshall/documentation_messages.ex:126
+#: lib/marshall/documentation_messages.ex:131
 #, elixir-autogen, elixir-format
 msgid "Every command accepts `--json`. Mutation commands accept `--request-id ID`.\nCreation, start, stop, deletion, relocation and request controls also accept `--timeout SECONDS` (1–3600,\ndefault 120) and `--no-wait`. Memory is in MiB and disk size is in GiB.\nImage identifiers are immutable `sha256:` digests returned by `images`.\nUse `--after UUID` with the returned cursor to fetch another list page."
 msgstr "Ang bawat utos ay tumatanggap ng `--json` . Tinatanggap ng mga mutation command ang `--request-id ID` . \n Ang paggawa, pagsisimula, paghinto, pagtanggal, paglilipat at mga kontrol sa kahilingan ay tumatanggap din ng `--timeout SECONDS` (1–3600, \n default 120) at `--no-wait` . Ang memorya ay nasa MiB at ang laki ng disk ay nasa GiB . \n Ang mga identifier ng imahe ay hindi nababago na mga `sha256:` digest na ibinalik ng `images` . \n Gamitin ang `--after UUID` kasama ang ibinalik na cursor upang kumuha ng isa pang pahina ng listahan."
 
-#: lib/marshall/documentation_messages.ex:130
+#: lib/marshall/documentation_messages.ex:135
 #, elixir-autogen, elixir-format
 msgid "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
 msgstr "Ang bawat tumatakbong bisita ay maaaring mag-query ng `https://reflection.internal` para sa isang hangganan, \n na walang lihim na paglalarawan ng sarili nito at ang mga pribadong serbisyo na kasalukuyang magagamit \n sa pagpapatupad nito."
 
-#: lib/marshall/documentation_messages.ex:134
+#: lib/marshall/documentation_messages.ex:143
 #, elixir-autogen, elixir-format
 msgid "Firefox temporary add-ons are removed when Firefox closes. Permanent Firefox\ninstallation requires Mozilla signing or an explicitly managed browser policy.\nOveralls does not currently publish either archive to a browser store."
 msgstr ""
@@ -259,156 +259,156 @@ msgstr ""
 "pag-install sa Firefox ang Mozilla signing o tahasang pinamamahalaang browser policy.\n"
 "Kasalukuyang hindi inilalathala ng Overalls ang alinman sa dalawang archive sa browser store."
 
-#: lib/marshall/documentation_messages.ex:138
+#: lib/marshall/documentation_messages.ex:147
 #, elixir-autogen, elixir-format
 msgid "For browser approval of an unknown key, start an interactive connection with\n`ssh YOUR_PORSCHE_HOST` and keep it open. Porsche gives you a short-lived approval\nlink after proving possession of the private key. Open it in your browser, sign\nin, compare the fingerprint and explicitly approve. Opening the link alone does\nnot register a key. Links expire after ten minutes and stop working when their\nSSH connection closes. The interactive prompt can continue after approval."
 msgstr "Para sa pag-apruba ng browser ng hindi kilalang key, magsimula ng interactive na koneksyon sa \n `ssh YOUR_PORSCHE_HOST` at panatilihin itong bukas. Binibigyan ka ng Porsche ng panandaliang pag-apruba \n link pagkatapos mapatunayang pagmamay-ari ang pribadong key. Buksan ito sa iyong browser, mag-sign in sa \n, ihambing ang fingerprint at tahasang aprubahan. Ang pagbubukas lamang ng link ay hindi nagrerehistro ng susi ang \n. Mag-e-expire ang mga link pagkalipas ng sampung minuto at hihinto sa paggana kapag nagsara ang kanilang \n SSH na koneksyon. Ang interactive na prompt ay maaaring magpatuloy pagkatapos ng pag-apruba."
 
-#: lib/marshall/documentation_messages.ex:142
+#: lib/marshall/documentation_messages.ex:151
 #, elixir-autogen, elixir-format
 msgid "For one-shot exec commands, register the key on Marshall's SSH keys page first,\nor complete approval in an interactive connection before retrying the command."
 msgstr ""
 "Para sa one-shot exec command, irehistro muna ang key sa pahina ng SSH key ng Marshall,\n"
 "o kumpletuhin ang pag-apruba sa interactive connection bago ulitin ang utos."
 
-#: lib/marshall/documentation_messages.ex:146
+#: lib/marshall/documentation_messages.ex:155
 #, elixir-autogen, elixir-format
 msgid "Getting started"
 msgstr "Pagsisimula"
 
-#: lib/marshall/documentation_messages.ex:147
+#: lib/marshall/documentation_messages.ex:156
 #, elixir-autogen, elixir-format
 msgid "Grant viewer, operator or manager access."
 msgstr "Bigyan ng access ang viewer, operator o manager."
 
-#: lib/marshall/documentation_messages.ex:148
+#: lib/marshall/documentation_messages.ex:157
 #, elixir-autogen, elixir-format
 msgid "Guest SSH and browser terminals use an automatically allocated Linux login such\nas `u200001`, with `/home/u200001` as its home. The login comes from a durable\naccount UID rather than your email address. It stays the same across machines and\nsame-account email changes. A new account registered after retirement receives a\ndifferent identity and does not inherit the former account's home or access.\nMarshall continues showing your email address; there is no username setting."
 msgstr "Gumagamit ang mga bisitang SSH at mga terminal ng browser ng awtomatikong inilalaan na pag-login sa Linux tulad ng \n bilang `u200001` , na may `/home/u200001` bilang tahanan nito. Ang pag-login ay nagmumula sa isang matibay na \n account UID kaysa sa iyong email address. Ito ay nananatiling pareho sa mga machine at \n sa parehong account na mga pagbabago sa email. Ang isang bagong account na nakarehistro pagkatapos ng pagreretiro ay tumatanggap ng \n ibang pagkakakilanlan at hindi nagmana ng tahanan o access ng dating account. \n Marshall patuloy na ipinapakita ang iyong email address; walang setting ng username."
 
-#: lib/marshall/documentation_messages.ex:152
+#: lib/marshall/documentation_messages.ex:161
 #, elixir-autogen, elixir-format
 msgid "Guest metadata includes the machine name and ID, profile, architecture,\noperating-system family, vCPU, memory and disk sizes, image identity,\ngeneration, owner email, team name, current Lilly node, labels, and comment.\nOperating-system values come from the validated image manifest."
 msgstr "Kasama sa metadata ng bisita ang pangalan at ID ng makina, profile, arkitektura, pamilya ng operating-system ng \n, vCPU, memory at laki ng disk, pagkakakilanlan ng imahe, henerasyon ng \n, email ng may-ari, pangalan ng koponan, kasalukuyang Lilly node, mga label, at komento. Ang mga halaga ng \n ng operating system ay nagmumula sa na-validate na manifest ng imahe."
 
-#: lib/marshall/documentation_messages.ex:156
+#: lib/marshall/documentation_messages.ex:165
 #, elixir-autogen, elixir-format
 msgid "Inspect a machine by name or UUID."
 msgstr "Siyasatin ang isang makina sa pamamagitan ng pangalan o UUID ."
 
-#: lib/marshall/documentation_messages.ex:157
+#: lib/marshall/documentation_messages.ex:166
 #, elixir-autogen, elixir-format
 msgid "Inspect a previously accepted request."
 msgstr "Suriin ang isang dating tinanggap na kahilingan."
 
-#: lib/marshall/documentation_messages.ex:159
+#: lib/marshall/documentation_messages.ex:168
 #, elixir-autogen, elixir-format
 msgid "Inspect an integration without secrets."
 msgstr "Siyasatin ang isang pagsasama nang walang mga lihim."
 
-#: lib/marshall/documentation_messages.ex:160
+#: lib/marshall/documentation_messages.ex:169
 #, elixir-autogen, elixir-format
 msgid "Integration entries describe the internal URL, useful paths, a short `help`\ncommand, a comment, and injected header names and kinds. Header values,\ncredentials, tokens, and upstream target URLs are never returned. The list\ncontains Reflection, LLM, and named integrations authorized for this exact\nmachine execution."
 msgstr "Inilalarawan ng mga entry ng integration ang panloob na URL , mga kapaki-pakinabang na landas, isang maikling `help` \n na utos, isang komento, at mga pangalan at uri ng header. Ang mga halaga ng header, mga kredensyal ng \n, mga token, at mga upstream na target na URL ay hindi na ibinalik. Ang listahan ng \n ay naglalaman ng Reflection , LLM, at pinangalanang mga pagsasama na pinahintulutan para sa eksaktong \n virtual machine execution na ito."
 
-#: lib/marshall/documentation_messages.ex:164
+#: lib/marshall/documentation_messages.ex:173
 #, elixir-autogen, elixir-format
 msgid "Key removal prevents subsequent commands and status polls from that session.\nAccepted jobs continue. Reconnect using another registered key, or use email login\nto manage your keys in Marshall. Do not put private keys or approval links in logs.\n"
 msgstr "Pinipigilan ng pag-aalis ng key ang mga kasunod na command at status poll mula sa session na iyon. \n Ang mga tinatanggap na trabaho ay nagpapatuloy. Kumonekta muli gamit ang isa pang nakarehistrong key, o gumamit ng email login \n upang pamahalaan ang iyong mga key sa Marshall . Huwag maglagay ng mga pribadong key o link sa pag-apruba sa mga log.\n"
 
-#: lib/marshall/documentation_messages.ex:169
+#: lib/marshall/documentation_messages.ex:178
 #, elixir-autogen, elixir-format
 msgid "List a team's members."
 msgstr "Maglista ng mga miyembro ng pangkat."
 
-#: lib/marshall/documentation_messages.ex:171
+#: lib/marshall/documentation_messages.ex:180
 #, elixir-autogen, elixir-format
 msgid "List access grants."
 msgstr "Ilista ang mga gawad ng pag-access."
 
-#: lib/marshall/documentation_messages.ex:173
+#: lib/marshall/documentation_messages.ex:182
 #, elixir-autogen, elixir-format
 msgid "List available images."
 msgstr "Ilista ang mga available na larawan."
 
-#: lib/marshall/documentation_messages.ex:174
+#: lib/marshall/documentation_messages.ex:183
 #, elixir-autogen, elixir-format
 msgid "List machines you can access."
 msgstr "Ilista ang mga makina na maaari mong ma-access."
 
-#: lib/marshall/documentation_messages.ex:175
+#: lib/marshall/documentation_messages.ex:184
 #, elixir-autogen, elixir-format
 msgid "List your SSH keys."
 msgstr "Ilista ang iyong mga SSH key."
 
-#: lib/marshall/documentation_messages.ex:176
+#: lib/marshall/documentation_messages.ex:185
 #, elixir-autogen, elixir-format
 msgid "List your integrations."
 msgstr "Ilista ang iyong mga pagsasama."
 
-#: lib/marshall/documentation_messages.ex:178
+#: lib/marshall/documentation_messages.ex:187
 #, elixir-autogen, elixir-format
 msgid "List your teams and roles."
 msgstr "Ilista ang iyong mga koponan at tungkulin."
 
-#: lib/marshall/documentation_messages.ex:179
+#: lib/marshall/documentation_messages.ex:188
 #, elixir-autogen, elixir-format
 msgid "Machine managers can edit labels and the machine comment from machine settings.\nLabels are limited to 32 entries and comments to 2 KiB. Integration managers\ncan edit an integration comment from the integrations page. Changes are\naudited without recording comment text or secret values."
 msgstr "Maaaring i-edit ng mga tagapamahala ng makina ang mga label at ang komento ng makina mula sa mga setting ng makina. Ang \n Label ay limitado sa 32 entry at komento sa 2 KiB. Maaaring i-edit ng mga manager ng pagsasama \n ang isang komento sa pagsasama mula sa pahina ng mga pagsasama. Ang mga pagbabago ay \n na-audit nang hindi nagre-record ng text ng komento o mga lihim na halaga."
 
-#: lib/marshall/documentation_messages.ex:183
+#: lib/marshall/documentation_messages.ex:192
 #, elixir-autogen, elixir-format
 msgid "Machine references accept names or UUIDs. Names are lowercase, begin with a letter,\nand contain letters, digits and single separating hyphens, up to 63 characters.\nUUID-shaped names are reserved for machine identifiers.\nCreation without a name generates one. Creation without an image selects the\noperator's default image. Creation without `--profile` selects OSS; use\n`--profile customer` for the restricted Customer environment. Omitted CPU,\nmemory and disk requests use defaults raised to the image minimum; explicitly\nundersized requests fail."
 msgstr "Ang mga sanggunian sa makina ay tumatanggap ng mga pangalan o UUID. Ang mga pangalan ay maliliit na titik, nagsisimula sa isang titik, \n at naglalaman ng mga titik, digit at nag-iisang naghihiwalay na mga gitling, hanggang sa 63 character. Ang \n UUID na mga pangalan ay nakalaan para sa mga virtual machine identifier. Ang \n Creation na walang pangalan ay bumubuo ng isa. Pinipili ng paglikha na walang larawan ang default na larawan ng operator ng \n. Ang paglikha na walang `--profile` ay pumipili ng OSS; gamitin ang \n `--profile customer` para sa pinaghihigpitang kapaligiran ng Customer. Ang mga inalis na CPU , \n memory at mga kahilingan sa disk ay gumagamit ng mga default na itinaas sa minimum na larawan; tahasang \n ang hindi gaanong laki ng mga kahilingan."
 
-#: lib/marshall/documentation_messages.ex:187
+#: lib/marshall/documentation_messages.ex:196
 #, elixir-autogen, elixir-format
 msgid "Make an integration available to a machine."
 msgstr "Gumawa ng isang pagsasama na magagamit sa isang makina."
 
-#: lib/marshall/documentation_messages.ex:197
+#: lib/marshall/documentation_messages.ex:206
 #, elixir-autogen, elixir-format
 msgid "Move a machine to an automatically selected host."
 msgstr "Ilipat ang isang makina sa isang awtomatikong napiling host."
 
-#: lib/marshall/documentation_messages.ex:206
+#: lib/marshall/documentation_messages.ex:215
 #, elixir-autogen, elixir-format
 msgid "Offer team ownership to an admin."
 msgstr "Mag-alok ng pagmamay-ari ng team sa isang admin."
 
-#: lib/marshall/documentation_messages.ex:207
+#: lib/marshall/documentation_messages.ex:216
 #, elixir-autogen, elixir-format
 msgid "On a supported repository page, clicking an unconfigured toolbar button opens\nsettings. Unsupported hosts show an **Unsupported page** state and do not send a\nURL. Marshall checks the launch request again before staging it and may require\nyou to sign in."
 msgstr "Sa isang sinusuportahang pahina ng repositoryo, ang pag-click sa isang hindi na-configure na toolbar na button ay magbubukas ng mga setting ng \n. Ang mga hindi sinusuportahang host ay nagpapakita ng **Hindi sinusuportahang page** na estado at hindi nagpapadala ng \n URL . Sinusuri ng Marshall muli ang kahilingan sa paglunsad bago ito isagawa at maaaring mangailangan ng \n na mag-sign in ka."
 
-#: lib/marshall/documentation_messages.ex:211
+#: lib/marshall/documentation_messages.ex:220
 #, elixir-autogen, elixir-format
 msgid "Open a GitHub, GitLab, Codeberg or Bitbucket Cloud repository in Overalls with a\nsingle toolbar click. The extension carries only the provider origin and path to\nOveralls, so you can move from a repository page to a machine without copying a\nURL by hand."
 msgstr "Magbukas ng GitHub , GitLab , Codeberg o Bitbucket Cloud repository sa Overalls na may \n solong pag-click sa toolbar. Dinadala lamang ng extension ang pinagmulan at landas ng provider sa \n Overalls , kaya maaari kang lumipat mula sa isang pahina ng repositoryo patungo sa isang makina nang hindi kinokopya ang isang \n URL sa pamamagitan ng kamay."
 
-#: lib/marshall/documentation_messages.ex:216
+#: lib/marshall/documentation_messages.ex:225
 #, elixir-autogen, elixir-format
 msgid "Options:"
 msgstr "Mga Pagpipilian:"
 
-#: lib/marshall/documentation_messages.ex:217
+#: lib/marshall/documentation_messages.ex:226
 #, elixir-autogen, elixir-format
 msgid "Overalls documentation"
 msgstr "Overalls dokumentasyon"
 
-#: lib/marshall/documentation_messages.ex:218
+#: lib/marshall/documentation_messages.ex:227
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can change a machine's CPU and memory; disk may only grow,\nup to 500 GiB:"
 msgstr ""
 "Maaaring baguhin ng may-ari at manager ang CPU at memory ng machine; maaari lamang palakihin ang disk,\n"
 "hanggang 500 GiB:"
 
-#: lib/marshall/documentation_messages.ex:222
+#: lib/marshall/documentation_messages.ex:231
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can queue an independent copy:"
 msgstr "Maaaring pumila ang mga may-ari at tagapamahala ng isang independiyenteng kopya:"
 
-#: lib/marshall/documentation_messages.ex:223
+#: lib/marshall/documentation_messages.ex:232
 #, elixir-autogen, elixir-format
 msgid "Owners, managers and team admins can move a machine to another eligible physical\nhost. The destination and transfer strategy are always selected by Marshall and\ncannot be supplied through Porsche:"
 msgstr ""
@@ -416,17 +416,17 @@ msgstr ""
 "na host. Palaging Marshall ang pumipili ng destinasyon at transfer strategy at\n"
 "hindi ito maibibigay sa pamamagitan ng Porsche:"
 
-#: lib/marshall/documentation_messages.ex:227
+#: lib/marshall/documentation_messages.ex:236
 #, elixir-autogen, elixir-format
 msgid "Permissions are checked at execution time. Access shown in a previous list is\nnot a guarantee that a later operation is allowed. Sharing roles are `viewer`,\n`operator` and `manager`; ownership and current permissions determine which\noperations you may perform. SSH key commands affect only your own keys."
 msgstr "Ang mga pahintulot ay sinusuri sa oras ng pagpapatupad. Ang pag-access na ipinakita sa isang nakaraang listahan ay \n hindi isang garantiya na pinapayagan ang isang operasyon sa ibang pagkakataon. Ang pagbabahagi ng mga tungkulin ay `viewer` , \n `operator` at `manager` ; ang pagmamay-ari at kasalukuyang mga pahintulot ay tumutukoy kung aling mga pagpapatakbo ng \n ang maaari mong gawin. Ang mga key command ng SSH ay nakakaapekto lamang sa sarili mong mga susi."
 
-#: lib/marshall/documentation_messages.ex:231
+#: lib/marshall/documentation_messages.ex:240
 #, elixir-autogen, elixir-format
 msgid "Pin a machine to the top of your lists. Your owner pin wakes it, prevents automatic suspension, and prevents deletion."
 msgstr "I-pin ang isang makina sa itaas ng iyong mga listahan. Binigising ito ng pin ng iyong may-ari, pinipigilan ang awtomatikong pagsususpinde, at pinipigilan ang pagtanggal."
 
-#: lib/marshall/documentation_messages.ex:235
+#: lib/marshall/documentation_messages.ex:244
 #, elixir-autogen, elixir-format
 msgid "Porsche manages machines; it does not provide a guest shell, guest file transfer,\nport forwarding or an SSH agent forwarding service. Machine console access is\navailable separately in Marshall's web interface, subject to account permissions.\n"
 msgstr "Ang Porsche ay namamahala ng mga makina; hindi ito nagbibigay ng guest shell, guest file transfer, \n port forwarding o SSH agent forwarding service. Ang access sa machine console ay \n na available nang hiwalay sa web interface ng Marshall, na napapailalim sa mga pahintulot ng account.\n"
@@ -436,219 +436,219 @@ msgstr "Ang Porsche ay namamahala ng mga makina; hindi ito nagbibigay ng guest s
 msgid "Public documentation for Overalls browser extensions and SSH machine management (Porsche v1)."
 msgstr "Pampublikong dokumentasyon para sa mga extension ng browser ng Overalls at pamamahala ng makina ng SSH ( Porsche v1)."
 
-#: lib/marshall/documentation_messages.ex:240
+#: lib/marshall/documentation_messages.ex:249
 #, elixir-autogen, elixir-format
 msgid "Queue an independent full-disk copy of a machine."
 msgstr "Ipila ang isang independiyenteng full-disk na kopya ng isang makina."
 
-#: lib/marshall/documentation_messages.ex:241
+#: lib/marshall/documentation_messages.ex:250
 #, elixir-autogen, elixir-format
 msgid "Queued requests recheck your access before execution. Use `request cancel copy-1`\nbefore the destination is published; successful cancellation waits for any required\ncleanup. Use `request retry copy-1` to resume a failed request rather than create\nanother destination. Clone accepts `--timeout` and `--no-wait`; a client\ntimeout does not cancel accepted work."
 msgstr "Ang mga nakapila na kahilingan ay muling suriin ang iyong access bago isagawa. Gamitin ang `request cancel copy-1` \n bago i-publish ang patutunguhan; ang matagumpay na pagkansela ay naghihintay para sa anumang kinakailangang paglilinis ng \n. Gamitin ang `request retry copy-1` upang ipagpatuloy ang isang nabigong kahilingan sa halip na lumikha ng \n ng isa pang destinasyon. Tumatanggap ang Clone ng `--timeout` at `--no-wait` ; hindi kinansela ng isang kliyenteng \n timeout ang tinatanggap na trabaho."
 
-#: lib/marshall/documentation_messages.ex:245
+#: lib/marshall/documentation_messages.ex:254
 #, elixir-autogen, elixir-format
 msgid "Reconnecting later is the same everywhere: `ssh HOST`. (On Windows, if you\ndeclined the administrator prompt, use `overalls ssh HOST` instead.)"
 msgstr ""
 "Pareho saanman ang muling pagkonekta sa ibang pagkakataon: `ssh HOST`. (Sa Windows, kung\n"
 "tinanggihan mo ang administrator prompt, gamitin sa halip ang `overalls ssh HOST`.)"
 
-#: lib/marshall/documentation_messages.ex:249
+#: lib/marshall/documentation_messages.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reflection integration"
 msgstr "Integrasyon ng Reflection"
 
-#: lib/marshall/documentation_messages.ex:250
+#: lib/marshall/documentation_messages.ex:259
 #, elixir-autogen, elixir-format
 msgid "Reflection is available only through the private network. Requests are bound to\nthe current VM, host, placement, and execution epoch; stopped, relocated,\nretired, stale, or unauthorized guests receive an unavailable response.\n"
 msgstr "Available lang ang Reflection sa pribadong network. Nakatali ang mga request sa kasalukuyang VM, host, placement, at execution epoch. Makakatanggap ng sagot na hindi available ang serbisyo ang mga guest na nakahinto, nailipat, inalis na, lipas ang estado, o walang pahintulot.\n"
 
-#: lib/marshall/documentation_messages.ex:258
+#: lib/marshall/documentation_messages.ex:267
 #, elixir-autogen, elixir-format
 msgid "Remove a machine's explicit availability."
 msgstr "Alisin ang tahasang kakayahang magamit ng isang makina."
 
-#: lib/marshall/documentation_messages.ex:259
+#: lib/marshall/documentation_messages.ex:268
 #, elixir-autogen, elixir-format
 msgid "Remove a named integration."
 msgstr "Alisin ang isang pinangalanang pagsasama."
 
-#: lib/marshall/documentation_messages.ex:260
+#: lib/marshall/documentation_messages.ex:269
 #, elixir-autogen, elixir-format
 msgid "Remove an account's membership."
 msgstr "Alisin ang membership ng isang account."
 
-#: lib/marshall/documentation_messages.ex:261
+#: lib/marshall/documentation_messages.ex:270
 #, elixir-autogen, elixir-format
 msgid "Remove your pin from a machine."
 msgstr "Alisin ang iyong pin sa isang makina."
 
-#: lib/marshall/documentation_messages.ex:262
+#: lib/marshall/documentation_messages.ex:271
 #, elixir-autogen, elixir-format
 msgid "Resume a suspended machine's preserved memory."
 msgstr "Ipagpatuloy ang napanatili na memorya ng nasuspinde na makina."
 
-#: lib/marshall/documentation_messages.ex:263
+#: lib/marshall/documentation_messages.ex:272
 #, elixir-autogen, elixir-format
 msgid "Resume preserved memory, waiting for capacity or relocation."
 msgstr "Ipagpatuloy ang napanatili na memorya, naghihintay ng kapasidad o relokasyon."
 
-#: lib/marshall/documentation_messages.ex:267
+#: lib/marshall/documentation_messages.ex:276
 #, elixir-autogen, elixir-format
 msgid "Retry a failed clone or relocation request."
 msgstr "Subukan muli ang isang nabigong pag-clone o kahilingan sa relokasyon."
 
-#: lib/marshall/documentation_messages.ex:269
+#: lib/marshall/documentation_messages.ex:278
 #, elixir-autogen, elixir-format
 msgid "Revoke an account's shared access."
 msgstr "Bawiin ang nakabahaging access ng isang account."
 
-#: lib/marshall/documentation_messages.ex:270
+#: lib/marshall/documentation_messages.ex:279
 #, elixir-autogen, elixir-format
 msgid "Revoke one of your SSH keys."
 msgstr "Bawiin ang isa sa iyong mga SSH key."
 
-#: lib/marshall/documentation_messages.ex:273
+#: lib/marshall/documentation_messages.ex:286
 #, elixir-autogen, elixir-format
 msgid "Show command help."
 msgstr "Ipakita ang tulong ng command."
 
-#: lib/marshall/documentation_messages.ex:274
+#: lib/marshall/documentation_messages.ex:287
 #, elixir-autogen, elixir-format
 msgid "Show the authenticated account."
 msgstr "Ipakita ang na-authenticate na account."
 
-#: lib/marshall/documentation_messages.ex:275
+#: lib/marshall/documentation_messages.ex:288
 #, elixir-autogen, elixir-format
 msgid "Sign in to Marshall using your email login and open\n[Account settings › SSH keys](/settings#ssh-keys). Paste one OpenSSH public key and optionally give it\na label. Paste the `.pub` file, never the private key. Supported public keys are\nEd25519, ECDSA and RSA (at least 2048 bits). Certificates and `authorized_keys`\noptions are not accepted."
 msgstr "Mag-sign in sa Marshall gamit ang iyong email login at buksan ang \n [Mga setting ng account › SSH keys ](/settings#ssh-keys) . Mag-paste ng isang OpenSSH public key at opsyonal na bigyan ito ng \n ng label. I-paste ang `.pub` file, hindi kailanman ang pribadong key. Ang mga sinusuportahang pampublikong key ay \n Ed25519, ECDSA at RSA (hindi bababa sa 2048 bits). Ang mga certificate at `authorized_keys` \n na opsyon ay hindi tinatanggap."
 
-#: lib/marshall/documentation_messages.ex:279
+#: lib/marshall/documentation_messages.ex:292
 #, elixir-autogen, elixir-format
 msgid "Start a machine."
 msgstr "Magsimula ng makina."
 
-#: lib/marshall/documentation_messages.ex:280
+#: lib/marshall/documentation_messages.ex:293
 #, elixir-autogen, elixir-format
 msgid "Stop a machine, retaining its disk and discarding suspended memory."
 msgstr "Ihinto ang isang makina, pinapanatili ang disk nito at itinatapon ang nasuspinde na memorya."
 
-#: lib/marshall/documentation_messages.ex:284
+#: lib/marshall/documentation_messages.ex:297
 #, elixir-autogen, elixir-format
 msgid "Stop retains the disk. `rm MACHINE` deletes the machine and its disk. A name is\navailable for reuse only after cleanup is confirmed. Use `exit` to leave the prompt."
 msgstr "Pinapanatili ng Stop ang disk. Tinatanggal ng `rm MACHINE` ang makina at ang disk nito. Ang isang pangalan ay \n na magagamit lamang muli pagkatapos makumpirma ang paglilinis. Gamitin ang `exit` para umalis sa prompt."
 
-#: lib/marshall/documentation_messages.ex:304
+#: lib/marshall/documentation_messages.ex:317
 #, elixir-autogen, elixir-format
 msgid "Suspend a machine, preserving its memory and disk."
 msgstr "Suspindihin ang isang makina, pinapanatili ang memorya at disk nito."
 
-#: lib/marshall/documentation_messages.ex:306
+#: lib/marshall/documentation_messages.ex:319
 #, elixir-autogen, elixir-format
 msgid "The Overalls operator chooses whether these immutable archives are available. If\nthe deployment has disabled its browser extension package, the download links return an unavailable response.\nSee the browser distribution notes for package and build details.\n"
 msgstr "Pinipili ng operator ng Overalls kung available ang mga hindi nababagong archive na ito. Kung ang \n ay hindi pinagana ng deployment ang browser extension package nito, ang mga link sa pag-download ay nagbabalik ng hindi available na tugon. \n Tingnan ang mga tala sa pamamahagi ng browser para sa mga detalye ng package at build.\n"
 
-#: lib/marshall/documentation_messages.ex:310
+#: lib/marshall/documentation_messages.ex:323
 #, elixir-autogen, elixir-format
 msgid "The accepted request retains its normalized command and resolved resources.\nRetrying cannot retarget a different machine after name reuse or silently select\na different default image. Query the original request after a lost response or\ntimeout. Request status remains subject to current account authorization, including\nafter the machine is archived."
 msgstr "Ang tinanggap na kahilingan ay nagpapanatili ng naka-normalize na utos at nalutas na mga mapagkukunan. Ang \n Ang muling pagsubok ay hindi maaaring mag-retarget ng ibang machine pagkatapos ng muling paggamit ng pangalan o tahimik na pumili ng \n ng ibang default na imahe. Itanong ang orihinal na kahilingan pagkatapos ng nawalang tugon o \n timeout. Ang status ng kahilingan ay nananatiling napapailalim sa kasalukuyang awtorisasyon ng account, kabilang ang \n pagkatapos ma-archive ang makina."
 
-#: lib/marshall/documentation_messages.ex:314
+#: lib/marshall/documentation_messages.ex:327
 #, elixir-autogen, elixir-format
 msgid "The browser extension opens supported repository pages in Overalls. The SSH guides\ndescribe Porsche v1; your operator supplies the SSH hostname for deployments\nwith Porsche enabled."
 msgstr "Binubuksan ng extension ng browser ang mga sinusuportahang pahina ng repository sa Overalls . Ang SSH ay gumagabay sa \n na naglalarawan ng Porsche v1; ang iyong operator ay nagbibigay ng SSH hostname para sa mga deployment na \n na may Porsche na naka-enable."
 
-#: lib/marshall/documentation_messages.ex:318
+#: lib/marshall/documentation_messages.ex:331
 #, elixir-autogen, elixir-format
 msgid "The extension opens Overalls with a source URL only after an explicit toolbar\nclick on the four supported HTTPS provider hosts. It sends the provider origin\nand path, strips query parameters and fragments, and never collects page\ncontents, credentials, history or telemetry."
 msgstr "Binubuksan ng extension ang Overalls na may pinagmulang URL lamang pagkatapos ng isang tahasang toolbar na \n na mag-click sa apat na sinusuportahang host ng provider ng HTTPS. Ipinapadala nito ang pinagmulan ng provider na \n at landas, tinatanggal ang mga parameter at fragment ng query, at hindi kailanman nangongolekta ng mga nilalaman, kredensyal, kasaysayan o telemetry ng pahina ng \n."
 
-#: lib/marshall/documentation_messages.ex:322
+#: lib/marshall/documentation_messages.ex:335
 #, elixir-autogen, elixir-format
 msgid "The machine keeps its identity, name, sharing, private address, image and requested\nshape. A running machine may have bounded downtime while final disk state and\nexecution authority move. `request cancel move-1` is available only before handoff\ncommits. If destination activation or readiness fails after commit,\n`request retry move-1` retries that retained destination. Both controls create\ntheir own durable request receipt; use a distinct `--request-id` for each control."
 msgstr "Pinapanatili ng makina ang pagkakakilanlan, pangalan, pagbabahagi, pribadong address, larawan at hiniling na hugis ng \n. Ang isang tumatakbong makina ay maaaring may hangganan sa downtime habang ang huling disk state at \n execution authority ay gumagalaw. Available lang ang `request cancel move-1` bago gawin ang handoff \n. Kung nabigo ang pag-activate o kahandaan ng patutunguhan pagkatapos ng pag-commit, muling susubukan ng \n `request retry move-1` ang nananatiling destinasyon. Ang parehong mga kontrol ay lumikha ng \n ng kanilang sariling matibay na resibo ng kahilingan; gumamit ng natatanging `--request-id` para sa bawat kontrol."
 
-#: lib/marshall/documentation_messages.ex:326
+#: lib/marshall/documentation_messages.ex:339
 #, elixir-autogen, elixir-format
 msgid "The page shows each key's label, type, fingerprint and creation time. Remove a key\nto revoke its access. You may remove your last SSH key and continue using email\nlogin. Adding the same public key again creates a new registration; previous\nsessions remain revoked."
 msgstr "Ipinapakita ng page ang label, uri, fingerprint at oras ng paggawa ng bawat key. Mag-alis ng key \n para bawiin ang access nito. Maaari mong alisin ang iyong huling SSH key at magpatuloy sa paggamit ng email na \n login. Ang muling pagdaragdag ng parehong pampublikong key ay lilikha ng bagong pagpaparehistro; nananatiling binawi ang mga nakaraang \n session."
 
-#: lib/marshall/documentation_messages.ex:330
+#: lib/marshall/documentation_messages.ex:347
 #, elixir-autogen, elixir-format
 msgid "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
 msgstr "Ang mga archive na ito ay hindi nalagdaan at inihahatid ng Overalls deployment. I-download ang \n ang archive para sa iyong browser, pagkatapos ay sundin ang daloy ng developer-install nito:"
 
-#: lib/marshall/documentation_messages.ex:334
+#: lib/marshall/documentation_messages.ex:351
 #, elixir-autogen, elixir-format
 msgid "These pages are public and contain no account or fleet data. Each page is available\nas HTML by removing `.md` from its URL. Language-model clients can start at\n[/llms.txt](/llms.txt) and follow the Markdown links."
 msgstr "Ang mga page na ito ay pampubliko at walang account o fleet data. Ang bawat pahina ay magagamit \n bilang HTML sa pamamagitan ng pag-alis ng `.md` mula sa URL nito. Maaaring magsimula ang mga kliyente ng modelo ng wika sa \n [/llms.txt ](/llms.txt) at sundin ang mga link ng Markdown."
 
-#: lib/marshall/documentation_messages.ex:338
+#: lib/marshall/documentation_messages.ex:355
 #, elixir-autogen, elixir-format
 msgid "This reference uses the same v1 command grammar as the SSH service."
 msgstr "Ginagamit ng reference na ito ang parehong v1 command grammar gaya ng SSH service."
 
-#: lib/marshall/documentation_messages.ex:343
+#: lib/marshall/documentation_messages.ex:364
 #, elixir-autogen, elixir-format
 msgid "Use Overalls from your browser or manage machines over SSH with Porsche. Marshall\nprovides the web interface and account permissions. Use the same account in both."
 msgstr "Gamitin ang Overalls mula sa iyong browser o pamahalaan ang mga makina sa SSH gamit ang Porsche . Nagbibigay ang Marshall \n ng web interface at mga pahintulot ng account. Gamitin ang parehong account sa pareho."
 
-#: lib/marshall/documentation_messages.ex:347
+#: lib/marshall/documentation_messages.ex:368
 #, elixir-autogen, elixir-format
 msgid "Use Porsche to manage machines over SSH, with the same account and permissions\nas Marshall’s web interface."
 msgstr "Gamitin ang Porsche upang pamahalaan ang mga makina sa SSH , na may parehong account at mga pahintulot na \n bilang web interface ng Marshall."
 
-#: lib/marshall/documentation_messages.ex:351
+#: lib/marshall/documentation_messages.ex:372
 #, elixir-autogen, elixir-format
 msgid "Use SSH exec commands and durable request IDs to automate machine management."
 msgstr "Gumamit ng mga SSH exec command at matibay na request ID para i-automate ang pamamahala sa makina."
 
-#: lib/marshall/documentation_messages.ex:355
+#: lib/marshall/documentation_messages.ex:376
 #, elixir-autogen, elixir-format
 msgid "Use `--json` for machine-readable results. An exec invocation writes one result\nto standard output; progress goes to standard error. Check the SSH command's exit\nstatus as well as its result. A failed command exits nonzero."
 msgstr "Gamitin ang `--json` para sa mga resultang nababasa ng makina. Ang isang exec invocation ay nagsusulat ng isang resulta \n sa karaniwang output; ang pag-unlad ay napupunta sa karaniwang error. Tingnan ang SSH command's exit \n status pati na rin ang resulta nito. Ang isang nabigong command ay lumalabas sa nonzero."
 
-#: lib/marshall/documentation_messages.ex:359
+#: lib/marshall/documentation_messages.ex:380
 #, elixir-autogen, elixir-format
 msgid "Use the Porsche hostname supplied by your operator. In a local terminal, run\n`ssh YOUR_PORSCHE_HOST help` for one command, or `ssh YOUR_PORSCHE_HOST` for an\ninteractive prompt. Verify the server host-key fingerprint using your operator's\ntrusted instructions. Management uses port 22."
 msgstr "Gamitin ang Porsche hostname na ibinigay ng iyong operator. Sa isang lokal na terminal, patakbuhin ang \n `ssh YOUR_PORSCHE_HOST help` para sa isang command, o `ssh YOUR_PORSCHE_HOST` para sa isang \n interactive prompt. I-verify ang fingerprint ng host-key ng server gamit ang mga pinagkakatiwalaang tagubilin ng iyong operator na \n. Ginagamit ng pamamahala ang port 22."
 
-#: lib/marshall/documentation_messages.ex:363
+#: lib/marshall/documentation_messages.ex:384
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests."
 msgstr "Ang mga VM disk ay may maximum na kapasidad na **500 GiB** (536,870,912,000 bytes). \n Ang mga kahilingan sa paggawa at pagbabago ng laki sa itaas ng limitasyong ito ay tinatanggihan, kasama ang mga kahilingan sa Porsche \n `new --disk`."
 
-#: lib/marshall/documentation_messages.ex:367
+#: lib/marshall/documentation_messages.ex:388
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests.\n"
 msgstr "Ang mga VM disk ay may maximum na kapasidad na **500 GiB** (536,870,912,000 bytes). \n Ang mga kahilingan sa paggawa at pagbabago ng laki sa itaas ng limitasyong ito ay tinatanggihan, kasama ang mga kahilingan sa Porsche \n `new --disk`.\n"
 
-#: lib/marshall/documentation_messages.ex:371
+#: lib/marshall/documentation_messages.ex:392
 #, elixir-autogen, elixir-format
 msgid "When the extension has been configured for this exact Overalls origin and the\nbrowser has granted site access, it marks the open Overalls page as installed.\nThat local marker hides setup prompts on the home page; it does not sign you in,\ngrant access to machines, or change launch authorization. If site access is\nwithdrawn, configuration is missing, or detection is unavailable, setup remains\nvisible."
 msgstr "Kapag ang extension ay na-configure para sa eksaktong Overalls na pinanggalingan at ang \n browser ay nagbigay ng access sa site, minarkahan nito ang bukas na Overalls na pahina bilang naka-install. \n Itinatago ng lokal na marker ang mga prompt ng pag-setup sa home page; hindi ka nito sina-sign in, nagbibigay ang \n ng access sa mga makina, o binabago ang awtorisasyon sa paglunsad. Kung ang pag-access sa site ay \n binawi, ang configuration ay nawawala, o ang pagtuklas ay hindi available, ang setup ay nananatiling \n na nakikita."
 
-#: lib/marshall/documentation_messages.ex:375
+#: lib/marshall/documentation_messages.ex:396
 #, elixir-autogen, elixir-format
 msgid "With exec, place the same command after `ssh YOUR_PORSCHE_HOST` and quote it for\nyour local shell when needed. Porsche does not evaluate shell expressions,\npipelines or substitutions. Single and double quotes group command arguments."
 msgstr "Sa exec, ilagay ang parehong command pagkatapos ng `ssh YOUR_PORSCHE_HOST` at sipiin ito para sa \n sa iyong lokal na shell kapag kinakailangan. Hindi sinusuri ng Porsche ang mga shell expression, \n pipeline o mga pamalit. Mga argumento ng utos ng grupong single at double quote."
 
-#: lib/marshall/documentation_messages.ex:384
+#: lib/marshall/documentation_messages.ex:405
 #, elixir-autogen, elixir-format
 msgid "`GET /` returns a versioned object containing `guest`, `integrations`, and the\navailable paths. `GET /guest` returns only guest metadata. `GET /integrations`\nreturns the integrations array directly, which makes it convenient for shell\nscripts and agents."
 msgstr "Ang `GET /` ay nagbabalik ng isang may bersyon na bagay na naglalaman ng `guest` , `integrations` , at ang \n na magagamit na mga landas. Ang `GET /guest` ay nagbabalik lamang ng metadata ng bisita. Direktang ibinabalik ng `GET /integrations` \n ang hanay ng mga integrasyon, na ginagawang maginhawa para sa mga script at ahente ng shell \n."
 
-#: lib/marshall/documentation_messages.ex:392
+#: lib/marshall/documentation_messages.ex:413
 #, elixir-autogen, elixir-format
 msgid "`new` selects OSS when `--profile` is omitted, as does the browser creation form.\nUse `new --profile customer` to choose Customer explicitly. Customer machines\npermit only owner SSH and serial-terminal access. All outbound network\nconnections, workspace sharing, and web/port exposure are disabled.\nSSH reply traffic is allowed only on admitted owner connections. Choose an\nappropriate non-Customer profile when networking or collaboration is required."
 msgstr "Pinipili ng `new` ang OSS kapag tinanggal ang `--profile`, gayundin ang form ng paglikha ng browser. \n Gamitin ang `new --profile customer` para tahasang pumili ng Customer. Ang mga makina ng customer na \n ay nagpapahintulot lamang sa may-ari na SSH at serial-terminal na pag-access. Naka-disable ang lahat ng outbound network na \n na koneksyon, pagbabahagi ng workspace, at web/port. Ang trapiko ng tugon ng \n SSH ay pinapayagan lamang sa mga koneksyon ng pinapapasok na may-ari. Pumili ng \n na naaangkop na hindi-Customer na profile kapag kailangan ang networking o pakikipagtulungan."
 
-#: lib/marshall/documentation_messages.ex:396
+#: lib/marshall/documentation_messages.ex:417
 #, elixir-autogen, elixir-format
 msgid "`pin MACHINE` keeps a machine at the top of your lists in the browser; `unpin\nMACHINE` removes your pin. Pins are personal, and you may hold up to twenty. While\nthe machine's owner has it pinned, nobody can delete it: `rm` answers\n`machine_pinned` until the owner runs `unpin MACHINE` or unpins it in the browser."
 msgstr "Pinapanatili ng `pin MACHINE` ang isang makina sa tuktok ng iyong mga listahan sa browser; Tinatanggal ng `unpin\nMACHINE` ang iyong pin. Ang mga pin ay personal, at maaari kang humawak ng hanggang dalawampu. Habang naka-pin ang \n ng may-ari ng makina, walang makakapagtanggal nito: Sinasagot ng `rm` ang \n `machine_pinned` hanggang sa patakbuhin ng may-ari ang `unpin MACHINE` o i-unpin ito sa browser."
 
-#: lib/marshall/documentation_messages.ex:400
+#: lib/marshall/documentation_messages.ex:421
 #, elixir-autogen, elixir-format
 msgid "`relocate MACHINE` moves the same machine and disk to another eligible physical\nhost. Porsche never accepts a destination: Marshall selects one from current\ncapacity, image availability and transfer readiness. The machine keeps its name,\nidentity, sharing and private address."
 msgstr "Inilipat ng `relocate MACHINE` ang parehong makina at disk sa isa pang karapat-dapat na pisikal na host ng \n. Ang Porsche ay hindi kailanman tumatanggap ng patutunguhan: Ang Marshall ay pumipili ng isa mula sa kasalukuyang kapasidad ng \n, pagkakaroon ng larawan at pagiging handa sa paglipat. Pinapanatili ng makina ang pangalan nito, pagkakakilanlan ng \n, pagbabahagi at pribadong address."
@@ -663,17 +663,17 @@ msgstr "# Mga push notification"
 msgid "## Devices"
 msgstr "## Mga device"
 
-#: lib/marshall/documentation_messages.ex:22
+#: lib/marshall/documentation_messages.ex:23
 #, elixir-autogen, elixir-format
 msgid "## Privacy"
 msgstr "## Pagkapribado"
 
-#: lib/marshall/documentation_messages.ex:29
+#: lib/marshall/documentation_messages.ex:30
 #, elixir-autogen, elixir-format
 msgid "## Turning notifications off"
 msgstr "## Pag-off ng mga notification"
 
-#: lib/marshall/documentation_messages.ex:30
+#: lib/marshall/documentation_messages.ex:31
 #, elixir-autogen, elixir-format
 msgid "- An operator can disable notifications for the whole deployment with\n  `services.marshall.notifications.enable = false`. Registration is then\n  refused and nothing is sent to Susan.\n- You can pause a single device with `device prefs DEVICE_ID --enabled false`.\n- You can revoke a device with `device rm DEVICE_ID`."
 msgstr ""
@@ -681,7 +681,7 @@ msgstr ""
 "- Maaari mong i-pause ang isang device gamit ang `device prefs DEVICE_ID --enabled false`.\n"
 "- Maaari mong bawiin ang isang device gamit ang `device rm DEVICE_ID`."
 
-#: lib/marshall/documentation_messages.ex:38
+#: lib/marshall/documentation_messages.ex:39
 #, elixir-autogen, elixir-format
 msgid "- [Browser extension](/docs/browser-extension.md): open supported repositories in Overalls.\n- [Getting started](/docs/quickstart.md): register a key and connect.\n- [Command reference](/docs/commands.md): syntax and available options.\n- [Automation](/docs/automation.md): JSON, retries and completion.\n- [Reflection integration](/docs/reflection.md): discover guest metadata and available private integrations.\n- [Push notifications](/docs/notifications.md): Mila notifications, devices and privacy."
 msgstr ""
@@ -692,162 +692,162 @@ msgstr ""
 "- [Integrasyon ng Reflection](/docs/reflection.md): tuklasin ang metadata ng guest at mga available na pribadong integrasyon.\n"
 "- [Mga push notification](/docs/notifications.md): mga notification, device at pagkapribado sa Mila."
 
-#: lib/marshall/documentation_messages.ex:56
+#: lib/marshall/documentation_messages.ex:61
 #, elixir-autogen, elixir-format
 msgid "Answer a thread's pending question with JSON read from standard input."
 msgstr "Sagutin ang nakabinbing tanong ng usapan gamit ang JSON na binasa mula sa standard input."
 
-#: lib/marshall/documentation_messages.ex:60
+#: lib/marshall/documentation_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "Apple and Google deliver notifications only to apps signed by the app's\npublisher, so every Overalls deployment sends notifications through one shared\nrelay, Susan, at `https://notifications.overalls.dev`. Your deployment cannot\nbe configured to use another relay."
 msgstr "Naghahatid lamang ang Apple at Google ng mga notification sa mga app na nilagdaan ng publisher ng app, kaya bawat deployment ng Overalls ay nagpapadala ng mga notification sa iisang shared relay, ang Susan, sa `https://notifications.overalls.dev`. Hindi maaaring i-configure ang iyong deployment na gumamit ng ibang relay."
 
-#: lib/marshall/documentation_messages.ex:64
+#: lib/marshall/documentation_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "Approve a thread's latest plan and start implementing it."
 msgstr "Aprubahan ang pinakabagong plano ng usapan at simulan itong ipatupad."
 
-#: lib/marshall/documentation_messages.ex:65
+#: lib/marshall/documentation_messages.ex:70
 #, elixir-autogen, elixir-format
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "Humingi ng binagong plano, na binabasa ang feedback mula sa standard input."
 
-#: lib/marshall/documentation_messages.ex:70
+#: lib/marshall/documentation_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "Ikabit ang SSH terminal na ito sa isang shared na sesyon ng terminal; kailangan ng ssh -t."
 
-#: lib/marshall/documentation_messages.ex:85
+#: lib/marshall/documentation_messages.ex:90
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "Baguhin ang web port o visibility ng makina, opsyonal sa inaasahang revision."
 
-#: lib/marshall/documentation_messages.ex:97
+#: lib/marshall/documentation_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "Isara ang isa sa iyong mga sesyon ng terminal sa isang makina."
 
-#: lib/marshall/documentation_messages.ex:158
+#: lib/marshall/documentation_messages.ex:167
 #, elixir-autogen, elixir-format
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "Siyasatin ang isang usapan, ang nakabinbing tanong nito at ang pinakabagong plano."
 
-#: lib/marshall/documentation_messages.ex:168
+#: lib/marshall/documentation_messages.ex:177
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "Ilista ang mga sesyon ng terminal ng makina na maaari mong buksan."
 
-#: lib/marshall/documentation_messages.ex:170
+#: lib/marshall/documentation_messages.ex:179
 #, elixir-autogen, elixir-format
 msgid "List a thread's transcript events after a sequence number."
 msgstr "Ilista ang mga event sa sipi ng usapan pagkatapos ng isang sequence number."
 
-#: lib/marshall/documentation_messages.ex:172
+#: lib/marshall/documentation_messages.ex:181
 #, elixir-autogen, elixir-format
 msgid "List agent threads you can read, with unread counts."
 msgstr "Ilista ang mga usapan ng agent na mababasa mo, kasama ang bilang ng hindi pa nababasa."
 
-#: lib/marshall/documentation_messages.ex:177
+#: lib/marshall/documentation_messages.ex:186
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "Ilista ang iyong mga device para sa push notification."
 
-#: lib/marshall/documentation_messages.ex:188
+#: lib/marshall/documentation_messages.ex:197
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "Markahang nabasa ang usapan hanggang sa isang sequence number ng sipi ng usapan."
 
-#: lib/marshall/documentation_messages.ex:189
+#: lib/marshall/documentation_messages.ex:198
 #, elixir-autogen, elixir-format
 msgid "Mila registers your phone when you allow notifications. The registration is\nbound to the SSH key Mila uses, so removing that key from your account also\nrevokes the device. Each account can have up to ten active devices."
 msgstr "Inirerehistro ng Mila ang iyong telepono kapag pinayagan mo ang mga notification. Nakatali ang pagpaparehistro sa SSH key na ginagamit ng Mila, kaya ang pag-alis ng key na iyon sa iyong account ay bumabawi rin sa device. Ang bawat account ay maaaring magkaroon ng hanggang sampung aktibong device."
 
-#: lib/marshall/documentation_messages.ex:193
+#: lib/marshall/documentation_messages.ex:202
 #, elixir-autogen, elixir-format
 msgid "Mila, the Overalls mobile app, can tell you when an agent needs your input:\nwhen a planning turn asks you a question or proposes a plan. A notification\nonly says that something needs attention; opening it takes you to the thread\nin Mila, which then fetches the details over your own SSH connection."
 msgstr "Ang Mila, ang mobile app ng Overalls, ay maaaring magsabi sa iyo kapag kailangan ng agent ang iyong input: kapag nagtanong sa iyo o nagmungkahi ng plano ang isang planning turn. Sinasabi lamang ng notification na may kailangang bigyang-pansin; dadalhin ka ng pagbubukas nito sa usapan sa Mila, na kukuha naman ng mga detalye sa sarili mong SSH connection."
 
-#: lib/marshall/documentation_messages.ex:198
+#: lib/marshall/documentation_messages.ex:207
 #, elixir-autogen, elixir-format
 msgid "Notifications are a convenience. While Mila is open, it follows your threads\nthrough its own live watch stream, which works even when notifications are\ndisabled or Susan is unavailable.\n"
 msgstr "Kaginhawahan lamang ang mga notification. Habang bukas ang Mila, sinusubaybayan nito ang iyong mga usapan sa sarili nitong live watch stream, na gumagana kahit naka-disable ang mga notification o hindi available ang Susan.\n"
 
-#: lib/marshall/documentation_messages.ex:202
+#: lib/marshall/documentation_messages.ex:211
 #, elixir-autogen, elixir-format
 msgid "Notifications go to the devices of every person who can currently act on the\nthread, except the person whose action caused it. People with view-only\naccess are not notified."
 msgstr "Napupunta ang mga notification sa mga device ng bawat taong kasalukuyang makakakilos sa usapan, maliban sa taong ang aksyon ang nagdulot nito. Hindi inaabisuhan ang mga taong may view-only na access."
 
-#: lib/marshall/documentation_messages.ex:215
+#: lib/marshall/documentation_messages.ex:224
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "Buksan ang iyong personal na sesyon ng terminal sa isang makina."
 
-#: lib/marshall/documentation_messages.ex:239
+#: lib/marshall/documentation_messages.ex:248
 #, elixir-autogen, elixir-format
 msgid "Push notifications"
 msgstr "Mga push notification"
 
-#: lib/marshall/documentation_messages.ex:254
+#: lib/marshall/documentation_messages.ex:263
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "Irehistro ang device na ito para sa mga push notification. Binabasa ang push key mula sa stdin."
 
-#: lib/marshall/documentation_messages.ex:268
+#: lib/marshall/documentation_messages.ex:277
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "Bawiin ang isang device para sa push notification."
 
-#: lib/marshall/documentation_messages.ex:271
+#: lib/marshall/documentation_messages.ex:284
 #, elixir-autogen, elixir-format
 msgid "Send a prompt read from standard input to a thread."
 msgstr "Magpadala sa usapan ng tagubiling binasa mula sa standard input."
 
-#: lib/marshall/documentation_messages.ex:272
+#: lib/marshall/documentation_messages.ex:285
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "Ipakita ang web endpoint, port at visibility ng makina."
 
-#: lib/marshall/documentation_messages.ex:288
+#: lib/marshall/documentation_messages.ex:301
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "Mag-stream ng mga JSON na abiso ng pagbabago para sa mga makina, usapan at sa sesyong ito."
 
-#: lib/marshall/documentation_messages.ex:292
+#: lib/marshall/documentation_messages.ex:305
 #, elixir-autogen, elixir-format
 msgid "Susan keeps an append-only audit log of key issues, accepted and refused\nnotifications, rate limits and delivery outcomes. Each entry records only the\naction, reason, a fingerprint of the sending deployment, the push key ID, the\nprovider (Apple or Google), the outcome and a delivery ID. It does not record IP\naddresses, push tokens, keys or encrypted messages. Audit entries are deleted\nafter 90 days."
 msgstr "Nagtatago ang Susan ng append-only na audit log ng pag-isyu ng key, mga tinanggap at tinanggihang notification, mga rate limit at resulta ng paghahatid. Itinatala lamang ng bawat entry ang aksyon, dahilan, fingerprint ng nagpapadalang deployment, ID ng push key, provider (Apple o Google), resulta at ID ng paghahatid. Hindi nito itinatala ang mga IP address, push token, key o naka-encrypt na mensahe. Binubura ang mga audit entry pagkalipas ng 90 araw."
 
-#: lib/marshall/documentation_messages.ex:296
+#: lib/marshall/documentation_messages.ex:309
 #, elixir-autogen, elixir-format
 msgid "Susan never sees your prompts, agent output, thread or machine names, email\naddress, SSH keys or any other account data."
 msgstr "Hindi kailanman nakikita ng Susan ang iyong mga tagubilin, output ng agent, pangalan ng usapan o makina, email address, SSH key o anumang iba pang data ng account."
 
-#: lib/marshall/documentation_messages.ex:300
+#: lib/marshall/documentation_messages.ex:313
 #, elixir-autogen, elixir-format
 msgid "Susan sees the IP address of your deployment and when each notification is\nsent, an opaque push key issued to your device, an encrypted message and the\nnotification kind. The message is encrypted on your deployment to a key that\nonly your device holds, so Susan cannot read where the notification leads."
 msgstr "Nakikita ng Susan ang IP address ng iyong deployment at kung kailan ipinadala ang bawat notification, isang opaque na push key na inisyu sa iyong device, isang naka-encrypt na mensahe at ang uri ng notification. Ine-encrypt ang mensahe sa iyong deployment gamit ang key na ang iyong device lamang ang may hawak, kaya hindi mabasa ng Susan kung saan patungo ang notification."
 
-#: lib/marshall/documentation_messages.ex:305
+#: lib/marshall/documentation_messages.ex:318
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "Ilipat ang mode ng pakikipagtulungan ng usapan sa pagitan ng plano at trabaho."
 
-#: lib/marshall/documentation_messages.ex:342
+#: lib/marshall/documentation_messages.ex:363
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "I-on o i-off ang mga push notification para sa isang device."
 
-#: lib/marshall/documentation_messages.ex:379
+#: lib/marshall/documentation_messages.ex:400
 #, elixir-autogen, elixir-format
 msgid "You can review and manage devices with Porsche:"
 msgstr "Maaari mong suriin at pamahalaan ang mga device gamit ang Porsche:"
 
-#: lib/marshall/documentation_messages.ex:380
+#: lib/marshall/documentation_messages.ex:401
 #, elixir-autogen, elixir-format
 msgid "Your deployment keeps delivery records for seven days and stores only a digest\nof each push key in its audit history."
 msgstr "Nagtatago ang iyong deployment ng mga record ng paghahatid nang pitong araw at nag-iimbak lamang ng digest ng bawat push key sa audit history nito."
 
-#: lib/marshall/documentation_messages.ex:388
+#: lib/marshall/documentation_messages.ex:409
 #, elixir-autogen, elixir-format
 msgid "`device prefs` pauses or resumes notifications for one device. `device rm`\nrevokes it permanently; Mila registers again the next time you allow\nnotifications. Deleting or retiring your account revokes all its devices."
 msgstr "Ipinapahinto o ipinagpapatuloy ng `device prefs` ang mga notification para sa isang device. Permanenteng binabawi ito ng `device rm`; muling magrerehistro ang Mila sa susunod na payagan mo ang mga notification. Ang pagbura o pagreretiro ng iyong account ay bumabawi sa lahat ng device nito."
@@ -856,3 +856,33 @@ msgstr "Ipinapahinto o ipinagpapatuloy ng `device prefs` ang mga notification pa
 #, elixir-autogen, elixir-format
 msgid "Documentation not found"
 msgstr "Hindi nahanap ang dokumentasyon"
+
+#: lib/marshall/documentation_messages.ex:18
+#, elixir-autogen, elixir-format
+msgid "## Examples"
+msgstr "## Mga halimbawa"
+
+#: lib/marshall/documentation_messages.ex:53
+#, elixir-autogen, elixir-format
+msgid "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+msgstr "Ang magagamit na bisita ay tumatanggap ng HTTP `200` at isang JSON array. Ang bisitang\nnakahinto, inilipat, iniretiro, luma na, o walang pahintulot ay tumatanggap ng tugong\nhindi ito magagamit sa halip na metadata; dapat ituring ng mga tumatawag ang anumang\nstatus na hindi `2xx` bilang pagtanggi at iwasang sumubok muli sa ibang makina."
+
+#: lib/marshall/documentation_messages.ex:139
+#, elixir-autogen, elixir-format
+msgid "Fetch only the guest metadata when an agent does not need integration details:"
+msgstr "Kunin lamang ang metadata ng bisita kapag hindi kailangan ng ahente ang mga detalye ng integrasyon:"
+
+#: lib/marshall/documentation_messages.ex:280
+#, elixir-autogen, elixir-format
+msgid "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+msgstr "Patakbuhin ang mga utos na ito mula sa loob ng bisita. Pinapanatiling tahimik ng mga\nflag na `-sS` ang matagumpay na mga tugon habang ipinapakita pa rin ang mga error sa\nkoneksyon, at hinihiling ng `-H` ang representasyong JSON."
+
+#: lib/marshall/documentation_messages.ex:343
+#, elixir-autogen, elixir-format
+msgid "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+msgstr "Ang tugon ay isang bagay na may bersyon. Ang maayos na bisita ay nagbabalik ng HTTP `200`\nkasama ang mga field na `guest`, `integrations`, at `paths`:"
+
+#: lib/marshall/documentation_messages.ex:359
+#, elixir-autogen, elixir-format
+msgid "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
+msgstr "Nagbabalik ito ng HTTP `200` at isang JSON object na naglalaman ng mga limitadong field\nng bisita na nakalista sa itaas. Direktang kunin ang listahan ng mga integrasyon para sa pagtuklas:"

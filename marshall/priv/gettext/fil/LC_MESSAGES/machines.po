@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n==1 || n==2 || n==3 || (n%10!=4 && n%10!=6 && n%10!=9) ? 0 : 1);\n"
 
-#: lib/marshall_web/live/machines_live.ex:1465
+#: lib/marshall_web/live/machines_live.ex:1467
 #, elixir-autogen, elixir-format
 msgid " and counting"
 msgstr " at nagbibilang"
 
-#: lib/marshall_web/live/machines_live.ex:1461
+#: lib/marshall_web/live/machines_live.ex:1463
 #, elixir-autogen, elixir-format
 msgid "%{seconds} seconds%{suffix}"
 msgstr "%{seconds} segundo%{suffix}"
@@ -29,8 +29,8 @@ msgstr "%{seconds} segundo%{suffix}"
 msgid "%{value1} CPU"
 msgstr "%{value1} CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1229
-#: lib/marshall_web/live/machines_live.ex:1232
+#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1234
 #: lib/marshall_web/live/overview_live.ex:351
 #: lib/marshall_web/live/overview_live.ex:356
 #: lib/marshall_web/live/resize_live.ex:322
@@ -43,20 +43,20 @@ msgstr "%{value1} GiB"
 msgid "%{value1} MiB"
 msgstr "%{value1} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:1226
+#: lib/marshall_web/live/machines_live.ex:1228
 #: lib/marshall_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU"
 msgstr "%{value1} vCPU"
 
 #: lib/marshall_web/live/admin/workloads_live.ex:160
-#: lib/marshall_web/live/machines_live.ex:948
+#: lib/marshall_web/live/machines_live.ex:950
 #: lib/marshall_web/live/overview_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB na disk"
 
-#: lib/marshall_web/live/machines_live.ex:1171
+#: lib/marshall_web/live/machines_live.ex:1173
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} MiB memory · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} MiB na memorya · %{value3} GiB na disk"
@@ -79,18 +79,18 @@ msgstr "%{value1} → %{value2} GiB"
 msgid "%{value1} → %{value2} MiB"
 msgstr "%{value1} → %{value2} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:890
+#: lib/marshall_web/live/machines_live.ex:892
 #: lib/marshall_web/live/overview_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "+ Create machine"
 msgstr "+ Lumikha ng makina"
 
-#: lib/marshall_web/live/machines_live.ex:1533
+#: lib/marshall_web/live/machines_live.ex:1535
 #, elixir-autogen, elixir-format
 msgid "+ Queue clone"
 msgstr "+ Queue ng clone"
 
-#: lib/marshall_web/live/machines_live.ex:721
+#: lib/marshall_web/live/machines_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "A Overalls development environment for nested machines. It uses a dedicated image, an extra 256 GiB data disk, and higher resource minimums. Its AI agent can start child agents."
 msgstr "Isang Overall development environment para sa mga nested machine. Gumagamit ito ng dedikadong imahe, dagdag na 256 GiB data disk, at mas mataas na resource minimum. Ang AI agent nito ay maaaring magsimula ng mga child agent."
@@ -105,9 +105,9 @@ msgstr "Isang magandang araw para gumawa ng isang bagay."
 msgid "A small preview. All your accessible machines are in"
 msgstr "Isang maliit na preview. Nasa loob ang lahat ng iyong naa-access na makina"
 
-#: lib/marshall_web/live/machines_live.ex:924
-#: lib/marshall_web/live/machines_live.ex:962
-#: lib/marshall_web/live/machines_live.ex:1265
+#: lib/marshall_web/live/machines_live.ex:926
+#: lib/marshall_web/live/machines_live.ex:964
+#: lib/marshall_web/live/machines_live.ex:1267
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "Pag-access"
@@ -117,9 +117,9 @@ msgstr "Pag-access"
 msgid "Access updated."
 msgstr "Na-update ang access."
 
-#: lib/marshall_web/live/machines_live.ex:1279
-#: lib/marshall_web/live/machines_live.ex:1286
-#: lib/marshall_web/live/machines_live.ex:1305
+#: lib/marshall_web/live/machines_live.ex:1281
+#: lib/marshall_web/live/machines_live.ex:1288
+#: lib/marshall_web/live/machines_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "Account ng gumagamit"
@@ -134,14 +134,14 @@ msgstr "Nag-expire ang administratibong pag-verify. Piliin ang makina sa mga wor
 msgid "Administrative verification expired. Your resize draft is kept in this page's address."
 msgstr "Nag-expire ang administratibong pag-verify. Ang iyong draft sa pagbabago ng laki ay nakatago sa address ng page na ito."
 
-#: lib/marshall_web/live/machines_live.ex:864
+#: lib/marshall_web/live/machines_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "All retained copies deleted"
 msgstr "Ang lahat ng mga nananatiling kopya ay tinanggal"
 
-#: lib/marshall_web/live/machines_live.ex:1281
-#: lib/marshall_web/live/machines_live.ex:1298
-#: lib/marshall_web/live/machines_live.ex:1317
+#: lib/marshall_web/live/machines_live.ex:1283
+#: lib/marshall_web/live/machines_live.ex:1300
+#: lib/marshall_web/live/machines_live.ex:1319
 #, elixir-autogen, elixir-format
 msgid "Allows"
 msgstr "Pinapayagan"
@@ -181,7 +181,7 @@ msgstr "Saglit na ihinto ang pinagmulan upang ligtas na makuha ang disk nito."
 msgid "Bring a GitHub, GitLab, Codeberg or Bitbucket repository into Overalls with the Chrome or Firefox extension."
 msgstr "Magdala ng GitHub, GitLab, Codeberg o Bitbucket repository sa Overalls gamit ang extension ng Chrome o Firefox."
 
-#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1227
 #: lib/marshall_web/live/overview_live.ex:347
 #: lib/marshall_web/live/resize_live.ex:315
 #: lib/marshall_web/live/resize_live.ex:359
@@ -191,7 +191,7 @@ msgstr "Magdala ng GitHub, GitLab, Codeberg o Bitbucket repository sa Overalls g
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1141
+#: lib/marshall_web/live/machines_live.ex:1143
 #, elixir-autogen, elixir-format
 msgid "CPU (vCPU)"
 msgstr "CPU (vCPU)"
@@ -202,7 +202,7 @@ msgid "CPU and memory can increase or decrease. Disk size can only grow."
 msgstr "Maaaring tumaas o bumaba ang CPU at memorya. Ang laki ng disk ay maaari lamang lumaki."
 
 #: lib/marshall_web/components/clone_components.ex:116
-#: lib/marshall_web/live/machines_live.ex:1193
+#: lib/marshall_web/live/machines_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "Kanselahin"
@@ -212,7 +212,7 @@ msgstr "Kanselahin"
 msgid "Cancel could not be accepted. Sizes are already being applied or the machine state is unconfirmed."
 msgstr "Hindi matanggap ang pagkansela. Inilapat na ang mga sukat o hindi nakumpirma ang estado ng makina."
 
-#: lib/marshall_web/live/machines_live.ex:1479
+#: lib/marshall_web/live/machines_live.ex:1481
 #, elixir-autogen, elixir-format
 msgid "Cancel move"
 msgstr "Kanselahin ang paglipat"
@@ -244,7 +244,7 @@ msgstr "Kinansela bago magsimula ang snapshot."
 msgid "Cancelling"
 msgstr "Kinakansela"
 
-#: lib/marshall_web/live/machines_live.ex:859
+#: lib/marshall_web/live/machines_live.ex:861
 #, elixir-autogen, elixir-format
 msgid "Cancelling and restoring the source"
 msgstr "Pagkansela at pagpapanumbalik ng pinagmulan"
@@ -264,7 +264,7 @@ msgstr "Pagkansela: naghihintay na makumpirma ang paghinto, pagkatapos ay mag-re
 msgid "Cancelling: waiting for the stop to confirm; the sizes stay unchanged."
 msgstr "Pagkansela: naghihintay para sa paghinto upang makumpirma; ang mga sukat ay nananatiling hindi nagbabago."
 
-#: lib/marshall_web/live/machines_live.ex:1477
+#: lib/marshall_web/live/machines_live.ex:1479
 #, elixir-autogen, elixir-format
 msgid "Cancelling…"
 msgstr "Kinakansela…"
@@ -284,27 +284,27 @@ msgstr "Kinukuha ang source disk. Magsisimula ang pagkopya pagkatapos handa na a
 msgid "Check your inbox and click the link to confirm your subscription."
 msgstr "Tingnan ang iyong inbox at i-click ang link upang kumpirmahin ang iyong subscription."
 
-#: lib/marshall_web/live/machines_live.ex:854
+#: lib/marshall_web/live/machines_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Checking destination readiness"
 msgstr "Sinusuri ang kahandaan sa patutunguhan"
 
-#: lib/marshall_web/live/machines_live.ex:849
+#: lib/marshall_web/live/machines_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Checking transfer connectivity"
 msgstr "Sinusuri ang koneksyon sa paglipat"
 
-#: lib/marshall_web/live/machines_live.ex:1082
+#: lib/marshall_web/live/machines_live.ex:1084
 #, elixir-autogen, elixir-format
 msgid "Choose an image"
 msgstr "Pumili ng larawan"
 
-#: lib/marshall_web/live/machines_live.ex:1020
+#: lib/marshall_web/live/machines_live.ex:1022
 #, elixir-autogen, elixir-format
 msgid "Choose an image and the resources for your environment."
 msgstr "Pumili ng larawan at mga mapagkukunan para sa iyong kapaligiran."
 
-#: lib/marshall_web/live/machines_live.ex:1075
+#: lib/marshall_web/live/machines_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Choose your environment"
 msgstr "Piliin ang iyong kapaligiran"
@@ -319,7 +319,7 @@ msgstr "Kinansela ang clone"
 msgid "Clone complete"
 msgstr "Kumpleto ang clone"
 
-#: lib/marshall_web/live/machines_live.ex:1499
+#: lib/marshall_web/live/machines_live.ex:1501
 #, elixir-autogen, elixir-format
 msgid "Clone machine"
 msgstr "I-clone ang makina"
@@ -334,12 +334,12 @@ msgstr "Kailangan ng clone ng atensyon"
 msgid "Clone queued. You can queue another copy."
 msgstr "Nakapila si Clone. Maaari kang pumila ng isa pang kopya."
 
-#: lib/marshall_web/live/machines_live.ex:1550
+#: lib/marshall_web/live/machines_live.ex:1552
 #, elixir-autogen, elixir-format
 msgid "Clone requests"
 msgstr "I-clone ang mga kahilingan"
 
-#: lib/marshall_web/live/machines_live.ex:1561
+#: lib/marshall_web/live/machines_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "Clone requests are temporarily unavailable. Retrying automatically."
 msgstr "Pansamantalang hindi available ang mga kahilingan sa pag-clone. Awtomatikong sinusubukang muli."
@@ -349,7 +349,7 @@ msgstr "Pansamantalang hindi available ang mga kahilingan sa pag-clone. Awtomati
 msgid "Clone stages"
 msgstr "I-clone ang mga yugto"
 
-#: lib/marshall_web/live/machines_live.ex:1403
+#: lib/marshall_web/live/machines_live.ex:1405
 #, elixir-autogen, elixir-format
 msgid "Comment"
 msgstr "Komento"
@@ -364,8 +364,8 @@ msgstr "Kumpleto"
 msgid "Confirmed resources"
 msgstr "Mga nakumpirma na mapagkukunan"
 
-#: lib/marshall_web/live/machines_live.ex:925
-#: lib/marshall_web/live/machines_live.ex:976
+#: lib/marshall_web/live/machines_live.ex:927
+#: lib/marshall_web/live/machines_live.ex:978
 #, elixir-autogen, elixir-format
 msgid "Connect"
 msgstr "Kumonekta"
@@ -385,7 +385,7 @@ msgstr "Nangongopya"
 msgid "Copying files"
 msgstr "Pagkopya ng mga file"
 
-#: lib/marshall_web/live/machines_live.ex:851
+#: lib/marshall_web/live/machines_live.ex:853
 #, elixir-autogen, elixir-format
 msgid "Copying the stopped disks"
 msgstr "Kinokopya ang mga tumigil na disk"
@@ -395,14 +395,14 @@ msgstr "Kinokopya ang mga tumigil na disk"
 msgid "Create a machine"
 msgstr "Lumikha ng isang makina"
 
-#: lib/marshall_web/live/machines_live.ex:1507
+#: lib/marshall_web/live/machines_live.ex:1509
 #, elixir-autogen, elixir-format
 msgid "Create a private, independent copy of this machine. Running machines stop briefly for each snapshot, then restart while copying continues. Copies are processed in order and match the source's power state when their turn begins."
 msgstr "Gumawa ng pribado, independiyenteng kopya ng makinang ito. Saglit na huminto ang mga tumatakbong machine para sa bawat snapshot, pagkatapos ay i-restart habang nagpapatuloy ang pagkopya. Pinoproseso ang mga kopya sa pagkakasunud-sunod at tumutugma sa estado ng kapangyarihan ng pinagmulan kapag nagsimula ang kanilang turn."
 
 #: lib/marshall_web/live/machines_live.ex:106
-#: lib/marshall_web/live/machines_live.ex:1019
-#: lib/marshall_web/live/machines_live.ex:1191
+#: lib/marshall_web/live/machines_live.ex:1021
+#: lib/marshall_web/live/machines_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Create machine"
 msgstr "Lumikha ng makina"
@@ -422,18 +422,18 @@ msgstr "Paglikha ng isang independiyenteng disk mula sa snapshot. Ang pagbawi ng
 msgid "Creating cloned machine"
 msgstr "Paglikha ng cloned machine"
 
-#: lib/marshall_web/live/machines_live.ex:1189
+#: lib/marshall_web/live/machines_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Creating…"
 msgstr "Ginagawa…"
 
-#: lib/marshall_web/live/machines_live.ex:904
+#: lib/marshall_web/live/machines_live.ex:906
 #, elixir-autogen, elixir-format
 msgid "Current headroom is temporarily unavailable."
 msgstr "Pansamantalang hindi available ang kasalukuyang headroom."
 
-#: lib/marshall_web/live/machines_live.ex:896
-#: lib/marshall_web/live/machines_live.ex:1038
+#: lib/marshall_web/live/machines_live.ex:898
+#: lib/marshall_web/live/machines_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Current headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
 msgstr "Kasalukuyang headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
@@ -443,53 +443,52 @@ msgstr "Kasalukuyang headroom: %{value1} vCPU · %{value2} GiB memory · %{value
 msgid "Current provisioning headroom"
 msgstr "Kasalukuyang provisioning headroom"
 
-#: lib/marshall_web/live/machines_live.ex:687
-#: lib/marshall_web/live/machines_live.ex:775
+#: lib/marshall_web/live/machines_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr "Kliyente"
 
-#: lib/marshall_web/live/machines_live.ex:1251
+#: lib/marshall_web/live/machines_live.ex:1253
 #, elixir-autogen, elixir-format
 msgid "Customer machines allow only owner SSH and terminal access. Outbound networking, workspace sharing, and web service exposure are disabled."
 msgstr "Pinapayagan lamang ng mga customer machine ang may-ari ng SSH at terminal access. Naka-disable ang outbound networking, workspace sharing, at web service exposure."
 
-#: lib/marshall_web/live/machines_live.ex:1605
+#: lib/marshall_web/live/machines_live.ex:1607
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Tanggalin"
 
-#: lib/marshall_web/live/machines_live.ex:1588
+#: lib/marshall_web/live/machines_live.ex:1590
 #, elixir-autogen, elixir-format
 msgid "Delete machine"
 msgstr "Tanggalin ang makina"
 
-#: lib/marshall_web/live/machines_live.ex:1602
+#: lib/marshall_web/live/machines_live.ex:1604
 #, elixir-autogen, elixir-format
 msgid "Delete this machine and its disk? This cannot be undone."
 msgstr "Tanggalin ang makinang ito at ang disk nito? Hindi na ito maaaring bawiin."
 
-#: lib/marshall_web/live/machines_live.ex:779
+#: lib/marshall_web/live/machines_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Deleting"
 msgstr "Tinatanggal"
 
-#: lib/marshall_web/live/machines_live.ex:861
+#: lib/marshall_web/live/machines_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Deleting retained copies"
 msgstr "Pagtanggal ng mga nananatiling kopya"
 
-#: lib/marshall_web/live/machines_live.ex:855
+#: lib/marshall_web/live/machines_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Destination boot failed; source copy retained"
 msgstr "Nabigo ang destination boot; pinanatili ang pinagmulang kopya"
 
-#: lib/marshall_web/live/machines_live.ex:857
+#: lib/marshall_web/live/machines_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Destination readiness failed; source copy retained"
 msgstr "Nabigo ang kahandaan sa patutunguhan; pinanatili ang pinagmulang kopya"
 
-#: lib/marshall_web/live/machines_live.ex:858
+#: lib/marshall_web/live/machines_live.ex:860
 #, elixir-autogen, elixir-format
 msgid "Destination ready; cleaning up the source"
 msgstr "Handa na ang patutunguhan; paglilinis ng pinanggalingan"
@@ -499,12 +498,12 @@ msgstr "Handa na ang patutunguhan; paglilinis ng pinanggalingan"
 msgid "Destination restart requested. The source copy remains retained until readiness succeeds."
 msgstr "Hiniling ang pag-restart ng destinasyon. Ang pinagmulang kopya ay nananatili hanggang sa magtagumpay ang pagiging handa."
 
-#: lib/marshall_web/live/machines_live.ex:1268
+#: lib/marshall_web/live/machines_live.ex:1270
 #, elixir-autogen, elixir-format
 msgid "Direct machine grants"
 msgstr "Mga gawad ng direktang makina"
 
-#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1233
 #: lib/marshall_web/live/overview_live.ex:355
 #: lib/marshall_web/live/resize_live.ex:321
 #: lib/marshall_web/live/resize_live.ex:375
@@ -513,7 +512,7 @@ msgstr "Mga gawad ng direktang makina"
 msgid "Disk"
 msgstr "Disk"
 
-#: lib/marshall_web/live/machines_live.ex:1160
+#: lib/marshall_web/live/machines_live.ex:1162
 #, elixir-autogen, elixir-format
 msgid "Disk (GiB)"
 msgstr "Disk (GiB)"
@@ -538,7 +537,7 @@ msgstr "Adres ng email"
 msgid "Enable JavaScript to open a repository link, or"
 msgstr "Paganahin ang JavaScript upang magbukas ng link ng repositoryo, o"
 
-#: lib/marshall_web/live/machines_live.ex:772
+#: lib/marshall_web/live/machines_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Ends that person's access to this machine."
 msgstr "Tinatapos ang pag-access ng taong iyon sa makinang ito."
@@ -553,7 +552,7 @@ msgstr "Maglagay ng wastong email address."
 msgid "Enter whole numbers for CPU, memory and disk size."
 msgstr "Ipasok ang mga buong numero para sa CPU, memorya at laki ng disk."
 
-#: lib/marshall_web/live/machines_live.ex:1299
+#: lib/marshall_web/live/machines_live.ex:1301
 #, elixir-autogen, elixir-format
 msgid "Everything; cannot be changed here."
 msgstr "Lahat; hindi na mababago dito."
@@ -563,12 +562,12 @@ msgstr "Lahat; hindi na mababago dito."
 msgid "Explore your usage ↗"
 msgstr "Galugarin ang iyong paggamit ↗"
 
-#: lib/marshall_web/live/machines_live.ex:1500
+#: lib/marshall_web/live/machines_live.ex:1502
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy"
 msgstr "Ang mga file at nakaimbak na kredensyal ay kasama sa kopya"
 
-#: lib/marshall_web/live/machines_live.ex:1540
+#: lib/marshall_web/live/machines_live.ex:1542
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy."
 msgstr "Ang mga file at nakaimbak na kredensyal ay kasama sa kopya."
@@ -593,12 +592,12 @@ msgstr "Pagtatapos"
 msgid "Get tips, tricks and updates about Overalls and AI by email."
 msgstr "Makatanggap sa email ng mga tip, paraan at balita tungkol sa Overalls at AI."
 
-#: lib/marshall_web/live/machines_live.ex:1135
+#: lib/marshall_web/live/machines_live.ex:1137
 #, elixir-autogen, elixir-format
 msgid "Give it room to grow"
 msgstr "Bigyan ito ng puwang upang lumago"
 
-#: lib/marshall_web/live/machines_live.ex:1337
+#: lib/marshall_web/live/machines_live.ex:1339
 #, elixir-autogen, elixir-format
 msgid "Grant, change or remove access"
 msgstr "Bigyan, baguhin o alisin ang access"
@@ -613,25 +612,25 @@ msgstr "Palakihin ang filesystem sa susunod na boot"
 msgid "Headroom is temporarily unavailable."
 msgstr "Pansamantalang hindi available ang headroom."
 
-#: lib/marshall_web/live/machines_live.ex:923
-#: lib/marshall_web/live/machines_live.ex:958
-#: lib/marshall_web/live/machines_live.ex:1234
+#: lib/marshall_web/live/machines_live.ex:925
+#: lib/marshall_web/live/machines_live.ex:960
+#: lib/marshall_web/live/machines_live.ex:1236
 #, elixir-autogen, elixir-format
 msgid "Host"
 msgstr "Host na kompyuter"
 
-#: lib/marshall_web/live/machines_live.ex:1081
+#: lib/marshall_web/live/machines_live.ex:1083
 #, elixir-autogen, elixir-format
 msgid "Image"
 msgstr "Imahe"
 
-#: lib/marshall_web/live/machines_live.ex:1024
+#: lib/marshall_web/live/machines_live.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Images and capacity are temporarily unavailable. Your choices are retained."
 msgstr "Pansamantalang hindi available ang mga larawan at kapasidad. Ang iyong mga pagpipilian ay pinananatili."
 
-#: lib/marshall_web/live/machines_live.ex:693
-#: lib/marshall_web/live/machines_live.ex:776
+#: lib/marshall_web/live/machines_live.ex:695
+#: lib/marshall_web/live/machines_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Inception"
 msgstr "Pagsisimula"
@@ -641,7 +640,7 @@ msgstr "Pagsisimula"
 msgid "Invalid request."
 msgstr "Di-wastong kahilingan."
 
-#: lib/marshall_web/live/machines_live.ex:1397
+#: lib/marshall_web/live/machines_live.ex:1399
 #, elixir-autogen, elixir-format
 msgid "Labels"
 msgstr "Mga label"
@@ -667,12 +666,12 @@ msgstr "Paglulunsad"
 msgid "Launching repository"
 msgstr "Paglulunsad ng repositoryo"
 
-#: lib/marshall_web/live/machines_live.ex:1523
+#: lib/marshall_web/live/machines_live.ex:1525
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name"
 msgstr "Iwanang blangko upang makabuo ng pangalan"
 
-#: lib/marshall_web/live/machines_live.ex:1537
+#: lib/marshall_web/live/machines_live.ex:1539
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name."
 msgstr "Iwanang blangko upang makabuo ng pangalan."
@@ -684,7 +683,7 @@ msgstr "Iwanang blangko upang makabuo ng pangalan."
 msgid "Leave stopped"
 msgstr "Huminto ang pag-alis"
 
-#: lib/marshall_web/live/machines_live.ex:919
+#: lib/marshall_web/live/machines_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Machine"
 msgstr "Makina"
@@ -694,7 +693,7 @@ msgstr "Makina"
 msgid "Machine metadata saved."
 msgstr "Nai-save ang metadata ng makina."
 
-#: lib/marshall_web/live/machines_live.ex:1005
+#: lib/marshall_web/live/machines_live.ex:1007
 #, elixir-autogen, elixir-format
 msgid "Machine pages"
 msgstr "Mga pahina ng makina"
@@ -705,7 +704,7 @@ msgid "Machine update requested."
 msgstr "Hiniling ang pag-update ng makina."
 
 #: lib/marshall_web/live/machines_live.ex:121
-#: lib/marshall_web/live/machines_live.ex:885
+#: lib/marshall_web/live/machines_live.ex:887
 #: lib/marshall_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Machines"
@@ -723,7 +722,7 @@ msgstr "Pansamantalang hindi magagamit ang mga makina."
 msgid "Machines couldn’t be loaded. Refresh to try again."
 msgstr "Hindi ma-load ang mga makina. I-refresh para subukang muli."
 
-#: lib/marshall_web/live/machines_live.ex:1118
+#: lib/marshall_web/live/machines_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Make it yours"
 msgstr "Gawin itong sa iyo"
@@ -733,24 +732,24 @@ msgstr "Gawin itong sa iyo"
 msgid "Make yourself at home"
 msgstr "Gawin ang iyong sarili sa bahay"
 
-#: lib/marshall_web/live/machines_live.ex:1248
+#: lib/marshall_web/live/machines_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Management access is required to change the remaining settings."
 msgstr "Kinakailangan ang access sa pamamahala upang mabago ang natitirang mga setting."
 
-#: lib/marshall_web/live/machines_live.ex:759
-#: lib/marshall_web/live/machines_live.ex:1360
-#: lib/marshall_web/live/machines_live.ex:1369
+#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:1362
+#: lib/marshall_web/live/machines_live.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "Tagapamahala"
 
-#: lib/marshall_web/live/machines_live.ex:1455
+#: lib/marshall_web/live/machines_live.ex:1457
 #, elixir-autogen, elixir-format
 msgid "Measured between control-plane stop and readiness observations; guest availability may differ."
 msgstr "Sinusukat sa pagitan ng control-plane stop at mga obserbasyon sa pagiging handa; maaaring mag-iba ang availability ng bisita."
 
-#: lib/marshall_web/live/machines_live.ex:1228
+#: lib/marshall_web/live/machines_live.ex:1230
 #: lib/marshall_web/live/overview_live.ex:350
 #: lib/marshall_web/live/resize_live.ex:318
 #: lib/marshall_web/live/resize_live.ex:365
@@ -759,33 +758,33 @@ msgstr "Sinusukat sa pagitan ng control-plane stop at mga obserbasyon sa pagigin
 msgid "Memory"
 msgstr "Alaala"
 
-#: lib/marshall_web/live/machines_live.ex:1149
+#: lib/marshall_web/live/machines_live.ex:1151
 #: lib/marshall_web/live/resize_live.ex:455
 #, elixir-autogen, elixir-format
 msgid "Memory (MiB)"
 msgstr "Memorya (MiB)"
 
-#: lib/marshall_web/live/machines_live.ex:1443
+#: lib/marshall_web/live/machines_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "Paraan"
 
-#: lib/marshall_web/live/machines_live.ex:862
+#: lib/marshall_web/live/machines_live.ex:864
 #, elixir-autogen, elixir-format
 msgid "Move cancelled; cleanup complete"
 msgstr "Kinansela ang paglipat; kumpleto ang paglilinis"
 
-#: lib/marshall_web/live/machines_live.ex:863
+#: lib/marshall_web/live/machines_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Move complete"
 msgstr "Kumpleto ang paglipat"
 
-#: lib/marshall_web/live/machines_live.ex:1423
+#: lib/marshall_web/live/machines_live.ex:1425
 #, elixir-autogen, elixir-format
 msgid "Move this machine to an automatically selected host? The machine may be briefly unavailable."
 msgstr "Ilipat ang machine na ito sa isang awtomatikong napiling host? Maaaring pansamantalang hindi magagamit ang makina."
 
-#: lib/marshall_web/live/machines_live.ex:1429
+#: lib/marshall_web/live/machines_live.ex:1431
 #, elixir-autogen, elixir-format
 msgid "Move to another host"
 msgstr "Lumipat sa ibang host"
@@ -796,7 +795,7 @@ msgstr "Lumipat sa ibang host"
 msgid "Needs attention"
 msgstr "Kailangan ng atensyon"
 
-#: lib/marshall_web/live/machines_live.ex:1522
+#: lib/marshall_web/live/machines_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "New machine name (optional)"
 msgstr "Bagong pangalan ng makina (opsyonal)"
@@ -806,8 +805,8 @@ msgstr "Bagong pangalan ng makina (opsyonal)"
 msgid "New sizes"
 msgstr "Mga bagong sukat"
 
-#: lib/marshall_web/live/machines_live.ex:1010
-#: lib/marshall_web/live/machines_live.ex:1332
+#: lib/marshall_web/live/machines_live.ex:1012
+#: lib/marshall_web/live/machines_live.ex:1334
 #, elixir-autogen, elixir-format
 msgid "Next page →"
 msgstr "Susunod na pahina →"
@@ -817,17 +816,17 @@ msgstr "Susunod na pahina →"
 msgid "Next steps"
 msgstr "Mga susunod na hakbang"
 
-#: lib/marshall_web/live/machines_live.ex:1555
+#: lib/marshall_web/live/machines_live.ex:1557
 #, elixir-autogen, elixir-format
 msgid "No clone requests yet. Queue a copy and follow its progress here."
 msgstr "Wala pang mga kahilingan sa clone. Ipila ang isang kopya at sundan ang pag-usad nito dito."
 
-#: lib/marshall_web/live/machines_live.ex:1325
+#: lib/marshall_web/live/machines_live.ex:1327
 #, elixir-autogen, elixir-format
 msgid "No direct machine grants."
 msgstr "Walang direktang machine grant."
 
-#: lib/marshall_web/live/machines_live.ex:1035
+#: lib/marshall_web/live/machines_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "No images are available on ready hosts right now."
 msgstr "Walang mga larawang available sa mga handa na host sa ngayon."
@@ -837,12 +836,12 @@ msgstr "Walang mga larawang available sa mga handa na host sa ngayon."
 msgid "No machines in this preview yet. Create one or ask an owner to share access."
 msgstr "Wala pang makina sa preview na ito. Gumawa ng isa o hilingin sa isang may-ari na magbahagi ng access."
 
-#: lib/marshall_web/live/machines_live.ex:910
+#: lib/marshall_web/live/machines_live.ex:912
 #, elixir-autogen, elixir-format
 msgid "No machines on this page. Create a machine or ask an owner to share access."
 msgstr "Walang mga makina sa pahinang ito. Gumawa ng makina o hilingin sa isang may-ari na ibahagi ang access."
 
-#: lib/marshall_web/live/machines_live.ex:828
+#: lib/marshall_web/live/machines_live.ex:830
 #, elixir-autogen, elixir-format
 msgid "No registered account matches that email address."
 msgstr "Walang nakarehistrong account ang tumutugma sa email address na iyon."
@@ -853,7 +852,7 @@ msgstr "Walang nakarehistrong account ang tumutugma sa email address na iyon."
 msgid "No relocation is available."
 msgstr "Walang magagamit na relokasyon."
 
-#: lib/marshall_web/live/machines_live.ex:1451
+#: lib/marshall_web/live/machines_live.ex:1453
 #, elixir-autogen, elixir-format
 msgid "Observed downtime"
 msgstr "Naobserbahan ang downtime"
@@ -873,12 +872,12 @@ msgstr "Buksan ang clone"
 msgid "Open repositories from your browser"
 msgstr "Buksan ang mga repository mula sa iyong browser"
 
-#: lib/marshall_web/live/machines_live.ex:989
+#: lib/marshall_web/live/machines_live.ex:991
 #, elixir-autogen, elixir-format
 msgid "Open terminal"
 msgstr "Buksan ang terminal"
 
-#: lib/marshall_web/live/machines_live.ex:987
+#: lib/marshall_web/live/machines_live.ex:989
 #, elixir-autogen, elixir-format
 msgid "Open terminal for %{value1}"
 msgstr "Buksan ang terminal para sa %{value1}"
@@ -888,24 +887,24 @@ msgstr "Buksan ang terminal para sa %{value1}"
 msgid "Open terminal ↗"
 msgstr "Buksan ang terminal ↗"
 
-#: lib/marshall_web/live/machines_live.ex:764
+#: lib/marshall_web/live/machines_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "Open this machine's web apps. No terminal."
 msgstr "Buksan ang web app ng machine na ito. Walang terminal."
 
-#: lib/marshall_web/live/machines_live.ex:1221
+#: lib/marshall_web/live/machines_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Operating system"
 msgstr "Sistema ng pagpapatakbo"
 
-#: lib/marshall_web/live/machines_live.ex:758
-#: lib/marshall_web/live/machines_live.ex:1359
-#: lib/marshall_web/live/machines_live.ex:1368
+#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:1361
+#: lib/marshall_web/live/machines_live.ex:1370
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "Tagapagpatakbo"
 
-#: lib/marshall_web/live/machines_live.ex:707
+#: lib/marshall_web/live/machines_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Outbound connections, sharing, web apps, SSH, terminal, and AI agent tools. The agent cannot start child agents."
 msgstr "Mga papalabas na koneksyon, pagbabahagi, web app, SSH, terminal, at mga tool ng ahente ng AI. Ang ahente ay hindi maaaring magsimula ng mga ahente ng bata."
@@ -915,9 +914,9 @@ msgstr "Mga papalabas na koneksyon, pagbabahagi, web app, SSH, terminal, at mga 
 msgid "Overview"
 msgstr "Pangkalahatang-ideya"
 
-#: lib/marshall_web/live/machines_live.ex:964
-#: lib/marshall_web/live/machines_live.ex:1122
-#: lib/marshall_web/live/machines_live.ex:1296
+#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1298
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "May-ari"
@@ -929,7 +928,7 @@ msgstr "May-ari"
 msgid "Pending"
 msgstr "Nakabinbin"
 
-#: lib/marshall_web/live/machines_live.ex:1615
+#: lib/marshall_web/live/machines_live.ex:1617
 #, elixir-autogen, elixir-format
 msgid "Permanently remove this machine and its disk. This cannot be undone."
 msgstr "Permanenteng alisin ang makinang ito at ang disk nito. Hindi na ito maaaring bawiin."
@@ -939,13 +938,13 @@ msgstr "Permanenteng alisin ang makinang ito at ang disk nito. Hindi na ito maaa
 msgid "Permission to clone this machine is no longer available."
 msgstr "Hindi na available ang pahintulot na i-clone ang makinang ito."
 
-#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1126
 #: lib/marshall_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr "Pansarili"
 
-#: lib/marshall_web/live/machines_live.ex:1440
+#: lib/marshall_web/live/machines_live.ex:1442
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "Yugto"
@@ -975,7 +974,7 @@ msgstr "Paghahanda ng clone"
 msgid "Preparing space and checking the source before taking a snapshot."
 msgstr "Paghahanda ng espasyo at pagsuri sa pinagmulan bago kumuha ng snapshot."
 
-#: lib/marshall_web/live/machines_live.ex:848
+#: lib/marshall_web/live/machines_live.ex:850
 #, elixir-autogen, elixir-format
 msgid "Preparing transfer"
 msgstr "Paghahanda ng paglipat"
@@ -990,20 +989,20 @@ msgstr "Inihahanda ang iyong makina…"
 msgid "Preparing your repository…"
 msgstr "Inihahanda ang iyong repository…"
 
-#: lib/marshall_web/live/machines_live.ex:700
+#: lib/marshall_web/live/machines_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Private and owner-only. SSH and terminal access; no outbound connections, sharing, web apps, or AI agent."
 msgstr "Pribado at may-ari lamang. SSH at terminal access; walang papalabas na koneksyon, pagbabahagi, web app, o ahente ng AI."
 
-#: lib/marshall_web/live/machines_live.ex:922
-#: lib/marshall_web/live/machines_live.ex:954
-#: lib/marshall_web/live/machines_live.ex:1097
-#: lib/marshall_web/live/machines_live.ex:1237
+#: lib/marshall_web/live/machines_live.ex:924
+#: lib/marshall_web/live/machines_live.ex:956
+#: lib/marshall_web/live/machines_live.ex:1099
+#: lib/marshall_web/live/machines_live.ex:1239
 #, elixir-autogen, elixir-format
 msgid "Profile"
 msgstr "Propayl"
 
-#: lib/marshall_web/live/machines_live.ex:1103
+#: lib/marshall_web/live/machines_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Profiles choose access and agent features. Machines remain isolated from one another."
 msgstr "Pinipili ng mga profile ang access at mga feature ng ahente. Ang mga makina ay nananatiling nakahiwalay sa isa't isa."
@@ -1020,12 +1019,12 @@ msgstr "Posisyon ng pila %{value1}"
 msgid "Queued"
 msgstr "Nakapila"
 
-#: lib/marshall_web/live/machines_live.ex:1531
+#: lib/marshall_web/live/machines_live.ex:1533
 #, elixir-autogen, elixir-format
 msgid "Queuing…"
 msgstr "Nakapila…"
 
-#: lib/marshall_web/live/machines_live.ex:766
+#: lib/marshall_web/live/machines_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Read and write in the terminal."
 msgstr "Magbasa at magsulat sa terminal."
@@ -1035,17 +1034,17 @@ msgstr "Magbasa at magsulat sa terminal."
 msgid "Read the field notes ↗"
 msgstr "Basahin ang mga tala sa field ↗"
 
-#: lib/marshall_web/live/machines_live.ex:765
+#: lib/marshall_web/live/machines_live.ex:767
 #, elixir-autogen, elixir-format
 msgid "Read the terminal."
 msgstr "Basahin ang terminal."
 
-#: lib/marshall_web/live/machines_live.ex:1169
+#: lib/marshall_web/live/machines_live.ex:1171
 #, elixir-autogen, elixir-format
 msgid "Ready when you are"
 msgstr "Handa kung kailan ka na"
 
-#: lib/marshall_web/live/machines_live.ex:1394
+#: lib/marshall_web/live/machines_live.ex:1396
 #, elixir-autogen, elixir-format
 msgid "Reflection metadata"
 msgstr "Metadata ng reflection"
@@ -1060,7 +1059,7 @@ msgstr "I-refresh"
 msgid "Refreshing…"
 msgstr "Nire-refresh…"
 
-#: lib/marshall_web/live/machines_live.ex:1349
+#: lib/marshall_web/live/machines_live.ex:1351
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "Nakarehistrong email"
@@ -1070,7 +1069,7 @@ msgstr "Nakarehistrong email"
 msgid "Registering the copied disk as your private machine."
 msgstr "Pagrerehistro sa nakopyang disk bilang iyong pribadong makina."
 
-#: lib/marshall_web/live/machines_live.ex:1412
+#: lib/marshall_web/live/machines_live.ex:1414
 #, elixir-autogen, elixir-format
 msgid "Relocate machine"
 msgstr "Ilipat ang makina"
@@ -1085,8 +1084,8 @@ msgstr "Hiniling ang relokasyon. Awtomatikong pinipili ang isang destinasyon."
 msgid "Remains stopped; the filesystem grows on the next boot"
 msgstr "Nananatiling tumigil; lumalaki ang filesystem sa susunod na boot"
 
-#: lib/marshall_web/live/machines_live.ex:1361
-#: lib/marshall_web/live/machines_live.ex:1370
+#: lib/marshall_web/live/machines_live.ex:1363
+#: lib/marshall_web/live/machines_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "Remove access"
 msgstr "Alisin ang access"
@@ -1101,7 +1100,7 @@ msgstr "Humihiling ng pagkansela..."
 msgid "Requesting resize…"
 msgstr "Humihiling ng resize..."
 
-#: lib/marshall_web/live/machines_live.ex:1485
+#: lib/marshall_web/live/machines_live.ex:1487
 #, elixir-autogen, elixir-format
 msgid "Requesting restart…"
 msgstr "Hinihiling na i-restart..."
@@ -1111,12 +1110,12 @@ msgstr "Hinihiling na i-restart..."
 msgid "Requesting retry…"
 msgstr "Humihiling na muling subukan..."
 
-#: lib/marshall_web/live/machines_live.ex:1421
+#: lib/marshall_web/live/machines_live.ex:1423
 #, elixir-autogen, elixir-format
 msgid "Requesting…"
 msgstr "Humihiling…"
 
-#: lib/marshall_web/live/machines_live.ex:1217
+#: lib/marshall_web/live/machines_live.ex:1219
 #: lib/marshall_web/live/resize_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "Resize"
@@ -1169,9 +1168,9 @@ msgstr "Baguhin ang laki ng mga yugto"
 msgid "Resizing"
 msgstr "Pagbabago ng laki"
 
-#: lib/marshall_web/live/machines_live.ex:921
-#: lib/marshall_web/live/machines_live.ex:947
-#: lib/marshall_web/live/machines_live.ex:1208
+#: lib/marshall_web/live/machines_live.ex:923
+#: lib/marshall_web/live/machines_live.ex:949
+#: lib/marshall_web/live/machines_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Resources"
 msgstr "Mga mapagkukunan"
@@ -1213,7 +1212,7 @@ msgstr "Subukan muli"
 msgid "Retry could not be accepted. Capacity or machine state may have changed."
 msgstr "Hindi matanggap ang muling subukan. Maaaring nagbago ang kapasidad o estado ng makina."
 
-#: lib/marshall_web/live/machines_live.ex:1487
+#: lib/marshall_web/live/machines_live.ex:1489
 #, elixir-autogen, elixir-format
 msgid "Retry destination boot"
 msgstr "Subukan muli ang patutunguhang boot"
@@ -1228,15 +1227,15 @@ msgstr "Subukan muli ang resize"
 msgid "Return to Fleet workloads and verify your passkey to reopen the machine →"
 msgstr "Bumalik sa mga workload ng Fleet at i-verify ang iyong passkey para muling buksan ang makina →"
 
-#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Binawi"
 
-#: lib/marshall_web/live/machines_live.ex:1280
-#: lib/marshall_web/live/machines_live.ex:1295
-#: lib/marshall_web/live/machines_live.ex:1314
-#: lib/marshall_web/live/machines_live.ex:1355
+#: lib/marshall_web/live/machines_live.ex:1282
+#: lib/marshall_web/live/machines_live.ex:1297
+#: lib/marshall_web/live/machines_live.ex:1316
+#: lib/marshall_web/live/machines_live.ex:1357
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Tungkulin"
@@ -1251,7 +1250,7 @@ msgstr "Silid para sa iyong susunod na ideya"
 msgid "Room to grow"
 msgstr "Kwarto para lumaki"
 
-#: lib/marshall_web/live/machines_live.ex:1159
+#: lib/marshall_web/live/machines_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Root disk (GiB)"
 msgstr "Pangunahing disk (GiB)"
@@ -1261,22 +1260,22 @@ msgstr "Pangunahing disk (GiB)"
 msgid "Running"
 msgstr "Tumatakbo"
 
-#: lib/marshall_web/live/machines_live.ex:1378
+#: lib/marshall_web/live/machines_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "I-save ang access"
 
-#: lib/marshall_web/live/machines_live.ex:1409
+#: lib/marshall_web/live/machines_live.ex:1411
 #, elixir-autogen, elixir-format
 msgid "Save metadata"
 msgstr "I-save ang metadata"
 
-#: lib/marshall_web/live/machines_live.ex:1376
+#: lib/marshall_web/live/machines_live.ex:1378
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Sine-save..."
 
-#: lib/marshall_web/live/machines_live.ex:749
+#: lib/marshall_web/live/machines_live.ex:751
 #, elixir-autogen, elixir-format
 msgid "Selected image unavailable"
 msgstr "Hindi magagamit ang napiling imahe"
@@ -1291,12 +1290,12 @@ msgstr "I-set up ang extension ng browser ↗"
 msgid "Shared"
 msgstr "Ibinahagi"
 
-#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Shared by"
 msgstr "Ibinahagi ni"
 
-#: lib/marshall_web/live/machines_live.ex:1406
+#: lib/marshall_web/live/machines_live.ex:1408
 #, elixir-autogen, elixir-format
 msgid "Short description for agents"
 msgstr "Maikling paglalarawan para sa mga agent"
@@ -1341,7 +1340,7 @@ msgstr "Kailangang asikasuhin ang pagbawi ng pinagmulan."
 msgid "Source recovery retry requested."
 msgstr "Hiniling ang muling pagsubok sa pagbawi ng pinagmulan."
 
-#: lib/marshall_web/live/machines_live.ex:860
+#: lib/marshall_web/live/machines_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "Source restored; destination cleanup pending"
 msgstr "Naibalik ang pinagmulan; hinihintay ang paglilinis sa patutunguhan"
@@ -1361,13 +1360,13 @@ msgstr "Ang pinagmulan ay pinananatiling itinigil, na tumutugma sa estado nito n
 msgid "Source was stopped when this request began."
 msgstr "Nakahinto ang pinagmulan nang simulan ang kahilingang ito."
 
-#: lib/marshall_web/live/machines_live.ex:688
-#: lib/marshall_web/live/machines_live.ex:777
+#: lib/marshall_web/live/machines_live.ex:690
+#: lib/marshall_web/live/machines_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr "Karaniwan"
 
-#: lib/marshall_web/live/machines_live.ex:785
+#: lib/marshall_web/live/machines_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "Starting"
 msgstr "Sinisimulan"
@@ -1377,8 +1376,8 @@ msgstr "Sinisimulan"
 msgid "Starting the machine with its new resources."
 msgstr "Pinapagana ang makina gamit ang mga bagong mapagkukunan nito."
 
-#: lib/marshall_web/live/machines_live.ex:920
-#: lib/marshall_web/live/machines_live.ex:939
+#: lib/marshall_web/live/machines_live.ex:922
+#: lib/marshall_web/live/machines_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Katayuan"
@@ -1410,7 +1409,7 @@ msgstr "Ihinto ang makina"
 msgid "Stopped"
 msgstr "Nakahinto"
 
-#: lib/marshall_web/live/machines_live.ex:782
+#: lib/marshall_web/live/machines_live.ex:784
 #: lib/marshall_web/live/resize_live.ex:536
 #, elixir-autogen, elixir-format
 msgid "Stopping"
@@ -1431,7 +1430,7 @@ msgstr "Inihihinto ang pagkopya at inaalis ang mga pansamantalang mapagkukunan. 
 msgid "Stopping the machine so its resources can change safely."
 msgstr "Inihihinto ang makina upang ligtas na mabago ang mga mapagkukunan nito."
 
-#: lib/marshall_web/live/machines_live.ex:850
+#: lib/marshall_web/live/machines_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Stopping the source"
 msgstr "Inihihinto ang pinagmulan"
@@ -1441,7 +1440,7 @@ msgstr "Inihihinto ang pinagmulan"
 msgid "Subscribe"
 msgstr "Mag-subscribe"
 
-#: lib/marshall_web/live/machines_live.ex:853
+#: lib/marshall_web/live/machines_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Switching placement"
 msgstr "Inililipat ang pagkakalagay"
@@ -1451,17 +1450,17 @@ msgstr "Inililipat ang pagkakalagay"
 msgid "Taking snapshot"
 msgstr "Kinokopya ang kasalukuyang estado"
 
-#: lib/marshall_web/live/machines_live.ex:1270
+#: lib/marshall_web/live/machines_live.ex:1272
 #, elixir-autogen, elixir-format
 msgid "Team membership and thread sharing can also grant machine access."
 msgstr "Maaari ring magbigay ng pag-access sa makina ang pagiging miyembro ng koponan at pagbabahagi ng usapan."
 
-#: lib/marshall_web/live/machines_live.ex:996
+#: lib/marshall_web/live/machines_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Terminal unavailable"
 msgstr "Hindi magagamit ang terminal"
 
-#: lib/marshall_web/live/machines_live.ex:769
+#: lib/marshall_web/live/machines_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Terminal, lifecycle, resize, clone and sharing."
 msgstr "Terminal, siklo ng buhay, pagbabago ng laki, pagkopya at pagbabahagi."
@@ -1486,7 +1485,7 @@ msgstr "Hindi wasto ang namespace ng repositoryong iyon."
 msgid "That repository reference cannot be launched."
 msgstr "Hindi mailulunsad ang sanggunian ng repositoryong iyon."
 
-#: lib/marshall_web/live/machines_live.ex:1339
+#: lib/marshall_web/live/machines_live.ex:1341
 #, elixir-autogen, elixir-format
 msgid "The account must already be registered. Saving a role replaces that person's direct machine role; choose Remove access to remove that direct grant."
 msgstr "Dapat nakarehistro na ang account. Pinapalitan ng pag-save ng tungkulin ang direktang tungkulin ng taong iyon sa makina; piliin ang Alisin ang pag-access upang bawiin ang direktang pahintulot na iyon."
@@ -1531,17 +1530,17 @@ msgstr "Hindi ma-update ang makina. I-refresh at subukang muli."
 msgid "The machine has changed since this draft was created. Review the confirmed resources above."
 msgstr "Nagbago ang makina mula nang likhain ang burador na ito. Suriin ang nakumpirmang mapagkukunan sa itaas."
 
-#: lib/marshall_web/live/machines_live.ex:1433
+#: lib/marshall_web/live/machines_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on an automatically selected host. Our development fleet uses a 1 Gbit/s connection between hosts, so a move can take a little longer; moves are expected to be much faster when Overalls runs on AWS in production."
 msgstr "Ihihinto ang makina, kokopyahin nang isang beses at paandarin sa awtomatikong napiling host. Gumagamit ang aming pangkat para sa pagbuo ng koneksiyong 1 Gbit/s sa pagitan ng mga host, kaya maaaring mas matagal nang kaunti ang paglilipat; inaasahang mas mabilis ito kapag tumatakbo na ang Overalls sa AWS sa produksiyon."
 
-#: lib/marshall_web/live/machines_live.ex:1445
+#: lib/marshall_web/live/machines_live.ex:1447
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on the destination."
 msgstr "Ihihinto ang makina, kokopyahin nang isang beses at paandarin sa patutunguhan."
 
-#: lib/marshall_web/live/machines_live.ex:829
+#: lib/marshall_web/live/machines_live.ex:831
 #, elixir-autogen, elixir-format
 msgid "The owner's access cannot be changed."
 msgstr "Hindi mababago ang pag-access ng may-ari."
@@ -1556,7 +1555,7 @@ msgstr "Hindi mabago ang pag-pin. I-refresh at subukang muli."
 msgid "The previous copy of this machine is still releasing its snapshot. Retry shortly."
 msgstr "Inilalabas pa ng naunang kopya ng makinang ito ang kopya ng estado nito. Subukang muli maya-maya."
 
-#: lib/marshall_web/live/machines_live.ex:839
+#: lib/marshall_web/live/machines_live.ex:841
 #, elixir-autogen, elixir-format
 msgid "The request could not be completed. Check the values and try again."
 msgstr "Hindi makumpleto ang kahilingan. Suriin ang mga halaga at subukang muli."
@@ -1571,13 +1570,13 @@ msgstr "Nagkaproblema ang kahilingan. Gamitin ang mga magagamit na aksiyon upang
 msgid "The resize has completed; this page refreshes with the confirmed sizes."
 msgstr "Natapos ang pagbabago ng laki; magre-refresh ang pahinang ito gamit ang mga nakumpirmang laki."
 
-#: lib/marshall_web/live/machines_live.ex:714
+#: lib/marshall_web/live/machines_live.ex:716
 #, elixir-autogen, elixir-format
 msgid "The same network and access options as Standard, with AI agents that can start child agents."
 msgstr "Parehong mga pagpipilian sa network at pag-access gaya ng Karaniwan, kasama ang mga ahenteng AI na maaaring magsimula ng mga anak na ahente."
 
-#: lib/marshall_web/live/machines_live.ex:808
-#: lib/marshall_web/live/machines_live.ex:825
+#: lib/marshall_web/live/machines_live.ex:810
+#: lib/marshall_web/live/machines_live.ex:827
 #, elixir-autogen, elixir-format
 msgid "The selected image needs more memory or disk space."
 msgstr "Nangangailangan ang napiling imahe ng higit na memorya o espasyo sa disk."
@@ -1607,7 +1606,7 @@ msgstr "Abala o nagbago ang pinagmulan bago nagsimula ang pagkopya. Subukang mul
 msgid "There is not enough available capacity for a new machine right now."
 msgstr "Kulang ang magagamit na kapasidad para sa bagong makina ngayon."
 
-#: lib/marshall_web/live/machines_live.ex:818
+#: lib/marshall_web/live/machines_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "There is not enough available capacity for this machine."
 msgstr "Kulang ang magagamit na kapasidad para sa makinang ito."
@@ -1617,8 +1616,8 @@ msgstr "Kulang ang magagamit na kapasidad para sa makinang ito."
 msgid "There is not enough capacity for this copy. Retry when space is available."
 msgstr "Kulang ang kapasidad para sa kopyang ito. Subukang muli kapag may espasyo na."
 
-#: lib/marshall_web/live/machines_live.ex:805
-#: lib/marshall_web/live/machines_live.ex:820
+#: lib/marshall_web/live/machines_live.ex:807
+#: lib/marshall_web/live/machines_live.ex:822
 #, elixir-autogen, elixir-format
 msgid "This image is no longer available. Refresh and choose another image."
 msgstr "Hindi na magagamit ang imaheng ito. I-refresh at pumili ng ibang imahe."
@@ -1643,7 +1642,7 @@ msgstr "Nag-expire na ang link na ito para sa paglulunsad. Buksan itong muli."
 msgid "This machine is being deleted and cannot be pinned."
 msgstr "Binubura ang makinang ito at hindi ito maaaring i-pin."
 
-#: lib/marshall_web/live/machines_live.ex:831
+#: lib/marshall_web/live/machines_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "This machine is being deleted."
 msgstr "Binubura ang makinang ito."
@@ -1658,7 +1657,7 @@ msgstr "Hindi magagamit ang makinang ito o wala ka nang pahintulot na mamahala."
 msgid "This machine is unavailable or your access has ended."
 msgstr "Hindi magagamit ang makinang ito o natapos na ang iyong pag-access."
 
-#: lib/marshall_web/live/machines_live.ex:826
+#: lib/marshall_web/live/machines_live.ex:828
 #, elixir-autogen, elixir-format
 msgid "This machine's host is currently unavailable."
 msgstr "Kasalukuyang hindi magagamit ang host ng makinang ito."
@@ -1673,7 +1672,7 @@ msgstr "Hindi mailunsad ang link ng repositoryong ito. Buksan muli ang link."
 msgid "This request could not finish. Review the issue below and the available actions."
 msgstr "Hindi matapos ang kahilingang ito. Suriin ang problema sa ibaba at ang mga magagamit na aksiyon."
 
-#: lib/marshall_web/live/machines_live.ex:834
+#: lib/marshall_web/live/machines_live.ex:836
 #, elixir-autogen, elixir-format
 msgid "This request has already been used. Refresh before trying again."
 msgstr "Nagamit na ang kahilingang ito. I-refresh bago subukang muli."
@@ -1683,24 +1682,24 @@ msgstr "Nagamit na ang kahilingang ito. I-refresh bago subukang muli."
 msgid "This request has ended without publishing a clone."
 msgstr "Natapos ang kahilingang ito nang hindi naglalathala ng kopya."
 
-#: lib/marshall_web/live/machines_live.ex:960
-#: lib/marshall_web/live/machines_live.ex:1223
-#: lib/marshall_web/live/machines_live.ex:1235
+#: lib/marshall_web/live/machines_live.ex:962
+#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1237
 #, elixir-autogen, elixir-format
 msgid "Unavailable"
 msgstr "Hindi magagamit"
 
-#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:763
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Hindi alam"
 
-#: lib/marshall_web/live/machines_live.ex:832
+#: lib/marshall_web/live/machines_live.ex:834
 #, elixir-autogen, elixir-format
 msgid "Unpin this machine before deleting it."
 msgstr "Alisin ang pag-pin sa makinang ito bago ito burahin."
 
-#: lib/marshall_web/live/machines_live.ex:1609
+#: lib/marshall_web/live/machines_live.ex:1611
 #, elixir-autogen, elixir-format
 msgid "Unpin to delete. While you have this machine pinned, nothing can delete it."
 msgstr "Alisin ang pag-pin upang burahin. Habang naka-pin sa iyo ang makinang ito, walang makabubura rito."
@@ -1715,7 +1714,7 @@ msgstr "Mag-unsubscribe anumang oras."
 msgid "Updated"
 msgstr "Na-update"
 
-#: lib/marshall_web/live/machines_live.ex:1551
+#: lib/marshall_web/live/machines_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "Updates automatically"
 msgstr "Awtomatikong nag-a-update"
@@ -1725,7 +1724,7 @@ msgstr "Awtomatikong nag-a-update"
 msgid "Use current machine state, keeping these sizes"
 msgstr "Gamitin ang kasalukuyang kalagayan ng makina at panatilihin ang mga laking ito"
 
-#: lib/marshall_web/live/machines_live.ex:852
+#: lib/marshall_web/live/machines_live.ex:854
 #, elixir-autogen, elixir-format
 msgid "Verifying the destination disks"
 msgstr "Bineberipika ang mga disk sa patutunguhan"
@@ -1735,9 +1734,9 @@ msgstr "Bineberipika ang mga disk sa patutunguhan"
 msgid "View all →"
 msgstr "Tingnan lahat →"
 
-#: lib/marshall_web/live/machines_live.ex:757
-#: lib/marshall_web/live/machines_live.ex:1358
-#: lib/marshall_web/live/machines_live.ex:1367
+#: lib/marshall_web/live/machines_live.ex:759
+#: lib/marshall_web/live/machines_live.ex:1360
+#: lib/marshall_web/live/machines_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "Tagatingin"
@@ -1777,13 +1776,13 @@ msgstr "Hindi namin makontak ang serbisyo ng newsletter. Subukang muli mamaya."
 msgid "We couldn't launch that repository"
 msgstr "Hindi namin mailunsad ang repositoryong iyon"
 
-#: lib/marshall_web/live/machines_live.ex:756
+#: lib/marshall_web/live/machines_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "Mga web app"
 
-#: lib/marshall_web/live/machines_live.ex:1357
-#: lib/marshall_web/live/machines_live.ex:1366
+#: lib/marshall_web/live/machines_live.ex:1359
+#: lib/marshall_web/live/machines_live.ex:1368
 #, elixir-autogen, elixir-format
 msgid "Web apps only"
 msgstr "Mga web app lamang"
@@ -1793,7 +1792,7 @@ msgstr "Mga web app lamang"
 msgid "What happens"
 msgstr "Ano ang mangyayari"
 
-#: lib/marshall_web/live/machines_live.ex:1266
+#: lib/marshall_web/live/machines_live.ex:1268
 #, elixir-autogen, elixir-format
 msgid "Who can reach this machine, and what each role allows."
 msgstr "Sino ang makaa-access sa makinang ito, at ano ang pinapayagan ng bawat tungkulin."
@@ -1803,7 +1802,7 @@ msgstr "Sino ang makaa-access sa makinang ito, at ano ang pinapayagan ng bawat t
 msgid "You can pin up to %{value1} machines. Unpin one before pinning another."
 msgstr "Maaari kang mag-pin ng hanggang %{value1} makina. Alisin muna ang pag-pin sa isa bago mag-pin ng iba."
 
-#: lib/marshall_web/live/machines_live.ex:830
+#: lib/marshall_web/live/machines_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "You no longer have permission for this action."
 msgstr "Wala ka nang pahintulot para sa aksiyong ito."
@@ -1813,17 +1812,17 @@ msgstr "Wala ka nang pahintulot para sa aksiyong ito."
 msgid "Your account cannot create machines."
 msgstr "Hindi makalikha ng mga makina ang iyong account."
 
-#: lib/marshall_web/live/machines_live.ex:886
+#: lib/marshall_web/live/machines_live.ex:888
 #, elixir-autogen, elixir-format
 msgid "Your development environments, personal and shared."
 msgstr "Ang iyong mga kapaligiran para sa pagbuo, pansarili at ibinabahagi."
 
-#: lib/marshall_web/live/machines_live.ex:1240
+#: lib/marshall_web/live/machines_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Your disk is retained when the machine is stopped."
 msgstr "Nananatili ang iyong disk kapag nakahinto ang makina."
 
-#: lib/marshall_web/live/machines_live.ex:1178
+#: lib/marshall_web/live/machines_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Your disk stays with you when the machine is stopped."
 msgstr "Nananatili sa iyo ang iyong disk kapag nakahinto ang makina."
@@ -1863,18 +1862,18 @@ msgstr "Iyong lugar-paggawa, na may kaunting luwag."
 msgid "continue to Overalls"
 msgstr "magpatuloy sa Overalls"
 
-#: lib/marshall_web/live/machines_live.ex:1399
+#: lib/marshall_web/live/machines_live.ex:1401
 #, elixir-autogen, elixir-format
 msgid "production, project-name"
 msgstr "produksiyon, pangalan-ng-proyekto"
 
-#: lib/marshall_web/live/machines_live.ex:1006
-#: lib/marshall_web/live/machines_live.ex:1329
+#: lib/marshall_web/live/machines_live.ex:1008
+#: lib/marshall_web/live/machines_live.ex:1331
 #, elixir-autogen, elixir-format
 msgid "← First page"
 msgstr "← Unang pahina"
 
-#: lib/marshall_web/live/machines_live.ex:1017
+#: lib/marshall_web/live/machines_live.ex:1019
 #, elixir-autogen, elixir-format
 msgid "← Machines"
 msgstr "← Mga makina"
@@ -1968,12 +1967,12 @@ msgstr "Kumpirmahin"
 msgid "A new machine will clone the repository when it boots."
 msgstr "Iko-clone ng bagong machine ang repository kapag nag-boot ito."
 
-#: lib/marshall_web/live/machines_live.ex:742
+#: lib/marshall_web/live/machines_live.ex:744
 #, elixir-autogen, elixir-format
 msgid "Android (API 36)"
 msgstr "Android (API 36)"
 
-#: lib/marshall_web/live/machines_live.ex:1069
+#: lib/marshall_web/live/machines_live.ex:1071
 #, elixir-autogen, elixir-format
 msgid "Leave this blank to create the machine without making setup changes."
 msgstr "Iwanang blangko ito para gawin ang makina nang walang pagbabago sa setup."
@@ -1988,7 +1987,7 @@ msgstr "Hiniling ang makina at ang thread ng setup."
 msgid "Provisioning is in progress. This page will open the machine when it is ready."
 msgstr "Isinasagawa ang provisioning. Bubuksan ng pahinang ito ang makina kapag handa na ito."
 
-#: lib/marshall_web/live/machine_provisioning_live.ex:70
+#: lib/marshall_web/live/machine_provisioning_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Provisioning request unavailable."
 msgstr "Hindi available ang kahilingan sa provisioning."
@@ -2008,12 +2007,12 @@ msgstr "Subukang muli ang setup"
 msgid "Setting up your machine"
 msgstr "Sine-set up ang iyong makina"
 
-#: lib/marshall_web/live/machines_live.ex:1059
+#: lib/marshall_web/live/machines_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "The machine agent will execute this instruction automatically in Work mode."
 msgstr "Awtomatikong isasagawa ng agent ng makina ang tagubiling ito sa Trabaho mode."
 
-#: lib/marshall_web/live/machines_live.ex:1057
+#: lib/marshall_web/live/machines_live.ex:1059
 #, elixir-autogen, elixir-format
 msgid "What should this machine do when it is ready?"
 msgstr "Ano ang dapat gawin ng makinang ito kapag handa na ito?"

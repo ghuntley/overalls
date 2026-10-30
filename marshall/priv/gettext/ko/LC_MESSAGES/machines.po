@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=1; plural=0;\n"
 
-#: lib/marshall_web/live/machines_live.ex:1465
+#: lib/marshall_web/live/machines_live.ex:1467
 #, elixir-autogen, elixir-format
 msgid " and counting"
 msgstr " 그리고 계산"
 
-#: lib/marshall_web/live/machines_live.ex:1461
+#: lib/marshall_web/live/machines_live.ex:1463
 #, elixir-autogen, elixir-format
 msgid "%{seconds} seconds%{suffix}"
 msgstr "%{seconds}초%{suffix}"
@@ -29,8 +29,8 @@ msgstr "%{seconds}초%{suffix}"
 msgid "%{value1} CPU"
 msgstr "%{value1} CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1229
-#: lib/marshall_web/live/machines_live.ex:1232
+#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1234
 #: lib/marshall_web/live/overview_live.ex:351
 #: lib/marshall_web/live/overview_live.ex:356
 #: lib/marshall_web/live/resize_live.ex:322
@@ -43,20 +43,20 @@ msgstr "%{value1} GiB"
 msgid "%{value1} MiB"
 msgstr "%{value1} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:1226
+#: lib/marshall_web/live/machines_live.ex:1228
 #: lib/marshall_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU"
 msgstr "%{value1} vCPU"
 
 #: lib/marshall_web/live/admin/workloads_live.ex:160
-#: lib/marshall_web/live/machines_live.ex:948
+#: lib/marshall_web/live/machines_live.ex:950
 #: lib/marshall_web/live/overview_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB 디스크"
 
-#: lib/marshall_web/live/machines_live.ex:1171
+#: lib/marshall_web/live/machines_live.ex:1173
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} MiB memory · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} MiB 메모리 · %{value3} GiB 디스크"
@@ -79,18 +79,18 @@ msgstr "%{value1} → %{value2} GiB"
 msgid "%{value1} → %{value2} MiB"
 msgstr "%{value1} → %{value2} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:890
+#: lib/marshall_web/live/machines_live.ex:892
 #: lib/marshall_web/live/overview_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "+ Create machine"
 msgstr "+ 기계 생성"
 
-#: lib/marshall_web/live/machines_live.ex:1533
+#: lib/marshall_web/live/machines_live.ex:1535
 #, elixir-autogen, elixir-format
 msgid "+ Queue clone"
 msgstr "+ 대기열 복제"
 
-#: lib/marshall_web/live/machines_live.ex:721
+#: lib/marshall_web/live/machines_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "A Overalls development environment for nested machines. It uses a dedicated image, an extra 256 GiB data disk, and higher resource minimums. Its AI agent can start child agents."
 msgstr ""
@@ -107,9 +107,9 @@ msgstr "뭔가 만들기 좋은 날."
 msgid "A small preview. All your accessible machines are in"
 msgstr "작은 미리보기. 접근 가능한 모든 기계가"
 
-#: lib/marshall_web/live/machines_live.ex:924
-#: lib/marshall_web/live/machines_live.ex:962
-#: lib/marshall_web/live/machines_live.ex:1265
+#: lib/marshall_web/live/machines_live.ex:926
+#: lib/marshall_web/live/machines_live.ex:964
+#: lib/marshall_web/live/machines_live.ex:1267
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "입장"
@@ -119,9 +119,9 @@ msgstr "입장"
 msgid "Access updated."
 msgstr "액세스가 업데이트되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1279
-#: lib/marshall_web/live/machines_live.ex:1286
-#: lib/marshall_web/live/machines_live.ex:1305
+#: lib/marshall_web/live/machines_live.ex:1281
+#: lib/marshall_web/live/machines_live.ex:1288
+#: lib/marshall_web/live/machines_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "계정"
@@ -136,14 +136,14 @@ msgstr "관리 확인이 만료되었습니다. Fleet 워크로드에서 머신�
 msgid "Administrative verification expired. Your resize draft is kept in this page's address."
 msgstr "관리 확인이 만료되었습니다. 크기 조정 초안은 이 페이지의 주소에 보관됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:864
+#: lib/marshall_web/live/machines_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "All retained copies deleted"
 msgstr "보관된 모든 복사본이 삭제되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1281
-#: lib/marshall_web/live/machines_live.ex:1298
-#: lib/marshall_web/live/machines_live.ex:1317
+#: lib/marshall_web/live/machines_live.ex:1283
+#: lib/marshall_web/live/machines_live.ex:1300
+#: lib/marshall_web/live/machines_live.ex:1319
 #, elixir-autogen, elixir-format
 msgid "Allows"
 msgstr "허용"
@@ -185,7 +185,7 @@ msgstr ""
 "Chrome 또는 Firefox 확장 프로그램을 사용하여 GitHub, GitLab, Codeberg 또는 Bitbucket 저장소를 "
 "전체 작업복으로 가져옵니다."
 
-#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1227
 #: lib/marshall_web/live/overview_live.ex:347
 #: lib/marshall_web/live/resize_live.ex:315
 #: lib/marshall_web/live/resize_live.ex:359
@@ -195,7 +195,7 @@ msgstr ""
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1141
+#: lib/marshall_web/live/machines_live.ex:1143
 #, elixir-autogen, elixir-format
 msgid "CPU (vCPU)"
 msgstr "CPU(vCPU)"
@@ -206,7 +206,7 @@ msgid "CPU and memory can increase or decrease. Disk size can only grow."
 msgstr "CPU와 메모리는 증가하거나 감소할 수 있습니다. 디스크 크기는 커질 수만 있습니다."
 
 #: lib/marshall_web/components/clone_components.ex:116
-#: lib/marshall_web/live/machines_live.ex:1193
+#: lib/marshall_web/live/machines_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "취소"
@@ -216,7 +216,7 @@ msgstr "취소"
 msgid "Cancel could not be accepted. Sizes are already being applied or the machine state is unconfirmed."
 msgstr "취소를 수락할 수 없습니다. 크기가 이미 적용 중이거나 기계 상태가 확인되지 않았습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1479
+#: lib/marshall_web/live/machines_live.ex:1481
 #, elixir-autogen, elixir-format
 msgid "Cancel move"
 msgstr "이동 취소"
@@ -248,7 +248,7 @@ msgstr "스냅샷이 시작되기 전에 취소되었습니다."
 msgid "Cancelling"
 msgstr "취소 중"
 
-#: lib/marshall_web/live/machines_live.ex:859
+#: lib/marshall_web/live/machines_live.ex:861
 #, elixir-autogen, elixir-format
 msgid "Cancelling and restoring the source"
 msgstr "소스 취소 및 복원"
@@ -268,7 +268,7 @@ msgstr "취소 중: 중지가 확인될 때까지 기다린 후 현재 크기로
 msgid "Cancelling: waiting for the stop to confirm; the sizes stay unchanged."
 msgstr "취소 중: 중지가 확인되기를 기다리는 중입니다. 크기는 변경되지 않습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1477
+#: lib/marshall_web/live/machines_live.ex:1479
 #, elixir-autogen, elixir-format
 msgid "Cancelling…"
 msgstr "취소 중…"
@@ -288,27 +288,27 @@ msgstr "소스 디스크를 캡처하는 중입니다. 스냅샷이 준비된 �
 msgid "Check your inbox and click the link to confirm your subscription."
 msgstr "받은편지함을 확인하고 링크를 클릭하여 구독을 확인하세요."
 
-#: lib/marshall_web/live/machines_live.ex:854
+#: lib/marshall_web/live/machines_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Checking destination readiness"
 msgstr "목적지 준비 확인"
 
-#: lib/marshall_web/live/machines_live.ex:849
+#: lib/marshall_web/live/machines_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Checking transfer connectivity"
 msgstr "전송 연결 확인 중"
 
-#: lib/marshall_web/live/machines_live.ex:1082
+#: lib/marshall_web/live/machines_live.ex:1084
 #, elixir-autogen, elixir-format
 msgid "Choose an image"
 msgstr "이미지를 선택하세요"
 
-#: lib/marshall_web/live/machines_live.ex:1020
+#: lib/marshall_web/live/machines_live.ex:1022
 #, elixir-autogen, elixir-format
 msgid "Choose an image and the resources for your environment."
 msgstr "환경에 맞는 이미지와 리소스를 선택하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1075
+#: lib/marshall_web/live/machines_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Choose your environment"
 msgstr "환경을 선택하세요"
@@ -323,7 +323,7 @@ msgstr "클론이 취소되었습니다."
 msgid "Clone complete"
 msgstr "복제 완료"
 
-#: lib/marshall_web/live/machines_live.ex:1499
+#: lib/marshall_web/live/machines_live.ex:1501
 #, elixir-autogen, elixir-format
 msgid "Clone machine"
 msgstr "복제 기계"
@@ -338,12 +338,12 @@ msgstr "클론에 주의가 필요함"
 msgid "Clone queued. You can queue another copy."
 msgstr "클론이 대기 중입니다. 다른 사본을 대기열에 추가할 수 있습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1550
+#: lib/marshall_web/live/machines_live.ex:1552
 #, elixir-autogen, elixir-format
 msgid "Clone requests"
 msgstr "복제 요청"
 
-#: lib/marshall_web/live/machines_live.ex:1561
+#: lib/marshall_web/live/machines_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "Clone requests are temporarily unavailable. Retrying automatically."
 msgstr "복제 요청을 일시적으로 사용할 수 없습니다. 자동으로 다시 시도하는 중입니다."
@@ -353,7 +353,7 @@ msgstr "복제 요청을 일시적으로 사용할 수 없습니다. 자동으�
 msgid "Clone stages"
 msgstr "클론 단계"
 
-#: lib/marshall_web/live/machines_live.ex:1403
+#: lib/marshall_web/live/machines_live.ex:1405
 #, elixir-autogen, elixir-format
 msgid "Comment"
 msgstr "댓글"
@@ -368,8 +368,8 @@ msgstr "완벽한"
 msgid "Confirmed resources"
 msgstr "확인된 리소스"
 
-#: lib/marshall_web/live/machines_live.ex:925
-#: lib/marshall_web/live/machines_live.ex:976
+#: lib/marshall_web/live/machines_live.ex:927
+#: lib/marshall_web/live/machines_live.ex:978
 #, elixir-autogen, elixir-format
 msgid "Connect"
 msgstr "연결하다"
@@ -389,7 +389,7 @@ msgstr "사자"
 msgid "Copying files"
 msgstr "파일 복사"
 
-#: lib/marshall_web/live/machines_live.ex:851
+#: lib/marshall_web/live/machines_live.ex:853
 #, elixir-autogen, elixir-format
 msgid "Copying the stopped disks"
 msgstr "중지된 디스크 복사"
@@ -399,7 +399,7 @@ msgstr "중지된 디스크 복사"
 msgid "Create a machine"
 msgstr "머신 생성"
 
-#: lib/marshall_web/live/machines_live.ex:1507
+#: lib/marshall_web/live/machines_live.ex:1509
 #, elixir-autogen, elixir-format
 msgid "Create a private, independent copy of this machine. Running machines stop briefly for each snapshot, then restart while copying continues. Copies are processed in order and match the source's power state when their turn begins."
 msgstr ""
@@ -407,8 +407,8 @@ msgstr ""
 "시작됩니다. 복사본은 순서대로 처리되며 차례가 시작될 때 소스의 전원 상태와 일치합니다."
 
 #: lib/marshall_web/live/machines_live.ex:106
-#: lib/marshall_web/live/machines_live.ex:1019
-#: lib/marshall_web/live/machines_live.ex:1191
+#: lib/marshall_web/live/machines_live.ex:1021
+#: lib/marshall_web/live/machines_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Create machine"
 msgstr "머신 생성"
@@ -428,18 +428,18 @@ msgstr "스냅샷에서 독립 디스크를 생성합니다. 소스 복구는 �
 msgid "Creating cloned machine"
 msgstr "복제된 머신 생성"
 
-#: lib/marshall_web/live/machines_live.ex:1189
+#: lib/marshall_web/live/machines_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Creating…"
 msgstr "만드는 중…"
 
-#: lib/marshall_web/live/machines_live.ex:904
+#: lib/marshall_web/live/machines_live.ex:906
 #, elixir-autogen, elixir-format
 msgid "Current headroom is temporarily unavailable."
 msgstr "현재 헤드룸을 일시적으로 사용할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:896
-#: lib/marshall_web/live/machines_live.ex:1038
+#: lib/marshall_web/live/machines_live.ex:898
+#: lib/marshall_web/live/machines_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Current headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
 msgstr "현재 헤드룸: %{value1} vCPU · %{value2} GiB 메모리 · %{value3} GiB 디스크"
@@ -449,54 +449,53 @@ msgstr "현재 헤드룸: %{value1} vCPU · %{value2} GiB 메모리 · %{value3}
 msgid "Current provisioning headroom"
 msgstr "현재 프로비저닝 헤드룸"
 
-#: lib/marshall_web/live/machines_live.ex:687
-#: lib/marshall_web/live/machines_live.ex:775
+#: lib/marshall_web/live/machines_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr "고객"
 
-#: lib/marshall_web/live/machines_live.ex:1251
+#: lib/marshall_web/live/machines_live.ex:1253
 #, elixir-autogen, elixir-format
 msgid "Customer machines allow only owner SSH and terminal access. Outbound networking, workspace sharing, and web service exposure are disabled."
 msgstr ""
 "고객 컴퓨터는 소유자 SSH 및 터미널 액세스만 허용합니다. 아웃바운드 네트워킹, 작업 공간 공유 및 웹 서비스 노출이 비활성화됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:1605
+#: lib/marshall_web/live/machines_live.ex:1607
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "삭제"
 
-#: lib/marshall_web/live/machines_live.ex:1588
+#: lib/marshall_web/live/machines_live.ex:1590
 #, elixir-autogen, elixir-format
 msgid "Delete machine"
 msgstr "머신 삭제"
 
-#: lib/marshall_web/live/machines_live.ex:1602
+#: lib/marshall_web/live/machines_live.ex:1604
 #, elixir-autogen, elixir-format
 msgid "Delete this machine and its disk? This cannot be undone."
 msgstr "이 머신과 해당 디스크를 삭제하시겠습니까? 이 작업은 취소할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:779
+#: lib/marshall_web/live/machines_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Deleting"
 msgstr "삭제 중"
 
-#: lib/marshall_web/live/machines_live.ex:861
+#: lib/marshall_web/live/machines_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Deleting retained copies"
 msgstr "보관된 복사본 삭제"
 
-#: lib/marshall_web/live/machines_live.ex:855
+#: lib/marshall_web/live/machines_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Destination boot failed; source copy retained"
 msgstr "대상 부팅에 실패했습니다. 원본 복사본이 유지됨"
 
-#: lib/marshall_web/live/machines_live.ex:857
+#: lib/marshall_web/live/machines_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Destination readiness failed; source copy retained"
 msgstr "대상 준비에 실패했습니다. 원본 복사본이 유지됨"
 
-#: lib/marshall_web/live/machines_live.ex:858
+#: lib/marshall_web/live/machines_live.ex:860
 #, elixir-autogen, elixir-format
 msgid "Destination ready; cleaning up the source"
 msgstr "목적지가 준비되었습니다. 소스를 정리하다"
@@ -506,12 +505,12 @@ msgstr "목적지가 준비되었습니다. 소스를 정리하다"
 msgid "Destination restart requested. The source copy remains retained until readiness succeeds."
 msgstr "대상 다시 시작이 요청되었습니다. 소스 복사본은 준비가 완료될 때까지 유지됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:1268
+#: lib/marshall_web/live/machines_live.ex:1270
 #, elixir-autogen, elixir-format
 msgid "Direct machine grants"
 msgstr "직접 머신 부여"
 
-#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1233
 #: lib/marshall_web/live/overview_live.ex:355
 #: lib/marshall_web/live/resize_live.ex:321
 #: lib/marshall_web/live/resize_live.ex:375
@@ -520,7 +519,7 @@ msgstr "직접 머신 부여"
 msgid "Disk"
 msgstr "디스크"
 
-#: lib/marshall_web/live/machines_live.ex:1160
+#: lib/marshall_web/live/machines_live.ex:1162
 #, elixir-autogen, elixir-format
 msgid "Disk (GiB)"
 msgstr "디스크(GiB)"
@@ -545,7 +544,7 @@ msgstr "이메일 주소"
 msgid "Enable JavaScript to open a repository link, or"
 msgstr "JavaScript를 활성화하여 저장소 링크를 열거나"
 
-#: lib/marshall_web/live/machines_live.ex:772
+#: lib/marshall_web/live/machines_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Ends that person's access to this machine."
 msgstr "해당 사람의 이 시스템에 대한 액세스를 종료합니다."
@@ -560,7 +559,7 @@ msgstr "유효한 이메일 주소를 입력하세요."
 msgid "Enter whole numbers for CPU, memory and disk size."
 msgstr "CPU, 메모리, 디스크 크기에 정수를 입력하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1299
+#: lib/marshall_web/live/machines_live.ex:1301
 #, elixir-autogen, elixir-format
 msgid "Everything; cannot be changed here."
 msgstr "모든 것; 여기서는 변경할 수 없습니다."
@@ -570,12 +569,12 @@ msgstr "모든 것; 여기서는 변경할 수 없습니다."
 msgid "Explore your usage ↗"
 msgstr "사용량 살펴보기 ↗"
 
-#: lib/marshall_web/live/machines_live.ex:1500
+#: lib/marshall_web/live/machines_live.ex:1502
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy"
 msgstr "파일 및 저장된 자격 증명이 복사본에 포함됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:1540
+#: lib/marshall_web/live/machines_live.ex:1542
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy."
 msgstr "파일과 저장된 자격 증명이 복사본에 포함됩니다."
@@ -600,12 +599,12 @@ msgstr "마무리"
 msgid "Get tips, tricks and updates about Overalls and AI by email."
 msgstr "Overalls와 AI에 관한 팁, 활용법 및 업데이트를 이메일로 받아보세요."
 
-#: lib/marshall_web/live/machines_live.ex:1135
+#: lib/marshall_web/live/machines_live.ex:1137
 #, elixir-autogen, elixir-format
 msgid "Give it room to grow"
 msgstr "성장할 여지를 줘"
 
-#: lib/marshall_web/live/machines_live.ex:1337
+#: lib/marshall_web/live/machines_live.ex:1339
 #, elixir-autogen, elixir-format
 msgid "Grant, change or remove access"
 msgstr "액세스 권한 부여, 변경 또는 제거"
@@ -620,25 +619,25 @@ msgstr "다음 부팅 시 파일 시스템 확장"
 msgid "Headroom is temporarily unavailable."
 msgstr "일시적으로 헤드룸을 사용할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:923
-#: lib/marshall_web/live/machines_live.ex:958
-#: lib/marshall_web/live/machines_live.ex:1234
+#: lib/marshall_web/live/machines_live.ex:925
+#: lib/marshall_web/live/machines_live.ex:960
+#: lib/marshall_web/live/machines_live.ex:1236
 #, elixir-autogen, elixir-format
 msgid "Host"
 msgstr "주인"
 
-#: lib/marshall_web/live/machines_live.ex:1081
+#: lib/marshall_web/live/machines_live.ex:1083
 #, elixir-autogen, elixir-format
 msgid "Image"
 msgstr "영상"
 
-#: lib/marshall_web/live/machines_live.ex:1024
+#: lib/marshall_web/live/machines_live.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Images and capacity are temporarily unavailable. Your choices are retained."
 msgstr "이미지와 용량을 일시적으로 사용할 수 없습니다. 귀하의 선택 사항은 유지됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:693
-#: lib/marshall_web/live/machines_live.ex:776
+#: lib/marshall_web/live/machines_live.ex:695
+#: lib/marshall_web/live/machines_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Inception"
 msgstr "처음"
@@ -648,7 +647,7 @@ msgstr "처음"
 msgid "Invalid request."
 msgstr "요청이 잘못되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1397
+#: lib/marshall_web/live/machines_live.ex:1399
 #, elixir-autogen, elixir-format
 msgid "Labels"
 msgstr "레이블"
@@ -674,12 +673,12 @@ msgstr "진수"
 msgid "Launching repository"
 msgstr "저장소 실행 중"
 
-#: lib/marshall_web/live/machines_live.ex:1523
+#: lib/marshall_web/live/machines_live.ex:1525
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name"
 msgstr "이름을 생성하려면 비워 두세요."
 
-#: lib/marshall_web/live/machines_live.ex:1537
+#: lib/marshall_web/live/machines_live.ex:1539
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name."
 msgstr "이름을 생성하려면 비워 두세요."
@@ -691,7 +690,7 @@ msgstr "이름을 생성하려면 비워 두세요."
 msgid "Leave stopped"
 msgstr "휴가 중지됨"
 
-#: lib/marshall_web/live/machines_live.ex:919
+#: lib/marshall_web/live/machines_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Machine"
 msgstr "기계"
@@ -701,7 +700,7 @@ msgstr "기계"
 msgid "Machine metadata saved."
 msgstr "머신 메타데이터를 저장했습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1005
+#: lib/marshall_web/live/machines_live.ex:1007
 #, elixir-autogen, elixir-format
 msgid "Machine pages"
 msgstr "기계 페이지"
@@ -712,7 +711,7 @@ msgid "Machine update requested."
 msgstr "기계 업데이트가 요청되었습니다."
 
 #: lib/marshall_web/live/machines_live.ex:121
-#: lib/marshall_web/live/machines_live.ex:885
+#: lib/marshall_web/live/machines_live.ex:887
 #: lib/marshall_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Machines"
@@ -730,7 +729,7 @@ msgstr "일시적으로 기계를 사용할 수 없습니다."
 msgid "Machines couldn’t be loaded. Refresh to try again."
 msgstr "머신을 로드할 수 없습니다. 다시 시도하려면 새로고침하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1118
+#: lib/marshall_web/live/machines_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Make it yours"
 msgstr "당신의 것으로 만드세요"
@@ -740,24 +739,24 @@ msgstr "당신의 것으로 만드세요"
 msgid "Make yourself at home"
 msgstr "집처럼 편안하게 지내세요"
 
-#: lib/marshall_web/live/machines_live.ex:1248
+#: lib/marshall_web/live/machines_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Management access is required to change the remaining settings."
 msgstr "나머지 설정을 변경하려면 관리 액세스가 필요합니다."
 
-#: lib/marshall_web/live/machines_live.ex:759
-#: lib/marshall_web/live/machines_live.ex:1360
-#: lib/marshall_web/live/machines_live.ex:1369
+#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:1362
+#: lib/marshall_web/live/machines_live.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "관리자"
 
-#: lib/marshall_web/live/machines_live.ex:1455
+#: lib/marshall_web/live/machines_live.ex:1457
 #, elixir-autogen, elixir-format
 msgid "Measured between control-plane stop and readiness observations; guest availability may differ."
 msgstr "제어 평면 정지와 준비 상태 관찰 사이에서 측정됩니다. 투숙객의 이용 가능 여부는 다를 수 있습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1228
+#: lib/marshall_web/live/machines_live.ex:1230
 #: lib/marshall_web/live/overview_live.ex:350
 #: lib/marshall_web/live/resize_live.ex:318
 #: lib/marshall_web/live/resize_live.ex:365
@@ -766,33 +765,33 @@ msgstr "제어 평면 정지와 준비 상태 관찰 사이에서 측정됩니�
 msgid "Memory"
 msgstr "메모리"
 
-#: lib/marshall_web/live/machines_live.ex:1149
+#: lib/marshall_web/live/machines_live.ex:1151
 #: lib/marshall_web/live/resize_live.ex:455
 #, elixir-autogen, elixir-format
 msgid "Memory (MiB)"
 msgstr "메모리(MiB)"
 
-#: lib/marshall_web/live/machines_live.ex:1443
+#: lib/marshall_web/live/machines_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "방법"
 
-#: lib/marshall_web/live/machines_live.ex:862
+#: lib/marshall_web/live/machines_live.ex:864
 #, elixir-autogen, elixir-format
 msgid "Move cancelled; cleanup complete"
 msgstr "이동이 취소되었습니다. 정리 완료"
 
-#: lib/marshall_web/live/machines_live.ex:863
+#: lib/marshall_web/live/machines_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Move complete"
 msgstr "이동 완료"
 
-#: lib/marshall_web/live/machines_live.ex:1423
+#: lib/marshall_web/live/machines_live.ex:1425
 #, elixir-autogen, elixir-format
 msgid "Move this machine to an automatically selected host? The machine may be briefly unavailable."
 msgstr "이 시스템을 자동으로 선택된 호스트로 이동하시겠습니까? 잠시 동안 기기를 사용하지 못할 수 있습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1429
+#: lib/marshall_web/live/machines_live.ex:1431
 #, elixir-autogen, elixir-format
 msgid "Move to another host"
 msgstr "다른 호스트로 이동"
@@ -803,7 +802,7 @@ msgstr "다른 호스트로 이동"
 msgid "Needs attention"
 msgstr "주의가 필요함"
 
-#: lib/marshall_web/live/machines_live.ex:1522
+#: lib/marshall_web/live/machines_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "New machine name (optional)"
 msgstr "새 시스템 이름(선택 사항)"
@@ -813,8 +812,8 @@ msgstr "새 시스템 이름(선택 사항)"
 msgid "New sizes"
 msgstr "새로운 크기"
 
-#: lib/marshall_web/live/machines_live.ex:1010
-#: lib/marshall_web/live/machines_live.ex:1332
+#: lib/marshall_web/live/machines_live.ex:1012
+#: lib/marshall_web/live/machines_live.ex:1334
 #, elixir-autogen, elixir-format
 msgid "Next page →"
 msgstr "다음 페이지 →"
@@ -824,17 +823,17 @@ msgstr "다음 페이지 →"
 msgid "Next steps"
 msgstr "다음 단계"
 
-#: lib/marshall_web/live/machines_live.ex:1555
+#: lib/marshall_web/live/machines_live.ex:1557
 #, elixir-autogen, elixir-format
 msgid "No clone requests yet. Queue a copy and follow its progress here."
 msgstr "아직 클론 요청이 없습니다. 여기에서 복사본을 대기열에 추가하고 진행 상황을 확인하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1325
+#: lib/marshall_web/live/machines_live.ex:1327
 #, elixir-autogen, elixir-format
 msgid "No direct machine grants."
 msgstr "직접적인 기계 부여는 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1035
+#: lib/marshall_web/live/machines_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "No images are available on ready hosts right now."
 msgstr "현재 준비된 호스트에는 이미지가 없습니다."
@@ -844,12 +843,12 @@ msgstr "현재 준비된 호스트에는 이미지가 없습니다."
 msgid "No machines in this preview yet. Create one or ask an owner to share access."
 msgstr "이 미리보기에는 아직 머신이 없습니다. 계정을 만들거나 소유자에게 액세스 공유를 요청하세요."
 
-#: lib/marshall_web/live/machines_live.ex:910
+#: lib/marshall_web/live/machines_live.ex:912
 #, elixir-autogen, elixir-format
 msgid "No machines on this page. Create a machine or ask an owner to share access."
 msgstr "이 페이지에는 기계가 없습니다. 머신을 생성하거나 소유자에게 액세스 공유를 요청하세요."
 
-#: lib/marshall_web/live/machines_live.ex:828
+#: lib/marshall_web/live/machines_live.ex:830
 #, elixir-autogen, elixir-format
 msgid "No registered account matches that email address."
 msgstr "해당 이메일 주소와 일치하는 등록된 계정이 없습니다."
@@ -860,7 +859,7 @@ msgstr "해당 이메일 주소와 일치하는 등록된 계정이 없습니다
 msgid "No relocation is available."
 msgstr "재배치는 불가능합니다."
 
-#: lib/marshall_web/live/machines_live.ex:1451
+#: lib/marshall_web/live/machines_live.ex:1453
 #, elixir-autogen, elixir-format
 msgid "Observed downtime"
 msgstr "관찰된 가동 중지 시간"
@@ -880,12 +879,12 @@ msgstr "클론 열기"
 msgid "Open repositories from your browser"
 msgstr "브라우저에서 저장소 열기"
 
-#: lib/marshall_web/live/machines_live.ex:989
+#: lib/marshall_web/live/machines_live.ex:991
 #, elixir-autogen, elixir-format
 msgid "Open terminal"
 msgstr "터미널 열기"
 
-#: lib/marshall_web/live/machines_live.ex:987
+#: lib/marshall_web/live/machines_live.ex:989
 #, elixir-autogen, elixir-format
 msgid "Open terminal for %{value1}"
 msgstr "%{value1}용 터미널 열기"
@@ -895,24 +894,24 @@ msgstr "%{value1}용 터미널 열기"
 msgid "Open terminal ↗"
 msgstr "터미널 열기 ↗"
 
-#: lib/marshall_web/live/machines_live.ex:764
+#: lib/marshall_web/live/machines_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "Open this machine's web apps. No terminal."
 msgstr "이 머신의 웹 앱을 엽니다. 터미널이 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1221
+#: lib/marshall_web/live/machines_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Operating system"
 msgstr "운영 체제"
 
-#: lib/marshall_web/live/machines_live.ex:758
-#: lib/marshall_web/live/machines_live.ex:1359
-#: lib/marshall_web/live/machines_live.ex:1368
+#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:1361
+#: lib/marshall_web/live/machines_live.ex:1370
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "연산자"
 
-#: lib/marshall_web/live/machines_live.ex:707
+#: lib/marshall_web/live/machines_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Outbound connections, sharing, web apps, SSH, terminal, and AI agent tools. The agent cannot start child agents."
 msgstr "아웃바운드 연결, 공유, 웹 앱, SSH, 터미널 및 AI 에이전트 도구. 에이전트는 하위 에이전트를 시작할 수 없습니다."
@@ -922,9 +921,9 @@ msgstr "아웃바운드 연결, 공유, 웹 앱, SSH, 터미널 및 AI 에이전
 msgid "Overview"
 msgstr "개요"
 
-#: lib/marshall_web/live/machines_live.ex:964
-#: lib/marshall_web/live/machines_live.ex:1122
-#: lib/marshall_web/live/machines_live.ex:1296
+#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1298
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "소유자"
@@ -936,7 +935,7 @@ msgstr "소유자"
 msgid "Pending"
 msgstr "보류 중"
 
-#: lib/marshall_web/live/machines_live.ex:1615
+#: lib/marshall_web/live/machines_live.ex:1617
 #, elixir-autogen, elixir-format
 msgid "Permanently remove this machine and its disk. This cannot be undone."
 msgstr "이 머신과 해당 디스크를 영구적으로 제거합니다. 이 작업은 취소할 수 없습니다."
@@ -946,13 +945,13 @@ msgstr "이 머신과 해당 디스크를 영구적으로 제거합니다. 이 �
 msgid "Permission to clone this machine is no longer available."
 msgstr "이 머신을 복제할 수 있는 권한을 더 이상 사용할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1126
 #: lib/marshall_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr "개인의"
 
-#: lib/marshall_web/live/machines_live.ex:1440
+#: lib/marshall_web/live/machines_live.ex:1442
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "단계"
@@ -982,7 +981,7 @@ msgstr "클론 준비 중"
 msgid "Preparing space and checking the source before taking a snapshot."
 msgstr "스냅샷을 찍기 전 공간을 준비하고 소스를 확인하세요."
 
-#: lib/marshall_web/live/machines_live.ex:848
+#: lib/marshall_web/live/machines_live.ex:850
 #, elixir-autogen, elixir-format
 msgid "Preparing transfer"
 msgstr "전송 준비 중"
@@ -997,20 +996,20 @@ msgstr "머신 준비 중…"
 msgid "Preparing your repository…"
 msgstr "저장소 준비 중…"
 
-#: lib/marshall_web/live/machines_live.ex:700
+#: lib/marshall_web/live/machines_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Private and owner-only. SSH and terminal access; no outbound connections, sharing, web apps, or AI agent."
 msgstr "개인 및 소유자 전용입니다. SSH 및 터미널 액세스; 아웃바운드 연결, 공유, 웹 앱 또는 AI 에이전트가 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:922
-#: lib/marshall_web/live/machines_live.ex:954
-#: lib/marshall_web/live/machines_live.ex:1097
-#: lib/marshall_web/live/machines_live.ex:1237
+#: lib/marshall_web/live/machines_live.ex:924
+#: lib/marshall_web/live/machines_live.ex:956
+#: lib/marshall_web/live/machines_live.ex:1099
+#: lib/marshall_web/live/machines_live.ex:1239
 #, elixir-autogen, elixir-format
 msgid "Profile"
 msgstr "윤곽"
 
-#: lib/marshall_web/live/machines_live.ex:1103
+#: lib/marshall_web/live/machines_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Profiles choose access and agent features. Machines remain isolated from one another."
 msgstr "프로필은 액세스 및 에이전트 기능을 선택합니다. 기계는 서로 격리된 상태로 유지됩니다."
@@ -1027,12 +1026,12 @@ msgstr "대기열 위치 %{value1}"
 msgid "Queued"
 msgstr "대기 중"
 
-#: lib/marshall_web/live/machines_live.ex:1531
+#: lib/marshall_web/live/machines_live.ex:1533
 #, elixir-autogen, elixir-format
 msgid "Queuing…"
 msgstr "대기 중…"
 
-#: lib/marshall_web/live/machines_live.ex:766
+#: lib/marshall_web/live/machines_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Read and write in the terminal."
 msgstr "터미널에서 읽고 쓰세요."
@@ -1042,17 +1041,17 @@ msgstr "터미널에서 읽고 쓰세요."
 msgid "Read the field notes ↗"
 msgstr "현장 노트 읽기 ↗"
 
-#: lib/marshall_web/live/machines_live.ex:765
+#: lib/marshall_web/live/machines_live.ex:767
 #, elixir-autogen, elixir-format
 msgid "Read the terminal."
 msgstr "터미널을 읽으십시오."
 
-#: lib/marshall_web/live/machines_live.ex:1169
+#: lib/marshall_web/live/machines_live.ex:1171
 #, elixir-autogen, elixir-format
 msgid "Ready when you are"
 msgstr "당신이 준비되면"
 
-#: lib/marshall_web/live/machines_live.ex:1394
+#: lib/marshall_web/live/machines_live.ex:1396
 #, elixir-autogen, elixir-format
 msgid "Reflection metadata"
 msgstr "리플렉션 메타데이터"
@@ -1067,7 +1066,7 @@ msgstr "새로 고치다"
 msgid "Refreshing…"
 msgstr "상쾌하다…"
 
-#: lib/marshall_web/live/machines_live.ex:1349
+#: lib/marshall_web/live/machines_live.ex:1351
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "등록된 이메일"
@@ -1077,7 +1076,7 @@ msgstr "등록된 이메일"
 msgid "Registering the copied disk as your private machine."
 msgstr "복사된 디스크를 개인 머신으로 등록합니다."
 
-#: lib/marshall_web/live/machines_live.ex:1412
+#: lib/marshall_web/live/machines_live.ex:1414
 #, elixir-autogen, elixir-format
 msgid "Relocate machine"
 msgstr "기계 재배치"
@@ -1092,8 +1091,8 @@ msgstr "이전을 요청했습니다. 대상이 자동으로 선택됩니다."
 msgid "Remains stopped; the filesystem grows on the next boot"
 msgstr "정지된 상태로 유지됩니다. 다음 부팅 시 파일 시스템이 커집니다."
 
-#: lib/marshall_web/live/machines_live.ex:1361
-#: lib/marshall_web/live/machines_live.ex:1370
+#: lib/marshall_web/live/machines_live.ex:1363
+#: lib/marshall_web/live/machines_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "Remove access"
 msgstr "액세스 권한 삭제"
@@ -1108,7 +1107,7 @@ msgstr "취소 요청 중…"
 msgid "Requesting resize…"
 msgstr "크기 조정을 요청하는 중…"
 
-#: lib/marshall_web/live/machines_live.ex:1485
+#: lib/marshall_web/live/machines_live.ex:1487
 #, elixir-autogen, elixir-format
 msgid "Requesting restart…"
 msgstr "다시 시작을 요청하는 중…"
@@ -1118,12 +1117,12 @@ msgstr "다시 시작을 요청하는 중…"
 msgid "Requesting retry…"
 msgstr "재시도 요청 중…"
 
-#: lib/marshall_web/live/machines_live.ex:1421
+#: lib/marshall_web/live/machines_live.ex:1423
 #, elixir-autogen, elixir-format
 msgid "Requesting…"
 msgstr "요청 중…"
 
-#: lib/marshall_web/live/machines_live.ex:1217
+#: lib/marshall_web/live/machines_live.ex:1219
 #: lib/marshall_web/live/resize_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "Resize"
@@ -1176,9 +1175,9 @@ msgstr "스테이지 크기 조정"
 msgid "Resizing"
 msgstr "크기 조정"
 
-#: lib/marshall_web/live/machines_live.ex:921
-#: lib/marshall_web/live/machines_live.ex:947
-#: lib/marshall_web/live/machines_live.ex:1208
+#: lib/marshall_web/live/machines_live.ex:923
+#: lib/marshall_web/live/machines_live.ex:949
+#: lib/marshall_web/live/machines_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Resources"
 msgstr "자원"
@@ -1220,7 +1219,7 @@ msgstr "다시 해 보다"
 msgid "Retry could not be accepted. Capacity or machine state may have changed."
 msgstr "재시도를 수락할 수 없습니다. 용량이나 기계 상태가 변경되었을 수 있습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1487
+#: lib/marshall_web/live/machines_live.ex:1489
 #, elixir-autogen, elixir-format
 msgid "Retry destination boot"
 msgstr "대상 부팅 재시도"
@@ -1235,15 +1234,15 @@ msgstr "크기 조정 다시 시도"
 msgid "Return to Fleet workloads and verify your passkey to reopen the machine →"
 msgstr "Fleet 워크로드로 돌아가서 암호 키를 확인하여 머신을 다시 엽니다 →"
 
-#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "취소됨"
 
-#: lib/marshall_web/live/machines_live.ex:1280
-#: lib/marshall_web/live/machines_live.ex:1295
-#: lib/marshall_web/live/machines_live.ex:1314
-#: lib/marshall_web/live/machines_live.ex:1355
+#: lib/marshall_web/live/machines_live.ex:1282
+#: lib/marshall_web/live/machines_live.ex:1297
+#: lib/marshall_web/live/machines_live.ex:1316
+#: lib/marshall_web/live/machines_live.ex:1357
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "역할"
@@ -1258,7 +1257,7 @@ msgstr "다음 아이디어를 위한 공간"
 msgid "Room to grow"
 msgstr "성장할 공간"
 
-#: lib/marshall_web/live/machines_live.ex:1159
+#: lib/marshall_web/live/machines_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Root disk (GiB)"
 msgstr "루트 디스크(GiB)"
@@ -1268,22 +1267,22 @@ msgstr "루트 디스크(GiB)"
 msgid "Running"
 msgstr "달리기"
 
-#: lib/marshall_web/live/machines_live.ex:1378
+#: lib/marshall_web/live/machines_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "액세스 저장"
 
-#: lib/marshall_web/live/machines_live.ex:1409
+#: lib/marshall_web/live/machines_live.ex:1411
 #, elixir-autogen, elixir-format
 msgid "Save metadata"
 msgstr "메타데이터 저장"
 
-#: lib/marshall_web/live/machines_live.ex:1376
+#: lib/marshall_web/live/machines_live.ex:1378
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "절약…"
 
-#: lib/marshall_web/live/machines_live.ex:749
+#: lib/marshall_web/live/machines_live.ex:751
 #, elixir-autogen, elixir-format
 msgid "Selected image unavailable"
 msgstr "선택한 이미지를 사용할 수 없습니다."
@@ -1298,12 +1297,12 @@ msgstr "브라우저 확장 프로그램 설정 ↗"
 msgid "Shared"
 msgstr "공유됨"
 
-#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Shared by"
 msgstr "공유자:"
 
-#: lib/marshall_web/live/machines_live.ex:1406
+#: lib/marshall_web/live/machines_live.ex:1408
 #, elixir-autogen, elixir-format
 msgid "Short description for agents"
 msgstr "에이전트용 짧은 설명"
@@ -1348,7 +1347,7 @@ msgstr "소스 복구에 주의가 필요합니다."
 msgid "Source recovery retry requested."
 msgstr "소스 복구 재시도가 요청되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:860
+#: lib/marshall_web/live/machines_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "Source restored; destination cleanup pending"
 msgstr "소스가 복원되었습니다. 대상 정리 보류 중"
@@ -1368,13 +1367,13 @@ msgstr "이 요청이 시작되었을 때의 상태와 일치하도록 소스가
 msgid "Source was stopped when this request began."
 msgstr "이 요청이 시작되었을 때 소스가 중지되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:688
-#: lib/marshall_web/live/machines_live.ex:777
+#: lib/marshall_web/live/machines_live.ex:690
+#: lib/marshall_web/live/machines_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr "기준"
 
-#: lib/marshall_web/live/machines_live.ex:785
+#: lib/marshall_web/live/machines_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "Starting"
 msgstr "시작"
@@ -1384,8 +1383,8 @@ msgstr "시작"
 msgid "Starting the machine with its new resources."
 msgstr "새로운 리소스로 머신을 시작합니다."
 
-#: lib/marshall_web/live/machines_live.ex:920
-#: lib/marshall_web/live/machines_live.ex:939
+#: lib/marshall_web/live/machines_live.ex:922
+#: lib/marshall_web/live/machines_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "상태"
@@ -1417,7 +1416,7 @@ msgstr "기계를 멈추세요"
 msgid "Stopped"
 msgstr "중지됨"
 
-#: lib/marshall_web/live/machines_live.ex:782
+#: lib/marshall_web/live/machines_live.ex:784
 #: lib/marshall_web/live/resize_live.ex:536
 #, elixir-autogen, elixir-format
 msgid "Stopping"
@@ -1438,7 +1437,7 @@ msgstr "복사를 중지하고 임시 리소스를 제거하는 중입니다. �
 msgid "Stopping the machine so its resources can change safely."
 msgstr "리소스가 안전하게 변경될 수 있도록 머신을 중지합니다."
 
-#: lib/marshall_web/live/machines_live.ex:850
+#: lib/marshall_web/live/machines_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Stopping the source"
 msgstr "소스 중지"
@@ -1448,7 +1447,7 @@ msgstr "소스 중지"
 msgid "Subscribe"
 msgstr "구독"
 
-#: lib/marshall_web/live/machines_live.ex:853
+#: lib/marshall_web/live/machines_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Switching placement"
 msgstr "배치 전환"
@@ -1458,17 +1457,17 @@ msgstr "배치 전환"
 msgid "Taking snapshot"
 msgstr "스냅샷 찍기"
 
-#: lib/marshall_web/live/machines_live.ex:1270
+#: lib/marshall_web/live/machines_live.ex:1272
 #, elixir-autogen, elixir-format
 msgid "Team membership and thread sharing can also grant machine access."
 msgstr "팀 구성원 자격과 스레드 공유도 시스템 액세스 권한을 부여할 수 있습니다."
 
-#: lib/marshall_web/live/machines_live.ex:996
+#: lib/marshall_web/live/machines_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Terminal unavailable"
 msgstr "터미널 이용 불가"
 
-#: lib/marshall_web/live/machines_live.ex:769
+#: lib/marshall_web/live/machines_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Terminal, lifecycle, resize, clone and sharing."
 msgstr "터미널, 라이프사이클, 크기 조정, 복제 및 공유."
@@ -1493,7 +1492,7 @@ msgstr "해당 저장소 네임스페이스가 유효하지 않습니다."
 msgid "That repository reference cannot be launched."
 msgstr "해당 저장소 참조를 시작할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:1339
+#: lib/marshall_web/live/machines_live.ex:1341
 #, elixir-autogen, elixir-format
 msgid "The account must already be registered. Saving a role replaces that person's direct machine role; choose Remove access to remove that direct grant."
 msgstr ""
@@ -1540,7 +1539,7 @@ msgstr "기기를 업데이트할 수 없습니다. 새로고침하고 다시 �
 msgid "The machine has changed since this draft was created. Review the confirmed resources above."
 msgstr "이 초안이 작성된 이후 기계가 변경되었습니다. 위에서 확인된 리소스를 검토하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1433
+#: lib/marshall_web/live/machines_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on an automatically selected host. Our development fleet uses a 1 Gbit/s connection between hosts, so a move can take a little longer; moves are expected to be much faster when Overalls runs on AWS in production."
 msgstr ""
@@ -1548,12 +1547,12 @@ msgstr ""
 "사용하므로 이동하는 데 시간이 조금 더 걸릴 수 있습니다. 작업복이 프로덕션 환경에서 AWS에서 실행되면 이동이 훨씬 더 빨라질 것으로 "
 "예상됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:1445
+#: lib/marshall_web/live/machines_live.ex:1447
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on the destination."
 msgstr "머신이 중지되고 한 번 복사된 후 대상에서 시작됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:829
+#: lib/marshall_web/live/machines_live.ex:831
 #, elixir-autogen, elixir-format
 msgid "The owner's access cannot be changed."
 msgstr "소유자의 액세스 권한은 변경할 수 없습니다."
@@ -1568,7 +1567,7 @@ msgstr "핀을 변경할 수 없습니다. 새로고침하고 다시 시도하�
 msgid "The previous copy of this machine is still releasing its snapshot. Retry shortly."
 msgstr "이 머신의 이전 복사본이 아직 스냅샷을 공개하는 중입니다. 잠시 후 다시 시도하세요."
 
-#: lib/marshall_web/live/machines_live.ex:839
+#: lib/marshall_web/live/machines_live.ex:841
 #, elixir-autogen, elixir-format
 msgid "The request could not be completed. Check the values and try again."
 msgstr "요청을 완료할 수 없습니다. 값을 확인하고 다시 시도하세요."
@@ -1583,13 +1582,13 @@ msgstr "요청에 문제가 발생했습니다. 사용 가능한 작업을 사�
 msgid "The resize has completed; this page refreshes with the confirmed sizes."
 msgstr "크기 조정이 완료되었습니다. 이 페이지는 확인된 크기로 새로 고쳐집니다."
 
-#: lib/marshall_web/live/machines_live.ex:714
+#: lib/marshall_web/live/machines_live.ex:716
 #, elixir-autogen, elixir-format
 msgid "The same network and access options as Standard, with AI agents that can start child agents."
 msgstr "하위 에이전트를 시작할 수 있는 AI 에이전트가 포함된 Standard와 동일한 네트워크 및 액세스 옵션."
 
-#: lib/marshall_web/live/machines_live.ex:808
-#: lib/marshall_web/live/machines_live.ex:825
+#: lib/marshall_web/live/machines_live.ex:810
+#: lib/marshall_web/live/machines_live.ex:827
 #, elixir-autogen, elixir-format
 msgid "The selected image needs more memory or disk space."
 msgstr "선택한 이미지에는 더 많은 메모리나 디스크 공간이 필요합니다."
@@ -1619,7 +1618,7 @@ msgstr "복제가 시작되기 전에 소스가 사용 중이거나 변경되었
 msgid "There is not enough available capacity for a new machine right now."
 msgstr "현재 새 시스템에 사용할 수 있는 용량이 충분하지 않습니다."
 
-#: lib/marshall_web/live/machines_live.ex:818
+#: lib/marshall_web/live/machines_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "There is not enough available capacity for this machine."
 msgstr "이 시스템에 사용 가능한 용량이 충분하지 않습니다."
@@ -1629,8 +1628,8 @@ msgstr "이 시스템에 사용 가능한 용량이 충분하지 않습니다."
 msgid "There is not enough capacity for this copy. Retry when space is available."
 msgstr "이 복사본에 대한 용량이 충분하지 않습니다. 공간이 확보되면 다시 시도하세요."
 
-#: lib/marshall_web/live/machines_live.ex:805
-#: lib/marshall_web/live/machines_live.ex:820
+#: lib/marshall_web/live/machines_live.ex:807
+#: lib/marshall_web/live/machines_live.ex:822
 #, elixir-autogen, elixir-format
 msgid "This image is no longer available. Refresh and choose another image."
 msgstr "이 이미지는 더 이상 사용할 수 없습니다. 새로고침하고 다른 이미지를 선택하세요."
@@ -1655,7 +1654,7 @@ msgstr "이 실행 링크는 만료되었습니다. 다시 열어보세요."
 msgid "This machine is being deleted and cannot be pinned."
 msgstr "이 머신은 삭제 중이므로 고정할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:831
+#: lib/marshall_web/live/machines_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "This machine is being deleted."
 msgstr "이 머신을 삭제하는 중입니다."
@@ -1670,7 +1669,7 @@ msgstr "이 머신을 사용할 수 없거나 더 이상 관리 액세스 권한
 msgid "This machine is unavailable or your access has ended."
 msgstr "이 기계를 사용할 수 없거나 액세스가 종료되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:826
+#: lib/marshall_web/live/machines_live.ex:828
 #, elixir-autogen, elixir-format
 msgid "This machine's host is currently unavailable."
 msgstr "이 머신의 호스트는 현재 사용할 수 없습니다."
@@ -1685,7 +1684,7 @@ msgstr "이 저장소 링크로 실행할 수 없습니다. 링크를 다시 여
 msgid "This request could not finish. Review the issue below and the available actions."
 msgstr "이 요청을 완료할 수 없습니다. 아래 문제와 사용 가능한 조치를 검토하세요."
 
-#: lib/marshall_web/live/machines_live.ex:834
+#: lib/marshall_web/live/machines_live.ex:836
 #, elixir-autogen, elixir-format
 msgid "This request has already been used. Refresh before trying again."
 msgstr "이 요청은 이미 사용되었습니다. 다시 시도하기 전에 새로고침하세요."
@@ -1695,24 +1694,24 @@ msgstr "이 요청은 이미 사용되었습니다. 다시 시도하기 전에 �
 msgid "This request has ended without publishing a clone."
 msgstr "이 요청은 클론을 게시하지 않고 종료되었습니다."
 
-#: lib/marshall_web/live/machines_live.ex:960
-#: lib/marshall_web/live/machines_live.ex:1223
-#: lib/marshall_web/live/machines_live.ex:1235
+#: lib/marshall_web/live/machines_live.ex:962
+#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1237
 #, elixir-autogen, elixir-format
 msgid "Unavailable"
 msgstr "없는"
 
-#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:763
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "알려지지 않은"
 
-#: lib/marshall_web/live/machines_live.ex:832
+#: lib/marshall_web/live/machines_live.ex:834
 #, elixir-autogen, elixir-format
 msgid "Unpin this machine before deleting it."
 msgstr "삭제하기 전에 이 머신을 고정 해제하세요."
 
-#: lib/marshall_web/live/machines_live.ex:1609
+#: lib/marshall_web/live/machines_live.ex:1611
 #, elixir-autogen, elixir-format
 msgid "Unpin to delete. While you have this machine pinned, nothing can delete it."
 msgstr "삭제하려면 고정을 해제하세요. 이 머신을 고정한 동안에는 아무것도 삭제할 수 없습니다."
@@ -1727,7 +1726,7 @@ msgstr "언제든지 구독을 취소할 수 있습니다."
 msgid "Updated"
 msgstr "업데이트됨"
 
-#: lib/marshall_web/live/machines_live.ex:1551
+#: lib/marshall_web/live/machines_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "Updates automatically"
 msgstr "자동으로 업데이트"
@@ -1737,7 +1736,7 @@ msgstr "자동으로 업데이트"
 msgid "Use current machine state, keeping these sizes"
 msgstr "현재 시스템 상태를 사용하여 이 크기를 유지합니다."
 
-#: lib/marshall_web/live/machines_live.ex:852
+#: lib/marshall_web/live/machines_live.ex:854
 #, elixir-autogen, elixir-format
 msgid "Verifying the destination disks"
 msgstr "대상 디스크 확인"
@@ -1747,9 +1746,9 @@ msgstr "대상 디스크 확인"
 msgid "View all →"
 msgstr "모두 보기 →"
 
-#: lib/marshall_web/live/machines_live.ex:757
-#: lib/marshall_web/live/machines_live.ex:1358
-#: lib/marshall_web/live/machines_live.ex:1367
+#: lib/marshall_web/live/machines_live.ex:759
+#: lib/marshall_web/live/machines_live.ex:1360
+#: lib/marshall_web/live/machines_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "뷰어"
@@ -1789,13 +1788,13 @@ msgstr "뉴스레터 서비스에 연결하지 못했습니다. 나중에 다시
 msgid "We couldn't launch that repository"
 msgstr "해당 저장소를 시작할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:756
+#: lib/marshall_web/live/machines_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "웹 앱"
 
-#: lib/marshall_web/live/machines_live.ex:1357
-#: lib/marshall_web/live/machines_live.ex:1366
+#: lib/marshall_web/live/machines_live.ex:1359
+#: lib/marshall_web/live/machines_live.ex:1368
 #, elixir-autogen, elixir-format
 msgid "Web apps only"
 msgstr "웹 앱만"
@@ -1805,7 +1804,7 @@ msgstr "웹 앱만"
 msgid "What happens"
 msgstr "무슨 일이 일어나는가"
 
-#: lib/marshall_web/live/machines_live.ex:1266
+#: lib/marshall_web/live/machines_live.ex:1268
 #, elixir-autogen, elixir-format
 msgid "Who can reach this machine, and what each role allows."
 msgstr "이 시스템에 접근할 수 있는 사람과 각 역할이 허용하는 것."
@@ -1815,7 +1814,7 @@ msgstr "이 시스템에 접근할 수 있는 사람과 각 역할이 허용하�
 msgid "You can pin up to %{value1} machines. Unpin one before pinning another."
 msgstr "최대 %{value1} 머신까지 고정할 수 있습니다. 다른 하나를 고정하기 전에 하나를 고정 해제하세요."
 
-#: lib/marshall_web/live/machines_live.ex:830
+#: lib/marshall_web/live/machines_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "You no longer have permission for this action."
 msgstr "더 이상 이 작업에 대한 권한이 없습니다."
@@ -1825,17 +1824,17 @@ msgstr "더 이상 이 작업에 대한 권한이 없습니다."
 msgid "Your account cannot create machines."
 msgstr "귀하의 계정은 머신을 생성할 수 없습니다."
 
-#: lib/marshall_web/live/machines_live.ex:886
+#: lib/marshall_web/live/machines_live.ex:888
 #, elixir-autogen, elixir-format
 msgid "Your development environments, personal and shared."
 msgstr "개인 및 공유 개발 환경."
 
-#: lib/marshall_web/live/machines_live.ex:1240
+#: lib/marshall_web/live/machines_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Your disk is retained when the machine is stopped."
 msgstr "머신이 중지되어도 디스크는 유지됩니다."
 
-#: lib/marshall_web/live/machines_live.ex:1178
+#: lib/marshall_web/live/machines_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Your disk stays with you when the machine is stopped."
 msgstr "머신이 중지되어도 디스크는 그대로 유지됩니다."
@@ -1875,18 +1874,18 @@ msgstr "숨 쉴 수 있는 작은 공간이 있는 작업 공간."
 msgid "continue to Overalls"
 msgstr "계속해서 작업복"
 
-#: lib/marshall_web/live/machines_live.ex:1399
+#: lib/marshall_web/live/machines_live.ex:1401
 #, elixir-autogen, elixir-format
 msgid "production, project-name"
 msgstr "프로덕션, 프로젝트 이름"
 
-#: lib/marshall_web/live/machines_live.ex:1006
-#: lib/marshall_web/live/machines_live.ex:1329
+#: lib/marshall_web/live/machines_live.ex:1008
+#: lib/marshall_web/live/machines_live.ex:1331
 #, elixir-autogen, elixir-format
 msgid "← First page"
 msgstr "← 첫 페이지"
 
-#: lib/marshall_web/live/machines_live.ex:1017
+#: lib/marshall_web/live/machines_live.ex:1019
 #, elixir-autogen, elixir-format
 msgid "← Machines"
 msgstr "← 기계"
@@ -1980,12 +1979,12 @@ msgstr "확인"
 msgid "A new machine will clone the repository when it boots."
 msgstr "새 머신은 부팅할 때 저장소를 복제합니다."
 
-#: lib/marshall_web/live/machines_live.ex:742
+#: lib/marshall_web/live/machines_live.ex:744
 #, elixir-autogen, elixir-format
 msgid "Android (API 36)"
 msgstr "Android (API 36)"
 
-#: lib/marshall_web/live/machines_live.ex:1069
+#: lib/marshall_web/live/machines_live.ex:1071
 #, elixir-autogen, elixir-format
 msgid "Leave this blank to create the machine without making setup changes."
 msgstr "설정을 변경하지 않고 머신을 만들려면 비워 두세요."
@@ -2000,7 +1999,7 @@ msgstr "머신과 설정 스레드를 요청했습니다."
 msgid "Provisioning is in progress. This page will open the machine when it is ready."
 msgstr "프로비저닝이 진행 중입니다. 준비되면 이 페이지에서 머신이 열립니다."
 
-#: lib/marshall_web/live/machine_provisioning_live.ex:70
+#: lib/marshall_web/live/machine_provisioning_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Provisioning request unavailable."
 msgstr "프로비저닝 요청을 사용할 수 없습니다."
@@ -2020,12 +2019,12 @@ msgstr "설정 다시 시도"
 msgid "Setting up your machine"
 msgstr "머신을 설정하는 중"
 
-#: lib/marshall_web/live/machines_live.ex:1059
+#: lib/marshall_web/live/machines_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "The machine agent will execute this instruction automatically in Work mode."
 msgstr "머신 에이전트가 작업 모드에서 이 지침을 자동으로 실행합니다."
 
-#: lib/marshall_web/live/machines_live.ex:1057
+#: lib/marshall_web/live/machines_live.ex:1059
 #, elixir-autogen, elixir-format
 msgid "What should this machine do when it is ready?"
 msgstr "준비되면 이 머신이 무엇을 해야 하나요?"

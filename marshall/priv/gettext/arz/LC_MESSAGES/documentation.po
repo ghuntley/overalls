@@ -64,167 +64,167 @@ msgstr "## اتصل"
 msgid "## Endpoints"
 msgstr "## نقاط الاتصال"
 
-#: lib/marshall/documentation_messages.ex:18
+#: lib/marshall/documentation_messages.ex:19
 #, elixir-autogen, elixir-format
 msgid "## First commands"
 msgstr "## أول أوامر"
 
-#: lib/marshall/documentation_messages.ex:19
+#: lib/marshall/documentation_messages.ex:20
 #, elixir-autogen, elixir-format
 msgid "## Install the Overalls CLI"
 msgstr "## ثبّت أداة Overalls CLI"
 
-#: lib/marshall/documentation_messages.ex:20
+#: lib/marshall/documentation_messages.ex:21
 #, elixir-autogen, elixir-format
 msgid "## Install the developer archive"
 msgstr "## ثبّت حزمة المطوّر"
 
-#: lib/marshall/documentation_messages.ex:21
+#: lib/marshall/documentation_messages.ex:22
 #, elixir-autogen, elixir-format
 msgid "## Metadata controls"
 msgstr "## التحكم في البيانات الوصفية"
 
-#: lib/marshall/documentation_messages.ex:23
+#: lib/marshall/documentation_messages.ex:24
 #, elixir-autogen, elixir-format
 msgid "## Privacy and availability"
 msgstr "## الخصوصية والإتاحة"
 
-#: lib/marshall/documentation_messages.ex:24
+#: lib/marshall/documentation_messages.ex:25
 #, elixir-autogen, elixir-format
 msgid "## Register your key"
 msgstr "## سجّل مفتاحك"
 
-#: lib/marshall/documentation_messages.ex:25
+#: lib/marshall/documentation_messages.ex:26
 #, elixir-autogen, elixir-format
 msgid "## Relocate a machine"
 msgstr "## انقل جهاز لمضيف تاني"
 
-#: lib/marshall/documentation_messages.ex:26
+#: lib/marshall/documentation_messages.ex:27
 #, elixir-autogen, elixir-format
 msgid "## Resize a machine"
 msgstr "## غيّر حجم جهاز"
 
-#: lib/marshall/documentation_messages.ex:27
+#: lib/marshall/documentation_messages.ex:28
 #, elixir-autogen, elixir-format
 msgid "## Results and completion"
 msgstr "## النتايج واكتمال التنفيذ"
 
-#: lib/marshall/documentation_messages.ex:28
+#: lib/marshall/documentation_messages.ex:29
 #, elixir-autogen, elixir-format
 msgid "## Retry safely"
 msgstr "## جرّب تاني بأمان"
 
-#: lib/marshall/documentation_messages.ex:34
+#: lib/marshall/documentation_messages.ex:35
 #, elixir-autogen, elixir-format
 msgid "- Linux and macOS: the `curl … /bin/install.sh | bash` command.\n- Windows: run the Windows `powershell …` command under \"Install and connect\"\n  in PowerShell. Windows needs OpenSSH 9.6 or newer: the installer installs it\n  with winget when the built-in client is older and, after you approve the\n  administrator prompt, makes it the default `ssh` for new terminals."
 msgstr "- Linux وmacOS: استخدم أمر `curl … /bin/install.sh | bash`.\n- Windows: شغّل أمر Windows `powershell …` الموجود تحت \"التثبيت والاتصال\"\n  في PowerShell. Windows محتاج OpenSSH 9.6 أو أحدث: المثبّت بيثبّته\n  باستخدام winget لو النسخة المدمجة أقدم، وبعد ما توافق على\n  طلب صلاحيات المسؤول، بيخلّيه `ssh` الافتراضي للطرفيات الجديدة."
 
-#: lib/marshall/documentation_messages.ex:42
+#: lib/marshall/documentation_messages.ex:43
 #, elixir-autogen, elixir-format
 msgid "- [Download for Chrome or Chromium](/bin/chrome.zip): extract the ZIP, open\n  `chrome://extensions`, enable **Developer mode**, and choose **Load unpacked**.\n- [Download for Firefox](/bin/firefox.xpi): open `about:debugging`, choose\n  **This Firefox**, then **Load Temporary Add-on** and select the downloaded XPI."
 msgstr "- [نزّل نسخة Chrome أو Chromium](/bin/chrome.zip): فك ملف ZIP وافتح\n  `chrome://extensions`، وفعّل **وضع المطوّر**، واختار **تحميل إضافة غير مضغوطة**.\n- [نزّل نسخة Firefox](/bin/firefox.xpi): افتح `about:debugging`، واختار\n  **Firefox ده**، وبعدها **تحميل إضافة مؤقتة** وحدّد ملف XPI اللي نزلته."
 
-#: lib/marshall/documentation_messages.ex:46
+#: lib/marshall/documentation_messages.ex:47
 #, elixir-autogen, elixir-format
 msgid "1. Open the extension's settings from the browser toolbar. If it is already\n   configured, use the toolbar's context menu and choose **Configure Overalls\n   server…** to change the server.\n2. Enter the HTTPS origin of this Overalls server. HTTP is supported only for\n   loopback development. The server origin is always selected explicitly; the\n   extension never guesses it from a page.\n3. Visit a supported repository page and click the Overalls toolbar button."
 msgstr "1. افتح إعدادات الإضافة من شريط أدوات المتصفح. لو الإضافة متضبطة\n   من قبل، افتح قائمة زر شريط الأدوات واختار **ضبط خادم Overalls…**\n   عشان تغيّر الخادم.\n2. اكتب أصل HTTPS لخادم Overalls ده. HTTP مدعوم بس للتطوير\n   على loopback. لازم تختار أصل الخادم بنفسك؛ الإضافة\n   مش بتخمّنه من الصفحة.\n3. افتح صفحة مستودع مدعومة واضغط على زر Overalls في شريط الأدوات."
 
-#: lib/marshall/documentation_messages.ex:50
+#: lib/marshall/documentation_messages.ex:51
 #, elixir-autogen, elixir-format
 msgid "Accept a pending ownership offer."
 msgstr "وافق على عرض ملكية مستنّي الرد."
 
-#: lib/marshall/documentation_messages.ex:51
+#: lib/marshall/documentation_messages.ex:52
 #, elixir-autogen, elixir-format
 msgid "Add or change an admin or member."
 msgstr "ضيف مسؤول أو عضو، أو غيّره."
 
-#: lib/marshall/documentation_messages.ex:52
+#: lib/marshall/documentation_messages.ex:57
 #, elixir-autogen, elixir-format
 msgid "An omitted option keeps the current size; a request with no size option is\nrefused. A running machine stops, applies the sizes and restarts; a stopped\nmachine stays stopped and grows its filesystem on the next boot. The receipt\nfollows the request's phases. `request cancel grow-1` is accepted only while the\nmachine is still stopping: the original sizes and holds are kept, and a running\nmachine restarts unchanged. `request retry grow-1` resumes a request that needs\nattention from its recorded phase.\n"
 msgstr "لو ما حدّدتش اختيار للحجم، الحجم الحالي بيفضل زي ما هو؛ الطلب اللي مفيهوش\nأي اختيار للحجم بيترفض. الجهاز الشغّال بيقف، وبيطبّق الأحجام وبيرجع يشتغل؛\nالجهاز المتوقف بيفضل متوقف وبيكبّر نظام الملفات في الإقلاع الجاي. إيصال الطلب\nبيتابع مراحله. `request cancel grow-1` بيتقبل بس والجهاز لسه بيقف:\nالأحجام والحجوزات الأصلية بتفضل، والجهاز اللي كان شغّال بيرجع يشتغل من غير تغيير.\n`request retry grow-1` بيكمّل الطلب اللي محتاج تدخل من المرحلة المسجّلة.\n"
 
-#: lib/marshall/documentation_messages.ex:69
+#: lib/marshall/documentation_messages.ex:74
 #, elixir-autogen, elixir-format
 msgid "At the Porsche prompt, enter:"
 msgstr "عند سطر أوامر Porsche، اكتب:"
 
-#: lib/marshall/documentation_messages.ex:74
+#: lib/marshall/documentation_messages.ex:79
 #, elixir-autogen, elixir-format
 msgid "Automation"
 msgstr "التشغيل الآلي"
 
-#: lib/marshall/documentation_messages.ex:75
+#: lib/marshall/documentation_messages.ex:80
 #, elixir-autogen, elixir-format
 msgid "Browser extension"
 msgstr "إضافة المتصفح"
 
-#: lib/marshall/documentation_messages.ex:76
+#: lib/marshall/documentation_messages.ex:81
 #, elixir-autogen, elixir-format
 msgid "Cancel an unpublished clone or uncommitted relocation request."
 msgstr "الغي طلب نسخ لسه ما اتنشرش أو طلب نقل لسه ما اتثبّتش."
 
-#: lib/marshall/documentation_messages.ex:80
+#: lib/marshall/documentation_messages.ex:85
 #, elixir-autogen, elixir-format
 msgid "Cancel your pending ownership offer."
 msgstr "الغي عرض الملكية بتاعك اللي مستنّي الرد."
 
-#: lib/marshall/documentation_messages.ex:81
+#: lib/marshall/documentation_messages.ex:86
 #, elixir-autogen, elixir-format
 msgid "Change a machine's CPU and memory; disk may only grow. A running machine stops and restarts."
 msgstr "غيّر CPU وذاكرة الجهاز؛ القرص بيتكبّر بس. الجهاز الشغّال بيقف ويرجع يشتغل."
 
-#: lib/marshall/documentation_messages.ex:89
+#: lib/marshall/documentation_messages.ex:94
 #, elixir-autogen, elixir-format
 msgid "Choose a stable, unique request ID for each intended mutation. Reuse it when\nretrying that same mutation after losing a reply. Request IDs contain 1–128 ASCII\nletters, digits, underscores, dots, colons or hyphens, and start with a letter or\ndigit. Do not reuse one ID for different operations."
 msgstr "اختار معرّف طلب ثابت ومميّز لكل تعديل ناوي تعمله. استخدم نفس المعرّف\nلو بتجرّب نفس التعديل تاني بعد ما الرد ضاع. معرّف الطلب بيتكوّن من 1–128\nحرف ASCII أو رقم أو شرطة سفلية أو نقطة أو نقطتين أو شرطة عادية، ولازم يبدأ\nبحرف أو رقم. ما تستخدمش نفس المعرّف لعمليات مختلفة."
 
-#: lib/marshall/documentation_messages.ex:93
+#: lib/marshall/documentation_messages.ex:98
 #, elixir-autogen, elixir-format
 msgid "Cloning is currently unavailable for the Inception multi-disk profile."
 msgstr "عمل النسخ مش متاح دلوقتي لملف Inception متعدد الأقراص."
 
-#: lib/marshall/documentation_messages.ex:98
+#: lib/marshall/documentation_messages.ex:103
 #, elixir-autogen, elixir-format
 msgid "Close this interactive channel."
 msgstr "اقفل القناة التفاعلية دي."
 
-#: lib/marshall/documentation_messages.ex:99
+#: lib/marshall/documentation_messages.ex:104
 #, elixir-autogen, elixir-format
 msgid "Command reference"
 msgstr "مرجع الأوامر"
 
-#: lib/marshall/documentation_messages.ex:100
+#: lib/marshall/documentation_messages.ex:105
 #, elixir-autogen, elixir-format
 msgid "Create a machine. Disk maximum: 500 GiB. --source clones a public GitHub, GitLab, Codeberg or Bitbucket repository in the guest."
 msgstr "اعمل جهاز. أقصى حجم للقرص: 500 GiB. --source بينسخ مستودع عام من GitHub أو GitLab أو Codeberg أو Bitbucket جوه الضيف."
 
-#: lib/marshall/documentation_messages.ex:104
+#: lib/marshall/documentation_messages.ex:109
 #, elixir-autogen, elixir-format
 msgid "Create a team you own."
 msgstr "اعمل فريق تبقى إنت مالكه."
 
-#: lib/marshall/documentation_messages.ex:105
+#: lib/marshall/documentation_messages.ex:110
 #, elixir-autogen, elixir-format
 msgid "Create or replace a named integration at https://NAME.integration.internal."
 msgstr "اعمل تكامل باسم أو استبدله على https://NAME.integration.internal."
 
-#: lib/marshall/documentation_messages.ex:109
+#: lib/marshall/documentation_messages.ex:114
 #, elixir-autogen, elixir-format
 msgid "Creation, start, stop, deletion, relocation and request controls wait up to 120\nseconds for the matching physical result. A request being accepted or acknowledged is not proof that the machine\nhas reached the requested state. `--no-wait` returns the accepted request without\nwaiting; `--timeout SECONDS` changes the wait limit. Timing out or disconnecting\ndoes not cancel accepted work."
 msgstr "أوامر الإنشاء والتشغيل والإيقاف والمسح والنقل والتحكم في الطلبات بتستنى لحد\n120 ثانية عشان النتيجة الفعلية المطابقة. قبول الطلب أو تأكيد استلامه مش دليل\nإن الجهاز وصل للحالة المطلوبة. `--no-wait` بيرجّع الطلب المقبول من غير\nانتظار؛ و`--timeout SECONDS` بيغيّر مهلة الانتظار. انتهاء المهلة أو قطع\nالاتصال مش بيلغي الشغل اللي اتقبل."
 
-#: lib/marshall/documentation_messages.ex:113
+#: lib/marshall/documentation_messages.ex:118
 #, elixir-autogen, elixir-format
 msgid "Decline a pending ownership offer."
 msgstr "ارفض عرض ملكية مستنّي الرد."
 
-#: lib/marshall/documentation_messages.ex:114
+#: lib/marshall/documentation_messages.ex:119
 #, elixir-autogen, elixir-format
 msgid "Delete a machine and its disk. Refused while its owner has it pinned."
 msgstr "امسح جهاز وقرصه. الطلب بيترفض طول ما مالكه مثبّته."
 
-#: lib/marshall/documentation_messages.ex:118
+#: lib/marshall/documentation_messages.ex:123
 #, elixir-autogen, elixir-format
 msgid "Different request IDs create separate copies, processed in order for each source.\nRepeating the same ID returns the same request. Each copy captures the source's\nfiles, specifications and power state when its turn begins. A running source stops\nfor snapshot capture and restarts while copying continues. The new machine belongs\nto you, is private, and has a fresh address; sharing is not copied. Guest files and\ncredentials stored inside the disk are copied. RAM is not copied."
 msgstr "معرّفات الطلبات المختلفة بتعمل نسخ منفصلة، وبتتنفّذ بالترتيب لكل مصدر.\nتكرار نفس المعرّف بيرجّع نفس الطلب. كل نسخة بتاخد ملفات المصدر ومواصفاته\nوحالة تشغيله وقت ما ييجي دورها. المصدر الشغّال بيقف عشان يتاخد منه لقطة\nوبيرجع يشتغل والنسخ لسه مكمّل. الجهاز الجديد بيبقى ملكك وخاص بيك وبعنوان\nجديد؛ المشاركة مش بتتنسخ. ملفات الضيف وبيانات الدخول المخزّنة جوه القرص\nبتتنسخ. الذاكرة العشوائية مش بتتنسخ."
@@ -234,187 +234,187 @@ msgstr "معرّفات الطلبات المختلفة بتعمل نسخ منف�
 msgid "Documentation"
 msgstr "التوثيق"
 
-#: lib/marshall/documentation_messages.ex:122
+#: lib/marshall/documentation_messages.ex:127
 #, elixir-autogen, elixir-format
 msgid "Each machine's page shows the machine name, its state, its operating system and\nits machine ID (with a Copy button) at the top, followed by a \"Connect from your\ncomputer\" section with a one-line installer that sets up SSH and connects to\nthat machine:"
 msgstr "فوق في صفحة كل جهاز هتلاقي اسمه وحالته ونظام تشغيله ومعرّفه\n(ومعاه زر نسخ)، وبعدهم قسم \"اتصل من كمبيوترك\"\nوفيه أمر تثبيت من سطر واحد بيضبط SSH وبيتصل\nبالجهاز ده:"
 
-#: lib/marshall/documentation_messages.ex:126
+#: lib/marshall/documentation_messages.ex:131
 #, elixir-autogen, elixir-format
 msgid "Every command accepts `--json`. Mutation commands accept `--request-id ID`.\nCreation, start, stop, deletion, relocation and request controls also accept `--timeout SECONDS` (1–3600,\ndefault 120) and `--no-wait`. Memory is in MiB and disk size is in GiB.\nImage identifiers are immutable `sha256:` digests returned by `images`.\nUse `--after UUID` with the returned cursor to fetch another list page."
 msgstr "كل أمر بيقبل `--json`. أوامر التعديل بتقبل `--request-id ID`.\nأوامر الإنشاء والتشغيل والإيقاف والمسح والنقل والتحكم في الطلبات بتقبل كمان `--timeout SECONDS`\n(من 1–3600، والافتراضي 120) و`--no-wait`. الذاكرة بوحدة MiB والقرص بوحدة GiB.\nمعرّفات الصور هي بصمات `sha256:` ثابتة بيرجّعها `images`.\nاستخدم `--after UUID` مع المؤشر اللي رجعلك عشان تجيب صفحة تانية من القائمة."
 
-#: lib/marshall/documentation_messages.ex:130
+#: lib/marshall/documentation_messages.ex:135
 #, elixir-autogen, elixir-format
 msgid "Every running guest can query `https://reflection.internal` for a bounded,\nsecret-free description of itself and the private services currently available\nto its execution."
 msgstr "كل ضيف شغّال يقدر يستعلم من `https://reflection.internal` عشان ياخد\nوصف محدود من غير أسرار لنفسه وللخدمات الخاصة المتاحة\nلتنفيذه دلوقتي."
 
-#: lib/marshall/documentation_messages.ex:134
+#: lib/marshall/documentation_messages.ex:143
 #, elixir-autogen, elixir-format
 msgid "Firefox temporary add-ons are removed when Firefox closes. Permanent Firefox\ninstallation requires Mozilla signing or an explicitly managed browser policy.\nOveralls does not currently publish either archive to a browser store."
 msgstr "إضافات Firefox المؤقتة بتتمسح لما Firefox يتقفل. التثبيت الدائم\nمحتاج توقيع من Mozilla أو سياسة متصفح مُدارة ومحدّدة صراحة.\nOveralls مش بينشر أي واحدة من الحزمتين في متجر متصفح دلوقتي."
 
-#: lib/marshall/documentation_messages.ex:138
+#: lib/marshall/documentation_messages.ex:147
 #, elixir-autogen, elixir-format
 msgid "For browser approval of an unknown key, start an interactive connection with\n`ssh YOUR_PORSCHE_HOST` and keep it open. Porsche gives you a short-lived approval\nlink after proving possession of the private key. Open it in your browser, sign\nin, compare the fingerprint and explicitly approve. Opening the link alone does\nnot register a key. Links expire after ten minutes and stop working when their\nSSH connection closes. The interactive prompt can continue after approval."
 msgstr "عشان توافق من المتصفح على مفتاح مش معروف، ابدأ اتصال تفاعلي باستخدام\n`ssh YOUR_PORSCHE_HOST` وسيبه مفتوح. Porsche بيدّيك رابط موافقة قصير العمر\nبعد ما يثبت إن معاك المفتاح الخاص. افتحه في المتصفح وسجّل دخولك وقارن البصمة\nووافق بنفسك. فتح الرابط لوحده مش بيسجّل المفتاح. الروابط بتنتهي بعد عشر دقايق\nوبتبطل تشتغل لما اتصال SSH بتاعها يتقفل. تقدر تكمّل في سطر الأوامر التفاعلي\nبعد الموافقة."
 
-#: lib/marshall/documentation_messages.ex:142
+#: lib/marshall/documentation_messages.ex:151
 #, elixir-autogen, elixir-format
 msgid "For one-shot exec commands, register the key on Marshall's SSH keys page first,\nor complete approval in an interactive connection before retrying the command."
 msgstr "لأوامر exec اللي بتتنفّذ مرة واحدة، سجّل المفتاح الأول في صفحة مفاتيح SSH\nفي Marshall، أو كمّل الموافقة في اتصال تفاعلي قبل ما تجرّب الأمر تاني."
 
-#: lib/marshall/documentation_messages.ex:146
+#: lib/marshall/documentation_messages.ex:155
 #, elixir-autogen, elixir-format
 msgid "Getting started"
 msgstr "نبدأ إزاي"
 
-#: lib/marshall/documentation_messages.ex:147
+#: lib/marshall/documentation_messages.ex:156
 #, elixir-autogen, elixir-format
 msgid "Grant viewer, operator or manager access."
 msgstr "ادّي صلاحية مشاهد أو مشغّل أو مدير."
 
-#: lib/marshall/documentation_messages.ex:148
+#: lib/marshall/documentation_messages.ex:157
 #, elixir-autogen, elixir-format
 msgid "Guest SSH and browser terminals use an automatically allocated Linux login such\nas `u200001`, with `/home/u200001` as its home. The login comes from a durable\naccount UID rather than your email address. It stays the same across machines and\nsame-account email changes. A new account registered after retirement receives a\ndifferent identity and does not inherit the former account's home or access.\nMarshall continues showing your email address; there is no username setting."
 msgstr "SSH للضيف وطرفيات المتصفح بيستخدموا اسم دخول Linux بيتخصّص تلقائيًا\nزي `u200001`، والمجلد الرئيسي بتاعه `/home/u200001`. الاسم جاي من\nمعرّف UID دائم للحساب، مش من بريدك الإلكتروني. بيفضل نفسه على كل الأجهزة\nولما تغيّر بريد نفس الحساب. الحساب الجديد اللي بيتسجّل بعد تقاعد القديم بياخد\nهوية مختلفة ومش بيورث مجلد الحساب القديم ولا صلاحياته. Marshall بيفضل\nيعرض بريدك الإلكتروني؛ مفيش إعداد لاسم المستخدم."
 
-#: lib/marshall/documentation_messages.ex:152
+#: lib/marshall/documentation_messages.ex:161
 #, elixir-autogen, elixir-format
 msgid "Guest metadata includes the machine name and ID, profile, architecture,\noperating-system family, vCPU, memory and disk sizes, image identity,\ngeneration, owner email, team name, current Lilly node, labels, and comment.\nOperating-system values come from the validated image manifest."
 msgstr "البيانات الوصفية للضيف بتشمل اسم الجهاز ومعرّفه وملفه ومعماريته\nوعيلة نظام تشغيله وعدد vCPU وأحجام الذاكرة والقرص وهوية الصورة\nوالجيل وبريد المالك واسم الفريق وعقدة Lilly الحالية والتسميات والتعليق.\nقيم نظام التشغيل بتيجي من بيان الصورة اللي اتراجع."
 
-#: lib/marshall/documentation_messages.ex:156
+#: lib/marshall/documentation_messages.ex:165
 #, elixir-autogen, elixir-format
 msgid "Inspect a machine by name or UUID."
 msgstr "افحص جهاز باسمه أو بمعرّف UUID."
 
-#: lib/marshall/documentation_messages.ex:157
+#: lib/marshall/documentation_messages.ex:166
 #, elixir-autogen, elixir-format
 msgid "Inspect a previously accepted request."
 msgstr "افحص طلب اتقبل قبل كده."
 
-#: lib/marshall/documentation_messages.ex:159
+#: lib/marshall/documentation_messages.ex:168
 #, elixir-autogen, elixir-format
 msgid "Inspect an integration without secrets."
 msgstr "افحص تكامل من غير أسرار."
 
-#: lib/marshall/documentation_messages.ex:160
+#: lib/marshall/documentation_messages.ex:169
 #, elixir-autogen, elixir-format
 msgid "Integration entries describe the internal URL, useful paths, a short `help`\ncommand, a comment, and injected header names and kinds. Header values,\ncredentials, tokens, and upstream target URLs are never returned. The list\ncontains Reflection, LLM, and named integrations authorized for this exact\nmachine execution."
 msgstr "بنود التكامل بتشرح العنوان الداخلي والمسارات المفيدة وأمر `help`\nقصير وتعليق وأسامي وأنواع الترويسات المحقونة. قيم الترويسات\nوبيانات الدخول والرموز وعناوين الوجهات الأصلية مش بترجع أبدًا. القائمة\nفيها Reflection وLLM والتكاملات اللي ليها اسم والمسموح بيها\nلتنفيذ الجهاز ده بالظبط."
 
-#: lib/marshall/documentation_messages.ex:164
+#: lib/marshall/documentation_messages.ex:173
 #, elixir-autogen, elixir-format
 msgid "Key removal prevents subsequent commands and status polls from that session.\nAccepted jobs continue. Reconnect using another registered key, or use email login\nto manage your keys in Marshall. Do not put private keys or approval links in logs.\n"
 msgstr "إزالة المفتاح بتمنع الأوامر واستعلامات الحالة اللي تيجي بعد كده من الجلسة دي.\nالمهام اللي اتقبلت بتكمّل. اتصل تاني بمفتاح مسجّل تاني، أو ادخل بالبريد\nعشان تدير مفاتيحك في Marshall. ما تحطّش مفاتيح خاصة أو روابط موافقة في السجلات.\n"
 
-#: lib/marshall/documentation_messages.ex:169
+#: lib/marshall/documentation_messages.ex:178
 #, elixir-autogen, elixir-format
 msgid "List a team's members."
 msgstr "اعرض أعضاء فريق."
 
-#: lib/marshall/documentation_messages.ex:171
+#: lib/marshall/documentation_messages.ex:180
 #, elixir-autogen, elixir-format
 msgid "List access grants."
 msgstr "اعرض منح الوصول."
 
-#: lib/marshall/documentation_messages.ex:173
+#: lib/marshall/documentation_messages.ex:182
 #, elixir-autogen, elixir-format
 msgid "List available images."
 msgstr "اعرض الصور المتاحة."
 
-#: lib/marshall/documentation_messages.ex:174
+#: lib/marshall/documentation_messages.ex:183
 #, elixir-autogen, elixir-format
 msgid "List machines you can access."
 msgstr "اعرض الأجهزة اللي تقدر توصل ليها."
 
-#: lib/marshall/documentation_messages.ex:175
+#: lib/marshall/documentation_messages.ex:184
 #, elixir-autogen, elixir-format
 msgid "List your SSH keys."
 msgstr "اعرض مفاتيح SSH بتاعتك."
 
-#: lib/marshall/documentation_messages.ex:176
+#: lib/marshall/documentation_messages.ex:185
 #, elixir-autogen, elixir-format
 msgid "List your integrations."
 msgstr "اعرض التكاملات بتاعتك."
 
-#: lib/marshall/documentation_messages.ex:178
+#: lib/marshall/documentation_messages.ex:187
 #, elixir-autogen, elixir-format
 msgid "List your teams and roles."
 msgstr "اعرض الفرق والأدوار بتاعتك."
 
-#: lib/marshall/documentation_messages.ex:179
+#: lib/marshall/documentation_messages.ex:188
 #, elixir-autogen, elixir-format
 msgid "Machine managers can edit labels and the machine comment from machine settings.\nLabels are limited to 32 entries and comments to 2 KiB. Integration managers\ncan edit an integration comment from the integrations page. Changes are\naudited without recording comment text or secret values."
 msgstr "مديرين الأجهزة يقدروا يغيّروا التسميات وتعليق الجهاز من إعداداته.\nالتسميات لحد 32 بند والتعليقات لحد 2 KiB. مديرين التكاملات\nيقدروا يغيّروا تعليق التكامل من صفحة التكاملات. التغييرات\nبتتسجّل للتدقيق من غير نص التعليق أو القيم السرية."
 
-#: lib/marshall/documentation_messages.ex:183
+#: lib/marshall/documentation_messages.ex:192
 #, elixir-autogen, elixir-format
 msgid "Machine references accept names or UUIDs. Names are lowercase, begin with a letter,\nand contain letters, digits and single separating hyphens, up to 63 characters.\nUUID-shaped names are reserved for machine identifiers.\nCreation without a name generates one. Creation without an image selects the\noperator's default image. Creation without `--profile` selects OSS; use\n`--profile customer` for the restricted Customer environment. Omitted CPU,\nmemory and disk requests use defaults raised to the image minimum; explicitly\nundersized requests fail."
 msgstr "تقدر تحدّد الجهاز باسمه أو بمعرّف UUID. الأسماء بحروف صغيرة وبتبدأ بحرف،\nوبتحتوي على حروف وأرقام وشرطات مفردة فاصلة، لحد 63 حرف.\nالأسماء اللي شكلها UUID محجوزة لمعرّفات الأجهزة.\nلو عملت جهاز من غير اسم، بيتولّد اسم. ولو من غير صورة، بيختار الصورة\nالافتراضية اللي حدّدها المشغّل. لو ما حدّدتش `--profile` بيختار OSS؛\nاستخدم `--profile customer` لبيئة Customer المقيّدة. لو ما طلبتش CPU أو\nذاكرة أو قرص، بتتستخدم القيم الافتراضية بعد رفعها للحد الأدنى للصورة؛\nأما الأحجام اللي بتحدّدها صراحة تحت الحد الأدنى فبتترفض."
 
-#: lib/marshall/documentation_messages.ex:187
+#: lib/marshall/documentation_messages.ex:196
 #, elixir-autogen, elixir-format
 msgid "Make an integration available to a machine."
 msgstr "خلّي تكامل متاح لجهاز."
 
-#: lib/marshall/documentation_messages.ex:197
+#: lib/marshall/documentation_messages.ex:206
 #, elixir-autogen, elixir-format
 msgid "Move a machine to an automatically selected host."
 msgstr "انقل جهاز لمضيف بيتختار تلقائيًا."
 
-#: lib/marshall/documentation_messages.ex:206
+#: lib/marshall/documentation_messages.ex:215
 #, elixir-autogen, elixir-format
 msgid "Offer team ownership to an admin."
 msgstr "اعرض ملكية الفريق على مسؤول."
 
-#: lib/marshall/documentation_messages.ex:207
+#: lib/marshall/documentation_messages.ex:216
 #, elixir-autogen, elixir-format
 msgid "On a supported repository page, clicking an unconfigured toolbar button opens\nsettings. Unsupported hosts show an **Unsupported page** state and do not send a\nURL. Marshall checks the launch request again before staging it and may require\nyou to sign in."
 msgstr "في صفحة مستودع مدعومة، الضغط على زر شريط أدوات لسه مش متضبط بيفتح\nالإعدادات. المضيفين اللي مش مدعومين بيظهروا حالة **صفحة مش مدعومة** ومش بيبعتوا\nURL. Marshall بيفحص طلب التشغيل تاني قبل ما يجهّزه، وممكن يطلب منك\nتسجّل دخولك."
 
-#: lib/marshall/documentation_messages.ex:211
+#: lib/marshall/documentation_messages.ex:220
 #, elixir-autogen, elixir-format
 msgid "Open a GitHub, GitLab, Codeberg or Bitbucket Cloud repository in Overalls with a\nsingle toolbar click. The extension carries only the provider origin and path to\nOveralls, so you can move from a repository page to a machine without copying a\nURL by hand."
 msgstr "افتح مستودع GitHub أو GitLab أو Codeberg أو Bitbucket Cloud في Overalls\nبضغطة واحدة على شريط الأدوات. الإضافة بتبعت أصل المزوّد والمسار بس إلى\nOveralls، فبتقدر تنتقل من صفحة المستودع لجهاز من غير ما تنسخ\nURL بإيدك."
 
-#: lib/marshall/documentation_messages.ex:216
+#: lib/marshall/documentation_messages.ex:225
 #, elixir-autogen, elixir-format
 msgid "Options:"
 msgstr "الاختيارات:"
 
-#: lib/marshall/documentation_messages.ex:217
+#: lib/marshall/documentation_messages.ex:226
 #, elixir-autogen, elixir-format
 msgid "Overalls documentation"
 msgstr "دليل Overalls"
 
-#: lib/marshall/documentation_messages.ex:218
+#: lib/marshall/documentation_messages.ex:227
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can change a machine's CPU and memory; disk may only grow,\nup to 500 GiB:"
 msgstr "الملاك والمديرين يقدروا يغيّروا CPU وذاكرة الجهاز؛ القرص بيتكبّر بس،\nلحد 500 GiB:"
 
-#: lib/marshall/documentation_messages.ex:222
+#: lib/marshall/documentation_messages.ex:231
 #, elixir-autogen, elixir-format
 msgid "Owners and managers can queue an independent copy:"
 msgstr "الملاك والمديرين يقدروا يحطّوا نسخة مستقلة في طابور التنفيذ:"
 
-#: lib/marshall/documentation_messages.ex:223
+#: lib/marshall/documentation_messages.ex:232
 #, elixir-autogen, elixir-format
 msgid "Owners, managers and team admins can move a machine to another eligible physical\nhost. The destination and transfer strategy are always selected by Marshall and\ncannot be supplied through Porsche:"
 msgstr "الملاك والمديرين ومسؤولي الفرق يقدروا ينقلوا جهاز لمضيف فعلي تاني مؤهّل.\nMarshall هو اللي بيختار الوجهة وطريقة النقل دايمًا، ومش ممكن تبعتهم\nعن طريق Porsche:"
 
-#: lib/marshall/documentation_messages.ex:227
+#: lib/marshall/documentation_messages.ex:236
 #, elixir-autogen, elixir-format
 msgid "Permissions are checked at execution time. Access shown in a previous list is\nnot a guarantee that a later operation is allowed. Sharing roles are `viewer`,\n`operator` and `manager`; ownership and current permissions determine which\noperations you may perform. SSH key commands affect only your own keys."
 msgstr "الصلاحيات بتتفحص وقت التنفيذ. ظهور صلاحية في قائمة قديمة مش ضمان\nإن العملية اللي بعدها هتتسمح. أدوار المشاركة هي `viewer` و`operator`\nو`manager`؛ الملكية والصلاحيات الحالية بيحددوا العمليات اللي تقدر تعملها.\nأوامر مفاتيح SSH بتأثر على مفاتيحك إنت بس."
 
-#: lib/marshall/documentation_messages.ex:231
+#: lib/marshall/documentation_messages.ex:240
 #, elixir-autogen, elixir-format
 msgid "Pin a machine to the top of your lists. Your owner pin wakes it, prevents automatic suspension, and prevents deletion."
 msgstr "ثبّت جهاز فوق في قوائمك. تثبيت المالك بيصحّي الجهاز وبيمنع التعليق التلقائي والمسح."
 
-#: lib/marshall/documentation_messages.ex:235
+#: lib/marshall/documentation_messages.ex:244
 #, elixir-autogen, elixir-format
 msgid "Porsche manages machines; it does not provide a guest shell, guest file transfer,\nport forwarding or an SSH agent forwarding service. Machine console access is\navailable separately in Marshall's web interface, subject to account permissions.\n"
 msgstr "Porsche بيدير الأجهزة؛ مش بيوفّر صدفة للضيف أو نقل ملفات الضيف\nأو تمرير منافذ أو خدمة تمرير وكيل SSH. الوصول لوحدة تحكم الجهاز\nمتاح بشكل منفصل في واجهة Marshall على الويب، حسب صلاحيات الحساب.\n"
@@ -424,217 +424,217 @@ msgstr "Porsche بيدير الأجهزة؛ مش بيوفّر صدفة للضي�
 msgid "Public documentation for Overalls browser extensions and SSH machine management (Porsche v1)."
 msgstr "التوثيق العام لإضافات متصفح Overalls وإدارة الأجهزة عبر SSH ‏(Porsche v1)."
 
-#: lib/marshall/documentation_messages.ex:240
+#: lib/marshall/documentation_messages.ex:249
 #, elixir-autogen, elixir-format
 msgid "Queue an independent full-disk copy of a machine."
 msgstr "حط نسخة كاملة مستقلة لقرص جهاز في طابور التنفيذ."
 
-#: lib/marshall/documentation_messages.ex:241
+#: lib/marshall/documentation_messages.ex:250
 #, elixir-autogen, elixir-format
 msgid "Queued requests recheck your access before execution. Use `request cancel copy-1`\nbefore the destination is published; successful cancellation waits for any required\ncleanup. Use `request retry copy-1` to resume a failed request rather than create\nanother destination. Clone accepts `--timeout` and `--no-wait`; a client\ntimeout does not cancel accepted work."
 msgstr "الطلبات اللي في الطابور بتراجع صلاحياتك تاني قبل التنفيذ. استخدم `request cancel copy-1`\nقبل نشر الوجهة؛ الإلغاء الناجح بيستنى أي تنظيف مطلوب. استخدم `request retry copy-1`\nعشان تكمّل طلب فشل بدل ما تعمل وجهة جديدة. النسخ بيقبل `--timeout`\nو`--no-wait`؛ انتهاء مهلة العميل مش بيلغي الشغل اللي اتقبل."
 
-#: lib/marshall/documentation_messages.ex:245
+#: lib/marshall/documentation_messages.ex:254
 #, elixir-autogen, elixir-format
 msgid "Reconnecting later is the same everywhere: `ssh HOST`. (On Windows, if you\ndeclined the administrator prompt, use `overalls ssh HOST` instead.)"
 msgstr "للاتصال تاني بعد كده، الأمر واحد في كل مكان: `ssh HOST`. (على Windows،\nلو رفضت طلب صلاحيات المسؤول، استخدم `overalls ssh HOST` بدلًا منه.)"
 
-#: lib/marshall/documentation_messages.ex:249
+#: lib/marshall/documentation_messages.ex:258
 #, elixir-autogen, elixir-format
 msgid "Reflection integration"
 msgstr "تكامل Reflection"
 
-#: lib/marshall/documentation_messages.ex:250
+#: lib/marshall/documentation_messages.ex:259
 #, elixir-autogen, elixir-format
 msgid "Reflection is available only through the private network. Requests are bound to\nthe current VM, host, placement, and execution epoch; stopped, relocated,\nretired, stale, or unauthorized guests receive an unavailable response.\n"
 msgstr "Reflection متاح بس من الشبكة الخاصة. الطلبات مرتبطة بالآلة الافتراضية\nوالمضيف والموضع وحقبة التنفيذ الحالية؛ الضيوف المتوقفة أو المنقولة\nأو المتقاعدة أو القديمة أو اللي ملهاش صلاحية بياخدوا رد إن الخدمة مش متاحة.\n"
 
-#: lib/marshall/documentation_messages.ex:258
+#: lib/marshall/documentation_messages.ex:267
 #, elixir-autogen, elixir-format
 msgid "Remove a machine's explicit availability."
 msgstr "شيل الإتاحة الصريحة لجهاز."
 
-#: lib/marshall/documentation_messages.ex:259
+#: lib/marshall/documentation_messages.ex:268
 #, elixir-autogen, elixir-format
 msgid "Remove a named integration."
 msgstr "شيل تكامل له اسم."
 
-#: lib/marshall/documentation_messages.ex:260
+#: lib/marshall/documentation_messages.ex:269
 #, elixir-autogen, elixir-format
 msgid "Remove an account's membership."
 msgstr "شيل عضوية حساب."
 
-#: lib/marshall/documentation_messages.ex:261
+#: lib/marshall/documentation_messages.ex:270
 #, elixir-autogen, elixir-format
 msgid "Remove your pin from a machine."
 msgstr "شيل تثبيتك لجهاز."
 
-#: lib/marshall/documentation_messages.ex:262
+#: lib/marshall/documentation_messages.ex:271
 #, elixir-autogen, elixir-format
 msgid "Resume a suspended machine's preserved memory."
 msgstr "كمّل من الذاكرة المحفوظة لجهاز معلّق."
 
-#: lib/marshall/documentation_messages.ex:263
+#: lib/marshall/documentation_messages.ex:272
 #, elixir-autogen, elixir-format
 msgid "Resume preserved memory, waiting for capacity or relocation."
 msgstr "كمّل من الذاكرة المحفوظة، مع انتظار السعة أو النقل."
 
-#: lib/marshall/documentation_messages.ex:267
+#: lib/marshall/documentation_messages.ex:276
 #, elixir-autogen, elixir-format
 msgid "Retry a failed clone or relocation request."
 msgstr "جرّب تاني طلب نسخ أو نقل فشل."
 
-#: lib/marshall/documentation_messages.ex:269
+#: lib/marshall/documentation_messages.ex:278
 #, elixir-autogen, elixir-format
 msgid "Revoke an account's shared access."
 msgstr "الغي الوصول المشترك لحساب."
 
-#: lib/marshall/documentation_messages.ex:270
+#: lib/marshall/documentation_messages.ex:279
 #, elixir-autogen, elixir-format
 msgid "Revoke one of your SSH keys."
 msgstr "الغي واحد من مفاتيح SSH بتاعتك."
 
-#: lib/marshall/documentation_messages.ex:273
+#: lib/marshall/documentation_messages.ex:286
 #, elixir-autogen, elixir-format
 msgid "Show command help."
 msgstr "اعرض مساعدة الأوامر."
 
-#: lib/marshall/documentation_messages.ex:274
+#: lib/marshall/documentation_messages.ex:287
 #, elixir-autogen, elixir-format
 msgid "Show the authenticated account."
 msgstr "اعرض الحساب اللي اتأكدت هويته."
 
-#: lib/marshall/documentation_messages.ex:275
+#: lib/marshall/documentation_messages.ex:288
 #, elixir-autogen, elixir-format
 msgid "Sign in to Marshall using your email login and open\n[Account settings › SSH keys](/settings#ssh-keys). Paste one OpenSSH public key and optionally give it\na label. Paste the `.pub` file, never the private key. Supported public keys are\nEd25519, ECDSA and RSA (at least 2048 bits). Certificates and `authorized_keys`\noptions are not accepted."
 msgstr "سجّل دخولك في Marshall بالبريد الإلكتروني وافتح\n[إعدادات الحساب › مفاتيح SSH](/settings#ssh-keys). الصق مفتاح OpenSSH عام واحد، ولو حابب سمّيه.\nالصق ملف `.pub`، وما تلصقش المفتاح الخاص أبدًا. المفاتيح العامة المدعومة هي\nEd25519 وECDSA وRSA (على الأقل 2048 بت). الشهادات واختيارات `authorized_keys`\nمش بتتقبل."
 
-#: lib/marshall/documentation_messages.ex:279
+#: lib/marshall/documentation_messages.ex:292
 #, elixir-autogen, elixir-format
 msgid "Start a machine."
 msgstr "شغّل جهاز."
 
-#: lib/marshall/documentation_messages.ex:280
+#: lib/marshall/documentation_messages.ex:293
 #, elixir-autogen, elixir-format
 msgid "Stop a machine, retaining its disk and discarding suspended memory."
 msgstr "وقّف جهاز واحتفظ بقرصه وامسح ذاكرة التعليق."
 
-#: lib/marshall/documentation_messages.ex:284
+#: lib/marshall/documentation_messages.ex:297
 #, elixir-autogen, elixir-format
 msgid "Stop retains the disk. `rm MACHINE` deletes the machine and its disk. A name is\navailable for reuse only after cleanup is confirmed. Use `exit` to leave the prompt."
 msgstr "الإيقاف بيحتفظ بالقرص. `rm MACHINE` بيمسح الجهاز وقرصه. الاسم مش بيبقى\nمتاح للاستخدام تاني إلا بعد تأكيد التنظيف. استخدم `exit` عشان تخرج من سطر الأوامر."
 
-#: lib/marshall/documentation_messages.ex:304
+#: lib/marshall/documentation_messages.ex:317
 #, elixir-autogen, elixir-format
 msgid "Suspend a machine, preserving its memory and disk."
 msgstr "علّق جهاز واحتفظ بذاكرته وقرصه."
 
-#: lib/marshall/documentation_messages.ex:306
+#: lib/marshall/documentation_messages.ex:319
 #, elixir-autogen, elixir-format
 msgid "The Overalls operator chooses whether these immutable archives are available. If\nthe deployment has disabled its browser extension package, the download links return an unavailable response.\nSee the browser distribution notes for package and build details.\n"
 msgstr "مشغّل Overalls بيختار إذا كانت الحزم الثابتة دي متاحة. لو\nالنشر عطّل حزمة إضافة المتصفح، روابط التنزيل بترجّع رد إن الحزمة مش متاحة.\nراجع ملاحظات توزيع المتصفح لتفاصيل الحزمة والبناء.\n"
 
-#: lib/marshall/documentation_messages.ex:310
+#: lib/marshall/documentation_messages.ex:323
 #, elixir-autogen, elixir-format
 msgid "The accepted request retains its normalized command and resolved resources.\nRetrying cannot retarget a different machine after name reuse or silently select\na different default image. Query the original request after a lost response or\ntimeout. Request status remains subject to current account authorization, including\nafter the machine is archived."
 msgstr "الطلب المقبول بيحتفظ بالأمر بعد توحيده وبالموارد اللي اتحدّدت.\nإعادة المحاولة مش ممكن تستهدف جهاز تاني بعد إعادة استخدام الاسم أو تختار\nصورة افتراضية مختلفة من غير ما تعرف. استعلم عن الطلب الأصلي لو الرد ضاع أو\nالمهلة انتهت. حالة الطلب بتفضل خاضعة لصلاحيات الحساب الحالية، حتى\nبعد أرشفة الجهاز."
 
-#: lib/marshall/documentation_messages.ex:314
+#: lib/marshall/documentation_messages.ex:327
 #, elixir-autogen, elixir-format
 msgid "The browser extension opens supported repository pages in Overalls. The SSH guides\ndescribe Porsche v1; your operator supplies the SSH hostname for deployments\nwith Porsche enabled."
 msgstr "إضافة المتصفح بتفتح صفحات المستودعات المدعومة في Overalls. أدلة SSH\nبتشرح Porsche v1؛ المشغّل بيدّيك اسم مضيف SSH في عمليات النشر\nاللي Porsche متفعّل فيها."
 
-#: lib/marshall/documentation_messages.ex:318
+#: lib/marshall/documentation_messages.ex:331
 #, elixir-autogen, elixir-format
 msgid "The extension opens Overalls with a source URL only after an explicit toolbar\nclick on the four supported HTTPS provider hosts. It sends the provider origin\nand path, strips query parameters and fragments, and never collects page\ncontents, credentials, history or telemetry."
 msgstr "الإضافة بتفتح Overalls بعنوان مصدر بس بعد ضغطة صريحة على شريط الأدوات\nعلى مضيفين HTTPS الأربعة المدعومين. بتبعت أصل المزوّد ومساره، وبتشيل\nمعلمات الاستعلام والأجزاء، ومش بتجمع محتوى الصفحات أو بيانات الدخول\nأو سجل التصفح أو القياسات عن بُعد أبدًا."
 
-#: lib/marshall/documentation_messages.ex:322
+#: lib/marshall/documentation_messages.ex:335
 #, elixir-autogen, elixir-format
 msgid "The machine keeps its identity, name, sharing, private address, image and requested\nshape. A running machine may have bounded downtime while final disk state and\nexecution authority move. `request cancel move-1` is available only before handoff\ncommits. If destination activation or readiness fails after commit,\n`request retry move-1` retries that retained destination. Both controls create\ntheir own durable request receipt; use a distinct `--request-id` for each control."
 msgstr "الجهاز بيحتفظ بهويته واسمه ومشاركته وعنوانه الخاص وصورته والمواصفات المطلوبة.\nالجهاز الشغّال ممكن يقف لفترة محدودة أثناء نقل آخر حالة للقرص وصلاحية\nالتنفيذ. `request cancel move-1` متاح بس قبل تثبيت التسليم.\nلو تفعيل الوجهة أو جاهزيتها فشل بعد التثبيت، `request retry move-1`\nبيجرّب نفس الوجهة المحفوظة تاني. كل أمر تحكم بيعمل إيصال طلب دائم\nخاص بيه؛ استخدم `--request-id` مختلف لكل أمر تحكم."
 
-#: lib/marshall/documentation_messages.ex:326
+#: lib/marshall/documentation_messages.ex:339
 #, elixir-autogen, elixir-format
 msgid "The page shows each key's label, type, fingerprint and creation time. Remove a key\nto revoke its access. You may remove your last SSH key and continue using email\nlogin. Adding the same public key again creates a new registration; previous\nsessions remain revoked."
 msgstr "الصفحة بتعرض اسم كل مفتاح ونوعه وبصمته ووقت إنشائه. شيل المفتاح\nعشان تلغي صلاحية وصوله. تقدر تشيل آخر مفتاح SSH وتكمّل دخول بالبريد\nالإلكتروني. إضافة نفس المفتاح العام تاني بتعمل تسجيل جديد؛ الجلسات\nالقديمة بتفضل ملغية."
 
-#: lib/marshall/documentation_messages.ex:330
+#: lib/marshall/documentation_messages.ex:347
 #, elixir-autogen, elixir-format
 msgid "These archives are unsigned and are served by the Overalls deployment. Download\nthe archive for your browser, then follow its developer-install flow:"
 msgstr "الحزم دي مش موقّعة وبيقدّمها نشر Overalls. نزّل\nحزمة المتصفح بتاعك، وبعدها اتّبع خطوات تثبيت المطوّر:"
 
-#: lib/marshall/documentation_messages.ex:334
+#: lib/marshall/documentation_messages.ex:351
 #, elixir-autogen, elixir-format
 msgid "These pages are public and contain no account or fleet data. Each page is available\nas HTML by removing `.md` from its URL. Language-model clients can start at\n[/llms.txt](/llms.txt) and follow the Markdown links."
 msgstr "الصفحات دي عامة ومفيهاش بيانات حسابات أو أسطول. كل صفحة متاحة\nبصيغة HTML لما تشيل `.md` من عنوانها. عملاء نماذج اللغة يقدروا يبدأوا من\n[/llms.txt](/llms.txt) ويتابعوا روابط Markdown."
 
-#: lib/marshall/documentation_messages.ex:338
+#: lib/marshall/documentation_messages.ex:355
 #, elixir-autogen, elixir-format
 msgid "This reference uses the same v1 command grammar as the SSH service."
 msgstr "المرجع ده بيستخدم نفس قواعد أوامر v1 اللي خدمة SSH بتستخدمها."
 
-#: lib/marshall/documentation_messages.ex:343
+#: lib/marshall/documentation_messages.ex:364
 #, elixir-autogen, elixir-format
 msgid "Use Overalls from your browser or manage machines over SSH with Porsche. Marshall\nprovides the web interface and account permissions. Use the same account in both."
 msgstr "استخدم Overalls من المتصفح، أو دير الأجهزة عبر SSH باستخدام Porsche. Marshall\nبيوفّر واجهة الويب وصلاحيات الحساب. استخدم نفس الحساب في الاتنين."
 
-#: lib/marshall/documentation_messages.ex:347
+#: lib/marshall/documentation_messages.ex:368
 #, elixir-autogen, elixir-format
 msgid "Use Porsche to manage machines over SSH, with the same account and permissions\nas Marshall’s web interface."
 msgstr "استخدم Porsche لإدارة الأجهزة عبر SSH، بنفس الحساب والصلاحيات\nاللي في واجهة Marshall على الويب."
 
-#: lib/marshall/documentation_messages.ex:351
+#: lib/marshall/documentation_messages.ex:372
 #, elixir-autogen, elixir-format
 msgid "Use SSH exec commands and durable request IDs to automate machine management."
 msgstr "استخدم أوامر SSH exec ومعرّفات الطلبات الدائمة عشان تشغّل إدارة الأجهزة آليًا."
 
-#: lib/marshall/documentation_messages.ex:355
+#: lib/marshall/documentation_messages.ex:376
 #, elixir-autogen, elixir-format
 msgid "Use `--json` for machine-readable results. An exec invocation writes one result\nto standard output; progress goes to standard error. Check the SSH command's exit\nstatus as well as its result. A failed command exits nonzero."
 msgstr "استخدم `--json` للنتايج اللي البرامج تقدر تقراها. استدعاء exec بيكتب نتيجة\nواحدة للمخرج القياسي؛ والتقدم بيروح لمخرج الخطأ القياسي. راجع حالة خروج\nأمر SSH ونتيجته مع بعض. الأمر اللي بيفشل بيخرج بحالة مش صفر."
 
-#: lib/marshall/documentation_messages.ex:359
+#: lib/marshall/documentation_messages.ex:380
 #, elixir-autogen, elixir-format
 msgid "Use the Porsche hostname supplied by your operator. In a local terminal, run\n`ssh YOUR_PORSCHE_HOST help` for one command, or `ssh YOUR_PORSCHE_HOST` for an\ninteractive prompt. Verify the server host-key fingerprint using your operator's\ntrusted instructions. Management uses port 22."
 msgstr "استخدم اسم مضيف Porsche اللي المشغّل ادّهولك. في طرفية محلية، شغّل\n`ssh YOUR_PORSCHE_HOST help` لأمر واحد، أو `ssh YOUR_PORSCHE_HOST`\nلسطر أوامر تفاعلي. اتأكد من بصمة مفتاح مضيف الخادم باتباع تعليمات\nالمشغّل الموثوقة. الإدارة بتستخدم المنفذ 22."
 
-#: lib/marshall/documentation_messages.ex:363
+#: lib/marshall/documentation_messages.ex:384
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests."
 msgstr "أقراص الآلات الافتراضية أقصى سعة ليها **500 GiB** (536,870,912,000 بايت).\nطلبات الإنشاء وتغيير الحجم فوق الحد ده بتترفض، بما فيها طلبات Porsche\n`new --disk`."
 
-#: lib/marshall/documentation_messages.ex:367
+#: lib/marshall/documentation_messages.ex:388
 #, elixir-autogen, elixir-format
 msgid "VM disks have a maximum capacity of **500 GiB** (536,870,912,000 bytes).\nCreation and resize requests above this limit are rejected, including Porsche\n`new --disk` requests.\n"
 msgstr "أقراص الآلات الافتراضية أقصى سعة ليها **500 GiB** (536,870,912,000 بايت).\nطلبات الإنشاء وتغيير الحجم فوق الحد ده بتترفض، بما فيها طلبات Porsche\n`new --disk`.\n"
 
-#: lib/marshall/documentation_messages.ex:371
+#: lib/marshall/documentation_messages.ex:392
 #, elixir-autogen, elixir-format
 msgid "When the extension has been configured for this exact Overalls origin and the\nbrowser has granted site access, it marks the open Overalls page as installed.\nThat local marker hides setup prompts on the home page; it does not sign you in,\ngrant access to machines, or change launch authorization. If site access is\nwithdrawn, configuration is missing, or detection is unavailable, setup remains\nvisible."
 msgstr "لما الإضافة تتضبط على أصل Overalls ده بالظبط والمتصفح يديها صلاحية\nالوصول للموقع، بتعلّم صفحة Overalls المفتوحة إن الإضافة متثبّتة.\nالعلامة المحلية دي بتخفي طلبات الإعداد في الصفحة الرئيسية؛ مش بتسجّل دخولك\nولا بتديك وصول للأجهزة ولا بتغيّر صلاحيات التشغيل. لو صلاحية الوصول اتسحبت،\nأو الإعداد ناقص، أو الكشف مش متاح، الإعداد بيفضل ظاهر."
 
-#: lib/marshall/documentation_messages.ex:375
+#: lib/marshall/documentation_messages.ex:396
 #, elixir-autogen, elixir-format
 msgid "With exec, place the same command after `ssh YOUR_PORSCHE_HOST` and quote it for\nyour local shell when needed. Porsche does not evaluate shell expressions,\npipelines or substitutions. Single and double quotes group command arguments."
 msgstr "مع exec، حط نفس الأمر بعد `ssh YOUR_PORSCHE_HOST` واستخدم علامات اقتباس\nللصدفة المحلية لو محتاج. Porsche مش بينفّذ تعبيرات الصدفة\nولا الأنابيب ولا الاستبدالات. علامات الاقتباس المفردة والمزدوجة بتجمّع معاملات الأمر."
 
-#: lib/marshall/documentation_messages.ex:384
+#: lib/marshall/documentation_messages.ex:405
 #, elixir-autogen, elixir-format
 msgid "`GET /` returns a versioned object containing `guest`, `integrations`, and the\navailable paths. `GET /guest` returns only guest metadata. `GET /integrations`\nreturns the integrations array directly, which makes it convenient for shell\nscripts and agents."
 msgstr "`GET /` بيرجّع كائن له إصدار فيه `guest` و`integrations` والمسارات\nالمتاحة. `GET /guest` بيرجّع بيانات الضيف الوصفية بس. `GET /integrations`\nبيرجّع مصفوفة التكاملات مباشرة، وده مناسب لنصوص\nالصدفة والوكلاء."
 
-#: lib/marshall/documentation_messages.ex:392
+#: lib/marshall/documentation_messages.ex:413
 #, elixir-autogen, elixir-format
 msgid "`new` selects OSS when `--profile` is omitted, as does the browser creation form.\nUse `new --profile customer` to choose Customer explicitly. Customer machines\npermit only owner SSH and serial-terminal access. All outbound network\nconnections, workspace sharing, and web/port exposure are disabled.\nSSH reply traffic is allowed only on admitted owner connections. Choose an\nappropriate non-Customer profile when networking or collaboration is required."
 msgstr "`new` بيختار OSS لما ما تحدّدش `--profile`، زي نموذج الإنشاء في المتصفح.\nاستخدم `new --profile customer` عشان تختار Customer صراحة. أجهزة Customer\nبتسمح بوصول المالك بس عبر SSH والطرفية التسلسلية. كل الاتصالات الخارجة\nللشبكة ومشاركة مساحة العمل وكشف الويب أو المنافذ متعطّلة.\nردود SSH مسموحة بس على اتصالات المالك اللي اتقبلت. اختار ملف\nمناسب غير Customer لو محتاج شبكة أو تعاون."
 
-#: lib/marshall/documentation_messages.ex:396
+#: lib/marshall/documentation_messages.ex:417
 #, elixir-autogen, elixir-format
 msgid "`pin MACHINE` keeps a machine at the top of your lists in the browser; `unpin\nMACHINE` removes your pin. Pins are personal, and you may hold up to twenty. While\nthe machine's owner has it pinned, nobody can delete it: `rm` answers\n`machine_pinned` until the owner runs `unpin MACHINE` or unpins it in the browser."
 msgstr "`pin MACHINE` بيخلّي الجهاز فوق في قوائمك في المتصفح؛ `unpin\nMACHINE` بيشيل تثبيتك. التثبيت شخصي، وتقدر تثبّت لحد عشرين جهاز. طول ما\nمالك الجهاز مثبّته، محدّش يقدر يمسحه: `rm` بيرد بـ\n`machine_pinned` لحد ما المالك يشغّل `unpin MACHINE` أو يشيل التثبيت من المتصفح."
 
-#: lib/marshall/documentation_messages.ex:400
+#: lib/marshall/documentation_messages.ex:421
 #, elixir-autogen, elixir-format
 msgid "`relocate MACHINE` moves the same machine and disk to another eligible physical\nhost. Porsche never accepts a destination: Marshall selects one from current\ncapacity, image availability and transfer readiness. The machine keeps its name,\nidentity, sharing and private address."
 msgstr "`relocate MACHINE` بينقل نفس الجهاز ونفس القرص لمضيف فعلي تاني مؤهّل.\nPorsche مش بيقبل وجهة أبدًا: Marshall بيختارها حسب السعة الحالية\nوتوفّر الصورة والاستعداد للنقل. الجهاز بيحتفظ باسمه\nوهويته ومشاركته وعنوانه الخاص."
@@ -649,17 +649,17 @@ msgstr "# الإشعارات الفورية"
 msgid "## Devices"
 msgstr "## الأجهزة"
 
-#: lib/marshall/documentation_messages.ex:22
+#: lib/marshall/documentation_messages.ex:23
 #, elixir-autogen, elixir-format
 msgid "## Privacy"
 msgstr "## الخصوصية"
 
-#: lib/marshall/documentation_messages.ex:29
+#: lib/marshall/documentation_messages.ex:30
 #, elixir-autogen, elixir-format
 msgid "## Turning notifications off"
 msgstr "## إزاي تقفل الإشعارات"
 
-#: lib/marshall/documentation_messages.ex:30
+#: lib/marshall/documentation_messages.ex:31
 #, elixir-autogen, elixir-format
 msgid "- An operator can disable notifications for the whole deployment with\n  `services.marshall.notifications.enable = false`. Registration is then\n  refused and nothing is sent to Susan.\n- You can pause a single device with `device prefs DEVICE_ID --enabled false`.\n- You can revoke a device with `device rm DEVICE_ID`."
 msgstr ""
@@ -667,7 +667,7 @@ msgstr ""
 "- تقدر توقّف جهاز واحد مؤقتًا بـ `device prefs DEVICE_ID --enabled false`.\n"
 "- تقدر تلغي جهاز بـ `device rm DEVICE_ID`."
 
-#: lib/marshall/documentation_messages.ex:38
+#: lib/marshall/documentation_messages.ex:39
 #, elixir-autogen, elixir-format
 msgid "- [Browser extension](/docs/browser-extension.md): open supported repositories in Overalls.\n- [Getting started](/docs/quickstart.md): register a key and connect.\n- [Command reference](/docs/commands.md): syntax and available options.\n- [Automation](/docs/automation.md): JSON, retries and completion.\n- [Reflection integration](/docs/reflection.md): discover guest metadata and available private integrations.\n- [Push notifications](/docs/notifications.md): Mila notifications, devices and privacy."
 msgstr ""
@@ -678,163 +678,163 @@ msgstr ""
 "- [تكامل Reflection](/docs/reflection.md): اكتشف بيانات الضيف الوصفية والتكاملات الخاصة المتاحة.\n"
 "- [الإشعارات الفورية](/docs/notifications.md): إشعارات Mila والأجهزة والخصوصية."
 
-#: lib/marshall/documentation_messages.ex:56
+#: lib/marshall/documentation_messages.ex:61
 #, elixir-autogen, elixir-format
 msgid "Answer a thread's pending question with JSON read from standard input."
 msgstr "جاوب على السؤال المستنّي في سلسلة بـ JSON متقري من الإدخال القياسي."
 
-#: lib/marshall/documentation_messages.ex:60
+#: lib/marshall/documentation_messages.ex:65
 #, elixir-autogen, elixir-format
 msgid "Apple and Google deliver notifications only to apps signed by the app's\npublisher, so every Overalls deployment sends notifications through one shared\nrelay, Susan, at `https://notifications.overalls.dev`. Your deployment cannot\nbe configured to use another relay."
 msgstr "Apple و Google مش بيوصّلوا الإشعارات غير للتطبيقات اللي ناشر التطبيق مضيها، علشان كده كل نشر Overalls بيبعت الإشعارات عن طريق مُرحِّل واحد مشترك، Susan، على `https://notifications.overalls.dev`. مينفعش تظبط النشر بتاعك إنه يستخدم مُرحِّل تاني."
 
-#: lib/marshall/documentation_messages.ex:64
+#: lib/marshall/documentation_messages.ex:69
 #, elixir-autogen, elixir-format
 msgid "Approve a thread's latest plan and start implementing it."
 msgstr "وافق على آخر خطة لسلسلة وابدأ تنفّذها."
 
-#: lib/marshall/documentation_messages.ex:65
+#: lib/marshall/documentation_messages.ex:70
 #, elixir-autogen, elixir-format
 msgid "Ask for a revised plan, reading the feedback from standard input."
 msgstr "اطلب خطة متعدّلة، والملاحظات بتتقري من الإدخال القياسي."
 
-#: lib/marshall/documentation_messages.ex:70
+#: lib/marshall/documentation_messages.ex:75
 #, elixir-autogen, elixir-format
 msgid "Attach this SSH terminal to a shared terminal session; needs ssh -t."
 msgstr "اربط طرفية SSH دي بجلسة طرفية مشتركة؛ محتاج ssh -t."
 
-#: lib/marshall/documentation_messages.ex:85
+#: lib/marshall/documentation_messages.ex:90
 #, elixir-autogen, elixir-format
 msgid "Change a machine's web port or visibility, optionally at an expected revision."
 msgstr "غيّر منفذ الويب أو الظهور لجهاز، ولو حبيت عند مراجعة متوقعة."
 
-#: lib/marshall/documentation_messages.ex:97
+#: lib/marshall/documentation_messages.ex:102
 #, elixir-autogen, elixir-format
 msgid "Close one of your terminal sessions on a machine."
 msgstr "اقفل جلسة من جلسات الطرفية بتاعتك على جهاز."
 
-#: lib/marshall/documentation_messages.ex:158
+#: lib/marshall/documentation_messages.ex:167
 #, elixir-autogen, elixir-format
 msgid "Inspect a thread, its pending question and latest plan."
 msgstr "افحص سلسلة وسؤالها المستنّي وآخر خطة ليها."
 
-#: lib/marshall/documentation_messages.ex:168
+#: lib/marshall/documentation_messages.ex:177
 #, elixir-autogen, elixir-format
 msgid "List a machine's terminal sessions you can open."
 msgstr "اعرض جلسات الطرفية لجهاز اللي تقدر تفتحها."
 
-#: lib/marshall/documentation_messages.ex:170
+#: lib/marshall/documentation_messages.ex:179
 #, elixir-autogen, elixir-format
 msgid "List a thread's transcript events after a sequence number."
 msgstr "اعرض أحداث نص سلسلة بعد رقم تسلسلي."
 
-#: lib/marshall/documentation_messages.ex:172
+#: lib/marshall/documentation_messages.ex:181
 #, elixir-autogen, elixir-format
 msgid "List agent threads you can read, with unread counts."
 msgstr "اعرض سلاسل الوكيل اللي تقدر تقراها، مع عدد اللي ما اتقراش."
 
-#: lib/marshall/documentation_messages.ex:177
+#: lib/marshall/documentation_messages.ex:186
 #, elixir-autogen, elixir-format
 msgid "List your push notification devices."
 msgstr "اعرض أجهزة الإشعارات الفورية بتاعتك."
 
-#: lib/marshall/documentation_messages.ex:188
+#: lib/marshall/documentation_messages.ex:197
 #, elixir-autogen, elixir-format
 msgid "Mark a thread read up to a transcript sequence number."
 msgstr "علّم سلسلة إنها اتقرت لحد رقم تسلسلي في النص."
 
-#: lib/marshall/documentation_messages.ex:189
+#: lib/marshall/documentation_messages.ex:198
 #, elixir-autogen, elixir-format
 msgid "Mila registers your phone when you allow notifications. The registration is\nbound to the SSH key Mila uses, so removing that key from your account also\nrevokes the device. Each account can have up to ten active devices."
 msgstr "Mila بيسجّل موبايلك لما تسمح بالإشعارات. التسجيل مربوط بمفتاح SSH اللي Mila بيستخدمه، فلو شلت المفتاح ده من حسابك الجهاز كمان بيتلغي. كل حساب يقدر يبقى عنده لحد عشر أجهزة نشطة."
 
-#: lib/marshall/documentation_messages.ex:193
+#: lib/marshall/documentation_messages.ex:202
 #, elixir-autogen, elixir-format
 msgid "Mila, the Overalls mobile app, can tell you when an agent needs your input:\nwhen a planning turn asks you a question or proposes a plan. A notification\nonly says that something needs attention; opening it takes you to the thread\nin Mila, which then fetches the details over your own SSH connection."
 msgstr "Mila، تطبيق Overalls للموبايل، يقدر يقولك لما وكيل يحتاج ردك: لما دور تخطيط يسألك سؤال أو يقترح خطة. الإشعار بيقول بس إن فيه حاجة محتاجة انتباهك؛ ولما تفتحه بيوديك للسلسلة في Mila، وهو بعدها بيجيب التفاصيل عن طريق اتصال SSH بتاعك."
 
-#: lib/marshall/documentation_messages.ex:198
+#: lib/marshall/documentation_messages.ex:207
 #, elixir-autogen, elixir-format
 msgid "Notifications are a convenience. While Mila is open, it follows your threads\nthrough its own live watch stream, which works even when notifications are\ndisabled or Susan is unavailable.\n"
 msgstr ""
 "الإشعارات مجرد وسيلة مريحة. طول ما Mila مفتوح، بيتابع السلاسل بتاعتك من خلال بث المتابعة المباشر بتاعه، واللي بيشتغل حتى لو الإشعارات مقفولة أو Susan مش متاح.\n"
 
-#: lib/marshall/documentation_messages.ex:202
+#: lib/marshall/documentation_messages.ex:211
 #, elixir-autogen, elixir-format
 msgid "Notifications go to the devices of every person who can currently act on the\nthread, except the person whose action caused it. People with view-only\naccess are not notified."
 msgstr "الإشعارات بتروح لأجهزة كل شخص يقدر دلوقتي ياخد إجراء في السلسلة، ما عدا الشخص اللي الإجراء بتاعه هو اللي عمل الإشعار. اللي عندهم صلاحية مشاهدة بس مش بيوصلهم إشعارات."
 
-#: lib/marshall/documentation_messages.ex:215
+#: lib/marshall/documentation_messages.ex:224
 #, elixir-autogen, elixir-format
 msgid "Open your personal terminal session on a machine."
 msgstr "افتح جلسة الطرفية الشخصية بتاعتك على جهاز."
 
-#: lib/marshall/documentation_messages.ex:239
+#: lib/marshall/documentation_messages.ex:248
 #, elixir-autogen, elixir-format
 msgid "Push notifications"
 msgstr "الإشعارات الفورية"
 
-#: lib/marshall/documentation_messages.ex:254
+#: lib/marshall/documentation_messages.ex:263
 #, elixir-autogen, elixir-format
 msgid "Register this device for push notifications. The push key is read from stdin."
 msgstr "سجّل الجهاز ده للإشعارات الفورية. مفتاح الإشعارات بيتقري من stdin."
 
-#: lib/marshall/documentation_messages.ex:268
+#: lib/marshall/documentation_messages.ex:277
 #, elixir-autogen, elixir-format
 msgid "Revoke a push notification device."
 msgstr "الغي جهاز إشعارات فورية."
 
-#: lib/marshall/documentation_messages.ex:271
+#: lib/marshall/documentation_messages.ex:284
 #, elixir-autogen, elixir-format
 msgid "Send a prompt read from standard input to a thread."
 msgstr "ابعت لسلسلة طلب متقري من الإدخال القياسي."
 
-#: lib/marshall/documentation_messages.ex:272
+#: lib/marshall/documentation_messages.ex:285
 #, elixir-autogen, elixir-format
 msgid "Show a machine's web endpoint, port and visibility."
 msgstr "اعرض نقطة نهاية الويب والمنفذ والظهور لجهاز."
 
-#: lib/marshall/documentation_messages.ex:288
+#: lib/marshall/documentation_messages.ex:301
 #, elixir-autogen, elixir-format
 msgid "Stream JSON change notices for machines, threads and this session."
 msgstr "اعمل بث لإشعارات التغيير بـ JSON للأجهزة والسلاسل والجلسة دي."
 
-#: lib/marshall/documentation_messages.ex:292
+#: lib/marshall/documentation_messages.ex:305
 #, elixir-autogen, elixir-format
 msgid "Susan keeps an append-only audit log of key issues, accepted and refused\nnotifications, rate limits and delivery outcomes. Each entry records only the\naction, reason, a fingerprint of the sending deployment, the push key ID, the\nprovider (Apple or Google), the outcome and a delivery ID. It does not record IP\naddresses, push tokens, keys or encrypted messages. Audit entries are deleted\nafter 90 days."
 msgstr "Susan بيحتفظ بسجل تدقيق بيتضاف عليه بس، فيه إصدار المفاتيح، والإشعارات المقبولة والمرفوضة، وحدود المعدل، ونتايج التوصيل. كل إدخال بيسجّل بس الإجراء، والسبب، وبصمة النشر اللي بعت، ومعرّف مفتاح الإشعارات، والمزوّد (Apple أو Google)، والنتيجة، ومعرّف التوصيل. مش بيسجّل عناوين IP ولا رموز الإشعارات ولا المفاتيح ولا الرسايل المشفّرة. إدخالات التدقيق بتتمسح بعد 90 يوم."
 
-#: lib/marshall/documentation_messages.ex:296
+#: lib/marshall/documentation_messages.ex:309
 #, elixir-autogen, elixir-format
 msgid "Susan never sees your prompts, agent output, thread or machine names, email\naddress, SSH keys or any other account data."
 msgstr "Susan عمره ما بيشوف الطلبات بتاعتك، ولا مخرجات الوكيل، ولا أسماء السلاسل أو الأجهزة، ولا إيميلك، ولا مفاتيح SSH، ولا أي بيانات تانية للحساب."
 
-#: lib/marshall/documentation_messages.ex:300
+#: lib/marshall/documentation_messages.ex:313
 #, elixir-autogen, elixir-format
 msgid "Susan sees the IP address of your deployment and when each notification is\nsent, an opaque push key issued to your device, an encrypted message and the\nnotification kind. The message is encrypted on your deployment to a key that\nonly your device holds, so Susan cannot read where the notification leads."
 msgstr "Susan بيشوف عنوان IP بتاع النشر بتاعك وإمتى كل إشعار بيتبعت، ومفتاح إشعارات مبهم متصدر لجهازك، ورسالة مشفّرة، ونوع الإشعار. الرسالة بتتشفّر على النشر بتاعك بمفتاح مع جهازك بس، فـ Susan مايقدرش يعرف الإشعار بيودّي على فين."
 
-#: lib/marshall/documentation_messages.ex:305
+#: lib/marshall/documentation_messages.ex:318
 #, elixir-autogen, elixir-format
 msgid "Switch a thread between plan and work collaboration."
 msgstr "بدّل سلسلة بين وضعي التعاون plan و work."
 
-#: lib/marshall/documentation_messages.ex:342
+#: lib/marshall/documentation_messages.ex:363
 #, elixir-autogen, elixir-format
 msgid "Turn push notifications on or off for one device."
 msgstr "شغّل أو اقفل الإشعارات الفورية لجهاز واحد."
 
-#: lib/marshall/documentation_messages.ex:379
+#: lib/marshall/documentation_messages.ex:400
 #, elixir-autogen, elixir-format
 msgid "You can review and manage devices with Porsche:"
 msgstr "تقدر تراجع الأجهزة وتديرها بـ Porsche:"
 
-#: lib/marshall/documentation_messages.ex:380
+#: lib/marshall/documentation_messages.ex:401
 #, elixir-autogen, elixir-format
 msgid "Your deployment keeps delivery records for seven days and stores only a digest\nof each push key in its audit history."
 msgstr "النشر بتاعك بيحتفظ بسجلات التوصيل سبع أيام، وبيخزّن بس ملخّص مُجزّأ لكل مفتاح إشعارات في سجل التدقيق بتاعه."
 
-#: lib/marshall/documentation_messages.ex:388
+#: lib/marshall/documentation_messages.ex:409
 #, elixir-autogen, elixir-format
 msgid "`device prefs` pauses or resumes notifications for one device. `device rm`\nrevokes it permanently; Mila registers again the next time you allow\nnotifications. Deleting or retiring your account revokes all its devices."
 msgstr "`device prefs` بيوقّف الإشعارات مؤقتًا لجهاز واحد أو بيرجّعها. `device rm` بيلغيه نهائيًا؛ و Mila بيسجّل تاني المرة الجاية اللي تسمح فيها بالإشعارات. لو مسحت حسابك أو قفلته نهائيًا كل أجهزته بتتلغي."
@@ -843,3 +843,33 @@ msgstr "`device prefs` بيوقّف الإشعارات مؤقتًا لجهاز �
 #, elixir-autogen, elixir-format
 msgid "Documentation not found"
 msgstr "ما لقيناش الوثائق"
+
+#: lib/marshall/documentation_messages.ex:18
+#, elixir-autogen, elixir-format
+msgid "## Examples"
+msgstr "## أمثلة"
+
+#: lib/marshall/documentation_messages.ex:53
+#, elixir-autogen, elixir-format
+msgid "An available guest receives HTTP `200` and a JSON array. A stopped, relocated,\nretired, stale, or unauthorized guest receives an unavailable response instead\nof metadata; callers should treat any non-`2xx` status as a refusal and avoid\nretrying against a different machine."
+msgstr "الضيف المتاح بياخد HTTP `200` ومصفوفة JSON. أما الضيف اللي واقف أو اتنقل أو اتسحب من الخدمة أو قديم أو مش مصرّح له فبياخد رد إنه مش متاح بدل البيانات الوصفية؛ واللي بينادي لازم يعتبر أي حالة برّه `2xx` رفض، وما يعيدش المحاولة على جهاز تاني."
+
+#: lib/marshall/documentation_messages.ex:139
+#, elixir-autogen, elixir-format
+msgid "Fetch only the guest metadata when an agent does not need integration details:"
+msgstr "هات البيانات الوصفية للضيف بس لما الوكيل مايحتاجش تفاصيل التكاملات:"
+
+#: lib/marshall/documentation_messages.ex:280
+#, elixir-autogen, elixir-format
+msgid "Run these commands from inside the guest. The `-sS` flags keep successful\nresponses quiet while still showing connection errors, and `-H` requests the\nJSON representation."
+msgstr "شغّل الأوامر دي من جوه الضيف. الخيارات `-sS` بتخلي الردود الناجحة ساكتة وفي نفس الوقت بتعرض أخطاء الاتصال، و`-H` بيطلب تمثيل JSON."
+
+#: lib/marshall/documentation_messages.ex:343
+#, elixir-autogen, elixir-format
+msgid "The response is a versioned object. A healthy guest returns HTTP `200` with\n`guest`, `integrations`, and `paths` fields:"
+msgstr "الرد كائن له إصدار. الضيف السليم بيرجّع HTTP `200` ومعاه الحقول `guest` و`integrations` و`paths`:"
+
+#: lib/marshall/documentation_messages.ex:359
+#, elixir-autogen, elixir-format
+msgid "This returns HTTP `200` and a JSON object containing the bounded guest fields\nlisted above. Fetch the integration list directly for discovery:"
+msgstr "ده بيرجّع HTTP `200` وكائن JSON فيه حقول الضيف المحدودة اللي فوق. هات قائمة التكاملات مباشرة علشان الاكتشاف:"

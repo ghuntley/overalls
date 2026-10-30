@@ -14,12 +14,12 @@ msgstr ""
 "Content-Type: text/plain; charset=UTF-8\n"
 "Plural-Forms: nplurals=2; plural=(n > 1);\n"
 
-#: lib/marshall_web/live/machines_live.ex:1465
+#: lib/marshall_web/live/machines_live.ex:1467
 #, elixir-autogen, elixir-format
 msgid " and counting"
 msgstr " और बढ़ता जा रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:1461
+#: lib/marshall_web/live/machines_live.ex:1463
 #, elixir-autogen, elixir-format
 msgid "%{seconds} seconds%{suffix}"
 msgstr "%{seconds} सेकंड%{suffix}"
@@ -29,8 +29,8 @@ msgstr "%{seconds} सेकंड%{suffix}"
 msgid "%{value1} CPU"
 msgstr "%{value1} CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1229
-#: lib/marshall_web/live/machines_live.ex:1232
+#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1234
 #: lib/marshall_web/live/overview_live.ex:351
 #: lib/marshall_web/live/overview_live.ex:356
 #: lib/marshall_web/live/resize_live.ex:322
@@ -43,20 +43,20 @@ msgstr "%{value1} GiB"
 msgid "%{value1} MiB"
 msgstr "%{value1} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:1226
+#: lib/marshall_web/live/machines_live.ex:1228
 #: lib/marshall_web/live/overview_live.ex:348
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU"
 msgstr "%{value1} vCPU"
 
 #: lib/marshall_web/live/admin/workloads_live.ex:160
-#: lib/marshall_web/live/machines_live.ex:948
+#: lib/marshall_web/live/machines_live.ex:950
 #: lib/marshall_web/live/overview_live.ex:225
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} GiB RAM · %{value3} GiB डिस्क"
 
-#: lib/marshall_web/live/machines_live.ex:1171
+#: lib/marshall_web/live/machines_live.ex:1173
 #, elixir-autogen, elixir-format
 msgid "%{value1} vCPU · %{value2} MiB memory · %{value3} GiB disk"
 msgstr "%{value1} vCPU · %{value2} MiB मेमोरी · %{value3} GiB डिस्क"
@@ -79,18 +79,18 @@ msgstr "%{value1} → %{value2} GiB"
 msgid "%{value1} → %{value2} MiB"
 msgstr "%{value1} → %{value2} MiB"
 
-#: lib/marshall_web/live/machines_live.ex:890
+#: lib/marshall_web/live/machines_live.ex:892
 #: lib/marshall_web/live/overview_live.ex:189
 #, elixir-autogen, elixir-format
 msgid "+ Create machine"
 msgstr "+ मशीन बनाएँ"
 
-#: lib/marshall_web/live/machines_live.ex:1533
+#: lib/marshall_web/live/machines_live.ex:1535
 #, elixir-autogen, elixir-format
 msgid "+ Queue clone"
 msgstr "+ क्लोन कतार में डालें"
 
-#: lib/marshall_web/live/machines_live.ex:721
+#: lib/marshall_web/live/machines_live.ex:723
 #, elixir-autogen, elixir-format
 msgid "A Overalls development environment for nested machines. It uses a dedicated image, an extra 256 GiB data disk, and higher resource minimums. Its AI agent can start child agents."
 msgstr ""
@@ -108,9 +108,9 @@ msgstr "कुछ बनाने के लिए अच्छा दिन।"
 msgid "A small preview. All your accessible machines are in"
 msgstr "छोटा प्रीव्यू। आपकी पहुँच वाली सभी मशीनें यहाँ हैं "
 
-#: lib/marshall_web/live/machines_live.ex:924
-#: lib/marshall_web/live/machines_live.ex:962
-#: lib/marshall_web/live/machines_live.ex:1265
+#: lib/marshall_web/live/machines_live.ex:926
+#: lib/marshall_web/live/machines_live.ex:964
+#: lib/marshall_web/live/machines_live.ex:1267
 #, elixir-autogen, elixir-format
 msgid "Access"
 msgstr "पहुँच"
@@ -120,9 +120,9 @@ msgstr "पहुँच"
 msgid "Access updated."
 msgstr "पहुँच अपडेट की गई।"
 
-#: lib/marshall_web/live/machines_live.ex:1279
-#: lib/marshall_web/live/machines_live.ex:1286
-#: lib/marshall_web/live/machines_live.ex:1305
+#: lib/marshall_web/live/machines_live.ex:1281
+#: lib/marshall_web/live/machines_live.ex:1288
+#: lib/marshall_web/live/machines_live.ex:1307
 #, elixir-autogen, elixir-format
 msgid "Account"
 msgstr "खाता"
@@ -141,14 +141,14 @@ msgstr ""
 "प्रशासनिक सत्यापन समाप्त हो गया। आकार बदलने का आपका मसौदा इस पृष्ठ के पते "
 "में सुरक्षित है।"
 
-#: lib/marshall_web/live/machines_live.ex:864
+#: lib/marshall_web/live/machines_live.ex:866
 #, elixir-autogen, elixir-format
 msgid "All retained copies deleted"
 msgstr "सभी रखी गई प्रतियाँ हटाई गईं"
 
-#: lib/marshall_web/live/machines_live.ex:1281
-#: lib/marshall_web/live/machines_live.ex:1298
-#: lib/marshall_web/live/machines_live.ex:1317
+#: lib/marshall_web/live/machines_live.ex:1283
+#: lib/marshall_web/live/machines_live.ex:1300
+#: lib/marshall_web/live/machines_live.ex:1319
 #, elixir-autogen, elixir-format
 msgid "Allows"
 msgstr "अनुमति देता है"
@@ -194,7 +194,7 @@ msgstr ""
 "Chrome या Firefox एक्सटेंशन से GitHub, GitLab, Codeberg या Bitbucket "
 "रिपॉज़िटरी को Overalls में लाएँ।"
 
-#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1227
 #: lib/marshall_web/live/overview_live.ex:347
 #: lib/marshall_web/live/resize_live.ex:315
 #: lib/marshall_web/live/resize_live.ex:359
@@ -204,7 +204,7 @@ msgstr ""
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/machines_live.ex:1141
+#: lib/marshall_web/live/machines_live.ex:1143
 #, elixir-autogen, elixir-format
 msgid "CPU (vCPU)"
 msgstr "CPU (vCPU)"
@@ -217,7 +217,7 @@ msgstr ""
 "है।"
 
 #: lib/marshall_web/components/clone_components.ex:116
-#: lib/marshall_web/live/machines_live.ex:1193
+#: lib/marshall_web/live/machines_live.ex:1195
 #, elixir-autogen, elixir-format
 msgid "Cancel"
 msgstr "रद्द करें"
@@ -229,7 +229,7 @@ msgstr ""
 "रद्द करने का अनुरोध स्वीकार नहीं हुआ। आकार पहले से लागू हो रहे हैं या मशीन "
 "की स्थिति की पुष्टि नहीं हुई है।"
 
-#: lib/marshall_web/live/machines_live.ex:1479
+#: lib/marshall_web/live/machines_live.ex:1481
 #, elixir-autogen, elixir-format
 msgid "Cancel move"
 msgstr "स्थानांतरण रद्द करें"
@@ -261,7 +261,7 @@ msgstr "स्नैपशॉट शुरू होने से पहले �
 msgid "Cancelling"
 msgstr "रद्द किया जा रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:859
+#: lib/marshall_web/live/machines_live.ex:861
 #, elixir-autogen, elixir-format
 msgid "Cancelling and restoring the source"
 msgstr "रद्द करके स्रोत बहाल किया जा रहा है"
@@ -284,7 +284,7 @@ msgid "Cancelling: waiting for the stop to confirm; the sizes stay unchanged."
 msgstr ""
 "रद्द किया जा रहा है: बंद होने की पुष्टि का इंतज़ार है; आकार नहीं बदलेंगे।"
 
-#: lib/marshall_web/live/machines_live.ex:1477
+#: lib/marshall_web/live/machines_live.ex:1479
 #, elixir-autogen, elixir-format
 msgid "Cancelling…"
 msgstr "रद्द किया जा रहा है…"
@@ -306,27 +306,27 @@ msgstr ""
 msgid "Check your inbox and click the link to confirm your subscription."
 msgstr "अपना इनबॉक्स देखें और सदस्यता की पुष्टि करने के लिए लिंक पर क्लिक करें।"
 
-#: lib/marshall_web/live/machines_live.ex:854
+#: lib/marshall_web/live/machines_live.ex:856
 #, elixir-autogen, elixir-format
 msgid "Checking destination readiness"
 msgstr "गंतव्य की तैयारी जाँची जा रही है"
 
-#: lib/marshall_web/live/machines_live.ex:849
+#: lib/marshall_web/live/machines_live.ex:851
 #, elixir-autogen, elixir-format
 msgid "Checking transfer connectivity"
 msgstr "स्थानांतरण कनेक्टिविटी जाँची जा रही है"
 
-#: lib/marshall_web/live/machines_live.ex:1082
+#: lib/marshall_web/live/machines_live.ex:1084
 #, elixir-autogen, elixir-format
 msgid "Choose an image"
 msgstr "इमेज चुनें"
 
-#: lib/marshall_web/live/machines_live.ex:1020
+#: lib/marshall_web/live/machines_live.ex:1022
 #, elixir-autogen, elixir-format
 msgid "Choose an image and the resources for your environment."
 msgstr "अपने परिवेश के लिए इमेज और संसाधन चुनें।"
 
-#: lib/marshall_web/live/machines_live.ex:1075
+#: lib/marshall_web/live/machines_live.ex:1077
 #, elixir-autogen, elixir-format
 msgid "Choose your environment"
 msgstr "अपना परिवेश चुनें"
@@ -341,7 +341,7 @@ msgstr "क्लोन रद्द किया गया"
 msgid "Clone complete"
 msgstr "क्लोन पूरा हुआ"
 
-#: lib/marshall_web/live/machines_live.ex:1499
+#: lib/marshall_web/live/machines_live.ex:1501
 #, elixir-autogen, elixir-format
 msgid "Clone machine"
 msgstr "मशीन का क्लोन बनाएँ"
@@ -356,12 +356,12 @@ msgstr "क्लोन पर ध्यान देना ज़रूरी �
 msgid "Clone queued. You can queue another copy."
 msgstr "क्लोन कतार में है। आप एक और कॉपी कतार में जोड़ सकते हैं।"
 
-#: lib/marshall_web/live/machines_live.ex:1550
+#: lib/marshall_web/live/machines_live.ex:1552
 #, elixir-autogen, elixir-format
 msgid "Clone requests"
 msgstr "क्लोन के अनुरोध"
 
-#: lib/marshall_web/live/machines_live.ex:1561
+#: lib/marshall_web/live/machines_live.ex:1563
 #, elixir-autogen, elixir-format
 msgid "Clone requests are temporarily unavailable. Retrying automatically."
 msgstr "क्लोन अनुरोध फ़िलहाल उपलब्ध नहीं हैं। अपने आप दोबारा कोशिश हो रही है।"
@@ -371,7 +371,7 @@ msgstr "क्लोन अनुरोध फ़िलहाल उपलब्
 msgid "Clone stages"
 msgstr "क्लोन के चरण"
 
-#: lib/marshall_web/live/machines_live.ex:1403
+#: lib/marshall_web/live/machines_live.ex:1405
 #, elixir-autogen, elixir-format
 msgid "Comment"
 msgstr "टिप्पणी"
@@ -386,8 +386,8 @@ msgstr "पूरा"
 msgid "Confirmed resources"
 msgstr "पुष्टि किए गए संसाधन"
 
-#: lib/marshall_web/live/machines_live.ex:925
-#: lib/marshall_web/live/machines_live.ex:976
+#: lib/marshall_web/live/machines_live.ex:927
+#: lib/marshall_web/live/machines_live.ex:978
 #, elixir-autogen, elixir-format
 msgid "Connect"
 msgstr "कनेक्ट करें"
@@ -407,7 +407,7 @@ msgstr "कॉपी किया जा रहा है"
 msgid "Copying files"
 msgstr "फ़ाइलें कॉपी की जा रही हैं"
 
-#: lib/marshall_web/live/machines_live.ex:851
+#: lib/marshall_web/live/machines_live.ex:853
 #, elixir-autogen, elixir-format
 msgid "Copying the stopped disks"
 msgstr "बंद डिस्क कॉपी की जा रही हैं"
@@ -417,7 +417,7 @@ msgstr "बंद डिस्क कॉपी की जा रही हैं
 msgid "Create a machine"
 msgstr "मशीन बनाएँ"
 
-#: lib/marshall_web/live/machines_live.ex:1507
+#: lib/marshall_web/live/machines_live.ex:1509
 #, elixir-autogen, elixir-format
 msgid "Create a private, independent copy of this machine. Running machines stop briefly for each snapshot, then restart while copying continues. Copies are processed in order and match the source's power state when their turn begins."
 msgstr ""
@@ -426,8 +426,8 @@ msgstr ""
 "जाती हैं और अपनी बारी शुरू होने पर स्रोत की चालू या बंद स्थिति अपनाती हैं।"
 
 #: lib/marshall_web/live/machines_live.ex:106
-#: lib/marshall_web/live/machines_live.ex:1019
-#: lib/marshall_web/live/machines_live.ex:1191
+#: lib/marshall_web/live/machines_live.ex:1021
+#: lib/marshall_web/live/machines_live.ex:1193
 #, elixir-autogen, elixir-format
 msgid "Create machine"
 msgstr "मशीन बनाएँ"
@@ -448,18 +448,18 @@ msgstr ""
 msgid "Creating cloned machine"
 msgstr "क्लोन मशीन बनाई जा रही है"
 
-#: lib/marshall_web/live/machines_live.ex:1189
+#: lib/marshall_web/live/machines_live.ex:1191
 #, elixir-autogen, elixir-format
 msgid "Creating…"
 msgstr "बनाया जा रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:904
+#: lib/marshall_web/live/machines_live.ex:906
 #, elixir-autogen, elixir-format
 msgid "Current headroom is temporarily unavailable."
 msgstr "वर्तमान अतिरिक्त क्षमता फ़िलहाल उपलब्ध नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:896
-#: lib/marshall_web/live/machines_live.ex:1038
+#: lib/marshall_web/live/machines_live.ex:898
+#: lib/marshall_web/live/machines_live.ex:1040
 #, elixir-autogen, elixir-format
 msgid "Current headroom: %{value1} vCPU · %{value2} GiB memory · %{value3} GiB disk"
 msgstr ""
@@ -471,55 +471,54 @@ msgstr ""
 msgid "Current provisioning headroom"
 msgstr "प्रोविज़निंग के लिए वर्तमान अतिरिक्त क्षमता"
 
-#: lib/marshall_web/live/machines_live.ex:687
-#: lib/marshall_web/live/machines_live.ex:775
+#: lib/marshall_web/live/machines_live.ex:777
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr "ग्राहक"
 
-#: lib/marshall_web/live/machines_live.ex:1251
+#: lib/marshall_web/live/machines_live.ex:1253
 #, elixir-autogen, elixir-format
 msgid "Customer machines allow only owner SSH and terminal access. Outbound networking, workspace sharing, and web service exposure are disabled."
 msgstr ""
 "ग्राहक मशीनों में केवल मालिक को SSH और टर्मिनल पहुँच मिलती है। बाहरी "
 "नेटवर्किंग, कार्यक्षेत्र साझा करना और वेब सेवा सार्वजनिक करना बंद हैं।"
 
-#: lib/marshall_web/live/machines_live.ex:1605
+#: lib/marshall_web/live/machines_live.ex:1607
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "हटाएँ"
 
-#: lib/marshall_web/live/machines_live.ex:1588
+#: lib/marshall_web/live/machines_live.ex:1590
 #, elixir-autogen, elixir-format
 msgid "Delete machine"
 msgstr "मशीन हटाएँ"
 
-#: lib/marshall_web/live/machines_live.ex:1602
+#: lib/marshall_web/live/machines_live.ex:1604
 #, elixir-autogen, elixir-format
 msgid "Delete this machine and its disk? This cannot be undone."
 msgstr "यह मशीन और इसकी डिस्क हटाएँ? यह कार्रवाई वापस नहीं ली जा सकती।"
 
-#: lib/marshall_web/live/machines_live.ex:779
+#: lib/marshall_web/live/machines_live.ex:781
 #, elixir-autogen, elixir-format
 msgid "Deleting"
 msgstr "हटाया जा रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:861
+#: lib/marshall_web/live/machines_live.ex:863
 #, elixir-autogen, elixir-format
 msgid "Deleting retained copies"
 msgstr "सुरक्षित रखी कॉपी हटाई जा रही हैं"
 
-#: lib/marshall_web/live/machines_live.ex:855
+#: lib/marshall_web/live/machines_live.ex:857
 #, elixir-autogen, elixir-format
 msgid "Destination boot failed; source copy retained"
 msgstr "गंतव्य बूट नहीं हुआ; स्रोत की कॉपी सुरक्षित है"
 
-#: lib/marshall_web/live/machines_live.ex:857
+#: lib/marshall_web/live/machines_live.ex:859
 #, elixir-autogen, elixir-format
 msgid "Destination readiness failed; source copy retained"
 msgstr "गंतव्य तैयार नहीं हुआ; स्रोत की कॉपी सुरक्षित है"
 
-#: lib/marshall_web/live/machines_live.ex:858
+#: lib/marshall_web/live/machines_live.ex:860
 #, elixir-autogen, elixir-format
 msgid "Destination ready; cleaning up the source"
 msgstr "गंतव्य तैयार है; स्रोत की सफ़ाई जारी है"
@@ -531,12 +530,12 @@ msgstr ""
 "गंतव्य दोबारा शुरू करने का अनुरोध किया गया। गंतव्य तैयार होने की पुष्टि तक "
 "स्रोत की कॉपी सुरक्षित रहेगी।"
 
-#: lib/marshall_web/live/machines_live.ex:1268
+#: lib/marshall_web/live/machines_live.ex:1270
 #, elixir-autogen, elixir-format
 msgid "Direct machine grants"
 msgstr "मशीन की सीधी पहुँच अनुमतियाँ"
 
-#: lib/marshall_web/live/machines_live.ex:1231
+#: lib/marshall_web/live/machines_live.ex:1233
 #: lib/marshall_web/live/overview_live.ex:355
 #: lib/marshall_web/live/resize_live.ex:321
 #: lib/marshall_web/live/resize_live.ex:375
@@ -545,7 +544,7 @@ msgstr "मशीन की सीधी पहुँच अनुमतिय�
 msgid "Disk"
 msgstr "डिस्क"
 
-#: lib/marshall_web/live/machines_live.ex:1160
+#: lib/marshall_web/live/machines_live.ex:1162
 #, elixir-autogen, elixir-format
 msgid "Disk (GiB)"
 msgstr "डिस्क (GiB)"
@@ -570,7 +569,7 @@ msgstr "ईमेल पता"
 msgid "Enable JavaScript to open a repository link, or"
 msgstr "रिपॉज़िटरी लिंक खोलने के लिए JavaScript चालू करें, या"
 
-#: lib/marshall_web/live/machines_live.ex:772
+#: lib/marshall_web/live/machines_live.ex:774
 #, elixir-autogen, elixir-format
 msgid "Ends that person's access to this machine."
 msgstr "इस मशीन तक उस व्यक्ति की पहुँच समाप्त करता है।"
@@ -585,7 +584,7 @@ msgstr "मान्य ईमेल पता दर्ज करें।"
 msgid "Enter whole numbers for CPU, memory and disk size."
 msgstr "CPU, मेमोरी और डिस्क के आकार के लिए पूर्ण संख्याएँ दर्ज करें।"
 
-#: lib/marshall_web/live/machines_live.ex:1299
+#: lib/marshall_web/live/machines_live.ex:1301
 #, elixir-autogen, elixir-format
 msgid "Everything; cannot be changed here."
 msgstr "सब कुछ; यहाँ बदला नहीं जा सकता।"
@@ -595,12 +594,12 @@ msgstr "सब कुछ; यहाँ बदला नहीं जा सक�
 msgid "Explore your usage ↗"
 msgstr "अपना उपयोग देखें ↗"
 
-#: lib/marshall_web/live/machines_live.ex:1500
+#: lib/marshall_web/live/machines_live.ex:1502
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy"
 msgstr "फ़ाइलें और सहेजे गए क्रेडेंशियल कॉपी में शामिल हैं"
 
-#: lib/marshall_web/live/machines_live.ex:1540
+#: lib/marshall_web/live/machines_live.ex:1542
 #, elixir-autogen, elixir-format
 msgid "Files and stored credentials are included in the copy."
 msgstr "फ़ाइलें और सहेजे गए क्रेडेंशियल कॉपी में शामिल हैं।"
@@ -625,12 +624,12 @@ msgstr "अंतिम काम जारी है"
 msgid "Get tips, tricks and updates about Overalls and AI by email."
 msgstr "ईमेल से Overalls और AI के बारे में सुझाव, तरकीबें और अपडेट पाएँ।"
 
-#: lib/marshall_web/live/machines_live.ex:1135
+#: lib/marshall_web/live/machines_live.ex:1137
 #, elixir-autogen, elixir-format
 msgid "Give it room to grow"
 msgstr "आगे बढ़ने की गुंजाइश रखें"
 
-#: lib/marshall_web/live/machines_live.ex:1337
+#: lib/marshall_web/live/machines_live.ex:1339
 #, elixir-autogen, elixir-format
 msgid "Grant, change or remove access"
 msgstr "पहुँच दें, बदलें या हटाएँ"
@@ -645,25 +644,25 @@ msgstr "अगले बूट पर फ़ाइल सिस्टम बढ�
 msgid "Headroom is temporarily unavailable."
 msgstr "अतिरिक्त क्षमता फ़िलहाल उपलब्ध नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:923
-#: lib/marshall_web/live/machines_live.ex:958
-#: lib/marshall_web/live/machines_live.ex:1234
+#: lib/marshall_web/live/machines_live.ex:925
+#: lib/marshall_web/live/machines_live.ex:960
+#: lib/marshall_web/live/machines_live.ex:1236
 #, elixir-autogen, elixir-format
 msgid "Host"
 msgstr "होस्ट"
 
-#: lib/marshall_web/live/machines_live.ex:1081
+#: lib/marshall_web/live/machines_live.ex:1083
 #, elixir-autogen, elixir-format
 msgid "Image"
 msgstr "इमेज"
 
-#: lib/marshall_web/live/machines_live.ex:1024
+#: lib/marshall_web/live/machines_live.ex:1026
 #, elixir-autogen, elixir-format
 msgid "Images and capacity are temporarily unavailable. Your choices are retained."
 msgstr "इमेज और क्षमता फ़िलहाल उपलब्ध नहीं हैं। आपके विकल्प सुरक्षित हैं।"
 
-#: lib/marshall_web/live/machines_live.ex:693
-#: lib/marshall_web/live/machines_live.ex:776
+#: lib/marshall_web/live/machines_live.ex:695
+#: lib/marshall_web/live/machines_live.ex:778
 #, elixir-autogen, elixir-format
 msgid "Inception"
 msgstr "Inception"
@@ -673,7 +672,7 @@ msgstr "Inception"
 msgid "Invalid request."
 msgstr "अमान्य अनुरोध।"
 
-#: lib/marshall_web/live/machines_live.ex:1397
+#: lib/marshall_web/live/machines_live.ex:1399
 #, elixir-autogen, elixir-format
 msgid "Labels"
 msgstr "लेबल"
@@ -699,12 +698,12 @@ msgstr "शुरू किया जा रहा है"
 msgid "Launching repository"
 msgstr "रिपॉज़िटरी शुरू की जा रही है"
 
-#: lib/marshall_web/live/machines_live.ex:1523
+#: lib/marshall_web/live/machines_live.ex:1525
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name"
 msgstr "नाम अपने आप बनाने के लिए खाली छोड़ें"
 
-#: lib/marshall_web/live/machines_live.ex:1537
+#: lib/marshall_web/live/machines_live.ex:1539
 #, elixir-autogen, elixir-format
 msgid "Leave blank to generate a name."
 msgstr "नाम अपने आप बनाने के लिए खाली छोड़ें।"
@@ -716,7 +715,7 @@ msgstr "नाम अपने आप बनाने के लिए खाल
 msgid "Leave stopped"
 msgstr "बंद रहने दें"
 
-#: lib/marshall_web/live/machines_live.ex:919
+#: lib/marshall_web/live/machines_live.ex:921
 #, elixir-autogen, elixir-format
 msgid "Machine"
 msgstr "मशीन"
@@ -726,7 +725,7 @@ msgstr "मशीन"
 msgid "Machine metadata saved."
 msgstr "मशीन का मेटाडेटा सहेजा गया।"
 
-#: lib/marshall_web/live/machines_live.ex:1005
+#: lib/marshall_web/live/machines_live.ex:1007
 #, elixir-autogen, elixir-format
 msgid "Machine pages"
 msgstr "मशीन के पेज"
@@ -737,7 +736,7 @@ msgid "Machine update requested."
 msgstr "मशीन अपडेट करने का अनुरोध किया गया।"
 
 #: lib/marshall_web/live/machines_live.ex:121
-#: lib/marshall_web/live/machines_live.ex:885
+#: lib/marshall_web/live/machines_live.ex:887
 #: lib/marshall_web/live/overview_live.ex:259
 #, elixir-autogen, elixir-format
 msgid "Machines"
@@ -755,7 +754,7 @@ msgstr "मशीनें फ़िलहाल उपलब्ध नहीं
 msgid "Machines couldn’t be loaded. Refresh to try again."
 msgstr "मशीनें लोड नहीं हुईं। दोबारा कोशिश के लिए रीफ़्रेश करें।"
 
-#: lib/marshall_web/live/machines_live.ex:1118
+#: lib/marshall_web/live/machines_live.ex:1120
 #, elixir-autogen, elixir-format
 msgid "Make it yours"
 msgstr "इसे अपना बनाएँ"
@@ -765,26 +764,26 @@ msgstr "इसे अपना बनाएँ"
 msgid "Make yourself at home"
 msgstr "इसे अपना घर समझें"
 
-#: lib/marshall_web/live/machines_live.ex:1248
+#: lib/marshall_web/live/machines_live.ex:1250
 #, elixir-autogen, elixir-format
 msgid "Management access is required to change the remaining settings."
 msgstr "बाकी सेटिंग बदलने के लिए प्रबंधन पहुँच ज़रूरी है।"
 
-#: lib/marshall_web/live/machines_live.ex:759
-#: lib/marshall_web/live/machines_live.ex:1360
-#: lib/marshall_web/live/machines_live.ex:1369
+#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:1362
+#: lib/marshall_web/live/machines_live.ex:1371
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "प्रबंधक"
 
-#: lib/marshall_web/live/machines_live.ex:1455
+#: lib/marshall_web/live/machines_live.ex:1457
 #, elixir-autogen, elixir-format
 msgid "Measured between control-plane stop and readiness observations; guest availability may differ."
 msgstr ""
 "कंट्रोल-प्लेन में बंद होने और तैयार होने के निरीक्षणों के बीच मापा गया; "
 "गेस्ट की उपलब्धता अलग हो सकती है।"
 
-#: lib/marshall_web/live/machines_live.ex:1228
+#: lib/marshall_web/live/machines_live.ex:1230
 #: lib/marshall_web/live/overview_live.ex:350
 #: lib/marshall_web/live/resize_live.ex:318
 #: lib/marshall_web/live/resize_live.ex:365
@@ -793,35 +792,35 @@ msgstr ""
 msgid "Memory"
 msgstr "मेमोरी"
 
-#: lib/marshall_web/live/machines_live.ex:1149
+#: lib/marshall_web/live/machines_live.ex:1151
 #: lib/marshall_web/live/resize_live.ex:455
 #, elixir-autogen, elixir-format
 msgid "Memory (MiB)"
 msgstr "मेमोरी (MiB)"
 
-#: lib/marshall_web/live/machines_live.ex:1443
+#: lib/marshall_web/live/machines_live.ex:1445
 #, elixir-autogen, elixir-format
 msgid "Mode"
 msgstr "मोड"
 
-#: lib/marshall_web/live/machines_live.ex:862
+#: lib/marshall_web/live/machines_live.ex:864
 #, elixir-autogen, elixir-format
 msgid "Move cancelled; cleanup complete"
 msgstr "स्थानांतरण रद्द हुआ; सफ़ाई पूरी"
 
-#: lib/marshall_web/live/machines_live.ex:863
+#: lib/marshall_web/live/machines_live.ex:865
 #, elixir-autogen, elixir-format
 msgid "Move complete"
 msgstr "स्थानांतरण पूरा"
 
-#: lib/marshall_web/live/machines_live.ex:1423
+#: lib/marshall_web/live/machines_live.ex:1425
 #, elixir-autogen, elixir-format
 msgid "Move this machine to an automatically selected host? The machine may be briefly unavailable."
 msgstr ""
 "इस मशीन को अपने आप चुने गए होस्ट पर भेजें? मशीन थोड़ी देर अनुपलब्ध हो सकती "
 "है।"
 
-#: lib/marshall_web/live/machines_live.ex:1429
+#: lib/marshall_web/live/machines_live.ex:1431
 #, elixir-autogen, elixir-format
 msgid "Move to another host"
 msgstr "दूसरे होस्ट पर भेजें"
@@ -832,7 +831,7 @@ msgstr "दूसरे होस्ट पर भेजें"
 msgid "Needs attention"
 msgstr "ध्यान देना ज़रूरी है"
 
-#: lib/marshall_web/live/machines_live.ex:1522
+#: lib/marshall_web/live/machines_live.ex:1524
 #, elixir-autogen, elixir-format
 msgid "New machine name (optional)"
 msgstr "नई मशीन का नाम (वैकल्पिक)"
@@ -842,8 +841,8 @@ msgstr "नई मशीन का नाम (वैकल्पिक)"
 msgid "New sizes"
 msgstr "नए आकार"
 
-#: lib/marshall_web/live/machines_live.ex:1010
-#: lib/marshall_web/live/machines_live.ex:1332
+#: lib/marshall_web/live/machines_live.ex:1012
+#: lib/marshall_web/live/machines_live.ex:1334
 #, elixir-autogen, elixir-format
 msgid "Next page →"
 msgstr "अगला पेज →"
@@ -853,19 +852,19 @@ msgstr "अगला पेज →"
 msgid "Next steps"
 msgstr "अगले चरण"
 
-#: lib/marshall_web/live/machines_live.ex:1555
+#: lib/marshall_web/live/machines_live.ex:1557
 #, elixir-autogen, elixir-format
 msgid "No clone requests yet. Queue a copy and follow its progress here."
 msgstr ""
 "अभी कोई क्लोन अनुरोध नहीं है। कॉपी कतार में जोड़ें और यहाँ उसकी प्रगति "
 "देखें।"
 
-#: lib/marshall_web/live/machines_live.ex:1325
+#: lib/marshall_web/live/machines_live.ex:1327
 #, elixir-autogen, elixir-format
 msgid "No direct machine grants."
 msgstr "मशीन की कोई सीधी पहुँच अनुमति नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:1035
+#: lib/marshall_web/live/machines_live.ex:1037
 #, elixir-autogen, elixir-format
 msgid "No images are available on ready hosts right now."
 msgstr "अभी तैयार होस्ट पर कोई इमेज उपलब्ध नहीं है।"
@@ -877,13 +876,13 @@ msgstr ""
 "इस प्रीव्यू में अभी कोई मशीन नहीं है। मशीन बनाएँ या मालिक से पहुँच साझा करने"
 " को कहें।"
 
-#: lib/marshall_web/live/machines_live.ex:910
+#: lib/marshall_web/live/machines_live.ex:912
 #, elixir-autogen, elixir-format
 msgid "No machines on this page. Create a machine or ask an owner to share access."
 msgstr ""
 "इस पेज पर कोई मशीन नहीं है। मशीन बनाएँ या मालिक से पहुँच साझा करने को कहें।"
 
-#: lib/marshall_web/live/machines_live.ex:828
+#: lib/marshall_web/live/machines_live.ex:830
 #, elixir-autogen, elixir-format
 msgid "No registered account matches that email address."
 msgstr "उस ईमेल पते से कोई पंजीकृत खाता मेल नहीं खाता।"
@@ -894,7 +893,7 @@ msgstr "उस ईमेल पते से कोई पंजीकृत ख
 msgid "No relocation is available."
 msgstr "कोई स्थानांतरण उपलब्ध नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:1451
+#: lib/marshall_web/live/machines_live.ex:1453
 #, elixir-autogen, elixir-format
 msgid "Observed downtime"
 msgstr "दर्ज अनुपलब्ध अवधि"
@@ -916,12 +915,12 @@ msgstr "क्लोन खोलें"
 msgid "Open repositories from your browser"
 msgstr "अपने ब्राउज़र से रिपॉज़िटरी खोलें"
 
-#: lib/marshall_web/live/machines_live.ex:989
+#: lib/marshall_web/live/machines_live.ex:991
 #, elixir-autogen, elixir-format
 msgid "Open terminal"
 msgstr "टर्मिनल खोलें"
 
-#: lib/marshall_web/live/machines_live.ex:987
+#: lib/marshall_web/live/machines_live.ex:989
 #, elixir-autogen, elixir-format
 msgid "Open terminal for %{value1}"
 msgstr "%{value1} के लिए टर्मिनल खोलें"
@@ -931,24 +930,24 @@ msgstr "%{value1} के लिए टर्मिनल खोलें"
 msgid "Open terminal ↗"
 msgstr "टर्मिनल खोलें ↗"
 
-#: lib/marshall_web/live/machines_live.ex:764
+#: lib/marshall_web/live/machines_live.ex:766
 #, elixir-autogen, elixir-format
 msgid "Open this machine's web apps. No terminal."
 msgstr "इस मशीन के वेब ऐप खोलें। टर्मिनल नहीं।"
 
-#: lib/marshall_web/live/machines_live.ex:1221
+#: lib/marshall_web/live/machines_live.ex:1223
 #, elixir-autogen, elixir-format
 msgid "Operating system"
 msgstr "ऑपरेटिंग सिस्टम"
 
-#: lib/marshall_web/live/machines_live.ex:758
-#: lib/marshall_web/live/machines_live.ex:1359
-#: lib/marshall_web/live/machines_live.ex:1368
+#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:1361
+#: lib/marshall_web/live/machines_live.ex:1370
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "ऑपरेटर"
 
-#: lib/marshall_web/live/machines_live.ex:707
+#: lib/marshall_web/live/machines_live.ex:709
 #, elixir-autogen, elixir-format
 msgid "Outbound connections, sharing, web apps, SSH, terminal, and AI agent tools. The agent cannot start child agents."
 msgstr ""
@@ -960,9 +959,9 @@ msgstr ""
 msgid "Overview"
 msgstr "अवलोकन"
 
-#: lib/marshall_web/live/machines_live.ex:964
-#: lib/marshall_web/live/machines_live.ex:1122
-#: lib/marshall_web/live/machines_live.ex:1296
+#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1298
 #, elixir-autogen, elixir-format
 msgid "Owner"
 msgstr "मालिक"
@@ -974,7 +973,7 @@ msgstr "मालिक"
 msgid "Pending"
 msgstr "लंबित"
 
-#: lib/marshall_web/live/machines_live.ex:1615
+#: lib/marshall_web/live/machines_live.ex:1617
 #, elixir-autogen, elixir-format
 msgid "Permanently remove this machine and its disk. This cannot be undone."
 msgstr ""
@@ -986,13 +985,13 @@ msgstr ""
 msgid "Permission to clone this machine is no longer available."
 msgstr "इस मशीन का क्लोन बनाने की अनुमति अब उपलब्ध नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:1124
+#: lib/marshall_web/live/machines_live.ex:1126
 #: lib/marshall_web/live/overview_live.ex:232
 #, elixir-autogen, elixir-format
 msgid "Personal"
 msgstr "व्यक्तिगत"
 
-#: lib/marshall_web/live/machines_live.ex:1440
+#: lib/marshall_web/live/machines_live.ex:1442
 #, elixir-autogen, elixir-format
 msgid "Phase"
 msgstr "चरण"
@@ -1022,7 +1021,7 @@ msgstr "क्लोन तैयार किया जा रहा है"
 msgid "Preparing space and checking the source before taking a snapshot."
 msgstr "स्नैपशॉट लेने से पहले जगह तैयार करके स्रोत जाँचा जा रहा है।"
 
-#: lib/marshall_web/live/machines_live.ex:848
+#: lib/marshall_web/live/machines_live.ex:850
 #, elixir-autogen, elixir-format
 msgid "Preparing transfer"
 msgstr "स्थानांतरण तैयार किया जा रहा है"
@@ -1037,22 +1036,22 @@ msgstr "आपकी मशीन तैयार की जा रही है
 msgid "Preparing your repository…"
 msgstr "आपकी रिपॉज़िटरी तैयार की जा रही है…"
 
-#: lib/marshall_web/live/machines_live.ex:700
+#: lib/marshall_web/live/machines_live.ex:702
 #, elixir-autogen, elixir-format
 msgid "Private and owner-only. SSH and terminal access; no outbound connections, sharing, web apps, or AI agent."
 msgstr ""
 "निजी और केवल मालिक के लिए। SSH और टर्मिनल पहुँच; बाहरी कनेक्शन, साझा करना, "
 "वेब ऐप या AI एजेंट नहीं।"
 
-#: lib/marshall_web/live/machines_live.ex:922
-#: lib/marshall_web/live/machines_live.ex:954
-#: lib/marshall_web/live/machines_live.ex:1097
-#: lib/marshall_web/live/machines_live.ex:1237
+#: lib/marshall_web/live/machines_live.ex:924
+#: lib/marshall_web/live/machines_live.ex:956
+#: lib/marshall_web/live/machines_live.ex:1099
+#: lib/marshall_web/live/machines_live.ex:1239
 #, elixir-autogen, elixir-format
 msgid "Profile"
 msgstr "प्रोफ़ाइल"
 
-#: lib/marshall_web/live/machines_live.ex:1103
+#: lib/marshall_web/live/machines_live.ex:1105
 #, elixir-autogen, elixir-format
 msgid "Profiles choose access and agent features. Machines remain isolated from one another."
 msgstr ""
@@ -1071,12 +1070,12 @@ msgstr "कतार में स्थान %{value1}"
 msgid "Queued"
 msgstr "कतार में"
 
-#: lib/marshall_web/live/machines_live.ex:1531
+#: lib/marshall_web/live/machines_live.ex:1533
 #, elixir-autogen, elixir-format
 msgid "Queuing…"
 msgstr "कतार में जोड़ा जा रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:766
+#: lib/marshall_web/live/machines_live.ex:768
 #, elixir-autogen, elixir-format
 msgid "Read and write in the terminal."
 msgstr "टर्मिनल में पढ़ें और लिखें।"
@@ -1086,17 +1085,17 @@ msgstr "टर्मिनल में पढ़ें और लिखें�
 msgid "Read the field notes ↗"
 msgstr "फ़ील्ड नोट्स पढ़ें ↗"
 
-#: lib/marshall_web/live/machines_live.ex:765
+#: lib/marshall_web/live/machines_live.ex:767
 #, elixir-autogen, elixir-format
 msgid "Read the terminal."
 msgstr "टर्मिनल पढ़ें।"
 
-#: lib/marshall_web/live/machines_live.ex:1169
+#: lib/marshall_web/live/machines_live.ex:1171
 #, elixir-autogen, elixir-format
 msgid "Ready when you are"
 msgstr "आप तैयार हों तो शुरू करें"
 
-#: lib/marshall_web/live/machines_live.ex:1394
+#: lib/marshall_web/live/machines_live.ex:1396
 #, elixir-autogen, elixir-format
 msgid "Reflection metadata"
 msgstr "रिफ़्लेक्शन मेटाडेटा"
@@ -1111,7 +1110,7 @@ msgstr "रीफ़्रेश करें"
 msgid "Refreshing…"
 msgstr "रीफ़्रेश हो रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:1349
+#: lib/marshall_web/live/machines_live.ex:1351
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "पंजीकृत ईमेल"
@@ -1121,7 +1120,7 @@ msgstr "पंजीकृत ईमेल"
 msgid "Registering the copied disk as your private machine."
 msgstr "कॉपी की गई डिस्क आपकी निजी मशीन के रूप में पंजीकृत हो रही है।"
 
-#: lib/marshall_web/live/machines_live.ex:1412
+#: lib/marshall_web/live/machines_live.ex:1414
 #, elixir-autogen, elixir-format
 msgid "Relocate machine"
 msgstr "मशीन स्थानांतरित करें"
@@ -1136,8 +1135,8 @@ msgstr "स्थानांतरण का अनुरोध किया �
 msgid "Remains stopped; the filesystem grows on the next boot"
 msgstr "बंद रहेगी; अगले बूट पर फ़ाइल सिस्टम बढ़ेगा"
 
-#: lib/marshall_web/live/machines_live.ex:1361
-#: lib/marshall_web/live/machines_live.ex:1370
+#: lib/marshall_web/live/machines_live.ex:1363
+#: lib/marshall_web/live/machines_live.ex:1372
 #, elixir-autogen, elixir-format
 msgid "Remove access"
 msgstr "पहुँच हटाएँ"
@@ -1152,7 +1151,7 @@ msgstr "रद्द करने का अनुरोध हो रहा ह
 msgid "Requesting resize…"
 msgstr "आकार बदलने का अनुरोध हो रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:1485
+#: lib/marshall_web/live/machines_live.ex:1487
 #, elixir-autogen, elixir-format
 msgid "Requesting restart…"
 msgstr "दोबारा शुरू करने का अनुरोध हो रहा है…"
@@ -1162,12 +1161,12 @@ msgstr "दोबारा शुरू करने का अनुरोध �
 msgid "Requesting retry…"
 msgstr "दोबारा कोशिश का अनुरोध हो रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:1421
+#: lib/marshall_web/live/machines_live.ex:1423
 #, elixir-autogen, elixir-format
 msgid "Requesting…"
 msgstr "अनुरोध किया जा रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:1217
+#: lib/marshall_web/live/machines_live.ex:1219
 #: lib/marshall_web/live/resize_live.ex:623
 #, elixir-autogen, elixir-format
 msgid "Resize"
@@ -1222,9 +1221,9 @@ msgstr "आकार बदलने के चरण"
 msgid "Resizing"
 msgstr "आकार बदला जा रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:921
-#: lib/marshall_web/live/machines_live.ex:947
-#: lib/marshall_web/live/machines_live.ex:1208
+#: lib/marshall_web/live/machines_live.ex:923
+#: lib/marshall_web/live/machines_live.ex:949
+#: lib/marshall_web/live/machines_live.ex:1210
 #, elixir-autogen, elixir-format
 msgid "Resources"
 msgstr "संसाधन"
@@ -1267,7 +1266,7 @@ msgid "Retry could not be accepted. Capacity or machine state may have changed."
 msgstr ""
 "दोबारा कोशिश स्वीकार नहीं हुई। क्षमता या मशीन की स्थिति बदल गई हो सकती है।"
 
-#: lib/marshall_web/live/machines_live.ex:1487
+#: lib/marshall_web/live/machines_live.ex:1489
 #, elixir-autogen, elixir-format
 msgid "Retry destination boot"
 msgstr "गंतव्य बूट की फिर कोशिश करें"
@@ -1283,15 +1282,15 @@ msgid "Return to Fleet workloads and verify your passkey to reopen the machine �
 msgstr ""
 "मशीन फिर खोलने के लिए फ़्लीट वर्कलोड पर लौटें और पासकी सत्यापित करें →"
 
-#: lib/marshall_web/live/machines_live.ex:760
+#: lib/marshall_web/live/machines_live.ex:762
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "रद्द"
 
-#: lib/marshall_web/live/machines_live.ex:1280
-#: lib/marshall_web/live/machines_live.ex:1295
-#: lib/marshall_web/live/machines_live.ex:1314
-#: lib/marshall_web/live/machines_live.ex:1355
+#: lib/marshall_web/live/machines_live.ex:1282
+#: lib/marshall_web/live/machines_live.ex:1297
+#: lib/marshall_web/live/machines_live.ex:1316
+#: lib/marshall_web/live/machines_live.ex:1357
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "भूमिका"
@@ -1306,7 +1305,7 @@ msgstr "आपके अगले विचार के लिए जगह"
 msgid "Room to grow"
 msgstr "आगे बढ़ने की जगह"
 
-#: lib/marshall_web/live/machines_live.ex:1159
+#: lib/marshall_web/live/machines_live.ex:1161
 #, elixir-autogen, elixir-format
 msgid "Root disk (GiB)"
 msgstr "रूट डिस्क (GiB)"
@@ -1316,22 +1315,22 @@ msgstr "रूट डिस्क (GiB)"
 msgid "Running"
 msgstr "चल रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:1378
+#: lib/marshall_web/live/machines_live.ex:1380
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "पहुँच सहेजें"
 
-#: lib/marshall_web/live/machines_live.ex:1409
+#: lib/marshall_web/live/machines_live.ex:1411
 #, elixir-autogen, elixir-format
 msgid "Save metadata"
 msgstr "मेटाडेटा सहेजें"
 
-#: lib/marshall_web/live/machines_live.ex:1376
+#: lib/marshall_web/live/machines_live.ex:1378
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "सहेजा जा रहा है…"
 
-#: lib/marshall_web/live/machines_live.ex:749
+#: lib/marshall_web/live/machines_live.ex:751
 #, elixir-autogen, elixir-format
 msgid "Selected image unavailable"
 msgstr "चुनी गई इमेज उपलब्ध नहीं है"
@@ -1346,12 +1345,12 @@ msgstr "ब्राउज़र एक्सटेंशन सेट करे
 msgid "Shared"
 msgstr "साझा"
 
-#: lib/marshall_web/live/machines_live.ex:966
+#: lib/marshall_web/live/machines_live.ex:968
 #, elixir-autogen, elixir-format
 msgid "Shared by"
 msgstr "साझा करने वाला"
 
-#: lib/marshall_web/live/machines_live.ex:1406
+#: lib/marshall_web/live/machines_live.ex:1408
 #, elixir-autogen, elixir-format
 msgid "Short description for agents"
 msgstr "एजेंटों के लिए संक्षिप्त विवरण"
@@ -1396,7 +1395,7 @@ msgstr "स्रोत की रिकवरी पर ध्यान दे�
 msgid "Source recovery retry requested."
 msgstr "स्रोत की रिकवरी की दोबारा कोशिश का अनुरोध हुआ।"
 
-#: lib/marshall_web/live/machines_live.ex:860
+#: lib/marshall_web/live/machines_live.ex:862
 #, elixir-autogen, elixir-format
 msgid "Source restored; destination cleanup pending"
 msgstr "स्रोत बहाल; गंतव्य की सफ़ाई बाकी"
@@ -1416,13 +1415,13 @@ msgstr "स्रोत बंद रखा गया, जैसा अनुर
 msgid "Source was stopped when this request began."
 msgstr "अनुरोध शुरू होने पर स्रोत बंद था।"
 
-#: lib/marshall_web/live/machines_live.ex:688
-#: lib/marshall_web/live/machines_live.ex:777
+#: lib/marshall_web/live/machines_live.ex:690
+#: lib/marshall_web/live/machines_live.ex:779
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr "मानक"
 
-#: lib/marshall_web/live/machines_live.ex:785
+#: lib/marshall_web/live/machines_live.ex:787
 #, elixir-autogen, elixir-format
 msgid "Starting"
 msgstr "शुरू हो रहा है"
@@ -1432,8 +1431,8 @@ msgstr "शुरू हो रहा है"
 msgid "Starting the machine with its new resources."
 msgstr "नए संसाधनों के साथ मशीन शुरू हो रही है।"
 
-#: lib/marshall_web/live/machines_live.ex:920
-#: lib/marshall_web/live/machines_live.ex:939
+#: lib/marshall_web/live/machines_live.ex:922
+#: lib/marshall_web/live/machines_live.ex:941
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "स्थिति"
@@ -1465,7 +1464,7 @@ msgstr "मशीन बंद करें"
 msgid "Stopped"
 msgstr "बंद"
 
-#: lib/marshall_web/live/machines_live.ex:782
+#: lib/marshall_web/live/machines_live.ex:784
 #: lib/marshall_web/live/resize_live.ex:536
 #, elixir-autogen, elixir-format
 msgid "Stopping"
@@ -1488,7 +1487,7 @@ msgstr ""
 msgid "Stopping the machine so its resources can change safely."
 msgstr "संसाधन सुरक्षित रूप से बदलने के लिए मशीन बंद की जा रही है।"
 
-#: lib/marshall_web/live/machines_live.ex:850
+#: lib/marshall_web/live/machines_live.ex:852
 #, elixir-autogen, elixir-format
 msgid "Stopping the source"
 msgstr "स्रोत बंद हो रहा है"
@@ -1498,7 +1497,7 @@ msgstr "स्रोत बंद हो रहा है"
 msgid "Subscribe"
 msgstr "सदस्यता लें"
 
-#: lib/marshall_web/live/machines_live.ex:853
+#: lib/marshall_web/live/machines_live.ex:855
 #, elixir-autogen, elixir-format
 msgid "Switching placement"
 msgstr "तैनाती बदली जा रही है"
@@ -1508,17 +1507,17 @@ msgstr "तैनाती बदली जा रही है"
 msgid "Taking snapshot"
 msgstr "स्नैपशॉट लिया जा रहा है"
 
-#: lib/marshall_web/live/machines_live.ex:1270
+#: lib/marshall_web/live/machines_live.ex:1272
 #, elixir-autogen, elixir-format
 msgid "Team membership and thread sharing can also grant machine access."
 msgstr "टीम की सदस्यता और थ्रेड साझा करने से भी मशीन की पहुँच मिल सकती है।"
 
-#: lib/marshall_web/live/machines_live.ex:996
+#: lib/marshall_web/live/machines_live.ex:998
 #, elixir-autogen, elixir-format
 msgid "Terminal unavailable"
 msgstr "टर्मिनल उपलब्ध नहीं है"
 
-#: lib/marshall_web/live/machines_live.ex:769
+#: lib/marshall_web/live/machines_live.ex:771
 #, elixir-autogen, elixir-format
 msgid "Terminal, lifecycle, resize, clone and sharing."
 msgstr "टर्मिनल, जीवनचक्र, आकार बदलना, क्लोन और साझा करना।"
@@ -1543,7 +1542,7 @@ msgstr "वह रिपॉज़िटरी नेमस्पेस मान
 msgid "That repository reference cannot be launched."
 msgstr "वह रिपॉज़िटरी रेफ़रेंस शुरू नहीं किया जा सकता।"
 
-#: lib/marshall_web/live/machines_live.ex:1339
+#: lib/marshall_web/live/machines_live.ex:1341
 #, elixir-autogen, elixir-format
 msgid "The account must already be registered. Saving a role replaces that person's direct machine role; choose Remove access to remove that direct grant."
 msgstr ""
@@ -1597,7 +1596,7 @@ msgid "The machine has changed since this draft was created. Review the confirme
 msgstr ""
 "यह ड्राफ़्ट बनने के बाद मशीन बदल गई है। ऊपर पुष्टि किए गए संसाधन देखें।"
 
-#: lib/marshall_web/live/machines_live.ex:1433
+#: lib/marshall_web/live/machines_live.ex:1435
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on an automatically selected host. Our development fleet uses a 1 Gbit/s connection between hosts, so a move can take a little longer; moves are expected to be much faster when Overalls runs on AWS in production."
 msgstr ""
@@ -1606,12 +1605,12 @@ msgstr ""
 "इसलिए स्थानांतरण में थोड़ा अधिक समय लग सकता है; प्रोडक्शन में AWS पर "
 "Overalls चलने पर स्थानांतरण बहुत तेज़ होने की उम्मीद है।"
 
-#: lib/marshall_web/live/machines_live.ex:1445
+#: lib/marshall_web/live/machines_live.ex:1447
 #, elixir-autogen, elixir-format
 msgid "The machine is stopped, copied once and started on the destination."
 msgstr "मशीन बंद करके एक बार कॉपी की जाती है और गंतव्य पर शुरू होती है।"
 
-#: lib/marshall_web/live/machines_live.ex:829
+#: lib/marshall_web/live/machines_live.ex:831
 #, elixir-autogen, elixir-format
 msgid "The owner's access cannot be changed."
 msgstr "मालिक की पहुँच नहीं बदली जा सकती।"
@@ -1628,7 +1627,7 @@ msgstr ""
 "इस मशीन की पिछली कॉपी अभी अपना स्नैपशॉट छोड़ रही है। थोड़ी देर में फिर कोशिश"
 " करें।"
 
-#: lib/marshall_web/live/machines_live.ex:839
+#: lib/marshall_web/live/machines_live.ex:841
 #, elixir-autogen, elixir-format
 msgid "The request could not be completed. Check the values and try again."
 msgstr "अनुरोध पूरा नहीं हुआ। मान जाँचकर फिर कोशिश करें।"
@@ -1646,15 +1645,15 @@ msgid "The resize has completed; this page refreshes with the confirmed sizes."
 msgstr ""
 "आकार बदलना पूरा हुआ; यह पेज पुष्टि किए गए आकारों के साथ रीफ़्रेश होगा।"
 
-#: lib/marshall_web/live/machines_live.ex:714
+#: lib/marshall_web/live/machines_live.ex:716
 #, elixir-autogen, elixir-format
 msgid "The same network and access options as Standard, with AI agents that can start child agents."
 msgstr ""
 "Standard जैसे नेटवर्क और पहुँच विकल्प, साथ में उप-एजेंट शुरू कर सकने वाले AI"
 " एजेंट।"
 
-#: lib/marshall_web/live/machines_live.ex:808
-#: lib/marshall_web/live/machines_live.ex:825
+#: lib/marshall_web/live/machines_live.ex:810
+#: lib/marshall_web/live/machines_live.ex:827
 #, elixir-autogen, elixir-format
 msgid "The selected image needs more memory or disk space."
 msgstr "चुनी गई इमेज को अधिक मेमोरी या डिस्क जगह चाहिए।"
@@ -1687,7 +1686,7 @@ msgstr ""
 msgid "There is not enough available capacity for a new machine right now."
 msgstr "अभी नई मशीन के लिए पर्याप्त क्षमता उपलब्ध नहीं है।"
 
-#: lib/marshall_web/live/machines_live.ex:818
+#: lib/marshall_web/live/machines_live.ex:820
 #, elixir-autogen, elixir-format
 msgid "There is not enough available capacity for this machine."
 msgstr "इस मशीन के लिए पर्याप्त क्षमता उपलब्ध नहीं है।"
@@ -1698,8 +1697,8 @@ msgid "There is not enough capacity for this copy. Retry when space is available
 msgstr ""
 "इस कॉपी के लिए पर्याप्त क्षमता नहीं है। जगह उपलब्ध होने पर फिर कोशिश करें।"
 
-#: lib/marshall_web/live/machines_live.ex:805
-#: lib/marshall_web/live/machines_live.ex:820
+#: lib/marshall_web/live/machines_live.ex:807
+#: lib/marshall_web/live/machines_live.ex:822
 #, elixir-autogen, elixir-format
 msgid "This image is no longer available. Refresh and choose another image."
 msgstr "यह इमेज अब उपलब्ध नहीं है। रीफ़्रेश करके दूसरी इमेज चुनें।"
@@ -1724,7 +1723,7 @@ msgstr "यह लॉन्च लिंक समाप्त हो गया 
 msgid "This machine is being deleted and cannot be pinned."
 msgstr "यह मशीन हटाई जा रही है और पिन नहीं की जा सकती।"
 
-#: lib/marshall_web/live/machines_live.ex:831
+#: lib/marshall_web/live/machines_live.ex:833
 #, elixir-autogen, elixir-format
 msgid "This machine is being deleted."
 msgstr "यह मशीन हटाई जा रही है।"
@@ -1739,7 +1738,7 @@ msgstr "यह मशीन उपलब्ध नहीं है या आप
 msgid "This machine is unavailable or your access has ended."
 msgstr "यह मशीन उपलब्ध नहीं है या आपकी पहुँच समाप्त हो गई है।"
 
-#: lib/marshall_web/live/machines_live.ex:826
+#: lib/marshall_web/live/machines_live.ex:828
 #, elixir-autogen, elixir-format
 msgid "This machine's host is currently unavailable."
 msgstr "इस मशीन का होस्ट अभी उपलब्ध नहीं है।"
@@ -1754,7 +1753,7 @@ msgstr "इस रिपॉज़िटरी लिंक से लॉन्�
 msgid "This request could not finish. Review the issue below and the available actions."
 msgstr "यह अनुरोध पूरा नहीं हुआ। नीचे समस्या और उपलब्ध कार्रवाइयाँ देखें।"
 
-#: lib/marshall_web/live/machines_live.ex:834
+#: lib/marshall_web/live/machines_live.ex:836
 #, elixir-autogen, elixir-format
 msgid "This request has already been used. Refresh before trying again."
 msgstr ""
@@ -1765,24 +1764,24 @@ msgstr ""
 msgid "This request has ended without publishing a clone."
 msgstr "यह अनुरोध क्लोन प्रकाशित किए बिना समाप्त हुआ।"
 
-#: lib/marshall_web/live/machines_live.ex:960
-#: lib/marshall_web/live/machines_live.ex:1223
-#: lib/marshall_web/live/machines_live.ex:1235
+#: lib/marshall_web/live/machines_live.ex:962
+#: lib/marshall_web/live/machines_live.ex:1225
+#: lib/marshall_web/live/machines_live.ex:1237
 #, elixir-autogen, elixir-format
 msgid "Unavailable"
 msgstr "अनुपलब्ध"
 
-#: lib/marshall_web/live/machines_live.ex:761
+#: lib/marshall_web/live/machines_live.ex:763
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "अज्ञात"
 
-#: lib/marshall_web/live/machines_live.ex:832
+#: lib/marshall_web/live/machines_live.ex:834
 #, elixir-autogen, elixir-format
 msgid "Unpin this machine before deleting it."
 msgstr "मशीन हटाने से पहले इसका पिन हटाएँ।"
 
-#: lib/marshall_web/live/machines_live.ex:1609
+#: lib/marshall_web/live/machines_live.ex:1611
 #, elixir-autogen, elixir-format
 msgid "Unpin to delete. While you have this machine pinned, nothing can delete it."
 msgstr ""
@@ -1798,7 +1797,7 @@ msgstr "किसी भी समय सदस्यता छोड़ें�
 msgid "Updated"
 msgstr "अपडेट किया गया"
 
-#: lib/marshall_web/live/machines_live.ex:1551
+#: lib/marshall_web/live/machines_live.ex:1553
 #, elixir-autogen, elixir-format
 msgid "Updates automatically"
 msgstr "अपने आप अपडेट होता है"
@@ -1808,7 +1807,7 @@ msgstr "अपने आप अपडेट होता है"
 msgid "Use current machine state, keeping these sizes"
 msgstr "ये आकार रखते हुए मशीन की वर्तमान स्थिति उपयोग करें"
 
-#: lib/marshall_web/live/machines_live.ex:852
+#: lib/marshall_web/live/machines_live.ex:854
 #, elixir-autogen, elixir-format
 msgid "Verifying the destination disks"
 msgstr "गंतव्य डिस्क सत्यापित हो रही हैं"
@@ -1818,9 +1817,9 @@ msgstr "गंतव्य डिस्क सत्यापित हो र�
 msgid "View all →"
 msgstr "सब देखें →"
 
-#: lib/marshall_web/live/machines_live.ex:757
-#: lib/marshall_web/live/machines_live.ex:1358
-#: lib/marshall_web/live/machines_live.ex:1367
+#: lib/marshall_web/live/machines_live.ex:759
+#: lib/marshall_web/live/machines_live.ex:1360
+#: lib/marshall_web/live/machines_live.ex:1369
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "दर्शक"
@@ -1864,13 +1863,13 @@ msgstr "हम न्यूज़लेटर सेवा तक नहीं �
 msgid "We couldn't launch that repository"
 msgstr "वह रिपॉज़िटरी शुरू नहीं हुई"
 
-#: lib/marshall_web/live/machines_live.ex:756
+#: lib/marshall_web/live/machines_live.ex:758
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "वेब ऐप"
 
-#: lib/marshall_web/live/machines_live.ex:1357
-#: lib/marshall_web/live/machines_live.ex:1366
+#: lib/marshall_web/live/machines_live.ex:1359
+#: lib/marshall_web/live/machines_live.ex:1368
 #, elixir-autogen, elixir-format
 msgid "Web apps only"
 msgstr "केवल वेब ऐप"
@@ -1880,7 +1879,7 @@ msgstr "केवल वेब ऐप"
 msgid "What happens"
 msgstr "क्या होता है"
 
-#: lib/marshall_web/live/machines_live.ex:1266
+#: lib/marshall_web/live/machines_live.ex:1268
 #, elixir-autogen, elixir-format
 msgid "Who can reach this machine, and what each role allows."
 msgstr "इस मशीन तक कौन पहुँच सकता है और हर भूमिका क्या अनुमति देती है।"
@@ -1892,7 +1891,7 @@ msgstr ""
 "आप अधिकतम %{value1} मशीनें पिन कर सकते हैं। दूसरी पिन करने से पहले एक का पिन"
 " हटाएँ।"
 
-#: lib/marshall_web/live/machines_live.ex:830
+#: lib/marshall_web/live/machines_live.ex:832
 #, elixir-autogen, elixir-format
 msgid "You no longer have permission for this action."
 msgstr "इस कार्रवाई की अनुमति अब आपके पास नहीं है।"
@@ -1902,17 +1901,17 @@ msgstr "इस कार्रवाई की अनुमति अब आप�
 msgid "Your account cannot create machines."
 msgstr "आपका खाता मशीनें नहीं बना सकता।"
 
-#: lib/marshall_web/live/machines_live.ex:886
+#: lib/marshall_web/live/machines_live.ex:888
 #, elixir-autogen, elixir-format
 msgid "Your development environments, personal and shared."
 msgstr "आपके व्यक्तिगत और साझा डेवलपमेंट परिवेश।"
 
-#: lib/marshall_web/live/machines_live.ex:1240
+#: lib/marshall_web/live/machines_live.ex:1242
 #, elixir-autogen, elixir-format
 msgid "Your disk is retained when the machine is stopped."
 msgstr "मशीन बंद होने पर आपकी डिस्क सुरक्षित रहती है।"
 
-#: lib/marshall_web/live/machines_live.ex:1178
+#: lib/marshall_web/live/machines_live.ex:1180
 #, elixir-autogen, elixir-format
 msgid "Your disk stays with you when the machine is stopped."
 msgstr "मशीन बंद होने पर आपकी डिस्क आपके पास रहती है।"
@@ -1956,18 +1955,18 @@ msgstr "आपका कार्यस्थान, थोड़ी खुल�
 msgid "continue to Overalls"
 msgstr "Overalls पर जारी रखें"
 
-#: lib/marshall_web/live/machines_live.ex:1399
+#: lib/marshall_web/live/machines_live.ex:1401
 #, elixir-autogen, elixir-format
 msgid "production, project-name"
 msgstr "उत्पादन, परियोजना-नाम"
 
-#: lib/marshall_web/live/machines_live.ex:1006
-#: lib/marshall_web/live/machines_live.ex:1329
+#: lib/marshall_web/live/machines_live.ex:1008
+#: lib/marshall_web/live/machines_live.ex:1331
 #, elixir-autogen, elixir-format
 msgid "← First page"
 msgstr "← पहला पेज"
 
-#: lib/marshall_web/live/machines_live.ex:1017
+#: lib/marshall_web/live/machines_live.ex:1019
 #, elixir-autogen, elixir-format
 msgid "← Machines"
 msgstr "← मशीनें"
@@ -2061,12 +2060,12 @@ msgstr "पुष्टि करें"
 msgid "A new machine will clone the repository when it boots."
 msgstr "नई मशीन बूट होने पर रिपॉज़िटरी क्लोन करेगी।"
 
-#: lib/marshall_web/live/machines_live.ex:742
+#: lib/marshall_web/live/machines_live.ex:744
 #, elixir-autogen, elixir-format
 msgid "Android (API 36)"
 msgstr "Android (API 36)"
 
-#: lib/marshall_web/live/machines_live.ex:1069
+#: lib/marshall_web/live/machines_live.ex:1071
 #, elixir-autogen, elixir-format
 msgid "Leave this blank to create the machine without making setup changes."
 msgstr "सेटअप में बदलाव किए बिना मशीन बनाने के लिए इसे खाली छोड़ें।"
@@ -2081,7 +2080,7 @@ msgstr "मशीन और सेटअप थ्रेड का अनुर�
 msgid "Provisioning is in progress. This page will open the machine when it is ready."
 msgstr "प्रोविज़निंग जारी है। मशीन तैयार होने पर यह पेज उसे खोल देगा।"
 
-#: lib/marshall_web/live/machine_provisioning_live.ex:70
+#: lib/marshall_web/live/machine_provisioning_live.ex:75
 #, elixir-autogen, elixir-format
 msgid "Provisioning request unavailable."
 msgstr "प्रोविज़निंग अनुरोध उपलब्ध नहीं है।"
@@ -2101,12 +2100,12 @@ msgstr "सेटअप फिर से आज़माएँ"
 msgid "Setting up your machine"
 msgstr "आपकी मशीन सेट की जा रही है"
 
-#: lib/marshall_web/live/machines_live.ex:1059
+#: lib/marshall_web/live/machines_live.ex:1061
 #, elixir-autogen, elixir-format
 msgid "The machine agent will execute this instruction automatically in Work mode."
 msgstr "मशीन एजेंट इस निर्देश को «काम» मोड में स्वचालित रूप से निष्पादित करेगा।"
 
-#: lib/marshall_web/live/machines_live.ex:1057
+#: lib/marshall_web/live/machines_live.ex:1059
 #, elixir-autogen, elixir-format
 msgid "What should this machine do when it is ready?"
 msgstr "तैयार होने पर यह मशीन क्या करे?"
