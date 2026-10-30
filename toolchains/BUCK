@@ -33,6 +33,11 @@ nix_rust_toolchain(
 
 nix_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"])
 
+# The prelude's toolchain attributes select `toolchains//:cxx_no_default_deps`
+# under `config//:none` (decls/toolchains_common.bzl), so traversing any C or
+# Rust target needs it to exist. The Nix stdenv toolchain has no default deps.
+nix_cxx_toolchain(name = "cxx_no_default_deps", visibility = ["PUBLIC"])
+
 # Local execution, plus the NativeLink cache when configured (ADR-0272).
 overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"])
 
