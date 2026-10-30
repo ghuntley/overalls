@@ -1,4 +1,4 @@
-{ pkgs, application, package, toolchain }:
+{ pkgs, application, package, toolchain, cargoVendor }:
 pkgs.runCommand "${application}-source-release-check" {
   env = {
     OVERALLS_RELEASE_APPLICATION = application;
@@ -38,6 +38,16 @@ pkgs.runCommand "${application}-source-release-check" {
   OVERALLS_RELEASE_ERTS="$(${toolchain.erlang}/bin/erl +S 2:2 -noshell \
     -eval 'io:format("~s", [erlang:system_info(version)]), halt().')"
   ${package}/bin/${application} eval 'Code.eval_file("${./probe.exs}")'
+  # @cc [owner:ghuntley,label:deployment] release-closure-excludes-cargo-vendor
+  # The runtime closure MUST NOT retain the root workspace's vendored crates;
+  # they are build inputs only (ADR-0273).
+  find ${cargoVendor}/ -mindepth 1 -maxdepth 1 -type l -exec readlink -f {} + |
+    sed -E 's|^(/nix/store/[^/]+).*|\1|' | sort -u > vendor-paths
+  echo ${cargoVendor} >> vendor-paths
+  if grep -Fxf vendor-paths ${pkgs.closureInfo { rootPaths = [ package ]; }}/store-paths; then
+    echo "${application} release retains vendored Cargo crates at runtime" >&2
+    exit 1
+  fi
   ${pkgs.lib.optionalString (application == "marshall") ''
     if env -u DATABASE_URL ${package}/bin/marshall eval ':ok' > rejected.log 2>&1; then
       echo "Marshall accepted missing production database configuration" >&2

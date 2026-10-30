@@ -289,6 +289,9 @@ let
         # Only the unpacked application directory is writable; keep Rustler's
         # build output beside the crate instead of in the workspace root.
         export CARGO_TARGET_DIR="$PWD/native/marshall_cedar/target"
+        # Panic locations name each vendored crate's source path. Remap the
+        # vendor so the NIF does not retain the whole crate set at runtime.
+        export RUSTFLAGS="--remap-path-prefix=${cargoWorkspace.vendor}=/vendor"
         mkdir -p "$CARGO_HOME"
         substitute ${cargoWorkspace.vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" \
           --subst-var-by vendor "${cargoWorkspace.vendor}"
@@ -332,7 +335,7 @@ let
 in
 rec {
   inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool;
-  inherit dependencies cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit dependencies cedarLints cargoWorkspace hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;

@@ -104,6 +104,14 @@ remain planned for milestone M5.
   source for Rustler. The `cedarCargo` fixed-output hash is gone, and
   `lib.dependencyPins.cargo` has the single `workspace` entry in
   [`default.nix`](../../../nix/domains/artifacts/default.nix).
+- **Vendor stays a build input.** The Cedar NIF's panic locations named
+  vendored crate sources, so Marshall's release retained the vendor link farm
+  and all 516 crates: 540 runtime paths instead of 24. Marshall's release
+  build now passes `--remap-path-prefix` for the vendor, and the closure is
+  23 paths. The single `marshall-cedar-vendor` that the pre-T2 build retained
+  is gone too. Every `<app>-release` check in
+  [`release/default.nix`](../../../nix/verification/tests/release/default.nix)
+  refuses a closure that contains the vendor or any crate in it.
 - **Exactly one lock.** `cargo_locks/1` in [`pins.ex`](../../../scripts/pins.ex)
   (the `pins` check) and `single_root_lock/1` in
   [`cargo_security_upgrades.ex`](../../../scripts/cargo_security_upgrades.ex)

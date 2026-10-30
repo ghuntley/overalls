@@ -50,6 +50,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
     inherit application;
     package = packages.${application};
     inherit (packages) toolchain;
+    cargoVendor = packages.cargoWorkspace.vendor;
   }) // {
   hegel-framework-packages = hegel-framework-packages;
   team-ssh = import ./machines/team-ssh service;
