@@ -479,9 +479,9 @@ msgstr "You already have the maximum number of devices; remove one first: device
 #: lib/porsche/ssh/output.ex:118
 #, elixir-autogen, elixir-format
 msgid "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
-msgstr ""
+msgstr "Checkpoints are unavailable for this machine on its host. Stop the machine instead of pausing it."
 
 #: lib/porsche/ssh/output.ex:124
 #, elixir-autogen, elixir-format
 msgid "The machine is busy with another operation. Try again after it finishes."
-msgstr ""
+msgstr "The machine is busy with another operation. Try again after it finishes."
