@@ -354,6 +354,20 @@ defmodule Marshall.AgentRevocationFixture do
     end
 
     query("DELETE FROM agent_events WHERE thread_id IN (#{threads})", [])
+
+    # Turns enqueue thread feed jobs keyed by turn and agent thread; they
+    # must go before the turns, or they outlive the fixture as raw jobs.
+    %{rows: feed_jobs} =
+      query(
+        "DELETE FROM oban_jobs WHERE args->>'turn_id' IN (SELECT id::text FROM agent_turns WHERE id IN (#{turns})) OR args->>'agent_thread_id' IN (SELECT id::text FROM agent_threads WHERE id IN (#{threads})) RETURNING id",
+        []
+      )
+
+    for [job] <- feed_jobs do
+      query("DELETE FROM admin_job_events WHERE job_id=$1", [job])
+      query("DELETE FROM admin_job_snapshots WHERE id=$1", [job])
+    end
+
     query("DELETE FROM agent_turns WHERE id IN (#{turns})", [])
     query("DELETE FROM agent_executors WHERE root_id IN (#{roots})", [])
     query("DELETE FROM agent_cli_sessions WHERE vm_id='#{vm_id}'", [])

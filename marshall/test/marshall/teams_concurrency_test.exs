@@ -200,6 +200,26 @@ defmodule Marshall.TeamsConcurrencyTest do
 
       Ecto.Adapters.SQL.query!(Repo, "DELETE FROM teams WHERE id = $1", params, log: false)
 
+      # Retirement enqueues a subscription review per affected owner. Left
+      # behind, it stays a raw job that installation-wide queue counts see.
+      %{rows: jobs} =
+        Ecto.Adapters.SQL.query!(
+          Repo,
+          "DELETE FROM oban_jobs WHERE worker = 'Marshall.Threads.SubscriptionRevokeJob' AND args->>'owner_id' IN ($1, $2) RETURNING id",
+          [owner.id, target.id],
+          log: false
+        )
+
+      for [job] <- jobs do
+        Ecto.Adapters.SQL.query!(Repo, "DELETE FROM admin_job_events WHERE job_id = $1", [job],
+          log: false
+        )
+
+        Ecto.Adapters.SQL.query!(Repo, "DELETE FROM admin_job_snapshots WHERE id = $1", [job],
+          log: false
+        )
+      end
+
       Ecto.Adapters.SQL.query!(
         Repo,
         "DELETE FROM users WHERE id IN ($1, $2)",
