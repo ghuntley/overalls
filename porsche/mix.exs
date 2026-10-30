@@ -58,6 +58,7 @@ defmodule Porsche.MixProject do
       "architecture.check": [&check_adrs/1],
       "contracts.check": [fn _ -> Code.eval_file("../scripts/check_contracts.exs", __DIR__) end],
       "logging.check": [fn _ -> Code.eval_file("../scripts/check_logging.exs", __DIR__) end],
+      "gettext.check": [&check_gettext/1],
       precommit: [
         "toolchain.check",
         "architecture.check",
@@ -68,10 +69,34 @@ defmodule Porsche.MixProject do
         "format --check-formatted",
         "test --warnings-as-errors",
         "covenant.check --no-run",
-        "gettext.extract --check-up-to-date",
+        "gettext.check",
         "dialyzer --force-check"
       ]
     ]
+  end
+
+  # @cc [owner:ghuntley,label:verification] porsche-gettext-check-own-vm
+  # The catalog freshness gate MUST run `mix gettext.extract --check-up-to-date`
+  # in a separate test-environment VM and MUST fail precommit when it fails.
+  # In the precommit VM its forced recompile runs with protocols already
+  # consolidated. That records "already consolidated" warnings in the compile
+  # manifest, and the next `compile --warnings-as-errors` on that _build
+  # replays them and fails.
+  @spec check_gettext([String.t()]) :: :ok
+  defp check_gettext(_args) do
+    mix = System.find_executable("mix") || Mix.raise("cannot find the `mix` executable on PATH")
+
+    case System.cmd(mix, ["gettext.extract", "--check-up-to-date"],
+           env: [{"MIX_ENV", "test"}],
+           into: IO.stream(:stdio, :line),
+           stderr_to_stdout: true
+         ) do
+      {_, 0} ->
+        :ok
+
+      {_, status} ->
+        Mix.raise("gettext.extract --check-up-to-date failed (exit status #{status})")
+    end
   end
 
   defp check_adrs(_args) do
