@@ -48,10 +48,19 @@ struct Tls {
     ca_pem: String,
     server_name: Option<String>,
 }
-#[derive(Clone, Debug, Deserialize)]
+#[derive(Clone, Deserialize)]
 struct Approver {
     url: String,
     bearer_token: String,
+}
+/// Debug names the approver URL only; the bearer token is never formatted.
+impl std::fmt::Debug for Approver {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Approver")
+            .field("url", &self.url)
+            .finish_non_exhaustive()
+    }
 }
 
 /// A failure carries only a closed stage name and an FFI status or reason.
@@ -148,7 +157,14 @@ impl State {
 }
 
 fn hex(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    use std::fmt::Write as _;
+    bytes
+        .iter()
+        .fold(String::with_capacity(bytes.len() * 2), |mut out, b| {
+            // Writing to a String cannot fail.
+            let _ = write!(out, "{b:02x}");
+            out
+        })
 }
 fn unhex(text: &str) -> Option<Vec<u8>> {
     if !text.len().is_multiple_of(2) {
@@ -169,7 +185,12 @@ fn public_key(key: &SigningKey) -> (String, String) {
         b"nistp256".as_slice(),
         point.as_bytes(),
     ] {
-        blob.extend_from_slice(&(field.len() as u32).to_be_bytes());
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "the three SSH wire fields are at most 65 bytes"
+        )]
+        let length = field.len() as u32;
+        blob.extend_from_slice(&length.to_be_bytes());
         blob.extend_from_slice(field);
     }
     let line = format!("ecdsa-sha2-nistp256 {}", STANDARD.encode(&blob));
@@ -188,6 +209,8 @@ unsafe extern "C" fn sign(context: usize, message: *const u8, length: usize, out
     let message = unsafe { std::slice::from_raw_parts(message, length) };
     let signature: Signature = key.sign(message);
     let bytes = signature.to_bytes();
+    // SAFETY: `bytes` is the 64-byte r || s encoding and the FFI guarantees
+    // `out` has 64 writable bytes that do not overlap this local array.
     unsafe { std::ptr::copy_nonoverlapping(bytes.as_ptr(), out, 64) };
     0
 }
@@ -208,8 +231,7 @@ impl Drop for Session {
 fn now() -> u64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
+        .map_or(0, |d| d.as_secs())
 }
 
 fn json_bytes(stage: &'static str, data: &[u8]) -> Outcome<Value> {
@@ -223,7 +245,10 @@ fn read_json(
 ) -> Outcome<Value> {
     let mut buffer = vec![0u8; OUTPUT];
     let mut written = 0usize;
-    status(stage, call(buffer.as_mut_ptr(), buffer.len(), &mut written))?;
+    status(
+        stage,
+        call(buffer.as_mut_ptr(), buffer.len(), &raw mut written),
+    )?;
     json_bytes(stage, &buffer[..written.min(buffer.len())])
 }
 
@@ -319,15 +344,17 @@ impl Driver {
                 self.descriptor.deployment.ssh_port,
                 TIMEOUT_MS,
                 Some(sign),
-                key as *const SigningKey as usize,
-                &mut handle,
+                std::ptr::from_ref::<SigningKey>(key) as usize,
+                &raw mut handle,
             )
         };
         status("connect", code)?;
         Ok(Session(handle))
     }
 
-    fn whoami(&self, session: &Session) -> Outcome<Value> {
+    fn whoami(session: &Session) -> Outcome<Value> {
+        // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+        // length and its counter for the duration of the call.
         read_json("whoami", |out, capacity, written| unsafe {
             ffi::mila_session_whoami(session.0, out, capacity, written)
         })
@@ -411,7 +438,7 @@ impl Driver {
         let key = self.state.key(true)?;
         let (line, fingerprint) = public_key(&key);
         let session = self.connect(&key)?;
-        let first = self.whoami(&session)?;
+        let first = Self::whoami(&session)?;
         let mut approved_by_browser = false;
         if first["status"] == "approval_required" {
             if first["fingerprint"] != fingerprint.as_str() {
@@ -431,9 +458,9 @@ impl Driver {
             self.approve(url, &fingerprint, &line)?;
             approved_by_browser = true;
         }
-        let deadline = Instant::now() + Duration::from_secs(120);
+        let deadline = Instant::now() + Duration::from_mins(2);
         loop {
-            let current = self.whoami(&session)?;
+            let current = Self::whoami(&session)?;
             if current["status"] == "succeeded" {
                 let result = &current["result"];
                 return Ok(json!({
@@ -452,14 +479,18 @@ impl Driver {
         }
     }
 
-    fn receipt(&self, session: &Session, id: &str) -> Outcome<Value> {
+    fn receipt(session: &Session, id: &str) -> Outcome<Value> {
+        // SAFETY: each pointer/length pair borrows a live string for the call, and
+        // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
         read_json("request show", |out, capacity, written| unsafe {
             ffi::mila_session_request_show(session.0, id.as_ptr(), id.len(), out, capacity, written)
         })
     }
 
-    fn listing(&self, session: &Session) -> Outcome<Value> {
+    fn listing(session: &Session) -> Outcome<Value> {
         status("ls", ffi::mila_session_read_machines(session.0, 0))?;
+        // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+        // length and its counter for the duration of the call.
         read_json("ls", |out, capacity, written| unsafe {
             ffi::mila_session_listing(session.0, out, capacity, written)
         })
@@ -467,6 +498,8 @@ impl Driver {
 
     /// Attach the session's closed refusal code to a failed step.
     fn refused(session: &Session, failure: Failure) -> Failure {
+        // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+        // length and its counter for the duration of the call.
         let code = read_json("refusal", |out, capacity, written| unsafe {
             ffi::mila_session_last_refusal(session.0, out, capacity, written)
         })
@@ -500,11 +533,15 @@ impl Driver {
         }
         let key = self.state.key(false)?;
         let session = self.connect(&key)?;
-        self.authenticated(&session, step, args)
+        Self::authenticated(&session, step, args)
             .map_err(|failure| Self::refused(&session, failure))
     }
 
-    fn authenticated(&self, session: &Session, step: &str, args: &[String]) -> Outcome<Value> {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one flat match arm per CLI step keeps the step table auditable"
+    )]
+    fn authenticated(session: &Session, step: &str, args: &[String]) -> Outcome<Value> {
         let arg = |index: usize| -> Outcome<&str> {
             args.get(index).map(String::as_str).ok_or(Failure {
                 stage: "arguments",
@@ -513,10 +550,12 @@ impl Driver {
         };
         let rid = request_id();
         match step {
-            "whoami" => Ok(json!({"step": step, "whoami": self.whoami(session)?})),
-            "ls" => Ok(json!({"step": step, "listing": self.listing(session)?})),
+            "whoami" => Ok(json!({"step": step, "whoami": Self::whoami(session)?})),
+            "ls" => Ok(json!({"step": step, "listing": Self::listing(session)?})),
             "snapshot" => {
-                self.listing(session)?;
+                Self::listing(session)?;
+                // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+                // length and its counter for the duration of the call.
                 let snapshot = read_json("snapshot", |out, capacity, written| unsafe {
                     ffi::mila_session_snapshot(session.0, now(), out, capacity, written)
                 })?;
@@ -527,6 +566,7 @@ impl Driver {
                 let cpu: u32 = arg(1)?.parse().or_else(|_| fail("create", "cpu"))?;
                 let memory: u64 = arg(2)?.parse().or_else(|_| fail("create", "memory"))?;
                 let disk: u64 = arg(3)?.parse().or_else(|_| fail("create", "disk"))?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("create", unsafe {
                     ffi::mila_session_machine_create(
                         session.0,
@@ -540,7 +580,7 @@ impl Driver {
                     )
                 })?;
                 Ok(
-                    json!({"step": step, "request_id": rid, "receipt": self.receipt(session, &rid)?}),
+                    json!({"step": step, "request_id": rid, "receipt": Self::receipt(session, &rid)?}),
                 )
             }
             "resize" => {
@@ -548,6 +588,7 @@ impl Driver {
                 let cpu: u32 = arg(1)?.parse().or_else(|_| fail("resize", "cpu"))?;
                 let memory: u64 = arg(2)?.parse().or_else(|_| fail("resize", "memory"))?;
                 let disk: u64 = arg(3)?.parse().or_else(|_| fail("resize", "disk"))?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("resize", unsafe {
                     ffi::mila_session_machine_resize(
                         session.0,
@@ -561,12 +602,13 @@ impl Driver {
                     )
                 })?;
                 Ok(
-                    json!({"step": step, "request_id": rid, "receipt": self.receipt(session, &rid)?}),
+                    json!({"step": step, "request_id": rid, "receipt": Self::receipt(session, &rid)?}),
                 )
             }
             "action" => {
                 let machine = arg(0)?;
                 let action = arg(1)?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("action", unsafe {
                     ffi::mila_session_machine_action(
                         session.0,
@@ -579,13 +621,14 @@ impl Driver {
                     )
                 })?;
                 Ok(
-                    json!({"step": step, "action": action, "request_id": rid, "receipt": self.receipt(session, &rid)?}),
+                    json!({"step": step, "action": action, "request_id": rid, "receipt": Self::receipt(session, &rid)?}),
                 )
             }
             "share-add" | "share-remove" => {
                 let machine = arg(0)?;
                 let email = arg(1)?;
                 let role = if step == "share-add" { arg(2)? } else { "" };
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("share", unsafe {
                     ffi::mila_session_share_mutation(
                         session.0,
@@ -601,15 +644,15 @@ impl Driver {
                     )
                 })?;
                 Ok(
-                    json!({"step": step, "request_id": rid, "receipt": self.receipt(session, &rid)?}),
+                    json!({"step": step, "request_id": rid, "receipt": Self::receipt(session, &rid)?}),
                 )
             }
             "thread" => {
                 // thread COMMAND [THREAD] [SECONDARY] [STDIN]
                 let command = arg(0)?;
-                let thread = args.get(1).map(String::as_str).unwrap_or("");
-                let secondary = args.get(2).map(String::as_str).unwrap_or("");
-                let input = args.get(3).map(String::as_str).unwrap_or("");
+                let thread = args.get(1).map_or("", String::as_str);
+                let secondary = args.get(2).map_or("", String::as_str);
+                let input = args.get(3).map_or("", String::as_str);
                 let mutation = matches!(
                     command,
                     "thread prompt"
@@ -618,6 +661,8 @@ impl Driver {
                         | "thread plan revise"
                 );
                 let request = if mutation { rid.as_str() } else { "" };
+                // SAFETY: each pointer/length pair borrows a live string for the call, and
+                // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
                 let value = read_json("thread", |out, capacity, written| unsafe {
                     ffi::mila_session_thread_action(
                         session.0,
@@ -642,6 +687,8 @@ impl Driver {
             }
             "web-show" => {
                 let machine = arg(0)?;
+                // SAFETY: each pointer/length pair borrows a live string for the call, and
+                // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
                 let value = read_json("web show", |out, capacity, written| unsafe {
                     ffi::mila_session_web_show(
                         session.0,
@@ -659,6 +706,7 @@ impl Driver {
                 let port: u16 = arg(1)?.parse().or_else(|_| fail("web set", "port"))?;
                 let public = arg(2)? == "public";
                 let revision: u64 = arg(3)?.parse().or_else(|_| fail("web set", "revision"))?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("web set", unsafe {
                     ffi::mila_session_web_set(
                         session.0,
@@ -672,10 +720,12 @@ impl Driver {
                     )
                 })?;
                 Ok(
-                    json!({"step": step, "request_id": rid, "receipt": self.receipt(session, &rid)?}),
+                    json!({"step": step, "request_id": rid, "receipt": Self::receipt(session, &rid)?}),
                 )
             }
             "ssh-keys" => {
+                // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+                // length and its counter for the duration of the call.
                 let value = read_json("ssh-key list", |out, capacity, written| unsafe {
                     ffi::mila_session_ssh_keys(session.0, out, capacity, written)
                 })?;
@@ -683,6 +733,7 @@ impl Driver {
             }
             "ssh-key-revoke" => {
                 let id = arg(0)?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("ssh-key remove", unsafe {
                     ffi::mila_session_ssh_key_revoke(
                         session.0,
@@ -711,6 +762,9 @@ impl Driver {
                 })
                 .to_string();
                 let enc = arg(2)?;
+                // SAFETY: each pointer/length pair borrows a live string for the call, the
+                // label is null with length zero as the FFI permits, and `out`, `capacity`
+                // and `written` are read_json's live buffer, length and counter.
                 let value = read_json("device register", |out, capacity, written| unsafe {
                     ffi::mila_session_device_register(
                         session.0,
@@ -730,6 +784,8 @@ impl Driver {
                 Ok(json!({"step": step, "receipt": value}))
             }
             "device-ls" => {
+                // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
+                // length and its counter for the duration of the call.
                 let value = read_json("device ls", |out, capacity, written| unsafe {
                     ffi::mila_session_device_ls(session.0, out, capacity, written)
                 })?;
@@ -737,6 +793,7 @@ impl Driver {
             }
             "device-rm" => {
                 let id = arg(0)?;
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("device rm", unsafe {
                     ffi::mila_session_device_rm(session.0, id.as_ptr(), id.len())
                 })?;
@@ -745,6 +802,7 @@ impl Driver {
             "device-prefs" => {
                 let id = arg(0)?;
                 let enabled = arg(1)? == "true";
+                // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("device prefs", unsafe {
                     ffi::mila_session_device_prefs(
                         session.0,
@@ -755,23 +813,25 @@ impl Driver {
                 })?;
                 Ok(json!({"step": step, "enabled": enabled}))
             }
-            "terminal" => self.terminal(session, arg(0)?),
+            "terminal" => Self::terminal(session, arg(0)?),
             _ => fail("arguments", "unknown step"),
         }
     }
 
-    fn poll_until(&self, terminal: u64, marker: &str, seconds: u64) -> Outcome<bool> {
+    fn poll_until(terminal: u64, marker: &str, seconds: u64) -> bool {
         let deadline = Instant::now() + Duration::from_secs(seconds);
         let mut seen = Vec::new();
         while Instant::now() < deadline {
             let mut buffer = vec![0u8; OUTPUT];
             let mut written = 0usize;
+            // SAFETY: `buffer` has `buffer.len()` writable bytes and `written` is a live
+            // local, both for the duration of the call.
             let code = unsafe {
                 ffi::mila_session_terminal_poll(
                     terminal,
                     buffer.as_mut_ptr(),
                     buffer.len(),
-                    &mut written,
+                    &raw mut written,
                 )
             };
             if code != SessionStatus::Ok {
@@ -783,16 +843,18 @@ impl Driver {
                 seen.drain(..seen.len() - OUTPUT);
             }
             if String::from_utf8_lossy(&seen).contains(marker) {
-                return Ok(true);
+                return true;
             }
         }
-        Ok(false)
+        false
     }
 
     /// Terminal: open personal session, attach a PTY, type a marker command,
     /// resize, detach, reattach and see the replayed marker, then kill it.
-    fn terminal(&self, session: &Session, machine: &str) -> Outcome<Value> {
+    fn terminal(session: &Session, machine: &str) -> Outcome<Value> {
         let rid = request_id();
+        // SAFETY: each pointer/length pair borrows a live string for the call, and
+        // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
         let created = read_json("terminal new", |out, capacity, written| unsafe {
             ffi::mila_session_terminal_new(
                 session.0,
@@ -814,6 +876,8 @@ impl Driver {
             .to_owned();
         let attach = |columns: u32, rows: u32| -> Outcome<u64> {
             let mut handle = 0u64;
+            // SAFETY: the pointer/length pairs borrow `machine` and `terminal_id`, which
+            // outlive the call, and `handle` is a live local.
             status("terminal attach", unsafe {
                 ffi::mila_session_terminal_attach_session(
                     session.0,
@@ -823,32 +887,39 @@ impl Driver {
                     terminal_id.len(),
                     columns,
                     rows,
-                    &mut handle,
+                    &raw mut handle,
                 )
             })?;
             Ok(handle)
         };
-        let marker = format!("mila-{}", &uuid::Uuid::new_v4().simple().to_string()[..12]);
+        // The simple UUID form is 32 ASCII hex digits, so 12 is a char boundary.
+        let mut suffix = uuid::Uuid::new_v4().simple().to_string();
+        suffix.truncate(12);
+        let marker = format!("mila-{suffix}");
         let first = attach(100, 30)?;
         let typed = format!("echo {marker}-$((6*7))\r");
+        // SAFETY: each pointer/length pair borrows a live local string for the call.
         status("terminal input", unsafe {
             ffi::mila_session_terminal_input(first, typed.as_ptr(), typed.len())
         })?;
-        let output_seen = self.poll_until(first, &format!("{marker}-42"), 60)?;
+        let output_seen = Self::poll_until(first, &format!("{marker}-42"), 60);
         status(
             "terminal resize",
             ffi::mila_session_terminal_resize(first, 132, 40),
         )?;
         let probe = "stty size\r";
+        // SAFETY: each pointer/length pair borrows a live local string for the call.
         status("terminal input", unsafe {
             ffi::mila_session_terminal_input(first, probe.as_ptr(), probe.len())
         })?;
-        let resized = self.poll_until(first, "40 132", 30)?;
+        let resized = Self::poll_until(first, "40 132", 30);
         status("terminal detach", ffi::mila_session_terminal_kill(first))?;
         let second = attach(132, 40)?;
-        let replayed = self.poll_until(second, &format!("{marker}-42"), 60)?;
+        let replayed = Self::poll_until(second, &format!("{marker}-42"), 60);
         status("terminal detach", ffi::mila_session_terminal_kill(second))?;
         let kill_id = request_id();
+        // SAFETY: each pointer/length pair borrows a live string for the call, and
+        // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
         let killed = read_json("terminal kill", |out, capacity, written| unsafe {
             ffi::mila_session_terminal_end(
                 session.0,
@@ -960,7 +1031,7 @@ mod tests {
                 assert_eq!(decoded.len() * 2, text.len());
             }
             None => {
-                assert!(text.len() % 2 == 1 || !text.bytes().all(|byte| byte.is_ascii_hexdigit()))
+                assert!(text.len() % 2 == 1 || !text.bytes().all(|byte| byte.is_ascii_hexdigit()));
             }
         }
     }

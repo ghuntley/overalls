@@ -21,3 +21,6 @@ base64 = "0.22"
 
 [dev-dependencies]
 hegeltest.workspace = true
+
+[lints]
+workspace = true
