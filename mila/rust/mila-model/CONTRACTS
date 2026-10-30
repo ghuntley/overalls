@@ -1,0 +1,6 @@
+@cc [owner:ghuntley,label:verification] mila-model-hegel-properties
+Hegel properties MUST cover `Identifier` and `RequestId` parsing against
+independent character-class oracles, the `WorkspaceSource` `to_url`/`parse`
+round-trip and canonical re-parse, and the private route component codec
+round-trip with its escape alphabet. Route grammar agreement with the shared
+Elixir fixtures stays with mila-protocol's fixture properties.

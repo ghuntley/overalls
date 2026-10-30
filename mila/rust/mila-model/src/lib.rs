@@ -495,3 +495,6 @@ impl fmt::Display for RequestId {
         formatter.write_str(&self.0)
     }
 }
+
+#[cfg(test)]
+mod tests;
