@@ -298,7 +298,11 @@ in {
         PrivateTmp = true; PrivateDevices = true; ProtectProc = "invisible";
         ProtectKernelTunables = true; ProtectKernelModules = true; ProtectControlGroups = true;
         RestrictAddressFamilies = [ "AF_UNIX" "AF_INET" ];
-        Environment = "OVERALLS_LOGGING_HEALTH_SCRIPT=${./health.py}";
+        Environment = [
+          "PYTHONDONTWRITEBYTECODE=1"
+          "OVERALLS_LOGGING_HEALTH_PYTHON=${pkgs.python3}/bin/python3"
+          "OVERALLS_LOGGING_HEALTH_SCRIPT=${./health.py}"
+        ];
         CapabilityBoundingSet = "";
         InaccessiblePaths = [ "-/etc/ssh" "-/run/overalls-secrets" "-/var/lib/overalls-secrets" ];
         ReadOnlyPaths = [ "-/var/lib/overalls-logging" ];
