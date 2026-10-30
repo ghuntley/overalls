@@ -76,7 +76,7 @@ pub fn decode_watch_line(line: &[u8]) -> Result<WatchEvent, WatchFormat> {
     }
     let v: serde_json::Value = serde_json::from_slice(line).map_err(|_| WatchFormat("json"))?;
     let o = v.as_object().ok_or(WatchFormat("object"))?;
-    if o.get("version").and_then(|v| v.as_u64()) != Some(1) {
+    if o.get("version").and_then(serde_json::Value::as_u64) != Some(1) {
         return Err(WatchFormat("version"));
     }
     let event = o

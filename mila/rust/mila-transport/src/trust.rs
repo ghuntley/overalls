@@ -59,20 +59,23 @@ pub fn decode_trust_document(
     origin_host: &str,
     now: u64,
 ) -> Result<TrustDocument, TrustRefusal> {
+    const KEYS: [&str; 5] = ["version", "ca", "management_host", "zone", "retirement"];
     if bytes.len() > MAX_TRUST_BYTES {
         return Err(TrustRefusal::Malformed);
     }
     let value: serde_json::Value =
         serde_json::from_slice(bytes).map_err(|_| TrustRefusal::Malformed)?;
     let obj = value.as_object().ok_or(TrustRefusal::Malformed)?;
-    const KEYS: [&str; 5] = ["version", "ca", "management_host", "zone", "retirement"];
     if obj.len() != KEYS.len() || KEYS.iter().any(|k| !obj.contains_key(*k)) {
         return Err(TrustRefusal::Malformed);
     }
-    let version = obj["version"]
-        .as_u64()
-        .filter(|v| *v == 1)
-        .ok_or(TrustRefusal::Malformed)? as u8;
+    let version = u8::try_from(
+        obj["version"]
+            .as_u64()
+            .filter(|v| *v == 1)
+            .ok_or(TrustRefusal::Malformed)?,
+    )
+    .map_err(|_| TrustRefusal::Malformed)?;
     let ca = obj["ca"]
         .as_str()
         .filter(|v| canonical_ca(v))

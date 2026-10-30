@@ -83,21 +83,21 @@ pub fn parse_host_certificate_blob(blob: &[u8]) -> Option<HostCertificate> {
     let mut r = Reader { b: blob, o: 0 };
     if r.field() != Some(ALG) {
         return None;
-    };
+    }
     let nonce = r.field()?;
     if !(16..=64).contains(&nonce.len()) {
         return None;
-    };
+    }
     let k = r.field()?;
     let public_key: [u8; 32] = k.try_into().ok()?;
     let _serial = r.u64()?;
     if r.u32() != Some(2) {
         return None;
-    };
+    }
     let id = r.field()?;
     if id.is_empty() || id.len() > 128 || std::str::from_utf8(id).is_err() {
         return None;
-    };
+    }
     let names = r.field()?;
     let mut nr = Reader { b: names, o: 0 };
     let mut principals = Vec::new();
@@ -106,13 +106,13 @@ pub fn parse_host_certificate_blob(blob: &[u8]) -> Option<HostCertificate> {
         if !host(&n) || principals.contains(&n) || principals.len() >= 8 {
             return None;
         }
-        principals.push(n)
+        principals.push(n);
     }
     let after = r.u64()?;
     let before = r.u64()?;
     if after >= before {
         return None;
-    };
+    }
     for _ in 0..3 {
         if !r.field()?.is_empty() {
             return None;
@@ -131,15 +131,15 @@ pub fn parse_host_certificate_blob(blob: &[u8]) -> Option<HostCertificate> {
     let sf = r.field()?;
     if !r.done() {
         return None;
-    };
+    }
     let mut sr = Reader { b: sf, o: 0 };
     if sr.field() != Some(b"ssh-ed25519") {
         return None;
-    };
+    }
     let sig: [u8; 64] = sr.field()?.try_into().ok()?;
     if !sr.done() {
         return None;
-    };
+    }
     Some(HostCertificate {
         public_key,
         ca,
@@ -178,11 +178,11 @@ pub fn verify_host_certificate(
             let mut r = Reader { b: &b, o: 0 };
             if r.field()? != b"ssh-ed25519" {
                 return None;
-            };
+            }
             let k = r.field()?;
             if !r.done() {
                 return None;
-            };
+            }
             Some(k.to_vec())
         })
         .ok_or(HostRefusal::Malformed)?;

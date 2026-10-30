@@ -68,7 +68,8 @@ impl<S: DeviceSigner> russh::Signer for ExternalSigner<S> {
             let first = integer.iter().position(|b| *b != 0).unwrap_or(31);
             let integer = &integer[first..];
             let padding = usize::from(integer[0] & 128 != 0);
-            integers.extend_from_slice(&((integer.len() + padding) as u32).to_be_bytes());
+            let length = u32::try_from(integer.len() + padding).map_err(|_| SshError::Signature)?;
+            integers.extend_from_slice(&length.to_be_bytes());
             if padding == 1 {
                 integers.push(0);
             }
@@ -82,7 +83,12 @@ impl<S: DeviceSigner> russh::Signer for ExternalSigner<S> {
     }
 }
 fn field(output: &mut Vec<u8>, value: &[u8]) {
-    output.extend_from_slice(&(value.len() as u32).to_be_bytes());
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "callers pass an algorithm name, two P-256 integers or the userauth signing payload, all far below 4 GiB"
+    )]
+    let length = value.len() as u32;
+    output.extend_from_slice(&length.to_be_bytes());
     output.extend_from_slice(value);
 }
 
@@ -91,7 +97,15 @@ struct HostPolicy {
 }
 impl client::Handler for HostPolicy {
     type Error = SshError;
-    async fn check_server_key(&mut self, key: &PublicKeyOrCertificate) -> Result<bool, SshError> {
+    fn check_server_key(
+        &mut self,
+        key: &PublicKeyOrCertificate,
+    ) -> impl Future<Output = Result<bool, SshError>> + Send {
+        std::future::ready(self.check(key))
+    }
+}
+impl HostPolicy {
+    fn check(&self, key: &PublicKeyOrCertificate) -> Result<bool, SshError> {
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map_err(|_| SshError::HostUntrusted)?
@@ -114,6 +128,14 @@ impl client::Handler for HostPolicy {
 pub struct SshSession {
     connection: client::Handle<HostPolicy>,
     timeout: Duration,
+}
+impl std::fmt::Debug for SshSession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SshSession")
+            .field("timeout", &self.timeout)
+            .finish_non_exhaustive()
+    }
 }
 #[derive(Debug, Eq, PartialEq)]
 pub struct ExecOutput {
@@ -143,7 +165,7 @@ impl SshSession {
         let mut config = client::Config::default();
         config.preferred.key = Cow::Borrowed(&[]);
         config.preferred.host_key_certificates = Cow::Owned(vec![Algorithm::Ed25519]);
-        config.inactivity_timeout = Some(Duration::from_secs(120));
+        config.inactivity_timeout = Some(Duration::from_mins(2));
         tokio::time::timeout(timeout, async move {
             let mut connection = client::connect(
                 Arc::new(config),
@@ -216,7 +238,7 @@ impl SshSession {
                     exit_status: exit_status.ok_or(SshError::MissingExit)?,
                 })
             };
-            let (_, output) =
+            let ((), output) =
                 tokio::try_join!(async { write.await.map_err(SshError::from) }, read)?;
             Ok(output)
         })
@@ -248,9 +270,18 @@ pub enum PtyChunk {
 
 pub struct PtySession {
     reader: russh::ChannelReadHalf,
-    writer: russh::ChannelWriteHalf<russh::client::Msg>,
+    writer: russh::ChannelWriteHalf<client::Msg>,
     timeout: Duration,
     closed: bool,
+}
+impl std::fmt::Debug for PtySession {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("PtySession")
+            .field("timeout", &self.timeout)
+            .field("closed", &self.closed)
+            .finish_non_exhaustive()
+    }
 }
 
 impl PtySession {

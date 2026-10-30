@@ -11,6 +11,7 @@ use russh::{
     server, Channel, ChannelId,
 };
 use std::{
+    future::Future,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -23,13 +24,18 @@ struct HardwareStandIn {
     calls: Arc<AtomicUsize>,
 }
 impl DeviceSigner for HardwareStandIn {
-    async fn sign(&mut self, message: &[u8]) -> Result<[u8; 64], SshError> {
+    fn sign(&mut self, message: &[u8]) -> impl Future<Output = Result<[u8; 64], SshError>> + Send {
         use p256::ecdsa::signature::Signer;
         self.calls.fetch_add(1, Ordering::SeqCst);
         let signature: p256::ecdsa::Signature = self.key.sign(message);
-        Ok(signature.to_bytes().into())
+        std::future::ready(Ok(signature.to_bytes().into()))
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    clippy::cast_possible_truncation,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test, and the three SSH key fields are under 100 bytes"
+)]
 fn identity(calls: Arc<AtomicUsize>) -> (String, HardwareStandIn) {
     let key = p256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
     let mut blob = Vec::new();
@@ -51,13 +57,13 @@ struct Handler {
 }
 impl server::Handler for Handler {
     type Error = russh::Error;
-    async fn auth_publickey(
+    fn auth_publickey(
         &mut self,
         _: &str,
         _: &russh::keys::PublicKey,
-    ) -> Result<server::Auth, Self::Error> {
+    ) -> impl Future<Output = Result<server::Auth, Self::Error>> + Send {
         self.authentications.fetch_add(1, Ordering::SeqCst);
-        Ok(server::Auth::Accept)
+        std::future::ready(Ok(server::Auth::Accept))
     }
     async fn channel_open_session(
         &mut self,
@@ -68,22 +74,24 @@ impl server::Handler for Handler {
         reply.accept().await;
         Ok(())
     }
-    async fn exec_request(
+    fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        if data == b"terminal attach --json" {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready((|| {
+            if data == b"terminal attach --json" {
+                session.channel_success(channel)?;
+                session.data(channel, b"ready\r\n".to_vec())?;
+                return Ok(());
+            }
+            assert_eq!(data, b"images --json");
             session.channel_success(channel)?;
-            session.data(channel, b"ready\r\n".to_vec())?;
-            return Ok(());
-        }
-        assert_eq!(data, b"images --json");
-        session.channel_success(channel)?;
-        Ok(())
+            Ok(())
+        })())
     }
-    async fn pty_request(
+    fn pty_request(
         &mut self,
         channel: ChannelId,
         _: &str,
@@ -93,36 +101,43 @@ impl server::Handler for Handler {
         _: u32,
         _: &[(russh::Pty, u32)],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        session.channel_success(channel)?;
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready(session.channel_success(channel))
     }
-    async fn data(
+    fn data(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        if data == b"exit" {
-            session.exit_status_request(channel, 0)?;
-            session.eof(channel)?;
-            session.close(channel)?;
-        }
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready((|| {
+            if data == b"exit" {
+                session.exit_status_request(channel, 0)?;
+                session.eof(channel)?;
+                session.close(channel)?;
+            }
+            Ok(())
+        })())
     }
-    async fn channel_eof(
+    fn channel_eof(
         &mut self,
         channel: ChannelId,
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        session.extended_data(channel, 1, b"discard progress".to_vec())?;
-        session.data(channel, b"{\"version\":1}".to_vec())?;
-        session.exit_status_request(channel, 0)?;
-        session.eof(channel)?;
-        session.close(channel)?;
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready((|| {
+            session.extended_data(channel, 1, b"discard progress".to_vec())?;
+            session.data(channel, b"{\"version\":1}".to_vec())?;
+            session.exit_status_request(channel, 0)?;
+            session.eof(channel)?;
+            session.close(channel)?;
+            Ok(())
+        })())
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 async fn endpoint(
     principal: &str,
     expired: bool,
