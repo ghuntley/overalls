@@ -31,6 +31,10 @@ fn invoke(action: &str, request: Option<&str>, capacity: usize) -> (MilaFfiStatu
     (status, buffer, written)
 }
 
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-command-format-capacity
+/// Every catalogued machine action MUST format to its canonical line within the
+/// caller's capacity, leave the buffer and `written` untouched when it is too
+/// small, and require a request id for mutations.
 #[hegel::test(test_cases = 128)]
 fn commands_require_identity_and_respect_capacity(tc: TestCase) {
     let action = ACTIONS[usize::from(tc.draw(gs::default::<u8>())) % ACTIONS.len()];
@@ -55,6 +59,9 @@ fn commands_require_identity_and_respect_capacity(tc: TestCase) {
     }
 }
 
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-command-format-injection
+/// An action token carrying whitespace or option text MUST be refused without
+/// writing caller storage.
 #[hegel::test(test_cases = 128)]
 fn action_tokens_cannot_inject_options(tc: TestCase) {
     let action = ACTIONS[usize::from(tc.draw(gs::default::<u8>())) % ACTIONS.len()];

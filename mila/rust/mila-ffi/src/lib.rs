@@ -1978,8 +1978,9 @@ mod tests {
         mila_terminal_validate, mila_thread_command_kind, mila_trust_document_reconcile,
         mila_watch_event_kind, mila_watch_validate_filters, MilaFfiAbiVersion, MilaFfiStatus,
         MilaMachineCommandKind, MilaRouteOutput, MilaSnapshotSummary, MilaThreadCommandKind,
-        MilaWatchEventKind,
+        MilaWatchEventKind, MILA_TERMINAL_MAX_INPUT,
     };
+    use hegel::{generators as gs, TestCase};
     use mila_runtime::MachineSnapshot;
 
     /// Keep the C ABI route writer aligned with the vectors consumed by every
@@ -2096,25 +2097,52 @@ mod tests {
         );
     }
 
-    /// Property-style boundary check: every dimension in the accepted rectangle is valid,
-    /// while every zero dimension and permission outside {0,1} is refused.
-    #[test]
-    fn terminal_dimension_property_is_bounded() {
-        for columns in [0_u16, 1, 80, 4096, 4097, u16::MAX] {
-            for rows in [0_u16, 1, 24, 512, 513, u16::MAX] {
-                let valid = (1..=4096).contains(&columns) && (1..=512).contains(&rows);
-                assert_eq!(
-                    mila_terminal_resize_validate(columns, rows, 1) == MilaFfiStatus::Ok,
-                    valid
-                );
-            }
-        }
-        for permission in [2_u8, u8::MAX] {
-            assert_eq!(
-                mila_terminal_resize_validate(80, 24, permission),
-                MilaFfiStatus::InvalidRequest
-            );
-        }
+    /// @cc [owner:ghuntley,label:verification;security] mila-ffi-terminal-dimension-bounds
+    /// Every terminal validator MUST accept exactly the 1..=4096 by 1..=512
+    /// rectangle with a permission bit in {0,1}, for any attach offset, and
+    /// return only `Ok` or `InvalidRequest`; the oracle is the rectangle itself.
+    #[hegel::test(test_cases = 256)]
+    fn terminal_dimension_property_is_bounded(tc: TestCase) {
+        let columns = tc.draw(gs::default::<u16>());
+        let rows = tc.draw(gs::default::<u16>());
+        let permission = tc.draw(gs::default::<u8>());
+        let from = tc.draw(gs::default::<u64>());
+        let valid = (1..=4096).contains(&columns) && (1..=512).contains(&rows) && permission <= 1;
+        let expected = if valid {
+            MilaFfiStatus::Ok
+        } else {
+            MilaFfiStatus::InvalidRequest
+        };
+        assert_eq!(mila_terminal_validate(columns, rows, permission), expected);
+        assert_eq!(
+            mila_terminal_attach_validate(from, columns, rows, permission),
+            expected
+        );
+        assert_eq!(
+            mila_terminal_resize_validate(columns, rows, permission),
+            expected
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] mila-ffi-terminal-input-bounds
+    /// Terminal input validation MUST accept exactly lengths up to
+    /// `MILA_TERMINAL_MAX_INPUT` with a permission bit in {0,1}, and only an
+    /// empty write without the read-write permission.
+    #[hegel::test(test_cases = 256)]
+    fn terminal_input_property_is_bounded(tc: TestCase) {
+        let length = tc.draw(gs::integers::<usize>().max_value(2 * MILA_TERMINAL_MAX_INPUT));
+        let permission = tc.draw(gs::default::<u8>());
+        let valid = match permission {
+            0 => length == 0,
+            1 => length <= MILA_TERMINAL_MAX_INPUT,
+            _ => false,
+        };
+        let expected = if valid {
+            MilaFfiStatus::Ok
+        } else {
+            MilaFfiStatus::InvalidRequest
+        };
+        assert_eq!(mila_terminal_input_validate(length, permission), expected);
     }
 
     #[test]

@@ -1,0 +1,14 @@
+@cc [owner:ghuntley,label:verification] mila-ffi-hegel-properties
+Hegel properties MUST cover the C ABI validators that write caller-owned
+buffers (`mila_route_format`, `mila_trust_document_reconcile`,
+`mila_push_key_request_encode` and `mila_session_command_format`): guard bytes
+past the declared capacity survive every call, refusals leave the buffer and
+`written` untouched, `OutputTooSmall` reports the required length, and every
+status stays in the stable set. They also cover agreement of route formatting
+with `MilaRoute`, of push key encoding with `mila_push_registration_validate`,
+totality of the snapshot, watch-line and command-kind projections with
+untouched out-parameters on refusal, the terminal dimension rectangle and
+input bounds of the scalar validators, and refusal of stale session and PTY
+handles without writing caller storage. JNI exports are not exercised by
+properties; they need a JVM and are covered by the Android instrumentation
+tests.

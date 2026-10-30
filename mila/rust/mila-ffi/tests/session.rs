@@ -305,6 +305,9 @@ fn ffi_real_ssh_read_snapshot_and_close() {
     assert!(responses.lock().unwrap().is_empty());
     task.abort();
 }
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-session-stale-handle-refusal
+/// Any generated stale session handle MUST be refused by the listing and close
+/// ABI without writing caller-owned output or length storage.
 #[hegel::test(test_cases = 128)]
 fn arbitrary_stale_handles_refuse_without_writing(tc: hegel::TestCase) {
     let handle = tc.draw(hegel::generators::default::<u64>()) | (1u64 << 63);
@@ -340,6 +343,7 @@ fn machine_actions_reject_invalid_inputs_before_lookup() {
     assert_eq!(status, SessionStatus::InvalidHandle);
 }
 
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-terminal-stale-handle-refusal
 /// PTY handles are opaque capabilities. Every generated stale handle must be
 /// rejected without modifying caller-owned output or length storage.
 #[hegel::test(test_cases = 128)]
@@ -369,6 +373,7 @@ fn arbitrary_stale_terminal_handles_refuse_without_writing(tc: hegel::TestCase) 
     assert_eq!(written, 17);
 }
 
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-terminal-read-bounds
 /// The bounded terminal read refuses undersized buffers and out-of-range waits
 /// before any handle lookup, and stale handles never write caller storage.
 #[hegel::test(test_cases = 128)]
@@ -409,6 +414,7 @@ fn arbitrary_terminal_reads_refuse_before_consuming(tc: hegel::TestCase) {
     assert_eq!(state, TerminalReadEvent::Closed);
 }
 
+/// @cc [owner:ghuntley,label:verification;security] mila-ffi-session-terminal-dimension-bounds
 /// Dimension validation is stable across the full generated input space and
 /// does not perform a session lookup for malformed dimensions.
 #[hegel::test(test_cases = 128)]
