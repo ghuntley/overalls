@@ -8,7 +8,15 @@ roots=${OVERALLS_GCROOT_DIR:-${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/overa
 mkdir -p "$roots"
 # Actions run in the project root; its hash keeps checkouts from sharing roots.
 link="$roots/$(pwd | sha256sum | cut -c1-12)-$gcroot"
-tree=$(mktemp -d "${TMPDIR:-/tmp}/overalls-assemble.XXXXXX")
+# The copy lives in this action's own Buck2 scratch directory, never a shared
+# temp dir: one CI evaluation lost files mid-`chmod -R` ("fts_read failed")
+# while sibling evaluations were being OOM-killed (run 41130542439).
+if [[ -n "${BUCK_SCRATCH_PATH:-}" ]]; then
+  mkdir -p "$BUCK_SCRATCH_PATH"
+  tree=$(mktemp -d "$(cd "$BUCK_SCRATCH_PATH" && pwd)/assemble.XXXXXX")
+else
+  tree=$(mktemp -d "${TMPDIR:-/tmp}/overalls-assemble.XXXXXX")
+fi
 trap 'rm -rf "$tree"' EXIT
 # Each line pairs an owned source directory with its package path.
 paste -d '\t' "$manifest" "$names" | while IFS=$'\t' read -r src package; do
