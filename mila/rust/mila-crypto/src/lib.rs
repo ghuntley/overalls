@@ -11,6 +11,13 @@ use thiserror::Error;
 #[derive(Clone)]
 pub struct DeviceKey(SigningKey);
 
+/// Formats only the type name; the private scalar is never printed.
+impl std::fmt::Debug for DeviceKey {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.debug_struct("DeviceKey").finish_non_exhaustive()
+    }
+}
+
 impl DeviceKey {
     /// @cc [owner:ghuntley,label:security] mila-crypto-device-key-custody
     /// Creates a key from exactly 32 bytes supplied by a platform key provider.

@@ -11,3 +11,6 @@ thiserror.workspace = true
 
 [dev-dependencies]
 hegeltest.workspace = true
+
+[lints]
+workspace = true

@@ -31,12 +31,13 @@ fn draw_seed(tc: &TestCase) -> [u8; 32] {
 }
 
 /// Draws a seed the oracle accepts, so signing properties never discard.
-fn draw_key(tc: &TestCase) -> DeviceKey {
-    let mut seed = tc.draw(gs::default::<[u8; 32]>());
-    if !valid_scalar(&seed) {
-        seed = [0x11; 32];
+fn draw_valid_seed(tc: &TestCase) -> [u8; 32] {
+    let seed = tc.draw(gs::default::<[u8; 32]>());
+    if valid_scalar(&seed) {
+        seed
+    } else {
+        [0x11; 32]
     }
-    DeviceKey::from_seed(seed).expect("oracle-valid scalar")
 }
 
 /// @cc [owner:ghuntley,label:verification;security] mila-crypto-seed-scalar-oracle
@@ -65,7 +66,7 @@ fn from_seed_accepts_exactly_valid_scalars(tc: TestCase) {
 /// point, and MUST NOT verify for any different message.
 #[hegel::test(test_cases = 64)]
 fn signatures_round_trip_and_bind_the_message(tc: TestCase) {
-    let key = draw_key(&tc);
+    let key = DeviceKey::from_seed(draw_valid_seed(&tc)).expect("oracle-valid scalar");
     let message = tc.draw(gs::vecs(gs::default::<u8>()).max_size(256));
     let other = tc.draw(gs::vecs(gs::default::<u8>()).max_size(256));
     let signature = key.sign(&message);
@@ -85,7 +86,7 @@ fn signatures_round_trip_and_bind_the_message(tc: TestCase) {
 /// `DeviceKey::verify`; a corrupted signature MUST NOT verify.
 #[hegel::test(test_cases = 64)]
 fn verification_is_total_and_fail_closed(tc: TestCase) {
-    let key = draw_key(&tc);
+    let key = DeviceKey::from_seed(draw_valid_seed(&tc)).expect("oracle-valid scalar");
     let message = tc.draw(gs::vecs(gs::default::<u8>()).max_size(128));
     let mut signature = key.sign(&message);
     let corrupt = tc.draw(gs::booleans());
