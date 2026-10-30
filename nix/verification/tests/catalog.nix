@@ -474,6 +474,9 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   # SSH attach (ADR-0223): Porsche `terminal attach` into the browser's
   # personal session, read-only refusal, revocation and journal privacy.
   porsche-terminal-fleet = import ./machines/fleet (service // { hostFixture = fixtures.hetzner-uefi; terminal = true; audi = true; porsche = true; porscheTerminal = true; });
+  # Mila terminal journey (ADR-0264): the Mila Rust core's C ABI drives the
+  # same real guest PTY through Porsche at the public host (nested KVM).
+  mila-journey-terminal = import ./machines/fleet (service // { hostFixture = fixtures.hetzner-uefi; terminal = true; audi = true; porsche = true; porscheTerminal = true; milaTerminal = true; });
   customer-isolation-fleet = featureFleets.customer-isolation-fleet;
   relocation-fleet = featureFleets.relocation-fleet;
   memory-suspension-fleet = featureFleets.memory-suspension-fleet;

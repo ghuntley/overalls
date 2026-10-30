@@ -66,6 +66,7 @@ def run() -> None:
                 "remove-owner",
                 "approve",
                 "approve-owner",
+                "approve-mila",
                 "clone",
                 "provision",
             )
@@ -73,7 +74,7 @@ def run() -> None:
                 ("stranger",)
                 if mode == "approve"
                 else ("owner",)
-                if mode in ("clone", "provision", "remove-owner", "approve-owner")
+                if mode in ("clone", "provision", "remove-owner", "approve-owner", "approve-mila")
                 else ("owner", "member")
             ):
                 context = browser.new_context()
@@ -140,14 +141,19 @@ def run() -> None:
                     expect(page.locator("#clone-requests")).to_contain_text("porsche-browser-copy")
                     context.close()
                     continue
-                if mode in ("approve", "approve-owner"):
+                if mode in ("approve", "approve-owner", "approve-mila"):
                     stage = role + " approval fingerprint comparison"
                     pending = json.loads((root / "pending.json").read_text())
                     assert pending["approval_url"].startswith(
                         "https://control.example.test/ssh/approve/"
                     )
                     fingerprint = subprocess.check_output(
-                        ["ssh-keygen", "-lf", str(root / (role + ".pub"))], text=True
+                        [
+                            "ssh-keygen",
+                            "-lf",
+                            str(root / ("mila.pub" if mode == "approve-mila" else role + ".pub")),
+                        ],
+                        text=True,
                     ).split()[1]
                     assert pending["fingerprint"] == fingerprint
                     stage = role + " approval navigation"
@@ -164,7 +170,16 @@ def run() -> None:
                     expect(page.locator("#ssh-approval-open-mila")).to_be_visible()
                     stage = role + " approved key visibility"
                     page.goto("https://control.example.test/settings")
-                    expect(page.locator("article")).to_contain_text(fingerprint)
+                    if mode == "approve-mila":
+                        # The owner already holds a fleet key: find the device key's own card.
+                        expect(page.locator("[data-phx-main].phx-connected")).to_be_visible(
+                            timeout=20000
+                        )
+                        expect(page.locator("article").filter(has_text=fingerprint)).to_have_count(
+                            1
+                        )
+                    else:
+                        expect(page.locator("article")).to_contain_text(fingerprint)
                     context.close()
                     continue
                 stage = role + " keys navigation"

@@ -333,7 +333,7 @@ impl Driver {
         })
     }
 
-    fn approve(&self, approval_url: &str, fingerprint: &str) -> Outcome<()> {
+    fn approve(&self, approval_url: &str, fingerprint: &str, public_key: &str) -> Outcome<()> {
         let approver = self.descriptor.approver.clone().ok_or(Failure {
             stage: "approval",
             reason: "descriptor has no approver".into(),
@@ -343,6 +343,30 @@ impl Driver {
             format!("Authorization: Bearer {}\n", approver.bearer_token).as_bytes(),
         )?;
         let body = json!({"approval_url": approval_url, "fingerprint": fingerprint});
+        // @cc [owner:ghuntley,label:verification;security] mila-journey-file-approver
+        // A `file://` approver hands the pending approval to an out-of-process
+        // browser as one owner-only, newly created file (the fleet harness's
+        // pending.json contract). It MUST NOT overwrite an existing file.
+        if let Some(path) = approver.url.strip_prefix("file://") {
+            use std::io::Write;
+            use std::os::unix::fs::OpenOptionsExt;
+            let mut file = fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .mode(0o600)
+                .open(path)
+                .or_else(|_| fail("approval", "pending approval file unavailable"))?;
+            // The out-of-process approver derives the fingerprint it compares
+            // from this public key line itself.
+            let pending = json!({
+                "approval_url": approval_url,
+                "fingerprint": fingerprint,
+                "public_key": public_key,
+            });
+            file.write_all(pending.to_string().as_bytes())
+                .or_else(|_| fail("approval", "pending approval write"))?;
+            return Ok(());
+        }
         self.state
             .write_private("approval.json", body.to_string().as_bytes())?;
         let output = Command::new("curl")
@@ -397,15 +421,14 @@ impl Driver {
                 stage: "approval",
                 reason: "no approval link".into(),
             })?;
-            let origin = format!(
-                "https://{}:{}/ssh/approve/",
-                self.server_name(),
-                self.descriptor.deployment.https_port
-            );
+            let origin = match self.descriptor.deployment.https_port {
+                443 => format!("https://{}/ssh/approve/", self.server_name()),
+                port => format!("https://{}:{port}/ssh/approve/", self.server_name()),
+            };
             if !url.starts_with(&origin) {
                 return fail("approval", "approval link is not on the deployment origin");
             }
-            self.approve(url, &fingerprint)?;
+            self.approve(url, &fingerprint, &line)?;
             approved_by_browser = true;
         }
         let deadline = Instant::now() + Duration::from_secs(120);
