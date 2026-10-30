@@ -636,7 +636,7 @@ pub fn request(path: &Path, command: Command) -> Result<Reply, Refusal> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
 
     fn frame(bytes: &[u8]) -> Vec<u8> {
         let mut output = (bytes.len() as u32).to_be_bytes().to_vec();
@@ -644,26 +644,59 @@ mod tests {
         output
     }
 
-    proptest! {
-        #[test]
-        fn proc_commands_cannot_shift_start_identity(name in "[a-z() ]{0,64}", ticks in 1_u64..u64::MAX) {
-            let fields = ["S".into(), vec!["0";18].join(" "), ticks.to_string()].join(" ");
-            let value = format!("42 ({name}) {fields} 0 0");
-            prop_assert_eq!(parse_ticks(&value, 42), Some(ticks));
-            prop_assert_eq!(parse_ticks(&value, 43), None);
-        }
-        #[test]
-        fn frame_sizes_are_bounded_before_allocation(length in 513_u32..u32::MAX) {
-            prop_assert!(matches!(read_frame(&mut length.to_be_bytes().as_slice()), Err(Refusal::Schema)));
-        }
-        #[test]
-        fn sibling_units_and_name_suffixes_never_authenticate(suffix in "[a-z]{1,20}") {
-            let expected = "audi-private.service";
-            prop_assert!(!unit_matches(&format!("0::/system.slice/{expected}{suffix}"), expected), "unit suffix must refuse");
-            prop_assert!(!unit_matches(&format!("0::/system.slice/{suffix}{expected}"), expected), "unit prefix must refuse");
-            prop_assert!(unit_matches("0::/system.slice/audi-private.service/child", expected));
-            prop_assert!(!unit_matches("0::/system.slice/audi-dns.service", expected));
-        }
+    /// @cc [owner:ghuntley,label:verification;security] otel-receiver-proc-ticks-property
+    /// Generated process names containing spaces and parentheses MUST NOT shift
+    /// the parsed start-time field, and a foreign pid MUST NOT parse.
+    #[hegel::test(test_cases = 256)]
+    fn proc_commands_cannot_shift_start_identity(tc: TestCase) {
+        let name = tc.draw(
+            gs::text()
+                .alphabet("abcdefghijklmnopqrstuvwxyz() ")
+                .max_size(64),
+        );
+        let ticks = tc.draw(gs::integers::<u64>().min_value(1).max_value(u64::MAX - 1));
+        let fields = ["S".into(), vec!["0"; 18].join(" "), ticks.to_string()].join(" ");
+        let value = format!("42 ({name}) {fields} 0 0");
+        assert_eq!(parse_ticks(&value, 42), Some(ticks));
+        assert_eq!(parse_ticks(&value, 43), None);
+    }
+
+    /// @cc [owner:ghuntley,label:verification;capacity] otel-receiver-frame-bound-property
+    /// Any declared frame length above 512 bytes MUST refuse before allocation.
+    #[hegel::test(test_cases = 256)]
+    fn frame_sizes_are_bounded_before_allocation(tc: TestCase) {
+        let length = tc.draw(gs::integers::<u32>().min_value(513).max_value(u32::MAX - 1));
+        assert!(matches!(
+            read_frame(&mut length.to_be_bytes().as_slice()),
+            Err(Refusal::Schema)
+        ));
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] otel-receiver-unit-match-property
+    /// Generated unit-name prefixes and suffixes MUST NOT authenticate as the
+    /// expected unit; only the exact unit or its child cgroups match.
+    #[hegel::test(test_cases = 256)]
+    fn sibling_units_and_name_suffixes_never_authenticate(tc: TestCase) {
+        let suffix = tc.draw(
+            gs::text()
+                .alphabet("abcdefghijklmnopqrstuvwxyz")
+                .min_size(1)
+                .max_size(20),
+        );
+        let expected = "audi-private.service";
+        assert!(
+            !unit_matches(&format!("0::/system.slice/{expected}{suffix}"), expected),
+            "unit suffix must refuse"
+        );
+        assert!(
+            !unit_matches(&format!("0::/system.slice/{suffix}{expected}"), expected),
+            "unit prefix must refuse"
+        );
+        assert!(unit_matches(
+            "0::/system.slice/audi-private.service/child",
+            expected
+        ));
+        assert!(!unit_matches("0::/system.slice/audi-dns.service", expected));
     }
 
     #[test]

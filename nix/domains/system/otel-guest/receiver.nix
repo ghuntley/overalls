@@ -4,7 +4,9 @@ rustPlatform.buildRustPackage {
   version = "0.1.0";
   src = lib.cleanSourceWith {
     src = ./receiver;
-    filter = path: _: builtins.baseNameOf path != "target";
+    filter = path: _:
+      let name = builtins.baseNameOf path;
+      in name != "target" && name != ".hegel";
   };
   cargoLock.lockFile = ./receiver/Cargo.lock;
 }

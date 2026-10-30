@@ -601,7 +601,7 @@ fn private_file(file: &File) -> Result<(), Error> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
     use std::os::unix::fs::PermissionsExt;
     use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -636,128 +636,368 @@ mod tests {
         State::new(Source::MarshallWeb, 1, "a".repeat(32)).unwrap()
     }
 
-    proptest! {
-        #![proptest_config(ProptestConfig::with_cases(32))]
-        #[test]
-        fn checkpoint_histories_preserve_lifetime_and_recover_pending_loss(
-            operations in prop::collection::vec((any::<bool>(), 0_u64..1_000_000), 0..12)
-        ) {
-            let directory = Directory::new();
-            let mut store = Store::open(&directory.0, Source::AudiSsh, 1, "a".repeat(32)).unwrap();
-            let mut completed = 0;
-            for (finish, duration) in operations {
-                let id = store.transition(|state| state.admit(producer(), 2, 100)).unwrap();
-                if finish {
-                    store.transition(|state| state.finish(id, &producer(), 3, Outcome::Success, duration)).unwrap();
-                    completed += 1;
-                }
-                let committed = store.state().unwrap().clone();
-                drop(store);
-                store = Store::open(&directory.0, Source::AudiSsh, 4, "b".repeat(32)).unwrap();
-                prop_assert_eq!(store.state().unwrap(), &committed);
+    /// @cc [owner:ghuntley,label:verification;durability] otel-receiver-checkpoint-history-property
+    /// Generated admit/finish histories MUST survive every reopen unchanged and
+    /// settle pending loss exactly once, keeping the original lifetime.
+    #[hegel::test(test_cases = 32)]
+    fn checkpoint_histories_preserve_lifetime_and_recover_pending_loss(tc: TestCase) {
+        let operations = tc.draw(
+            gs::vecs(gs::tuples!(
+                gs::booleans(),
+                gs::integers::<u64>().max_value(999_999)
+            ))
+            .max_size(11),
+        );
+        let directory = Directory::new();
+        let mut store = Store::open(&directory.0, Source::AudiSsh, 1, "a".repeat(32)).unwrap();
+        let mut completed = 0;
+        for (finish, duration) in operations {
+            let id = store
+                .transition(|state| state.admit(producer(), 2, 100))
+                .unwrap();
+            if finish {
+                store
+                    .transition(|state| {
+                        state.finish(id, &producer(), 3, Outcome::Success, duration)
+                    })
+                    .unwrap();
+                completed += 1;
             }
-            let admitted = store.state().unwrap().next_id - 1;
-            store.transition(|state| state.reconcile(4, &[producer()])).unwrap();
+            let committed = store.state().unwrap().clone();
             drop(store);
-            let mut store = Store::open(&directory.0, Source::AudiSsh, 5, "c".repeat(32)).unwrap();
-            prop_assert_eq!(store.state().unwrap().totals.requests, admitted);
-            prop_assert_eq!(store.state().unwrap().totals.successes, completed);
-            prop_assert_eq!(store.state().unwrap().totals.failures, admitted - completed);
-            prop_assert_eq!(store.state().unwrap().totals.duration_count, completed);
-            prop_assert_eq!(store.state().unwrap().started_at_ns, 1);
-            prop_assert_eq!(&store.state().unwrap().incarnation, &"a".repeat(32));
-            prop_assert_eq!(store.transition(|state| state.reconcile(100, &[producer()])), Ok(0));
+            store = Store::open(&directory.0, Source::AudiSsh, 4, "b".repeat(32)).unwrap();
+            assert_eq!(store.state().unwrap(), &committed);
+        }
+        let admitted = store.state().unwrap().next_id - 1;
+        store
+            .transition(|state| state.reconcile(4, &[producer()]))
+            .unwrap();
+        drop(store);
+        let mut store = Store::open(&directory.0, Source::AudiSsh, 5, "c".repeat(32)).unwrap();
+        assert_eq!(store.state().unwrap().totals.requests, admitted);
+        assert_eq!(store.state().unwrap().totals.successes, completed);
+        assert_eq!(store.state().unwrap().totals.failures, admitted - completed);
+        assert_eq!(store.state().unwrap().totals.duration_count, completed);
+        assert_eq!(store.state().unwrap().started_at_ns, 1);
+        assert_eq!(&store.state().unwrap().incarnation, &"a".repeat(32));
+        assert_eq!(
+            store.transition(|state| state.reconcile(100, &[producer()])),
+            Ok(0)
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-gap-settlement-property
+    /// For generated gap times and every terminal kind, a gap-crossing
+    /// settlement MUST withhold coverage through settlement without cascading.
+    #[hegel::test(test_cases = 256)]
+    fn gap_crossing_terminals_withhold_through_settlement_without_cascading(tc: TestCase) {
+        let gap = tc.draw(gs::integers::<u64>().min_value(3).max_value(99));
+        let terminal = tc.draw(gs::integers::<u8>().max_value(4));
+        let mut state = state();
+        let old = state.admit(producer(), 2, 1_000).unwrap();
+        state.mark_gap(gap).unwrap();
+        let later_producer = Producer {
+            start_ticks: 2,
+            ..producer()
+        };
+        let later = state.admit(later_producer.clone(), gap + 1, 2_000).unwrap();
+        let expected = match terminal {
+            0 => {
+                state
+                    .finish(old, &producer(), gap + 2, Outcome::Success, 10)
+                    .unwrap();
+                gap + 2
+            }
+            1 => {
+                state
+                    .finish(old, &producer(), gap + 2, Outcome::Failure, 10)
+                    .unwrap();
+                gap + 2
+            }
+            2 => {
+                state.reconcile(1_000, &[]).unwrap();
+                1_000
+            }
+            3 => {
+                state.reconcile(gap + 2, &[producer()]).unwrap();
+                gap + 2
+            }
+            _ => {
+                state
+                    .finish(old, &producer(), gap + 2, Outcome::Exclude, 0)
+                    .unwrap();
+                gap
+            }
+        };
+        assert_eq!(state.coverage_started_at_ns, expected);
+        state
+            .finish(later, &later_producer, expected + 3, Outcome::Success, 5)
+            .unwrap();
+        assert_eq!(state.coverage_started_at_ns, expected);
+        assert_eq!(state.started_at_ns, 1);
+        assert_eq!(state.next_id, 3);
+        assert_eq!(state.totals.requests + state.excluded, 2);
+        state.validate().unwrap();
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-gap-history-property
+    /// Generated gap sequences MUST only advance coverage and mark crossings;
+    /// backward gaps MUST refuse without changing state.
+    #[hegel::test(test_cases = 256)]
+    fn recording_gaps_preserve_admissions_counters_and_lifetime(tc: TestCase) {
+        let gaps =
+            tc.draw(gs::vecs(gs::integers::<u64>().min_value(3).max_value(999_999)).max_size(63));
+        let mut state = state();
+        state.admit(producer(), 2, 2_000_000).unwrap();
+        let original = state.clone();
+        for gap in gaps {
+            let before = state.clone();
+            if gap < state.coverage_started_at_ns {
+                assert_eq!(state.mark_gap(gap), Err(Error::Invalid));
+                assert_eq!(state.clone(), before);
+            } else {
+                state.mark_gap(gap).unwrap();
+                assert!(state
+                    .pending
+                    .values()
+                    .all(|admission| admission.crossed_gap));
+            }
+            let mut without_coverage_change = state.clone();
+            without_coverage_change.coverage_started_at_ns = original.coverage_started_at_ns;
+            for (id, admission) in &mut without_coverage_change.pending {
+                admission.crossed_gap = original.pending[id].crossed_gap;
+            }
+            assert_eq!(&without_coverage_change, &original);
+            state.validate().unwrap();
         }
     }
 
-    proptest! {
-        #[test]
-        fn gap_crossing_terminals_withhold_through_settlement_without_cascading(gap in 3_u64..100, terminal in 0_u8..5) {
-            let mut state = state();
-            let old = state.admit(producer(), 2, 1_000).unwrap();
-            state.mark_gap(gap).unwrap();
-            let later_producer = Producer { start_ticks: 2, ..producer() };
-            let later = state.admit(later_producer.clone(), gap + 1, 2_000).unwrap();
-            let expected = match terminal {
-                0 => { state.finish(old, &producer(), gap + 2, Outcome::Success, 10).unwrap(); gap + 2 },
-                1 => { state.finish(old, &producer(), gap + 2, Outcome::Failure, 10).unwrap(); gap + 2 },
-                2 => { state.reconcile(1_000, &[]).unwrap(); 1_000 },
-                3 => { state.reconcile(gap + 2, &[producer()]).unwrap(); gap + 2 },
-                _ => { state.finish(old, &producer(), gap + 2, Outcome::Exclude, 0).unwrap(); gap },
-            };
-            prop_assert_eq!(state.coverage_started_at_ns, expected);
-            state.finish(later, &later_producer, expected + 3, Outcome::Success, 5).unwrap();
-            prop_assert_eq!(state.coverage_started_at_ns, expected);
-            prop_assert_eq!(state.started_at_ns, 1);
-            prop_assert_eq!(state.next_id, 3);
-            prop_assert_eq!(state.totals.requests + state.excluded, 2);
-            state.validate().unwrap();
-        }
-
-        #[test]
-        fn recording_gaps_preserve_admissions_counters_and_lifetime(gaps in prop::collection::vec(3_u64..1_000_000, 0..64)) {
-            let mut state = state();
-            state.admit(producer(), 2, 2_000_000).unwrap();
-            let original = state.clone();
-            for gap in gaps {
-                let before = state.clone();
-                if gap < state.coverage_started_at_ns {
-                    prop_assert_eq!(state.mark_gap(gap), Err(Error::Invalid));
-                    prop_assert_eq!(state.clone(), before);
-                } else {
-                    state.mark_gap(gap).unwrap();
-                    prop_assert!(state.pending.values().all(|admission| admission.crossed_gap));
-                }
-                let mut without_coverage_change = state.clone();
-                without_coverage_change.coverage_started_at_ns = original.coverage_started_at_ns;
-                for (id, admission) in &mut without_coverage_change.pending {
-                    admission.crossed_gap = original.pending[id].crossed_gap;
-                }
-                prop_assert_eq!(&without_coverage_change, &original);
-                state.validate().unwrap();
-            }
-        }
-        #[test]
-        fn histories_conserve_every_admission(steps in prop::collection::vec((0_u8..5, 0_u64..20_000_000), 0..128)) {
-            let mut state = state();
-            for (operation, duration) in steps {
-                let id = state.admit(producer(), 2, 100).unwrap();
-                match operation {
-                    0 => state.finish(id, &producer(), 3, Outcome::Success, duration).unwrap(),
-                    1 => state.finish(id, &producer(), 3, Outcome::Failure, duration).unwrap(),
-                    2 => state.finish(id, &producer(), 3, Outcome::Exclude, duration).unwrap(),
-                    3 => { state.reconcile(3, &[producer()]).unwrap(); },
-                    _ => {},
-                }
-                state.validate().unwrap();
-                let wire = serde_json::to_vec(&state).unwrap();
-                let restored: State = serde_json::from_slice(&wire).unwrap();
-                prop_assert_eq!(&state, &restored);
-                state = restored;
-            }
-            let before = state.clone();
-            state.reconcile(100, &[]).unwrap();
-            prop_assert!(state.pending.is_empty());
-            prop_assert_eq!(state.totals.requests + state.excluded, state.next_id - 1);
-            prop_assert_eq!(state.totals.duration_count, before.totals.duration_count);
-            let settled = state.clone();
-            prop_assert_eq!(state.reconcile(101, &[producer()]).unwrap(), 0);
-            prop_assert_eq!(state, settled);
-        }
-
-        #[test]
-        fn foreign_late_and_duplicate_results_cannot_change_totals(duration in 0_u64..MAXIMUM) {
-            let mut state = state();
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-admission-conservation-property
+    /// Generated histories MUST conserve every admission across serde
+    /// round-trips and settle all remaining work exactly once.
+    #[hegel::test(test_cases = 256)]
+    fn histories_conserve_every_admission(tc: TestCase) {
+        let steps = tc.draw(
+            gs::vecs(gs::tuples!(
+                gs::integers::<u8>().max_value(4),
+                gs::integers::<u64>().max_value(19_999_999)
+            ))
+            .max_size(127),
+        );
+        let mut state = state();
+        for (operation, duration) in steps {
             let id = state.admit(producer(), 2, 100).unwrap();
+            match operation {
+                0 => state
+                    .finish(id, &producer(), 3, Outcome::Success, duration)
+                    .unwrap(),
+                1 => state
+                    .finish(id, &producer(), 3, Outcome::Failure, duration)
+                    .unwrap(),
+                2 => state
+                    .finish(id, &producer(), 3, Outcome::Exclude, duration)
+                    .unwrap(),
+                3 => {
+                    state.reconcile(3, &[producer()]).unwrap();
+                }
+                _ => {}
+            }
+            state.validate().unwrap();
+            let wire = serde_json::to_vec(&state).unwrap();
+            let restored: State = serde_json::from_slice(&wire).unwrap();
+            assert_eq!(&state, &restored);
+            state = restored;
+        }
+        let before = state.clone();
+        state.reconcile(100, &[]).unwrap();
+        assert!(state.pending.is_empty());
+        assert_eq!(state.totals.requests + state.excluded, state.next_id - 1);
+        assert_eq!(state.totals.duration_count, before.totals.duration_count);
+        let settled = state.clone();
+        assert_eq!(state.reconcile(101, &[producer()]).unwrap(), 0);
+        assert_eq!(state, settled);
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] otel-receiver-terminal-fence-property
+    /// For generated durations, foreign, late and duplicate results MUST refuse
+    /// without changing totals.
+    #[hegel::test(test_cases = 256)]
+    fn foreign_late_and_duplicate_results_cannot_change_totals(tc: TestCase) {
+        let duration = tc.draw(gs::integers::<u64>().max_value(MAXIMUM - 1));
+        let mut state = state();
+        let id = state.admit(producer(), 2, 100).unwrap();
+        let before = state.clone();
+        let foreign = Producer {
+            start_ticks: 2,
+            ..producer()
+        };
+        assert_eq!(
+            state.finish(id, &foreign, 3, Outcome::Success, duration),
+            Err(Error::Foreign)
+        );
+        assert_eq!(
+            state.finish(id, &producer(), 100, Outcome::Success, duration),
+            Err(Error::Expired)
+        );
+        assert_eq!(&state, &before);
+        state
+            .finish(id, &producer(), 3, Outcome::Success, duration)
+            .unwrap();
+        let terminal = state.clone();
+        assert_eq!(
+            state.finish(id, &producer(), 4, Outcome::Failure, duration),
+            Err(Error::Unknown)
+        );
+        assert_eq!(state, terminal);
+    }
+
+    const SOURCES: [Source; 11] = [
+        Source::MarshallWeb,
+        Source::MarshallLive,
+        Source::Galileo,
+        Source::Enrico,
+        Source::Brady,
+        Source::Porsche,
+        Source::AudiPrivate,
+        Source::AudiDns,
+        Source::AudiSsh,
+        Source::VscodeBrowserNixos,
+        Source::VscodeBrowserUbuntu,
+    ];
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-source-name-roundtrip
+    /// Every source MUST round-trip through `name`/`from_name` and serialize as
+    /// its name; any accepted string MUST be exactly the accepted source's name.
+    #[hegel::test(test_cases = 256)]
+    fn source_names_round_trip(tc: TestCase) {
+        let source = tc.draw(gs::sampled_from(SOURCES.to_vec()));
+        assert_eq!(Source::from_name(source.name()), Some(source));
+        assert_eq!(
+            serde_json::to_string(&source).unwrap(),
+            format!("\"{}\"", source.name())
+        );
+        let candidate = if tc.draw(gs::booleans()) {
+            let name = source.name();
+            match tc.draw(gs::integers::<u8>().max_value(2)) {
+                0 => format!("{name}_"),
+                1 => name.to_uppercase(),
+                _ => name[1..].to_owned(),
+            }
+        } else {
+            tc.draw(gs::text().alphabet("abcdeghilnoprstuvwxyz_").max_size(24))
+        };
+        match Source::from_name(&candidate) {
+            Some(parsed) => assert_eq!(parsed.name(), candidate),
+            None => assert!(SOURCES.iter().all(|known| known.name() != candidate)),
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-source-bounds-increasing
+    /// Every source's histogram bounds MUST be strictly increasing, and only the
+    /// browser sources MAY use the browser bound set.
+    #[hegel::test(test_cases = 64)]
+    fn source_bounds_strictly_increase(tc: TestCase) {
+        let source = tc.draw(gs::sampled_from(SOURCES.to_vec()));
+        let bounds = source.bounds_us();
+        assert!(bounds.windows(2).all(|pair| pair[0] < pair[1]));
+        let browser = matches!(
+            source,
+            Source::VscodeBrowserNixos | Source::VscodeBrowserUbuntu
+        );
+        assert_eq!(
+            bounds,
+            if browser {
+                BROWSER_BOUNDS_US
+            } else {
+                BOUNDS_US
+            }
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-add-overflow-oracle
+    /// `add` MUST return the exact sum when it is at most `MAXIMUM` and
+    /// `Overflow` exactly when the mathematical sum exceeds `MAXIMUM`.
+    #[hegel::test(test_cases = 512)]
+    fn add_errs_exactly_past_maximum(tc: TestCase) {
+        let anchors = vec![0, 1, MAXIMUM / 2, MAXIMUM - 1, MAXIMUM, u64::MAX - 1];
+        let operand = || {
+            if tc.draw(gs::booleans()) {
+                tc.draw(gs::integers::<u64>())
+            } else {
+                tc.draw(gs::sampled_from(anchors.clone()))
+                    .saturating_add(tc.draw(gs::integers::<u64>().max_value(2)))
+            }
+        };
+        let left = operand();
+        let right = operand();
+        let sum = u128::from(left) + u128::from(right);
+        let expected = if sum <= u128::from(MAXIMUM) {
+            Ok(u64::try_from(sum).unwrap())
+        } else {
+            Err(Error::Overflow)
+        };
+        assert_eq!(add(left, right), expected);
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-transitions-preserve-validity
+    /// Every state reached from a new state through generated admit, finish,
+    /// mark_gap and reconcile calls MUST pass `validate`, and every refused
+    /// transition MUST leave the state unchanged.
+    #[hegel::test(test_cases = 256)]
+    fn transitions_preserve_validity(tc: TestCase) {
+        let producers = vec![
+            producer(),
+            Producer {
+                start_ticks: 2,
+                ..producer()
+            },
+            Producer {
+                pid: 0,
+                ..producer()
+            },
+        ];
+        let source = tc.draw(gs::sampled_from(SOURCES.to_vec()));
+        let started = tc.draw(gs::integers::<u64>().min_value(1).max_value(5));
+        let mut state = State::new(source, started, "a".repeat(32)).unwrap();
+        let steps = tc.draw(gs::integers::<usize>().max_value(48));
+        for _ in 0..steps {
             let before = state.clone();
-            let foreign = Producer { start_ticks: 2, ..producer() };
-            prop_assert_eq!(state.finish(id, &foreign, 3, Outcome::Success, duration), Err(Error::Foreign));
-            prop_assert_eq!(state.finish(id, &producer(), 100, Outcome::Success, duration), Err(Error::Expired));
-            prop_assert_eq!(&state, &before);
-            state.finish(id, &producer(), 3, Outcome::Success, duration).unwrap();
-            let terminal = state.clone();
-            prop_assert_eq!(state.finish(id, &producer(), 4, Outcome::Failure, duration), Err(Error::Unknown));
-            prop_assert_eq!(state, terminal);
+            let now = tc.draw(gs::integers::<u64>().max_value(400));
+            let result: Result<(), Error> = match tc.draw(gs::integers::<u8>().max_value(3)) {
+                0 => {
+                    let who = tc.draw(gs::sampled_from(producers.clone()));
+                    let deadline = now + tc.draw(gs::integers::<u64>().max_value(200));
+                    state.admit(who, now, deadline).map(drop)
+                }
+                1 => {
+                    let id = tc.draw(gs::integers::<u64>().max_value(state.next_id + 1));
+                    let who = tc.draw(gs::sampled_from(producers.clone()));
+                    let outcome = tc.draw(gs::sampled_from(vec![
+                        Outcome::Success,
+                        Outcome::Failure,
+                        Outcome::Exclude,
+                    ]));
+                    let duration = if tc.draw(gs::booleans()) {
+                        tc.draw(gs::integers::<u64>().max_value(100_000_000))
+                    } else {
+                        tc.draw(gs::integers::<u64>())
+                    };
+                    state.finish(id, &who, now, outcome, duration)
+                }
+                2 => state.mark_gap(now),
+                _ => {
+                    let dead: Vec<Producer> = producers
+                        .iter()
+                        .filter(|_| tc.draw(gs::booleans()))
+                        .cloned()
+                        .collect();
+                    state.reconcile(now, &dead).map(drop)
+                }
+            };
+            if result.is_err() {
+                assert_eq!(state, before);
+            }
+            assert_eq!(state.validate(), Ok(()));
         }
     }
 

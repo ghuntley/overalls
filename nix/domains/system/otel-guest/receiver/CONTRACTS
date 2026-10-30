@@ -1,0 +1,16 @@
+@cc [owner:ghuntley,label:verification] otel-receiver-hegel-properties
+Hegel is the receiver's only property engine. Hegel properties MUST cover the
+per-VM and host intake budgets; binding round-trip and its size, padding and
+canonical-identity refusals; independent oracles for canonical UUIDs, safe
+span names, the closed guest metric vocabulary and total service-name lookup;
+outer/unreviewed metric refusal and guest resource, dimension and span-detail
+replacement; the SLO snapshot hex-identity oracle, `valid` refusal lattice,
+strictly increasing service bounds, closed lifecycle set and histogram,
+coverage and outcome exports; durable source name round-trip, increasing
+source bounds, the `add` overflow oracle, validity of every transition-reached
+state, checkpoint reopen, gap settlement, admission conservation and the
+terminal fence; recorder start-tick parsing, frame bounds and unit matching;
+chunked-body reassembly; probe clocks and monitor freshness; and browser
+deadline, bound isolation and skipped-slot gaps. Socket peer credentials,
+file custody and process reaping stay with unit tests and the
+otel-request-recorder machine test.

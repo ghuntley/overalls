@@ -207,7 +207,7 @@ pub fn run(monitor_socket: &Path, collector_socket: &Path) -> ! {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
 
     fn response(now: u64, attempts: u64, unknown: u64, bins: usize) -> Vec<u8> {
         let body = serde_json::json!({
@@ -224,24 +224,46 @@ mod tests {
         .into_bytes()
     }
 
-    proptest! {
-        #[test]
-        fn probe_sampling_clock_preserves_observation(now in 0u64..u64::MAX, ready in any::<bool>()) {
-            let request = ExportMetricsServiceRequest::decode(encode(ready, now).as_slice()).unwrap();
-            let metrics = &request.resource_metrics[0].scope_metrics[0].metrics;
-            prop_assert_eq!(metrics.len(), 2);
-            let Some(Data::Gauge(clock)) = &metrics[1].data else { panic!("clock gauge"); };
-            prop_assert_eq!(clock.data_points[0].time_unix_nano, now);
-            prop_assert_eq!(clock.data_points[0].value, Some(NumberValue::AsDouble(now as f64 / 1_000_000_000.0)));
-        }
-        #[test]
-        fn monitor_freshness_and_accounting_are_closed(now in 10_000u64..1_000_000, attempts in 0u64..1000, unknown in 0u64..1000, offset in 0u64..12_000) {
-            let unknown = unknown.min(attempts);
-            prop_assert!(valid_response(&response(now, attempts, unknown, 60), now));
-            prop_assert!(!valid_response(&response(now + 5_001 + offset, attempts, unknown, 60), now));
-            prop_assert!(!valid_response(&response(now, attempts, attempts + 1, 60), now));
-            prop_assert!(!valid_response(&response(now, attempts, unknown, 59), now));
-        }
+    /// @cc [owner:ghuntley,label:verification] otel-receiver-probe-clock-property
+    /// For any generated sample time and readiness, the probe OTLP MUST carry
+    /// exactly the readiness and sample-clock gauges at that time.
+    #[hegel::test(test_cases = 256)]
+    fn probe_sampling_clock_preserves_observation(tc: TestCase) {
+        let now = tc.draw(gs::integers::<u64>().max_value(u64::MAX - 1));
+        let ready = tc.draw(gs::booleans());
+        let request = ExportMetricsServiceRequest::decode(encode(ready, now).as_slice()).unwrap();
+        let metrics = &request.resource_metrics[0].scope_metrics[0].metrics;
+        assert_eq!(metrics.len(), 2);
+        let Some(Data::Gauge(clock)) = &metrics[1].data else {
+            panic!("clock gauge");
+        };
+        assert_eq!(clock.data_points[0].time_unix_nano, now);
+        assert_eq!(
+            clock.data_points[0].value,
+            Some(NumberValue::AsDouble(now as f64 / 1_000_000_000.0))
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-monitor-freshness-property
+    /// Generated monitor replies MUST validate only when fresh, conserving and
+    /// carrying exactly sixty minute bins.
+    #[hegel::test(test_cases = 256)]
+    fn monitor_freshness_and_accounting_are_closed(tc: TestCase) {
+        let now = tc.draw(gs::integers::<u64>().min_value(10_000).max_value(999_999));
+        let attempts = tc.draw(gs::integers::<u64>().max_value(999));
+        let unknown = tc.draw(gs::integers::<u64>().max_value(999));
+        let offset = tc.draw(gs::integers::<u64>().max_value(11_999));
+        let unknown = unknown.min(attempts);
+        assert!(valid_response(&response(now, attempts, unknown, 60), now));
+        assert!(!valid_response(
+            &response(now + 5_001 + offset, attempts, unknown, 60),
+            now
+        ));
+        assert!(!valid_response(
+            &response(now, attempts, attempts + 1, 60),
+            now
+        ));
+        assert!(!valid_response(&response(now, attempts, unknown, 59), now));
     }
 
     #[test]

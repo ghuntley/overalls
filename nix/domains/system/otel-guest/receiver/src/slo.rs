@@ -516,7 +516,7 @@ pub fn run_with_custody(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
     use std::os::unix::fs::{symlink, PermissionsExt};
 
     fn sample(requests: u64, successes: u64) -> Snapshot {
@@ -540,187 +540,538 @@ mod tests {
         }
     }
 
-    proptest! {
-        #[test]
-        fn browser_recorder_histogram_survives_validated_otlp_export(duration in 0u64..80_000_000) {
-            use crate::durable_slo::{Outcome, Producer, Source, State};
-            for source in [Source::VscodeBrowserNixos, Source::VscodeBrowserUbuntu] {
-                let mut state = State::new(source, 1, "a".repeat(32)).unwrap();
-                let producer = Producer { pid: 1, start_ticks: 1,
-                    boot_id: "00000000-0000-0000-0000-000000000001".to_owned() };
-                let id = state.admit(producer.clone(), 2, 100_000_000_000).unwrap();
-                state.finish(id, &producer, 3, Outcome::Success, duration).unwrap();
-                let bytes = crate::request_recorder::snapshot_bytes(&state, 4).unwrap();
-                let mut snapshot: Snapshot = serde_json::from_slice(&bytes).unwrap();
-                prop_assert!(valid(&snapshot, source.name(), None, 4));
-                let decoded = ExportMetricsServiceRequest::decode(encode(&snapshot).as_slice()).unwrap();
-                let histogram = decoded.resource_metrics[0].scope_metrics[0].metrics.iter()
-                    .find_map(|metric| match &metric.data {
-                        Some(Data::Histogram(histogram)) => Some(&histogram.data_points[0]),
-                        _ => None,
-                    }).unwrap();
-                prop_assert_eq!(&histogram.explicit_bounds,
-                    &vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]);
-                prop_assert_eq!(histogram.count, 1);
-                prop_assert_eq!(histogram.bucket_counts.iter().sum::<u64>(), 1);
-                snapshot.duration.explicit_bounds_us = BOUNDS_US.to_vec();
-                prop_assert!(!valid(&snapshot, source.name(), None, 4));
-            }
-        }
-
-        /// @cc [owner:ghuntley,label:verification] underclass-single-histogram-export
-        /// Generated Underclass histories MUST validate and export exactly one
-        /// 15-bound duration histogram; conservation breaks, foreign bounds,
-        /// bucket-shape changes and bound reuse by another service are refused.
-        #[test]
-        fn underclass_exports_one_fifteen_bound_histogram(durations in prop::collection::vec(0u64..100_000_000_000, 1..40)) {
-            let n = durations.len() as u64;
-            let mut snapshot = sample(n, n);
-            snapshot.service = "underclass_proxy".to_owned();
-            let mut buckets = vec![0u64; 16];
-            for duration in &durations {
-                let index = UNDERCLASS_BOUNDS_US.iter().position(|b| duration <= b).unwrap_or(15);
-                buckets[index] += 1;
-            }
-            snapshot.duration = DurationSample {
-                count: n, sum_us: durations.iter().sum(),
-                explicit_bounds_us: UNDERCLASS_BOUNDS_US.to_vec(), bucket_counts: buckets,
+    /// @cc [owner:ghuntley,label:verification] otel-receiver-browser-histogram-export
+    /// Generated browser journey durations recorded by the durable recorder MUST
+    /// validate and export the browser bound set; foreign bounds are refused.
+    #[hegel::test(test_cases = 256)]
+    fn browser_recorder_histogram_survives_validated_otlp_export(tc: TestCase) {
+        use crate::durable_slo::{Outcome, Producer, Source, State};
+        let duration = tc.draw(gs::integers::<u64>().max_value(79_999_999));
+        for source in [Source::VscodeBrowserNixos, Source::VscodeBrowserUbuntu] {
+            let mut state = State::new(source, 1, "a".repeat(32)).unwrap();
+            let producer = Producer {
+                pid: 1,
+                start_ticks: 1,
+                boot_id: "00000000-0000-0000-0000-000000000001".to_owned(),
             };
-            prop_assert!(valid(&snapshot, "underclass_proxy", None, snapshot.sampled_at_unix_nano));
-            let encoded = ExportMetricsServiceRequest::decode(encode(&snapshot).as_slice()).unwrap();
-            let metrics = &encoded.resource_metrics[0].scope_metrics[0].metrics;
-            prop_assert_eq!(metrics.len(), 7);
-            let histograms: Vec<&Metric> = metrics.iter()
-                .filter(|m| matches!(m.data, Some(Data::Histogram(_)))).collect();
-            prop_assert_eq!(histograms.len(), 1);
-            prop_assert_eq!(histograms[0].name.as_str(), "overalls.outer.underclass_proxy.duration");
-            let Some(Data::Histogram(histogram)) = &histograms[0].data else { panic!("histogram missing"); };
-            prop_assert_eq!(&histogram.data_points[0].explicit_bounds,
-                &UNDERCLASS_BOUNDS_US.map(|bound| bound as f64 / 1_000_000.0).to_vec());
-            prop_assert_eq!(histogram.data_points[0].bucket_counts.len(), 16);
-            let mut broken = snapshot.clone();
-            broken.duration.bucket_counts[0] += 1;
-            prop_assert!(!valid(&broken, "underclass_proxy", None, broken.sampled_at_unix_nano));
-            let mut short = snapshot.clone();
-            short.duration.bucket_counts.pop();
-            prop_assert!(!valid(&short, "underclass_proxy", None, short.sampled_at_unix_nano));
-            let mut legacy = sample(n, n);
-            legacy.service = "underclass_proxy".to_owned();
-            prop_assert!(!valid(&legacy, "underclass_proxy", None, legacy.sampled_at_unix_nano));
-            snapshot.service = "brady".to_owned();
-            prop_assert!(!valid(&snapshot, "brady", None, snapshot.sampled_at_unix_nano));
+            let id = state.admit(producer.clone(), 2, 100_000_000_000).unwrap();
+            state
+                .finish(id, &producer, 3, Outcome::Success, duration)
+                .unwrap();
+            let bytes = crate::request_recorder::snapshot_bytes(&state, 4).unwrap();
+            let mut snapshot: Snapshot = serde_json::from_slice(&bytes).unwrap();
+            assert!(valid(&snapshot, source.name(), None, 4));
+            let decoded =
+                ExportMetricsServiceRequest::decode(encode(&snapshot).as_slice()).unwrap();
+            let histogram = decoded.resource_metrics[0].scope_metrics[0]
+                .metrics
+                .iter()
+                .find_map(|metric| match &metric.data {
+                    Some(Data::Histogram(histogram)) => Some(&histogram.data_points[0]),
+                    _ => None,
+                })
+                .unwrap();
+            assert_eq!(
+                &histogram.explicit_bounds,
+                &vec![0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0]
+            );
+            assert_eq!(histogram.count, 1);
+            assert_eq!(histogram.bucket_counts.iter().sum::<u64>(), 1);
+            snapshot.duration.explicit_bounds_us = BOUNDS_US.to_vec();
+            assert!(!valid(&snapshot, source.name(), None, 4));
         }
     }
 
-    proptest! {
-        #[test]
-        fn coverage_clocks_never_reset_counters_or_allow_quality_regression(gap in 1_000_000_000_u64..3_000_000_000) {
-            let original = sample(10, 7);
-            let mut newer = original.clone();
-            newer.sampled_at_unix_nano += 1;
-            newer.coverage_started_at_unix_nano = Some(gap);
-            prop_assert!(valid(&newer, "brady", Some(&original), newer.sampled_at_unix_nano));
-            let decoded = ExportMetricsServiceRequest::decode(encode(&newer).as_slice()).unwrap();
-            let metric = decoded.resource_metrics[0].scope_metrics[0].metrics.iter()
-                .find(|metric| metric.name == "overalls.outer.brady.source_coverage_start_time").unwrap();
-            let Some(Data::Gauge(gauge)) = &metric.data else { panic!("coverage clock missing"); };
-            prop_assert_eq!(gauge.data_points[0].value, Some(NumberValue::AsDouble(gap as f64 / 1_000_000_000.0)));
-            let mut regression = newer.clone();
-            regression.sampled_at_unix_nano += 1;
-            regression.coverage_started_at_unix_nano = Some(gap - 1);
-            prop_assert!(!valid(&regression, "brady", Some(&newer), regression.sampled_at_unix_nano));
-            regression.coverage_started_at_unix_nano = Some(regression.sampled_at_unix_nano + 1);
-            prop_assert!(!valid(&regression, "brady", None, regression.sampled_at_unix_nano));
+    /// @cc [owner:ghuntley,label:verification] underclass-single-histogram-export
+    /// Generated Underclass histories MUST validate and export exactly one
+    /// 15-bound duration histogram; conservation breaks, foreign bounds,
+    /// bucket-shape changes and bound reuse by another service are refused.
+    #[hegel::test(test_cases = 256)]
+    fn underclass_exports_one_fifteen_bound_histogram(tc: TestCase) {
+        let durations = tc.draw(
+            gs::vecs(gs::integers::<u64>().max_value(99_999_999_999))
+                .min_size(1)
+                .max_size(39),
+        );
+        let n = durations.len() as u64;
+        let mut snapshot = sample(n, n);
+        snapshot.service = "underclass_proxy".to_owned();
+        let mut buckets = vec![0u64; 16];
+        for duration in &durations {
+            let index = UNDERCLASS_BOUNDS_US
+                .iter()
+                .position(|b| duration <= b)
+                .unwrap_or(15);
+            buckets[index] += 1;
         }
-        #[test]
-        fn generated_lifecycle_histograms_keep_fixed_service_bounds(requests in 0u64..100_000, successes in 0u64..100_000) {
-            for service in ["marshall_ready", "lilly_physical", "porsche_physical",
-                "porsche_clone", "porsche_relocate", "porsche_retry", "porsche_cancel"] {
-                let mut snapshot = sample(requests, successes.min(requests));
-                snapshot.service = service.to_owned();
-                snapshot.duration.explicit_bounds_us = LIFECYCLE_BOUNDS_US.to_vec();
-                prop_assert!(valid(&snapshot, service, None, snapshot.sampled_at_unix_nano));
-                let encoded = encode(&snapshot);
-                let decoded = ExportMetricsServiceRequest::decode(encoded.as_slice()).unwrap();
-                let metrics = &decoded.resource_metrics[0].scope_metrics[0].metrics;
-                let histogram = metrics.iter().find_map(|metric| match &metric.data {
+        snapshot.duration = DurationSample {
+            count: n,
+            sum_us: durations.iter().sum(),
+            explicit_bounds_us: UNDERCLASS_BOUNDS_US.to_vec(),
+            bucket_counts: buckets,
+        };
+        assert!(valid(
+            &snapshot,
+            "underclass_proxy",
+            None,
+            snapshot.sampled_at_unix_nano
+        ));
+        let encoded = ExportMetricsServiceRequest::decode(encode(&snapshot).as_slice()).unwrap();
+        let metrics = &encoded.resource_metrics[0].scope_metrics[0].metrics;
+        assert_eq!(metrics.len(), 7);
+        let histograms: Vec<&Metric> = metrics
+            .iter()
+            .filter(|m| matches!(m.data, Some(Data::Histogram(_))))
+            .collect();
+        assert_eq!(histograms.len(), 1);
+        assert_eq!(
+            histograms[0].name.as_str(),
+            "overalls.outer.underclass_proxy.duration"
+        );
+        let Some(Data::Histogram(histogram)) = &histograms[0].data else {
+            panic!("histogram missing");
+        };
+        assert_eq!(
+            &histogram.data_points[0].explicit_bounds,
+            &UNDERCLASS_BOUNDS_US
+                .map(|bound| bound as f64 / 1_000_000.0)
+                .to_vec()
+        );
+        assert_eq!(histogram.data_points[0].bucket_counts.len(), 16);
+        let mut broken = snapshot.clone();
+        broken.duration.bucket_counts[0] += 1;
+        assert!(!valid(
+            &broken,
+            "underclass_proxy",
+            None,
+            broken.sampled_at_unix_nano
+        ));
+        let mut short = snapshot.clone();
+        short.duration.bucket_counts.pop();
+        assert!(!valid(
+            &short,
+            "underclass_proxy",
+            None,
+            short.sampled_at_unix_nano
+        ));
+        let mut legacy = sample(n, n);
+        legacy.service = "underclass_proxy".to_owned();
+        assert!(!valid(
+            &legacy,
+            "underclass_proxy",
+            None,
+            legacy.sampled_at_unix_nano
+        ));
+        snapshot.service = "brady".to_owned();
+        assert!(!valid(
+            &snapshot,
+            "brady",
+            None,
+            snapshot.sampled_at_unix_nano
+        ));
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-coverage-clock-monotone
+    /// Generated coverage clocks MUST export unchanged and MUST NOT regress or
+    /// pass the sample time.
+    #[hegel::test(test_cases = 256)]
+    fn coverage_clocks_never_reset_counters_or_allow_quality_regression(tc: TestCase) {
+        let gap = tc.draw(
+            gs::integers::<u64>()
+                .min_value(1_000_000_000)
+                .max_value(2_999_999_999),
+        );
+        let original = sample(10, 7);
+        let mut newer = original.clone();
+        newer.sampled_at_unix_nano += 1;
+        newer.coverage_started_at_unix_nano = Some(gap);
+        assert!(valid(
+            &newer,
+            "brady",
+            Some(&original),
+            newer.sampled_at_unix_nano
+        ));
+        let decoded = ExportMetricsServiceRequest::decode(encode(&newer).as_slice()).unwrap();
+        let metric = decoded.resource_metrics[0].scope_metrics[0]
+            .metrics
+            .iter()
+            .find(|metric| metric.name == "overalls.outer.brady.source_coverage_start_time")
+            .unwrap();
+        let Some(Data::Gauge(gauge)) = &metric.data else {
+            panic!("coverage clock missing");
+        };
+        assert_eq!(
+            gauge.data_points[0].value,
+            Some(NumberValue::AsDouble(gap as f64 / 1_000_000_000.0))
+        );
+        let mut regression = newer.clone();
+        regression.sampled_at_unix_nano += 1;
+        regression.coverage_started_at_unix_nano = Some(gap - 1);
+        assert!(!valid(
+            &regression,
+            "brady",
+            Some(&newer),
+            regression.sampled_at_unix_nano
+        ));
+        regression.coverage_started_at_unix_nano = Some(regression.sampled_at_unix_nano + 1);
+        assert!(!valid(
+            &regression,
+            "brady",
+            None,
+            regression.sampled_at_unix_nano
+        ));
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-lifecycle-bounds-fixed
+    /// Generated lifecycle snapshots MUST validate and export only the lifecycle
+    /// bound set; request bounds are refused for lifecycle services.
+    #[hegel::test(test_cases = 256)]
+    fn generated_lifecycle_histograms_keep_fixed_service_bounds(tc: TestCase) {
+        let requests = tc.draw(gs::integers::<u64>().max_value(99_999));
+        let successes = tc.draw(gs::integers::<u64>().max_value(99_999));
+        for service in [
+            "marshall_ready",
+            "lilly_physical",
+            "porsche_physical",
+            "porsche_clone",
+            "porsche_relocate",
+            "porsche_retry",
+            "porsche_cancel",
+        ] {
+            let mut snapshot = sample(requests, successes.min(requests));
+            snapshot.service = service.to_owned();
+            snapshot.duration.explicit_bounds_us = LIFECYCLE_BOUNDS_US.to_vec();
+            assert!(valid(
+                &snapshot,
+                service,
+                None,
+                snapshot.sampled_at_unix_nano
+            ));
+            let encoded = encode(&snapshot);
+            let decoded = ExportMetricsServiceRequest::decode(encoded.as_slice()).unwrap();
+            let metrics = &decoded.resource_metrics[0].scope_metrics[0].metrics;
+            let histogram = metrics
+                .iter()
+                .find_map(|metric| match &metric.data {
                     Some(Data::Histogram(histogram)) => Some(histogram),
                     _ => None,
-                }).unwrap();
-                prop_assert_eq!(&histogram.data_points[0].explicit_bounds,
-                    &LIFECYCLE_BOUNDS_US.map(|bound| bound as f64 / 1_000_000.0).to_vec());
-                snapshot.duration.explicit_bounds_us = BOUNDS_US.to_vec();
-                prop_assert!(!valid(&snapshot, service, None, snapshot.sampled_at_unix_nano));
+                })
+                .unwrap();
+            assert_eq!(
+                &histogram.data_points[0].explicit_bounds,
+                &LIFECYCLE_BOUNDS_US
+                    .map(|bound| bound as f64 / 1_000_000.0)
+                    .to_vec()
+            );
+            snapshot.duration.explicit_bounds_us = BOUNDS_US.to_vec();
+            assert!(!valid(
+                &snapshot,
+                service,
+                None,
+                snapshot.sampled_at_unix_nano
+            ));
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-outcome-arithmetic
+    /// Generated outcome counts MUST conserve requests, stay monotonic across
+    /// samples and export under each fixed source's own metric names.
+    #[hegel::test(test_cases = 256)]
+    fn generated_outcome_arithmetic_and_monotonicity(tc: TestCase) {
+        let requests = tc.draw(gs::integers::<u64>().max_value(99_999));
+        let successes = tc.draw(gs::integers::<u64>().max_value(99_999));
+        let successes = successes.min(requests);
+        let first = sample(requests, successes);
+        assert!(valid(&first, "brady", None, 3_000_000_000));
+        let mut next = sample(requests + 1, successes + 1);
+        next.sampled_at_unix_nano += 1;
+        assert!(valid(&next, "brady", Some(&first), 3_000_000_001));
+        next.failures += 1;
+        assert!(!valid(&next, "brady", Some(&first), 3_000_000_001));
+        let decoded = ExportMetricsServiceRequest::decode(encode(&first).as_slice()).unwrap();
+        assert_eq!(
+            decoded.resource_metrics[0].scope_metrics[0].metrics.len(),
+            7
+        );
+        let start = &decoded.resource_metrics[0].scope_metrics[0].metrics[3];
+        assert_eq!(
+            start.name.as_str(),
+            "overalls.outer.brady.source_start_time"
+        );
+        let sampled = &decoded.resource_metrics[0].scope_metrics[0].metrics[6];
+        assert_eq!(
+            sampled.name.as_str(),
+            "overalls.outer.brady.source_sample_time"
+        );
+        let Some(Data::Gauge(clock)) = &sampled.data else {
+            panic!("source clock missing");
+        };
+        assert_eq!(
+            clock.data_points[0].value,
+            Some(NumberValue::AsDouble(
+                first.sampled_at_unix_nano as f64 / 1_000_000_000.0
+            ))
+        );
+        let Some(Data::Gauge(gauge)) = &start.data else {
+            panic!("missing source start gauge");
+        };
+        assert_eq!(gauge.data_points[0].value, Some(NumberValue::AsDouble(1.0)));
+        let mut galileo = first.clone();
+        galileo.service = "galileo".to_owned();
+        assert!(valid(&galileo, "galileo", None, 3_000_000_000));
+        assert!(!valid(&galileo, "brady", None, 3_000_000_000));
+        let galileo_otlp =
+            ExportMetricsServiceRequest::decode(encode(&galileo).as_slice()).unwrap();
+        assert_eq!(
+            galileo_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.galileo.requests"
+        );
+        let mut enrico = first.clone();
+        enrico.service = "enrico".to_owned();
+        assert!(valid(&enrico, "enrico", None, 3_000_000_000));
+        assert!(!valid(&enrico, "brady", None, 3_000_000_000));
+        let enrico_otlp = ExportMetricsServiceRequest::decode(encode(&enrico).as_slice()).unwrap();
+        assert_eq!(
+            enrico_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.enrico.requests"
+        );
+        let mut porsche = first.clone();
+        porsche.service = "porsche".to_owned();
+        assert!(valid(&porsche, "porsche", None, 3_000_000_000));
+        assert!(!valid(&porsche, "brady", None, 3_000_000_000));
+        let porsche_otlp =
+            ExportMetricsServiceRequest::decode(encode(&porsche).as_slice()).unwrap();
+        assert_eq!(
+            porsche_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.porsche.requests"
+        );
+        let mut ziggy = first.clone();
+        ziggy.service = "ziggy".to_owned();
+        assert!(valid(&ziggy, "ziggy", None, 3_000_000_000));
+        assert!(!valid(&ziggy, "brady", None, 3_000_000_000));
+        let ziggy_otlp = ExportMetricsServiceRequest::decode(encode(&ziggy).as_slice()).unwrap();
+        assert_eq!(
+            ziggy_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.ziggy.requests"
+        );
+        let mut audi = first.clone();
+        audi.service = "audi_private".to_owned();
+        assert!(valid(&audi, "audi_private", None, 3_000_000_000));
+        assert!(!valid(&audi, "ziggy", None, 3_000_000_000));
+        let audi_otlp = ExportMetricsServiceRequest::decode(encode(&audi).as_slice()).unwrap();
+        assert_eq!(
+            audi_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.audi_private.requests"
+        );
+        let mut dns = first.clone();
+        dns.service = "audi_dns".to_owned();
+        assert!(valid(&dns, "audi_dns", None, 3_000_000_000));
+        assert!(!valid(&dns, "audi_private", None, 3_000_000_000));
+        let dns_otlp = ExportMetricsServiceRequest::decode(encode(&dns).as_slice()).unwrap();
+        assert_eq!(
+            dns_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.audi_dns.requests"
+        );
+        let mut marshall = first.clone();
+        marshall.service = "marshall_web".to_owned();
+        assert!(valid(&marshall, "marshall_web", None, 3_000_000_000));
+        let marshall_otlp = ExportMetricsServiceRequest::decode(
+            encode_with_instance(&marshall, Some("overalls_a")).as_slice(),
+        )
+        .unwrap();
+        assert_eq!(
+            marshall_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.marshall_web.requests"
+        );
+        assert_eq!(
+            marshall_otlp.resource_metrics[0]
+                .resource
+                .as_ref()
+                .unwrap()
+                .attributes[1]
+                .key
+                .as_str(),
+            "service.instance.id"
+        );
+        let mut ssh = first.clone();
+        ssh.service = "audi_ssh".to_owned();
+        assert!(valid(&ssh, "audi_ssh", None, 3_000_000_000));
+        let ssh_otlp = ExportMetricsServiceRequest::decode(encode(&ssh).as_slice()).unwrap();
+        assert_eq!(
+            ssh_otlp.resource_metrics[0].scope_metrics[0].metrics[0]
+                .name
+                .as_str(),
+            "overalls.outer.audi_ssh.requests"
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] otel-receiver-hex-identity-oracle
+    /// `hex_identity` MUST accept exactly 32 lowercase hexadecimal characters,
+    /// agreeing with an independent character-class oracle.
+    #[hegel::test(test_cases = 512)]
+    fn hex_identity_matches_oracle(tc: TestCase) {
+        let value = if tc.draw(gs::booleans()) {
+            let mut value = format!("{:032x}", tc.draw(gs::integers::<u128>()));
+            if tc.draw(gs::booleans()) {
+                let at = tc.draw(gs::integers::<usize>().max_value(31));
+                let replacement =
+                    tc.draw(gs::sampled_from(vec!["A", "F", "g", "-", " ", "\u{e9}"]));
+                value.replace_range(at..=at, replacement);
+            }
+            value
+        } else {
+            tc.draw(
+                gs::text()
+                    .alphabet("0123456789abcdefABCDEFg")
+                    .min_size(30)
+                    .max_size(34),
+            )
+        };
+        let expected =
+            value.chars().count() == 32 && value.chars().all(|c| "0123456789abcdef".contains(c));
+        assert_eq!(hex_identity(&value), expected);
+    }
+
+    /// @cc [owner:ghuntley,label:verification;security] otel-receiver-snapshot-refusal-lattice
+    /// Starting from a valid snapshot, any nonempty set of independent field
+    /// violations (version, service, identities, start, coverage, bounds,
+    /// bucket shape, conservation, counter range, staleness or future clock)
+    /// MUST make `valid` refuse; the empty set MUST be accepted.
+    #[hegel::test(test_cases = 512)]
+    fn snapshot_refusal_lattice(tc: TestCase) {
+        let requests = tc.draw(gs::integers::<u64>().max_value(99_999));
+        let successes = tc.draw(gs::integers::<u64>().max_value(requests));
+        let mut snapshot = sample(requests, successes);
+        let mutations = tc.draw(gs::vecs(gs::booleans()).min_size(12).max_size(12));
+        let mut now = snapshot.sampled_at_unix_nano;
+        for (index, applied) in mutations.iter().enumerate() {
+            if !applied {
+                continue;
+            }
+            match index {
+                0 => snapshot.version = 2,
+                1 => snapshot.service = "galileo".to_owned(),
+                2 => snapshot.incarnation = "A".repeat(32),
+                3 => snapshot.invocation_id = "b".repeat(31),
+                4 => snapshot.started_at_unix_nano = 0,
+                5 => {
+                    snapshot.coverage_started_at_unix_nano =
+                        Some(snapshot.sampled_at_unix_nano + 1);
+                }
+                6 => snapshot.duration.explicit_bounds_us = LIFECYCLE_BOUNDS_US.to_vec(),
+                7 => snapshot.duration.bucket_counts.push(0),
+                8 => snapshot.failures += 1,
+                9 => snapshot.duration.sum_us = MAX_COUNTER + 1,
+                10 => snapshot.duration.bucket_counts[0] += 1,
+                _ => {
+                    now = if tc.draw(gs::booleans()) {
+                        snapshot.sampled_at_unix_nano + 15_000_000_001
+                    } else {
+                        snapshot.sampled_at_unix_nano - 2_000_000_001
+                    };
+                }
             }
         }
-        #[test]
-        fn generated_outcome_arithmetic_and_monotonicity(requests in 0u64..100_000, successes in 0u64..100_000) {
-            let successes = successes.min(requests);
-            let first = sample(requests, successes);
-            prop_assert!(valid(&first, "brady", None, 3_000_000_000));
-            let mut next = sample(requests + 1, successes + 1);
-            next.sampled_at_unix_nano += 1;
-            prop_assert!(valid(&next, "brady", Some(&first), 3_000_000_001));
-            next.failures += 1;
-            prop_assert!(!valid(&next, "brady", Some(&first), 3_000_000_001));
-            let decoded = ExportMetricsServiceRequest::decode(encode(&first).as_slice()).unwrap();
-            prop_assert_eq!(decoded.resource_metrics[0].scope_metrics[0].metrics.len(), 7);
-            let start = &decoded.resource_metrics[0].scope_metrics[0].metrics[3];
-            prop_assert_eq!(start.name.as_str(), "overalls.outer.brady.source_start_time");
-            let sampled = &decoded.resource_metrics[0].scope_metrics[0].metrics[6];
-            prop_assert_eq!(sampled.name.as_str(), "overalls.outer.brady.source_sample_time");
-            let Some(Data::Gauge(clock)) = &sampled.data else { panic!("source clock missing"); };
-            prop_assert_eq!(clock.data_points[0].value, Some(NumberValue::AsDouble(first.sampled_at_unix_nano as f64 / 1_000_000_000.0)));
-            let Some(Data::Gauge(gauge)) = &start.data else { return Err(proptest::test_runner::TestCaseError::fail("missing source start gauge")); };
-            prop_assert_eq!(gauge.data_points[0].value, Some(NumberValue::AsDouble(1.0)));
-            let mut galileo = first.clone();
-            galileo.service = "galileo".to_owned();
-            prop_assert!(valid(&galileo, "galileo", None, 3_000_000_000));
-            prop_assert!(!valid(&galileo, "brady", None, 3_000_000_000));
-            let galileo_otlp = ExportMetricsServiceRequest::decode(encode(&galileo).as_slice()).unwrap();
-            prop_assert_eq!(galileo_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.galileo.requests");
-            let mut enrico = first.clone();
-            enrico.service = "enrico".to_owned();
-            prop_assert!(valid(&enrico, "enrico", None, 3_000_000_000));
-            prop_assert!(!valid(&enrico, "brady", None, 3_000_000_000));
-            let enrico_otlp = ExportMetricsServiceRequest::decode(encode(&enrico).as_slice()).unwrap();
-            prop_assert_eq!(enrico_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.enrico.requests");
-            let mut porsche = first.clone();
-            porsche.service = "porsche".to_owned();
-            prop_assert!(valid(&porsche, "porsche", None, 3_000_000_000));
-            prop_assert!(!valid(&porsche, "brady", None, 3_000_000_000));
-            let porsche_otlp = ExportMetricsServiceRequest::decode(encode(&porsche).as_slice()).unwrap();
-            prop_assert_eq!(porsche_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.porsche.requests");
-            let mut ziggy = first.clone();
-            ziggy.service = "ziggy".to_owned();
-            prop_assert!(valid(&ziggy, "ziggy", None, 3_000_000_000));
-            prop_assert!(!valid(&ziggy, "brady", None, 3_000_000_000));
-            let ziggy_otlp = ExportMetricsServiceRequest::decode(encode(&ziggy).as_slice()).unwrap();
-            prop_assert_eq!(ziggy_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.ziggy.requests");
-            let mut audi = first.clone();
-            audi.service = "audi_private".to_owned();
-            prop_assert!(valid(&audi, "audi_private", None, 3_000_000_000));
-            prop_assert!(!valid(&audi, "ziggy", None, 3_000_000_000));
-            let audi_otlp = ExportMetricsServiceRequest::decode(encode(&audi).as_slice()).unwrap();
-            prop_assert_eq!(audi_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.audi_private.requests");
-            let mut dns = first.clone();
-            dns.service = "audi_dns".to_owned();
-            prop_assert!(valid(&dns, "audi_dns", None, 3_000_000_000));
-            prop_assert!(!valid(&dns, "audi_private", None, 3_000_000_000));
-            let dns_otlp = ExportMetricsServiceRequest::decode(encode(&dns).as_slice()).unwrap();
-            prop_assert_eq!(dns_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.audi_dns.requests");
-            let mut marshall = first.clone();
-            marshall.service = "marshall_web".to_owned();
-            prop_assert!(valid(&marshall, "marshall_web", None, 3_000_000_000));
-            let marshall_otlp = ExportMetricsServiceRequest::decode(encode_with_instance(&marshall, Some("overalls_a")).as_slice()).unwrap();
-            prop_assert_eq!(marshall_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.marshall_web.requests");
-            prop_assert_eq!(marshall_otlp.resource_metrics[0].resource.as_ref().unwrap().attributes[1].key.as_str(), "service.instance.id");
-            let mut ssh = first.clone();
-            ssh.service = "audi_ssh".to_owned();
-            prop_assert!(valid(&ssh, "audi_ssh", None, 3_000_000_000));
-            let ssh_otlp = ExportMetricsServiceRequest::decode(encode(&ssh).as_slice()).unwrap();
-            prop_assert_eq!(ssh_otlp.resource_metrics[0].scope_metrics[0].metrics[0].name.as_str(), "overalls.outer.audi_ssh.requests");
+        let violated = mutations.iter().any(|applied| *applied);
+        assert_eq!(valid(&snapshot, "brady", None, now), !violated);
+    }
+
+    const KNOWN_SERVICES: [&str; 21] = [
+        "brady",
+        "galileo",
+        "enrico",
+        "porsche",
+        "audi_private",
+        "audi_dns",
+        "audi_ssh",
+        "marshall_web",
+        "marshall_live",
+        "vscode_browser_nixos",
+        "vscode_browser_ubuntu",
+        "ziggy",
+        "underclass_proxy",
+        "marshall_ready",
+        "lilly_physical",
+        "porsche_physical",
+        "porsche_clone",
+        "porsche_relocate",
+        "porsche_retry",
+        "porsche_cancel",
+        "unknown",
+    ];
+
+    const LIFECYCLE_SERVICES: [&str; 7] = [
+        "marshall_ready",
+        "lilly_physical",
+        "porsche_physical",
+        "porsche_clone",
+        "porsche_relocate",
+        "porsche_retry",
+        "porsche_cancel",
+    ];
+
+    fn draw_service(tc: &TestCase) -> String {
+        if tc.draw(gs::booleans()) {
+            tc.draw(gs::sampled_from(KNOWN_SERVICES.to_vec()))
+                .to_owned()
+        } else {
+            tc.draw(gs::text().alphabet("abcdeilnoprstuy_").max_size(24))
         }
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-service-bounds-increasing
+    /// For any service name, `service_bounds` MUST return one of the four
+    /// reviewed bound sets, nonempty and strictly increasing.
+    #[hegel::test(test_cases = 256)]
+    fn service_bounds_strictly_increase(tc: TestCase) {
+        let service = draw_service(&tc);
+        let bounds = service_bounds(&service);
+        assert!(!bounds.is_empty());
+        assert!(bounds.windows(2).all(|pair| pair[0] < pair[1]));
+        assert!(
+            bounds == BOUNDS_US.as_slice()
+                || bounds == LIFECYCLE_BOUNDS_US.as_slice()
+                || bounds == UNDERCLASS_BOUNDS_US.as_slice()
+                || bounds == crate::durable_slo::BROWSER_BOUNDS_US.as_slice()
+        );
+    }
+
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-lifecycle-service-closed
+    /// `lifecycle_service` MUST accept exactly the seven reviewed lifecycle
+    /// sources, and exactly those MUST receive the lifecycle bound set.
+    #[hegel::test(test_cases = 256)]
+    fn lifecycle_service_set_is_closed(tc: TestCase) {
+        let service = if tc.draw(gs::booleans()) {
+            let base = tc.draw(gs::sampled_from(LIFECYCLE_SERVICES.to_vec()));
+            match tc.draw(gs::integers::<u8>().max_value(3)) {
+                0 => base.to_owned(),
+                1 => format!("{base}_"),
+                2 => base.to_uppercase(),
+                _ => base[1..].to_owned(),
+            }
+        } else {
+            draw_service(&tc)
+        };
+        let expected = LIFECYCLE_SERVICES.contains(&service.as_str());
+        assert_eq!(lifecycle_service(&service), expected);
+        assert_eq!(
+            service_bounds(&service) == LIFECYCLE_BOUNDS_US.as_slice(),
+            expected
+        );
     }
 
     #[test]

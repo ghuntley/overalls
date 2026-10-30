@@ -260,7 +260,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
 
     fn request(chunks: &[Vec<u8>]) -> Vec<u8> {
         let mut bytes = b"POST /v1/metrics HTTP/1.1\r\nHost: otel.integration.internal\r\nContent-Type: application/x-protobuf\r\nTransfer-Encoding: chunked\r\nX-Overalls-Binding: e30\r\n\r\n".to_vec();
@@ -279,15 +279,18 @@ mod tests {
         read_request(&mut read)
     }
 
-    proptest! {
-        #[test]
-        fn chunk_boundaries_preserve_payload(
-            chunks in proptest::collection::vec(proptest::collection::vec(any::<u8>(), 1..100), 1..20)
-        ) {
-            let expected: Vec<u8> = chunks.iter().flatten().copied().collect();
-            let (_, _, body) = parse(request(&chunks)).expect("valid chunked request");
-            prop_assert_eq!(body, expected);
-        }
+    /// @cc [owner:ghuntley,label:verification] otel-receiver-chunk-boundary-property
+    /// Generated chunk boundaries MUST reassemble to exactly the concatenated payload.
+    #[hegel::test(test_cases = 256)]
+    fn chunk_boundaries_preserve_payload(tc: TestCase) {
+        let chunks = tc.draw(
+            gs::vecs(gs::vecs(gs::integers::<u8>()).min_size(1).max_size(99))
+                .min_size(1)
+                .max_size(19),
+        );
+        let expected: Vec<u8> = chunks.iter().flatten().copied().collect();
+        let (_, _, body) = parse(request(&chunks)).expect("valid chunked request");
+        assert_eq!(body, expected);
     }
 
     #[test]

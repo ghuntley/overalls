@@ -228,7 +228,7 @@ pub fn run(socket: &Path, driver: &Path, fixture: &Path, chromium: &Path) -> ! {
 mod tests {
     use super::*;
     use crate::durable_slo::{Outcome, Producer, Source, State};
-    use proptest::prelude::*;
+    use hegel::{generators as gs, TestCase};
     use std::io::{BufRead, BufReader};
 
     fn fixture(name: &str) -> ProcessCommand {
@@ -292,40 +292,75 @@ mod tests {
         std::thread::sleep(Duration::from_secs(30));
     }
 
-    proptest! {
-        #[test]
-        fn late_child_exit_never_becomes_success(micros in 60_000_000u64..1_000_000_000, success in any::<bool>()) {
-            prop_assert!(matches!(terminal(success, Duration::from_micros(micros)), Terminal::Failure));
-        }
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-late-browser-failure
+    /// A browser exit at or after the minute deadline MUST settle as failure,
+    /// whatever its exit status.
+    #[hegel::test(test_cases = 256)]
+    fn late_child_exit_never_becomes_success(tc: TestCase) {
+        let micros = tc.draw(
+            gs::integers::<u64>()
+                .min_value(60_000_000)
+                .max_value(999_999_999),
+        );
+        let success = tc.draw(gs::booleans());
+        assert!(matches!(
+            terminal(success, Duration::from_micros(micros)),
+            Terminal::Failure
+        ));
+    }
 
-        #[test]
-        fn browser_bounds_preserve_every_old_source(duration in 0u64..80_000_000) {
-            for old in [Source::MarshallWeb, Source::MarshallLive, Source::Galileo, Source::Enrico, Source::Brady,
-                Source::Porsche, Source::AudiPrivate, Source::AudiDns, Source::AudiSsh] {
-                prop_assert_eq!(old.bounds_us(), crate::durable_slo::BOUNDS_US);
-            }
-            let mut state = State::new(Source::VscodeBrowserNixos, 1, "a".repeat(32)).unwrap();
-            let producer = Producer { pid: 1, start_ticks: 1, boot_id: "00000000-0000-0000-0000-000000000001".to_owned() };
-            let id = state.admit(producer.clone(), 2, 100_000_000_000).unwrap();
-            state.finish(id, &producer, 3, Outcome::Success, duration).unwrap();
-            prop_assert!(state.finish(id, &producer, 4, Outcome::Success, duration).is_err());
-            prop_assert_eq!(state.totals.requests, 1);
-            prop_assert_eq!(state.totals.successes, 1);
-            prop_assert_eq!(state.totals.bucket_counts.iter().sum::<u64>(), 1);
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-browser-bounds-isolated
+    /// Browser bounds MUST NOT change any existing source's bounds, and a
+    /// generated browser duration MUST settle exactly once.
+    #[hegel::test(test_cases = 256)]
+    fn browser_bounds_preserve_every_old_source(tc: TestCase) {
+        let duration = tc.draw(gs::integers::<u64>().max_value(79_999_999));
+        for old in [
+            Source::MarshallWeb,
+            Source::MarshallLive,
+            Source::Galileo,
+            Source::Enrico,
+            Source::Brady,
+            Source::Porsche,
+            Source::AudiPrivate,
+            Source::AudiDns,
+            Source::AudiSsh,
+        ] {
+            assert_eq!(old.bounds_us(), crate::durable_slo::BOUNDS_US);
         }
+        let mut state = State::new(Source::VscodeBrowserNixos, 1, "a".repeat(32)).unwrap();
+        let producer = Producer {
+            pid: 1,
+            start_ticks: 1,
+            boot_id: "00000000-0000-0000-0000-000000000001".to_owned(),
+        };
+        let id = state.admit(producer.clone(), 2, 100_000_000_000).unwrap();
+        state
+            .finish(id, &producer, 3, Outcome::Success, duration)
+            .unwrap();
+        assert!(state
+            .finish(id, &producer, 4, Outcome::Success, duration)
+            .is_err());
+        assert_eq!(state.totals.requests, 1);
+        assert_eq!(state.totals.successes, 1);
+        assert_eq!(state.totals.bucket_counts.iter().sum::<u64>(), 1);
+    }
 
-        #[test]
-        fn skipped_slots_reset_coverage_without_fabricated_health(delay in 300u64..100_000) {
-            let initial = Instant::now();
-            let now = initial + Duration::from_secs(delay);
-            let (next, decision) = slot(initial, now, true);
-            prop_assert_eq!(decision, Slot::Gap);
-            prop_assert_eq!(slot(next, now, true).1, Slot::Wait);
-            let mut state = State::new(Source::VscodeBrowserUbuntu, 1, "a".repeat(32)).unwrap();
-            let totals = state.totals.clone();
-            state.mark_gap(delay * 1_000_000_000).unwrap();
-            prop_assert_eq!(state.totals, totals);
-            prop_assert!(state.coverage_started_at_ns > state.started_at_ns);
-        }
+    /// @cc [owner:ghuntley,label:verification;reliability] otel-receiver-skipped-slot-gap
+    /// A generated skipped probe slot MUST record a gap that advances coverage
+    /// without fabricating health or changing totals.
+    #[hegel::test(test_cases = 256)]
+    fn skipped_slots_reset_coverage_without_fabricated_health(tc: TestCase) {
+        let delay = tc.draw(gs::integers::<u64>().min_value(300).max_value(99_999));
+        let initial = Instant::now();
+        let now = initial + Duration::from_secs(delay);
+        let (next, decision) = slot(initial, now, true);
+        assert_eq!(decision, Slot::Gap);
+        assert_eq!(slot(next, now, true).1, Slot::Wait);
+        let mut state = State::new(Source::VscodeBrowserUbuntu, 1, "a".repeat(32)).unwrap();
+        let totals = state.totals.clone();
+        state.mark_gap(delay * 1_000_000_000).unwrap();
+        assert_eq!(state.totals, totals);
+        assert!(state.coverage_started_at_ns > state.started_at_ns);
     }
 }
