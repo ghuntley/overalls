@@ -26,6 +26,14 @@ r() { printf '%s\\n' "$1" >> "$out"; }
 read -r host < /proc/sys/kernel/hostname
 r "$host"
 while read -r key value _; do if [ "$key" = Uid: ]; then r "uid $value"; fi; done < /proc/self/status
+while read -r key value _; do
+  case "$key" in CapInh:|CapPrm:|CapEff:|CapBnd:|CapAmb:|NoNewPrivs:) r "$key $value" ;; esac
+done < /proc/self/status
+# The capability-carrying sandbox, by its path and as this namespace's PID 1.
+for helper in /run/nativelink-worker-exec/action-sandbox /proc/1/exe; do
+  if (exec 3< "$helper") 2>/dev/null; then r "helper-readable $helper"; fi
+  if ("$helper" /bin/sh -c 'exit 0') 2>/dev/null; then r "helper-ran $helper"; fi
+done
 for path in /run/nativelink-worker/identity.pem /run/nativelink-worker /var/lib/nativelink-worker \\
     /var/lib/nativelink-worker/cas/content /run/nativelink-worker-exec/action-sandbox \\
     /run/overalls-secrets/buck-re-worker/worker.pem /run/credentials/nativelink-worker.service/worker.pem; do

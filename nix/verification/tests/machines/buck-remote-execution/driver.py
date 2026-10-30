@@ -265,7 +265,20 @@ with subtest("remote actions cannot reach the worker identity"):
     assert lines[1] == f"uid {action_uid}", lines
     procs = int(next(line for line in lines if line.startswith("procs "))[6:])
     assert procs <= 3, lines
-    assert lines[2:] == [f"procs {procs}", "pid1 action-sandbox", "fds"], lines
+    # No capability in any set, no way to gain one, and no way back to the
+    # sandbox that holds them.
+    zero = "0000000000000000"
+    assert lines[2:] == [
+        f"CapInh: {zero}",
+        f"CapPrm: {zero}",
+        f"CapEff: {zero}",
+        f"CapBnd: {zero}",
+        f"CapAmb: {zero}",
+        "NoNewPrivs: 1",
+        f"procs {procs}",
+        "pid1 action-sandbox",
+        "fds",
+    ], lines
     # The worker itself still holds the identity, and runs without capabilities.
     pid = worker_pid(runs)
     status = runs.succeed(f"cat /proc/{pid}/status")

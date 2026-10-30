@@ -221,14 +221,15 @@ let
     worker_gid=$(id -g nativelink-worker)
     mount -t tmpfs -o "mode=0750,uid=0,gid=$worker_gid,nodev,size=4m" nativelink-worker-exec ${sandboxDirectory}
     install -m 0750 -o root -g "$worker_gid" ${actionSandbox}/bin/buck-re-action-sandbox ${sandboxBinary}
-    setcap cap_setuid,cap_setgid,cap_sys_admin+ep ${sandboxBinary}
+    setcap cap_setuid,cap_setgid,cap_setpcap,cap_sys_admin+ep ${sandboxBinary}
     # Directories the worker creates are group-writable for the action user.
     umask 0007
     # No capabilities and no no_new_privs: the worker gains the bounding
-    # set's three only by running the sandbox, which drops to the action
-    # user. Setuid wrappers are not visible in this namespace.
+    # set's four only by running the sandbox, which empties every set and
+    # drops to the action user. Setuid wrappers are not visible in this
+    # namespace. Accepted risk; see the M10c review (ADR-0272).
     exec setpriv --reuid=nativelink-worker --regid=nativelink-worker --init-groups \
-      --inh-caps=-all --bounding-set=-all,+setuid,+setgid,+sys_admin \
+      --inh-caps=-all --bounding-set=-all,+setuid,+setgid,+setpcap,+sys_admin \
       -- ${lib.getExe packages.nativelink} ${workerConfig}
   '';
   # Buck2 reads root's ~/.buckconfig.d but ignores symlinks and includes
@@ -567,8 +568,8 @@ in {
           RestrictRealtime = true;
           RestrictSUIDSGID = true;
           LockPersonality = true;
-          # The start script's; the worker keeps only SETUID, SETGID and
-          # SYS_ADMIN in its bounding set, for the sandbox.
+          # The start script's; the worker keeps only SETUID, SETGID, SETPCAP
+          # and SYS_ADMIN in its bounding set, for the sandbox.
           CapabilityBoundingSet = [ "CAP_SYS_ADMIN" "CAP_SETUID" "CAP_SETGID" "CAP_SETPCAP" "CAP_CHOWN"
             "CAP_SETFCAP" "CAP_DAC_OVERRIDE" "CAP_FOWNER" ];
           SystemCallArchitectures = "native";

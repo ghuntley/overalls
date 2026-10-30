@@ -2,7 +2,8 @@
  * @cc [owner:ghuntley,label:security;isolation] buck-re-action-sandbox
  * The NativeLink worker's entrypoint for every remote action (ADR-0272).
  * Only the worker user MAY run it. It MUST run the action as ACTION_USER,
- * never the worker user, with no capabilities, no_new_privs and file
+ * never the worker user, with empty effective, permitted, inheritable,
+ * ambient and bounding capability sets, no_new_privs and file
  * descriptors above stderr closed, in fresh mount, PID, IPC, UTS and network
  * namespaces: the action sees no network, no process outside its own PID
  * namespace, no sibling action directory, and none of HIDDEN_PATHS (the
@@ -138,6 +139,19 @@ static void hide_worker_paths(void) {
 }
 
 static void drop_to(const struct passwd *action) {
+  /* Empty the bounding set (CAP_SETPCAP, still held) and the ambient set, so
+   * nothing the action runs can regain a capability. */
+  for (unsigned long capability = 0;; capability++) {
+    if (prctl(PR_CAPBSET_READ, capability, 0, 0, 0) < 0) {
+      break;
+    }
+    if (prctl(PR_CAPBSET_DROP, capability, 0, 0, 0) != 0) {
+      fail("bounding set");
+    }
+  }
+  if (prctl(PR_CAP_AMBIENT, PR_CAP_AMBIENT_CLEAR_ALL, 0, 0, 0) != 0) {
+    fail("ambient set");
+  }
   if (setgroups(0, NULL) != 0) {
     fail("setgroups");
   }

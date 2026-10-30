@@ -483,6 +483,63 @@ Verification: `buck-remote-execution` passed all 14 subtests on 2026-10-30,
 including "remote actions cannot reach the worker identity" and "a forged
 worker cannot register or record results".
 
+### M10c: the sandbox's privileges (accepted risk)
+
+**What the worker holds.** `nativelink-worker` runs with an empty
+effective, permitted, inheritable and ambient set and a bounding set of
+exactly `CAP_SETUID`, `CAP_SETGID`, `CAP_SETPCAP` and `CAP_SYS_ADMIN`, without
+`no_new_privs`. The only file it can gain them from is the sandbox,
+`/run/nativelink-worker-exec/action-sandbox`: a copy the start script puts on
+a tmpfs that exists only in the unit's mount namespace, owned
+`root:nativelink-worker`, mode 0750, with
+`cap_setuid,cap_setgid,cap_setpcap,cap_sys_admin+ep`. `/run/wrappers` is
+hidden in that namespace, so no setuid binary is reachable, and the Nix
+store carries no file capabilities. The sandbox accepts only the worker uid
+as caller and only switches to `nativelink-action`; before it runs the
+action it empties every capability set, including the bounding set (hence
+`CAP_SETPCAP`), sets `no_new_privs` and closes descriptors.
+
+**Why.** NativeLink runs an action by executing its `entrypoint` as a child
+of the worker, reads its stdout and stderr through pipes, kills it by
+process group and samples its resources by process group. A different user
+and fresh namespaces therefore have to be set up by something the worker
+itself executes, which needs these capabilities at exec time; `no_new_privs`
+would discard them.
+
+**The risk accepted.** A compromised NativeLink worker process (not an
+action) could run the sandbox with arguments of its choosing. That gives it
+what the sandbox does: a command as `nativelink-action` in fresh namespaces,
+less than the worker itself already has, since the worker holds the identity
+and can write the cache. It cannot use the bounding set any other way
+without a file that grants capabilities, and the only one is the sandbox. A
+memory-safety bug in the sandbox, which runs with `CAP_SYS_ADMIN` until it
+drops, would be the residual path; it is about 300 lines of C with `-Wall -Wextra
+-Werror`, parses no input beyond its argument vector and working directory,
+and checks the working directory against the work root.
+
+**Alternative: a root-owned launcher.** A separate root service (socket
+activated, or `systemd-run` from the worker) would start each action, and the
+worker would keep an empty bounding set and `no_new_privs`. It was not
+chosen, because it is neither cheaper nor clearly safer:
+- NativeLink's entrypoint would become a client that passes stdin, stdout
+  and stderr over the socket (`SCM_RIGHTS`), relays signals and the exit
+  status, and stands in for the real process group. NativeLink's kill and
+  resource sampling act on the client's process group, so the launched
+  action would escape both unless the launcher mirrored them.
+- The launcher runs as root with every capability it needs permanently and
+  parses requests from the worker over a socket: a larger, always-running
+  privileged surface than a sandbox that execs once per action and drops.
+- `systemd-run` would need the worker to reach the system manager over
+  D-Bus with polkit rights to start transient units, which is broader than
+  starting one fixed program.
+If NativeLink later supports running actions as another user itself, the
+file capabilities can go.
+
+Verification (M10c): the identity subtest now also asserts, from inside the
+action, that `CapInh`, `CapPrm`, `CapEff`, `CapBnd` and `CapAmb` are all zero
+and `NoNewPrivs` is 1, and that neither the sandbox's path nor
+`/proc/1/exe` can be opened or executed.
+
 ## M8: precommit on Buck2 BXL
 
 This milestone implements the precommit part of ADR-0269 and shares
