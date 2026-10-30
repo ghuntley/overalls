@@ -66,8 +66,9 @@ let
         secretspec = { url = "path:${packages.secretTools.secretspec}"; flake = false; };
         sops = { url = "path:${packages.secretTools.sops}"; flake = false; };
         sshToAge = { url = "path:${packages.secretTools.ssh-to-age}"; flake = false; };
+        observabilityRuntimes = { url = "path:${packages.observabilityRuntimes}"; flake = false; };
       };
-      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge }: {
+      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: {
         nixosConfigurations.fixture-enrollment = import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
           system = "x86_64-linux";
           modules = [
@@ -83,6 +84,7 @@ let
               packages = { marshall = marshall.outPath; lilly = lilly.outPath;
                 encrypted = { marshall = marshall.outPath; lilly = lilly.outPath; };
                 secretTools = { secretspec = secretspec.outPath; sops = sops.outPath; ssh-to-age = sshToAge.outPath; };
+                observabilityRuntimes = observabilityRuntimes.outPath;
               };
             })
             (import (project.outPath + "/nix/platform/hosts/profile.nix") {
@@ -128,7 +130,7 @@ let
         };
         packages = { marshall = pkgs.hello; lilly = pkgs.hello;
           encrypted = { marshall = pkgs.hello; lilly = pkgs.hello; };
-          inherit (packages) secretTools;
+          inherit (packages) secretTools observabilityRuntimes;
         };
       })
       (import ../../../../platform/hosts/profile.nix {
@@ -159,7 +161,7 @@ let
       # and immutable source inputs so this isolated test needs no network cache.
       system.extraDependencies = [ source nixpkgs.outPath diskoSource nixCompactSource pkgs.hello
         packages.secretTools.secretspec packages.secretTools.sops packages.secretTools.ssh-to-age
-        pkgs.stdenv pkgs.stdenvNoCC ];
+        packages.observabilityRuntimes pkgs.stdenv pkgs.stdenvNoCC ];
       system.build.overallsEnrollmentImages = lib.overrideDerivation config.system.build.diskoImages (old: {
         buildCommand = old.buildCommand + "\n${config.boot.zfs.package}/bin/zpool export zroot\n";
       });
