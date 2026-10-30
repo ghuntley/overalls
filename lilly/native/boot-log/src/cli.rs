@@ -17,8 +17,8 @@ pub struct Request {
 pub const READER_UIDS: std::ops::RangeInclusive<u32> = 1..=4_294_967_294;
 
 /// @cc [owner:ghuntley,label:security] boot-log-cli-reader
-/// parse_cli MUST accept `[--reader-uid N] LOG PROGRAM ARGS...` only, with N
-/// a decimal uid in READER_UIDS and LOG and PROGRAM absolute; any other
+/// `parse_cli` MUST accept `[--reader-uid N] LOG PROGRAM ARGS...` only, with N
+/// a decimal uid in `READER_UIDS` and LOG and PROGRAM absolute; any other
 /// shape, including a repeated or misplaced `--reader-uid`, MUST be None.
 pub fn parse_cli(arguments: &[OsString]) -> Option<Request> {
     let (reader, arguments) = match arguments {

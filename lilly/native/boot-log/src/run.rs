@@ -9,7 +9,7 @@ use std::process::{Command as Process, Stdio};
 use std::time::{Duration, Instant};
 
 /// @cc [owner:ghuntley,label:recovery;security] bounded-byte-safe-boot-log
-/// The child MUST be drained continuously; at most BOOT_LOG_LIMIT bytes of the
+/// The child MUST be drained continuously; at most `BOOT_LOG_LIMIT` bytes of the
 /// line-stamped stream (boot-log-line-timestamps) are persisted without other
 /// interpretation, and output beyond the limit is discarded without blocking
 /// or terminating the VM. The child's exit
@@ -23,9 +23,8 @@ pub fn run(request: &Request) -> u8 {
     let Ok((reader, writer)) = pipe_with(PipeFlags::CLOEXEC) else {
         return EXIT_CHILD_SETUP;
     };
-    let stderr_writer = match writer.try_clone() {
-        Err(_) => return EXIT_CHILD_SETUP,
-        Ok(clone) => clone,
+    let Ok(stderr_writer) = writer.try_clone() else {
+        return EXIT_CHILD_SETUP;
     };
     let outcome = {
         let mut builder = Process::new(&request.program);
@@ -40,9 +39,8 @@ pub fn run(request: &Request) -> u8 {
         drop(builder);
         spawned
     };
-    let mut child = match outcome {
-        Err(_) => return EXIT_CHILD_SETUP,
-        Ok(child) => child,
+    let Ok(mut child) = outcome else {
+        return EXIT_CHILD_SETUP;
     };
     let started = Instant::now();
     match drain(&reader, &mut output, &|| started.elapsed()) {
@@ -53,6 +51,10 @@ pub fn run(request: &Request) -> u8 {
     settle(&mut child)
 }
 
+#[expect(
+    clippy::large_stack_arrays,
+    reason = "one 64 KiB read buffer on the main thread's multi-megabyte stack"
+)]
 pub(crate) fn drain(
     reader: &OwnedFd,
     output: &mut std::fs::File,
@@ -62,7 +64,7 @@ pub(crate) fn drain(
     let mut buffer = [0_u8; 65536];
     loop {
         match rustix::io::read(reader, &mut buffer) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Err(_) => return Drained::ReadFailed,
             Ok(0) => return Drained::Complete,
             Ok(count) => {
@@ -79,9 +81,8 @@ pub(crate) fn drain(
 }
 
 pub(crate) fn settle(child: &mut std::process::Child) -> u8 {
-    let status = match child.wait() {
-        Err(_) => return EXIT_CHILD_SETUP,
-        Ok(status) => status,
+    let Ok(status) = child.wait() else {
+        return EXIT_CHILD_SETUP;
     };
     if let Some(code) = status.code() {
         return u8::try_from(code).unwrap_or(EXIT_CHILD_SETUP);

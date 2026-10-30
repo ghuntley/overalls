@@ -19,6 +19,10 @@ impl Drop for Running {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn run_helper(
     log: &Path,
     argv: &[String],
@@ -62,6 +66,10 @@ fn run_helper(
     (status.code(), status.signal(), out, err, started.elapsed())
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn harness() -> String {
     std::env::current_exe()
         .expect("harness path")
@@ -88,6 +96,7 @@ fn new_log(directory: &tempfile::TempDir) -> PathBuf {
 #[test]
 #[ignore = "boot-log fixture"]
 fn fixture_child_emit() {
+    use std::io::Write as _;
     let bytes: usize = std::env::var("HL_LOG_BYTES")
         .expect("flood budget")
         .parse()
@@ -96,7 +105,6 @@ fn fixture_child_emit() {
         .unwrap_or_else(|_| "0".to_string())
         .parse()
         .expect("numeric exit");
-    use std::io::Write as _;
     let mut out = std::io::stdout().lock();
     let mut remaining = bytes;
     while remaining > 0 {
@@ -191,7 +199,12 @@ fn missing_exec_target_is_seventy_one() {
 // -- Behavioural evidence. --
 
 #[test]
+#[expect(
+    clippy::naive_bytecount,
+    reason = "counting one byte in a small test log needs no bytecount dependency"
+)]
 fn child_exit_code_passes_through_and_streams_merge() {
+    use std::os::unix::fs::MetadataExt as _;
     let directory = tempfile::tempdir().expect("fixture directory");
     let log = new_log(&directory);
     let argv = fixture_argv("fixture_child_emit");
@@ -220,7 +233,6 @@ fn child_exit_code_passes_through_and_streams_merge() {
         "console lines carry host-monotonic offsets"
     );
     let metadata = std::fs::metadata(&log).expect("metadata");
-    use std::os::unix::fs::MetadataExt as _;
     assert_eq!(metadata.mode() & 0o777, 0o600, "log must be owner-only");
 }
 
@@ -268,6 +280,10 @@ fn child_signal_death_propagates_through_the_helper() {
     assert!(out.is_empty() && err.is_empty());
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn wait(child: &mut Running) -> Option<i32> {
     let deadline = Instant::now() + Duration::from_secs(15);
     loop {
@@ -279,6 +295,10 @@ fn wait(child: &mut Running) -> Option<i32> {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn run_reader(reader: u32, log: &Path) -> Option<i32> {
     let mut child = Running(
         Process::new(HELPER)
@@ -296,6 +316,10 @@ fn run_reader(reader: u32, log: &Path) -> Option<i32> {
     wait(&mut child)
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "a fixture setup failure fails the calling test"
+)]
 fn owner_and_mode(log: &Path) -> (u32, u32) {
     use std::os::unix::fs::MetadataExt;
     let metadata = std::fs::metadata(log).expect("log metadata");

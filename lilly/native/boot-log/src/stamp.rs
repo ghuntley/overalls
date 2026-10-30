@@ -64,7 +64,7 @@ pub fn push_prefix(now: Duration, out: &mut Vec<u8>) {
     let _ = write!(out, "[+{}.{:03}] ", now.as_secs(), now.subsec_millis());
 }
 
-/// Bounded retention of the stamped stream. Once BOOT_LOG_LIMIT stamped bytes
+/// Bounded retention of the stamped stream. Once `BOOT_LOG_LIMIT` stamped bytes
 /// are retained, later input is discarded without stamping.
 #[derive(Debug)]
 pub struct Retention {

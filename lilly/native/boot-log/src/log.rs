@@ -3,7 +3,7 @@ use std::os::unix::fs::MetadataExt;
 use std::path::Path;
 
 /// @cc [owner:ghuntley,label:security] boot-log-private-to-its-reader
-/// open_log MUST write only through a descriptor opened without following a
+/// `open_log` MUST write only through a descriptor opened without following a
 /// final symlink onto a single-link regular file of mode 0600 owned by the
 /// writer's euid or by `reader`; any other inode is refused. With a reader,
 /// the file MUST then belong to that uid, changed through the same descriptor

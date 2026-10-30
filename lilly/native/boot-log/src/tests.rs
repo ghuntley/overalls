@@ -83,6 +83,10 @@ fn cli_selector_matches_independent_oracle(tc: TestCase) {
 /// BOOT_LOG_LIMIT-truncated prefix of the independently stamped stream, for
 /// sizes around the pipe window and up to three times the limit.
 #[hegel::test(test_cases = 100)]
+#[expect(
+    clippy::cast_possible_truncation,
+    reason = "the byte pattern deliberately keeps the low eight bits of a mixed index"
+)]
 fn drain_retains_exactly_the_bounded_prefix(tc: TestCase) {
     use std::io::Write as _;
     let size = tc.draw(hegel::one_of!(
@@ -98,7 +102,7 @@ fn drain_retains_exactly_the_bounded_prefix(tc: TestCase) {
             .max_value(BOOT_LOG_LIMIT * 3),
     ));
     let seed = tc.draw(gs::integers::<u64>());
-    let pattern = move |index: usize| ((index as u64).wrapping_mul(2654435761) ^ seed) as u8;
+    let pattern = move |index: usize| ((index as u64).wrapping_mul(2_654_435_761) ^ seed) as u8;
 
     let (reader, writer) = pipe_with(PipeFlags::CLOEXEC).expect("pipe");
     let expected: Vec<u8> = (0..size).map(pattern).collect();
@@ -233,7 +237,7 @@ fn stamping_is_chunking_independent(tc: TestCase) {
 }
 
 /// @cc [owner:ghuntley,label:verification;capacity] hegel-boot-log-retention-prefix
-/// The stamped retention MUST never exceed BOOT_LOG_LIMIT and MUST equal the
+/// The stamped retention MUST never exceed `BOOT_LOG_LIMIT` and MUST equal the
 /// limit-truncated prefix of the unbounded stamped stream for any chunking.
 #[hegel::test(test_cases = 100)]
 fn retention_is_the_bounded_prefix_of_the_stamped_stream(tc: TestCase) {
@@ -318,7 +322,7 @@ fn push_prefix_matches_the_independent_format_oracle(tc: TestCase) {
     assert_eq!(out, expected);
 }
 
-/// The candidate inode at the log path before open_log runs.
+/// The candidate inode at the log path before `open_log` runs.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum LogShape {
     Absent,
@@ -397,8 +401,8 @@ fn open_log_refuses_every_unproven_inode(tc: TestCase) {
     }
 }
 
-/// The settle fixture child: exits with BOOT_LOG_SETTLE_EXIT, or kills itself
-/// with BOOT_LOG_SETTLE_SIGNAL. It runs only when a property execs it by name.
+/// The settle fixture child: exits with `BOOT_LOG_SETTLE_EXIT`, or kills itself
+/// with `BOOT_LOG_SETTLE_SIGNAL`. It runs only when a property execs it by name.
 #[test]
 #[ignore = "boot-log settle fixture"]
 fn settle_fixture_child() {
