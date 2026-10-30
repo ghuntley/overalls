@@ -687,6 +687,23 @@ impl PushRegistrationRequest {
     }
 }
 
+impl PushRegistrationRequest {
+    /// @cc [owner:ghuntley,label:protocol;privacy] mila-susan-key-request-body
+    /// The Susan key-issuance body MUST contain exactly Susan's closed members
+    /// `provider`, `token`, `app_id`, `environment` and `deployment`; the WNS
+    /// `endpoint` duplicate is a client-side check and MUST NOT be sent.
+    pub fn susan_body(&self) -> Vec<u8> {
+        serde_json::to_vec(&serde_json::json!({
+            "provider": self.provider,
+            "token": self.token.as_str(),
+            "app_id": self.app_id,
+            "environment": self.environment,
+            "deployment": self.deployment,
+        }))
+        .unwrap_or_default()
+    }
+}
+
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PushRegistrationReply {
@@ -718,6 +735,103 @@ impl PushRegistrationReply {
     }
 }
 
+impl PushRegistrationReply {
+    /// Decodes Susan's `201` key-issuance reply
+    /// `{"push_key","key_id","expires_at"}` where `expires_at` is an ISO-8601
+    /// UTC timestamp. Unknown members, non-UTC offsets and expired keys refuse.
+    pub fn decode_susan(bytes: &[u8], now: u64) -> Result<Self, RuntimeError> {
+        if bytes.len() > 4096 {
+            return Err(RuntimeError::InvalidPushRegistration);
+        }
+        #[derive(Deserialize)]
+        #[serde(deny_unknown_fields)]
+        struct Wire {
+            push_key: String,
+            key_id: String,
+            expires_at: String,
+        }
+        let wire: Wire =
+            serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidPushRegistration)?;
+        let expires_at =
+            parse_utc_timestamp(&wire.expires_at).ok_or(RuntimeError::InvalidPushRegistration)?;
+        if wire.key_id.chars().any(char::is_control) {
+            return Err(RuntimeError::InvalidPushRegistration);
+        }
+        Self::new(wire.push_key, wire.key_id, expires_at, now)
+    }
+}
+
+/// Parses `YYYY-MM-DDTHH:MM:SS[.fraction]Z` into Unix seconds.
+fn parse_utc_timestamp(value: &str) -> Option<u64> {
+    let bytes = value.as_bytes();
+    if !value.is_ascii() || bytes.len() < 20 || bytes.len() > 32 || *bytes.last()? != b'Z' {
+        return None;
+    }
+    let digits = |range: std::ops::Range<usize>| -> Option<u64> {
+        let part = value.get(range)?;
+        if part.bytes().all(|b| b.is_ascii_digit()) {
+            part.parse().ok()
+        } else {
+            None
+        }
+    };
+    if bytes[4] != b'-'
+        || bytes[7] != b'-'
+        || bytes[10] != b'T'
+        || bytes[13] != b':'
+        || bytes[16] != b':'
+    {
+        return None;
+    }
+    let fraction = &value[19..value.len() - 1];
+    if !(fraction.is_empty()
+        || (fraction.len() >= 2
+            && fraction.starts_with('.')
+            && fraction[1..].bytes().all(|b| b.is_ascii_digit())))
+    {
+        return None;
+    }
+    let (year, month, day) = (digits(0..4)?, digits(5..7)?, digits(8..10)?);
+    let (hour, minute, second) = (digits(11..13)?, digits(14..16)?, digits(17..19)?);
+    let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    let month_days = [
+        31,
+        if leap { 29 } else { 28 },
+        31,
+        30,
+        31,
+        30,
+        31,
+        31,
+        30,
+        31,
+        30,
+        31,
+    ];
+    if !(1970..=9999).contains(&year)
+        || !(1..=12).contains(&month)
+        || day == 0
+        || day > month_days[(month - 1) as usize]
+        || hour > 23
+        || minute > 59
+        || second > 59
+    {
+        return None;
+    }
+    // Days from civil (Howard Hinnant), restricted to post-epoch dates.
+    let (y, m) = if month <= 2 {
+        (year - 1, month + 9)
+    } else {
+        (year, month - 3)
+    };
+    let era = y / 400;
+    let yoe = y - era * 400;
+    let doy = (153 * m + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    Some(days * 86_400 + hour * 3600 + minute * 60 + second)
+}
+
 fn provider_token_valid(provider: PushProvider, token: &str) -> bool {
     match provider {
         PushProvider::Apns => {
@@ -736,24 +850,33 @@ fn provider_token_valid(provider: PushProvider, token: &str) -> bool {
     }
 }
 
+/// @cc [owner:ghuntley,label:security;privacy] mila-wns-channel-shape
+/// A WNS channel MUST match Susan's `susan-wns-channel-shape`: HTTPS with the
+/// implicit default port, a lower-case DNS host under `.notify.windows.com`, a
+/// non-empty path, no userinfo or fragment, no backslash, space or `%00`, and
+/// at most 1024 bytes. Percent escapes in the channel token are permitted.
 fn wns_channel_valid(value: &str) -> bool {
     if value.len() > 1024
         || !value.starts_with("https://")
-        || value.contains([' ', '\\', '%', '#', '@'])
+        || value.contains([' ', '\\', '#', '@'])
+        || value.contains("%00")
+        || value.bytes().any(|b| b.is_ascii_control() || !b.is_ascii())
     {
         return false;
     }
-    let Some((authority, path)) = value[8..].split_once('/') else {
+    let Some((host, path)) = value[8..].split_once('/') else {
         return false;
     };
-    if path.is_empty() || !authority.ends_with(":443") {
+    let Some(prefix) = host.strip_suffix(".notify.windows.com") else {
         return false;
-    }
-    let host = authority.strip_suffix(":443").unwrap_or(authority);
-    host.ends_with(".notify.windows.com")
-        && host.split('.').all(|part| {
-            !part.is_empty()
-                && part
+    };
+    !path.is_empty()
+        && !prefix.is_empty()
+        && host.split('.').all(|label| {
+            (1..=63).contains(&label.len())
+                && !label.starts_with('-')
+                && !label.ends_with('-')
+                && label
                     .bytes()
                     .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
         })

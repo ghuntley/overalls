@@ -624,6 +624,71 @@ pub unsafe extern "C" fn mila_session_device_ls(
     })
 }
 
+/// Register this device for push notifications. `susan_reply` is Susan's
+/// key-issuance JSON; Rust validates it (closed members, base64url push key,
+/// unexpired ISO-8601 `expires_at`) and sends the push key to Porsche on stdin
+/// only. `platform`: 0=iOS, 1=Android, 2=macOS, 3=Windows. A zero-length label
+/// is omitted. The bounded Porsche JSON result is copied to `out`.
+///
+/// # Safety
+/// Input pointers reference their declared readable lengths (`label` may be
+/// null when `label_len` is zero); `out`/`written` follow [`mila_session_listing`].
+#[no_mangle]
+#[allow(clippy::too_many_arguments)]
+pub unsafe extern "C" fn mila_session_device_register(
+    handle: u64,
+    platform: u8,
+    susan_reply: *const u8,
+    susan_reply_len: usize,
+    enc_pubkey: *const u8,
+    enc_pubkey_len: usize,
+    label: *const u8,
+    label_len: usize,
+    now: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let platform = match platform {
+            0 => mila_model::DevicePlatform::Ios,
+            1 => mila_model::DevicePlatform::Android,
+            2 => mila_model::DevicePlatform::Macos,
+            3 => mila_model::DevicePlatform::Windows,
+            _ => return Err(SessionStatus::Invalid),
+        };
+        let reply = mila_runtime::PushRegistrationReply::decode_susan(
+            bytes(susan_reply, susan_reply_len, 4096)?,
+            now,
+        )
+        .map_err(|_| SessionStatus::Invalid)?;
+        let enc_pubkey = std::str::from_utf8(bytes(enc_pubkey, enc_pubkey_len, 64)?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        if !mila_protocol::device_public_key_valid(enc_pubkey) {
+            return Err(SessionStatus::Invalid);
+        }
+        let label = if label_len == 0 {
+            None
+        } else {
+            Some(
+                std::str::from_utf8(bytes(label, label_len, 256)?)
+                    .map_err(|_| SessionStatus::Invalid)?,
+            )
+        };
+        let runtime = runtime()?;
+        let entry = entry(handle)?;
+        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+        let data = runtime
+            .block_on(session.device_register(platform, &reply.push_key, enc_pubkey, label))
+            .map_err(|e| match e {
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })?;
+        output(&data, out, capacity, written)
+    })
+}
+
 /// Revoke one authenticated caller-owned notification device.
 #[no_mangle]
 pub unsafe extern "C" fn mila_session_device_rm(
@@ -812,6 +877,51 @@ pub unsafe extern "C" fn mila_session_terminal_poll(
             .block_on(terminal.read())
             .map_err(|_| SessionStatus::Transport)?;
         unsafe { output(&data, out, capacity, written) }
+    })
+}
+
+/// Terminal read outcome reported beside [`mila_session_terminal_read`] output.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TerminalReadEvent {
+    /// `written` bytes of PTY output were copied.
+    Data = 0,
+    /// No output arrived within the session timeout; the channel is still open.
+    Idle = 1,
+    /// The server or client closed the channel; no further output will arrive.
+    Closed = 2,
+}
+
+/// Poll one bounded chunk and classify it, so native reconnect logic can tell
+/// an idle PTY from a closed one and from a lost transport (`Transport`).
+///
+/// # Safety
+/// `out` references `capacity` writable bytes; `written` and `event` are writable.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_read(
+    terminal_handle: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+    event: *mut TerminalReadEvent,
+) -> SessionStatus {
+    guarded(|| {
+        if event.is_null() || written.is_null() {
+            return Err(SessionStatus::Invalid);
+        }
+        let runtime = runtime()?;
+        let terminal = terminal_entry(terminal_handle)?;
+        let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let (data, kind) = match runtime.block_on(terminal.read()) {
+            Ok(data) if !data.is_empty() => (data, TerminalReadEvent::Data),
+            Ok(_) if terminal.is_closed() => (Vec::new(), TerminalReadEvent::Closed),
+            Ok(_) | Err(SshError::Timeout) => (Vec::new(), TerminalReadEvent::Idle),
+            Err(_) => return Err(SessionStatus::Transport),
+        };
+        unsafe { output(&data, out, capacity, written)? };
+        unsafe { *event = kind };
+        Ok(())
     })
 }
 

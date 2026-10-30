@@ -103,3 +103,47 @@ fn sampled_commands_agree(tc: TestCase) {
     let refused = tc.draw(gs::sampled_from(commands().refused.clone()));
     assert!(Command::parse(&refused).is_err());
 }
+
+/// Every device command line in the shared Porsche device fixture parses under
+/// the Rust grammar and formats back to a line that parses identically, so the
+/// Rust session can issue the commands Marshall and Porsche test against.
+#[test]
+fn porsche_device_fixture_commands_parse() {
+    let value: Value =
+        serde_json::from_str(&fixture("porsche_device_results.json")).expect("device fixture");
+    let mut lines: Vec<String> = value["commands"]
+        .as_object()
+        .expect("commands")
+        .values()
+        .map(|entry| entry["command"].as_str().expect("command").to_owned())
+        .collect();
+    lines.extend(
+        value["refusals"]
+            .as_array()
+            .expect("refusals")
+            .iter()
+            .map(|entry| entry["command"].as_str().expect("command").to_owned()),
+    );
+    assert!(lines.len() >= 4);
+    for line in lines {
+        let command = Command::parse(&line).unwrap_or_else(|_| panic!("refused {line}"));
+        let canonical = command.format().expect("format");
+        assert_eq!(
+            Command::parse(&canonical).expect("reparse"),
+            command,
+            "{line}"
+        );
+    }
+    for refused in [
+        "device register --platform linux --push-key - --enc-pubkey BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU --json",
+        "device register --platform windows --push-key literal-secret-key-value --enc-pubkey BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU --json",
+        "device register --platform windows --push-key - --enc-pubkey BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQV --json",
+        "device register --platform windows --push-key - --json",
+        "device prefs 5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b --enabled maybe --json",
+        "device prefs 5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b --json",
+        "device rm not-an-id --json",
+    ] {
+        assert!(Command::parse(refused).is_err(), "accepted {refused}");
+    }
+    assert!(Command::parse("ssh-key list --json").is_ok());
+}

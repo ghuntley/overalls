@@ -276,6 +276,11 @@ impl PtySession {
         })
     }
 
+    /// True once the server closed the channel or the client closed it.
+    pub fn is_closed(&self) -> bool {
+        self.closed
+    }
+
     /// Reads one bounded PTY data chunk. Empty means no data or channel close.
     pub async fn read(&mut self) -> Result<Vec<u8>, SshError> {
         if self.closed {

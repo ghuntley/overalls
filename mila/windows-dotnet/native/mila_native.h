@@ -87,6 +87,22 @@ MilaFfiStatus mila_session_terminal_input(uint64_t terminal_handle, const uint8_
 MilaFfiStatus mila_session_terminal_resize(uint64_t terminal_handle, uint32_t columns,
                                            uint32_t rows);
 MilaFfiStatus mila_session_terminal_kill(uint64_t terminal_handle);
+typedef enum MilaTerminalReadEvent { MILA_TERMINAL_DATA = 0, MILA_TERMINAL_IDLE = 1, MILA_TERMINAL_CLOSED = 2 } MilaTerminalReadEvent;
+/* Polls one chunk and classifies it as data, idle (still open) or closed; a lost
+ * transport returns the session transport status instead. */
+int32_t mila_session_terminal_read(uint64_t terminal_handle, uint8_t *output,
+                                   size_t capacity, size_t *written,
+                                   MilaTerminalReadEvent *out_event);
+/* Returns the bounded `whoami --json` envelope, including approval_required. */
+int32_t mila_session_whoami(uint64_t handle, uint8_t *output, size_t capacity,
+                            size_t *written);
+/* Validates Susan's key reply and registers this device through Porsche; the push
+ * key is sent on stdin only. platform: 0=iOS 1=Android 2=macOS 3=Windows. */
+int32_t mila_session_device_register(uint64_t handle, uint8_t platform,
+                                     const uint8_t *susan_reply, size_t susan_reply_len,
+                                     const uint8_t *enc_pubkey, size_t enc_pubkey_len,
+                                     const uint8_t *label, size_t label_len, uint64_t now,
+                                     uint8_t *output, size_t capacity, size_t *written);
 /* Decodes one bounded watch line and returns only its event tag. */
 MilaFfiStatus mila_watch_event_kind(const uint8_t *line, size_t length,
                                     MilaWatchEventKind *out_kind);
@@ -95,6 +111,12 @@ MilaFfiStatus mila_push_poke_validate(const uint8_t *envelope, size_t length,
 MilaFfiStatus mila_push_registration_validate(uint8_t provider, uint8_t environment,
                                               const char *token, const char *app_id,
                                               const char *deployment, const char *endpoint);
+
+/* Encodes Susan's closed key-issuance body after push registration validation. */
+MilaFfiStatus mila_push_key_request_encode(uint8_t provider, uint8_t environment,
+                                           const char *token, const char *app_id,
+                                           const char *deployment, const char *endpoint,
+                                           MilaRouteOutput output);
 
 #ifdef __cplusplus
 }

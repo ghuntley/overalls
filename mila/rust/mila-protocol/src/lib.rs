@@ -278,7 +278,12 @@ fn command_known(command: &str) -> bool {
             | "share add"
             | "share remove"
             | "request show"
+            | "ssh-key list"
             | "ssh-key remove"
+            | "device register"
+            | "device ls"
+            | "device rm"
+            | "device prefs"
             | "team list"
             | "thread ls"
             | "thread show"
@@ -331,6 +336,8 @@ fn allowed_option(command: &str, key: &str) -> bool {
             "port" | "public" | "private" | "revision" | "request-id"
         ),
         "terminal attach" => matches!(key, "cursor" | "read-only"),
+        "device register" => matches!(key, "platform" | "push-key" | "enc-pubkey" | "label"),
+        "device prefs" => key == "enabled",
         _ if mutation(command) => matches!(key, "request-id" | "no-wait"),
         _ => false,
     }
@@ -371,6 +378,8 @@ fn validate_command(
 ) -> Result<(), ProtocolError> {
     let (min, max) = match command {
         "whoami" | "images" | "ls" | "team list" | "watch" => (0, 0),
+        "ssh-key list" | "device ls" | "device register" => (0, 0),
+        "device rm" | "device prefs" => (1, 1),
         "show" | "start" | "resize" | "request show" | "ssh-key remove" | "thread show"
         | "thread turns" | "terminal ls" | "terminal new" | "web show" => (1, 1),
         "pause" | "resume" | "unpause" | "stop" | "rm" | "pin" | "unpin" => (1, 1),
@@ -467,6 +476,21 @@ fn validate_command(
     if command == "thread ls" && matches!(options.get("machine"), Some(OptionValue::Values(_))) {
         return Err(ProtocolError::InvalidCommand);
     }
+    if matches!(command, "device rm" | "device prefs")
+        && arguments
+            .first()
+            .is_none_or(|value| Identifier::parse(value).is_err())
+    {
+        return Err(ProtocolError::InvalidCommand);
+    }
+    if command == "device prefs"
+        && !matches!(options.get("enabled"), Some(OptionValue::String(value)) if value == "true" || value == "false")
+    {
+        return Err(ProtocolError::InvalidCommand);
+    }
+    if command == "device register" && !device_register_options_valid(options) {
+        return Err(ProtocolError::InvalidCommand);
+    }
     if command == "web set" && options.is_empty() {
         return Err(ProtocolError::InvalidCommand);
     }
@@ -531,6 +555,42 @@ fn validate_command(
         }
     }
     Ok(())
+}
+
+/// @cc [owner:ghuntley,label:protocol;security] mila-protocol-device-register-options
+/// Device registration MUST name a closed platform, read the Susan push key from
+/// stdin (`-`) and carry a canonical unpadded base64url 32-byte X25519 public key,
+/// matching Porsche's `ssh-device-register-options`. A literal push key is refused
+/// so the opaque Susan key never appears on a command line.
+fn device_register_options_valid(options: &BTreeMap<String, OptionValue>) -> bool {
+    let text = |key: &str| match options.get(key) {
+        Some(OptionValue::String(value)) => Some(value.as_str()),
+        _ => None,
+    };
+    let platform_valid = text("platform").is_some_and(|value| parse_platform(value).is_ok());
+    let push_key_valid = text("push-key") == Some("-");
+    let key_valid = text("enc-pubkey").is_some_and(device_public_key_valid);
+    let label_valid = match options.get("label") {
+        None => true,
+        Some(OptionValue::String(value)) => {
+            (1..=64).contains(&value.len()) && !value.chars().any(char::is_control)
+        }
+        Some(_) => false,
+    };
+    platform_valid && push_key_valid && key_valid && label_valid
+}
+
+/// True for the canonical unpadded base64url encoding of exactly 32 bytes.
+pub fn device_public_key_valid(value: &str) -> bool {
+    // 32 bytes encode to 43 symbols; the final symbol carries two zero pad bits.
+    value.len() == 43
+        && value
+            .bytes()
+            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
+        && value
+            .bytes()
+            .last()
+            .is_some_and(|b| b"AEIMQUYcgkosw048".contains(&b))
 }
 
 fn mutation(command: &str) -> bool {

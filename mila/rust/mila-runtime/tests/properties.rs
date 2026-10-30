@@ -8,7 +8,7 @@ use mila_runtime::{AttachHeader, AttachMode};
 use mila_runtime::{AttachOutcome, AttachPhase, TerminalAttach};
 use mila_runtime::{MutationPhase, MutationTracker, NextAction};
 use mila_runtime::{PokeEnvelope, RuntimeError, SnapshotStore};
-use mila_runtime::{PushEnvironment, PushProvider, PushRegistrationRequest};
+use mila_runtime::{PushEnvironment, PushProvider, PushRegistrationReply, PushRegistrationRequest};
 
 #[hegel::test(test_cases = 64)]
 fn terminal_output_never_advances_before_connection(tc: TestCase) {
@@ -214,6 +214,126 @@ fn registration_restricts_origins_and_secrets() {
         Some("https://evil.example/channel".into())
     )
     .is_err());
+}
+
+fn wns(channel: &str) -> bool {
+    PushRegistrationRequest::new(
+        PushProvider::Wns,
+        channel.into(),
+        "dev.overalls.mila".into(),
+        PushEnvironment::Production,
+        "mgmt.example.test".into(),
+        Some(channel.into()),
+    )
+    .is_ok()
+}
+
+/// Mirrors Susan's `susan-wns-channel-shape` so a channel Mila sends is one
+/// Susan's key issuance accepts (and nothing Susan would refuse is sent).
+#[test]
+fn wns_channel_shape_matches_susan() {
+    assert!(wns(
+        "https://wns2-par02p.notify.windows.com/w/?token=AwYAAAB%2bQk1%3d"
+    ));
+    assert!(wns("https://push.notify.windows.com/channel/abc"));
+    for refused in [
+        "https://wns2-par02p.notify.windows.com:443/w/?token=abc",
+        "https://wns2-par02p.notify.windows.com:8443/w/?token=abc",
+        "http://wns2-par02p.notify.windows.com/w/?token=abc",
+        "https://notify.windows.com/w/?token=abc",
+        "https://WNS2.notify.windows.com/w/?token=abc",
+        "https://wns2.notify.windows.com",
+        "https://wns2.notify.windows.com/",
+        "https://wns2.notify.windows.com/w/?token=a%00b",
+        "https://wns2.notify.windows.com/w/#fragment",
+        "https://user@wns2.notify.windows.com/w/",
+        "https://wns2.notify.windows.com/w/a b",
+        "https://wns2.notify.windows.com.evil.example/w/",
+        "https://evil.example/wns2.notify.windows.com/w/",
+        "https://-bad.notify.windows.com/w/",
+    ] {
+        assert!(!wns(refused), "accepted {refused}");
+    }
+    let long = format!("https://wns2.notify.windows.com/{}", "a".repeat(1024));
+    assert!(!wns(&long));
+}
+
+#[test]
+fn susan_key_request_body_is_closed() {
+    let channel = "https://wns2-par02p.notify.windows.com/w/?token=abc";
+    let request = PushRegistrationRequest::new(
+        PushProvider::Wns,
+        channel.into(),
+        "dev.overalls.mila".into(),
+        PushEnvironment::Production,
+        "localhost".into(),
+        Some(channel.into()),
+    )
+    .expect("valid");
+    let body: serde_json::Value = serde_json::from_slice(&request.susan_body()).unwrap();
+    let mut keys: Vec<_> = body.as_object().unwrap().keys().cloned().collect();
+    keys.sort();
+    assert_eq!(
+        keys,
+        ["app_id", "deployment", "environment", "provider", "token"]
+    );
+    assert_eq!(body["provider"], "wns");
+    assert_eq!(body["environment"], "production");
+    assert_eq!(body["token"], channel);
+}
+
+fn susan_reply(expires_at: &str) -> Vec<u8> {
+    format!(
+        r#"{{"push_key":"{}","key_id":"k1","expires_at":"{expires_at}"}}"#,
+        "A".repeat(40)
+    )
+    .into_bytes()
+}
+
+#[test]
+fn susan_key_reply_decodes_iso_timestamps() {
+    for (text, seconds) in [
+        ("2026-11-29T00:00:00Z", 1_795_910_400),
+        ("2000-02-29T12:34:56Z", 951_827_696),
+        ("2100-03-01T00:00:00Z", 4_107_542_400),
+        ("2026-11-29T00:00:00.000000Z", 1_795_910_400),
+    ] {
+        let reply = PushRegistrationReply::decode_susan(&susan_reply(text), 1).expect(text);
+        assert_eq!(reply.expires_at, seconds, "{text}");
+        assert_eq!(reply.key_id, "k1");
+    }
+    for refused in [
+        "2026-11-29T00:00:00+00:00",
+        "2026-02-30T00:00:00Z",
+        "2100-02-29T00:00:00Z",
+        "2026-11-29 00:00:00Z",
+        "2026-11-29T24:00:00Z",
+        "2026-11-29T00:00:00.Z",
+        "1969-12-31T23:59:59Z",
+    ] {
+        assert!(
+            PushRegistrationReply::decode_susan(&susan_reply(refused), 1).is_err(),
+            "{refused}"
+        );
+    }
+    assert!(PushRegistrationReply::decode_susan(
+        &susan_reply("2026-11-29T00:00:00Z"),
+        1_795_910_400
+    )
+    .is_err());
+    assert!(PushRegistrationReply::decode_susan(br#"{"push_key":"AAAAAAAAAAAAAAAAAAAA","key_id":"k","expires_at":"2026-11-29T00:00:00Z","extra":1}"#, 1).is_err());
+    assert!(PushRegistrationReply::decode_susan(
+        br#"{"push_key":"bad key!","key_id":"k","expires_at":"2026-11-29T00:00:00Z"}"#,
+        1
+    )
+    .is_err());
+}
+
+#[hegel::test(test_cases = 128)]
+fn arbitrary_susan_replies_never_panic(tc: TestCase) {
+    let bytes = tc.draw(gs::vecs(gs::default::<u8>()).max_size(512));
+    let now = tc.draw(gs::default::<u64>());
+    let _ = PushRegistrationReply::decode_susan(&bytes, now);
 }
 
 #[hegel::test(test_cases = 64)]

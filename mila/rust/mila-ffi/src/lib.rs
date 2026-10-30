@@ -190,50 +190,92 @@ pub unsafe extern "C" fn mila_push_registration_validate(
     deployment: *const c_char,
     endpoint: *const c_char,
 ) -> MilaFfiStatus {
-    if token.is_null() || app_id.is_null() || deployment.is_null() {
-        return MilaFfiStatus::NullInput;
+    match push_registration_request(provider, environment, token, app_id, deployment, endpoint) {
+        Ok(_) => MilaFfiStatus::Ok,
+        Err(status) => status,
     }
-    let token = match CStr::from_ptr(token).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
+}
+
+unsafe fn push_registration_request(
+    provider: u8,
+    environment: u8,
+    token: *const c_char,
+    app_id: *const c_char,
+    deployment: *const c_char,
+    endpoint: *const c_char,
+) -> Result<PushRegistrationRequest, MilaFfiStatus> {
+    if token.is_null() || app_id.is_null() || deployment.is_null() {
+        return Err(MilaFfiStatus::NullInput);
+    }
+    let text = |value: *const c_char| {
+        CStr::from_ptr(value)
+            .to_str()
+            .map(str::to_owned)
+            .map_err(|_| MilaFfiStatus::InvalidRequest)
     };
-    let deployment = match CStr::from_ptr(deployment).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
-    };
-    let app_id = match CStr::from_ptr(app_id).to_str() {
-        Ok(value) => value,
-        Err(_) => return MilaFfiStatus::InvalidRequest,
-    };
+    let token = text(token)?;
+    let deployment = text(deployment)?;
+    let app_id = text(app_id)?;
     let endpoint = if endpoint.is_null() {
         None
     } else {
-        match CStr::from_ptr(endpoint).to_str() {
-            Ok(value) => Some(value),
-            Err(_) => return MilaFfiStatus::InvalidRequest,
-        }
+        Some(text(endpoint)?)
     };
     let provider = match provider {
         0 => PushProvider::Apns,
         1 => PushProvider::Fcm,
         2 => PushProvider::Wns,
-        _ => return MilaFfiStatus::InvalidRequest,
+        _ => return Err(MilaFfiStatus::InvalidRequest),
     };
     let environment = match environment {
         0 => PushEnvironment::Development,
         1 => PushEnvironment::Production,
-        _ => return MilaFfiStatus::InvalidRequest,
+        _ => return Err(MilaFfiStatus::InvalidRequest),
     };
-    PushRegistrationRequest::new(
-        provider,
-        token.to_owned(),
-        app_id.to_owned(),
-        environment,
-        deployment.to_owned(),
-        endpoint.map(str::to_owned),
-    )
-    .map(|_| MilaFfiStatus::Ok)
-    .unwrap_or(MilaFfiStatus::InvalidRequest)
+    PushRegistrationRequest::new(provider, token, app_id, environment, deployment, endpoint)
+        .map_err(|_| MilaFfiStatus::InvalidRequest)
+}
+
+/// Copies bytes into caller storage, reporting the required length first.
+unsafe fn write_output(bytes: &[u8], output: MilaRouteOutput) -> MilaFfiStatus {
+    if output.written.is_null() {
+        return MilaFfiStatus::NullInput;
+    }
+    *output.written = bytes.len();
+    if bytes.len() > output.capacity {
+        return MilaFfiStatus::OutputTooSmall;
+    }
+    if output.bytes.is_null() {
+        return MilaFfiStatus::NullInput;
+    }
+    std::ptr::copy_nonoverlapping(bytes.as_ptr(), output.bytes, bytes.len());
+    MilaFfiStatus::Ok
+}
+
+/// Encodes Susan's closed key-issuance body for a validated push registration.
+/// Arguments are those of [`mila_push_registration_validate`]; the body is
+/// written to caller storage only after the same validation succeeds.
+///
+/// # Safety
+/// String arguments follow [`mila_push_registration_validate`]; `output`
+/// references caller-owned writable storage of `capacity` bytes.
+#[no_mangle]
+pub unsafe extern "C" fn mila_push_key_request_encode(
+    provider: u8,
+    environment: u8,
+    token: *const c_char,
+    app_id: *const c_char,
+    deployment: *const c_char,
+    endpoint: *const c_char,
+    output: MilaRouteOutput,
+) -> MilaFfiStatus {
+    let request =
+        match push_registration_request(provider, environment, token, app_id, deployment, endpoint)
+        {
+            Ok(request) => request,
+            Err(status) => return status,
+        };
+    write_output(&request.susan_body(), output)
 }
 
 /// Validates a Susan push poke envelope without exposing its ciphertext to a UI.

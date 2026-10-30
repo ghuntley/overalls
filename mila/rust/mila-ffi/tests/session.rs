@@ -41,6 +41,7 @@ fn reply(command: &str, bytes: Vec<u8>) -> Response {
         command: command.into(),
         bytes,
         exit: Some(0),
+        stdin: None,
     }
 }
 
@@ -72,10 +73,13 @@ struct Response {
     command: String,
     bytes: Vec<u8>,
     exit: Option<u32>,
+    /// When set, the exact stdin bytes the client must send before EOF.
+    stdin: Option<Vec<u8>>,
 }
 struct Handler {
     responses: Arc<Mutex<VecDeque<Response>>>,
     pending: Option<Response>,
+    received: Vec<u8>,
     authentications: Arc<AtomicUsize>,
 }
 impl server::Handler for Handler {
@@ -111,7 +115,17 @@ impl server::Handler for Handler {
             .expect("unexpected command");
         assert_eq!(data, response.command.as_bytes());
         self.pending = Some(response);
+        self.received.clear();
         session.channel_success(channel)?;
+        Ok(())
+    }
+    async fn data(
+        &mut self,
+        _: ChannelId,
+        data: &[u8],
+        _: &mut server::Session,
+    ) -> Result<(), Self::Error> {
+        self.received.extend_from_slice(data);
         Ok(())
     }
     async fn channel_eof(
@@ -121,6 +135,9 @@ impl server::Handler for Handler {
     ) -> Result<(), Self::Error> {
         session.extended_data(channel, 1, b"discard progress".to_vec())?;
         let response = self.pending.take().unwrap();
+        if let Some(expected) = &response.stdin {
+            assert_eq!(&self.received, expected, "stdin payload");
+        }
         session.data(channel, response.bytes)?;
         if let Some(exit) = response.exit {
             session.exit_status_request(channel, exit)?;
@@ -187,6 +204,7 @@ async fn endpoint(
                 authentications: count,
                 responses,
                 pending: None,
+                received: Vec::new(),
             },
         )
         .await
@@ -366,4 +384,137 @@ fn arbitrary_terminal_dimensions_are_bounded_before_lookup(tc: hegel::TestCase) 
         assert_eq!(status, SessionStatus::Invalid);
     }
     assert_eq!(terminal, 0);
+}
+
+const PUSH_KEY: &str = "c3VzYW4tc2VhbGVkLXB1c2gta2V5LWZvci13bnM";
+const ENC_PUBKEY: &str = "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU";
+
+fn connect_scripted(
+    runtime: &tokio::runtime::Runtime,
+    responses: Arc<Mutex<VecDeque<Response>>>,
+) -> (u64, HardwareStandIn, tokio::task::JoinHandle<()>) {
+    let (trust, port, _, task) = runtime.block_on(endpoint(responses));
+    let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
+    let trust = serde_json::to_vec(&trust).unwrap();
+    let mut handle = 0;
+    // SAFETY: buffers live for the call; the signer outlives the connect.
+    let status = unsafe {
+        mila_session_connect(
+            trust.as_ptr(),
+            trust.len(),
+            b"localhost".as_ptr(),
+            9,
+            public.as_ptr(),
+            public.len(),
+            port,
+            5000,
+            Some(sign),
+            &signer as *const _ as usize,
+            &mut handle,
+        )
+    };
+    assert_eq!(status, SessionStatus::Ok);
+    (handle, signer, task)
+}
+
+/// Fixture agreement with `protocol/test/fixtures/porsche_device_results.json`:
+/// the Windows registration line is canonical, the push key travels only on
+/// stdin, and the Susan reply is validated before any channel opens.
+#[test]
+fn ffi_device_register_sends_push_key_on_stdin_only() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let result = br#"{"version":1,"status":"succeeded","request_id":"porsche-0123456789abcdef0123456789abcdef","operation_id":null,"result":{"id":"5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b","platform":"windows","enabled":true,"state":"active"}}"#.to_vec();
+    let line = format!(
+        "device register --enc-pubkey={ENC_PUBKEY} --json --label=Desk --platform=windows --push-key=-"
+    );
+    let responses = Arc::new(Mutex::new(VecDeque::from([Response {
+        command: line.clone(),
+        bytes: result.clone(),
+        exit: Some(0),
+        stdin: Some(PUSH_KEY.as_bytes().to_vec()),
+    }])));
+    let parsed = mila_protocol::Command::parse(&line).expect("canonical line parses");
+    assert_eq!(parsed.format().unwrap(), line);
+    let (handle, _signer, task) = connect_scripted(&runtime, responses.clone());
+    let susan =
+        format!(r#"{{"push_key":"{PUSH_KEY}","key_id":"k1","expires_at":"2099-01-01T00:00:00Z"}}"#);
+    let expired =
+        format!(r#"{{"push_key":"{PUSH_KEY}","key_id":"k1","expires_at":"2000-01-01T00:00:00Z"}}"#);
+    let mut out = vec![0u8; 4096];
+    let mut written = 0usize;
+    // SAFETY: every pointer references a live buffer of the stated length.
+    unsafe {
+        let register =
+            |reply: &str, key: &str, platform: u8, out: &mut [u8], written: &mut usize| {
+                mila_session_device_register(
+                    handle,
+                    platform,
+                    reply.as_ptr(),
+                    reply.len(),
+                    key.as_ptr(),
+                    key.len(),
+                    b"Desk".as_ptr(),
+                    4,
+                    1_800_000_000,
+                    out.as_mut_ptr(),
+                    out.len(),
+                    written,
+                )
+            };
+        assert_eq!(
+            register(&expired, ENC_PUBKEY, 3, &mut out, &mut written),
+            SessionStatus::Invalid
+        );
+        assert_eq!(
+            register(&susan, "short", 3, &mut out, &mut written),
+            SessionStatus::Invalid
+        );
+        assert_eq!(
+            register(&susan, ENC_PUBKEY, 4, &mut out, &mut written),
+            SessionStatus::Invalid
+        );
+        assert_eq!(
+            register(&susan, ENC_PUBKEY, 3, &mut out, &mut written),
+            SessionStatus::Ok
+        );
+        assert_eq!(&out[..written], result.as_slice());
+        assert_eq!(mila_session_close(handle), SessionStatus::Ok);
+    }
+    assert!(responses.lock().unwrap().is_empty());
+    task.abort();
+}
+
+#[test]
+fn terminal_read_refuses_stale_handles_and_null_outputs() {
+    let mut out = [0u8; 8];
+    let mut written = 0usize;
+    let mut event = TerminalReadEvent::Data;
+    // SAFETY: valid stack storage; null pointers are the refused inputs.
+    unsafe {
+        assert_eq!(
+            mila_session_terminal_read(
+                u64::MAX,
+                out.as_mut_ptr(),
+                out.len(),
+                &mut written,
+                &mut event
+            ),
+            SessionStatus::InvalidHandle
+        );
+        assert_eq!(
+            mila_session_terminal_read(
+                1,
+                out.as_mut_ptr(),
+                out.len(),
+                &mut written,
+                std::ptr::null_mut()
+            ),
+            SessionStatus::Invalid
+        );
+    }
+    assert_eq!(event, TerminalReadEvent::Data);
 }
