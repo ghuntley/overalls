@@ -17,6 +17,13 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
+/**
+ * Read timeout for the approver and `/fixture/<action>` hooks. Each hook runs one fixture action
+ * in the VM, which the approver bounds at 300 s (`fixture_action`'s subprocess timeout) and runs
+ * one at a time; under a loaded host a single thread hook exceeded the old 30 s socket timeout.
+ */
+private const val FIXTURE_HOOK_READ_TIMEOUT_MS: Int = 330_000
+
 /** Instrumentation argument carrying the base64 (standard, unwrapped) descriptor JSON. */
 const val MILA_JOURNEY_ARGUMENT: String = "milaJourneyDescriptor"
 
@@ -73,13 +80,13 @@ data class MilaJourneyDescriptor(
     }
 
     /** Opens an HTTPS connection that verifies the fixture certificate against [serverName]. */
-    fun open(url: URL): HttpsURLConnection = (url.openConnection() as HttpsURLConnection).apply {
+    fun open(url: URL, readTimeoutMs: Int = 30_000): HttpsURLConnection = (url.openConnection() as HttpsURLConnection).apply {
         sslSocketFactory = socketFactory
         val defaultVerifier = HttpsURLConnection.getDefaultHostnameVerifier()
         hostnameVerifier = javax.net.ssl.HostnameVerifier { _, session -> defaultVerifier.verify(serverName, session) }
         instanceFollowRedirects = false
         connectTimeout = 15_000
-        readTimeout = 30_000
+        readTimeout = readTimeoutMs
     }
 
     companion object {
@@ -138,7 +145,7 @@ class MilaJourneyTrustFetcher(private val descriptor: MilaJourneyDescriptor) : M
 
 /** Asks the fixture's approver hook to approve one pending device key as the owner user. */
 suspend fun MilaJourneyDescriptor.approve(approval: MilaApprovalInfo): Unit = withContext(Dispatchers.IO) {
-    val connection = open(approverUrl.toURL()).apply {
+    val connection = open(approverUrl.toURL(), FIXTURE_HOOK_READ_TIMEOUT_MS).apply {
         requestMethod = "POST"
         doOutput = true
         setRequestProperty("Content-Type", "application/json")
@@ -161,7 +168,7 @@ enum class MilaFixtureAction(val wire: String) {
 
 /** POSTs one fixture hook; any non-2xx answer (including 404) fails the journey. */
 suspend fun MilaJourneyDescriptor.fixture(action: MilaFixtureAction, body: JSONObject = JSONObject()): JSONObject = withContext(Dispatchers.IO) {
-    val connection = open(fixtureUrl.resolve(action.wire).toURL()).apply {
+    val connection = open(fixtureUrl.resolve(action.wire).toURL(), FIXTURE_HOOK_READ_TIMEOUT_MS).apply {
         requestMethod = "POST"
         doOutput = true
         setRequestProperty("Content-Type", "application/json")
