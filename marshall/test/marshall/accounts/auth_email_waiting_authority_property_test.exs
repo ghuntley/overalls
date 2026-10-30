@@ -11,7 +11,10 @@ defmodule Marshall.Accounts.AuthEmailWaitingAuthorityPropertyTest do
   # Each generated case boots three fresh Marshall peers: 100 cases measured
   # 594 s per property (about 6 s each, 2026-10-30, 8 schedulers), far above the
   # old 180 s aggregate. Every boot, RPC and SMTP deadline below is unchanged;
-  # the CI profile only suppresses Hegel's TooSlow health check.
+  # the CI profile only suppresses Hegel's TooSlow health check. The cost is
+  # inherent: the property needs three independent BEAM peers per case (fresh
+  # per case under the Hegel fixture rules), and each one boots the full
+  # application. Speed up peer boot before raising this again.
   @moduletag timeout: 1_800_000
   @type peer :: %{controller: pid(), database_name: String.t(), node: node()}
   @type call_result ::

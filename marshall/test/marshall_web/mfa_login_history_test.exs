@@ -11,7 +11,10 @@ defmodule MarshallWeb.MFALoginHistoryTest do
   # 6-11 s (recorded 2026-10-30 at 8 schedulers; the /admin/users mount alone
   # is about 120 ms), and the full run took 975 s. The aggregate budget keeps
   # load margin above that for an 8-vCPU CI runner; each history retains the
-  # default finite SQL ownership timeout.
+  # default finite SQL ownership timeout. The cost is inherent, not a leak:
+  # per-case times stay flat across the run, and every event re-mounts real
+  # views. Before raising this again, profile the mounts or reduce mounts per
+  # event; do not cut test_cases.
   @moduletag timeout: 1_800_000
 
   @typep state :: %{live: boolean(), completed: boolean(), elevated: boolean()}
