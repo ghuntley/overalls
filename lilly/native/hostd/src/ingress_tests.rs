@@ -86,9 +86,9 @@ fn ingress_decoding_matches_model(tc: TestCase) {
         && !device.is_empty();
     let decoded = decode(&body);
     if length == greeting.len() {
-        assert_eq!(decoded.is_some(), model, "body {body:?}");
+        assert_eq!(decoded.is_ok(), model, "body {body:?}");
     }
-    if let Some(envelope) = decoded {
+    if let Ok(envelope) = decoded {
         assert!(carries_descriptor(&envelope.request));
         assert_eq!(encode_request(&envelope), body);
         if let Request::BridgeIngress {
@@ -109,13 +109,13 @@ fn ingress_decoding_matches_model(tc: TestCase) {
     let mut list = vec![15_u8];
     list.extend(1_u64.to_be_bytes());
     list.extend(&trailing);
-    assert_eq!(decode(&list).is_some(), trailing.is_empty());
+    assert_eq!(decode(&list).is_ok(), trailing.is_empty());
     let mut end = vec![16_u8];
     end.extend(1_u64.to_be_bytes());
     end.extend(&trailing);
     let decoded = decode(&end);
-    assert_eq!(decoded.is_some(), trailing.len() == KEY);
-    if let Some(envelope) = decoded {
+    assert_eq!(decoded.is_ok(), trailing.len() == KEY);
+    if let Ok(envelope) = decoded {
         assert!(!carries_descriptor(&envelope.request));
         assert_eq!(encode_request(&envelope), end);
     }

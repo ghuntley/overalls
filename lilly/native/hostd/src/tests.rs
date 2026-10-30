@@ -83,8 +83,8 @@ fn run_decoding_matches_independent_model(tc: TestCase) {
     }
     let accepted = spec_run(timeout, limit, utility, &model_arguments, model_terminated);
     let decoded = decode(&body);
-    assert_eq!(decoded.is_some(), accepted, "body {body:?}");
-    if let Some(envelope) = decoded {
+    assert_eq!(decoded.is_ok(), accepted, "body {body:?}");
+    if let Ok(envelope) = decoded {
         assert_eq!(encode_request(&envelope), body);
     }
 }
@@ -133,7 +133,7 @@ fn acquire_decoding_matches_model(tc: TestCase) {
         && directory[1..]
             .split(|byte| *byte == b'/')
             .all(|part| !part.is_empty() && part != b"." && part != b"..");
-    assert_eq!(decode(&body).is_some(), model, "directory {directory:?}");
+    assert_eq!(decode(&body).is_ok(), model, "directory {directory:?}");
 }
 
 /// Replies round-trip through the reference decoder.
@@ -1039,7 +1039,7 @@ fn vm_launch_refuses_unknown_launch_flags() {
     // Datagram header (9), then lease/placement/epoch/generation/uid/memory/vCPU.
     let flags = 9 + 8 + 36 + 8 + 8 + 4 + 8 + 1;
     frame[flags] |= 0b1000;
-    assert_eq!(decode(&frame), None);
+    assert_eq!(decode(&frame), Err(DecodeError::Value));
 }
 
 #[test]
@@ -1103,7 +1103,7 @@ fn vm_launch_decoding_round_trips(tc: TestCase) {
         },
     };
     let bytes = encode_request(&envelope);
-    assert_eq!(decode(&bytes), Some(envelope));
+    assert_eq!(decode(&bytes), Ok(envelope));
     let direct = encode_request(&Envelope {
         id: 1,
         request: Request::Run {
@@ -1114,7 +1114,7 @@ fn vm_launch_decoding_round_trips(tc: TestCase) {
             arguments: vec![],
         },
     });
-    assert_eq!(decode(&direct), None);
+    assert_eq!(decode(&direct), Err(DecodeError::Value));
 }
 
 // ---------------------------------------------------------- transfer stream
@@ -1195,7 +1195,7 @@ fn transfer_streams_run_the_helper_under_the_lease() {
             arguments: vec![],
         },
     });
-    assert_eq!(decode(&direct), None);
+    assert_eq!(decode(&direct), Err(DecodeError::Value));
 }
 
 /// A local resume runs only after lilly-resume-token confirmed the token.

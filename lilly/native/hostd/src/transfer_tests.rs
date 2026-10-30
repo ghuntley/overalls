@@ -658,22 +658,22 @@ fn transfer_stream_decoding_round_trips(tc: TestCase) {
         },
     };
     let bytes = encode_request(&envelope);
-    assert_eq!(decode(&bytes), Some(envelope));
+    assert_eq!(decode(&bytes), Ok(envelope));
     let mut extra = bytes.clone();
     extra.extend(b"x\0");
-    assert_eq!(decode(&extra), None);
+    assert!(decode(&extra).is_err());
     // Dropping the last field (its bytes and NUL terminator).
     let last = bytes[..bytes.len() - 1]
         .iter()
         .rposition(|byte| *byte == 0)
         .map_or(9 + 18, |at| at + 1);
-    assert_eq!(decode(&bytes[..last]), None);
+    assert!(decode(&bytes[..last]).is_err());
     let mut slow = bytes.clone();
     slow[9 + 8..9 + 12].copy_from_slice(&86_400_001_u32.to_be_bytes());
-    assert_eq!(decode(&slow), None);
+    assert_eq!(decode(&slow), Err(DecodeError::Value));
     let mut fast = bytes;
     fast[9 + 12..9 + 16].copy_from_slice(&1_073_741_825_u32.to_be_bytes());
-    assert_eq!(decode(&fast), None);
+    assert_eq!(decode(&fast), Err(DecodeError::Value));
 }
 
 /// Resume-token syntax matches Lilly's ExportRequest.token? model.

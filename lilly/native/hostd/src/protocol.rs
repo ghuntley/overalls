@@ -41,8 +41,6 @@ const OP_BRIDGE_NETNS_TCP: u8 = 13;
 const OP_BRIDGE_INGRESS: u8 = 14;
 const OP_LIST_INGRESS_BRIDGES: u8 = 15;
 const OP_END_INGRESS_BRIDGE: u8 = 16;
-/// Fixed `TransferStream` prefix: lease, timeout, rate, producer and consumer kinds.
-const STREAM_FIXED: usize = 8 + 4 + 4 + 1 + 1;
 /// Most NUL-terminated `TransferStream` fields (an SSH pull into a receive).
 const MAX_STREAM_FIELDS: usize = 14;
 /// Length of a durable job key.
@@ -247,17 +245,106 @@ pub fn carries_descriptor(request: &Request) -> bool {
 }
 
 fn u32_at(bytes: &[u8], at: usize) -> Option<u32> {
-    Some(u32::from_be_bytes(bytes.get(at..at + 4)?.try_into().ok()?))
+    Some(u32::from_be_bytes(
+        bytes.get(at..at.checked_add(4)?)?.try_into().ok()?,
+    ))
 }
 
 fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
-    Some(u64::from_be_bytes(bytes.get(at..at + 8)?.try_into().ok()?))
+    Some(u64::from_be_bytes(
+        bytes.get(at..at.checked_add(8)?)?.try_into().ok()?,
+    ))
+}
+
+/// Why a request datagram did not decode. The reasons are closed and carry
+/// no wire bytes or native text; the session answers every one alike, by
+/// ending the session.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum DecodeError {
+    /// Shorter than the 9-byte header, or longer than `REQUEST_LIMIT`.
+    Size,
+    /// The operation byte names no request.
+    Operation,
+    /// The body is shorter or longer than its operation's layout, a length
+    /// field names more bytes than follow it, or a NUL-terminated field is
+    /// unterminated.
+    Layout,
+    /// A field is outside what its operation accepts: a timeout, limit, wait,
+    /// mode, flag, kind, utility, path, name, port, length or count.
+    Value,
+}
+
+type Decoded<T> = Result<T, DecodeError>;
+
+/// A field the operation refuses unless `accepted`.
+fn require(accepted: bool) -> Decoded<()> {
+    if accepted {
+        Ok(())
+    } else {
+        Err(DecodeError::Value)
+    }
+}
+
+/// A bounds-checked reader over untrusted bytes: a read past the end is
+/// `Layout`, never a panic.
+struct Cursor<'a> {
+    rest: &'a [u8],
+}
+
+impl<'a> Cursor<'a> {
+    fn new(bytes: &'a [u8]) -> Self {
+        Cursor { rest: bytes }
+    }
+
+    fn take(&mut self, count: usize) -> Decoded<&'a [u8]> {
+        let (head, tail) = self
+            .rest
+            .split_at_checked(count)
+            .ok_or(DecodeError::Layout)?;
+        self.rest = tail;
+        Ok(head)
+    }
+
+    fn array<const N: usize>(&mut self) -> Decoded<[u8; N]> {
+        self.take(N)?.try_into().map_err(|_| DecodeError::Layout)
+    }
+
+    fn u8(&mut self) -> Decoded<u8> {
+        let [byte] = self.array::<1>()?;
+        Ok(byte)
+    }
+
+    fn u16(&mut self) -> Decoded<u16> {
+        Ok(u16::from_be_bytes(self.array()?))
+    }
+
+    fn u32(&mut self) -> Decoded<u32> {
+        Ok(u32::from_be_bytes(self.array()?))
+    }
+
+    fn u64(&mut self) -> Decoded<u64> {
+        Ok(u64::from_be_bytes(self.array()?))
+    }
+
+    /// Every remaining byte.
+    fn rest(self) -> &'a [u8] {
+        self.rest
+    }
+
+    /// The layout ends here: trailing bytes are `Layout`.
+    fn finish(self) -> Decoded<()> {
+        if self.rest.is_empty() {
+            Ok(())
+        } else {
+            Err(DecodeError::Layout)
+        }
+    }
 }
 
 /// @cc [owner:ghuntley,label:protocol;security] hostd-request-decoding-total
 /// decode MUST return a request only for a datagram of at most 65536 bytes
-/// that exactly matches one operation layout, and None for anything else:
-/// unknown operations, trailing bytes, timeouts outside 1000..14400000 ms,
+/// that exactly matches one operation layout, and a `DecodeError` for
+/// anything else: unknown operations, trailing bytes, timeouts outside 1000..14400000 ms,
 /// output limits other than 65536 or 4194304, waits above 120000 ms, a
 /// directory that is not absolute or contains NUL or a `..` component, more
 /// than 127 arguments, unterminated arguments, an unknown or typed-only
@@ -273,44 +360,34 @@ fn u64_at(bytes: &[u8], at: usize) -> Option<u64> {
 /// rules, or a
 /// `ListIngressBridges` or `EndIngressBridge` with any other body length.
 /// The caller never names an executable: the utility is an index into the
-/// closed table that hostd resolves itself.
-#[expect(
-    clippy::too_many_lines,
-    reason = "one arm per wire request kind keeps the closed decoder in one reviewable match"
-)]
-pub fn decode(bytes: &[u8]) -> Option<Envelope> {
-    if bytes.len() > REQUEST_LIMIT || bytes.len() < 9 {
-        return None;
+/// closed table that hostd resolves itself. decode MUST NOT panic on any
+/// input: every read is bounds-checked, because under `panic = "abort"` one
+/// panic would end the whole daemon.
+pub fn decode(bytes: &[u8]) -> Result<Envelope, DecodeError> {
+    if bytes.len() > REQUEST_LIMIT {
+        return Err(DecodeError::Size);
     }
-    let op = bytes[0];
-    let id = u64_at(bytes, 1)?;
-    let body = &bytes[9..];
+    let Some((header, body)) = bytes.split_at_checked(9) else {
+        return Err(DecodeError::Size);
+    };
+    let mut header = Cursor::new(header);
+    let op = header.u8()?;
+    let id = header.u64()?;
+    let mut fields = Cursor::new(body);
     let request = match op {
-        OP_HELLO if body.len() == 4 => Request::Hello {
-            version: u32_at(body, 0)?,
-        },
-        OP_ACQUIRE if body.len() >= 6 => {
-            let mode = match body[0] {
-                0 => Mode::Exclusive,
-                1 => Mode::Shared,
-                _ => return None,
-            };
-            let wait_ms = u32_at(body, 1)?;
-            let directory = body[5..].to_vec();
-            if wait_ms > MAX_WAIT_MS || !valid_directory(&directory) {
-                return None;
-            }
-            Request::Acquire {
-                mode,
-                wait_ms,
-                directory,
-            }
+        OP_HELLO => {
+            let version = fields.u32()?;
+            fields.finish()?;
+            Request::Hello { version }
         }
-        OP_RELEASE if body.len() == 8 => Request::Release {
-            lease: u64_at(body, 0)?,
-        },
-        OP_RUN if body.len() >= 17 => {
-            let (lease, timeout_ms, output_limit, utility, arguments) = run_body(body)?;
+        OP_ACQUIRE => acquire(fields)?,
+        OP_RELEASE => {
+            let lease = fields.u64()?;
+            fields.finish()?;
+            Request::Release { lease }
+        }
+        OP_RUN => {
+            let (lease, timeout_ms, output_limit, utility, arguments) = run_body(fields)?;
             Request::Run {
                 lease,
                 timeout_ms,
@@ -319,9 +396,9 @@ pub fn decode(bytes: &[u8]) -> Option<Envelope> {
                 arguments,
             }
         }
-        OP_RUN_DURABLE if body.len() >= JOB_KEY + 17 => {
-            let key: [u8; JOB_KEY] = body[..JOB_KEY].try_into().ok()?;
-            let (lease, timeout_ms, output_limit, utility, arguments) = run_body(&body[JOB_KEY..])?;
+        OP_RUN_DURABLE => {
+            let key = fields.array::<JOB_KEY>()?;
+            let (lease, timeout_ms, output_limit, utility, arguments) = run_body(fields)?;
             Request::RunDurable {
                 key,
                 lease,
@@ -331,28 +408,24 @@ pub fn decode(bytes: &[u8]) -> Option<Envelope> {
                 arguments,
             }
         }
-        OP_ATTACH if body.len() == JOB_KEY + 4 => {
-            let wait_ms = u32_at(body, JOB_KEY)?;
-            if wait_ms > MAX_WAIT_MS {
-                return None;
-            }
-            Request::Attach {
-                key: body[..JOB_KEY].try_into().ok()?,
-                wait_ms,
-            }
+        OP_ATTACH => {
+            let key = fields.array::<JOB_KEY>()?;
+            let wait_ms = fields.u32()?;
+            fields.finish()?;
+            require(wait_ms <= MAX_WAIT_MS)?;
+            Request::Attach { key, wait_ms }
         }
-        OP_CONNECT_UNIX if body.len() > 4 => {
-            let timeout_ms = u32_at(body, 0)?;
-            if !(1..=30_000).contains(&timeout_ms) || !valid_directory(&body[4..]) {
-                return None;
-            }
+        OP_CONNECT_UNIX => {
+            let timeout_ms = fields.u32()?;
+            let path = fields.rest();
+            require((1..=30_000).contains(&timeout_ms) && valid_directory(path))?;
             Request::ConnectUnix {
                 timeout_ms,
-                path: body[4..].to_vec(),
+                path: path.to_vec(),
             }
         }
         OP_BRIDGE_NETNS_TCP => {
-            let target = netns_target(body)?;
+            let target = netns_target(fields)?;
             Request::BridgeNetnsTcp {
                 mark: target.mark,
                 destination: target.destination,
@@ -363,123 +436,168 @@ pub fn decode(bytes: &[u8]) -> Option<Envelope> {
                 device: target.device,
             }
         }
-        OP_BRIDGE_INGRESS if body.len() >= crate::ingress::KEY => {
-            let key: [u8; crate::ingress::KEY] = body[..crate::ingress::KEY].try_into().ok()?;
-            let rest = &body[crate::ingress::KEY..];
-            let (greeting, rest) = sized(rest, crate::ingress::MAX_GREETING)?;
-            let (preface, rest) = sized(rest, crate::ingress::MAX_PREFACE)?;
-            let (expect, rest) = sized(rest, crate::ingress::MAX_EXPECT)?;
-            let ready_ms = u32_at(rest, 0)?;
-            let ready_valid = if expect.is_empty() {
-                ready_ms == 0
-            } else {
-                (1..=crate::ingress::MAX_READY_MS).contains(&ready_ms)
-            };
-            if !ready_valid {
-                return None;
-            }
-            let target = netns_target(&rest[4..])?;
-            Request::BridgeIngress {
-                key,
-                greeting: greeting.to_vec(),
-                preface: preface.to_vec(),
-                expect: expect.to_vec(),
-                ready_ms,
-                mark: target.mark,
-                destination: target.destination,
-                port: target.port,
-                source: target.source,
-                timeout_ms: target.timeout_ms,
-                namespace: target.namespace,
-                device: target.device,
-            }
+        OP_BRIDGE_INGRESS => bridge_ingress(fields)?,
+        OP_LIST_INGRESS_BRIDGES => {
+            fields.finish()?;
+            Request::ListIngressBridges
         }
-        OP_LIST_INGRESS_BRIDGES if body.is_empty() => Request::ListIngressBridges,
-        OP_END_INGRESS_BRIDGE if body.len() == crate::ingress::KEY => Request::EndIngressBridge {
-            key: body.try_into().ok()?,
-        },
-        OP_LAUNCH_VM if body.len() >= LAUNCH_FIXED + 3 => {
-            let flags = body[LAUNCH_FIXED - 3];
-            let state_length = usize::from(body[LAUNCH_FIXED - 2]);
-            let namespace_length = usize::from(body[LAUNCH_FIXED - 1]);
-            let rest = &body[LAUNCH_FIXED..];
-            if flags & !0b111 != 0
-                || state_length == 0
-                || namespace_length == 0
-                || state_length + namespace_length >= rest.len()
-            {
-                return None;
-            }
-            Request::LaunchVm {
-                lease: u64_at(body, 0)?,
-                launch: crate::vm_launch::Launch {
-                    placement: body[8..44].try_into().ok()?,
-                    epoch: u64_at(body, 44)?,
-                    generation: u64_at(body, 52)?,
-                    uid: u32_at(body, 60)?,
-                    memory_bytes: u64_at(body, 64)?,
-                    vcpus: body[72],
-                    firmware: flags & 0b01 != 0,
-                    logging: flags & 0b10 != 0,
-                    restore: flags & 0b100 != 0,
-                    state_dir: rest[..state_length].to_vec(),
-                    namespace: rest[state_length..state_length + namespace_length].to_vec(),
-                    pool: rest[state_length + namespace_length..].to_vec(),
-                },
-            }
+        OP_END_INGRESS_BRIDGE => {
+            let key = fields.array::<{ crate::ingress::KEY }>()?;
+            fields.finish()?;
+            Request::EndIngressBridge { key }
         }
-        OP_TRANSFER_STREAM if body.len() > STREAM_FIXED => {
-            let timeout_ms = u32_at(body, 8)?;
-            let rate = u32_at(body, 12)?;
-            if !crate::transfer::TIMEOUTS.contains(&timeout_ms)
-                || !crate::transfer::RATES.contains(&rate)
-            {
-                return None;
-            }
-            let mut fields = Vec::new();
-            let mut rest = &body[STREAM_FIXED..];
-            while !rest.is_empty() {
-                if fields.len() == MAX_STREAM_FIELDS {
-                    return None;
-                }
-                let end = rest.iter().position(|byte| *byte == 0)?;
-                fields.push(rest[..end].to_vec());
-                rest = &rest[end + 1..];
-            }
-            Request::TransferStream {
-                lease: u64_at(body, 0)?,
-                timeout_ms,
-                rate,
-                stream: Box::new(crate::transfer::Stream::decode(body[16], body[17], fields)?),
-            }
+        OP_LAUNCH_VM => launch_vm(fields)?,
+        OP_TRANSFER_STREAM => transfer_stream(fields)?,
+        OP_CANCEL => {
+            let target = fields.u64()?;
+            fields.finish()?;
+            Request::Cancel { target }
         }
-        OP_CANCEL if body.len() == 8 => Request::Cancel {
-            target: u64_at(body, 0)?,
-        },
-        _ => return None,
+        _ => return Err(DecodeError::Operation),
     };
-    Some(Envelope { id, request })
+    Ok(Envelope { id, request })
 }
 
 type RunBody = (u64, u32, u32, Utility, Vec<CString>);
 
-/// Fixed `LaunchVm` prefix: lease, placement, epoch, generation, uid, memory,
-/// vCPUs, flags, the state directory length and the namespace length.
-const LAUNCH_FIXED: usize = 8 + 36 + 8 + 8 + 4 + 8 + 1 + 1 + 1 + 1;
-
-fn port_zero(body: &[u8]) -> bool {
-    body[8] == 0 && body[9] == 0
+/// Mode, wait and directory.
+fn acquire(mut fields: Cursor<'_>) -> Decoded<Request> {
+    let mode = match fields.u8()? {
+        0 => Mode::Exclusive,
+        1 => Mode::Shared,
+        _ => return Err(DecodeError::Value),
+    };
+    let wait_ms = fields.u32()?;
+    let directory = fields.rest();
+    require(wait_ms <= MAX_WAIT_MS && valid_directory(directory))?;
+    Ok(Request::Acquire {
+        mode,
+        wait_ms,
+        directory: directory.to_vec(),
+    })
 }
 
-/// A u16 big-endian length, at most `maximum`, and that many bytes; the
-/// field and what follows it, or None.
-fn sized(body: &[u8], maximum: usize) -> Option<(&[u8], &[u8])> {
-    let length = usize::from(u16::from_be_bytes([*body.first()?, *body.get(1)?]));
-    let rest = &body[2..];
-    if length > maximum || length > rest.len() {
-        return None;
+/// Key, three u16-sized fields, the ready wait and a namespace target.
+fn bridge_ingress(mut fields: Cursor<'_>) -> Decoded<Request> {
+    let key = fields.array::<{ crate::ingress::KEY }>()?;
+    let greeting = sized(&mut fields, crate::ingress::MAX_GREETING)?;
+    let preface = sized(&mut fields, crate::ingress::MAX_PREFACE)?;
+    let expect = sized(&mut fields, crate::ingress::MAX_EXPECT)?;
+    let ready_ms = fields.u32()?;
+    require(if expect.is_empty() {
+        ready_ms == 0
+    } else {
+        (1..=crate::ingress::MAX_READY_MS).contains(&ready_ms)
+    })?;
+    let target = netns_target(fields)?;
+    Ok(Request::BridgeIngress {
+        key,
+        greeting: greeting.to_vec(),
+        preface: preface.to_vec(),
+        expect: expect.to_vec(),
+        ready_ms,
+        mark: target.mark,
+        destination: target.destination,
+        port: target.port,
+        source: target.source,
+        timeout_ms: target.timeout_ms,
+        namespace: target.namespace,
+        device: target.device,
+    })
+}
+
+/// Lease, placement, epoch, generation, uid, memory, vCPUs, flags, the state
+/// directory and namespace lengths, then the state directory, the namespace
+/// and the (non-empty) pool.
+fn launch_vm(mut fields: Cursor<'_>) -> Decoded<Request> {
+    let lease = fields.u64()?;
+    let placement = fields.array::<36>()?;
+    let epoch = fields.u64()?;
+    let generation = fields.u64()?;
+    let uid = fields.u32()?;
+    let memory_bytes = fields.u64()?;
+    let vcpus = fields.u8()?;
+    let flags = fields.u8()?;
+    let state_length = usize::from(fields.u8()?);
+    let namespace_length = usize::from(fields.u8()?);
+    require(flags & !0b111 == 0 && state_length != 0 && namespace_length != 0)?;
+    let (state_dir, rest) = fields
+        .rest()
+        .split_at_checked(state_length)
+        .ok_or(DecodeError::Layout)?;
+    let (namespace, pool) = rest
+        .split_at_checked(namespace_length)
+        .ok_or(DecodeError::Layout)?;
+    require(!pool.is_empty())?;
+    Ok(Request::LaunchVm {
+        lease,
+        launch: crate::vm_launch::Launch {
+            placement,
+            epoch,
+            generation,
+            uid,
+            memory_bytes,
+            vcpus,
+            firmware: flags & 0b01 != 0,
+            logging: flags & 0b10 != 0,
+            restore: flags & 0b100 != 0,
+            state_dir: state_dir.to_vec(),
+            namespace: namespace.to_vec(),
+            pool: pool.to_vec(),
+        },
+    })
+}
+
+/// Lease, timeout, rate, producer and consumer kinds, then NUL-terminated
+/// fields.
+fn transfer_stream(mut fields: Cursor<'_>) -> Decoded<Request> {
+    let lease = fields.u64()?;
+    let timeout_ms = fields.u32()?;
+    let rate = fields.u32()?;
+    let producer = fields.u8()?;
+    let consumer = fields.u8()?;
+    require(
+        crate::transfer::TIMEOUTS.contains(&timeout_ms) && crate::transfer::RATES.contains(&rate),
+    )?;
+    let strings = nul_terminated(fields.rest(), MAX_STREAM_FIELDS)?
+        .into_iter()
+        .map(<[u8]>::to_vec)
+        .collect();
+    let stream =
+        crate::transfer::Stream::decode(producer, consumer, strings).ok_or(DecodeError::Value)?;
+    Ok(Request::TransferStream {
+        lease,
+        timeout_ms,
+        rate,
+        stream: Box::new(stream),
+    })
+}
+
+/// Split `rest` into NUL-terminated fields: more than `maximum` is `Value`,
+/// a last field without its NUL is `Layout`.
+fn nul_terminated(mut rest: &[u8], maximum: usize) -> Decoded<Vec<&[u8]>> {
+    let mut fields = Vec::new();
+    while !rest.is_empty() {
+        if fields.len() == maximum {
+            return Err(DecodeError::Value);
+        }
+        let end = rest
+            .iter()
+            .position(|byte| *byte == 0)
+            .ok_or(DecodeError::Layout)?;
+        let (field, tail) = rest.split_at_checked(end).ok_or(DecodeError::Layout)?;
+        fields.push(field);
+        rest = tail.get(1..).ok_or(DecodeError::Layout)?;
     }
-    Some(rest.split_at(length))
+    Ok(fields)
+}
+
+/// A u16 big-endian length, at most `maximum` (else `Value`), and that many
+/// bytes (else `Layout`).
+fn sized<'a>(fields: &mut Cursor<'a>, maximum: usize) -> Decoded<&'a [u8]> {
+    let length = usize::from(fields.u16()?);
+    require(length <= maximum)?;
+    fields.take(length)
 }
 
 /// A namespace TCP target as `BridgeNetnsTcp` and `BridgeIngress` carry it.
@@ -495,73 +613,63 @@ struct NetnsTarget {
 
 /// Parse mark, destination, port, source, timeout, the namespace length,
 /// the namespace and the device; port 0, an empty namespace or device, or a
-/// timeout outside 1..=30000 ms is None.
-fn netns_target(body: &[u8]) -> Option<NetnsTarget> {
-    if body.len() < 20 {
-        return None;
-    }
-    let namespace_length = usize::from(body[18]);
-    let rest = &body[19..];
-    if namespace_length == 0 || namespace_length >= rest.len() || port_zero(body) {
-        return None;
-    }
-    let timeout_ms = u32_at(body, 14)?;
-    if !(1..=30_000).contains(&timeout_ms) {
-        return None;
-    }
-    Some(NetnsTarget {
-        mark: u32_at(body, 0)?,
-        destination: body[4..8].try_into().ok()?,
-        port: u16::from_be_bytes([body[8], body[9]]),
-        source: body[10..14].try_into().ok()?,
+/// timeout outside 1..=30000 ms is `Value`, a namespace longer than the bytes
+/// left is `Layout`.
+fn netns_target(mut fields: Cursor<'_>) -> Decoded<NetnsTarget> {
+    let mark = fields.u32()?;
+    let destination = fields.array::<4>()?;
+    let port = fields.u16()?;
+    let source = fields.array::<4>()?;
+    let timeout_ms = fields.u32()?;
+    let namespace_length = usize::from(fields.u8()?);
+    require(namespace_length != 0 && port != 0 && (1..=30_000).contains(&timeout_ms))?;
+    let (namespace, device) = fields
+        .rest()
+        .split_at_checked(namespace_length)
+        .ok_or(DecodeError::Layout)?;
+    require(!device.is_empty())?;
+    Ok(NetnsTarget {
+        mark,
+        destination,
+        port,
+        source,
         timeout_ms,
-        namespace: rest[..namespace_length].to_vec(),
-        device: rest[namespace_length..].to_vec(),
+        namespace: namespace.to_vec(),
+        device: device.to_vec(),
     })
 }
 
 /// Parse the shared Run layout: lease, timeout, output limit, utility and
 /// NUL-terminated arguments.
-fn run_body(body: &[u8]) -> Option<RunBody> {
-    if body.len() < 17 {
-        return None;
-    }
-    let lease = u64_at(body, 0)?;
-    let timeout_ms = u32_at(body, 8)?;
-    let output_limit = u32_at(body, 12)?;
-    let utility = Utility::from_index(body[16])?;
+fn run_body(mut fields: Cursor<'_>) -> Decoded<RunBody> {
+    let lease = fields.u64()?;
+    let timeout_ms = fields.u32()?;
+    let output_limit = fields.u32()?;
+    let utility = Utility::from_index(fields.u8()?).ok_or(DecodeError::Value)?;
     // Reachable only through typed requests whose command lines hostd
     // builds itself (typed-only-utilities).
-    if utility.typed_only() {
-        return None;
-    }
-    if !(MIN_TIMEOUT_MS..=MAX_TIMEOUT_MS).contains(&timeout_ms)
-        || (output_limit != DEFAULT_OUTPUT_LIMIT && output_limit != EXTENDED_OUTPUT_LIMIT)
-    {
-        return None;
-    }
-    let mut arguments = Vec::new();
-    let mut rest = &body[17..];
-    while !rest.is_empty() {
-        if arguments.len() == MAX_ARGUMENTS {
-            return None;
-        }
-        let end = rest.iter().position(|byte| *byte == 0)?;
-        arguments.push(CString::new(&rest[..end]).ok()?);
-        rest = &rest[end + 1..];
-    }
-    Some((lease, timeout_ms, output_limit, utility, arguments))
+    require(
+        !utility.typed_only()
+            && (MIN_TIMEOUT_MS..=MAX_TIMEOUT_MS).contains(&timeout_ms)
+            && (output_limit == DEFAULT_OUTPUT_LIMIT || output_limit == EXTENDED_OUTPUT_LIMIT),
+    )?;
+    let arguments = nul_terminated(fields.rest(), MAX_ARGUMENTS)?
+        .into_iter()
+        .map(|argument| CString::new(argument).map_err(|_| DecodeError::Layout))
+        .collect::<Decoded<Vec<CString>>>()?;
+    Ok((lease, timeout_ms, output_limit, utility, arguments))
 }
 
 /// Whether a lock directory is absolute, NUL-free, bounded and free of `.`,
 /// `..` and empty components.
 pub fn valid_directory(directory: &[u8]) -> bool {
     directory.len() <= MAX_PATH
-        && directory.first() == Some(&b'/')
         && !directory.contains(&0)
-        && directory[1..]
-            .split(|byte| *byte == b'/')
-            .all(|part| !part.is_empty() && part != b"." && part != b"..")
+        && directory.strip_prefix(b"/").is_some_and(|relative| {
+            relative
+                .split(|byte| *byte == b'/')
+                .all(|part| !part.is_empty() && part != b"." && part != b"..")
+        })
 }
 
 /// Encode a request (used by tests and by documentation of the layout).
@@ -786,7 +894,7 @@ pub fn decode_reply(bytes: &[u8]) -> Option<(u64, Reply)> {
             lease: u64_at(body, 0)?,
         },
         KIND_REFUSED if body.len() == 1 => Reply::Refused {
-            reason: match body[0] {
+            reason: match *body.first()? {
                 1 => Refusal::Contended,
                 2 => Refusal::Unavailable,
                 3 => Refusal::Malformed,
@@ -805,7 +913,7 @@ pub fn decode_reply(bytes: &[u8]) -> Option<(u64, Reply)> {
             bytes: body.to_vec(),
         },
         KIND_RESULT if !body.is_empty() => Reply::Result {
-            status: match body[0] {
+            status: match *body.first()? {
                 0 => Status::Succeeded,
                 1 => Status::Failed,
                 2 => Status::TimedOut,
@@ -814,7 +922,7 @@ pub fn decode_reply(bytes: &[u8]) -> Option<(u64, Reply)> {
                 5 => Status::Cancelled,
                 _ => return None,
             },
-            bytes: body[1..].to_vec(),
+            bytes: body.get(1..)?.to_vec(),
         },
         _ => return None,
     };

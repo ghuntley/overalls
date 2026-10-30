@@ -158,7 +158,7 @@ pub fn serve(daemon: Arc<Daemon>, socket: OwnedFd) {
         return;
     };
     match decode(first) {
-        Some(envelope) => match envelope.request {
+        Ok(envelope) => match envelope.request {
             Request::Hello { version } if version == PROTOCOL_VERSION => {
                 session.reply(
                     envelope.id,
@@ -177,12 +177,12 @@ pub fn serve(daemon: Arc<Daemon>, socket: OwnedFd) {
                 return;
             }
         },
-        None => return,
+        Err(_) => return,
     }
     while let Some((datagram, descriptor)) = receive(&session.socket, &mut buffer) {
-        let Some(envelope) = decode(datagram) else {
-            // A malformed datagram ends the session: a confused client must
-            // not keep authority.
+        let Ok(envelope) = decode(datagram) else {
+            // A malformed datagram, whatever its DecodeError, ends the
+            // session: a confused client must not keep authority.
             break;
         };
         if carries_descriptor(&envelope.request) != descriptor.is_some() {
@@ -199,11 +199,24 @@ pub fn serve(daemon: Arc<Daemon>, socket: OwnedFd) {
             );
             continue;
         }
+        // @cc [owner:ghuntley,label:security;recovery] hostd-thread-exhaustion-refuses
+        // When no thread can be created for a request, hostd MUST answer
+        // that request Unavailable (a durable job's key and lease bookkeeping
+        // undone), and when none can be created for a connection it MUST
+        // close that connection; it MUST NOT panic, so the daemon keeps
+        // serving.
         let worker = Arc::clone(&session);
-        std::thread::spawn(move || {
+        let id = envelope.id;
+        let spawned = std::thread::Builder::new().spawn(move || {
             worker.handle(envelope.id, envelope.request, descriptor);
             worker.done();
         });
+        if spawned.is_err() {
+            // No thread (resource exhaustion): the request was never started;
+            // its descriptor was dropped with the closure.
+            session.done();
+            session.refuse(id, Refusal::Unavailable);
+        }
     }
     session.close();
 }
@@ -991,7 +1004,7 @@ impl Session {
             },
         );
         let session = Arc::clone(self);
-        std::thread::spawn(move || {
+        let spawned = std::thread::Builder::new().spawn(move || {
             let (status, bytes) = match session.daemon.utilities.get(utility) {
                 None => (Status::Setup, Vec::new()),
                 Some(executable) => exec::run(
@@ -1031,6 +1044,20 @@ impl Session {
                 session.reply_result(id, status, &bytes);
             }
         });
+        if spawned.is_err() {
+            // No thread (resource exhaustion): the job never started. Undo
+            // its bookkeeping so the key and lease are free again.
+            crate::lock(&self.daemon.jobs, "job table").remove(&key);
+            {
+                let mut book = crate::lock(&self.book, "session book");
+                book.runs.remove(&id);
+                book.busy.remove(&lease);
+                book.durable.remove(&lease);
+                self.idle.notify_all();
+            }
+            self.daemon.jobs_changed.notify_all();
+            self.refuse(id, Refusal::Unavailable);
+        }
     }
 
     /// @cc [owner:ghuntley,label:recovery] durable-job-attach

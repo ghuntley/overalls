@@ -708,6 +708,37 @@ panic the connection thread, and under `hardened` (abort) all of hostd. The
 decoder must use checked `get(..)` with a decode error and gain a property
 test over truncated and oversized frames before `hardened` returns.
 
+Closed (hostd decoder prerequisite). An audit of every index, slice,
+conversion and wire length field on the decode path (`decode`, `sized`,
+`netns_target`, `run_body`, `valid_directory`, `Stream::decode`,
+`decode_reply`, `receive` and the argument grammars that read decoded
+fields) found no reachable panic: each offset slice was dominated by a
+length check, and the new property tests also pass against the previous
+decoder. The decoder is now total by construction: a bounds-checked cursor
+(`split_at_checked`, `try_into`) returns a closed `DecodeError` (`Size`,
+`Operation`, `Layout`, `Value`), the wire format is unchanged, and a
+malformed datagram still closes its session with no reply. The one
+peer-reachable abort found was elsewhere: `std::thread::spawn` panics when no
+thread can be created, so a connection or request flood that exhausted
+threads would abort a `hardened` hostd. Connection, request, durable-job and
+namespace-dial threads now use `thread::Builder::spawn`; a failed request is
+refused `Unavailable` and a failed connection is closed. Evidence: Hegel
+properties in `lilly/native/hostd/src/decode_tests.rs` (arbitrary bytes,
+truncated and byte-corrupted frames of every operation, corrupted length
+fields of `LaunchVm`, `BridgeNetnsTcp` and `BridgeIngress`, each asserting no
+panic, a typed error and exact re-encoding of anything accepted, plus
+in-process sessions whose threads must not panic) and
+`lilly/native/hostd/tests/malformed_frames.rs`, which drives the real binary
+and requires it to stay running and serve a new session after each
+malformed datagram. Both pass under `cargo test --profile release` and
+`--profile hardened`, and through Buck2 (`//lilly:lilly-hostd-unittest`,
+`//lilly:lilly-hostd-test-malformed_frames`). A mutant with one unchecked
+namespace slice fails both suites; under `hardened` the daemon exits with
+SIGABRT (wait status 134), under `release` only its session thread dies,
+which shows that the binary test checks the abort case. Remaining for
+`hardened`: the other twelve helpers, and the start-up-only spawns in
+`exec.rs` (reaper and bridge-exit reporter), were not audited here.
+
 **Mila C header.** The three copies of the C ABI had drifted: the Rust
 crate's header declared 32 of the 52 `mila_*` exports, Apple's 37 and the
 Windows scaffold's 26, and the Windows copy spelled the watch enumerators

@@ -142,7 +142,10 @@ fn run() -> u8 {
         match accept_with(&listener, SocketFlags::CLOEXEC) {
             Ok(connection) => {
                 let daemon = Arc::clone(&daemon);
-                std::thread::spawn(move || serve(daemon, connection));
+                // A thread that cannot be created (resource exhaustion)
+                // drops this connection, closing it; the daemon keeps
+                // accepting.
+                let _ = std::thread::Builder::new().spawn(move || serve(daemon, connection));
             }
             Err(rustix::io::Errno::INTR | rustix::io::Errno::CONNABORTED) => {}
             Err(_) => return EXIT_SETUP,

@@ -58,8 +58,8 @@ fn connect_unix_decoding_matches_model(tc: TestCase) {
     body.extend(&path);
     let model = (1..=30_000).contains(&timeout) && path_model(&path);
     let decoded = decode(&body);
-    assert_eq!(decoded.is_some(), model, "path {path:?} timeout {timeout}");
-    if let Some(envelope) = decoded {
+    assert_eq!(decoded.is_ok(), model, "path {path:?} timeout {timeout}");
+    if let Ok(envelope) = decoded {
         assert!(carries_descriptor(&envelope.request));
         assert_eq!(encode_request(&envelope), body);
     }
@@ -99,8 +99,8 @@ fn bridge_decoding_matches_model(tc: TestCase) {
         && declared != 0
         && usize::from(declared) < rest;
     let decoded = decode(&body);
-    assert_eq!(decoded.is_some(), model, "body {body:?}");
-    if let Some(envelope) = decoded {
+    assert_eq!(decoded.is_ok(), model, "body {body:?}");
+    if let Ok(envelope) = decoded {
         assert!(carries_descriptor(&envelope.request));
         assert_eq!(encode_request(&envelope), body);
     }
@@ -124,11 +124,11 @@ fn only_connect_requests_carry_descriptors() {
     let mut lend_unix = vec![8_u8];
     lend_unix.extend(1_u64.to_be_bytes());
     lend_unix.extend(b"/run/vm/api.sock");
-    assert_eq!(decode(&lend_unix), None);
+    assert_eq!(decode(&lend_unix), Err(DecodeError::Operation));
     let mut lend_tcp = vec![9_u8];
     lend_tcp.extend(1_u64.to_be_bytes());
     lend_tcp.extend([0; 24]);
-    assert_eq!(decode(&lend_tcp), None);
+    assert_eq!(decode(&lend_tcp), Err(DecodeError::Operation));
 }
 
 // ---------------------------------------------------------------- sessions

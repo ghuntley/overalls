@@ -178,9 +178,13 @@ pub fn open_netns_tcp(request: NetnsTcp) -> Result<OwnedFd, Refusal> {
     if !name_ok(&request.namespace, 64) || !name_ok(&request.device, 15) {
         return Err(Refusal::Malformed);
     }
-    std::thread::spawn(move || connect_in_namespace(&request))
-        .join()
-        .unwrap_or(Err(Refusal::Unavailable))
+    // A thread that cannot be created, or (in unwinding builds) one that
+    // panicked, is Unavailable; the namespace switch dies with the thread.
+    std::thread::Builder::new()
+        .spawn(move || connect_in_namespace(&request))
+        .map_or(Err(Refusal::Unavailable), |thread| {
+            thread.join().unwrap_or(Err(Refusal::Unavailable))
+        })
 }
 
 fn connect_in_namespace(request: &NetnsTcp) -> Result<OwnedFd, Refusal> {

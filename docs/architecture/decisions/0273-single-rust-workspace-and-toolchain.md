@@ -109,6 +109,14 @@ partial, in milestone M5.
   effective `buildType = "release"`, and `cargoWorkspace.rustPlatform`'s
   `buildRustPackage` refuses `cargoBuildType`, so a declared profile can no
   longer be dropped silently.
+  For hostd, the panic-path audit is done: its
+  request decoder is total by construction with a typed decode error, its
+  per-connection and per-request threads no longer panic when none can be
+  created, and property and real-binary tests pass under both `release` and
+  `hardened` ([review](../reviews/2026-10-30-buck2-migration.md#m5-rust-on-buck2),
+  [`decode_tests.rs`](../../../lilly/native/hostd/src/decode_tests.rs),
+  [`malformed_frames.rs`](../../../lilly/native/hostd/tests/malformed_frames.rs)).
+  The helpers still build `release`; the other twelve were not audited.
 - **Nix.** [`cargo-workspace.nix`](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
   vendors the root lock once with `importCargoLock` (through
   [`locked-cargo-vendor.nix`](../../../nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix)).
