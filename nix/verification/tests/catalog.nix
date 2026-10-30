@@ -128,7 +128,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   proxy-runtime-address = import ./machines/proxy-runtime-address { pkgs = testPkgs; module = modules.default; };
   runtime-socket-configuration =import ./evaluation/runtime-socket.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
   trace-spool-native = import ./machines/trace-spool { pkgs = testPkgs; };
-  otel-fleet = import ./machines/otel-fleet { pkgs = testPkgs; };
+  otel-fleet = import ./machines/otel-fleet { pkgs = testPkgs; inherit packages; };
   otel-burn-delivery = import ./machines/otel-burn-delivery { pkgs = testPkgs; inherit hegel; };
   otel-marshall = import ./machines/otel-marshall service;
   otel-request-recorder = import ./machines/otel-request-recorder { pkgs = testPkgs; inherit (packages) toolchain; inherit hegel; };
