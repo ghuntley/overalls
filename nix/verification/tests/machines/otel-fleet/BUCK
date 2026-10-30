@@ -12,7 +12,7 @@ nixos_machine_test(
     nested_kvm = False,
     labels = [],
     params = {},
-    inputs = NIX_INPUTS + [
+    inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
     ],
 )
