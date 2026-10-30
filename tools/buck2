@@ -42,6 +42,9 @@ if [[ "${1:-}" == --no-nix ]]; then
   printf 'no-nix %s\n' "$(cat .buck-cells/kit-id)" > "$state"
   exe=.buck-cells/bin/buck2
   [[ -f "$exe.exe" ]] && exe=$exe.exe
+  # Git Bash rewrites arguments that look like POSIX paths when it starts a
+  # Windows program, turning //mila:x into /mila:x; buck2 takes them verbatim.
+  export MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*'
   exec "$root/$exe" "$@"
 fi
 
