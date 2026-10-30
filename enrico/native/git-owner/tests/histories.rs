@@ -1,6 +1,7 @@
 use hegel::{generators as gs, TestCase};
 use std::fs;
 use std::io::Read;
+use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use std::thread;
@@ -16,6 +17,10 @@ struct Owner {
     release: PathBuf,
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn shell() -> PathBuf {
     let path =
         PathBuf::from(std::env::var_os("ENRICO_TEST_SHELL").expect("set pinned fixture shell"));
@@ -44,6 +49,10 @@ fn retired(pid: u32) -> bool {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn spawn(
     directory: &Path,
     repository: &str,
@@ -79,6 +88,10 @@ impl Owner {
     /// @cc [owner:ghuntley,label:verification] complete-native-pid-witness
     /// File creation MUST NOT count as a published process witness. Wait for
     /// complete positive PID bytes before inspecting or signaling that process.
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+    )]
     fn pid(&self) -> u32 {
         let mut observed: Option<u32> = None;
         await_condition(|| {
@@ -91,6 +104,10 @@ impl Owner {
         observed.expect("complete positive PID witness")
     }
 
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+    )]
     fn finish(&mut self) -> (i32, Vec<u8>) {
         let mut status = None;
         await_condition(|| {
@@ -155,6 +172,10 @@ fn configured_large_output_boundaries(tc: TestCase) {
             let output = owner.child.stdout.take().expect("concurrent output pipe");
             let reader = thread::spawn(move || {
                 let mut output = output;
+                #[expect(
+                    clippy::large_stack_arrays,
+                    reason = "one 64 KiB read chunk fits the 2 MiB default test-thread stack"
+                )]
                 let mut buffer = [0_u8; 65_536];
                 let mut count = 0_usize;
                 loop {
@@ -229,7 +250,6 @@ fn caller_death_retires_child_before_successor(tc: TestCase) {
         "printf successor",
     );
     assert_eq!(successor.finish(), (0, b"successor".to_vec()));
-    use std::os::unix::fs::MetadataExt;
     assert_eq!(fs::metadata(lock_path).expect("stable lock").ino(), inode);
 }
 
@@ -383,7 +403,12 @@ fn retained_locks(pid: u32) -> Option<RetainedLocks> {
     for entry in fs::read_dir(format!("/proc/{pid}/fd")).ok()? {
         let target = fs::read_link(entry.ok()?.path()).ok()?;
         let name = target.file_name()?.to_str()?;
-        if name.starts_with(".enrico-git-slot-") && name.ends_with(".lock") {
+        #[expect(
+            clippy::case_sensitive_file_extension_comparisons,
+            reason = "the helper creates slot locks with the exact lowercase .lock suffix"
+        )]
+        let admission = name.starts_with(".enrico-git-slot-") && name.ends_with(".lock");
+        if admission {
             result.admission += 1;
         }
         if name == ".enrico-escaped.lock" {
@@ -393,6 +418,11 @@ fn retained_locks(pid: u32) -> Option<RetainedLocks> {
     Some(result)
 }
 
+#[expect(
+    clippy::expect_used,
+    clippy::too_many_lines,
+    reason = "integration-test fixture helper outside #[test] that drives one complete escaped-session history; a failed fixture step must abort the calling test"
+)]
 fn escaped_session_history(trigger: EscapedTrigger, count: usize) {
     assert!(count <= 7);
     let setsid = PathBuf::from(

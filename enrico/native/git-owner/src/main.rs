@@ -27,7 +27,7 @@ struct Request {
     arguments: Vec<String>,
 }
 
-fn parse(arguments: Vec<String>) -> Option<Request> {
+fn parse(arguments: &[String]) -> Option<Request> {
     if !(7..=134).contains(&arguments.len()) {
         return None;
     }
@@ -70,6 +70,10 @@ fn parse(arguments: Vec<String>) -> Option<Request> {
 /// @cc [owner:ghuntley,label:security;recovery] stable-owned-lock-inode
 /// Locks MUST be regular, singly linked, private caller-owned files, opened
 /// without following links; flock descriptors MUST survive utility exec.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
+)]
 fn lock(path: &Path, shared: bool) -> Result<OwnedFd, u8> {
     let fd = open(
         path,
@@ -111,7 +115,10 @@ fn admission(directory: &Path) -> Result<OwnedFd, u8> {
     Err(75)
 }
 
-#[allow(unsafe_code)]
+#[expect(
+    unsafe_code,
+    reason = "pre_exec and the async-signal-safe SIGPIPE reset are the only unsafe operations"
+)]
 mod child_fence {
     use rustix::process::{getppid, set_parent_process_death_signal, Pid, Signal};
     use std::os::unix::process::CommandExt;
@@ -120,17 +127,27 @@ mod child_fence {
     /// @cc [owner:ghuntley,label:recovery] git-child-parent-death
     /// Before exec, children MUST install parent-death SIGKILL and verify the
     /// recorded parent, closing the setup race. Lock descriptors survive exec.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
+    )]
     pub(super) fn install(command: &mut Command, parent: Pid) {
+        let fence = move || {
+            if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
+                || getppid() != Some(parent)
+            {
+                return Err(std::io::ErrorKind::PermissionDenied.into());
+            }
+            // SAFETY: signal(2) is async-signal-safe and only restores the
+            // default SIGPIPE disposition in the forked child before exec.
+            unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+            Ok(())
+        };
+        // SAFETY: the pre-exec closure runs in the forked child and only calls
+        // prctl(2), getppid(2) and signal(2), which are async-signal-safe; it
+        // allocates nothing and touches no locks shared with the parent.
         unsafe {
-            command.pre_exec(move || {
-                if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
-                    || getppid() != Some(parent)
-                {
-                    return Err(std::io::ErrorKind::PermissionDenied.into());
-                }
-                libc::signal(libc::SIGPIPE, libc::SIG_DFL);
-                Ok(())
-            });
+            command.pre_exec(fence);
         }
     }
 }
@@ -140,6 +157,10 @@ mod child_fence {
 /// reuse. Adopted descendants in every process group/session MUST be reaped
 /// before cleanup is confirmed;
 /// unresolved cleanup MUST report failure and retain descendant-held locks.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
+)]
 fn terminate(child: &mut Child, pid: Pid) -> Result<(), u8> {
     let _ = kill_process_group(pid, Signal::KILL);
     let _ = child.kill();
@@ -147,7 +168,7 @@ fn terminate(child: &mut Child, pid: Pid) -> Result<(), u8> {
     let deadline = Instant::now() + Duration::from_secs(2);
     loop {
         match wait(WaitOptions::NOHANG) {
-            Ok(Some(_)) | Err(Errno::INTR) => continue,
+            Ok(Some(_)) | Err(Errno::INTR) => {}
             Err(Errno::CHILD) => return Ok(()),
             Err(_) => return Err(126),
             Ok(None) if Instant::now() >= deadline => return Err(126),
@@ -191,6 +212,11 @@ fn run(request: Request) -> Result<u8, u8> {
 /// @cc [owner:ghuntley,label:capacity;recovery] caller-responsive-stream
 /// Forwarding MUST retain at most one bounded chunk, observe caller EOF even
 /// while stdout is blocked, and preserve exact bytes within the command limit.
+#[expect(
+    rustdoc::broken_intra_doc_links,
+    clippy::too_many_lines,
+    reason = "the @cc metadata is code-contracts syntax, not an intra-doc link; one poll loop owns the caller, child and output state that the bounded-chunk contract reasons about"
+)]
 fn stream(child: &mut Child, reader: &OwnedFd, timeout: Duration, limit: usize) -> Result<u8, u8> {
     let input = io::stdin();
     let output = io::stdout();
@@ -240,6 +266,10 @@ fn stream(child: &mut Child, reader: &OwnedFd, timeout: Duration, limit: usize) 
             return Err(126);
         }
         if pending.is_empty() && !ended {
+            #[expect(
+                clippy::large_stack_arrays,
+                reason = "one 64 KiB CHUNK on the main thread stack is the single bounded read buffer"
+            )]
             let mut bytes = [0_u8; CHUNK];
             match rustix::io::read(reader, &mut bytes) {
                 Ok(0) => ended = true,
@@ -282,7 +312,7 @@ fn stream(child: &mut Child, reader: &OwnedFd, timeout: Duration, limit: usize) 
                             .exit_status()
                             .and_then(|code| u8::try_from(code).ok())
                             .unwrap_or(127)
-                    })
+                    });
                 }
                 Err(Errno::INTR) => continue,
                 Err(_) => return Err(126),
@@ -304,11 +334,11 @@ fn stream(child: &mut Child, reader: &OwnedFd, timeout: Duration, limit: usize) 
 fn main() -> ExitCode {
     let arguments: Result<Vec<String>, _> = std::env::args_os()
         .skip(1)
-        .map(|value| value.into_string())
+        .map(std::ffi::OsString::into_string)
         .collect();
     let result = arguments
         .map_err(|_| 64_u8)
-        .and_then(|code| parse(code).ok_or(64_u8))
+        .and_then(|code| parse(&code).ok_or(64_u8))
         .and_then(run);
     ExitCode::from(result.unwrap_or_else(|code| code))
 }
