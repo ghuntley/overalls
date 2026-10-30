@@ -125,6 +125,7 @@ jobs:
         timeout-minutes: 65
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Apple journey against the tunnelled fixture
+        id: apple-journey
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         working-directory: mila/native/apple
         timeout-minutes: 20
@@ -132,6 +133,19 @@ jobs:
           MILA_FFI_LIB_DIR: ${{ github.workspace }}/mila/rust/target/release
           MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
         run: swift test --filter MilaJourneyTests
+      # An explicit result lets the fixture job stop once every journey ended.
+      - name: Report the journey result to the tailnet fixture
+        if: always() && env.MILA_TAILSCALE_AUTHKEY != ''
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.apple-journey.outcome }}
+          NODE: mila-apple-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          if ! address=$(cat "$RUNNER_TEMP/mila-tailnet-fixture-address" 2>/dev/null); then
+            echo "no tunnelled fixture was reached; nothing to report"
+            exit 0
+          fi
+          curl -sS --max-time 10 -X POST "http://$address:8445/finished/$NODE/${OUTCOME:-skipped}" || true
 
   windows-native:
     runs-on: windows-2025
@@ -197,6 +211,7 @@ jobs:
         shell: bash
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Windows journey against the tunnelled fixture
+        id: windows-journey
         if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' || env.MILA_TAILSCALE_AUTHKEY != '' }}
         shell: pwsh
         env:
@@ -206,6 +221,19 @@ jobs:
           $staged = Join-Path $env:GITHUB_WORKSPACE "mila/windows-dotnet/bin/Release/net10.0-windows10.0.19041.0/win-x64/mila_native.dll"
           dotnet run --project mila/windows-dotnet-smoke --configuration Release -p:MilaNativeDll=$staged -- --descriptor $env:MILA_JOURNEY_DESCRIPTOR
           if ($LASTEXITCODE -ne 0) { throw "Windows fixture journey failed" }
+      # An explicit result lets the fixture job stop once every journey ended.
+      - name: Report the journey result to the tailnet fixture
+        if: always() && env.MILA_TAILSCALE_AUTHKEY != ''
+        shell: bash
+        env:
+          OUTCOME: ${{ steps.windows-journey.outcome }}
+          NODE: mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          if ! address=$(cat "$RUNNER_TEMP/mila-tailnet-fixture-address" 2>/dev/null); then
+            echo "no tunnelled fixture was reached; nothing to report"
+            exit 0
+          fi
+          curl -sS --max-time 10 -X POST "http://$address:8445/finished/$NODE/${OUTCOME:-skipped}" || true
 
   linux-native:
     runs-on: ubuntu-24.04
@@ -629,11 +657,12 @@ jobs:
           done
           token="$(jq -r .approver.bearer_token "$dir/public/descriptor.json")"
           echo "::add-mask::$token"
-          # Only tag:mila-ci peers can reach this port (see the tailnet ACL).
-          nohup python3 -I -m http.server 8445 --bind "$address" --directory "$dir/public" \
-            > /dev/null 2>&1 &
+          # Only tag:mila-ci peers can reach port 8445 (see the tailnet policy). The
+          # script fails fast when this node's tag or packet filter cannot admit them,
+          # and stops once every journey job has reported a result or left.
           read -ra peers <<< "$PEERS"
-          python3 -I .github/scripts/mila-tailnet-peers.py 3000 "${peers[@]}"
+          python3 -I .github/scripts/mila-tailnet-peers.py --bind "$address" \
+            --directory "$dir/public" --deadline 3000 "${peers[@]}"
       - name: Show journey fixture logs
         if: failure() && env.MILA_TAILSCALE_AUTHKEY != ''
         run: |

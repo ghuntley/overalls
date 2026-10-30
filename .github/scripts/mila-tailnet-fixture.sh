@@ -10,37 +10,31 @@ set -euo pipefail
 # trust management host and Porsche certificate principal are `localhost`.
 # Only loopback listeners are opened; the bearer MUST NOT be echoed unmasked.
 descriptor=${1:?usage: mila-tailnet-fixture.sh DESCRIPTOR_PATH}
-fixture="mila-fixture-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
 python=$(command -v python3 || command -v python)
-address=""
-for _ in $(seq 1 720); do
-  if address=$(tailscale ip -4 "$fixture" 2>/dev/null) && [ -n "$address" ]; then
-    if curl -fsS --max-time 5 "http://$address:8445/descriptor.json" -o "$descriptor.tmp" 2>/dev/null; then
-      break
-    fi
-  fi
-  address=""
-  sleep 5
-done
-if [ -z "$address" ]; then
-  echo "tunnelled fixture $fixture did not publish a descriptor within 60 minutes" >&2
-  exit 1
-fi
+address_file="${RUNNER_TEMP:-/tmp}/mila-tailnet-fixture-address"
 umask 077
-mv "$descriptor.tmp" "$descriptor"
-chmod 600 "$descriptor"
+# Resolves the fixture via `tailscale status --json`, prints a diagnostic
+# every minute and fails fast when this node is not tagged tag:mila-ci.
+"$python" -I .github/scripts/mila-tailnet-join.py "$descriptor" "$address_file"
+address=$(cat "$address_file")
 token=$("$python" -I -c 'import json,sys; print(json.load(open(sys.argv[1]))["approver"]["bearer_token"])' "$descriptor")
 echo "::add-mask::$token"
 nohup "$python" -I .github/scripts/mila-tailnet-forward.py "$address" 8443 2222 8444 \
   > "${RUNNER_TEMP:-/tmp}/mila-tailnet-forward.log" 2>&1 &
 "$python" -I -c 'import json,sys; open(sys.argv[2], "w").write(json.load(open(sys.argv[1]))["tls"]["ca_pem"])' \
   "$descriptor" "$descriptor.ca.pem"
-for _ in $(seq 1 60); do
-  if curl -fsS --max-time 5 -o /dev/null --cacert "$descriptor.ca.pem" "https://localhost:8443/health/ready" 2>/dev/null; then
+error=""
+for attempt in $(seq 1 60); do
+  if error=$(curl -fsS --max-time 5 -o /dev/null --cacert "$descriptor.ca.pem" \
+    "https://localhost:8443/health/ready" 2>&1); then
     echo "tunnelled fixture reachable on localhost"
     exit 0
   fi
+  if [ $((attempt % 15)) -eq 0 ]; then
+    echo "localhost:8443 not ready yet: $error" >&2
+    cat "${RUNNER_TEMP:-/tmp}/mila-tailnet-forward.log" >&2 || true
+  fi
   sleep 2
 done
-echo "tunnelled fixture did not answer on localhost:8443" >&2
+echo "tunnelled fixture did not answer on localhost:8443: $error" >&2
 exit 1

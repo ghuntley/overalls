@@ -51,10 +51,15 @@ harness uses for real guest execution.
 6. macOS and Windows runners reach a Linux runner's fixture over a Tailscale
    tailnet (the tunnelled fixture). The `journey-fixture-tailnet` job boots
    the launcher with `--bind` on its tailnet address and serves only the
-   descriptor on port 8445. It stays up until this run's Apple and Windows
-   nodes have joined and left, or a deadline passes. The journey jobs join as
-   ephemeral `tag:mila-ci` nodes, download the descriptor and forward
-   `127.0.0.1:8443/2222/8444` to the fixture. `deployment.host` therefore
+   descriptor on port 8445. Before serving, it fails fast if its node lacks
+   `tag:mila-ci` or its packet filter admits none of the fixture ports. It
+   stays up until each Apple and Windows journey job has reported its result
+   (`POST /finished/<node>/<outcome>`), left the tailnet, or never joined, or
+   until a deadline passes. Only a reported `success` counts as finished. The
+   journey jobs join as ephemeral `tag:mila-ci` nodes and resolve the fixture
+   from `tailscale status --json`. They print a diagnostic every minute while
+   waiting, download the descriptor and forward `127.0.0.1:8443/2222/8444`
+   to the fixture. `deployment.host` therefore
    stays `localhost`, which the TLS SAN, trust management host and Porsche
    certificate principal all name. Every tailnet step is skipped when the
    `MILA_TAILSCALE_AUTHKEY` secret is absent.
