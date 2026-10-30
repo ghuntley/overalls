@@ -90,6 +90,13 @@ int32_t mila_session_machine_resize(uint64_t handle, const uint8_t *machine,
     const uint8_t *request_id, size_t request_id_len);
 int32_t mila_session_web_show(uint64_t handle, const uint8_t *machine,
     size_t machine_len, uint8_t *output, size_t capacity, size_t *written);
+/* Read one machine (`show MACHINE --json`) and its owner and grants
+ * (`share show MACHINE --json`); output follows mila_session_web_show and
+ * each call runs the remote command once. */
+int32_t mila_session_machine_show(uint64_t handle, const uint8_t *machine,
+    size_t machine_len, uint8_t *output, size_t capacity, size_t *written);
+int32_t mila_session_share_show(uint64_t handle, const uint8_t *machine,
+    size_t machine_len, uint8_t *output, size_t capacity, size_t *written);
 int32_t mila_session_web_set(uint64_t handle, const uint8_t *machine,
     size_t machine_len, uint16_t port, uint8_t is_public, uint64_t revision,
     const uint8_t *request_id, size_t request_id_len);
