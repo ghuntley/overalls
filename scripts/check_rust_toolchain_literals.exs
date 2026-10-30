@@ -30,7 +30,12 @@ defmodule Overalls.RustToolchainLiterals do
 
   @spec workflow_files(Path.t()) :: [Path.t()]
   def workflow_files(root) do
-    [".github/workflows/*.yml", ".github/workflows/*.yaml", ".github/actions/**/*.yml", ".github/actions/**/*.yaml"]
+    [
+      ".github/workflows/*.yml",
+      ".github/workflows/*.yaml",
+      ".github/actions/**/*.yml",
+      ".github/actions/**/*.yaml"
+    ]
     |> Enum.flat_map(&Path.wildcard(Path.join(root, &1)))
     |> Enum.sort()
   end
@@ -42,9 +47,16 @@ defmodule Overalls.RustToolchainLiterals do
     |> Enum.with_index(1)
     |> Enum.flat_map(fn {line, number} ->
       case Regex.named_captures(@literal, line) do
-        %{"value" => ^expected} -> []
-        %{"value" => value} -> ["#{path}:#{number}: Rust toolchain #{value}, expected #{expected} (#{@toolchain_file})"]
-        nil -> []
+        %{"value" => ^expected} ->
+          []
+
+        %{"value" => value} ->
+          [
+            "#{path}:#{number}: Rust toolchain #{value}, expected #{expected} (#{@toolchain_file})"
+          ]
+
+        nil ->
+          []
       end
     end)
   end
@@ -68,7 +80,9 @@ root =
 
 case Overalls.RustToolchainLiterals.run(root) do
   [] ->
-    IO.puts("Workflow Rust toolchain literals match #{Overalls.RustToolchainLiterals.expected!(root)}")
+    IO.puts(
+      "Workflow Rust toolchain literals match #{Overalls.RustToolchainLiterals.expected!(root)}"
+    )
 
   found ->
     Enum.each(found, &IO.puts(:stderr, &1))
