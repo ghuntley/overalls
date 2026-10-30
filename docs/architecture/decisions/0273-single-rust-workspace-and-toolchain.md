@@ -156,9 +156,18 @@ partial, in milestone M5.
   precommit checks. The 13 Lilly helpers, Enrico's git owner, the guest
   telemetry receiver, observability-runtimes and the trace spool build and pass
   their tests (60 Buck2 test targets). `rust_leaf_parity_test` compares an
-  imported Buck2 leaf with its Nix build. Remaining: the leaf swaps,
-  terminald, the editor broker and Lyra (musl and cross targets), Marshall's
-  Cedar NIF and Mila.
+  imported Buck2 leaf with its Nix build. Those five leaves are swapped for
+  machine tests: [rust_artifacts.bzl](../../../buck/rust_artifacts.bzl) maps
+  `lilly-host-helpers`, `enrico-git-owner`, `otel-guest-receiver`,
+  `observability-runtimes` and `trace-spool` to their imports, and each has a
+  passing `heavy` parity test (see the
+  [M5 review](../reviews/2026-10-30-buck2-migration.md#m5-rust-on-buck2)).
+  The affected machine tests pass with the swaps except fleet's capacity
+  race, which fails identically without them on current trunk (race host
+  16.895 GB free against a sub-180 MB slot margin) until overalls-1f's fix.
+  Hosts keep the Nix builds until M2. Remaining: terminald, the editor broker
+  and Lyra (musl and cross targets), Marshall's Cedar NIF, Mila and its
+  cbindgen header.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.
@@ -177,7 +186,8 @@ partial, in milestone M5.
 
 Remaining for this decision:
 
-- the rust-overlay toolchain (decision 2) and Buck2 prelude and reindeer builds
+- the remaining `buildRustPackage` leaves on nixpkgs Rust 1.99 (decision 2)
+  and the Buck2 builds of terminald, the broker, Lyra, the Cedar NIF and Mila
   (decision 3), in M5;
 - per-consumer Nix source filters, until M5 deletes the `buildRustPackage`
   leaves.

@@ -359,3 +359,104 @@ rules read for a source file, so per-file results agree with the whole run.
   `//:contracts-tests` passed.
 
 No NixOS machine test covers this change, because no deployed module changes.
+
+## M5: Rust on Buck2
+
+This milestone implements ADR-0273 decisions 2 and 3 for the first leaves and
+the Rust part of ADR-0269. It makes no new decision.
+
+**One toolchain.** `nix/rust-toolchain.nix` builds the 1.97.1 rust-overlay
+toolchain from the flake's `rust-overlay` input and is the only Rust release
+definition. devenv, Lyra's and terminald's cross and native builds and Buck2
+use it. Two findings shaped it:
+- With `rust-src` installed, rustc maps std's `/rustc/<hash>` panic paths to
+  the toolchain's store path, and every `allowedReferences = [ ]` cross
+  build failed. The toolchain omits `rust-src`, and editors read
+  `RUST_SRC_PATH`.
+- rust-overlay's illumos standard library links the guest's libc family;
+  `autoPatchelf` fails on it, so it is added with those libraries ignored.
+
+The other `buildRustPackage` leaves still use nixpkgs 1.99 until their Buck2
+replacements become the only build.
+
+**Third-party crates.** reindeer cannot vendor from a lock it does not
+resolve, and committing its output would add a second pin. `nix/buck/rust.nix`
+therefore generates the `rust//` cell in Nix: a pseudo-package lists every
+member's direct dependencies at the exact root-lock versions (a versioned
+alias where two versions are used), Cargo prunes a copy of the root lock, a
+subset check refuses any version the root lock did not resolve, and `reindeer
+buckify` runs over the `importCargoLock` sources. `cargo metadata` runs over
+the manifests plus empty stubs of every target-discovery file, so the cell
+depends on Rust file names but not their contents. Build scripts run by
+default; libc needs one committed fixup (a macro-declared module). Cfg
+conditions of first-party dependencies are evaluated against the same six
+reindeer platforms.
+
+**Rules.** `toolchains//:rust` takes rustc, rustdoc and clippy-driver from the
+store path, with the root `clippy.toml`. `toolchains//:cxx` links with the Nix
+cc wrapper under `env -i`: a Buck2 daemon started in a dev shell otherwise
+linked that shell's `NIX_LDFLAGS` rpath into binaries. `overalls_rust_crate`
+turns a member's row of `rust//:workspace.bzl` into prelude library, binary
+and test targets with the workspace lints, the Cargo profile the Nix build
+selects, native library directories and test environments, plus the
+`<pkg>-clippy` and `<pkg>-rustfmt` precommit checks. A planted `unwrap()` and
+a planted format error each failed their check.
+
+**Leaf swaps.** A swapped leaf is a bundle in the consumer's layout, imported
+with `nix_store_import` and its rpath store paths as runtime references, and
+read by Nix through `swapLeaf`, which keeps the Nix build's `meta` (the
+trace-spool module's `lib.getExe` needs `mainProgram`) and exposes it as
+`passthru.nixBuild`. The request-recorder fixtures patch and rebuild the
+receiver's source, so they derive from `nixBuild`: an `overrideAttrs` on the
+import only changes its copy step, which the first swapped run showed as a
+missing `request_fixture`. `ASSEMBLY_ARTIFACTS`
+(`buck/artifacts.bzl`, merging `RUST_ARTIFACTS` and M6's `MIX_ARTIFACTS`)
+feeds every machine test, and `nix/domains/artifacts/default.nix` refuses an
+artifact name it does not consume. The flake, from which hosts self-deploy,
+keeps the Nix builds until the M2 activation gate; deletions are M11.
+`rust_leaf_parity_test` (label `heavy`) builds the Nix side and fails when the
+two builds name different executables, when an executable's interpreter or
+RUNPATH differs, when it needs a library the Nix
+build does not, or when any store path in its rpath or bytes is outside the
+closure of the import's declared references. Fewer NEEDED entries are allowed:
+Cargo's links also list `ld-linux-x86-64.so.2` (PT_INTERP loads it either way),
+and the Nix receiver and spool carry an unused `libm.so.6` from rustc 1.99.
+It also fails on a `.debug_*` section the Nix build strips: the first
+Buck2 receiver binaries were five times larger because the prelude does not
+apply Cargo's implicit `strip = "debuginfo"` for `release`, which
+`buck/rust.bzl` now passes. Byte identity is not expected: the drivers
+differ, and the Nix leaves still use rustc 1.99.
+
+| Leaf | Buck2 import | Parity and tests |
+| --- | --- | --- |
+| Lilly host helpers (13 executables) | `//lilly:host-helpers-import` | `//lilly:host-helpers-parity` passes; the helpers' unit and integration test targets pass |
+| Enrico git owner | `//enrico:git-owner-import` | `//enrico:git-owner-parity` passes; unit and history tests pass serially |
+| Guest telemetry receiver (6) | `//nix:otel-guest-receiver-import` | `//nix:otel-guest-receiver-parity` passes |
+| observability-runtimes (2) | `//nix:observability-runtimes-import` | `//nix:observability-runtimes-parity` passes |
+| Trace spool | `//elixir:trace-spool-import` | `//elixir:trace-spool-parity` passes |
+
+Machine tests through Buck2 with all five swaps, each assembly using the
+imports (different store paths from the Nix leaves): vm-watch, image-copy,
+enrico-service, otel-fleet, source-export, export-endpoint, trace-spool-native
+(with independent trace custody) and both otel-request-recorder variants
+pass. fleet fails only "capacity races spend pending startup headroom only
+once", which current trunk also fails without
+any swap. The unswapped flake derivation fails it identically: the race host
+has 16.895 GB free after its first placement (16.713 GB on the older trunk
+where it passed), so the "fewer than three disk slots" term is false. The
+race's slot margin is under 180 MB; overalls-1f is deriving it from the
+actual pool.
+The first swapped run found two consumer mismatches, fixed above: the spool's
+`lib.getExe` lost `mainProgram`, and the recorder fixtures overrode the
+import. It also found that `support/zfs-node.nix` reads
+`zfs-lifecycle/probe.exs` without declaring it, so every ZFS-node assembly
+failed to evaluate; d9e423ee4 declared it in `NIX_INPUTS`.
+
+**Vendor leak (T2).** A panic location naming a vendored crate keeps the
+whole `importCargoLock` link farm in a closure. Lyra's main zigbuild phase had
+no remap, so `tool-lyra` carried 518 store paths, every crate included; it now
+remaps `${vendor}` like the cross builds, and its closure is the single output
+path. The Buck2 leaves name crates by their relative cell path
+(`.buck-cells/rust/vendor/...`), never a store path, and each parity test's
+embedded-path scan refuses an import that would carry one. The prelude's own
+`--remap-path-prefix` wins over a toolchain flag, so no extra remap is set.

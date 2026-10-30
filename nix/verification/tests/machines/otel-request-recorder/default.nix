@@ -18,7 +18,10 @@ let
       ${../../../../../elixir/request_accounting/lib/overalls/request_accounting}/producer/*.ex
   '';
   recorder = packages.otelReceiver;
-  fixture = recorder.overrideAttrs (previous: {
+  # The fixtures patch and rebuild the source, so they derive from the Nix
+  # build even when the recorder itself is the Buck2 leaf.
+  recorderSource = recorder.nixBuild or recorder;
+  fixture = recorderSource.overrideAttrs (previous: {
     pname = "overalls-request-recorder-native-fixture";
     postPatch = (previous.postPatch or "") + pkgs.lib.optionalString commitReplyLoss ''
       substituteInPlace nix/domains/system/otel-guest/receiver/examples/request_fixture.rs --replace-fail \
@@ -32,7 +35,7 @@ let
         || install -m 0755 target/release/examples/request_fixture "$out/bin/request_fixture"
     '';
   });
-  cutRecorder = recorder.overrideAttrs (previous: {
+  cutRecorder = recorderSource.overrideAttrs (previous: {
     pname = "overalls-request-recorder-commit-reply-fixture";
     nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ pkgs.clippy ];
     postPatch = (previous.postPatch or "") + ''

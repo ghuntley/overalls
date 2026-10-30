@@ -1,6 +1,7 @@
 load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
-load("@root//buck:rust.bzl", "overalls_rust_crate")
+load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
 
 nix_owned()
 
@@ -18,4 +19,34 @@ script_check(
 [overalls_rust_crate(path) for path in [
     "nix/domains/system/observability-runtimes",
     "nix/domains/system/otel-guest/receiver",
+]]
+
+_GLIBC_REFS = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib"]]
+
+# Imported bundles in the layout of the Nix builds they replace, each with a
+# parity test against that build (deleted at M11).
+[(
+    genrule(
+        name = leaf,
+        out = leaf,
+        cmd = "mkdir -p $OUT/bin && " + " && ".join(["cp $(location :{b}) $OUT/bin/{b}".format(b = b) for b in bins]),
+    ),
+    nix_store_import(
+        name = leaf + "-import",
+        src = ":" + leaf,
+        runtime_refs = _GLIBC_REFS,
+        visibility = ["PUBLIC"],
+    ),
+    rust_leaf_parity_test(
+        name = leaf + "-parity",
+        buck = ":" + leaf + "-import",
+        nix_attr = "legacyPackages.x86_64-linux." + attr,
+        labels = ["heavy"],
+    ),
+) for leaf, attr, bins in [
+    ("otel-guest-receiver", "otelReceiver", [
+        "browser_probe", "overalls-otel-guest-receiver", "slo_exporter",
+        "slo_recorder", "storage_probe", "underclass_probe",
+    ]),
+    ("observability-runtimes", "observabilityRuntimes", ["overalls-fleet-exporter", "overalls-logging-health"]),
 ]]

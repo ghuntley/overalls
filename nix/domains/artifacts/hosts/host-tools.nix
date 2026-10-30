@@ -1,4 +1,8 @@
-{ pkgs }:
+{ pkgs
+  # The Buck2-built helper bundle (//lilly:host-helpers-import), when assembly
+  # imports one; it then replaces every per-helper Nix build below.
+, buck ? null
+}:
 let
   imageCopy = import ../guests/image-copy.nix { inherit pkgs; };
   hostd = import ./hostd.nix { inherit pkgs; };
@@ -24,7 +28,8 @@ in
 # hostTools evaluation by construction of the fixed list.
 pkgs.symlinkJoin {
   name = "lilly-host-tools";
-  paths = [ imageCopy hostd kvmProbe launchGuard bootLog zfsNamespaceUnmount sourceExport transferStream ingressBridge exportChannel resumeToken flowLabel vmWatch ];
+  paths = if buck != null then [ buck ] else
+    [ imageCopy hostd kvmProbe launchGuard bootLog zfsNamespaceUnmount sourceExport transferStream ingressBridge exportChannel resumeToken flowLabel vmWatch ];
   postBuild = ''
     # Fail loudly if any Rust derivation start deviating from the fixed names.
     expected="lilly-boot-log lilly-export-channel lilly-flow-label lilly-hostd lilly-image-copy lilly-ingress-bridge lilly-kvm-probe lilly-launch-guard lilly-resume-token lilly-source-export lilly-transfer-stream lilly-vm-watch lilly-zfs-namespace-unmount"

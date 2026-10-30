@@ -148,8 +148,10 @@ per-target and per-file `[rustfmt/<path>]` sub-targets (ADR-0265, ADR-0273).
 
 @cc [owner:ghuntley,label:build;verification] rust-leaf-parity
 rust_leaf_parity_test MUST fail when an imported Buck2 Rust leaf's
-executables differ from the Nix build it replaces in name, ELF interpreter,
-NEEDED libraries (the loader excepted) or RUNPATH, or when an rpath store path
-is outside the closure of the import's declared runtime references. It builds
+executables differ from the Nix build it replaces in their set of names, ELF
+interpreter or RUNPATH, need a library or carry a `.debug_*` section the Nix
+build does not, or embed (in an rpath or
+anywhere in their bytes) a store path outside the closure of the import's
+declared runtime references. It builds
 the Nix side, so it is labelled heavy and is deleted with that build at M11
 (ADR-0269).

@@ -250,11 +250,15 @@ the approved migration plan.
   same dict (M2). The package set
   ([default.nix](../../../nix/domains/artifacts/default.nix)) refuses an
   artifact name it does not consume, so a misspelt key cannot silently leave
-  the Nix build in place.
+  the Nix build in place. M5 switched five Rust leaves there (the Lilly host
+  helpers, Enrico's git owner, the guest telemetry receiver,
+  observability-runtimes and the trace spool); each has a `heavy`
+  `rust_leaf_parity_test` against its Nix build.
 
 Remaining gaps, by milestone of the migration plan:
 
-- rust-overlay toolchain and Rust and Elixir rules (M5, M6);
+- the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
+  NIF, Mila) and the Elixir rules (M5, M6);
 - the remaining M3 items:
   - deployment and machine-test targets on `nix_assemble` (M2, M4a);
 - M7 leftovers:
@@ -277,8 +281,9 @@ Remaining gaps, by milestone of the migration plan:
   `ci.yml` precommit job now runs;
 - M8 leftovers: each project's `mix precommit` (compile, format, tests,
   Covenant, Dialyzer, gettext, Marshall's extra gates) stays, and CI keeps its
-  matrix, until the M6 Mix rules provide `precommit` sub-targets; the Rust
-  `rustfmt`/clippy sub-targets come with M5.
+  matrix, until the M6 Mix rules provide `precommit` sub-targets. The Rust
+  `<pkg>-rustfmt` and `<pkg>-clippy` checks exist for the Buck2-built crates
+  (M5).
 
 ## Open questions
 

@@ -8,8 +8,10 @@ load(":checks.bzl", "PrecommitInfo", "check_providers", "search_path", "tool", "
 load("@rust//:workspace.bzl", "CRATES", "LINT_FLAGS")
 
 # Cargo's `hardened` profile (root Cargo.toml): release optimisation, strip,
-# fat LTO, one codegen unit and abort on panic. `release` adds -O only.
-_RELEASE_FLAGS = ["-Copt-level=3", "-Cdebug-assertions=off", "-Coverflow-checks=off"]
+# fat LTO, one codegen unit and abort on panic. `release` is -O plus Cargo's
+# implicit `strip = "debuginfo"` (Cargo 1.77+ when `debug` is off), without
+# which the standard library's debug info made binaries five times larger.
+_RELEASE_FLAGS = ["-Copt-level=3", "-Cdebug-assertions=off", "-Coverflow-checks=off", "-Cstrip=debuginfo"]
 _HARDENED_FLAGS = _RELEASE_FLAGS + ["-Cstrip=symbols", "-Clto=fat", "-Ccodegen-units=1", "-Cpanic=abort"]
 
 def _crate_env(crate: dict, path: str) -> dict[str, str]:

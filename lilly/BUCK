@@ -57,6 +57,6 @@ nix_store_import(
 rust_leaf_parity_test(
     name = "host-helpers-parity",
     buck = ":host-helpers-import",
-    nix_attr = "legacyPackages.x86_64-linux.hostTools",
+    nix_attr = "legacyPackages.x86_64-linux.hostLock",
     labels = ["heavy"],
 )

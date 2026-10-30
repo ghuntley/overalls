@@ -1,5 +1,6 @@
 load("@root//buck:nix.bzl", "nix_owned")
-load("@root//buck:rust.bzl", "overalls_rust_crate")
+load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
 
 nix_owned()
 
@@ -12,3 +13,25 @@ filegroup(name = "trace_schema", srcs = ["diagnostics/priv/trace-schema.json"], 
 
 # The diagnostics trace spool, built by Buck2 (ADR-0273, M5).
 overalls_rust_crate("elixir/diagnostics/native/spool")
+
+genrule(
+    name = "trace-spool",
+    out = "trace-spool",
+    cmd = "mkdir -p $OUT/bin && cp $(location :overalls-trace-spool) $OUT/bin/overalls-trace-spool",
+)
+
+# sqlite is bundled (static), so glibc and libgcc_s are the only references.
+nix_store_import(
+    name = "trace-spool-import",
+    src = ":trace-spool",
+    runtime_refs = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib"]],
+    visibility = ["PUBLIC"],
+)
+
+# Parity with the Nix build it replaces (deleted at M11). Builds the Nix side.
+rust_leaf_parity_test(
+    name = "trace-spool-parity",
+    buck = ":trace-spool-import",
+    nix_attr = "legacyPackages.x86_64-linux.traceSpool",
+    labels = ["heavy"],
+)

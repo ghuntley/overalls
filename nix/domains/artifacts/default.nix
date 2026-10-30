@@ -42,7 +42,7 @@ let
     crates = [ "marshall/native/marshall_cedar" ];
   };
   version = "0.1.0";
-  hostLock = import ./hosts/host-tools.nix { inherit pkgs; };
+  hostLock = import ./hosts/host-tools.nix { inherit pkgs; buck = artifacts.lilly-host-helpers or null; };
   terminald = import ./infrastructure/terminald.nix { inherit pkgs; };
   terminaldChecks = import ./infrastructure/terminald-checks.nix { inherit pkgs; };
   # Hash-pinned Windows native runtime inputs. This is a staging closure only:
@@ -163,7 +163,7 @@ let
   # environment.
   mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
   # Buck2 Rust leaves this set consumes as `artifacts.<name>` (buck/rust_artifacts.bzl).
-  rustArtifactNames = [ ];
+  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "observability-runtimes" "otel-guest-receiver" "trace-spool" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
   # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2
@@ -334,19 +334,32 @@ let
   # Builds that modules used to make for themselves; modules take them from
   # this set so every system and test shares one build (ADR-0269).
 
+  # @cc [owner:ghuntley,label:build] swapped-leaf-keeps-nix-interface
+  # A Buck2 leaf that replaces a Nix build MUST keep that build's meta (so
+  # lib.getExe finds mainProgram) and expose it as passthru.nixBuild, so a
+  # fixture that patches or rebuilds the source overrides the Nix build rather
+  # than silently overriding the import's copy step (ADR-0269, ADR-0273).
+  swapLeaf = name: nixBuild:
+    if artifacts ? ${name} then
+      artifacts.${name}.overrideAttrs (previous: {
+        meta = nixBuild.meta or { };
+        passthru = (previous.passthru or { }) // { inherit nixBuild; };
+      })
+    else nixBuild;
+
   # @cc [owner:ghuntley,label:build] package-set-first-party-builds
   # NixOS modules, machine tests and the antithesis harness MUST take these
   # first-party builds from this set, never build their own copy. Patched
   # third-party nixpkgs packages (Fluent Bit) stay on the system's nixpkgs so
   # a host keeps the version its configuration was reviewed against.
-  otelReceiver = pkgs.callPackage ../system/otel-guest/receiver.nix { };
-  enricoGitOwner = import ./applications/enrico-git-owner.nix { inherit pkgs; };
-  observabilityRuntimes = import ../system/observability-runtimes.nix { inherit pkgs; };
-  traceSpool = import ./infrastructure/trace-spool.nix { inherit pkgs; };
+  otelReceiver = swapLeaf "otel-guest-receiver" (pkgs.callPackage ../system/otel-guest/receiver.nix { });
+  enricoGitOwner = swapLeaf "enrico-git-owner" (import ./applications/enrico-git-owner.nix { inherit pkgs; });
+  observabilityRuntimes = swapLeaf "observability-runtimes" (import ../system/observability-runtimes.nix { inherit pkgs; });
+  traceSpool = swapLeaf "trace-spool" (import ./infrastructure/trace-spool.nix { inherit pkgs; });
 in
 assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
-  inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool;
+  inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool hostLock;
   inherit dependencies cedarLints cargoWorkspace hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
