@@ -39,7 +39,12 @@ pub fn encode(request: &Request) -> [u8; WIRE_BYTES] {
     let mut wire = [0_u8; WIRE_BYTES];
     wire[0..4].copy_from_slice(MAGIC);
     wire[4..6].copy_from_slice(&68_u16.to_be_bytes());
-    wire[6..8].copy_from_slice(&(request.command.len() as u16).to_be_bytes());
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "a command longer than COMMAND_BYTES (8320) panics on the slice copy below, so every encoded length fits u16"
+    )]
+    let command_size = request.command.len() as u16;
+    wire[6..8].copy_from_slice(&command_size.to_be_bytes());
     wire[8..8 + 68].copy_from_slice(request.key.as_bytes());
     let start = 8 + KEY_BYTES;
     wire[start..start + request.command.len()].copy_from_slice(request.command.as_bytes());
@@ -78,8 +83,7 @@ pub fn decode(wire: &[u8]) -> Option<Request> {
         return None;
     }
     Some(Request {
-        key: String::from_utf8(key[..68].to_vec()).expect("charset is ASCII-safe"),
-        command: String::from_utf8(command[..command_size as usize].to_vec())
-            .expect("printable ASCII"),
+        key: String::from_utf8(key[..68].to_vec()).ok()?,
+        command: String::from_utf8(command[..command_size as usize].to_vec()).ok()?,
     })
 }

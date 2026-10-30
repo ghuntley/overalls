@@ -8,17 +8,21 @@ use std::process::Command;
 /// time or arrives through the std Stdio mapping only. Unsafe-declared
 /// calls stay confined to this hook.
 pub(super) fn serve_child(command: &mut Command, parent: Pid) {
-    unsafe {
-        command.pre_exec(move || {
-            if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
-                || getppid() != Some(parent)
-            {
-                return Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied));
-            }
-            libc::signal(libc::SIGTERM, libc::SIG_DFL);
-            libc::signal(libc::SIGINT, libc::SIG_DFL);
-            libc::signal(libc::SIGPIPE, libc::SIG_DFL);
-            Ok(())
-        })
+    let hook = move || {
+        if set_parent_process_death_signal(Some(Signal::KILL)).is_err() || getppid() != Some(parent)
+        {
+            return Err(std::io::Error::from(std::io::ErrorKind::PermissionDenied));
+        }
+        // SAFETY: SIG_DFL installs no handler; signal is async-signal-safe.
+        unsafe { libc::signal(libc::SIGTERM, libc::SIG_DFL) };
+        // SAFETY: as above.
+        unsafe { libc::signal(libc::SIGINT, libc::SIG_DFL) };
+        // SAFETY: as above.
+        unsafe { libc::signal(libc::SIGPIPE, libc::SIG_DFL) };
+        Ok(())
     };
+    // SAFETY: the hook runs in the forked child before exec. It captures one
+    // integer, allocates nothing, takes no locks and makes only
+    // async-signal-safe system calls (prctl, getppid, signal).
+    unsafe { command.pre_exec(hook) };
 }

@@ -28,9 +28,8 @@ pub fn serve(request: &ServeRequest, channel: BorrowedFd<'_>) -> u8 {
     let Some(account_uid) = posix::account_uid(&request.account) else {
         return EXIT_FAILED;
     };
-    let creds = match socket_peercred(channel) {
-        Err(_) => return EXIT_FAILED,
-        Ok(creds) => creds,
+    let Ok(creds) = socket_peercred(channel) else {
+        return EXIT_FAILED;
     };
     if creds.uid.as_raw() != account_uid {
         return EXIT_FAILED;
@@ -80,9 +79,8 @@ pub fn serve(request: &ServeRequest, channel: BorrowedFd<'_>) -> u8 {
     let Some(record) = decode(&wire) else {
         return EXIT_FAILED;
     };
-    let mode = match rustix::fs::fcntl_getfl(&received) {
-        Err(_) => return EXIT_FAILED,
-        Ok(flags) => flags,
+    let Ok(mode) = rustix::fs::fcntl_getfl(&received) else {
+        return EXIT_FAILED;
     };
     if mode & rustix::fs::OFlags::ACCMODE == rustix::fs::OFlags::RDONLY {
         return EXIT_FAILED;
@@ -96,11 +94,10 @@ fn serve_worker(
     received: &OwnedFd,
     channel: BorrowedFd<'_>,
 ) -> u8 {
-    let forwarded = std::fs::File::from(
-        received
-            .try_clone()
-            .expect("duplicate the received descriptor"),
-    );
+    let Ok(duplicate) = received.try_clone() else {
+        return EXIT_FAILED;
+    };
+    let forwarded = std::fs::File::from(duplicate);
     let mut builder = Process::new(&request.worker[0]);
     builder
         .args(&request.worker[1..])
@@ -111,9 +108,8 @@ fn serve_worker(
         .env("LILLY_EXPORT_REQUEST", &record.command);
     builder.process_group(0);
     pins::serve_child(&mut builder, getpid());
-    let mut worker = match builder.spawn() {
-        Err(_) => return EXIT_FAILED,
-        Ok(worker) => worker,
+    let Ok(mut worker) = builder.spawn() else {
+        return EXIT_FAILED;
     };
     let mut status = 1_u8;
     loop {
@@ -123,7 +119,7 @@ fn serve_worker(
         match child_status(&worker) {
             Err(()) => break,
             Ok(Some(ok)) => {
-                status = if ok { 0 } else { 1 };
+                status = u8::from(!ok);
                 break;
             }
             Ok(None) => {}
@@ -157,7 +153,10 @@ fn serve_worker(
 }
 
 fn child_status(child: &std::process::Child) -> Result<Option<bool>, ()> {
-    let pid = Pid::from_raw(child.id() as i32).ok_or(())?;
+    let pid = i32::try_from(child.id())
+        .ok()
+        .and_then(Pid::from_raw)
+        .ok_or(())?;
     match waitid(
         WaitId::Pid(pid),
         WaitIdOptions::EXITED | WaitIdOptions::NOHANG | WaitIdOptions::NOWAIT,
@@ -169,16 +168,15 @@ fn child_status(child: &std::process::Child) -> Result<Option<bool>, ()> {
 }
 
 fn finish(worker: &mut std::process::Child) {
-    if let Some(pid) = Pid::from_raw(worker.id() as i32) {
+    if let Some(pid) = i32::try_from(worker.id()).ok().and_then(Pid::from_raw) {
         let _ = kill_process_group(pid, Signal::KILL);
         let _ = kill_process(pid, Signal::KILL);
     }
     let _ = worker.wait();
     loop {
         match waitid(WaitId::All, WaitIdOptions::EXITED) {
-            Err(_) => return,
-            Ok(None) => return,
-            Ok(Some(_)) => continue,
+            Err(_) | Ok(None) => return,
+            Ok(Some(_)) => {}
         }
     }
 }

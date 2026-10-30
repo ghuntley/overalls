@@ -15,34 +15,30 @@ use std::os::unix::fs::{FileTypeExt, MetadataExt};
 /// and reports success only from the separate completion byte.
 pub fn bridge(request: &BridgeRequest) -> u8 {
     install_cancel_handlers();
-    let metadata = match std::fs::symlink_metadata(&request.socket) {
-        Err(_) => return EXIT_FAILED,
-        Ok(metadata) => metadata,
+    let Ok(metadata) = std::fs::symlink_metadata(&request.socket) else {
+        return EXIT_FAILED;
     };
     if !metadata.file_type().is_socket() {
         return EXIT_FAILED;
     }
-    let socket = match rustix::net::socket_with(
+    let Ok(socket) = rustix::net::socket_with(
         rustix::net::AddressFamily::UNIX,
         rustix::net::SocketType::STREAM,
         rustix::net::SocketFlags::CLOEXEC | rustix::net::SocketFlags::NONBLOCK,
         None,
-    ) {
-        Err(_) => return EXIT_FAILED,
-        Ok(fd) => fd,
+    ) else {
+        return EXIT_FAILED;
     };
-    let address = match rustix::net::SocketAddrUnix::new(&request.socket) {
-        Err(_) => return EXIT_FAILED,
-        Ok(addr) => addr,
+    let Ok(address) = rustix::net::SocketAddrUnix::new(&request.socket) else {
+        return EXIT_FAILED;
     };
     // A nonblocking stream connect returns at once for local listeners;
     // anything that comes back is a refused boundary, matching C's `||` shape.
     if rustix::net::connect(&socket, &address).is_err() {
         return EXIT_FAILED;
     }
-    let creds = match socket_peercred(&socket) {
-        Err(_) => return EXIT_FAILED,
-        Ok(creds) => creds,
+    let Ok(creds) = socket_peercred(&socket) else {
+        return EXIT_FAILED;
     };
     if creds.uid.as_raw() != metadata.uid() {
         return EXIT_FAILED;
@@ -66,8 +62,7 @@ pub fn bridge(request: &BridgeRequest) -> u8 {
         SendFlags::NOSIGNAL,
     ) {
         Ok(sent) if sent == WIRE_BYTES => {}
-        Ok(_) => return EXIT_FAILED,
-        Err(_) => return EXIT_FAILED,
+        Ok(_) | Err(_) => return EXIT_FAILED,
     }
     bridge_await(socket.as_fd())
 }

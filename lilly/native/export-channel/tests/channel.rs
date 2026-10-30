@@ -4,6 +4,10 @@ use std::process::{Command as Process, Stdio};
 
 const HELPER: &str = env!("CARGO_BIN_EXE_lilly-export-channel");
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a spawn failure must abort the test"
+)]
 fn run(arguments: &[&str], envs: &[(&str, &str)]) -> Option<i32> {
     Process::new(HELPER)
         .args(arguments)

@@ -4,7 +4,7 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::PathBuf;
 
 /// Validated bridge invocation: absolute socket path plus key; the SSH-side
-/// command arrives through SSH_ORIGINAL_COMMAND only.
+/// command arrives through `SSH_ORIGINAL_COMMAND` only.
 #[derive(Debug, Eq, PartialEq)]
 pub struct BridgeRequest {
     pub socket: PathBuf,

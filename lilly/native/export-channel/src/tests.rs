@@ -66,7 +66,8 @@ fn record_refusal_matrix_follows_the_oracle(tc: TestCase) {
         }
         "command_size" => {
             let size = command.len() + 1;
-            wire[6..8].copy_from_slice(&(size as u16).to_be_bytes());
+            wire[6..8]
+                .copy_from_slice(&u16::try_from(size).expect("bounded command").to_be_bytes());
             expected = false;
         }
         "key_content" => {
@@ -143,7 +144,7 @@ fn selector_and_environment_parsing_match_the_spec(tc: TestCase) {
 
 /// @cc [owner:ghuntley,label:verification;protocol] hegel-export-decode-totality
 /// decode MUST be total over arbitrary bytes: it never panics, accepts only
-/// frames of exactly WIRE_BYTES, and every accepted frame is the canonical
+/// frames of exactly `WIRE_BYTES`, and every accepted frame is the canonical
 /// encoding of the record it yields. Assertions never print frame or key bytes.
 #[hegel::test(test_cases = 200)]
 fn decode_is_total_and_canonical(tc: TestCase) {
@@ -181,8 +182,8 @@ fn decode_is_total_and_canonical(tc: TestCase) {
     }
     let decoded = decode(&wire);
     if let Some(record) = decoded {
-        assert!(wire.len() == WIRE_BYTES);
-        assert!(encode(&record)[..] == wire[..]);
+        assert_eq!(wire.len(), WIRE_BYTES);
+        assert_eq!(encode(&record)[..], wire[..]);
     } else {
         assert!(
             wire.len() != WIRE_BYTES || wire[..4] != MAGIC[..] || {
