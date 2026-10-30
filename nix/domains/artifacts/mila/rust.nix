@@ -46,6 +46,9 @@ in
     installPhase = ''
       mkdir -p "$out/lib/mila-rust"
       cp -a target/release/. "$out/lib/mila-rust/"
+      # The headless journey driver (ADR-0264) links the production C FFI.
+      journey=$(find target -type f -path '*/release/mila-journey' | head -n 1)
+      install -Dm755 "$journey" "$out/bin/mila-journey"
     '';
     meta.description = "Mila's Rust workspace libraries";
   });

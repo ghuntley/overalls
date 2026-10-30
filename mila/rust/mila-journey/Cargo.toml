@@ -1,0 +1,20 @@
+[package]
+name = "mila-journey"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Headless Mila journey driver over the production C FFI surface."
+
+[[bin]]
+name = "mila-journey"
+path = "src/main.rs"
+
+[dependencies]
+mila-ffi = { path = "../mila-ffi" }
+mila-transport = { path = "../mila-transport" }
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+p256.workspace = true
+sha2.workspace = true
+base64 = "0.22"

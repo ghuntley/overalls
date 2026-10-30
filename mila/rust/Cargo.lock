@@ -1171,6 +1171,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "mila-journey"
+version = "0.1.0"
+dependencies = [
+ "base64",
+ "mila-ffi",
+ "mila-transport",
+ "p256 0.13.2",
+ "serde",
+ "serde_json",
+ "sha2 0.10.9",
+ "uuid",
+]
+
+[[package]]
 name = "mila-localization"
 version = "0.1.0"
 dependencies = [

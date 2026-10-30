@@ -9,6 +9,7 @@ members = [
   "mila-transport",
   "mila-session",
   "mila-localization",
+  "mila-journey",
 ]
 
 [workspace.package]
