@@ -35,3 +35,17 @@ implementation; operating-system differences live only in the `conn`, `pty`,
 `vsock` and boot-identity modules selected by target, so the wire protocol and
 the capacity, fidelity and recovery contracts above hold on every supported target. Native linking MUST NOT establish kernel transport or
 image admission (ADR-0190).
+
+@cc [owner:ghuntley,label:verification] terminald-hegel-properties
+Hegel properties MUST cover, against independent oracles or round-trips: the
+scrollback ring byte history, cursor gaps, configured-capacity boundaries,
+shrink/grow and bounded overwrite backing; control frame encode/decode,
+arbitrary chunking and header refusals; the HELLO, CREATE, KILL, RESIZE and
+ATTACH payload codecs and their exact extents; split-invariant SHA-256/HMAC,
+RFC 2104 long keys and constant-time comparison; the HELLO proof binding to
+nonce, placement and epoch; the boot-identity lattice; JSON round-trip of
+encoded log lines; and MMDS HTTP response framing. Real local PTY properties
+MUST cover shared ring admission and retirement, actual growth backing,
+mixed-pressure growth, natural-EOF release with a stalled tail, neighbor
+progress beside a credit-stalled session and explicit kill of a credit-stalled
+session. None of these establishes vsock, VM or guest isolation.

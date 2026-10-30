@@ -148,23 +148,23 @@ pub fn put_bytes(out: &mut Vec<u8>, value: &[u8]) {
 #[cfg(test)]
 mod tests {
   use super::*;
+  use hegel::{generators as gs, TestCase};
 
-  #[test]
-  fn round_trips_arbitrary_frames() {
-    let mut state: u64 = 0x2545f4914f6cdd1d;
-    for _ in 0..200 {
-      state = state.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
-      let len = (state >> 33) as usize % (MAX_PAYLOAD + 1);
-      let payload: Vec<u8> = (0..len).map(|i| ((state >> (i % 57)) & 0xff) as u8).collect();
-      let wire = encode(OP_CREATE, &payload);
-      match decode(&wire).expect("complete frame") {
-        Ok(frame) => {
-          assert_eq!(frame.op, OP_CREATE);
-          assert_eq!(frame.payload, payload);
-          assert_eq!(wire.len(), consumed(payload.len()));
-        }
-        Err(_) => panic!("valid frame rejected"),
+  /// @cc [owner:ghuntley,label:verification;protocol] terminal-frame-round-trip
+  /// Every op and every payload up to `MAX_PAYLOAD` MUST decode to exactly the
+  /// encoded frame, consuming exactly the header and declared payload.
+  #[hegel::test(test_cases = 200)]
+  fn round_trips_arbitrary_frames(tc: TestCase) {
+    let op = tc.draw(gs::integers::<u8>());
+    let payload: Vec<u8> = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(MAX_PAYLOAD));
+    let wire = encode(op, &payload);
+    match decode(&wire).expect("complete frame") {
+      Ok(frame) => {
+        assert_eq!(frame.op, op);
+        assert!(frame.payload == payload, "decoded payload differs from encoded payload");
+        assert_eq!(wire.len(), consumed(payload.len()));
       }
+      Err(()) => panic!("valid frame rejected"),
     }
   }
 

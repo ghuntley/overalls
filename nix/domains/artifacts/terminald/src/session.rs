@@ -1251,7 +1251,11 @@ mod tests {
     daemon.kill(second.0).ok();
   }
 
-  #[hegel::test]
+  /// @cc [owner:ghuntley,label:verification;recovery] explicit-kill-credit-stall-property
+  /// For viewer watermarks around 1 KiB, 32 KiB and 1 MiB, with or without a
+  /// descendant holding the PTY, explicit kill MUST retire a session whose
+  /// viewer withholds read credit.
+  #[hegel::test(test_cases = 100)]
   fn explicit_kill_retires_a_session_with_a_credit_stalled_viewer(tc: hegel::TestCase) {
     let watermarks = [1_usize, 1023, 1024, 1025, 32767, 32768, 32769,
       (1 << 20) - 1, 1 << 20, (1 << 20) + 1];

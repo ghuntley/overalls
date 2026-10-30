@@ -150,6 +150,47 @@ pub fn now_ms() -> u64 {
 #[cfg(test)]
 mod tests {
   use super::{encode, Context, Event};
+  use hegel::{generators as gs, TestCase};
+
+  /// @cc [owner:ghuntley,label:verification;observability] terminald-log-line-json
+  /// Every encoded event line MUST be one newline-terminated JSON object whose
+  /// identifier strings and numbers round-trip exactly through an independent
+  /// JSON parser, whatever quotes, backslashes or control characters they hold.
+  #[hegel::test(test_cases = 100)]
+  fn encoded_lines_round_trip_through_json(tc: TestCase) {
+    // Every C0 control, both JSON metacharacters, DEL and non-ASCII scalars.
+    let alphabet: Vec<char> = (0_u8..0x20)
+      .map(char::from)
+      .chain(['"', '\\', '/', 'a', '\u{7f}', '\u{e9}', '\u{2028}', '\u{1f600}'])
+      .collect();
+    let placement: String = if tc.draw(gs::booleans()) {
+      tc.draw(gs::text().max_size(48))
+    } else {
+      tc.draw(gs::vecs(gs::sampled_from(&alphabet)).max_size(48)).into_iter().collect()
+    };
+    let epoch: String = tc.draw(gs::vecs(gs::sampled_from(&alphabet)).max_size(24)).into_iter().collect();
+    let session_id = tc.draw(gs::integers::<u64>());
+    let cols = tc.draw(gs::integers::<u16>());
+    let rows = tc.draw(gs::integers::<u16>());
+    let timestamp = tc.draw(gs::integers::<u64>());
+    let line = encode(Event::SessionCreated {
+      context: Context { placement_id: &placement, execution_epoch: &epoch },
+      session_id,
+      cols,
+      rows,
+    }, timestamp);
+    let body = line.strip_suffix('\n').expect("newline-terminated line");
+    assert!(!body.contains('\n'), "encoded line spans several lines");
+    let value: serde_json::Value = serde_json::from_str(body).expect("encoded line is JSON");
+    assert_eq!(value["placement_id"].as_str(), Some(placement.as_str()));
+    assert_eq!(value["execution_epoch"].as_str(), Some(epoch.as_str()));
+    assert_eq!(value["session_id"].as_u64(), Some(session_id));
+    assert_eq!(value["cols"].as_u64(), Some(u64::from(cols)));
+    assert_eq!(value["rows"].as_u64(), Some(u64::from(rows)));
+    assert_eq!(value["timestamp_ms"].as_u64(), Some(timestamp));
+    assert_eq!(value["event"].as_str(), Some("terminald.session_created"));
+    assert_eq!(value.as_object().map(serde_json::Map::len), Some(9));
+  }
 
   #[test]
   fn encoding_has_fixed_schema_and_numeric_values() {

@@ -142,6 +142,35 @@ mod tests {
   use super::*;
   use std::io::BufRead;
   use std::net::TcpListener;
+  use hegel::{generators as gs, TestCase};
+
+  /// @cc [owner:ghuntley,label:verification;security] windows-terminald-mmds-response-framing
+  /// A complete HTTP/1.x response MUST parse to exactly its status and its
+  /// Content-Length body, ignoring later bytes; a body shorter than its declared
+  /// length MUST be neither complete nor parsed, and arbitrary bytes MUST NOT panic.
+  #[hegel::test(test_cases = 100)]
+  fn responses_parse_exactly_their_declared_body(tc: TestCase) {
+    let status = tc.draw(gs::integers::<u16>().min_value(100).max_value(599));
+    let version = tc.draw(gs::sampled_from(&["HTTP/1.1", "HTTP/1.0"]));
+    let body: Vec<u8> = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(256));
+    let trailing: Vec<u8> = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(32));
+    let header = tc.draw(gs::sampled_from(&["Content-Length", "content-length", "CONTENT-LENGTH"]));
+    let mut raw = format!("{version} {status} OK\r\nServer: mmds\r\n{header}: {}\r\n\r\n", body.len()).into_bytes();
+    let head = raw.len();
+    raw.extend_from_slice(&body);
+    let complete = raw.clone();
+    raw.extend_from_slice(&trailing);
+    assert!(response_complete(&raw));
+    assert!(parse_response(&raw) == Some((status, body.clone())), "parsed response differs");
+    if !body.is_empty() {
+      let cut = tc.draw(gs::integers::<usize>().min_value(head).max_value(complete.len() - 1));
+      assert!(!response_complete(&complete[..cut]));
+      assert!(parse_response(&complete[..cut]).is_none());
+    }
+    let arbitrary: Vec<u8> = tc.draw(gs::vecs(gs::integers::<u8>()).max_size(256));
+    let _ = response_complete(&arbitrary);
+    let _ = parse_response(&arbitrary);
+  }
 
   const DOCUMENT: &str = r#"{"version":1,"placement":"dddddddd-dddd-4ddd-8ddd-000000000201","execution_epoch":7,"boot_challenge":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","ipv4":"10.10.0.203","prefix_length":32,"gateway":"10.10.0.1","mac":"02:fc:0a:00:00:cb"}"#;
 
