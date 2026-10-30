@@ -1,12 +1,12 @@
 //! Bounded Unix OTLP ingress. All refusals use closed outcomes; no payload logs.
+#![deny(unsafe_code)]
 use opentelemetry_proto::tonic::collector::trace::v1::ExportTraceServiceResponse;
-use overalls_trace_spool::{Error, Schema, Store, BODY_LIMIT};
+use overalls_trace_spool::{sys, Error, Schema, Store, BODY_LIMIT};
 use prost::Message;
 use serde::Deserialize;
 use std::ffi::CString;
 use std::fs::OpenOptions;
 use std::io::{Read, Write};
-use std::os::fd::AsRawFd;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
@@ -50,29 +50,11 @@ fn ticks(pid: libc::pid_t) -> Result<u64, Error> {
 }
 
 fn authenticate(stream: &UnixStream, config: &Config) -> Result<(libc::pid_t, u64), Error> {
-    let mut credentials = libc::ucred {
-        pid: 0,
-        uid: 0,
-        gid: 0,
-    };
-    let mut size = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
-    if unsafe {
-        libc::getsockopt(
-            stream.as_raw_fd(),
-            libc::SOL_SOCKET,
-            libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut size,
-        )
-    } != 0
-        || size as usize != std::mem::size_of::<libc::ucred>()
-        || credentials.pid <= 0
-    {
-        return Err(Error::Foreign);
-    }
+    let credentials = sys::peer_credentials(stream)
+        .filter(|credentials| credentials.pid > 0)
+        .ok_or(Error::Foreign)?;
     let user = CString::new(config.producer_user.as_str()).map_err(|_| Error::Invalid)?;
-    let account = unsafe { libc::getpwnam(user.as_ptr()) };
-    if account.is_null() || credentials.uid != unsafe { (*account).pw_uid } {
+    if sys::user_uid(&user) != Some(credentials.uid) {
         return Err(Error::Foreign);
     }
     let before = ticks(credentials.pid)?;
@@ -306,8 +288,7 @@ fn metrics(path: &Path, body: &str) -> Result<(), Error> {
         .open(&stage)
         .map_err(|_| Error::Storage)?;
     let metadata = file.metadata().map_err(|_| Error::Storage)?;
-    if !metadata.is_file() || metadata.uid() != unsafe { libc::geteuid() } || metadata.nlink() != 1
-    {
+    if !metadata.is_file() || metadata.uid() != sys::geteuid() || metadata.nlink() != 1 {
         return Err(Error::Storage);
     }
     file.set_permissions(std::fs::Permissions::from_mode(0o640))
@@ -401,16 +382,13 @@ fn run(config: Config, replay_only: bool) -> Result<(), Error> {
     }
     let parent = config.socket.parent().ok_or(Error::Storage)?;
     let metadata = std::fs::symlink_metadata(parent).map_err(|_| Error::Storage)?;
-    if !metadata.is_dir()
-        || metadata.uid() != unsafe { libc::geteuid() }
-        || metadata.mode() & 0o007 != 0
-    {
+    if !metadata.is_dir() || metadata.uid() != sys::geteuid() || metadata.mode() & 0o007 != 0 {
         return Err(Error::Storage);
     }
     match std::fs::symlink_metadata(&config.socket) {
         Ok(metadata) => {
             if !std::os::unix::fs::FileTypeExt::is_socket(&metadata.file_type())
-                || metadata.uid() != unsafe { libc::geteuid() }
+                || metadata.uid() != sys::geteuid()
             {
                 return Err(Error::Storage);
             }
