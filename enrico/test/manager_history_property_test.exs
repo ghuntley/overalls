@@ -64,6 +64,66 @@ defmodule Enrico.ManagerHistoryPropertyTest do
     end)
   end
 
+  property "refresh waits for a retiring native writer instead of failing before clone",
+    profile: :ci do
+    hold_ms = draw("hold_ms", member_of([50, 400, 1_500]))
+
+    with_state(fn initial ->
+      directory = initial.config.state_dir
+      bin = Path.join(directory, "bin")
+      File.mkdir_p!(bin)
+      File.ln_s!(Path.expand("support/controlled_git.sh", __DIR__), Path.join(bin, "git"))
+      original_path = System.fetch_env!("PATH")
+      root = Path.join(directory, @id <> ".git")
+      witness = root <> ".owner"
+      helper = System.find_executable("enrico-git-owner") || raise ArgumentError
+      shell = System.find_executable("bash") || raise ArgumentError
+      seconds = :erlang.float_to_binary(hold_ms / 1_000, decimals: 3)
+
+      # Stands in for a killed worker's owner that still holds the repository
+      # lock while it reaps its process group, then exits and releases it.
+      port =
+        Port.open({:spawn_executable, helper}, [
+          :binary,
+          :exit_status,
+          args: [
+            "10000",
+            "65536",
+            directory,
+            Path.basename(root),
+            "exclusive",
+            shell,
+            "-c",
+            "printf ready > \"$1\"; sleep #{seconds}",
+            "fixture",
+            witness
+          ]
+        ])
+
+      try do
+        await(fn -> File.read(witness) == {:ok, "ready"} end)
+        System.put_env("PATH", bin <> ":" <> original_path)
+        start_supervised!({Enrico.RefreshSupervisor, initial.config})
+        head = String.pad_leading("1", 40, "0")
+        assert {:ok, :running} = Manager.refresh(@id, @attempt, "NixOS", "nixpkgs")
+        await(fn -> Manager.status(@id, @attempt) != :running end)
+        assert Manager.status(@id, @attempt) == %{state: :succeeded, head: head}
+        assert_receive {^port, {:exit_status, 0}}, @await_ms
+        assert File.read!(root <> ".calls") == "clone\n"
+        assert File.dir?(root)
+        refute File.exists?(root <> ".new")
+        assert :sys.get_state(Manager).slo.requests == 1
+      after
+        try do
+          stop_supervised(Enrico.RefreshSupervisor)
+        after
+          System.put_env("PATH", original_path)
+          if Port.info(port), do: Port.close(port)
+        end
+      end
+    end)
+  end
+
   property "manager replacement retires saturated workers before new admission",
     profile: :ci do
     for culprit <- [:manager, :tasks], count <- [1, 7, 8], do: restart_history(culprit, count)

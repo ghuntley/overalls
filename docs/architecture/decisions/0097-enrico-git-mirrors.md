@@ -189,6 +189,19 @@ This repair's integrated fourteen-check component gate and zero-error forced
 Dialyzer passed; all-file hooks and evaluated HLDD also passed. Broader packaged
 and physical acceptance remain open.
 
+A loaded-host counterexample showed a refresh admitted by a replacement
+Manager failing before Git ran: the killed worker's native owner still held
+the repository writer lock while it reaped its process group, and the
+successor's `.git.new` cleanup took the owner's immediate lock refusal (exit
+75) as a Git failure. The native refusal is unchanged. Manager-owned refreshes
+now retry only that pre-execution refusal with bounded backoff, up to ten
+seconds per step, before failing the attempt; direct Git callers,
+administrative removal and reads still refuse at once. The
+[generated histories](../../../enrico/test/manager_history_property_test.exs)
+add a retiring-writer refresh property, and the replacement-admission property
+passed repeatedly under 80 competing CPU-bound processes. This is local BEAM and
+native-process evidence only; packaged cgroup recovery remains open.
+
 ## Related decisions
 
 [ADR-0036](0036-automatic-host-updates.md),

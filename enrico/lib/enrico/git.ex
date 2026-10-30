@@ -6,6 +6,9 @@ defmodule Enrico.Git do
   @max_path_scan 67_108_864
   @fetch_timeout 3_600_000
   @read_timeout 10_000
+  @contention_wait 10_000
+  @contention_backoff_ms 10
+  @contention_backoff_cap_ms 250
   @owner ~r/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?$/
   @repo ~r/^[A-Za-z0-9._-]{1,100}$/
   @ref ~r|^[A-Za-z0-9_][A-Za-z0-9_./+-]{0,199}$|
@@ -19,6 +22,7 @@ defmodule Enrico.Git do
           | :timeout
           | :git_failed
   @type result :: {:ok, binary()} | {:error, reason()}
+  @typep native_result :: {:ok, binary()} | {:error, reason() | :contended}
 
   @spec valid_source?(term(), term()) :: boolean()
   def valid_source?(owner, repo) when is_binary(owner) and is_binary(repo) do
@@ -48,17 +52,31 @@ defmodule Enrico.Git do
   # Fetch MUST construct a credential-free github.com HTTPS URL from validated
   # owner/repo labels. No caller-controlled remote, helper, shell or protocol
   # may be used, and failure MUST preserve the last published mirror.
-  @spec refresh(binary(), binary(), binary()) :: {:ok, binary()} | {:error, reason()}
-  def refresh(root, owner, repo) do
+
+  # @cc [owner:ghuntley,label:recovery;capacity] refresh-retiring-owner-wait
+  # Given a wait budget, each refresh step MUST retry, up to that bound, only
+  # the native owner's pre-exec lock refusal, never a started command. The
+  # budget defaults to zero so direct callers refuse an occupied writer at
+  # once; administrative removal and reads always refuse immediately, and an
+  # exhausted wait fails the attempt without effects.
+  @spec refresh(binary(), binary(), binary(), non_neg_integer()) ::
+          {:ok, binary()} | {:error, reason()}
+  def refresh(root, owner, repo, wait \\ 0) do
     if valid_source?(owner, repo) do
       url = "https://github.com/#{owner}/#{repo}.git"
 
       if File.dir?(root) do
         with {:ok, _} <-
-               run(["--git-dir=#{root}", "remote", "set-url", "origin", url], @read_timeout),
-             {:ok, previous} <- default_head(root),
-             :ok <- retain_head(root, previous),
-             {:ok, branch} <- remote_head(root),
+               run(
+                 ["--git-dir=#{root}", "remote", "set-url", "origin", url],
+                 @read_timeout,
+                 @max_result,
+                 false,
+                 wait
+               ),
+             {:ok, previous} <- resolve(root, "HEAD", wait),
+             :ok <- retain_head(root, previous, wait),
+             {:ok, branch} <- remote_head(root, wait),
              {:ok, _} <-
                run(
                  [
@@ -71,21 +89,38 @@ defmodule Enrico.Git do
                    "+refs/heads/*:refs/heads/*",
                    "+refs/tags/*:refs/tags/*"
                  ],
-                 @fetch_timeout
+                 @fetch_timeout,
+                 @max_result,
+                 false,
+                 wait
                ),
-             {:ok, _} <- run(["--git-dir=#{root}", "symbolic-ref", "HEAD", branch], @read_timeout),
-             {:ok, head} <- default_head(root),
-             :ok <- retain_head(root, head) do
+             {:ok, _} <-
+               run(
+                 ["--git-dir=#{root}", "symbolic-ref", "HEAD", branch],
+                 @read_timeout,
+                 @max_result,
+                 false,
+                 wait
+               ),
+             {:ok, head} <- resolve(root, "HEAD", wait),
+             :ok <- retain_head(root, head, wait) do
           {:ok, head}
         end
       else
         temporary = root <> ".new"
 
-        with :ok <- remove(temporary),
-             {:ok, _} <- run(["clone", "--quiet", "--mirror", url, temporary], @fetch_timeout),
-             {:ok, head} <- default_head(temporary),
-             :ok <- retain_head(temporary, head),
-             :ok <- mutate(root, "mv", ["-T", "--", temporary, root]) do
+        with :ok <- mutate(temporary, "rm", ["-rf", "--", temporary], wait),
+             {:ok, _} <-
+               run(
+                 ["clone", "--quiet", "--mirror", url, temporary],
+                 @fetch_timeout,
+                 @max_result,
+                 false,
+                 wait
+               ),
+             {:ok, head} <- resolve(temporary, "HEAD", wait),
+             :ok <- retain_head(temporary, head, wait),
+             :ok <- mutate(root, "mv", ["-T", "--", temporary, root], wait) do
           {:ok, head}
         else
           _ ->
@@ -98,6 +133,12 @@ defmodule Enrico.Git do
     end
   end
 
+  # Bounds one refresh step's wait for an earlier worker lifetime's native
+  # owner, which releases its locks only after reaping its process group
+  # (itself bounded to two seconds once the caller has gone).
+  @spec retiring_owner_wait() :: pos_integer()
+  def retiring_owner_wait, do: @contention_wait
+
   @spec default_head(binary()) :: result()
   def default_head(root) do
     resolve(root, "HEAD")
@@ -105,19 +146,28 @@ defmodule Enrico.Git do
 
   # Keep every default head addressable when an upstream force-push makes it
   # unreachable from its branch before Marshall has published the next head.
-  defp retain_head(root, sha) do
+  defp retain_head(root, sha, wait) do
     case run(
            ["--git-dir=#{root}", "update-ref", "refs/enrico/retained/#{sha}", sha],
-           @read_timeout
+           @read_timeout,
+           @max_result,
+           false,
+           wait
          ) do
       {:ok, _} -> :ok
       error -> error
     end
   end
 
-  defp remote_head(root) do
+  defp remote_head(root, wait) do
     with {:ok, output} <-
-           run(["--git-dir=#{root}", "ls-remote", "--symref", "origin", "HEAD"], @read_timeout),
+           run(
+             ["--git-dir=#{root}", "ls-remote", "--symref", "origin", "HEAD"],
+             @read_timeout,
+             @max_result,
+             false,
+             wait
+           ),
          [_, branch] <- Regex.run(~r/^ref: (refs\/heads\/[^\t\n]+)\tHEAD$/m, output),
          true <- valid_ref?(branch) do
       {:ok, branch}
@@ -127,7 +177,10 @@ defmodule Enrico.Git do
   end
 
   @spec resolve(binary(), binary()) :: result()
-  def resolve(root, ref) do
+  def resolve(root, ref), do: resolve(root, ref, 0)
+
+  @spec resolve(binary(), binary(), non_neg_integer()) :: result()
+  defp resolve(root, ref, wait) do
     if valid_ref?(ref) do
       with {:ok, value} <-
              run(
@@ -138,7 +191,10 @@ defmodule Enrico.Git do
                  "--end-of-options",
                  "#{ref}^{commit}"
                ],
-               @read_timeout
+               @read_timeout,
+               @max_result,
+               false,
+               wait
              ),
            sha = String.trim(value),
            true <- Regex.match?(~r/^[0-9a-f]{40,64}$/, sha) do
@@ -254,29 +310,66 @@ defmodule Enrico.Git do
 
   @spec remove(binary()) :: :ok | {:error, :git_failed}
   def remove(root) do
-    mutate(root, "rm", ["-rf", "--", root])
+    mutate(root, "rm", ["-rf", "--", root], 0)
   end
 
   # @cc [owner:ghuntley,label:recovery] git-filesystem-write-owner
   # Cleanup, publication and removal MUST acquire the same native writer lock
   # as Git before any filesystem effect. Occupied authority MUST refuse safely.
-  @spec mutate(binary(), binary(), [binary()]) :: :ok | {:error, :git_failed}
-  defp mutate(root, utility, arguments) do
+  @spec mutate(binary(), binary(), [binary()], non_neg_integer()) :: :ok | {:error, :git_failed}
+  defp mutate(root, utility, arguments, wait) do
     executable = System.find_executable(utility) || raise ArgumentError
-    port = open_native(root, "exclusive", executable, arguments, @read_timeout, @max_result, [])
 
-    case collect(
-           port,
-           <<>>,
-           System.monotonic_time(:millisecond) + @read_timeout,
-           @max_result,
-           false
-         ) do
+    attempt = fn ->
+      port =
+        open_native(root, "exclusive", executable, arguments, @read_timeout, @max_result, [])
+
+      collect(
+        port,
+        <<>>,
+        System.monotonic_time(:millisecond) + @read_timeout,
+        @max_result,
+        false
+      )
+    end
+
+    case await_owner(attempt, wait) do
       {:ok, _} -> :ok
       _ -> {:error, :git_failed}
     end
   rescue
     _ -> {:error, :git_failed}
+  end
+
+  # The native owner exits 75 with no output only when it could not take the
+  # repository or admission lock, before any command or filesystem effect, so
+  # repeating that refusal cannot duplicate work. A retiring owner from a
+  # killed worker releases its locks once its private process group is reaped.
+  @spec await_owner((-> native_result()), non_neg_integer()) :: result()
+  defp await_owner(attempt, wait) do
+    await_owner(
+      attempt,
+      System.monotonic_time(:millisecond) + wait,
+      @contention_backoff_ms
+    )
+  end
+
+  @spec await_owner((-> native_result()), integer(), pos_integer()) :: result()
+  defp await_owner(attempt, deadline, delay) do
+    case attempt.() do
+      {:error, :contended} ->
+        remaining = deadline - System.monotonic_time(:millisecond)
+
+        if remaining > 0 do
+          Process.sleep(min(delay, remaining))
+          await_owner(attempt, deadline, min(delay * 2, @contention_backoff_cap_ms))
+        else
+          {:error, :git_failed}
+        end
+
+      other ->
+        other
+    end
   end
 
   defp blob(prefix, sha, path) when path != "" do
@@ -368,14 +461,14 @@ defmodule Enrico.Git do
     if byte_size(value) <= @max_result, do: {:ok, value}, else: {:error, :too_large}
   end
 
-  @spec run([binary()], pos_integer(), pos_integer(), boolean()) :: result()
-  defp run(args, timeout, limit \\ @max_result, allow_no_match \\ false) do
+  @spec run([binary()], pos_integer(), pos_integer(), boolean(), non_neg_integer()) :: result()
+  defp run(args, timeout, limit \\ @max_result, allow_no_match \\ false, wait \\ 0) do
     Overalls.Diagnostics.Tracing.with_span("enrico.git.utility", [], fn ->
-      run_native(args, timeout, limit, allow_no_match)
+      await_owner(fn -> run_native(args, timeout, limit, allow_no_match) end, wait)
     end)
   end
 
-  @spec run_native([binary()], pos_integer(), pos_integer(), boolean()) :: result()
+  @spec run_native([binary()], pos_integer(), pos_integer(), boolean()) :: native_result()
   defp run_native(args, timeout, limit, allow_no_match) do
     port = open_git(args, timeout, limit)
 
@@ -484,6 +577,9 @@ defmodule Enrico.Git do
 
       {^port, {:exit_status, 125}} ->
         {:error, :too_large}
+
+      {^port, {:exit_status, 75}} when output == "" ->
+        {:error, :contended}
 
       {^port, {:exit_status, _}} ->
         {:error, :git_failed}

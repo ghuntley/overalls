@@ -62,6 +62,13 @@ defmodule Enrico.Manager do
   # receipt namespace; capped receipt eviction and service restart end local
   # replay retention. Marshall retains the durable audit and retry intent.
 
+  # @cc [owner:ghuntley,label:recovery] mirror-refresh-retiring-owner
+  # An admitted refresh MUST wait a bounded time for native owners retiring
+  # from an earlier worker lifetime instead of failing before Git runs.
+  # Single flight means any repository-lock holder is such a retiring owner
+  # or an escaped descendant, never a live refresh of this Manager lifetime;
+  # admission-slot holders may also be bounded reads.
+
   # @cc [owner:ghuntley,label:capacity] mirror-refresh-admission
   # At most eight repositories MUST own active refreshes. At saturation, new
   # attempts MUST refuse without task, receipt or measurement admission; replay
@@ -91,7 +98,7 @@ defmodule Enrico.Manager do
             receive do
               {:slo_ticket, ticket} ->
                 started = System.monotonic_time(:microsecond)
-                result = Git.refresh(root, owner, repo)
+                result = Git.refresh(root, owner, repo, Git.retiring_owner_wait())
 
                 Overalls.RequestAccounting.Producer.complete(
                   Enrico.RequestRecorder,
