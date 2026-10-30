@@ -391,10 +391,11 @@ defmodule EditorGuestFixture do
   # @cc [owner:ghuntley,label:verification;recovery;security] editor-native-fresh-boot-proof
   # Boot evidence MUST verify native confinement through Driver, then reacquire
   # the placement lock and match current running intent, Boot.current and the
-  # ready Provisioning journal. Before/after snapshots MUST retain host,
-  # placement and epoch, advance generation, and change both challenge and guest
-  # boot UUID digests. Only digests enter separate root-private fixture files;
-  # no production journal mutation or challenge/terminal output is permitted.
+  # ready Provisioning journal, including its attested guest boot UUID.
+  # Before/after snapshots MUST retain host, placement and epoch, advance
+  # generation, and change both challenge and guest boot UUID digests. Only
+  # digests enter separate root-private fixture files; no production journal
+  # mutation or challenge/terminal output is permitted.
   @spec snapshot_boot(String.t()) :: boot_snapshot()
   defp snapshot_boot(placement) do
     directory = "/var/lib/lilly/vms/" <> placement
@@ -446,8 +447,15 @@ defmodule EditorGuestFixture do
 
       true = record.state == :ready
       true = record.payload["host_id"] == runtime.execution.network.host_id
-      true = Enum.all?(boot, fn {key, value} -> record.payload[Atom.to_string(key)] == value end)
+      # Lilly records the readiness-attested guest boot UUID in boot.json as
+      # guest_boot_id; the Provisioning journal names the same value boot_id.
+      {guest_boot_id, launch} = Map.pop(boot, :guest_boot_id, record.payload["boot_id"])
+
+      true =
+        Enum.all?(launch, fn {key, value} -> record.payload[Atom.to_string(key)] == value end)
+
       true = OverallsProtocol.uuid?(record.payload["boot_id"])
+      true = guest_boot_id == record.payload["boot_id"]
 
       :ok = mark(:snapshot)
 
