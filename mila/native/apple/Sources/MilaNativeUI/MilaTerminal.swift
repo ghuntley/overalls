@@ -42,13 +42,13 @@ public final class MilaAuthenticatedTerminalTransport: MilaTerminalTransport, @u
     private let authorized: @Sendable () -> Bool
     private let transport: any MilaTerminalTransport
 
-    public init(session: MilaLiveSession, transport: any MilaTerminalTransport) {
+    public init(session: any MilaPtySession, transport: any MilaTerminalTransport) {
         self.authorized = { session.isAuthenticated }
         self.transport = transport
     }
 
     /// Production transport backed by the authenticated Rust PTY registry.
-    public convenience init(session: MilaLiveSession) {
+    public convenience init(session: any MilaPtySession) {
         self.init(session: session, transport: MilaLiveSessionTerminalTransport(session: session))
     }
 
@@ -82,15 +82,28 @@ public final class MilaAuthenticatedTerminalTransport: MilaTerminalTransport, @u
         try await transport.resize(columns: columns, rows: rows)
     }
 
+    public func receiveOutput() async throws -> Data? {
+        guard authorized() else { await transport.close(); return nil }
+        return try await transport.receiveOutput()
+    }
+
     public func close() async { await transport.close() }
 }
 
+/// @cc [owner:ghuntley,label:security] mila-apple-pty-generation
 /// Native Apple adapter for the Rust authenticated PTY ABI. It owns only the
-/// opaque terminal handle; all channel bytes remain in caller-owned buffers.
+/// opaque terminal handle and binds it to a PTY generation: attach kills any
+/// previous handle and starts a new generation, and output polled for a handle
+/// that is no longer current is discarded. When the parent session stops being
+/// authenticated the handle is killed and the stream ends.
 public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unchecked Sendable {
-    private let session: MilaLiveSession
+    /// Back-off between empty polls (no data, window adjust, or a closed channel).
+    static let idlePoll: Duration = .milliseconds(25)
+    private let session: any MilaPtySession
+    private let idle: Duration
     private let lock = NSLock()
     private var terminal: UInt64 = 0
+    private var generation: UInt64 = 0
 
     /// Keep locking in a synchronous helper; Swift 6 rejects direct
     /// `NSLock.lock/unlock` calls from an async context.
@@ -100,38 +113,52 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
         return body()
     }
 
-    public init(session: MilaLiveSession) { self.session = session }
+    public init(session: any MilaPtySession) { self.session = session; self.idle = Self.idlePoll }
+    init(session: any MilaPtySession, idle: Duration) { self.session = session; self.idle = idle }
+
+    /// The PTY generation bound to the current handle; zero while detached.
+    var currentGeneration: UInt64 { withTerminalLock { terminal == 0 ? 0 : generation } }
 
     public func attach(from: UInt64, columns: UInt16, rows: UInt16, readWrite: Bool) async throws {
         // `from` is the UI resume cursor, not the opaque PTY handle.  A fresh
         // attachment legitimately starts at zero; authorization comes from the
         // authenticated session and the requested read/write mode.
         guard readWrite else { throw MilaTerminalError.permissionDenied }
-        let handle = try session.terminalAttach(columns: UInt32(columns), rows: UInt32(rows))
-        let previous = withTerminalLock { let old = terminal; terminal = handle; return old }
+        guard session.isAuthenticated else { throw MilaTerminalError.unavailable }
+        let handle: UInt64
+        do { handle = try session.terminalAttach(columns: UInt32(columns), rows: UInt32(rows)) }
+        catch { throw MilaTerminalError.unavailable }
+        let previous = withTerminalLock { let old = terminal; terminal = handle; generation &+= 1; return old }
         if previous != 0 { session.terminalKill(previous) }
     }
 
     public func receiveOutput() async throws -> Data? {
-        let handle = withTerminalLock { terminal }
+        let (handle, bound) = withTerminalLock { (terminal, generation) }
         guard handle != 0 else { return nil }
-        return try session.terminalPoll(handle)
+        guard session.isAuthenticated else { await close(); return nil }
+        let data: Data
+        do { data = try session.terminalPoll(handle) } catch { throw MilaTerminalError.unavailable }
+        // A reattach or close during the poll invalidates its chunk.
+        guard withTerminalLock({ terminal == handle && generation == bound }) else { return nil }
+        if data.isEmpty { try? await Task.sleep(for: idle) }
+        return data
     }
 
     public func sendInput(_ input: Data) async throws {
         let handle = withTerminalLock { terminal }
-        guard handle != 0 else { throw MilaTerminalError.unavailable }
-        try session.terminalInput(handle, data: input)
+        guard handle != 0, session.isAuthenticated else { throw MilaTerminalError.unavailable }
+        do { try session.terminalInput(handle, data: input) } catch { throw MilaTerminalError.unavailable }
     }
 
     public func resize(columns: UInt16, rows: UInt16) async throws {
         let handle = withTerminalLock { terminal }
-        guard handle != 0 else { throw MilaTerminalError.unavailable }
-        try session.terminalResize(handle, columns: UInt32(columns), rows: UInt32(rows))
+        guard handle != 0, session.isAuthenticated else { throw MilaTerminalError.unavailable }
+        do { try session.terminalResize(handle, columns: UInt32(columns), rows: UInt32(rows)) }
+        catch { throw MilaTerminalError.invalidRequest }
     }
 
     public func close() async {
-        let handle = withTerminalLock { let old = terminal; terminal = 0; return old }
+        let handle = withTerminalLock { let old = terminal; terminal = 0; generation &+= 1; return old }
         if handle != 0 { session.terminalKill(handle) }
     }
 }

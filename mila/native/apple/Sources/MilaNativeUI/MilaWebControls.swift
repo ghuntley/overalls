@@ -85,14 +85,70 @@ public struct MilaWebEndpointProjection: Codable, Equatable, Sendable {
     public func clear() { endpoint = nil; policyRevision = 0; error = nil }
 }
 
+public enum MilaWebViewPhase: Equatable, Sendable {
+    case idle
+    case loading(generation: UInt64)
+    case loaded(generation: UInt64)
+    case failed(generation: UInt64)
+    case blocked(generation: UInt64)
+    case closed
+}
+
+/// @cc [owner:ghuntley,label:security] mila-apple-webview-lifecycle
+/// A web view is bound to one endpoint and one generation. Navigation events
+/// from an earlier generation MUST NOT change the phase; `invalidate` (sign-out,
+/// session change, dismissal) ends the generation and requests teardown, which
+/// stops loading, detaches the delegate and discards the view's ephemeral
+/// (non-persistent) website data store.
+@MainActor public final class MilaWebViewLifecycle: ObservableObject {
+    @Published public private(set) var phase: MilaWebViewPhase = .idle
+    @Published public private(set) var endpoint: MilaWebEndpoint?
+    public private(set) var generation: UInt64 = 0
+    public init() {}
+
+    /// Starts a new generation for an authenticated endpoint.
+    @discardableResult public func begin(_ endpoint: MilaWebEndpoint, sessionActive: Bool) -> UInt64? {
+        generation &+= 1
+        guard sessionActive else { self.endpoint = nil; phase = .closed; return nil }
+        self.endpoint = endpoint
+        phase = .loading(generation: generation)
+        return generation
+    }
+
+    public func didStart(_ generation: UInt64) { guard live(generation) else { return }; phase = .loading(generation: generation) }
+    public func didFinish(_ generation: UInt64) { guard live(generation) else { return }; phase = .loaded(generation: generation) }
+    public func didFail(_ generation: UInt64) { guard live(generation) else { return }; phase = .failed(generation: generation) }
+    public func didBlock(_ generation: UInt64) { guard live(generation) else { return }; phase = .blocked(generation: generation) }
+
+    public func invalidate() { generation &+= 1; endpoint = nil; phase = .closed }
+
+    /// Ends `candidate` only if it is still current (a dismissed view must not
+    /// close a newer one that replaced it).
+    public func end(_ candidate: UInt64) { if candidate == generation { invalidate() } }
+
+    private func live(_ candidate: UInt64) -> Bool { candidate == generation && endpoint != nil && phase != .closed }
+}
+
 #if canImport(WebKit)
 import WebKit
 
 /// Native embedded web controls for iOS and macOS. Navigation remains HTTPS-only.
 public struct MilaWebView: View {
     public let endpoint: MilaWebEndpoint
-    public init(endpoint: MilaWebEndpoint) { self.endpoint = endpoint }
-    public var body: some View { MilaWebViewRepresentable(url: endpoint.url) }
+    @ObservedObject private var lifecycle: MilaWebViewLifecycle
+    private let generation: UInt64
+    public init(endpoint: MilaWebEndpoint, lifecycle: MilaWebViewLifecycle, generation: UInt64) {
+        self.endpoint = endpoint; self.lifecycle = lifecycle; self.generation = generation
+    }
+    public var body: some View {
+        Group {
+            if lifecycle.generation == generation, lifecycle.endpoint == endpoint {
+                MilaWebViewRepresentable(url: endpoint.url, lifecycle: lifecycle, generation: generation)
+            } else {
+                ContentUnavailableView(MilaStrings.text(.webFailed), systemImage: "globe")
+            }
+        }
+    }
 }
 
 /// @cc [owner:ghuntley,label:security] web-navigation-same-origin
@@ -102,7 +158,11 @@ public struct MilaWebView: View {
 /// not HTTPS, carries credentials, or leaves the endpoint's host and port.
 @MainActor final class MilaWebNavigationGuard: NSObject, WKNavigationDelegate {
     let origin: URL
-    init(origin: URL) { self.origin = origin }
+    let lifecycle: MilaWebViewLifecycle?
+    let generation: UInt64
+    init(origin: URL, lifecycle: MilaWebViewLifecycle? = nil, generation: UInt64 = 0) {
+        self.origin = origin; self.lifecycle = lifecycle; self.generation = generation
+    }
     func allows(_ candidate: URL?) -> Bool {
         guard let candidate,
               candidate.scheme?.lowercased() == "https",
@@ -113,38 +173,68 @@ public struct MilaWebView: View {
     }
     func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
                  decisionHandler: @escaping @MainActor @Sendable (WKNavigationActionPolicy) -> Void) {
-        decisionHandler(allows(navigationAction.request.url) ? .allow : .cancel)
+        let allowed = allows(navigationAction.request.url)
+        if !allowed { lifecycle?.didBlock(generation) }
+        decisionHandler(allowed ? .allow : .cancel)
+    }
+    func webView(_ webView: WKWebView, didStartProvisionalNavigation navigation: WKNavigation!) { lifecycle?.didStart(generation) }
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) { lifecycle?.didFinish(generation) }
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: any Error) { lifecycle?.didFail(generation) }
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: any Error) { lifecycle?.didFail(generation) }
+}
+
+/// Creates and tears down the platform web view for one lifecycle generation.
+@MainActor enum MilaWebViewFactory {
+    static func make(url: URL, delegate: MilaWebNavigationGuard) -> WKWebView {
+        let configuration = WKWebViewConfiguration()
+        // Cookies and storage for a machine endpoint never outlive this view.
+        configuration.websiteDataStore = .nonPersistent()
+        let view = WKWebView(frame: .zero, configuration: configuration)
+        view.navigationDelegate = delegate
+        view.load(URLRequest(url: url))
+        return view
+    }
+
+    static func update(_ view: WKWebView, url: URL, lifecycle: MilaWebViewLifecycle?, generation: UInt64) {
+        guard let lifecycle, lifecycle.generation == generation, lifecycle.endpoint?.url == url else {
+            teardown(view)
+            return
+        }
+        guard view.url != url, !view.isLoading else { return }
+        view.load(URLRequest(url: url))
+    }
+
+    static func teardown(_ view: WKWebView) {
+        view.stopLoading()
+        view.navigationDelegate = nil
+        view.loadHTMLString("", baseURL: nil)
     }
 }
 
 #if os(iOS)
 struct MilaWebViewRepresentable: UIViewRepresentable {
     let url: URL
-    func makeCoordinator() -> MilaWebNavigationGuard { MilaWebNavigationGuard(origin: url) }
-    func makeUIView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
-        view.navigationDelegate = context.coordinator
-        view.load(URLRequest(url: url))
-        return view
-    }
-    func updateUIView(_ view: WKWebView, context: Context) {
-        guard view.url != url else { return }
-        view.load(URLRequest(url: url))
+    let lifecycle: MilaWebViewLifecycle
+    let generation: UInt64
+    func makeCoordinator() -> MilaWebNavigationGuard { MilaWebNavigationGuard(origin: url, lifecycle: lifecycle, generation: generation) }
+    func makeUIView(context: Context) -> WKWebView { MilaWebViewFactory.make(url: url, delegate: context.coordinator) }
+    func updateUIView(_ view: WKWebView, context: Context) { MilaWebViewFactory.update(view, url: url, lifecycle: lifecycle, generation: generation) }
+    static func dismantleUIView(_ view: WKWebView, coordinator: MilaWebNavigationGuard) {
+        MilaWebViewFactory.teardown(view)
+        coordinator.lifecycle?.end(coordinator.generation)
     }
 }
 #elseif os(macOS)
 struct MilaWebViewRepresentable: NSViewRepresentable {
     let url: URL
-    func makeCoordinator() -> MilaWebNavigationGuard { MilaWebNavigationGuard(origin: url) }
-    func makeNSView(context: Context) -> WKWebView {
-        let view = WKWebView(frame: .zero)
-        view.navigationDelegate = context.coordinator
-        view.load(URLRequest(url: url))
-        return view
-    }
-    func updateNSView(_ view: WKWebView, context: Context) {
-        guard view.url != url else { return }
-        view.load(URLRequest(url: url))
+    let lifecycle: MilaWebViewLifecycle
+    let generation: UInt64
+    func makeCoordinator() -> MilaWebNavigationGuard { MilaWebNavigationGuard(origin: url, lifecycle: lifecycle, generation: generation) }
+    func makeNSView(context: Context) -> WKWebView { MilaWebViewFactory.make(url: url, delegate: context.coordinator) }
+    func updateNSView(_ view: WKWebView, context: Context) { MilaWebViewFactory.update(view, url: url, lifecycle: lifecycle, generation: generation) }
+    static func dismantleNSView(_ view: WKWebView, coordinator: MilaWebNavigationGuard) {
+        MilaWebViewFactory.teardown(view)
+        coordinator.lifecycle?.end(coordinator.generation)
     }
 }
 #endif

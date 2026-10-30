@@ -1,12 +1,70 @@
 import SwiftUI
+import Combine
+
+/// @cc [owner:ghuntley,label:security] mila-apple-app-model-binding
+/// Owns the deployment session, sign-in lifecycle and feature controllers.
+/// Feature controllers are bound only to the adapter of an approved sign-in
+/// generation, and every phase change rebinds them, so sign-out, expiry or a
+/// deployment switch clears machine and thread state in one place.
+@MainActor public final class MilaAppModel: ObservableObject {
+    public let session: MilaDeploymentSessionController
+    public let signIn: MilaSignInController
+    public let machines = MilaMachinesController()
+    public let threads = MilaThreadsController()
+    public let web = MilaWebViewLifecycle()
+    private var boundGeneration: UInt64?
+    private var observation: AnyCancellable?
+
+    public init(session: MilaDeploymentSessionController, signIn: MilaSignInController? = nil) {
+        self.session = session
+        self.signIn = signIn ?? MilaSignInController(session: session)
+        observation = self.signIn.$phase.sink { [weak self] phase in
+            // `@Published` emits before the stored value changes.
+            MainActor.assumeIsolated { self?.phaseChanged(phase) }
+        }
+    }
+
+    /// The authenticated adapter, only while the approved generation is current.
+    public var adapter: (any MilaFFIAdapter)? { signIn.adapter }
+
+    private func phaseChanged(_ phase: MilaSignInPhase) {
+        let generation: UInt64?
+        if case .signedIn(_, let value) = phase { generation = value } else { generation = nil }
+        guard generation != boundGeneration else { return }
+        boundGeneration = generation
+        let adapter = generation.flatMap { $0 == session.generation ? session.adapter() : nil }
+        machines.bind(adapter)
+        threads.bind(adapter)
+        web.invalidate()
+        if adapter != nil { Task { await machines.refresh() } }
+    }
+}
 
 /// Native presentation shell. Machine records are supplied by the validated Rust snapshot boundary.
 public struct MilaNativeRootView: View {
-    private let adapter: any MilaFFIAdapter
-    @StateObject private var session: MilaDeploymentSessionController
+    @StateObject private var model: MilaAppModel
+
+    public init(adapter: any MilaFFIAdapter = LinkedMilaFFIAdapter(), snapshot: MilaValidatedSnapshot? = nil) {
+        _ = adapter; _ = snapshot
+        _model = StateObject(wrappedValue: MilaAppModel(session: MilaDeploymentSessionController { deployment in
+            let signer = try MilaDeviceSigner(deploymentHost: deployment.host)
+            return try LinkedMilaFFIAdapter(trust: deployment.trust, host: deployment.host, port: deployment.port, signer: signer)
+        }))
+    }
+
+    public init(model: MilaAppModel) { _model = StateObject(wrappedValue: model) }
+
+    public var body: some View {
+        MilaRootContent(model: model, session: model.session, signIn: model.signIn, machines: model.machines)
+    }
+}
+
+private struct MilaRootContent: View {
+    let model: MilaAppModel
+    @ObservedObject var session: MilaDeploymentSessionController
+    @ObservedObject var signIn: MilaSignInController
+    @ObservedObject var machines: MilaMachinesController
     @State private var selection: MilaRoute = .machines
-    @State private var machines: [MilaMachinePresentation] = []
-    @State private var status = MilaStrings.text(.ready)
     @State private var deepLinkRouter = MilaDeepLinkRouter()
     @State private var pendingDeepLink: MilaRoute?
     @State private var showCreate = false
@@ -15,16 +73,7 @@ public struct MilaNativeRootView: View {
     @AppStorage("mila.appearance") private var appearance = "system"
     @AppStorage("mila.locale") private var locale = "en"
 
-    public init(adapter: any MilaFFIAdapter = LinkedMilaFFIAdapter(), snapshot: MilaValidatedSnapshot? = nil) {
-        self.adapter = adapter
-        _machines = State(initialValue: Array((snapshot?.machines ?? []).prefix(256)))
-        _session = StateObject(wrappedValue: MilaDeploymentSessionController { deployment in
-            let signer = try MilaDeviceSigner(deploymentHost: deployment.host)
-            return try LinkedMilaFFIAdapter(trust: deployment.trust, host: deployment.host, port: deployment.port, signer: signer)
-        })
-    }
-
-    public var body: some View {
+    var body: some View {
         MilaAppLockView(controller: appLock) {
         NavigationSplitView {
             // iOS offers List selection only through an optional binding.
@@ -36,30 +85,41 @@ public struct MilaNativeRootView: View {
         } detail: {
             Group {
                 switch selection {
-                case .machines: MachinesView(machines: machines, create: { showCreate = true }) { selection = .machine(id: $0) }
-                case .machine(let id): MachineDetailView(machine: machines.first { $0.id == id }, adapter: session.adapter() ?? adapter, signedIn: session.adapter() != nil)
-                case .threads: ThreadsView(adapter: session.adapter() ?? adapter, select: { selection = .thread(id: $0) })
-                case .thread(let id): ThreadDetailView(id: id, adapter: session.adapter() ?? adapter)
-                case .settings: SettingsView(adapter: session.adapter() ?? adapter, lockController: appLock, session: session)
+                case .machines:
+                    MachinesView(controller: machines, create: { showCreate = true }) { id in
+                        machines.select(id); selection = .machine(id: id)
+                    }
+                case .machine(let id):
+                    if let adapter = model.adapter, let machine = machines.machine(id) {
+                        MachineDetailView(machine: machine, adapter: adapter, web: model.web) {
+                            Task { await machines.refresh() }
+                        }.id(machine.id)
+                    } else {
+                        ContentUnavailableView(MilaStrings.text(.machineUnavailable), systemImage: "questionmark")
+                    }
+                case .threads: ThreadsView(controller: model.threads, select: { selection = .thread(id: $0) })
+                case .thread(let id): ThreadDetailView(id: id, controller: model.threads)
+                case .settings: SettingsView(model: model, lockController: appLock, session: session, signIn: signIn)
                 }
             }
-            .toolbar { ToolbarItem { Button(MilaStrings.text(.refresh)) { Task { await refresh() } } } }
+            .toolbar { ToolbarItem { Button(MilaStrings.text(.refresh)) { Task { await machines.refresh() } }.disabled(model.adapter == nil) } }
             .safeAreaInset(edge: .bottom) { Text(status).font(.caption).foregroundStyle(.secondary).padding(4) }
         }.sheet(isPresented: $showCreate) {
-            MilaMachineCreateView(adapter: session.adapter() ?? adapter) { result in
-                status = result ? MilaStrings.text(.actionSubmitted) : MilaStrings.text(.actionNotSubmitted)
-                if result { Task { await refresh() } }
+            if let adapter = model.adapter {
+                MilaMachineCreateView(adapter: adapter) { result in
+                    if result { Task { await machines.refresh() } }
+                }
             }
         }
         .milaDesignSystem()
         .preferredColorScheme(appearance == "light" ? .light : appearance == "dark" ? .dark : nil)
         .environment(\.locale, Locale(identifier: MilaStrings.canonicalLocale(locale)))
-        .onChange(of: session.state) { _, state in
+        .onChange(of: signIn.phase) { _, phase in
             let signedIn: Bool
-            if case .signedIn(_, _) = state { signedIn = true } else { signedIn = false }
+            if case .signedIn = phase { signedIn = true } else { signedIn = false }
             deepLinkRouter.setSession(signedIn: signedIn)
             if signedIn, let pendingDeepLink { selection = pendingDeepLink; self.pendingDeepLink = nil }
-            if !signedIn { machines = []; selection = .machines; status = MilaStrings.text(.ready) }
+            if !signedIn, selection != .settings { selection = .machines }
         }.onChange(of: scenePhase) { _, phase in
             switch phase {
             case .inactive, .background: appLock.sceneDidEnterBackground()
@@ -70,49 +130,59 @@ public struct MilaNativeRootView: View {
             let decision = deepLinkRouter.decide(url.absoluteString)
             switch decision {
             case .open(let route, let generation) where deepLinkRouter.accepts(decision, generation: generation):
+                if case .machine(let id) = route { machines.select(id) }
                 selection = route
-                status = MilaStrings.text(.ready)
             case .signedOut(let route):
                 pendingDeepLink = route
                 selection = .settings
-                status = MilaStrings.text(.ready)
             default:
-                status = MilaStrings.text(.runtimeUnavailable)
+                break
             }
-        }.task {
-            await refresh()
         }
         }
     }
 
-    private func refresh() async {
-        let requestedGeneration = session.generation
-        guard let active = session.adapter() ?? (session.state == .signedOut ? adapter : nil) else { machines = []; return }
-        do {
-            let snapshot = try await active.refreshSnapshot()
-            guard session.generation == requestedGeneration, session.adapter() != nil || session.state == .signedOut else { return }
-            machines = Array(snapshot.machines.prefix(256)); status = MilaStrings.text(.snapshotLoaded)
-        }
-        catch {
-            guard session.generation == requestedGeneration else { return }
-            status = MilaStrings.text(.noSnapshotLoaded); machines = []
+    private var status: String {
+        switch machines.state {
+        case .signedOut: return MilaStrings.text(.ready)
+        case .loading: return MilaStrings.text(.connecting)
+        case .loaded: return MilaStrings.text(.snapshotLoaded)
+        case .failed: return MilaStrings.text(.noSnapshotLoaded)
         }
     }
 }
 
 private struct MachinesView: View {
-    let machines: [MilaMachinePresentation]
+    @ObservedObject var controller: MilaMachinesController
     let create: () -> Void
     let select: (UUID) -> Void
     var body: some View {
         List {
-            if machines.isEmpty { ContentUnavailableView(MilaStrings.text(.machinesEmpty), systemImage: "desktopcomputer", description: Text(MilaStrings.text(.machinesHint))) }
-            ForEach(machines) { machine in
+            if controller.state == .failed {
+                VStack(alignment: .leading) {
+                    Text(MilaStrings.text(.noSnapshotLoaded))
+                    Button(MilaStrings.text(.retry)) { Task { await controller.refresh() } }
+                }
+            } else if controller.machines.isEmpty, controller.state != .loading {
+                ContentUnavailableView(MilaStrings.text(.machinesEmpty), systemImage: "desktopcomputer", description: Text(MilaStrings.text(.machinesHint)))
+            }
+            ForEach(controller.machines) { machine in
                 Button { select(machine.id) } label: {
-                    VStack(alignment: .leading) { Text(machine.machine.name); Text(machine.machine.observedState ?? "unknown").font(.caption).foregroundStyle(.secondary) }
+                    VStack(alignment: .leading) {
+                        Text(machine.machine.name)
+                        Text(machine.machine.observedState ?? machine.machine.desiredState).font(.caption).foregroundStyle(.secondary)
+                    }
                 }
             }
-        }.navigationTitle(MilaStrings.text(.machines)).toolbar { ToolbarItem(placement: .primaryAction) { Button("＋") { create() }.accessibilityLabel("Create machine") } }
+            if controller.hasMore {
+                Button(MilaStrings.text(.machineMore)) { Task { await controller.loadMore() } }
+            }
+        }
+        .overlay { if controller.state == .loading { ProgressView() } }
+        .navigationTitle(MilaStrings.text(.machines))
+        .toolbar { ToolbarItem(placement: .primaryAction) {
+            Button(MilaStrings.text(.actionCreate)) { create() }.disabled(controller.state == .signedOut)
+        } }
     }
 }
 
@@ -133,9 +203,9 @@ private struct MilaMachineCreateView: View {
             TextField("Memory (MiB)", text: $memory)
             TextField("Disk (GiB)", text: $disk)
             if error { Text(MilaStrings.text(.actionNotSubmitted)).foregroundStyle(.secondary) }
-        }.navigationTitle("Create machine").toolbar {
-            ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-            ToolbarItem(placement: .confirmationAction) { Button("Create") { submit() }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
+        }.navigationTitle(MilaStrings.text(.actionCreate)).toolbar {
+            ToolbarItem(placement: .cancellationAction) { Button(MilaStrings.text(.cancel)) { dismiss() } }
+            ToolbarItem(placement: .confirmationAction) { Button(MilaStrings.text(.actionCreate)) { submit() }.disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) }
         }}
     }
     private func submit() {
@@ -149,124 +219,125 @@ private struct MilaMachineCreateView: View {
 }
 
 private struct MachineDetailView: View {
-    let machine: MilaMachinePresentation?
+    let machine: MilaMachinePresentation
     let adapter: any MilaFFIAdapter
-    let signedIn: Bool
+    @ObservedObject var web: MilaWebViewLifecycle
+    let refresh: () -> Void
     @StateObject private var workflow: MilaMachineWorkflow
-    @State private var classified = ""
+    @StateObject private var sharing: MilaMachineSharingController
     @State private var showTerminal = false
-    @State private var webURL = ""
-    @StateObject private var webControls = MilaWebControlsController()
     @State private var showWeb = false
+    @State private var webGeneration: UInt64 = 0
     @State private var webLoading = false
+    @State private var webError = false
+    @State private var confirmDelete = false
     @State private var sharePrincipal = ""
     @State private var shareRole: MilaShareRole = .viewer
     @State private var resizeCPU = "2"
     @State private var resizeMemory = "2048"
     @State private var resizeDisk = "20"
     @State private var resizeStatus = ""
-    @State private var refreshedState: String?
-    @State private var refreshing = false
-    @StateObject private var sharing: MilaMachineSharingController
-    init(machine: MilaMachinePresentation?, adapter: any MilaFFIAdapter, signedIn: Bool = false) {
+
+    init(machine: MilaMachinePresentation, adapter: any MilaFFIAdapter, web: MilaWebViewLifecycle, refresh: @escaping () -> Void) {
         self.machine = machine
         self.adapter = adapter
-        self.signedIn = signedIn
+        self.web = web
+        self.refresh = refresh
         _workflow = StateObject(wrappedValue: MilaMachineWorkflow(adapter: adapter))
         _sharing = StateObject(wrappedValue: MilaMachineSharingController(adapter: adapter))
     }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            if let machine {
+        Form {
+            Section {
                 Text(machine.machine.name).font(.title)
-                Text(machine.id.uuidString).font(.caption)
-                Text(refreshedState ?? machine.machine.observedState ?? "unknown").foregroundStyle(.secondary)
-                Button("Refresh machine") { refreshMachine(machine.id) }
-                    .disabled(!signedIn || refreshing)
+                Text(machine.id.uuidString.lowercased()).font(.caption).textSelection(.enabled)
+                Text(machine.machine.observedState ?? machine.machine.desiredState).foregroundStyle(.secondary)
+            }
+            Section {
+                HStack {
+                    ForEach(machine.actions.lifecycle, id: \.self) { action in
+                        Button(action.title, role: action == .delete ? .destructive : nil) {
+                            if action == .delete { confirmDelete = true } else { workflow.submit(action, machine: machine) }
+                        }
+                        .disabled(workflow.isSubmitting)
+                    }
+                }
+                Text(mutationStatus).font(.caption).foregroundStyle(.secondary)
+            }
+            Section {
                 HStack {
                     TextField("CPU", text: $resizeCPU).frame(width: 60)
-                    TextField("Memory MiB", text: $resizeMemory).frame(width: 110)
-                    TextField("Disk GiB", text: $resizeDisk).frame(width: 100)
-                    Button("Resize") { resize(machine) }.disabled(!machine.machine.write)
+                    TextField("MiB", text: $resizeMemory).frame(width: 110)
+                    TextField("GiB", text: $resizeDisk).frame(width: 100)
+                    Button(MilaStrings.text(.actionResize)) { resize() }.disabled(!machine.machine.write)
                 }
                 Text(resizeStatus).font(.caption).foregroundStyle(.secondary)
-                Button(MilaStrings.text(.openTerminal)) { showTerminal = true }.disabled(!signedIn || !machine.machine.write)
+            }
+            Section {
+                Button(MilaStrings.text(.openTerminal)) { showTerminal = true }.disabled(!machine.machine.write)
+                Button(MilaStrings.text(.webOpen)) { openWeb() }.disabled(webLoading || !machine.machine.read)
+                if webError { Text(MilaStrings.text(.webFailed)).font(.caption).foregroundStyle(.secondary) }
+            }
+            Section {
+                TextField(MilaStrings.text(.sharePrincipal), text: $sharePrincipal).autocorrectionDisabled()
+                Picker(MilaStrings.text(.sharePrincipal), selection: $shareRole) {
+                    ForEach(MilaShareRole.allCases) { role in Text(Self.roleTitle(role)).tag(role) }
+                }
                 HStack {
-                    TextField(MilaStrings.text(.sharePrincipal), text: $sharePrincipal)
-                        .autocorrectionDisabled()
-                    Picker("Role", selection: $shareRole) {
-                        ForEach(MilaShareRole.allCases) { role in Text(role.rawValue.capitalized).tag(role) }
-                    }.frame(maxWidth: 130)
                     Button(MilaStrings.text(.shareAdd)) { sharing.submit(principal: sharePrincipal, role: shareRole) }
-                        .disabled(!signedIn || !machine.machine.write || sharePrincipal.isEmpty)
+                        .disabled(!machine.machine.write || sharePrincipal.isEmpty)
                     Button(MilaStrings.text(.shareRemove)) { sharing.submit(principal: sharePrincipal, remove: true) }
-                        .disabled(!signedIn || !machine.machine.write || sharePrincipal.isEmpty)
+                        .disabled(!machine.machine.write || sharePrincipal.isEmpty)
                 }
                 Text(shareStatus).font(.caption).foregroundStyle(.secondary)
-                HStack {
-                    TextField(MilaStrings.text(.webPlaceholder), text: $webURL).textContentType(.URL).autocorrectionDisabled()
-                    Button(MilaStrings.text(.webOpen)) { openAuthenticatedWeb(machine.id) }
-                        .disabled(!signedIn || webLoading || !machine.machine.read)
-                }
-                if webControls.error != nil { Text(MilaStrings.text(.webInvalid)).font(.caption).foregroundStyle(.secondary) }
-                ForEach(machine.actions.values, id: \.self) { action in
-                    Button(action.title) {
-                        workflow.submit(action, machine: machine)
-                    }
-                    .disabled(!signedIn || !isIdle)
-                }
-                HStack {
-                    ForEach(["show", "resize", "share show", "web show"], id: \.self) { command in
-                        Button(command) {
-                            do { classified = String(describing: try adapter.classifyMachineCommand(command)) }
-                            catch { classified = MilaStrings.text(.rejectedByRust) }
-                        }
-                    }
-                }
-                Text(classified).font(.caption).foregroundStyle(.secondary)
-                Text(mutationStatus).font(.caption).foregroundStyle(.secondary)
-                .onAppear { sharing.setSession(signedIn: signedIn, machine: machine) }
-            } else { ContentUnavailableView(MilaStrings.text(.machineUnavailable), systemImage: "questionmark") }
-        }.padding().sheet(isPresented: $showTerminal) {
+            }
+        }
+        .onAppear {
+            sharing.setSession(signedIn: true, machine: machine)
+            workflow.onApplied = { _ in refresh() }
+        }
+        .confirmationDialog(MilaStrings.text(.confirmDelete, ["name": machine.machine.name]), isPresented: $confirmDelete) {
+            Button(MilaStrings.text(.actionDelete), role: .destructive) { workflow.submit(.delete, machine: machine) }
+            Button(MilaStrings.text(.cancel), role: .cancel) {}
+        }
+        .sheet(isPresented: $showTerminal) {
             MilaTerminalView(transport: (adapter as? LinkedMilaFFIAdapter)?.terminalTransport() ?? MilaNoopTerminalTransport())
         }
         #if canImport(WebKit)
-        .sheet(isPresented: $showWeb) { if let endpoint = webControls.endpoint { MilaWebView(endpoint: endpoint) } }
+        .sheet(isPresented: $showWeb, onDismiss: { web.end(webGeneration) }) {
+            if let endpoint = web.endpoint { MilaWebView(endpoint: endpoint, lifecycle: web, generation: webGeneration) }
+        }
         #endif
     }
 
-    private func openAuthenticatedWeb(_ machineID: UUID) {
-        guard signedIn else {
-            webControls.clear()
-            _ = webControls.set("signed-out")
-            return
-        }
-        webLoading = true
-        Task {
-            defer { webLoading = false }
-            do {
-                let projection = try await adapter.webEndpointProjection(machine: machineID)
-                let endpoint = try projection.endpoint(for: machineID)
-                guard webControls.openAuthenticated(endpoint, sessionActive: signedIn,
-                                                    policyRevision: projection.policyRevision,
-                                                    expectedRevision: projection.policyRevision) else { return }
-                showWeb = true
-            } catch {
-                webControls.clear()
-                _ = webControls.set("invalid")
-            }
+    private static func roleTitle(_ role: MilaShareRole) -> String {
+        switch role {
+        case .viewer: return MilaStrings.text(.shareRoleViewer)
+        case .operatorRole: return MilaStrings.text(.shareRoleOperator)
+        case .manager: return MilaStrings.text(.shareRoleManager)
         }
     }
 
-    private var isIdle: Bool {
-        if case .idle = workflow.state { return true }
-        return false
+    private func openWeb() {
+        webLoading = true
+        webError = false
+        Task {
+            defer { webLoading = false }
+            do {
+                let projection = try await adapter.webEndpointProjection(machine: machine.id)
+                let endpoint = try projection.endpoint(for: machine.id)
+                guard let generation = web.begin(endpoint, sessionActive: true) else { webError = true; return }
+                webGeneration = generation
+                showWeb = true
+            } catch { webError = true }
+        }
     }
 
     private var shareStatus: String {
         switch sharing.state {
         case .signedOut: return MilaStrings.text(.runtimeUnavailable)
-        case .idle: return MilaStrings.text(.ready)
+        case .idle: return ""
         case .submitting: return MilaStrings.text(.connecting)
         case .applied(_, _, let remove): return remove ? MilaStrings.text(.shareRemoved) : MilaStrings.text(.shareAdded)
         case .failed: return MilaStrings.text(.actionNotSubmitted)
@@ -275,123 +346,112 @@ private struct MachineDetailView: View {
 
     private var mutationStatus: String {
         switch workflow.state {
-        case .idle: return MilaStrings.text(.ready)
+        case .idle: return ""
         case .submitting: return MilaStrings.text(.connecting)
         case .applied: return MilaStrings.text(.actionSubmitted)
         case .failed: return MilaStrings.text(.actionNotSubmitted)
         }
     }
 
-    private func refreshMachine(_ machineID: UUID) {
-        refreshing = true
-        Task {
-            defer { refreshing = false }
-            guard let snapshot = try? await adapter.refreshSnapshot(),
-                  let current = snapshot.machines.first(where: { $0.id == machineID }) else { return }
-            refreshedState = current.machine.observedState
-        }
-    }
-
-    private func resize(_ machine: MilaMachinePresentation) {
+    private func resize() {
         guard let cpu = UInt32(resizeCPU), let memory = UInt64(resizeMemory), let disk = UInt64(resizeDisk), cpu > 0, memory > 0, disk > 0 else { resizeStatus = MilaStrings.text(.actionNotSubmitted); return }
         resizeStatus = MilaStrings.text(.connecting)
         Task {
-            do { try await adapter.resize(machine: machine, cpu: cpu, memory: memory, disk: disk, requestID: UUID()); resizeStatus = MilaStrings.text(.actionSubmitted) }
+            do { try await adapter.resize(machine: machine, cpu: cpu, memory: memory, disk: disk, requestID: UUID()); resizeStatus = MilaStrings.text(.actionSubmitted); refresh() }
             catch { resizeStatus = MilaStrings.text(.actionNotSubmitted) }
         }
     }
-
 }
+
 private struct ThreadsView: View {
-    let adapter: any MilaFFIAdapter
+    @ObservedObject var controller: MilaThreadsController
     let select: (UUID) -> Void
-    @State private var status = ""
-    @State private var input = ""
-    @State private var busy = false
-    @State private var threadIDs: [UUID] = []
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text(MilaStrings.text(.threads)).font(.title)
-            Text(MilaStrings.text(.commandsRust)).font(.caption).foregroundStyle(.secondary)
-            HStack {
-                actionButton("List", action: .list)
-                actionButton("Read", action: .read)
-            }
-            TextField(MilaStrings.text(.input), text: $input).textFieldStyle(.roundedBorder)
-            Button(MilaStrings.text(.send)) { Task { await execute(.answer(input)) } }
-                .disabled(input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || busy)
-            Text(status).font(.caption)
-            if threadIDs.isEmpty {
+        List {
+            switch controller.state {
+            case .signedOut:
                 ContentUnavailableView(MilaStrings.text(.noThreads), systemImage: "bubble.left", description: Text(MilaStrings.text(.threadsHint)))
-            } else {
-                ForEach(threadIDs, id: \.self) { threadID in
-                    Button(threadID.uuidString) { select(threadID) }
-                        .buttonStyle(.bordered)
+            case .failed:
+                Text(MilaStrings.text(.threadsFailed))
+                Button(MilaStrings.text(.retry)) { Task { await controller.list() } }
+            case .idle, .loading, .loaded:
+                if controller.threads.isEmpty, controller.state == .loaded {
+                    ContentUnavailableView(MilaStrings.text(.noThreads), systemImage: "bubble.left", description: Text(MilaStrings.text(.threadsHint)))
+                }
+                ForEach(controller.threads) { thread in
+                    Button { select(thread.id) } label: {
+                        VStack(alignment: .leading) {
+                            Text(thread.title ?? MilaStrings.text(.threadUntitled))
+                            Text(thread.status).font(.caption).foregroundStyle(.secondary)
+                        }
+                    }
                 }
             }
-        }.padding()
-    }
-    @ViewBuilder private func actionButton(_ title: String, action: MilaThreadAction) -> some View {
-        Button(title) { Task { await execute(action) } }.disabled(busy)
-    }
-    private func execute(_ action: MilaThreadAction) async {
-        guard !busy else { return }; busy = true; defer { busy = false }
-        do {
-            _ = try adapter.classifyThreadCommand(action.command + (action.secondary.map { " " + $0 } ?? ""))
-            let data = try await adapter.threadAction(thread: nil, command: action.command, secondary: action.secondary, input: action.input, requestID: UUID())
-            status = String(decoding: data.prefix(4096), as: UTF8.self)
-            if case .list = action { threadIDs = Self.decodeThreadIDs(data) }
-            if case .answer = action { input = "" }
-        } catch { status = MilaStrings.text(.unavailable) }
-    }
-
-    private static func decodeThreadIDs(_ data: Data) -> [UUID] {
-        struct Row: Decodable { let id: UUID }
-        struct Envelope: Decodable { let result: Result }
-        struct Result: Decodable { let threads: [Row] }
-        guard data.count <= 512 * 1024 else { return [] }
-        let decoder = JSONDecoder()
-        if let envelope = try? decoder.decode(Envelope.self, from: data) {
-            return envelope.result.threads.map(\.id).prefix(256).map { $0 }
         }
-        if let rows = try? decoder.decode([Row].self, from: data) { return rows.map(\.id).prefix(256).map { $0 } }
-        if let rows = try? decoder.decode([String].self, from: data) {
-            return rows.compactMap(UUID.init(uuidString:)).prefix(256).map { $0 }
-        }
-        return []
+        .overlay { if controller.state == .loading { ProgressView() } }
+        .navigationTitle(MilaStrings.text(.threads))
+        .toolbar { ToolbarItem { Button(MilaStrings.text(.refresh)) { Task { await controller.list() } }.disabled(controller.state == .signedOut) } }
+        .task { if controller.state == .idle { await controller.list() } }
     }
 }
+
 private struct ThreadDetailView: View {
     let id: UUID
-    let adapter: any MilaFFIAdapter
-    @State private var input = ""
-    @State private var plan = ""
-    @State private var status = ""
-    @State private var busy = false
+    @ObservedObject var controller: MilaThreadsController
+    @State private var prompt = ""
+    @State private var answer = ""
+    @State private var revision = ""
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("\(MilaStrings.text(.threads)) \(id.uuidString)")
-            TextField(MilaStrings.text(.input), text: $input).textFieldStyle(.roundedBorder)
-            HStack {
-                Button(MilaStrings.text(.send)) { Task { await send(.answer(input)) } }.disabled(!MilaThreadAction.answer(input).isWellFormed || busy)
-                Button("Prompt") { Task { await send(.prompt(input)) } }.disabled(!MilaThreadAction.prompt(input).isWellFormed || busy)
-                Button("Approve plan") { Task { await send(.planApprove(plan)) } }.disabled(!MilaThreadAction.planApprove(plan).isWellFormed || busy)
-                Button("Revise plan") { Task { await send(.planRevise(plan)) } }.disabled(!MilaThreadAction.planRevise(plan).isWellFormed || busy)
+        Form {
+            if let detail = controller.detail, detail.id == id {
+                Section {
+                    Text(detail.title ?? MilaStrings.text(.threadUntitled)).font(.title2)
+                    Text(detail.busy == true ? MilaStrings.text(.threadWorking) : detail.status).font(.caption).foregroundStyle(.secondary)
+                }
+                if let question = detail.pendingQuestion {
+                    Section(MilaStrings.text(.threadQuestionTitle)) {
+                        TextField(MilaStrings.text(.input), text: $answer, axis: .vertical)
+                        Button(MilaStrings.text(.threadAnswerSend)) { submit(.answer(thread: id, question: question.id, text: answer)) { answer = "" } }
+                            .disabled(!MilaThreadAction.answer(thread: id, question: question.id, text: answer).isWellFormed || busy)
+                    }
+                }
+                if let plan = detail.latestPlan, plan.implemented != true {
+                    Section(MilaStrings.text(.threadPlanTitle)) {
+                        Button(MilaStrings.text(.threadPlanApprove)) { submit(.planApprove(thread: id, plan: plan.id)) {} }.disabled(busy)
+                        TextField(MilaStrings.text(.threadPlanRevisionHint), text: $revision, axis: .vertical)
+                        Button(MilaStrings.text(.threadPlanRevise)) { submit(.planRevise(thread: id, plan: plan.id, text: revision)) { revision = "" } }
+                            .disabled(!MilaThreadAction.planRevise(thread: id, plan: plan.id, text: revision).isWellFormed || busy)
+                    }
+                }
+                Section {
+                    TextField(MilaStrings.text(.threadComposerHint), text: $prompt, axis: .vertical)
+                    Button(MilaStrings.text(.send)) { submit(.prompt(thread: id, text: prompt)) { prompt = "" } }
+                        .disabled(!MilaThreadAction.prompt(thread: id, text: prompt).isWellFormed || busy)
+                }
+                if case .failed = controller.mutation { Text(MilaStrings.text(.actionNotSubmitted)).font(.caption).foregroundStyle(.secondary) }
+            } else if controller.state == .failed {
+                Text(MilaStrings.text(.threadFailed))
+            } else {
+                ProgressView()
             }
-            TextField("Plan identifier", text: $plan).textFieldStyle(.roundedBorder)
-            Text(status).font(.caption).foregroundStyle(.secondary)
-        }.padding()
+        }
+        .task(id: id) { await controller.show(id) }
     }
-    private func send(_ action: MilaThreadAction) async {
-        guard !busy else { return }; busy = true; defer { busy = false }
-        do { let data = try await adapter.threadAction(thread: id, command: action.command, secondary: action.secondary, input: action.input, requestID: UUID()); status = String(decoding: data.prefix(4096), as: UTF8.self); if case .answer = action { input = "" } }
-        catch { status = MilaStrings.text(.unavailable) }
+    private var busy: Bool { if case .submitting = controller.mutation { return true }; return false }
+    private func submit(_ action: MilaThreadAction, clear: @escaping () -> Void) {
+        Task {
+            await controller.perform(action)
+            if case .applied = controller.mutation { clear() }
+        }
     }
 }
+
 private struct SettingsView: View {
-    let adapter: any MilaFFIAdapter
+    let model: MilaAppModel
     @ObservedObject var lockController: MilaAppLockController
     @ObservedObject var session: MilaDeploymentSessionController
+    @ObservedObject var signIn: MilaSignInController
+    @Environment(\.openURL) private var openURL
     @AppStorage("mila.appearance") private var appearance = "system"
     @AppStorage("mila.locale") private var locale = "en"
     @AppStorage("mila.appLockEnabled") private var appLockEnabled = false
@@ -404,30 +464,19 @@ private struct SettingsView: View {
     @State private var deploymentPort = "22"
     @State private var deploymentTrust = ""
     @State private var deploymentStatus = ""
-    @StateObject private var approval = MilaApprovalController()
     var body: some View {
         Form {
-            Section("Deployment sign-in") {
-                Picker("Deployment", selection: Binding(get: { session.selectedDeployment?.id }, set: { id in if let id, let value = session.deployments.first(where: { $0.id == id }) { session.select(value) } })) {
-                    Text("Select deployment").tag(Optional<UUID>.none)
+            Section(MilaStrings.text(.signInTitle)) {
+                Picker(MilaStrings.text(.signInTitle), selection: Binding(get: { session.selectedDeployment?.id }, set: { id in if let id, let value = session.deployments.first(where: { $0.id == id }) { session.select(value) } })) {
+                    Text("—").tag(Optional<UUID>.none)
                     ForEach(session.deployments) { deployment in Text("\(deployment.host):\(deployment.port)").tag(Optional(deployment.id)) }
                 }
+                signInStatus
                 HStack {
-                    Button("Sign in") { if let value = session.selectedDeployment { _ = session.signIn(value) } }.disabled(session.selectedDeployment == nil)
-                    Button("Reconnect") { _ = session.reconnect() }.disabled(session.selectedDeployment == nil)
-                    Button("Sign out") { session.signOut() }.disabled(session.state == .signedOut)
-                    Button("Refresh approval") {
-                        guard let adapter = session.adapter(), let host = session.selectedDeployment?.host else { return }
-                        Task { await approval.inspect(adapter, expectedHost: host) }
-                    }
-                    .disabled(session.adapter() == nil)
-                }
-                Text(String(describing: session.state)).font(.caption).foregroundStyle(.secondary)
-                if case .pending(let info) = approval.result {
-                    Link("Open approval in browser", destination: info.url)
-                    Text("Fingerprint: \(info.fingerprint)").font(.caption).foregroundStyle(.secondary)
-                } else if approval.error {
-                    Text("Approval status unavailable").font(.caption).foregroundStyle(.secondary)
+                    Button(MilaStrings.text(.signInStart)) { if let value = session.selectedDeployment { signIn.signIn(value) } }
+                        .disabled(session.selectedDeployment == nil || isConnecting)
+                    Button(MilaStrings.text(.reconnect)) { signIn.reconnect() }.disabled(session.selectedDeployment == nil || isConnecting)
+                    Button(MilaStrings.text(.signInSignOut)) { signIn.signOut() }.disabled(signIn.phase == .signedOut)
                 }
             }
             Section("Deployment") {
@@ -495,7 +544,7 @@ private struct SettingsView: View {
                             notificationsEnabled = false
                             notificationStatus = MilaStrings.text(.notificationsTurnOff)
                         } else {
-                            let controller = MilaNotificationController(adapter: adapter, appID: "com.overalls.mila", deployment: "current")
+                            let controller = MilaNotificationController(adapter: model.adapter ?? UnavailableMilaFFIAdapter(), appID: "com.overalls.mila", deployment: "current")
                             controller.register(token: notificationToken, endpoint: notificationEndpoint)
                             notificationsEnabled = controller.state == .on
                             notificationStatus = notificationsEnabled ? MilaStrings.text(.notificationsTurnOn) : MilaStrings.text(.runtimeUnavailable)
@@ -505,7 +554,7 @@ private struct SettingsView: View {
                     Text(notificationsEnabled ? "[on]" : "[off]").font(.caption)
                 }
                 Text(notificationStatus).font(.caption).foregroundStyle(.secondary)
-                if session.state != .signedOut {
+                if signIn.isSignedIn {
                     ForEach(notificationDevices) { device in
                         HStack {
                             VStack(alignment: .leading) {
@@ -524,30 +573,52 @@ private struct SettingsView: View {
                 }
             }
             NavigationLink(MilaStrings.text(.sshKeysTitle)) {
+                let adapter = model.adapter
                 MilaSSHKeysView(
                     controller: MilaSSHKeysController(
-                        loader: { try await adapter.listSSHKeys() },
+                        loader: { try await (adapter ?? UnavailableMilaFFIAdapter()).listSSHKeys() },
                         revoker: { keyID in
                             let key = MilaSSHKey(id: keyID, fingerprint: "", algorithm: "")
-                            try await adapter.revokeSSHKey(key, requestID: UUID())
+                            try await (adapter ?? UnavailableMilaFFIAdapter()).revokeSSHKey(key, requestID: UUID())
                         }
                     ),
-                    signedIn: session.state != .signedOut
+                    signedIn: adapter != nil
                 )
             }
-            Text(MilaStrings.text(.runtimeUnavailable)).foregroundStyle(.secondary)
         }
         .navigationTitle(MilaStrings.text(.settings))
         .onAppear {
-            notificationDevices = session.state == .signedOut ? [] : MilaUserDefaultsNotificationStore().list()
+            notificationDevices = signIn.isSignedIn ? MilaUserDefaultsNotificationStore().list() : []
             // Defaults may contain values written by an older build. Normalize
             // them at the read boundary before they reach SwiftUI.
             let canonicalLocale = MilaStrings.canonicalLocale(locale)
             if canonicalLocale != locale { locale = canonicalLocale }
-            if case .signedIn = session.state, let active = session.adapter(), let host = session.selectedDeployment?.host {
-                Task { await approval.inspect(active, expectedHost: host) }
-            }
             if !["system", "light", "dark"].contains(appearance) { appearance = "system" }
+        }
+    }
+
+    private var isConnecting: Bool { if case .connecting = signIn.phase { return true }; return false }
+
+    @ViewBuilder private var signInStatus: some View {
+        switch signIn.phase {
+        case .signedOut:
+            EmptyView()
+        case .connecting:
+            Text(MilaStrings.text(.signInConnectingHost, ["host": session.selectedDeployment?.host ?? ""])).font(.caption)
+        case .awaitingApproval(_, let info):
+            Text(MilaStrings.text(.signInApprove)).font(.caption)
+            Button(MilaStrings.text(.signInOpenBrowser)) { openURL(info.url) }
+            Text("\(MilaStrings.text(.signInFingerprint)): \(info.fingerprint)").font(.caption.monospaced()).foregroundStyle(.secondary).textSelection(.enabled)
+        case .signedIn:
+            Text(MilaStrings.text(.signedIn)).font(.caption)
+        case .expired:
+            Text(MilaStrings.text(.signInExpired)).font(.caption)
+        case .failed(_, let failure):
+            switch failure {
+            case .unreachable: Text(MilaStrings.text(.signInFailedUnreachable)).font(.caption)
+            case .refused: Text(MilaStrings.text(.signInFailedRefused)).font(.caption)
+            case .protocolError: Text(MilaStrings.text(.signInFailedProtocol)).font(.caption)
+            }
         }
     }
 }
@@ -582,20 +653,10 @@ public struct MilaSSHKeysView: View {
 }
 
 @MainActor public struct MilaNativeApp: App {
-    private let adapter: any MilaFFIAdapter
-    @StateObject private var session: MilaDeploymentSessionController
-    public init() {
-        let selectedAdapter: any MilaFFIAdapter = LinkedMilaFFIAdapter()
-        self.adapter = selectedAdapter
-        self._session = StateObject(wrappedValue: MilaDeploymentSessionController(factory: { _ in selectedAdapter }))
-    }
-    public init(adapter: any MilaFFIAdapter) {
-        self.adapter = adapter
-        self._session = StateObject(wrappedValue: MilaDeploymentSessionController(factory: { _ in adapter }))
-    }
-    public var body: some Scene { WindowGroup { MilaNativeRootView(adapter: adapter) } }
+    public init() {}
+    public init(adapter: any MilaFFIAdapter) { _ = adapter }
+    public var body: some Scene { WindowGroup { MilaNativeRootView() } }
 }
-
 
 private struct MilaTerminalView: View {
     @StateObject private var terminal: MilaTerminalController
@@ -609,8 +670,16 @@ private struct MilaTerminalView: View {
             ScrollView { Text(String(decoding: terminal.output, as: UTF8.self)).font(.system(.body, design: .monospaced)).frame(maxWidth: .infinity, alignment: .leading) }
                 .frame(maxHeight: .infinity).background(.black).foregroundStyle(.green)
             HStack { TextField(MilaStrings.text(.input), text: $command).onSubmit { send() }; Button(MilaStrings.text(.send)) { send() }; Button(MilaStrings.text(.reconnect)) { Task { await terminal.reconnect() } } }
-            Text("\(String(describing: terminal.state)) · \(terminal.columns)x\(terminal.rows)").font(.caption).foregroundStyle(.secondary)
+            Text(stateText).font(.caption).foregroundStyle(.secondary)
         }.padding().task { await terminal.attach() }.onDisappear { Task { await terminal.close() } }
     }
-    private func send() { let data = Data(command.utf8); command = ""; Task { await terminal.sendInput(data) } }
+    private var stateText: String {
+        switch terminal.state {
+        case .detached, .failed: return MilaStrings.text(.terminalEnded)
+        case .attaching: return MilaStrings.text(.terminalAttaching)
+        case .attached: return "\(MilaStrings.text(.terminalLive)) · \(terminal.columns)x\(terminal.rows)"
+        case .reconnecting: return MilaStrings.text(.terminalReconnecting)
+        }
+    }
+    private func send() { let data = Data((command + "\n").utf8); command = ""; Task { await terminal.sendInput(data) } }
 }

@@ -19,8 +19,20 @@ public final class MilaMachineWorkflow: ObservableObject {
     public init(adapter: any MilaFFIAdapter) { self.adapter = adapter }
     deinit { task?.cancel() }
 
+    /// True while a mutation is in flight; a settled outcome accepts the next action.
+    public var isSubmitting: Bool { if case .submitting = state { return true }; return false }
+
+    /// Called with each applied mutation so the owner can refresh its listing.
+    public var onApplied: (@MainActor (MilaMachineAction) -> Void)?
+
+    /// Waits for the in-flight mutation to settle.
+    public func settle() async { await task?.value }
+
+    /// @cc [owner:ghuntley,label:security] mila-apple-machine-lifecycle-dispatch
+    /// One mutation at a time per machine view; each request ID is used at most
+    /// once, and only Rust-projected lifecycle actions reach the session.
     public func submit(_ action: MilaMachineAction, machine: MilaMachinePresentation, requestID: UUID = UUID()) {
-        guard case .idle = state else { return }
+        guard !isSubmitting else { return }
         guard submittedRequestIDs.insert(requestID).inserted else {
             state = .failed(requestID: requestID, action: action, error: .actionNotAllowed)
             return
@@ -37,7 +49,7 @@ public final class MilaMachineWorkflow: ObservableObject {
             state = .failed(requestID: requestID, action: action, error: .actionNotAllowed)
             return
         }
-        guard machine.actions.values.contains(action) else {
+        guard machine.actions.values.contains(action), action.isSessionLifecycle else {
             state = .failed(requestID: requestID, action: action, error: .actionNotAllowed)
             return
         }
@@ -48,6 +60,7 @@ public final class MilaMachineWorkflow: ObservableObject {
                 try await adapter.submit(action, machine: machine, requestID: requestID)
                 guard !Task.isCancelled, submittedGeneration == generation else { return }
                 state = .applied(requestID: requestID, action: action)
+                onApplied?(action)
             } catch let error as MilaFFIError {
                 guard !Task.isCancelled, submittedGeneration == generation else { return }
                 state = .failed(requestID: requestID, action: action, error: error)

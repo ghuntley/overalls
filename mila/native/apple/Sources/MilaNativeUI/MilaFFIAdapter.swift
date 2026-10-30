@@ -85,14 +85,31 @@ public struct MilaSnapshotMachine: Codable, Equatable, Identifiable, Sendable {
 public enum MilaMachineAction: UInt16, CaseIterable, Sendable {
     case start, stop, pause, resume, pin, unpin, delete
 
-    public var title: String { rawValue == MilaMachineAction.delete.rawValue ? "Delete" : String(describing: self).capitalized }
-    fileprivate var token: String {
+    public var title: String {
+        switch self {
+        case .start: MilaStrings.text(.actionStart); case .stop: MilaStrings.text(.actionStop)
+        case .pause: MilaStrings.text(.actionPause); case .resume: MilaStrings.text(.actionResume)
+        case .pin: MilaStrings.text(.actionPin); case .unpin: MilaStrings.text(.actionUnpin)
+        case .delete: MilaStrings.text(.actionDelete)
+        }
+    }
+
+    /// @cc [owner:ghuntley,label:security;protocol] mila-apple-session-lifecycle-actions
+    /// Only the lifecycle verbs the Rust session dispatches (`start`, `stop`,
+    /// `pause`, `resume`, `rm`) may be submitted; pin and unpin are projected by
+    /// Rust policy but have no authenticated session command and MUST be refused
+    /// before the bridge rather than reported as submitted.
+    public var isSessionLifecycle: Bool { self != .pin && self != .unpin }
+
+    var token: String {
         switch self { case .start: "start"; case .stop: "stop"; case .pause: "pause"; case .resume: "resume"; case .pin: "pin"; case .unpin: "unpin"; case .delete: "rm" }
     }
 }
 
 public struct MilaMachineActions: Equatable, Sendable {
     public let values: [MilaMachineAction]
+    /// Lifecycle actions the authenticated session can dispatch, in Rust policy order.
+    public var lifecycle: [MilaMachineAction] { values.filter(\.isSessionLifecycle) }
     fileprivate init(bits: UInt16) { values = MilaMachineAction.allCases.filter { bits & (1 << $0.rawValue) != 0 } }
 }
 
@@ -152,50 +169,72 @@ public enum MilaThreadCommandKind: Int32, CaseIterable, Sendable {
 }
 public enum MilaMachineCommandKind: Int32, Sendable { case unknown = 0, list, show, new, resize, start, stop, pause, resume, delete, shareAdd, shareRemove, webShow, webSet }
 
-/// Closed set of authenticated thread mutations exposed to native presentation.
-/// The command text is only assembled here and is always reclassified by Rust.
+/// @cc [owner:ghuntley,label:security;protocol] mila-apple-thread-actions
+/// Closed set of authenticated thread operations, matching the Rust session's
+/// vocabulary exactly: `thread ls`, `show`/`turns` (thread), `prompt` (thread +
+/// stdin), `answer` (thread + question id + stdin), `plan approve` (thread +
+/// plan id) and `plan revise` (thread + plan id + stdin). Reads carry no request
+/// ID; mutations MUST carry a fresh one. Text crosses only as bounded stdin.
 public enum MilaThreadAction: Sendable, Equatable {
     case list
-    case read
-    case answer(String)
-    case prompt(String)
-    case planApprove(String)
-    case planRevise(String)
+    case show(thread: UUID)
+    case turns(thread: UUID)
+    case prompt(thread: UUID, text: String)
+    case answer(thread: UUID, question: UUID, text: String)
+    case planApprove(thread: UUID, plan: UUID)
+    case planRevise(thread: UUID, plan: UUID, text: String)
+
+    public static let maximumTextBytes = 64 * 1024
 
     public var isWellFormed: Bool {
         func safe(_ value: String) -> Bool {
-            !value.unicodeScalars.contains { $0.properties.generalCategory == .control }
+            !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+                value.utf8.count <= Self.maximumTextBytes &&
+                !value.unicodeScalars.contains { $0.value == 0 || ($0.properties.generalCategory == .control && $0 != "\n" && $0 != "\t") }
         }
         switch self {
-        case .list, .read: return true
-        case .answer(let value), .prompt(let value): return !value.isEmpty && safe(value) && value.utf8.count <= 64 * 1024
-        case .planApprove(let value), .planRevise(let value): return safe(value) && !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && value.utf8.count <= 256
+        case .list, .show, .turns, .planApprove: return true
+        case .prompt(_, let text), .answer(_, _, let text), .planRevise(_, _, let text): return safe(text)
+        }
+    }
+
+    public var isMutation: Bool {
+        switch self { case .list, .show, .turns: false; default: true }
+    }
+
+    public var thread: UUID? {
+        switch self {
+        case .list: nil
+        case .show(let id), .turns(let id), .prompt(let id, _), .answer(let id, _, _), .planApprove(let id, _), .planRevise(let id, _, _): id
         }
     }
 
     public var command: String {
         switch self {
-        case .list: return "thread ls"
-        case .read: return "thread read"
-        case .answer: return "thread answer"
-        case .prompt: return "thread prompt"
-        case .planApprove: return "thread plan approve"
-        case .planRevise: return "thread plan revise"
+        case .list: "thread ls"
+        case .show: "thread show"
+        case .turns: "thread turns"
+        case .prompt: "thread prompt"
+        case .answer: "thread answer"
+        case .planApprove: "thread plan approve"
+        case .planRevise: "thread plan revise"
         }
     }
 
+    /// Canonical lowercase question or plan identity.
     public var secondary: String? {
         switch self {
-        case .prompt(let value): return value
-        case .planApprove(let value), .planRevise(let value): return value
-        default: return nil
+        case .answer(_, let question, _): question.uuidString.lowercased()
+        case .planApprove(_, let plan), .planRevise(_, let plan, _): plan.uuidString.lowercased()
+        default: nil
         }
     }
 
     public var input: String? {
-        if case .answer(let value) = self { return value }
-        if case .prompt(let value) = self { return value }
-        return nil
+        switch self {
+        case .prompt(_, let text), .answer(_, _, let text), .planRevise(_, _, let text): text
+        default: nil
+        }
     }
 }
 
@@ -247,21 +286,34 @@ private enum MilaRustFFI {
 /// Adapter for the stable C ABI exported by `mila-ffi`.
 /// The host must link the Rust library; no Rust-owned memory is retained by this value.
 public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
-    private let liveSession: MilaLiveSession?
+    private let liveSession: (any MilaSessionClient)?
+    private let ptySession: (any MilaPtySession)?
 
-    public init() { liveSession = nil }
+    public init() { liveSession = nil; ptySession = nil }
 
     /// Creates an adapter backed by an authenticated Rust session. Trust is pinned deployment data.
     public init(trust: Data, host: String, port: UInt16, signer: MilaDeviceSigner) throws {
-        liveSession = try MilaLiveSession(trust: trust, host: host, port: port, signer: signer)
+        let session = try MilaLiveSession(trust: trust, host: host, port: port, signer: signer)
+        liveSession = session; ptySession = session
+    }
+
+    /// Wraps an existing authenticated session (production `MilaLiveSession`, or a
+    /// recording client in package tests). The adapter's validation and mapping
+    /// run unchanged above it.
+    public init(session: any MilaSessionClient, pty: (any MilaPtySession)? = nil) {
+        liveSession = session
+        ptySession = pty ?? (session as? any MilaPtySession)
     }
 
     /// Returns the authenticated PTY transport for native terminal presentation.
     /// Unsigned adapters deliberately return nil so a terminal cannot open.
     public func terminalTransport() -> (any MilaTerminalTransport)? {
-        guard let liveSession else { return nil }
-        return MilaAuthenticatedTerminalTransport(session: liveSession)
+        guard let ptySession else { return nil }
+        return MilaAuthenticatedTerminalTransport(session: ptySession)
     }
+
+    /// Closes the authenticated Rust session. Later calls fail as stale.
+    public func close() { liveSession?.close() }
 
     public func call(_ request: MilaFFIRequest) async throws -> MilaFFIResponse {
         guard abiCompatible() else { throw MilaFFIError.incompatibleABI }
@@ -404,10 +456,9 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
 
     public func listSSHKeys() async throws -> [MilaSSHKey] {
         guard let liveSession else { throw MilaFFIError.unavailable }
-        let data = try liveSession.sshKeys()
-        let decoded = try JSONDecoder().decode(MilaSSHKeyEnvelope.self, from: data)
-        guard decoded.keys.count <= 256 else { throw MilaFFIError.outputTooSmall }
-        return try decoded.keys.map { try $0.presentation() }
+        let data: Data
+        do { data = try liveSession.sshKeys() } catch { throw MilaFFIError.unavailable }
+        return try Self.decodeSSHKeys(data)
     }
 
     public func revokeSSHKey(_ key: MilaSSHKey, requestID: UUID) async throws {
@@ -417,8 +468,17 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
 
     public func refreshSnapshot() async throws -> MilaValidatedSnapshot {
         guard let liveSession else { throw MilaFFIError.unavailable }
-        let data = try liveSession.refresh()
-        return try projectListing(data)
+        let data: Data
+        do { data = try liveSession.refresh() } catch { throw MilaFFIError.unavailable }
+        return try Self.projectListing(data)
+    }
+
+    /// Fetches the next bounded page; Rust returns the accumulated listing.
+    public func loadMoreSnapshot() async throws -> MilaValidatedSnapshot {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        let data: Data
+        do { data = try liveSession.readMore() } catch { throw MilaFFIError.unavailable }
+        return try Self.projectListing(data)
     }
 
     public func checkApproval() async throws -> Data {
@@ -427,43 +487,43 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         catch { throw MilaFFIError.unavailable }
     }
 
-    private func projectListing(_ data: Data) throws -> MilaValidatedSnapshot {
+    /// Projects the Rust live listing (`{"machines":[...],"has_more":bool}` with
+    /// per-row `action_bits`) into presentation records.
+    static func projectListing(_ data: Data) throws -> MilaValidatedSnapshot {
         let decoder = JSONDecoder()
         let envelope = try decoder.decode(MilaSnapshotEnvelope.self, from: data)
         guard envelope.machines.count <= 256 else { throw MilaFFIError.outputTooSmall }
         let metadata = MilaSnapshotMetadata(machineCount: UInt32(envelope.machines.count), savedAt: 0, hasMore: envelope.hasMore)
         let machines = try envelope.machines.enumerated().map { index, machine in
+            _ = index
             try validateMachineDisplay(machine)
-            let actions: MilaMachineActions
-            if let actionBits = machine.actionBits {
-                actions = MilaMachineActions(bits: actionBits)
-            } else {
-                actions = try machineActionsFromListing(data, index: UInt32(index))
-            }
-            return MilaMachinePresentation(machine: machine, actions: actions)
+            // A live row without Rust policy bits presents no actions.
+            return MilaMachinePresentation(machine: machine, actions: MilaMachineActions(bits: machine.actionBits ?? 0))
         }
         return MilaValidatedSnapshot(machines: machines, metadata: metadata)
     }
 
-    private func validateMachineDisplay(_ machine: MilaSnapshotMachine) throws {
+    static func decodeSSHKeys(_ data: Data) throws -> [MilaSSHKey] {
+        guard data.count <= MilaLiveSession.commandLimit else { throw MilaFFIError.outputTooSmall }
+        let decoded = try MilaPorscheEnvelope<MilaSSHKeyEnvelope>.decode(data)
+        guard decoded.keys.count <= 256 else { throw MilaFFIError.outputTooSmall }
+        return try decoded.keys.map { try $0.presentation() }
+    }
+
+    private func validateMachineDisplay(_ machine: MilaSnapshotMachine) throws { try Self.validateMachineDisplay(machine) }
+
+    private static func validateMachineDisplay(_ machine: MilaSnapshotMachine) throws {
         guard machine.name.utf8.count <= 128,
               !machine.name.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7f }) else {
             throw MilaFFIError.outputTooSmall
         }
     }
 
-    private func machineActionsFromListing(_ data: Data, index: UInt32) throws -> MilaMachineActions {
-        // The live listing is produced by Rust and is already policy-projected; actions are
-        // intentionally empty until a validated offline snapshot is available for projection.
-        _ = data; _ = index
-        return MilaMachineActions(bits: 0)
-    }
-
     /// @cc [owner:ghuntley,label:security] mila-apple-no-fabricated-submission
     /// Formatting MUST NOT be reported as submission; absent an authenticated session, actions fail unavailable.
     public func submit(_ action: MilaMachineAction, machine: MilaMachinePresentation, requestID: UUID) async throws {
         guard requestID != UUID.zero else { throw MilaFFIError.unavailable }
-        guard machine.actions.values.contains(action) else { throw MilaFFIError.actionNotAllowed }
+        guard machine.actions.values.contains(action), action.isSessionLifecycle else { throw MilaFFIError.actionNotAllowed }
         _ = try formatMachineAction(action, machineID: machine.id, requestID: requestID)
         guard let liveSession else { throw MilaFFIError.unavailable }
         do {
@@ -493,8 +553,7 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     public func webEndpointProjection(machine: UUID) async throws -> MilaWebEndpointProjection {
         guard let liveSession else { throw MilaFFIError.unavailable }
         do {
-            let data = try liveSession.webShow(machine: machine)
-            return try JSONDecoder().decode(MilaWebEndpointProjection.self, from: data)
+            return try MilaPorscheEnvelope<MilaWebEndpointProjection>.decode(try liveSession.webShow(machine: machine))
         } catch { throw MilaFFIError.unavailable }
     }
 
@@ -515,6 +574,28 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     }
 }
 
+/// @cc [owner:ghuntley,label:protocol] mila-apple-porsche-envelope
+/// Porsche `--json` reads arrive as `{"version":1,"status":"succeeded","result":T}`.
+/// Decoders MUST accept that envelope (and the bare `T` some Rust projections
+/// emit) and MUST refuse any other status rather than presenting partial data.
+struct MilaPorscheEnvelope<Value: Decodable>: Decodable {
+    let value: Value
+    private enum Keys: String, CodingKey { case version, status, result }
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: Keys.self)
+        if container.contains(.status) {
+            guard try container.decode(Int.self, forKey: .version) == 1,
+                  try container.decode(String.self, forKey: .status) == "succeeded" else {
+                throw MilaFFIError.unavailable
+            }
+            value = try container.decode(Value.self, forKey: .result)
+        } else {
+            value = try Value(from: decoder)
+        }
+    }
+    static func decode(_ data: Data) throws -> Value { try JSONDecoder().decode(Self.self, from: data).value }
+}
+
 /**
  * @cc [owner:ghuntley,label:security] mila-apple-ffi-typed-boundary
  * The Apple UI MUST exchange typed requests and validated snapshot projections with the Rust
@@ -526,8 +607,9 @@ private struct MilaSSHKeyEnvelope: Codable {
 private struct MilaSSHKeyWire: Codable {
     let id: UUID; let label: String?; let algorithm: String; let fingerprint: String
     func presentation() throws -> MilaSSHKey {
-        guard algorithm.count <= 64, fingerprint.count <= 256, (label?.count ?? 0) <= 256 else { throw MilaFFIError.invalidRoute }
-        return MilaSSHKey(id: id, fingerprint: fingerprint, algorithm: algorithm, label: label)
+        guard algorithm.utf8.count <= 64,
+              let key = MilaSSHKey.validated(id: id, fingerprint: fingerprint, algorithm: algorithm, label: label) else { throw MilaFFIError.invalidRoute }
+        return key
     }
 }
 
@@ -545,6 +627,9 @@ private struct MilaSnapshotEnvelope: Codable {
 public protocol MilaFFIAdapter: Sendable {
     func call(_ request: MilaFFIRequest) async throws -> MilaFFIResponse
     func refreshSnapshot() async throws -> MilaValidatedSnapshot
+    func loadMoreSnapshot() async throws -> MilaValidatedSnapshot
+    /// Ends the authenticated session owned by this adapter, if any.
+    func close()
     func checkApproval() async throws -> Data
     func listSSHKeys() async throws -> [MilaSSHKey]
     func revokeSSHKey(_ key: MilaSSHKey, requestID: UUID) async throws
@@ -566,6 +651,8 @@ public extension MilaFFIAdapter {
     func listSSHKeys() async throws -> [MilaSSHKey] { throw MilaFFIError.unavailable }
     func revokeSSHKey(_ key: MilaSSHKey, requestID: UUID) async throws { _ = key; _ = requestID; throw MilaFFIError.unavailable }
     func refreshSnapshot() async throws -> MilaValidatedSnapshot { throw MilaFFIError.unavailable }
+    func loadMoreSnapshot() async throws -> MilaValidatedSnapshot { throw MilaFFIError.unavailable }
+    func close() {}
     func submit(_ action: MilaMachineAction, machine: MilaMachinePresentation, requestID: UUID) async throws { throw MilaFFIError.unavailable }
     func resize(machine: MilaMachinePresentation, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws { throw MilaFFIError.unavailable }
     func createMachine(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws { throw MilaFFIError.unavailable }

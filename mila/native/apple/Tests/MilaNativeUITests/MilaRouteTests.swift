@@ -258,24 +258,32 @@ final class MilaAuthenticatedTerminalTransportTests: XCTestCase {
 }
 
 final class MilaThreadActionTests: XCTestCase {
-    func testClosedThreadActionsProduceRustCommands() {
+    private let thread = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+    private let other = UUID(uuidString: "BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB")!
+
+    /// Each action carries exactly the shape `mila-session` accepts.
+    func testActionsMatchRustSessionVocabulary() {
         XCTAssertEqual(MilaThreadAction.list.command, "thread ls")
-        XCTAssertEqual(MilaThreadAction.read.command, "thread read")
-        XCTAssertEqual(MilaThreadAction.answer("hello").input, "hello")
-        XCTAssertEqual(MilaThreadAction.prompt("question").command, "thread prompt")
-        XCTAssertEqual(MilaThreadAction.planApprove("plan-1").secondary, "plan-1")
-        XCTAssertEqual(MilaThreadAction.planRevise("plan-2").command, "thread plan revise")
+        XCTAssertNil(MilaThreadAction.list.thread)
+        XCTAssertFalse(MilaThreadAction.list.isMutation)
+        XCTAssertEqual(MilaThreadAction.show(thread: thread).command, "thread show")
+        XCTAssertEqual(MilaThreadAction.turns(thread: thread).command, "thread turns")
+        let prompt = MilaThreadAction.prompt(thread: thread, text: "hello")
+        XCTAssertEqual(prompt.command, "thread prompt"); XCTAssertNil(prompt.secondary); XCTAssertEqual(prompt.input, "hello"); XCTAssertTrue(prompt.isMutation)
+        let answer = MilaThreadAction.answer(thread: thread, question: other, text: "yes")
+        XCTAssertEqual(answer.command, "thread answer"); XCTAssertEqual(answer.secondary, other.uuidString.lowercased()); XCTAssertEqual(answer.input, "yes")
+        let approve = MilaThreadAction.planApprove(thread: thread, plan: other)
+        XCTAssertEqual(approve.command, "thread plan approve"); XCTAssertEqual(approve.secondary, other.uuidString.lowercased()); XCTAssertNil(approve.input)
+        let revise = MilaThreadAction.planRevise(thread: thread, plan: other, text: "smaller")
+        XCTAssertEqual(revise.command, "thread plan revise"); XCTAssertEqual(revise.input, "smaller"); XCTAssertEqual(revise.thread, thread)
     }
 
-    func testThreadActionsDoNotAllowEmptyPlanIdentifiers() {
-        // The UI disables these actions; the typed value remains observable for
-        // adapters and cannot be confused with an answer payload.
-        XCTAssertEqual(MilaThreadAction.planApprove("").secondary, "")
-        XCTAssertNil(MilaThreadAction.planApprove("").input)
-        XCTAssertFalse(MilaThreadAction.planApprove("   ").isWellFormed)
-        XCTAssertFalse(MilaThreadAction.answer(String(repeating: "x", count: 64 * 1024 + 1)).isWellFormed)
-        XCTAssertFalse(MilaThreadAction.answer("hello\nworld").isWellFormed)
-        XCTAssertFalse(MilaThreadAction.planApprove("plan\u{0000}1").isWellFormed)
-        XCTAssertTrue(MilaThreadAction.prompt("question").isWellFormed)
+    func testTextBoundsAndControlCharacters() {
+        XCTAssertTrue(MilaThreadAction.prompt(thread: thread, text: "line one\nline two").isWellFormed)
+        XCTAssertFalse(MilaThreadAction.prompt(thread: thread, text: "   ").isWellFormed)
+        XCTAssertFalse(MilaThreadAction.prompt(thread: thread, text: "nul\u{0000}").isWellFormed)
+        XCTAssertFalse(MilaThreadAction.answer(thread: thread, question: other, text: "bell\u{0007}").isWellFormed)
+        XCTAssertFalse(MilaThreadAction.planRevise(thread: thread, plan: other, text: String(repeating: "x", count: 64 * 1024 + 1)).isWellFormed)
+        XCTAssertTrue(MilaThreadAction.planApprove(thread: thread, plan: other).isWellFormed)
     }
 }

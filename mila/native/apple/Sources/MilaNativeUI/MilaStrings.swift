@@ -1,7 +1,7 @@
 import Foundation
 
 /// Stable message identities shared with the Rust localization catalog.
-public enum MilaMessage: String, Sendable { case appName, sharePrincipal, shareAdd, shareRemove, shareAdded, shareRemoved, machines, threads, settings, ready, refresh, connecting, connected, runtimeUnavailable, noAction, snapshotLoaded, noSnapshotLoaded, machinesEmpty, machinesHint, openTerminal, actionSubmitted, actionNotSubmitted, rejectedByRust, machineUnavailable, commandsRust, noThreads, threadsHint, unavailable, terminal, input, send, reconnect, appearance, appearanceSystem, appearanceLight, appearanceDark, lockTitle, lockExplain, lockUnavailable, lockUnlock, lockFailed, notificationsTitle, notificationsExplain, notificationsTurnOn, notificationsTurnOff, pushUnsupported, sshKeysTitle, sshKeysExplain, sshKeysEmpty, sshKeyRevoke, sshKeyAlgorithm, sshKeyThisDevice, webOpen, webInvalid, webPlaceholder }
+public enum MilaMessage: String, Sendable { case appName, sharePrincipal, shareAdd, shareRemove, shareAdded, shareRemoved, machines, threads, settings, ready, refresh, connecting, connected, runtimeUnavailable, noAction, snapshotLoaded, noSnapshotLoaded, machinesEmpty, machinesHint, openTerminal, actionSubmitted, actionNotSubmitted, rejectedByRust, machineUnavailable, commandsRust, noThreads, threadsHint, unavailable, terminal, input, send, reconnect, appearance, appearanceSystem, appearanceLight, appearanceDark, lockTitle, lockExplain, lockUnavailable, lockUnlock, lockFailed, notificationsTitle, notificationsExplain, notificationsTurnOn, notificationsTurnOff, pushUnsupported, sshKeysTitle, sshKeysExplain, sshKeysEmpty, sshKeyRevoke, sshKeyAlgorithm, sshKeyThisDevice, webOpen, webInvalid, webPlaceholder, actionStart, actionStop, actionPause, actionResume, actionPin, actionUnpin, actionDelete, confirmDelete, cancel, retry, machineMore, signInStart, signInApprove, signInOpenBrowser, signInFingerprint, signInExpired, signInFailedRefused, signInFailedUnreachable, signInFailedProtocol, signInSignOut, signedIn, signInConnectingHost, threadsFailed, threadFailed, threadUntitled, threadPlanTitle, threadPlanApprove, threadPlanRevise, threadPlanRevisionHint, threadQuestionTitle, threadAnswerSend, threadComposerHint, threadWorking, webFailed, terminalEnded, terminalSignedOut, terminalLive, terminalAttaching, terminalReconnecting, signInTitle, shareRoleViewer, shareRoleOperator, shareRoleManager, actionCreate, actionResize }
 
 public enum MilaStrings {
     /// The deterministic ordering emitted by the shared Rust locale policy.
@@ -43,8 +43,24 @@ public enum MilaStrings {
     private static let ids: [MilaMessage: String] = [
         .appName: "appTitle", .sharePrincipal: "sharePrincipal", .shareAdd: "shareAdd", .shareRemove: "shareRemove", .shareAdded: "shareAdded", .shareRemoved: "shareRemoved", .machines: "machinesTitle", .threads: "tabThreads", .settings: "settingsTitle",
         .ready: "ready", .refresh: "refresh", .connecting: "signInConnecting", .connected: "connected",
-        .runtimeUnavailable: "runtimeUnavailable", .noAction: "noAction", .snapshotLoaded: "snapshotLoaded", .noSnapshotLoaded: "noSnapshotLoaded", .machinesEmpty: "machinesEmpty", .machinesHint: "machinesEmptyHint", .openTerminal: "terminalAttach", .actionSubmitted: "requestSucceeded", .actionNotSubmitted: "requestFailed", .rejectedByRust: "linkRefused", .machineUnavailable: "machineNotFound", .commandsRust: "threadEventTool", .noThreads: "threadsEmpty", .threadsHint: "threadsEmptyHint", .unavailable: "runtimeUnavailable", .terminal: "tabTerminals", .input: "threadAnswerHint", .send: "threadSend", .reconnect: "signInReconnect", .appearance: "appearance", .appearanceSystem: "appearanceSystem", .appearanceLight: "appearanceLight", .appearanceDark: "appearanceDark", .lockTitle: "lockTitle", .lockExplain: "lockExplain", .lockUnavailable: "lockUnavailable", .lockUnlock: "lockUnlock", .lockFailed: "lockFailed", .notificationsTitle: "notificationsTitle", .notificationsExplain: "notificationsExplain", .notificationsTurnOn: "notificationsTurnOn", .notificationsTurnOff: "notificationsTurnOff", .pushUnsupported: "pushUnsupported", .sshKeysTitle: "sshKeysTitle", .sshKeysExplain: "sshKeysExplain", .sshKeysEmpty: "sshKeysEmpty", .sshKeyRevoke: "sshKeyRevoke", .sshKeyAlgorithm: "sshKeyAlgorithm", .sshKeyThisDevice: "sshKeyThisDevice", .webOpen: "webOpen", .webInvalid: "webInvalid", .webPlaceholder: "webPlaceholder"
+        .runtimeUnavailable: "runtimeUnavailable", .noAction: "noAction", .snapshotLoaded: "snapshotLoaded", .noSnapshotLoaded: "noSnapshotLoaded", .machinesEmpty: "machinesEmpty", .machinesHint: "machinesEmptyHint", .openTerminal: "terminalAttach", .actionSubmitted: "requestSucceeded", .actionNotSubmitted: "requestFailed", .rejectedByRust: "linkRefused", .machineUnavailable: "machineNotFound", .commandsRust: "threadEventTool", .noThreads: "threadsEmpty", .threadsHint: "threadsEmptyHint", .unavailable: "runtimeUnavailable", .terminal: "tabTerminals", .input: "threadAnswerHint", .send: "threadSend", .reconnect: "signInReconnect", .appearance: "appearance", .appearanceSystem: "appearanceSystem", .appearanceLight: "appearanceLight", .appearanceDark: "appearanceDark", .lockTitle: "lockTitle", .lockExplain: "lockExplain", .lockUnavailable: "lockUnavailable", .lockUnlock: "lockUnlock", .lockFailed: "lockFailed", .notificationsTitle: "notificationsTitle", .notificationsExplain: "notificationsExplain", .notificationsTurnOn: "notificationsTurnOn", .notificationsTurnOff: "notificationsTurnOff", .pushUnsupported: "pushUnsupported", .sshKeysTitle: "sshKeysTitle", .sshKeysExplain: "sshKeysExplain", .sshKeysEmpty: "sshKeysEmpty", .sshKeyRevoke: "sshKeyRevoke", .sshKeyAlgorithm: "sshKeyAlgorithm", .sshKeyThisDevice: "sshKeyThisDevice", .webOpen: "webOpen", .webInvalid: "webInvalid", .webPlaceholder: "webPlaceholder",
+        .actionStart: "actionStart", .actionStop: "actionStop", .actionPause: "actionPause", .actionResume: "actionResume", .actionPin: "actionPin", .actionUnpin: "actionUnpin", .actionDelete: "actionDelete", .confirmDelete: "confirmDelete", .cancel: "cancel", .retry: "retry", .machineMore: "machineMore", .signInStart: "signInStart", .signInApprove: "signInApprove", .signInOpenBrowser: "signInOpenBrowser", .signInFingerprint: "signInFingerprint", .signInExpired: "signInExpired", .signInFailedRefused: "signInFailedRefused", .signInFailedUnreachable: "signInFailedUnreachable", .signInFailedProtocol: "signInFailedProtocol", .signInSignOut: "signInSignOut", .signedIn: "settingsSignedIn", .signInConnectingHost: "signInConnecting", .threadsFailed: "threadsFailed", .threadFailed: "threadFailed", .threadUntitled: "threadUntitled", .threadPlanTitle: "threadPlanTitle", .threadPlanApprove: "threadPlanApprove", .threadPlanRevise: "threadPlanRevise", .threadPlanRevisionHint: "threadPlanRevisionHint", .threadQuestionTitle: "threadQuestionTitle", .threadAnswerSend: "threadAnswerSend", .threadComposerHint: "threadComposerHint", .threadWorking: "threadWorking", .webFailed: "webFailed", .terminalEnded: "terminalEnded", .terminalSignedOut: "terminalSignedOut", .terminalLive: "terminalLive", .terminalAttaching: "terminalAttaching", .terminalReconnecting: "terminalReconnecting", .signInTitle: "signInTitle", .shareRoleViewer: "shareRoleViewer", .shareRoleOperator: "shareRoleOperator", .shareRoleManager: "shareRoleManager", .actionCreate: "actionCreate", .actionResize: "actionResize"
     ]
+
+    /// Resolves a catalog message and substitutes named ICU-style `{placeholder}`
+    /// arguments. A catalog form that still has an unresolved placeholder falls
+    /// back to the English source so raw markup never reaches the UI.
+    public static func text(_ message: MilaMessage, _ arguments: [String: String], locale: Locale = .current) -> String {
+        func fill(_ template: String) -> String {
+            arguments.reduce(template) { $0.replacingOccurrences(of: "{\($1.key)}", with: $1.value) }
+        }
+        let value = fill(text(message, locale: locale))
+        return hasPlaceholder(value) ? fill(fallback(message)) : value
+    }
+
+    static func hasPlaceholder(_ value: String) -> Bool {
+        value.range(of: "\\{[A-Za-z_][A-Za-z0-9_]*\\}", options: .regularExpression) != nil
+    }
 
     public static func text(_ message: MilaMessage, locale: Locale = .current) -> String {
         let candidates: [String] = [
@@ -53,12 +69,65 @@ public enum MilaStrings {
             "en",
         ]
         for candidate in candidates {
-            if let value = resourceValue(message, locale: candidate) { return value }
+            if let value = resourceValue(message, locale: candidate) {
+                // Argument-free callers of a templated catalog form (for example the
+                // generic connecting status) use the placeholder-free fallback.
+                return hasPlaceholder(value) && !hasPlaceholder(fallback(message)) ? fallback(message) : value
+            }
         }
+        return fallback(message)
+    }
+
+    static func fallback(_ message: MilaMessage) -> String {
         switch message {
         case .appName: return "Mila"; case .sharePrincipal: return "Share principal"; case .shareAdd: return "Share"; case .shareRemove: return "Remove share"; case .shareAdded: return "Share added"; case .shareRemoved: return "Share removed"; case .machines: return "Machines"; case .threads: return "Threads"; case .settings: return "Settings"
         case .ready: return "Ready"; case .refresh: return "Refresh"; case .connecting: return "Connecting…"; case .connected: return "Connected"
         case .runtimeUnavailable: return "Native runtime unavailable"; case .appearance: return "Appearance"; case .appearanceSystem: return "System"; case .appearanceLight: return "Light"; case .appearanceDark: return "Dark"; case .lockTitle: return "App lock"; case .lockExplain: return "Ask for your fingerprint, face or device passcode before showing Mila."; case .lockUnavailable: return "App lock is not available on this device."; case .lockUnlock: return "Unlock Mila"; case .lockFailed: return "Authentication failed."; case .noAction: return "No action selected"; case .snapshotLoaded: return "Snapshot loaded"; case .noSnapshotLoaded: return "No snapshot loaded"; case .machinesEmpty: return "No machines"; case .machinesHint: return "Connect to a deployment to load a validated snapshot."; case .openTerminal: return "Open terminal"; case .actionSubmitted: return "Action submitted"; case .actionNotSubmitted: return "Action not submitted"; case .rejectedByRust: return "Rejected by Rust"; case .machineUnavailable: return "Machine unavailable"; case .commandsRust: return "Commands are classified by Rust before execution."; case .noThreads: return "No threads"; case .threadsHint: return "Connect to a deployment to load threads."; case .unavailable: return "Unavailable"; case .terminal: return "Terminal"; case .input: return "Input"; case .send: return "Send"; case .reconnect: return "Reconnect"; case .notificationsTitle: return "Notifications"; case .notificationsExplain: return "Notifications tell you when an agent needs your input."; case .notificationsTurnOn: return "Turn on"; case .notificationsTurnOff: return "Turn off"; case .pushUnsupported: return "Notifications are not available on this platform."; case .webOpen: return "Open web"; case .webInvalid: return "Invalid HTTPS URL"; case .webPlaceholder: return "https://machine.example"; case .sshKeysTitle: return "SSH keys"; case .sshKeysExplain: return "Keys approved to sign in to your account on this deployment."; case .sshKeysEmpty: return "No approved keys."; case .sshKeyRevoke: return "Revoke"; case .sshKeyAlgorithm: return "Type"; case .sshKeyThisDevice: return "This device"
+        case .actionStart: return "Start"
+        case .actionStop: return "Stop"
+        case .actionPause: return "Pause"
+        case .actionResume: return "Resume"
+        case .actionPin: return "Pin"
+        case .actionUnpin: return "Unpin"
+        case .actionDelete: return "Delete"
+        case .confirmDelete: return "Delete {name} and its disk? This cannot be undone."
+        case .cancel: return "Cancel"
+        case .retry: return "Try again"
+        case .machineMore: return "Show more"
+        case .signInStart: return "Sign in with browser"
+        case .signInApprove: return "Approve this device in your browser, then return here. Keep Mila open until you have approved it."
+        case .signInOpenBrowser: return "Open approval page"
+        case .signInFingerprint: return "Key fingerprint"
+        case .signInExpired: return "The approval link is no longer valid. Start again to get a new one."
+        case .signInFailedRefused: return "The deployment refused this device."
+        case .signInFailedUnreachable: return "The deployment cannot be reached."
+        case .signInFailedProtocol: return "The deployment sent a reply Mila does not understand."
+        case .signInSignOut: return "Sign out"
+        case .signedIn: return "Signed in"
+        case .signInConnectingHost: return "Connecting to {host}…"
+        case .threadsFailed: return "Threads could not be loaded."
+        case .threadFailed: return "This thread could not be loaded."
+        case .threadUntitled: return "Untitled thread"
+        case .threadPlanTitle: return "Proposed plan"
+        case .threadPlanApprove: return "Approve"
+        case .threadPlanRevise: return "Ask for changes"
+        case .threadPlanRevisionHint: return "What should change?"
+        case .threadQuestionTitle: return "The agent asks"
+        case .threadAnswerSend: return "Send answer"
+        case .threadComposerHint: return "Message the agent"
+        case .threadWorking: return "working"
+        case .webFailed: return "The web address could not be loaded."
+        case .terminalEnded: return "The terminal session ended."
+        case .terminalSignedOut: return "This device is no longer authorized. Sign in again to attach."
+        case .terminalLive: return "live"
+        case .terminalAttaching: return "attaching"
+        case .terminalReconnecting: return "reconnecting"
+        case .signInTitle: return "Sign in"
+        case .shareRoleViewer: return "viewer"
+        case .shareRoleOperator: return "operator"
+        case .shareRoleManager: return "manager"
+        case .actionCreate: return "Create"
+        case .actionResize: return "Resize"
         }
     }
 

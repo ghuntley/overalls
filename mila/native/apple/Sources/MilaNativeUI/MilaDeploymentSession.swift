@@ -9,7 +9,9 @@ public enum MilaDeploymentSessionState: Equatable, Sendable {
 
 /// @cc [owner:ghuntley,label:security] deployment-session-generation
 /// Every sign-in/reconnect gets a fresh generation; consumers must discard work from
-/// an earlier generation after sign-out or switching deployments.
+/// an earlier generation after sign-out or switching deployments. Ending a
+/// generation closes its adapter's authenticated Rust session immediately, so a
+/// view that still holds the old adapter cannot keep using the connection.
 ///
 /// Coordinates the durable deployment selection with the authenticated adapter.
 /// The coordinator is the single owner of session generation fencing for native UI.
@@ -41,14 +43,18 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
         // acquires this non-reentrant lock; calling it while holding the lock would
         // deadlock every deployment switch (including the initial selection).
         let previousID = selectedDeployment?.id
-        lock.lock(); defer { lock.unlock() }
+        lock.lock()
         let changed = previousID != deployment.id
         defaults.set(deployment.id.uuidString, forKey: selectionKey)
+        var ended: (any MilaFFIAdapter)?
         if changed {
             generation &+= 1
+            ended = adapter
             adapter = nil
             currentState = .signedOut
         }
+        lock.unlock()
+        ended?.close()
         return true
     }
     /// Removes a persisted deployment and fences any session that was using it.
@@ -57,28 +63,37 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
         let selected = selectedDeployment?.id == id
         store.remove(id)
         lock.lock()
+        var ended: (any MilaFFIAdapter)?
         if selected {
             generation &+= 1
+            ended = adapter
             adapter = nil
             currentState = .signedOut
             defaults.removeObject(forKey: selectionKey)
         }
         lock.unlock()
+        ended?.close()
         return true
     }
     @discardableResult public func signIn(_ deployment: MilaDeployment) -> Bool {
         guard Self.valid(deployment), store.list().contains(where: { $0.id == deployment.id }) else { return false }
-        lock.lock(); generation &+= 1; let next = generation; currentState = .connecting(deployment.id); lock.unlock()
+        lock.lock(); generation &+= 1; let next = generation; let ended = adapter; adapter = nil; currentState = .connecting(deployment.id); lock.unlock()
+        ended?.close()
         do {
             let created = try factory(deployment)
-            lock.lock(); adapter = created; defaults.set(deployment.id.uuidString, forKey: selectionKey); currentState = .signedIn(deployment.id, next); lock.unlock(); return true
+            lock.lock()
+            guard generation == next else { lock.unlock(); created.close(); return false }
+            adapter = created; defaults.set(deployment.id.uuidString, forKey: selectionKey); currentState = .signedIn(deployment.id, next); lock.unlock(); return true
         } catch {
-            lock.lock(); currentState = .failed(deployment.id, String(describing: error)); adapter = nil; lock.unlock(); return false
+            lock.lock()
+            if generation == next { currentState = .failed(deployment.id, String(describing: error)) }
+            lock.unlock(); return false
         }
     }
     public func reconnect() -> Bool { guard let deployment = selectedDeployment else { return false }; return signIn(deployment) }
     public func signOut() {
-        lock.lock(); generation &+= 1; adapter = nil; currentState = .signedOut; lock.unlock()
+        lock.lock(); generation &+= 1; let ended = adapter; adapter = nil; currentState = .signedOut; lock.unlock()
+        ended?.close()
     }
     public func adapter(for expectedGeneration: UInt64) -> (any MilaFFIAdapter)? {
         lock.lock(); defer { lock.unlock() }
