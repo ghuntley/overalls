@@ -93,9 +93,17 @@ jobs:
   # Builds every CI-enabled flake check that is not a NixOS machine test
   # (meta.ci, nix/verification/tests/ci.nix) and publishes it to Cachix.
   # Machine tests run in nixos-machine-tests.yml.
-  nix:
+  #
+  # The selected checks are built in shards on separate runners: built on one
+  # runner, their evaluation-time images, build directories and outputs
+  # outgrew its 116 GB store volume (ENOSPC in run 40999640832) even after
+  # selection collected its garbage. `nix` is the aggregate gate.
+  nix-select:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    timeout-minutes: 180
+    timeout-minutes: 120
+    outputs:
+      checks: ${{ steps.select.outputs.checks }}
+      errors: ${{ steps.select.outputs.errors }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
@@ -107,23 +115,71 @@ jobs:
       - name: Select checks
         id: select
         run: .github/scripts/select-checks.sh build
+
+  nix-build:
+    needs: nix-select
+    if: needs.nix-select.outputs.checks != '[]'
+    name: nix-build (${{ matrix.shard }}/6)
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2, 3, 4, 5]
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
       - name: Build checks
         env:
-          CHECKS: ${{ steps.select.outputs.checks }}
+          CHECKS: ${{ needs.nix-select.outputs.checks }}
+          SHARD: ${{ matrix.shard }}
+          SHARDS: 6
         run: |
           set -euo pipefail
-          mapfile -t names < <(jq -r '.[]' <<<"$CHECKS")
+          # Round-robin over the sorted selection, so every check is built by
+          # exactly one shard.
+          mapfile -t names < <(jq -r --argjson shard "$SHARD" --argjson shards "$SHARDS" \
+            'to_entries[] | select(.key % $shards == $shard) | .value' <<<"$CHECKS")
+          if [ "${#names[@]}" -eq 0 ]; then
+            echo "No checks in shard $SHARD"
+            exit 0
+          fi
+          echo "Building ${#names[@]} checks: ${names[*]}"
           # watch-exec uploads everything realised during the build to the
           # overalls cache, including paths a previous job on this cache
           # volume built but could not push.
           cachix watch-exec overalls -- \
             nix build -L --no-link --keep-going "${names[@]/#/.#checks.x86_64-linux.}"
-      - name: Require every check to evaluate
-        if: always() && steps.select.outcome == 'success'
+          df -h /nix/store || true
+
+  nix:
+    needs: [nix-select, nix-build]
+    if: always()
+    runs-on: namespace-profile-cached-amd64
+    steps:
+      - name: Require selection and every build shard to succeed
         env:
-          ERRORS: ${{ steps.select.outputs.errors }}
+          SELECT: ${{ needs.nix-select.result }}
+          BUILD: ${{ needs.nix-build.result }}
+        run: |
+          if [ "$SELECT" != success ]; then
+            echo "::error::check selection did not succeed ($SELECT)"
+            exit 1
+          fi
+          if [ "$BUILD" != success ] && [ "$BUILD" != skipped ]; then
+            echo "::error::a build shard did not succeed ($BUILD)"
+            exit 1
+          fi
+      - name: Require every check to evaluate
+        env:
+          ERRORS: ${{ needs.nix-select.outputs.errors }}
         run: |
           if [ "${ERRORS:-0}" -gt 0 ]; then
-            echo "::error::$ERRORS checks failed to evaluate; see the job summary"
+            echo "::error::$ERRORS checks failed to evaluate; see the nix-select job summary"
             exit 1
           fi
