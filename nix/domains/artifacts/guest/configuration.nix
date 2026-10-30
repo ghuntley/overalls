@@ -157,7 +157,6 @@ in
     ripgrep
     mercurial
     git
-    gh
     atop
     btop
     iotop

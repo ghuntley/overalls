@@ -12,8 +12,12 @@ let
   present = name: builtins.any (p: lib.getName p == name) config.environment.systemPackages;
   toolset = with pkgs; [
     curl iproute2 iputils dnsutils wget tmux vim neovim less lsof jq ripgrep
-    mercurial git gh atop btop iotop ncdu sqlite podman-compose direnv devenv starship
+    mercurial git atop btop iotop ncdu sqlite podman-compose direnv devenv starship
   ] ++ codingClis.packages;
+  # gh is the managed client (ADR-0202): an unpatched nixpkgs gh earlier in
+  # systemPackages wins the buildEnv collision for bin/gh and bypasses Galileo.
+  managedGh = present "overalls-managed-gh-linux-amd64";
+  unmanagedGh = builtins.any (p: lib.getName p == "gh") config.environment.systemPackages;
   missing = lib.filter (package: !(present (lib.getName package))) toolset;
   dockerAlias = builtins.any (p: lib.hasPrefix "podman-docker-compat" (lib.getName p))
     config.environment.systemPackages;
@@ -31,6 +35,8 @@ assert lib.assertMsg (builtins.elem "/run/docker.sock"
   "guest podman socket does not alias /run/docker.sock";
 assert lib.assertMsg dockerAlias "guest image lacks the docker CLI compatibility alias";
 assert lib.assertMsg (missing == [ ]) "guest image is missing default tools: ${toString missing}";
+assert lib.assertMsg (managedGh && !unmanagedGh)
+  "guest gh must be the managed client only; an unmanaged gh shadows it";
 assert lib.assertMsg (config.environment.etc."codex/config.toml".source == codingClis.codexConfiguration
   && config.environment.etc."claude-code/managed-settings.json".source == codingClis.claudeConfiguration)
   "guest native coding CLI configuration is absent or differs from the shared image settings";
