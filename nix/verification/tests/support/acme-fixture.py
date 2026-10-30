@@ -245,6 +245,13 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except Exception:
-        print("ACME fixture verification failed", file=sys.stderr)
+    except Exception as error:
+        # Only the exception class, never its message: messages can carry
+        # certificate, key or credential material. The class alone separates a
+        # WebSocket opening-handshake TimeoutError from a TLS SSLError or an
+        # assertion on the heartbeat reply.
+        print(
+            json.dumps({"event": "fixture.failed", "error": type(error).__name__}),
+            file=sys.stderr,
+        )
         sys.exit(1)
