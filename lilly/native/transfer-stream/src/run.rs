@@ -20,7 +20,7 @@ fn report(progress: Option<BorrowedFd<'_>>, total: u64) -> Result<(), ()> {
     let bytes = total.to_be_bytes();
     loop {
         match rustix::io::pwrite(fd, &bytes, 0) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) => {}
             Ok(8) => return Ok(()),
             _ => return Err(()),
         }
@@ -93,7 +93,6 @@ fn finish(
         let _ = producer.kill();
     }
     let mut consumer = consumer;
-    #[allow(clippy::needless_option_as_deref)]
     if let Some(side) = consumer.as_mut() {
         if let Some(pid) = i32::try_from(side.id()).ok().and_then(Pid::from_raw) {
             let _ = kill_process_group(pid, Signal::KILL);
@@ -104,17 +103,15 @@ fn finish(
         }
     }
     uncertain |= producer.wait().is_err();
-    #[allow(clippy::needless_option_as_deref)]
     if let Some(side) = consumer.as_mut() {
         uncertain |= side.wait().is_err();
     }
     // Subreaper: adopted descendants are ours until ECHILD.
     loop {
         match wait(WaitOptions::empty()) {
-            Err(Errno::INTR) => continue,
+            Err(Errno::INTR) | Ok(_) => {}
             Err(Errno::CHILD) => return if uncertain { EXIT_IO } else { status },
             Err(_) => return EXIT_IO,
-            Ok(_) => continue,
         }
     }
 }
@@ -125,7 +122,7 @@ pub fn run(request: &Request) -> u8 {
     if set_child_subreaper(Some(getpid())).is_err() {
         return EXIT_SETUP;
     }
-    #[allow(
+    #[expect(
         unsafe_code,
         reason = "borrowing the caller-opened progress descriptor by number"
     )]
@@ -136,9 +133,7 @@ pub fn run(request: &Request) -> u8 {
         .progress
         .map(|fd| unsafe { BorrowedFd::borrow_raw(fd) });
     if let Some(fd) = progress {
-        if rustix::fs::fstat(fd)
-            .map(|stat| stat.st_mode & libc::S_IFMT != libc::S_IFREG)
-            .unwrap_or(true)
+        if rustix::fs::fstat(fd).map_or(true, |stat| stat.st_mode & libc::S_IFMT != libc::S_IFREG)
             || report(Some(fd), 0).is_err()
         {
             return EXIT_SETUP;
@@ -189,7 +184,10 @@ fn spawn(
 
 /// The plumbing harness: three kernel pipes whose writer ends ride into the
 /// two children and whose reader ends the caller owns.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "each of the six pipe ends has a distinct custody destination; a struct would hide which side owns which end"
+)]
 fn transfer(
     request: &Request,
     data_reader: OwnedFd,
@@ -201,13 +199,11 @@ fn transfer(
     progress: Option<BorrowedFd<'_>>,
 ) -> u8 {
     // The C twin-dup2 puts one diag descriptor into both consumer channels.
-    let consumer_stdout = match diag_writer.try_clone() {
-        Err(_) => return EXIT_SETUP,
-        Ok(clone) => clone,
+    let Ok(consumer_stdout) = diag_writer.try_clone() else {
+        return EXIT_SETUP;
     };
-    let consumer_stderr = match diag_writer.try_clone() {
-        Err(_) => return EXIT_SETUP,
-        Ok(clone) => clone,
+    let Ok(consumer_stderr) = diag_writer.try_clone() else {
+        return EXIT_SETUP;
     };
     // Producer: stdin=null, stdout=data pipe, stderr=diag (same channel).
     let mut producer = match spawn(
@@ -217,7 +213,7 @@ fn transfer(
         Stdio::from(data_writer),
         Stdio::from(diag_writer),
     ) {
-        Err(_) => return EXIT_SETUP,
+        Err(()) => return EXIT_SETUP,
         Ok(child) => child,
     };
     // Consumer: stdin=sink reader; stdout and stderr both ride diag into the
@@ -229,7 +225,7 @@ fn transfer(
         Stdio::from(consumer_stdout),
         Stdio::from(consumer_stderr),
     ) {
-        Err(_) => {
+        Err(()) => {
             let _ = finish(&mut producer, None, EXIT_SETUP);
             return EXIT_SETUP;
         }
@@ -278,6 +274,14 @@ pub(crate) fn debit(credit: i64, count: usize, rate: u64) -> i64 {
     }
 }
 
+#[expect(
+    clippy::too_many_lines,
+    reason = "one reviewed poll loop: deadline, throttle, splice, progress, diagnostics and outcome must stay in order"
+)]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "sweep owns the data and diagnostics readers so they close when the pipeline ends"
+)]
 fn sweep(
     request: &Request,
     producer: &mut std::process::Child,
@@ -300,6 +304,10 @@ fn sweep(
             return finish(producer, Some(consumer), 2);
         }
         let now = Instant::now();
+        #[expect(
+            clippy::cast_possible_truncation,
+            reason = "monotonic time between two sweeps is far below i64::MAX milliseconds (292 million years)"
+        )]
         let elapsed = now.duration_since(last).as_millis() as i64;
         last = now;
         credit = refill(credit, elapsed, request.rate);
@@ -307,10 +315,15 @@ fn sweep(
         if !eof {
             let available = window(credit, request.rate);
             if available > 0 {
+                #[expect(
+                    clippy::expect_used,
+                    reason = "sink is Some until eof is set, and this splice runs only while !eof"
+                )]
+                let live_sink = sink.as_ref().expect("live sink");
                 match splice(
                     &data_reader,
                     None,
-                    sink.as_ref().expect("live sink"),
+                    live_sink,
                     None,
                     available,
                     SpliceFlags::NONBLOCK | SpliceFlags::MOVE,
@@ -327,7 +340,7 @@ fn sweep(
                         };
                         credit = debit(credit, count, request.rate);
                     }
-                    Err(Errno::AGAIN) | Err(Errno::INTR) => {}
+                    Err(Errno::AGAIN | Errno::INTR) => {}
                     Err(_) => return finish(producer, Some(consumer), 8),
                 }
             }
@@ -356,9 +369,8 @@ fn sweep(
         loop {
             let mut discard = [0_u8; 4096];
             match rustix::io::read(&diag_reader, &mut discard) {
-                Err(Errno::AGAIN) | Err(Errno::INTR) => break,
+                Err(Errno::AGAIN | Errno::INTR) | Ok(0) => break,
                 Err(_) => return finish(producer, Some(consumer), 3),
-                Ok(0) => break,
                 Ok(count) => {
                     diagnostics += count;
                     if diagnostics > DIAGNOSTICS_LIMIT {

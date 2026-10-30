@@ -48,6 +48,10 @@ fn fixture_consumer_escaped_children() {
     fixture_consumer();
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn spawn_escaped_children(role: &str) {
     let root = PathBuf::from(std::env::var_os("HL_ESCAPE_ROOT").expect("fixture root"));
     let count = std::env::var("HL_ESCAPE_COUNT")
@@ -98,7 +102,7 @@ fn fixture_escaped_stream_child() {
         std::process::id().to_string(),
     )
     .expect("complete escaped witness");
-    std::thread::sleep(Duration::from_secs(60));
+    std::thread::sleep(Duration::from_mins(1));
 }
 
 /// @cc [owner:ghuntley,label:verification;recovery] transfer-all-adopted-sessions
@@ -237,6 +241,14 @@ fn escaped_stream_failure_retains_custody_until_actual_reaping(tc: hegel::TestCa
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one linear failure-custody scenario: setup, trigger, witness and reap stay in order"
+)]
 fn failed_escape_case(role: StreamSide, trigger: EscapeFailure, count: usize) {
     let directory = tempfile::tempdir().expect("failure fixture directory");
     let root = directory.path().to_str().expect("root path");
@@ -366,6 +378,14 @@ fn process_retired(pid: rustix::process::Pid) -> bool {
 struct Running(Child);
 
 impl Running {
+    #[expect(
+        clippy::expect_used,
+        reason = "integration-test fixture helper: a failed poll must abort the test"
+    )]
+    #[expect(
+        clippy::panic,
+        reason = "integration-test fixture helper: an overdue helper fails the test"
+    )]
     fn wait_bounded(&mut self, timeout: Duration) -> std::process::ExitStatus {
         let deadline = Instant::now() + timeout;
         loop {
@@ -388,6 +408,10 @@ impl Drop for Running {
     }
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn harness() -> String {
     std::env::current_exe()
         .expect("harness path")
@@ -415,6 +439,10 @@ fn spawn(
 }
 
 /// Start the helper as hostd does: no stdin, stdout and stderr captured.
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test fixture helper: a setup failure must abort the test"
+)]
 fn spawn_with(
     timeout_ms: &str,
     rate: &str,
@@ -485,13 +513,18 @@ fn fixture_consumer() {
     }
     let mut sink = std::io::stdin().lock();
     let mut total = 0_u64;
-    let mut buffer = [0_u8; 65536];
+    let mut buffer = vec![0_u8; 65536];
     loop {
         let read = sink.read(&mut buffer).expect("consumer read");
         if read == 0 {
             break;
         }
-        total += buffer[..read].iter().filter(|byte| **byte == b'x').count() as u64;
+        #[expect(
+            clippy::naive_bytecount,
+            reason = "test fixture counts payload bytes without adding a bytecount dependency"
+        )]
+        let payload = buffer[..read].iter().filter(|byte| **byte == b'x').count();
+        total += payload as u64;
     }
     if let Ok(path) = std::env::var("HL_CONS_COUNTFILE") {
         std::fs::write(path, format!("{total}")).expect("count file");
@@ -509,7 +542,7 @@ fn fixture_producer_idle() {
     if let Ok(path) = std::env::var("HL_PROD_PIDFILE") {
         std::fs::write(path, format!("{}", std::process::id())).expect("pid");
     }
-    std::thread::sleep(Duration::from_secs(60));
+    std::thread::sleep(Duration::from_mins(1));
 }
 
 #[test]
@@ -529,7 +562,7 @@ fn fixture_consumer_idle() {
     if let Some(path) = std::env::var_os("HL_CONS_PIDFILE") {
         std::fs::write(path, std::process::id().to_string()).expect("consumer PID witness");
     }
-    std::thread::sleep(Duration::from_secs(60));
+    std::thread::sleep(Duration::from_mins(1));
 }
 
 // -- Cases. --

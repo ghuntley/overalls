@@ -23,7 +23,7 @@ fn number(text: &OsStr, min: i64, max: i64) -> Option<i64> {
     if bytes.is_empty() || (bytes[0] == b'0' && bytes.len() > 1) {
         return None;
     }
-    if !bytes.iter().all(|b| b.is_ascii_digit()) {
+    if !bytes.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let text = std::str::from_utf8(bytes).ok()?;
@@ -32,6 +32,10 @@ fn number(text: &OsStr, min: i64, max: i64) -> Option<i64> {
 }
 
 /// `-` or a strict decimal in `min..=max`.
+#[expect(
+    clippy::option_option,
+    reason = "three outcomes by design: invalid (None), dash (Some(None)) or a bounded value"
+)]
 fn optional(text: &OsStr, min: i64, max: i64) -> Option<Option<i64>> {
     if text.as_bytes() == b"-" {
         return Some(None);
@@ -68,7 +72,12 @@ pub fn parse_cli(arguments: &[OsString]) -> Option<Request> {
     };
     let producer_uid = uid(producer_uid)?;
     let consumer_uid = uid(consumer_uid)?;
-    let producer_count = usize::try_from(number(producers, 1, PRODUCER_ARGS_LIMIT as i64)?).ok()?;
+    let producer_count = usize::try_from(number(
+        producers,
+        1,
+        i64::try_from(PRODUCER_ARGS_LIMIT).ok()?,
+    )?)
+    .ok()?;
     if rest.len() < producer_count + 1 || rest.len() - producer_count > CONSUMER_ARGS_LIMIT {
         return None;
     }

@@ -62,9 +62,11 @@ fn oracle(words: &[OsString]) -> Option<Selected> {
     };
     let t = decimal(timeout, 1000, 86_400_000)?;
     let r = decimal(rate, 0, 1_073_741_824)?;
-    let progress = dash(progress, 3, 1023)?.map(|fd| fd as i32);
-    let producer_uid = dash(producer_uid, 1, 4_294_967_294)?.map(|uid| uid as u32);
-    let consumer_uid = dash(consumer_uid, 1, 4_294_967_294)?.map(|uid| uid as u32);
+    let progress = dash(progress, 3, 1023)?.map(|fd| i32::try_from(fd).expect("bounded by 1023"));
+    let producer_uid = dash(producer_uid, 1, 4_294_967_294)?
+        .map(|uid| u32::try_from(uid).expect("bounded below u32::MAX"));
+    let consumer_uid = dash(consumer_uid, 1, 4_294_967_294)?
+        .map(|uid| u32::try_from(uid).expect("bounded below u32::MAX"));
     let split = usize::try_from(decimal(producers, 1, 128)?).ok()?;
     if rest.len() < split + 1 || rest.len() - split > CONSUMER_ARGS_LIMIT {
         return None;
@@ -153,8 +155,8 @@ fn refill_oracle(credit: i64, elapsed_ms: i64, rate: u64) -> i64 {
 
 /// @cc [owner:ghuntley,label:verification] hegel-transfer-credit-throttle-bounds
 /// Generated refill/splice schedules MUST keep throttle credit within
-/// 0..=CREDIT_CAP_MS, match the independent wide-arithmetic refill oracle, and
-/// never open a splice window beyond credit/1000 bytes (or SPLICE_WINDOW).
+/// `0..=CREDIT_CAP_MS`, match the independent wide-arithmetic refill oracle, and
+/// never open a splice window beyond credit/1000 bytes (or `SPLICE_WINDOW`).
 #[hegel::test(test_cases = 200)]
 fn credit_throttle_stays_bounded(tc: TestCase) {
     let rate = tc.draw(gs::one_of(vec![
