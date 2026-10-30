@@ -99,7 +99,7 @@ defmodule Lilly.VM.CheckpointStorage do
 
       %{"state" => "empty"} = leaf ->
         with {:ok, _} <- native(pool, spec, slot, leaf, :off),
-             {:ok, []} <- File.ls(output(pool, spec.id, slot)),
+             :ok <- empty_output(spec, output(pool, spec.id, slot)),
              do: {:ok, record}
 
       %{"state" => "sealed"} = leaf ->
@@ -108,6 +108,25 @@ defmodule Lilly.VM.CheckpointStorage do
       _ ->
         failure()
     end
+  end
+
+  # @cc [owner:ghuntley,label:recovery;security] checkpoint-empty-output-reverified-unprivileged
+  # An already-empty slot (a start without an intervening stop, such as after host
+  # loss) MUST still prove its output directory is an empty real directory. The
+  # unprivileged BEAM (ADR-0182) cannot list the 0700 jail-uid directory, so it
+  # reclaims it through hostd's single-path no-dereference chown, lists it, and
+  # MUST return it to the jail uid before success. Any entry or failed step refuses.
+  @spec empty_output(Spec.t(), Path.t()) :: :ok | failure()
+  defp empty_output(spec, out) do
+    uid = Privilege.service_uid()
+    jail = "#{spec.network.uid}:#{spec.network.uid}"
+
+    with {:ok, %File.Stat{type: :directory}} <- File.lstat(out),
+         {:ok, _} <- Command.run(:chown, ["--no-dereference", "#{uid}:#{uid}", "--", out]),
+         {:ok, []} <- File.ls(out),
+         {:ok, _} <- Command.run(:chown, ["--no-dereference", jail, "--", out]),
+         do: :ok,
+         else: (_ -> failure())
   end
 
   defp create_or_match(pool, spec, slot, leaf) do
