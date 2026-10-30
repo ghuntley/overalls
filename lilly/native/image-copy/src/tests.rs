@@ -1,7 +1,10 @@
 use super::*;
+use crate::materialize::{data_extents, materialize_with};
+use crate::source::{source_lease, with_source_lease};
 use hegel::{generators as gs, TestCase};
+use rustix::fs::{copy_file_range, flock, FlockOperation, Mode as FileMode};
 use std::fs;
-use std::os::unix::fs::{symlink, PermissionsExt};
+use std::os::unix::fs::{symlink, FileExt, PermissionsExt};
 
 fn fixture(bytes: &[u8]) -> (tempfile::TempDir, std::path::PathBuf, std::path::PathBuf) {
     let directory = tempfile::tempdir().expect("isolated fixture");
