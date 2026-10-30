@@ -20,6 +20,11 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NuGet pins (ADR-0269): restore only what packages.lock.json records. Run
+         `dotnet restore -p:RestoreLockedMode=false -p:EnableWindowsTargeting=true`
+         to refresh it after changing a PackageReference. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
     <LangVersion>preview</LangVersion>
   </PropertyGroup>
 

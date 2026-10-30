@@ -69,6 +69,38 @@ defmodule Overalls.PinsTest do
              [:no_root_cargo_lock, {:cargo_lock, "mila/rust/Cargo.lock"}]
   end
 
+  test "platform projects restore only from committed lock files (ADR-0269 M9)" do
+    locked = """
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+    """
+
+    read = fn
+      "w/Locked.csproj" -> locked
+      "u/Unlocked.csproj" -> "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>"
+      "n/NoLock.csproj" -> locked
+    end
+
+    assert Pins.platform_locks(
+             [
+               "w/Locked.csproj",
+               "w/packages.lock.json",
+               "u/Unlocked.csproj",
+               "u/packages.lock.json",
+               "n/NoLock.csproj",
+               "a/settings.gradle.kts",
+               "a/gradle/verification-metadata.xml",
+               "b/settings.gradle.kts"
+             ],
+             read
+           ) == [
+             {:platform_lock, "n/NoLock.csproj", "has no tracked n/packages.lock.json"},
+             {:platform_lock, "u/Unlocked.csproj", "does not restore in locked mode"},
+             {:platform_lock, "b/settings.gradle.kts",
+              "has no tracked b/gradle/verification-metadata.xml"}
+           ]
+  end
+
   test "the repository satisfies the registry rule" do
     assert Pins.check(Path.expand("../../..", __DIR__)) == []
   end

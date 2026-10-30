@@ -30,6 +30,9 @@ case Overalls.Pins.check(root) do
 
           :no_root_cargo_lock ->
             "Cargo.lock: the root workspace lock is missing (ADR-0273)"
+
+          {:platform_lock, path, reason} ->
+            "#{path}: #{reason}; pin its packages with a lock file (ADR-0269)"
         end
 
       IO.puts(:stderr, message)

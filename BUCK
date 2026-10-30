@@ -141,7 +141,7 @@ repo_check(
 repo_check(
     name = "pins",
     cmd = [_ELIXIR, "scripts/check_pins.exs"],
-    include = ["*.nix", "nix/domains/artifacts/dependency-hashes.json", "scripts/pins.ex", "scripts/check_pins.exs"],
+    include = ["*.nix", "nix/domains/artifacts/dependency-hashes.json", "scripts/pins.ex", "scripts/check_pins.exs", "*.csproj", "*/packages.lock.json", "*settings.gradle*", "*/verification-metadata.xml"],
     labels = ["check", "precommit"],
     local_only = True,
     owned = ALL_OWNED_FILES,

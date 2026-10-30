@@ -39,6 +39,7 @@ defmodule Overalls.Pins do
           | {:unknown, Path.t(), pos_integer(), String.t()}
           | {:cargo_lock, Path.t()}
           | :no_root_cargo_lock
+          | {:platform_lock, Path.t(), String.t()}
 
   @spec registry() :: Path.t()
   def registry, do: @registry
@@ -110,6 +111,47 @@ defmodule Overalls.Pins do
     if "Cargo.lock" in locks, do: extra, else: [:no_root_cargo_lock | extra]
   end
 
+  # @cc [owner:ghuntley,label:build;security] platform-lock-files
+  # The non_hermetic Mila platform builds (ADR-0269 M9) MUST resolve
+  # third-party packages only through committed lock files: every tracked
+  # .csproj MUST restore in NuGet locked mode from its tracked
+  # packages.lock.json, and every tracked Gradle settings script MUST have a
+  # tracked gradle/verification-metadata.xml beside it.
+  @doc "Platform projects whose third-party packages are not pinned by a lock file."
+  @spec platform_locks([Path.t()], (Path.t() -> binary())) :: [violation()]
+  def platform_locks(paths, read) do
+    tracked = MapSet.new(paths)
+
+    nuget =
+      for path <- Enum.sort(paths), String.ends_with?(path, ".csproj") do
+        lock = Path.join(Path.dirname(path), "packages.lock.json")
+        text = read.(path)
+
+        cond do
+          lock not in tracked ->
+            {:platform_lock, path, "has no tracked #{lock}"}
+
+          not String.contains?(text, "<RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>") ->
+            {:platform_lock, path, "does not set RestorePackagesWithLockFile"}
+
+          not Regex.match?(~r/<RestoreLockedMode[^>]*>true<\/RestoreLockedMode>/, text) ->
+            {:platform_lock, path, "does not restore in locked mode"}
+
+          true ->
+            nil
+        end
+      end
+
+    gradle =
+      for path <- Enum.sort(paths),
+          Path.basename(path) in ["settings.gradle", "settings.gradle.kts"],
+          metadata = Path.join([Path.dirname(path), "gradle", "verification-metadata.xml"]),
+          metadata not in tracked,
+          do: {:platform_lock, path, "has no tracked #{metadata}"}
+
+    Enum.reject(nuget, &is_nil/1) ++ gradle
+  end
+
   @spec check(Path.t()) :: [violation()]
   def check(root) do
     paths = tracked(root)
@@ -121,7 +163,9 @@ defmodule Overalls.Pins do
       |> Enum.map(fn path -> {path, File.read!(Path.join(root, path))} end)
 
     registry = root |> Path.join(@registry) |> File.read!() |> JSON.decode!()
-    inline(files) ++ registry_use(registry, files) ++ cargo_locks(paths)
+    inline(files) ++
+      registry_use(registry, files) ++
+      cargo_locks(paths) ++ platform_locks(paths, &File.read!(Path.join(root, &1)))
   end
 
   @spec tracked(Path.t()) :: [Path.t()]
@@ -135,7 +179,9 @@ defmodule Overalls.Pins do
     else
       _ ->
         root
-        |> Path.join("**/{*.nix,Cargo.lock}")
+        |> Path.join(
+          "**/{*.nix,Cargo.lock,*.csproj,packages.lock.json,settings.gradle,settings.gradle.kts,verification-metadata.xml}"
+        )
         |> Path.wildcard()
         |> Enum.map(&Path.relative_to(&1, root))
     end
