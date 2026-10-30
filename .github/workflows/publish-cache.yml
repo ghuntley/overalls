@@ -10,7 +10,9 @@ on:
 # so CI always builds the latest commit instead of queueing a backlog.
 concurrency:
   group: publish-cache-${{ github.ref }}
-  cancel-in-progress: true
+  # Let a started run finish so trunk records a result even under a steady
+  # stream of pushes; GitHub keeps only the newest pending run per group.
+  cancel-in-progress: false
 
 permissions:
   contents: read

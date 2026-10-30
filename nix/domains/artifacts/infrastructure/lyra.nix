@@ -13,7 +13,7 @@ let
   vendor = pkgs.rustPlatform.fetchCargoVendor {
     name = "lyra-vendor";
     src = source;
-    hash = "sha256-oeLe/Oicp5fc3Kh6QMzkRejHC6uQVWy/GyZ02xBN7WU=";
+    hash = "sha256-h0p8FKZdcmv3baQx59H+zDnGRIZoQp4/PYBqOYppkiI=";
   };
   rustStd = target: hash: pkgs.fetchurl {
     url = "https://static.rust-lang.org/dist/rust-std-${rustVersion}-${target}.tar.xz";

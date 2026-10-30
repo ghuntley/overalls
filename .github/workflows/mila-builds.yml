@@ -28,7 +28,9 @@ on:
 
 concurrency:
   group: mila-builds-${{ github.ref }}
-  cancel-in-progress: true
+  # Let a started run finish so trunk records a result even under a steady
+  # stream of pushes; GitHub keeps only the newest pending run per group.
+  cancel-in-progress: false
 
 permissions:
   contents: read
