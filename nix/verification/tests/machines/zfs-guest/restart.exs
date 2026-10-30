@@ -52,16 +52,21 @@ defmodule ZFSGuestRestartFixture do
     end
 
     # Corrupt only fixture-owned files after contention. No success may bypass
-    # either validation layer or reconstruct the missing disk/bundle.
-    for file <- [
-          Disk.path(pool, spec),
-          Path.join(ZFSDataset.directory(pool, spec), "boot-bundle.json")
+    # either validation layer or reconstruct the missing disk/bundle. Since
+    # ec54d521d (ADR-0190 native admission) restart/4 validates the portable
+    # bundle before Disk.ready, so a missing or malformed bundle refuses as
+    # invalid_workload_bundle before any storage lock; a missing disk still
+    # refuses inside Disk.ready as disk_not_ready.
+    for {file, refusal} <- [
+          {Disk.path(pool, spec), :disk_not_ready},
+          {Path.join(ZFSDataset.directory(pool, spec), "boot-bundle.json"),
+           :invalid_workload_bundle}
         ] do
       saved = file <> ".fixture-saved"
       :ok = File.rename(file, saved)
 
       try do
-        {:error, :disk_not_ready} = Driver.restart(config, pool, spec, options)
+        {:error, ^refusal} = Driver.restart(config, pool, spec, options)
         false = File.exists?(file)
         {:ok, :stopped} = Unit.status(spec)
         ^previous = Enum.map(files, &File.read/1)
@@ -75,7 +80,8 @@ defmodule ZFSGuestRestartFixture do
 
     try do
       :ok = File.write(bundle, "{}")
-      {:error, :disk_not_ready} = Driver.restart(config, pool, spec, options)
+      {:error, :invalid_workload_bundle} = Driver.restart(config, pool, spec, options)
+      {:ok, :stopped} = Unit.status(spec)
       ^previous = Enum.map(files, &File.read/1)
     after
       :ok = File.write(bundle, original_bundle)
