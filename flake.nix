@@ -82,6 +82,11 @@
       lib.dependencyPins = built.dependencyPins;
       packages.${system} = {
         default = built.marshall;
+        # Hermetic Mila journey backend launcher (ADR-0264); the app runs it.
+        mila-journey-fixture = import ./nix/verification/tests/machines/mila-journey/launcher.nix {
+          inherit nixpkgs; pkgs = nixpkgs.legacyPackages.${system};
+          module = self.nixosModules.default; packages = built;
+        };
         service-marshall = built.marshall;
         service-lilly = built.lilly;
         service-audi = built.audi;
@@ -167,10 +172,7 @@
       # Hermetic Mila journey backend for platform journey tests (ADR-0264).
       apps.${system}.mila-journey-fixture = {
         type = "app";
-        program = "${import ./nix/verification/tests/machines/mila-journey/launcher.nix {
-          inherit nixpkgs; pkgs = nixpkgs.legacyPackages.${system};
-          module = self.nixosModules.default; packages = built;
-        }}/bin/mila-journey-fixture";
+        program = "${self.packages.${system}.mila-journey-fixture}/bin/mila-journey-fixture";
         meta.description = "Boot the hermetic Mila journey backend and print its descriptor";
       };
 
@@ -248,6 +250,9 @@
       }) // {
         nix-compact-core = nix-compact.lib.mkCoreCheck { inherit pkgs; };
         nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; };
+        # Built (not booted) by the cache job so the linux-native journey
+        # substitutes the fixture VM closure instead of building it.
+        mila-journey-fixture = self.packages.${system}.mila-journey-fixture;
         nix-compact-native-host = nix-compact.lib.mkNativeCheck { pkgs = nixpkgs.legacyPackages.${system}; };
         nix-compact-configuration = import ./nix/domains/artifacts/nix-compact/configuration-check.nix { inherit nixpkgs; nixCompact = nix-compact; };
         fleet-builds-configuration = import ./nix/verification/tests/evaluation/fleet-builds.nix {

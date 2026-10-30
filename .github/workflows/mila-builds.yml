@@ -81,7 +81,7 @@ jobs:
 
   apple-native:
     runs-on: macos-15
-    timeout-minutes: 90
+    timeout-minutes: 120
     env:
       MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
     steps:
@@ -122,7 +122,7 @@ jobs:
           hostname: mila-apple-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Forward the tailnet fixture to localhost
         if: env.MILA_TAILSCALE_AUTHKEY != ''
-        timeout-minutes: 35
+        timeout-minutes: 65
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Apple journey against the tunnelled fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
@@ -135,7 +135,7 @@ jobs:
 
   windows-native:
     runs-on: windows-2025
-    timeout-minutes: 75
+    timeout-minutes: 110
     env:
       MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
     steps:
@@ -193,7 +193,7 @@ jobs:
           hostname: mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Forward the tailnet fixture to localhost
         if: env.MILA_TAILSCALE_AUTHKEY != ''
-        timeout-minutes: 35
+        timeout-minutes: 65
         shell: bash
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Windows journey against the tunnelled fixture
@@ -209,7 +209,7 @@ jobs:
 
   linux-native:
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Install the pinned Rust toolchain
@@ -292,6 +292,16 @@ jobs:
       - name: Install Nix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
+      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      - name: Configure Cachix for the journey fixture
+        if: steps.journey.outputs.declared == 'true'
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
       # The fixture launcher boots a KVM QEMU VM and refuses to fall back to TCG.
       - name: Enable KVM for the journey fixture
         if: steps.journey.outputs.declared == 'true'
@@ -302,21 +312,30 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           test -r /dev/kvm -a -w /dev/kvm
-      - name: Start hermetic journey fixture
+      # Building first keeps substitution/build time apart from VM startup.
+      - name: Build hermetic journey fixture
         id: fixture
         if: steps.journey.outputs.declared == 'true'
-        timeout-minutes: 30
+        timeout-minutes: 40
         run: |
           set -euo pipefail
           system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-          if ! nix eval --raw ".#apps.${system}.mila-journey-fixture.program" >/dev/null 2>&1; then
-            echo "flake has no apps.${system}.mila-journey-fixture; journey skipped"
+          if ! nix eval --raw ".#packages.${system}.mila-journey-fixture.drvPath" >/dev/null 2>&1; then
+            echo "flake has no packages.${system}.mila-journey-fixture; journey skipped"
             exit 0
           fi
+          nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
+          echo "built=true" >> "$GITHUB_OUTPUT"
+      - name: Start hermetic journey fixture
+        if: steps.fixture.outputs.built == 'true'
+        timeout-minutes: 25
+        run: |
+          set -euo pipefail
           dir="$RUNNER_TEMP/mila-journey"
-          mkdir -p "$dir"
+          mkdir -p "$dir/state"
           chmod 700 "$dir"
-          nohup nix run ".#mila-journey-fixture" -- --descriptor "$dir/descriptor.json" \
+          nohup "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture" \
+            --descriptor "$dir/descriptor.json" --state "$dir/state" \
             > "$dir/fixture.log" 2>&1 &
           echo "$!" > "$dir/fixture.pid"
           for _ in $(seq 1 1500); do
@@ -342,6 +361,13 @@ jobs:
           print(f"::add-mask::{token}")
           PY
           echo "MILA_JOURNEY_DESCRIPTOR=$dir/descriptor.json" >> "$GITHUB_ENV"
+      # The fixture logs carry no credentials: the bearer is only in descriptor.json.
+      - name: Show journey fixture logs
+        if: failure() && steps.fixture.outputs.built == 'true'
+        run: |
+          dir="$RUNNER_TEMP/mila-journey"
+          tail -n 200 "$dir/fixture.log" || true
+          tail -n 200 "$dir/state/console.log" || true
       - name: Linux journeys against the hermetic fixture
         if: env.MILA_JOURNEY_DESCRIPTOR != ''
         timeout-minutes: 15
@@ -517,7 +543,7 @@ jobs:
   # deadline passes). Skipped cleanly without MILA_TAILSCALE_AUTHKEY.
   journey-fixture-tailnet:
     runs-on: ubuntu-24.04
-    timeout-minutes: 90
+    timeout-minutes: 130
     env:
       MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
       PEERS: mila-apple-${{ github.run_id }}-${{ github.run_attempt }} mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
@@ -530,6 +556,20 @@ jobs:
       - name: Install Nix for the journey fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
+      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      - name: Configure Cachix for the journey fixture
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
+      - name: Build hermetic journey fixture
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        timeout-minutes: 40
+        run: nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
       - name: Enable KVM for the journey fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         run: |
@@ -552,10 +592,11 @@ jobs:
           set -euo pipefail
           address="$(tailscale ip -4)"
           dir="$RUNNER_TEMP/mila-journey"
-          mkdir -p "$dir/public"
+          mkdir -p "$dir/public" "$dir/state"
           chmod 700 "$dir"
-          nohup nix run ".#mila-journey-fixture" -- --bind "$address" \
-            --descriptor "$dir/public/descriptor.json" > "$dir/fixture.log" 2>&1 &
+          nohup "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture" --bind "$address" \
+            --descriptor "$dir/public/descriptor.json" --state "$dir/state" \
+            > "$dir/fixture.log" 2>&1 &
           fixture=$!
           for _ in $(seq 1 1500); do
             [ -s "$dir/public/descriptor.json" ] && break
@@ -569,6 +610,12 @@ jobs:
             > /dev/null 2>&1 &
           read -ra peers <<< "$PEERS"
           python3 -I .github/scripts/mila-tailnet-peers.py 3000 "${peers[@]}"
+      - name: Show journey fixture logs
+        if: failure() && env.MILA_TAILSCALE_AUTHKEY != ''
+        run: |
+          dir="$RUNNER_TEMP/mila-journey"
+          tail -n 200 "$dir/fixture.log" || true
+          tail -n 200 "$dir/state/console.log" || true
 
   native-gate:
     name: Native platform gate

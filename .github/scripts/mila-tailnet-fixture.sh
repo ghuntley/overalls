@@ -13,7 +13,7 @@ descriptor=${1:?usage: mila-tailnet-fixture.sh DESCRIPTOR_PATH}
 fixture="mila-fixture-${GITHUB_RUN_ID:?}-${GITHUB_RUN_ATTEMPT:?}"
 python=$(command -v python3 || command -v python)
 address=""
-for _ in $(seq 1 360); do
+for _ in $(seq 1 720); do
   if address=$(tailscale ip -4 "$fixture" 2>/dev/null) && [ -n "$address" ]; then
     if curl -fsS --max-time 5 "http://$address:8445/descriptor.json" -o "$descriptor.tmp" 2>/dev/null; then
       break
@@ -23,7 +23,7 @@ for _ in $(seq 1 360); do
   sleep 5
 done
 if [ -z "$address" ]; then
-  echo "tunnelled fixture $fixture did not publish a descriptor within 30 minutes" >&2
+  echo "tunnelled fixture $fixture did not publish a descriptor within 60 minutes" >&2
   exit 1
 fi
 umask 077
