@@ -135,13 +135,14 @@ jobs:
           # expected_failure targets are soundness probes that must not build.
           all_builds=$(jq -c '[.builds[] | select((.labels | index("bootstrap")) or (.labels | index("expected_failure")) | not) | .target]' affected.json)
           # Whole host systems (deployment, base, install) and the kexec image
-          # each fill most of a runner's store, so they build one host per
-          # runner; several in one job ran out of space (run 41090838856).
+          # each fill most of a runner's store, so they build one target per
+          # runner: several hosts in one job (run 41090838856), and one host's
+          # deployment, base and install together (run 41102561512), ran out
+          # of space.
           host_re='^root//(fleet/hosts/[^:]+|nix/platform):'
           builds=$(jq -c --arg re "$host_re" '[.[] | select(test($re) | not)]' <<<"$all_builds")
           host_builds=$(jq -c --arg re "$host_re" '[.[] | select(test($re))]
-            | group_by(sub(":.*"; ""))
-            | map({name: (.[0] | sub("^root//"; "") | sub(":.*"; "")), targets: .})' <<<"$all_builds")
+            | map({name: sub("^root//"; ""), targets: [.]})' <<<"$all_builds")
           errors=$(jq '.errors | length' affected.json)
           {
             echo "machine_tests=$machine"
