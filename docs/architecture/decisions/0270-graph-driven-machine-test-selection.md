@@ -148,7 +148,12 @@ PR runs the affected machine-test set, and the approved migration plan.
   When everything is selected (a change to the cells, toolchains or rule
   files), `ci.yml` runs the builds and tests but leaves the full machine-test
   set to that daily run unless dispatched with `machine_all`; about 200
-  nested-KVM jobs per such push would exceed the runner pool.
+  nested-KVM jobs per such push would exceed the runner pool. The same
+  deferral applies when more than 40 suites are selected without everything
+  (a `catalog.nix` or shared-module change, until M11 narrows module inputs):
+  run 41059576724 fanned out about 200 jobs for an otel-fleet test fix. This
+  is a capacity limit on decision 4, not a change of it; the deferred suites
+  run daily, and dispatch with `machine_all` runs them at once.
 - **Executed:** `tools/buck2 test` of `sysctl` and `nix-ld` booted their VMs
   and passed; through `nix_assemble`, `sysctl` produced the same store path as
   the flake check, so the declared-only tree evaluates the same test.

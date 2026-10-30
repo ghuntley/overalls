@@ -104,6 +104,7 @@ jobs:
         id: plan
         env:
           MACHINE_ALL: ${{ inputs.machine_all }}
+          MACHINE_LIMIT: "40"
         run: |
           set -euo pipefail
           # Known Inception failures (AGENTS.md) run only in the daily backstop.
@@ -112,8 +113,13 @@ jobs:
           # When everything is selected (cells, toolchain or rule changes), the
           # full machine-test set is the daily run's (nixos-machine-tests.yml);
           # dispatch with machine_all to run it here.
+          # Until M11 narrows module inputs, a shared-file change (catalog.nix,
+          # a common module) selects most suites without setting everything.
+          # Above MACHINE_LIMIT suites the daily run covers them too, so one
+          # push cannot occupy the shared runner pool with ~200 jobs.
           deferred=false
-          if [ "$(jq .everything affected.json)" = true ] && [ "${MACHINE_ALL:-false}" != true ]; then
+          if [ "${MACHINE_ALL:-false}" != true ] && { [ "$(jq .everything affected.json)" = true ] \
+            || [ "$(jq length <<<"$machine")" -gt "$MACHINE_LIMIT" ]; }; then
             deferred=true
             machine='[]'
           fi

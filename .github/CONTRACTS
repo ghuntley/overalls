@@ -5,7 +5,7 @@ head of the newest earlier started, non-cancelled push run (so replaced pushes s
 covered), or everything when there is no usable base, and MUST run the
 affected builds, tests and machine tests, each machine test as its own
 job wrapped in `cachix watch-exec`, and tools/precommit over the same range. Known Inception failures, and the full
-machine-test set when everything is selected (unless dispatched with
+machine-test set when everything or more than 40 suites are selected (unless dispatched with
 machine_all), run only in the daily backstop. A selection error, or any failed job, MUST fail the ci job
 (ADR-0270).
 
