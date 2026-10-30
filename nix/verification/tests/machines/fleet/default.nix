@@ -1127,7 +1127,14 @@ let
       requires = [ "fleet-credentials.service" ];
     };
     virtualisation.memorySize = 6144;
-    virtualisation.cores = 8;
+    # Six vCPUs per fleet host. In machine-test run 41111309494, cloning-fleet
+    # had 35 lilly.control_unavailable cycles: seven 2-vCPU VMs (the three
+    # Marshall nodes among them) plus two 8-vCPU hosts, 30 vCPUs, shared one
+    # 8-vCPU runner and starved the control plane. Six makes it 26.
+    # Six is the floor: Lilly advertises min(logical CPUs, guestCpuCores
+    # quota = 6), and enrollment asserts 6 cores, so advertised capacity and
+    # every capacity scenario stay unchanged.
+    virtualisation.cores = 6;
     virtualisation.vlans = [ 1 2 ];
     virtualisation.qemu.drives = map (member: {
       name = "fleet-${member}";
