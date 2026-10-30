@@ -162,15 +162,40 @@ Partial.
     [`marshall/test/architecture/rust_lints_test.exs`](../../../marshall/test/architecture/rust_lints_test.exs)
   - the `rust-lints` hook in [`devenv.nix`](../../../devenv.nix) and the Nix check in
     [`flake.nix`](../../../flake.nix)
-- **Recorded crate by crate:** adoption, splits and properties land in later
-  changes.
+- **Adopted, with fixes, Hegel properties and Nix fmt and clippy gates:**
+  - diagnostics spool: split into [`schema.rs`](../../../elixir/diagnostics/native/spool/src/schema.rs)
+    and [`store.rs`](../../../elixir/diagnostics/native/spool/src/store.rs), with unsafe code
+    confined to [`sys.rs`](../../../elixir/diagnostics/native/spool/src/sys.rs); gated in
+    [`trace-spool.nix`](../../../nix/domains/artifacts/infrastructure/trace-spool.nix)
+  - guest editor broker: split into
+    [`validate.rs`](../../../nix/domains/artifacts/vscode-web-broker/src/validate.rs) and
+    [`boot.rs`](../../../nix/domains/artifacts/vscode-web-broker/src/boot.rs); Windows-target
+    clippy in [`windows.nix`](../../../nix/domains/artifacts/vscode-web-broker/windows.nix)
+  - guest telemetry receiver: split into `intake.rs`, `binding.rs` and `sanitize.rs`, with
+    its property contract in
+    [`CONTRACTS`](../../../nix/domains/system/otel-guest/receiver/CONTRACTS); gated in
+    [`receiver.nix`](../../../nix/domains/system/otel-guest/receiver.nix)
+  - observability-runtimes, gated in
+    [`observability-runtimes.nix`](../../../nix/domains/system/observability-runtimes.nix)
+    after its stale lockfile was pruned
+  - Enrico [`git-owner`](../../../enrico/native/git-owner/Cargo.toml)
+  - all twelve Lilly helpers and [`hostd`](../../../lilly/native/hostd/Cargo.toml). The
+    nine oversized helpers are split, for example
+    [`transfer-stream/src/run.rs`](../../../lilly/native/transfer-stream/src/run.rs). The
+    transfer-stream credit-throttle and boot-log custody properties that `CONTRACTS`
+    previously over-claimed now exist.
+  - [`terminald`](../../../nix/domains/artifacts/terminald/Cargo.toml), with Windows-target
+    clippy in [`terminald-windows.nix`](../../../nix/domains/artifacts/infrastructure/terminald-windows.nix)
+  - [Lyra](../../../lyra/Cargo.toml), gated in
+    [`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix) under the pinned
+    1.97.1 toolchain, including FreeBSD and illumos targets
+- **proptest is gone.** Spool, the broker and the receiver now use Hegel only.
 - **Remaining:**
-  - adopt the policy in every crate, then run the checker with `--strict`
-  - migrate proptest to Hegel in spool, the broker and the receiver
-  - add the gap properties
-  - add clippy gates to spool, the receiver, observability-runtimes and the Mila
-    platform jobs
-  - confine unsafe code in Lyra and terminald (follow-up)
+  - the Mila workspace and `mila/native/linux`: Hegel gap properties, the splits, adoption
+    and clippy in the Mila platform CI jobs. These wait for concurrent Mila work to land.
+  - running the checker with `--strict`, once every crate has adopted the policy
+  - confining unsafe code in Lyra and terminald (follow-up)
+  - a clippy gate in the native FreeBSD and illumos terminald derivation (follow-up)
 
 ## Open questions
 
