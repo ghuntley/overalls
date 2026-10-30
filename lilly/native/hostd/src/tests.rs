@@ -412,9 +412,13 @@ struct Fixture {
     root: PathBuf,
 }
 
+/// Writes a fixture script for the pinned shell in `LILLY_TEST_SHELL` (Buck2
+/// sets a Nix bash) or `/bin/sh` under Cargo. The bodies stay POSIX, so dash
+/// (Debian's `/bin/sh`) runs them too.
 fn script(directory: &Path, name: &str, body: &str) {
     let path = directory.join(name);
-    std::fs::write(&path, format!("#!/bin/sh\n{body}\n")).unwrap();
+    let shell = std::env::var("LILLY_TEST_SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
+    std::fs::write(&path, format!("#!{shell}\n{body}\n")).unwrap();
     std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o755)).unwrap();
 }
 
@@ -433,13 +437,15 @@ fn daemon() -> Fixture {
     script(&bin, "cp", "sleep \"$1\"");
     script(&bin, "realpath", "head -c \"$1\" /dev/zero");
     // The stream helper records its argv and progress descriptor, then exits
-    // with the code named by its consumer's last argument when numeric.
+    // with the code named by its consumer's last argument when numeric. It
+    // writes through /proc: dash cannot redirect to a descriptor above 9, and
+    // the inherited one often is.
     let record = directory.path().join("stream-record");
     script(
         &bin,
         "lilly-transfer-stream",
         &format!(
-            "printf '%s\\n' \"$@\" > {record}\nfd=$3\n[ \"$fd\" = - ] || printf 'progress' >&\"$fd\" || exit 70\nexit 6",
+            "printf '%s\\n' \"$@\" > {record}\nfd=$3\n[ \"$fd\" = - ] || printf 'progress' >> \"/proc/self/fd/$fd\" || exit 70\nexit 6",
             record = record.display()
         ),
     );

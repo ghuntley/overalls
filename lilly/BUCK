@@ -10,8 +10,13 @@ filegroup(name = "cargo_manifests", srcs = glob(["native/*/Cargo.toml"]), visibi
 
 # The Lilly host helpers, built by Buck2 with the workspace `hardened` profile
 # their Nix builds select (ADR-0273, M5).
+# hostd's fixture scripts run under the pinned bash, not the runner's /bin/sh.
+overalls_rust_crate("lilly/native/hostd", profile = "hardened", test_env = {
+    "LILLY_TEST_SHELL": read_root_config("nix", "bash"),
+})
+
 [overalls_rust_crate("lilly/native/" + helper, profile = "hardened") for helper in [
-    "boot-log", "export-channel", "hostd", "image-copy", "ingress-bridge",
+    "boot-log", "export-channel", "image-copy", "ingress-bridge",
     "kvm-probe", "launch-guard", "source-export", "transfer-stream", "vm-watch",
     "zfs-namespace-unmount",
 ]]
