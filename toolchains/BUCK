@@ -5,7 +5,7 @@ load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_toolchain")
 load(":nix.bzl", "nix_tool")
 load("@root//buck:platforms.bzl", "overalls_execution_platform")
-load(":rust.bzl", "nix_cxx_toolchain", "nix_rust_toolchain")
+load(":rust.bzl", "nix_cxx_toolchain", "nix_rust_toolchain", "rust_lld")
 
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
 
@@ -27,11 +27,36 @@ noop_test_toolchain(name = "test", visibility = ["PUBLIC"])
 nix_rust_toolchain(
     name = "rust",
     clippy_toml = "root//:clippy.toml",
-    rustc_flags = ["-Copt-level=3"],
+    rustc_flags = ["-Copt-level=3"] + select({
+        ":musl": ["-Clinker-flavor=ld.lld"],
+        "DEFAULT": [],
+    }),
+    rustc_target_triple = select({
+        ":musl": "x86_64-unknown-linux-musl",
+        "DEFAULT": "x86_64-unknown-linux-gnu",
+    }),
     visibility = ["PUBLIC"],
 )
 
-nix_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"])
+# Under `:musl` the same toolchain targets x86_64-unknown-linux-musl and links
+# a static-pie executable with its bundled rust-lld against rustc's
+# self-contained musl CRT, as the Nix `buildStaticMusl` does. Only the
+# `rust_musl_binary` transition (buck/rust.bzl) selects it; build scripts and
+# proc macros stay on the gnu execution platform.
+constraint_setting(name = "libc", visibility = ["PUBLIC"])
+
+constraint_value(name = "gnu", constraint_setting = ":libc", visibility = ["PUBLIC"])
+
+constraint_value(name = "musl", constraint_setting = ":libc", visibility = ["PUBLIC"])
+
+nix_cxx_toolchain(
+    name = "cxx",
+    linker = select({
+        ":musl": rust_lld(),
+        "DEFAULT": None,
+    }),
+    visibility = ["PUBLIC"],
+)
 
 # The prelude's toolchain attributes select `toolchains//:cxx_no_default_deps`
 # under `config//:none` (decls/toolchains_common.bzl), so traversing any C or

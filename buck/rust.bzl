@@ -14,6 +14,12 @@ load("@rust//:workspace.bzl", "CRATES", "LINT_FLAGS")
 _RELEASE_FLAGS = ["-Copt-level=3", "-Cdebug-assertions=off", "-Coverflow-checks=off", "-Cstrip=debuginfo"]
 _HARDENED_FLAGS = _RELEASE_FLAGS + ["-Cstrip=symbols", "-Clto=fat", "-Ccodegen-units=1", "-Cpanic=abort"]
 
+# Hegel property tests read CI to disable their failure database and fix the
+# seed, as on GitHub Actions. Without it a local Buck2 run, which starts at the
+# project root, keeps `.hegel/` there and replays an old failure in later runs;
+# the Nix sandbox discards its copy.
+_TEST_ENV = {"CI": "true"}
+
 def _crate_env(crate: dict, path: str) -> dict[str, str]:
     major, minor, patch = (crate["version"].split("-")[0].split(".") + ["0", "0"])[:3]
     return {
@@ -58,8 +64,8 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
 
     Called from the BUCK file of the path's top-level directory. Defines
     `<package>-lib` (rust_library), `<package>-unittest` (the library's tests),
-    one rust_binary per `[[bin]]` and `<package>-test-<name>` per integration
-    test. `profile` is the Cargo profile the Nix build selects for binaries:
+    one rust_binary per `[[bin]]` with its `<bin>-bin-unittest` (the binary's
+    own tests) and `<package>-test-<name>` per integration test. `profile` is the Cargo profile the Nix build selects for binaries:
     `release` or `hardened`. `native_libs` names `[nix]` library directories
     (cells.nix) searched for the crate's `#[link]` libraries; the cc wrapper
     records them as the binaries' rpath. `test_env` is added to every test's
@@ -106,7 +112,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
                 crate = lib["crate"],
                 crate_root = sub + "/" + lib["root"],
                 rustc_flags = lints,
-                run_env = test_env,
+                run_env = _TEST_ENV | test_env,
                 **common
             ), crate, ["normal", "dev"]))
     for binary in crate["bins"]:
@@ -119,6 +125,17 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             visibility = visibility,
             **common
         ), crate, ["normal"], lib_label))
+        # The binary's own `#[cfg(test)]` modules, as `cargo test` runs them.
+        if binary["test"]:
+            targets.append(binary["name"] + "-bin-unittest")
+            native.rust_test(**_with_platform_deps(dict(
+                name = binary["name"] + "-bin-unittest",
+                crate = binary["name"].replace("-", "_"),
+                crate_root = sub + "/" + binary["root"],
+                rustc_flags = lints,
+                run_env = _TEST_ENV | test_env,
+                **common
+            ), crate, ["normal", "dev"], lib_label))
     # Cargo gives integration tests each binary's path at compile time.
     bin_env = {"CARGO_BIN_EXE_" + b["name"]: "$(location :{})".format(b["name"]) for b in crate["bins"]}
     for test in crate["tests"]:
@@ -130,7 +147,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             crate = test["name"].replace("-", "_"),
             crate_root = sub + "/" + test["root"],
             rustc_flags = lints,
-            run_env = test_env,
+            run_env = _TEST_ENV | test_env,
             **test_attrs
         ), crate, ["normal", "dev"], lib_label))
 
@@ -312,3 +329,31 @@ def rust_leaf_parity_test(name: str, buck: str, nix_attr: str, labels: list[str]
         readelf = _store_path("bintools") + "/readelf",
         labels = labels,
     )
+
+def _musl_transition_impl(platform: PlatformInfo, refs: struct) -> PlatformInfo:
+    musl = refs.musl[ConstraintValueInfo]
+    constraints = dict(platform.configuration.constraints)
+    constraints[musl.setting.label] = musl
+    return PlatformInfo(
+        # Idempotent: Buck2 checks that a second application is a no-op.
+        label = platform.label if platform.label.endswith("-musl") else platform.label + "-musl",
+        configuration = ConfigurationInfo(constraints = constraints, values = platform.configuration.values),
+    )
+
+_musl_transition = transition(impl = _musl_transition_impl, refs = {"musl": "toolchains//:musl"})
+
+def _rust_musl_binary_impl(ctx: AnalysisContext) -> list[Provider]:
+    actual = ctx.attrs.actual
+    providers = [actual[DefaultInfo]]
+    if RunInfo in actual:
+        providers.append(actual[RunInfo])
+    return providers
+
+# Contract rust-musl-binary: see buck/CONTRACTS.
+# `actual`, a rust_binary, built for x86_64-unknown-linux-musl as a static-pie
+# executable (toolchains//:musl): the Buck2 counterpart of the Nix
+# `buildStaticMusl` leaves (terminald, the editor broker).
+rust_musl_binary = rule(
+    impl = _rust_musl_binary_impl,
+    attrs = {"actual": attrs.transition_dep(cfg = _musl_transition)},
+)

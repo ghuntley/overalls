@@ -43,7 +43,7 @@ def _nix_cxx_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
             linker_info = LinkerInfo(
                 # The Nix cc wrapper: it adds glibc's and every -L store
                 # directory's rpath, as buildRustPackage's links do.
-                linker = _run(ctx.attrs.cc),
+                linker = _run(ctx.attrs.linker or ctx.attrs.cc),
                 linker_flags = ctx.attrs.link_flags,
                 post_linker_flags = [],
                 archiver = _run(bintools + "/ar"),
@@ -113,10 +113,16 @@ _nix_cxx_toolchain = rule(
         "cc": attrs.string(),
         "cxx": attrs.string(),
         "link_flags": attrs.list(attrs.string(), default = []),
+        # A linker other than the cc wrapper: rust-lld for static musl links.
+        "linker": attrs.option(attrs.string(), default = None),
         "_internal_tools": attrs.default_only(attrs.exec_dep(providers = [CxxInternalTools], default = "prelude//cxx/tools:internal_tools")),
     },
     is_toolchain_rule = True,
 )
+
+def rust_lld() -> str:
+    """The single toolchain's bundled lld, which links static musl executables."""
+    return _store_path("rust") + "/lib/rustlib/x86_64-unknown-linux-gnu/bin/rust-lld"
 
 def nix_cxx_toolchain(name: str, **kwargs):
     """The Nix stdenv C compiler and binutils, as Buck2's C/linker toolchain."""
@@ -142,7 +148,7 @@ def _nix_rust_toolchain_impl(ctx: AnalysisContext) -> list[Provider]:
             nightly_features = False,
             doctests = False,
             report_unused_deps = False,
-            rustc_target_triple = "x86_64-unknown-linux-gnu",
+            rustc_target_triple = ctx.attrs.rustc_target_triple,
             rustc_flags = ctx.attrs.rustc_flags,
             rustc_binary_flags = [],
             rustc_test_flags = [],
@@ -159,6 +165,7 @@ _nix_rust_toolchain = rule(
         "clippy_toml": attrs.option(attrs.dep(providers = [DefaultInfo]), default = None),
         "rust": attrs.string(),
         "rustc_flags": attrs.list(attrs.string(), default = []),
+        "rustc_target_triple": attrs.string(default = "x86_64-unknown-linux-gnu"),
     },
     is_toolchain_rule = True,
 )

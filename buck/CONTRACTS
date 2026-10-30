@@ -149,8 +149,16 @@ overalls_rust_crate MUST define a member's Buck2 targets only from the
 generated rust//:workspace.bzl table, so each crate's targets, features,
 editions, workspace lints and dependencies (first-party and the rust// cell's
 locked third-party crates) match the root Cargo workspace; it MUST refuse a
-path that is not a member and a crate with a build script it cannot run, and
-binaries MUST use the Cargo profile their Nix build selects (ADR-0273).
+path that is not a member and a crate with a build script it cannot run;
+binaries MUST use the Cargo profile their Nix build selects, and every binary
+Cargo would test MUST have a `<bin>-bin-unittest` target (ADR-0273).
+
+@cc [owner:ghuntley,label:build] rust-musl-binary
+rust_musl_binary MUST build its `actual` binary under `toolchains//:musl`, so
+it is a static-pie x86_64-unknown-linux-musl executable linked by the single
+toolchain's rust-lld against rustc's self-contained musl CRT, with no ELF
+interpreter, NEEDED library or store path; build scripts and proc macros stay
+on the gnu execution platform (ADR-0273).
 
 @cc [owner:ghuntley,label:build;verification] rust-checks-precommit
 Each crate's `<name>-clippy` check MUST fail on any clippy diagnostic of any of

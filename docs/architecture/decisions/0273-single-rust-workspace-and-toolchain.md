@@ -211,8 +211,16 @@ partial, in milestone M5.
   helpers now build `release`, with the panic strategy in the parity test.
   Since M2 (7ccb4f72a) a host's `:deployment` target carries the same
   `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too; the flake's
-  Nix builds remain the fallback until M11. Remaining: terminald, the editor broker
-  and Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
+  Nix builds remain the fallback until M11. terminald and the editor broker
+  followed: `rust_musl_binary` ([buck/rust.bzl](../../../buck/rust.bzl))
+  transitions a binary to `toolchains//:musl`, under which the same toolchain
+  targets x86_64-unknown-linux-musl and links a static-pie executable with its
+  own rust-lld, as the Nix `buildStaticMusl` does; build scripts and proc
+  macros stay on the gnu execution platform. Both pass their parity tests
+  (`//nix:terminald-parity`, `//nix:vscode-web-broker-parity`) and are
+  swapped. Every testable binary now also gets a `<bin>-bin-unittest` target,
+  so bin-only crates such as terminald run their own tests under Buck2.
+  Remaining: Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.

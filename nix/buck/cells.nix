@@ -101,6 +101,12 @@ let
     gcc_lib = "${lib.getLib pkgs.stdenv.cc.cc}/lib";
     # Session fixture utility for enrico git-owner's tests.
     setsid = "${pkgs.util-linux}/bin/setsid";
+    # terminald's PTY tests start the user's login shell. Buck2 runs tests
+    # outside the build sandbox, where bash would read the host's
+    # /etc/profile; this one skips it, as the sandbox's absent file does.
+    test_login_shell = "${pkgs.writeShellScript "overalls-test-login-shell" ''
+      exec ${pkgs.bash}/bin/bash --noprofile --norc "$@"
+    ''}";
     # Native libraries first-party crates link (overalls_rust_crate native_libs),
     # the same packages their Nix builds take as buildInputs.
     zfs_lib = "${lib.getLib pkgs.zfs}/lib";

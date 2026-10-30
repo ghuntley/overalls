@@ -337,7 +337,11 @@ def generate(metadata: Path, root_manifest: Path, platforms_file: Path, out: Pat
                 "test": lib["test"],
             },
             "bins": [
-                {"name": t["name"], "root": _relative(t["src_path"], root / member_paths[pid])}
+                {
+                    "name": t["name"],
+                    "root": _relative(t["src_path"], root / member_paths[pid]),
+                    "test": t["test"],
+                }
                 for t in package["targets"]
                 if "bin" in t["kind"]
             ],

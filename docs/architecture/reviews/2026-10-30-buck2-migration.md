@@ -677,6 +677,22 @@ differ.
 | Guest telemetry receiver (6) | `//nix:otel-guest-receiver-import` | `//nix:otel-guest-receiver-parity` passes |
 | observability-runtimes (2) | `//nix:observability-runtimes-import` | `//nix:observability-runtimes-parity` passes |
 | Trace spool | `//elixir:trace-spool-import` | `//elixir:trace-spool-parity` passes |
+| terminald (static musl) | `//nix:terminald-import` | `//nix:terminald-parity` passes; 61 binary tests pass |
+| Editor broker (static musl) | `//nix:vscode-web-broker-import` | `//nix:vscode-web-broker-parity` passes; binary tests pass |
+
+**Static musl leaves.** `rust_musl_binary` applies a transition that adds
+`toolchains//:musl`; the Rust toolchain's target triple and flags and the C
+toolchain's linker select on it, so the binary and its third-party crates
+build for x86_64-unknown-linux-musl and link with rust-lld (the first build
+was 593,960 bytes, the size of the Nix build). Proc macros and build scripts
+are exec-configured and stay on gnu. The imports declare no runtime
+references; parity checks that they have no interpreter, NEEDED entry or
+RUNPATH, as the Nix builds do. Two findings came from running terminald's
+tests: the rule had no target for a binary's own `#[cfg(test)]` modules, so
+bin-only crates ran none of them (24 `<bin>-bin-unittest` targets now exist),
+and its PTY tests start a login shell, which outside the build sandbox read
+the host's `/etc/profile` and grew one session's ring past its budget. The
+tests now use `[nix] test_login_shell`, bash with `--noprofile --norc`.
 
 Machine tests through Buck2 with all five swaps, each assembly using the
 imports (different store paths from the Nix leaves): vm-watch, image-copy,

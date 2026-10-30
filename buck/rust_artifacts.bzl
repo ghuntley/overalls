@@ -8,5 +8,7 @@ RUST_ARTIFACTS = {
     "lilly-host-helpers": "root//lilly:host-helpers-import",
     "observability-runtimes": "root//nix:observability-runtimes-import",
     "otel-guest-receiver": "root//nix:otel-guest-receiver-import",
+    "terminald": "root//nix:terminald-import",
     "trace-spool": "root//elixir:trace-spool-import",
+    "vscode-web-broker": "root//nix:vscode-web-broker-import",
 }

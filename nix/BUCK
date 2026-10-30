@@ -1,7 +1,7 @@
 load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:assemble.bzl", "nix_store_import")
-load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
+load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test", "rust_musl_binary")
 
 nix_owned()
 
@@ -19,6 +19,42 @@ script_check(
 [overalls_rust_crate(path) for path in [
     "nix/domains/system/observability-runtimes",
     "nix/domains/system/otel-guest/receiver",
+]]
+
+# terminald, the guest terminal multiplexer: a static musl executable with the
+# `release` profile infrastructure/terminald.nix really builds (the declared
+# `hardened` is the open T2 regression in ADR-0273). Its tests get
+# terminald-checks.nix's environment: the pinned head, a login shell without
+# the host's startup files (the sandbox has none), and one test thread, so
+# each PTY history's process budget measures only its own workload.
+overalls_rust_crate("nix/domains/artifacts/terminald", profile = "release", test_env = {
+    "RUST_TEST_THREADS": "1",
+    "TERMINALD_TEST_HEAD": read_root_config("nix", "coreutils") + "/head",
+    "TERMINALD_TEST_SHELL": read_root_config("nix", "test_login_shell"),
+})
+
+# The editor broker, the other static musl leaf (vscode-web-broker/default.nix).
+overalls_rust_crate("nix/domains/artifacts/vscode-web-broker", profile = "release")
+
+# Static musl bundles: no interpreter, NEEDED library or rpath, so no runtime
+# references. Each has a parity test against the Nix build (deleted at M11).
+[(
+    rust_musl_binary(name = binary + "-musl", actual = ":" + binary),
+    genrule(
+        name = leaf,
+        out = leaf,
+        cmd = "mkdir -p $OUT/bin && cp $(location :{}-musl) $OUT/bin/{}".format(binary, binary),
+    ),
+    nix_store_import(name = leaf + "-import", src = ":" + leaf, runtime_refs = [], visibility = ["PUBLIC"]),
+    rust_leaf_parity_test(
+        name = leaf + "-parity",
+        buck = ":" + leaf + "-import",
+        nix_attr = "legacyPackages.x86_64-linux." + attr,
+        labels = ["heavy"],
+    ),
+) for leaf, attr, binary in [
+    ("terminald", "terminald", "lilly-terminald"),
+    ("vscode-web-broker", "vscodeWebBroker", "overalls-vscode-web-broker"),
 ]]
 
 _GLIBC_REFS = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib"]]

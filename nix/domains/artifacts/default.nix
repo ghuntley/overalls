@@ -43,7 +43,7 @@ let
   };
   version = "0.1.0";
   hostLock = import ./hosts/host-tools.nix { inherit pkgs; buck = artifacts.lilly-host-helpers or null; };
-  terminald = import ./infrastructure/terminald.nix { inherit pkgs; };
+  terminald = swapLeaf "terminald" (import ./infrastructure/terminald.nix { inherit pkgs; });
   terminaldChecks = import ./infrastructure/terminald-checks.nix { inherit pkgs; };
   # Hash-pinned Windows native runtime inputs. This is a staging closure only:
   # it does not contain the Code OSS bundle or broker and cannot widen
@@ -163,7 +163,7 @@ let
   # environment.
   mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
   # Buck2 Rust leaves this set consumes as `artifacts.<name>` (buck/rust_artifacts.bzl).
-  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "observability-runtimes" "otel-guest-receiver" "trace-spool" ];
+  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
   # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2
@@ -336,14 +336,15 @@ let
 
   # @cc [owner:ghuntley,label:build] swapped-leaf-keeps-nix-interface
   # A Buck2 leaf that replaces a Nix build MUST keep that build's meta (so
-  # lib.getExe finds mainProgram) and expose it as passthru.nixBuild, so a
-  # fixture that patches or rebuilds the source overrides the Nix build rather
-  # than silently overriding the import's copy step (ADR-0269, ADR-0273).
+  # lib.getExe finds mainProgram) and passthru (terminald's `native`), and
+  # expose it as passthru.nixBuild, so a fixture that patches or rebuilds the
+  # source overrides the Nix build rather than silently overriding the
+  # import's copy step (ADR-0269, ADR-0273).
   swapLeaf = name: nixBuild:
     if artifacts ? ${name} then
       artifacts.${name}.overrideAttrs (previous: {
         meta = nixBuild.meta or { };
-        passthru = (previous.passthru or { }) // { inherit nixBuild; };
+        passthru = (previous.passthru or { }) // (nixBuild.passthru or { }) // { inherit nixBuild; };
       })
     else nixBuild;
 
@@ -372,7 +373,7 @@ rec {
   mila = import ./mila { inherit pkgs; };
   vscodeWeb = import ./vscode-web { inherit pkgs; };
   updateVscodeExtensions = import ./vscode-web/updater.nix { inherit pkgs vscodeWeb; };
-  vscodeWebBroker = import ./vscode-web-broker { inherit pkgs; };
+  vscodeWebBroker = swapLeaf "vscode-web-broker" (import ./vscode-web-broker { inherit pkgs; });
   smtprelay = pkgs.callPackage ./smtprelay {};
   underclass = pkgs.callPackage ./underclass {};
   # NativeLink is FSL-1.1-ALv2 (source-available, unfree in nixpkgs terms);

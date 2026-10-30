@@ -12,4 +12,6 @@ nix_rust_toolchain MUST take rustc, rustdoc and clippy-driver only from the
 nix/rust-toolchain.nix defines, and nix_cxx_toolchain MUST link with the Nix
 stdenv cc wrapper and binutils from `[nix] cc` and `[nix] bintools`, so a
 Buck2 Rust binary links glibc and native libraries the way buildRustPackage
-does and no tool resolves through PATH (ADR-0273, ADR-0269).
+does and no tool resolves through PATH (ADR-0273, ADR-0269). Under
+`:musl` both MUST instead target x86_64-unknown-linux-musl and link with the
+toolchain's own rust-lld, as the Nix `buildStaticMusl` does.
