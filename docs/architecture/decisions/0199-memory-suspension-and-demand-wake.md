@@ -142,6 +142,11 @@ The authenticated host inventory carries that qualification independently of
 physical checkpoint compatibility. Marshall checks it for pause, restored
 capacity, memory relocation selection and the final destination handoff fence.
 
+[ADR-0266](0266-anonymous-restored-guest-memory.md) records that restored RAM is
+an anonymous copy of the checkpoint memory file, not a file mapping, so a restored
+guest is charged once within its accounted memory and can be checkpointed again.
+The mapped-slot custody rules above are unchanged.
+
 ## Open questions
 
 None. Exact-image and physical-fleet qualification remain verification work.
@@ -158,3 +163,4 @@ None. Exact-image and physical-fleet qualification remain verification work.
 - [ADR-0182](0182-unprivileged-lilly-beam.md)
 - [ADR-0183](0183-guest-dataset-streams-in-hostd.md)
 - [ADR-0193](0193-per-user-machine-pins.md)
+- [ADR-0266](0266-anonymous-restored-guest-memory.md)

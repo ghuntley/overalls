@@ -57,6 +57,10 @@ defmodule Lilly.VM.API do
   # load_checkpoint/3 MUST target only fixed jail-local immutable files, load into
   # a fresh API-only VMM with resume_vm false, and override only the validated
   # destination TAP/vsock paths. Failure MUST NOT fall back to InstanceStart.
+  # The File backend is only safe with the pinned VMM's anonymous-restore patch
+  # (contract snapshot-restore-anonymous-memory, ADR-0266): restored RAM is a copy,
+  # so it is charged to the VM cgroup like cold-boot RAM and a later checkpoint
+  # cannot fault /restore.memory page cache into the VM's MemoryMax.
   @spec load_checkpoint(Path.t(), Lilly.Network.Guest.t(), boolean()) ::
           :ok | {:error, :vmm_api_unavailable}
   def load_checkpoint(path, network, vsock?) do

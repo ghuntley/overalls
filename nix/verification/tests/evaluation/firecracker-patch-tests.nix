@@ -18,7 +18,10 @@
 # transferred whole by both I/O engines (the upstream parser, engine and
 # property tests run again against the changed request shape), and the vsock
 # device resolves indirect descriptor tables for RX and TX packets while
-# refusing malformed or nested tables. The nixpkgs
+# refusing malformed or nested tables, and a File-backend snapshot restores into
+# anonymous memory with exactly the file's bytes, populating only non-zero pages
+# across regions and copy-chunk boundaries and refusing a short file (the
+# upstream snapshot-file and discard tests run again against the copy). The nixpkgs
 # package only
 # runs the firecracker and jailer crate tests, so this derivation re-runs cargo
 # on the vmm crate with those filters. KVM is needed for the legacy device test.
@@ -70,6 +73,9 @@ packages.vmm.overrideAttrs (previous: {
     "test_indirect_chain_refusals"
     "test_rx_packet_assembly"
     "test_tx_packet_assembly"
+    "test_snapshot_file"
+    "snapshot_file_copy_matches_file_and_populates_nonzero_pages"
+    "test_discard_range_on_file"
   ];
   doInstallCheck = false;
   installPhase = ''

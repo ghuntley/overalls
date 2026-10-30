@@ -129,6 +129,22 @@ with subtest("Audi stable names and strict nested SSH follow a real guest reloca
     assert destination["host_id"] != original["host_id"]
     assert destination["slot"] == original["slot"]
     destination_host = host_for(destination)
+    # @cc [owner:ghuntley,label:verification;capacity] restored-guest-memory-is-anonymous
+    # A memory-restored guest MUST NOT run on a file mapping of its checkpoint:
+    # mapped checkpoint page cache is charged to the VM cgroup and the next
+    # checkpoint faults all of it in, past MemoryMax (ADR-0266). Only the static
+    # VMM and helper binaries remain as mapped files.
+    restored_unit = "lilly-vm-" + str(uuid.UUID(destination["placement_id"])) + ".service"
+    restored_stat = destination_host.succeed(
+        "cat " + shlex.quote("/sys/fs/cgroup/lilly.slice/" + restored_unit + "/memory.stat")
+    )
+    restored_mapped = next(
+        int(line.split()[1])
+        for line in restored_stat.splitlines()
+        if line.startswith("file_mapped ")
+    )
+    print(f"restored_guest_file_mapped_bytes: {restored_mapped}", flush=True)
+    assert restored_mapped < 32 * 1024 * 1024, "restored guest RAM is a checkpoint file mapping"
     destination_address = client.succeed(
         "python3 -c "
         + shlex.quote(

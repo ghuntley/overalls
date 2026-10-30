@@ -1,5 +1,9 @@
 # Architecture decision records
 
+[ADR-0266](0266-anonymous-restored-guest-memory.md) restores checkpointed guest
+RAM into anonymous memory instead of a private mapping of the memory file, so a
+restored VM stays within its accounted memory and can be checkpointed again.
+
 [ADR-0264](0264-hermetic-mila-journey-fixture.md) adds a hermetic Mila journey
 fixture: source-built Marshall, Porsche and a browser approver, used by the
 `mila-journey` machine test and the `mila-journey-fixture` launcher.
@@ -1102,6 +1106,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0261](0261-thread-feed-turn-notifications-and-subscription-revocation.md) | accepted | partial | Thread feed turn notifications and subscription revocation |
 | [ADR-0264](0264-hermetic-mila-journey-fixture.md) | accepted | partial | Hermetic Mila journey fixture |
 | [ADR-0265](0265-rust-code-quality.md) | accepted | partial | Rust code quality: module layout, lint policy and Hegel properties |
+| [ADR-0266](0266-anonymous-restored-guest-memory.md) | accepted | partial | Restored guest memory is anonymous |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

@@ -10,6 +10,13 @@ let
     # A failed asynchronous block drain/flush MUST terminate the VMM before
     # memory/device snapshot publication, never become a successful API reply.
     ../../../platform/patches/firecracker-snapshot-block-barrier.patch
+    # @cc [owner:ghuntley,label:capacity;isolation] snapshot-restore-anonymous-memory
+    # A File-backend snapshot load MUST copy the memory file into anonymous
+    # private guest memory, never map it, so restored RAM is charged to the VM
+    # cgroup at most once per guest page and a later checkpoint cannot fault
+    # file page cache into that cgroup (ADR-0266). All-zero pages stay
+    # unpopulated; a short memory file is refused.
+    ../../../platform/patches/firecracker-snapshot-anonymous-restore.patch
     # PVH start info carries the ACPI RSDP address (ADR-0169). Firmware
     # payloads such as edk2 CloudHv find the tables only through this field.
     ../../../platform/patches/firecracker-pvh-rsdp-paddr.patch

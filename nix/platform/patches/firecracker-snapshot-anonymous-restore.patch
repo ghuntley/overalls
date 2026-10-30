@@ -1,0 +1,288 @@
+From: Overalls maintainers
+Subject: [PATCH] Restore File-backend snapshots into anonymous guest memory
+
+Upstream maps the snapshot memory file MAP_PRIVATE as guest RAM. Every page
+the guest or VMM reads is then a page-cache folio of that file charged to the
+VMM's memory cgroup, beside the anonymous copy of every page the guest writes.
+The next full snapshot of the restored guest writes guest RAM to a new file;
+the kernel prefaults the write source and faults the whole file mapping into
+the cgroup, and the mapped, recently referenced folios are not reclaimed before
+the limit. A 512 MiB guest restored on ZFS reached a 576 MiB MemoryMax that
+way and, with panic_on_oom, panicked its provisioner host (ADR-0266).
+
+Allocate anonymous private memory as a cold boot does and copy the file into
+it before KVM registration and before the VMM seccomp filter is installed.
+All-zero host pages are not written and stay unpopulated. A short file is still
+refused; dirty tracking starts clean. The API, snapshot format and version are
+unchanged; only the residency of the restored memory changes.
+
+diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
+--- a/src/vmm/src/vstate/memory.rs
++++ b/src/vmm/src/vstate/memory.rs
+@@ -53,6 +53,8 @@
+     OffsetTooLarge,
+     /// Cannot retrieve snapshot file metadata: {0}
+     FileMetadata(std::io::Error),
++    /// Cannot read snapshot memory file: {0}
++    SnapshotFileRead(std::io::Error),
+     /// Memory region has zero slots
+     ZeroSlots,
+     /// Memory region of {region_size} bytes is not evenly divisible into {slot_count} slots
+@@ -575,6 +577,17 @@
+ 
+ /// Creates a GuestMemoryMmap given a `file` containing the data
+ /// and a `state` containing mapping information.
++///
++/// Overalls (ADR-0266): the restored guest memory is anonymous private memory
++/// populated by copying the file, never a MAP_PRIVATE mapping of the file.
++/// A file mapping charges every page the guest or VMM reads to the VMM cgroup
++/// as page cache of the checkpoint file, beside the anonymous copy of every
++/// page the guest writes, so one restored guest can need more than its
++/// accounted size. A later snapshot of that guest faults the whole mapping in
++/// while the kernel prefaults the write source, and mapped file pages are not
++/// reliably reclaimed before the cgroup limit is reached. A copy keeps restored
++/// RAM bounded by the guest size exactly as for a cold boot. All-zero pages are
++/// not written and stay unpopulated, like guest memory the guest never touched.
+ pub fn snapshot_file(
+     file: File,
+     regions: impl Iterator<Item = (GuestAddress, usize)>,
+@@ -585,20 +598,64 @@
+         .iter()
+         .try_fold(0u64, |acc, (_, size)| acc.checked_add(*size as u64))
+         .ok_or(MemoryError::OffsetTooLarge)?;
++    if memory_size >= i64::MAX as u64 {
++        return Err(MemoryError::OffsetTooLarge);
++    }
+     let file_size = file.metadata().map_err(MemoryError::FileMetadata)?.len();
+ 
+-    // ensure we do not mmap beyond EOF. The kernel would allow that but a SIGBUS is triggered
+-    // on an attempted access to a page of the buffer that lies beyond the end of the mapped file.
++    // The file must hold every region; a short file is refused rather than
++    // restored with a zero-filled tail.
+     if memory_size > file_size {
+         return Err(MemoryError::OffsetTooLarge);
+     }
+ 
+-    create(
+-        regions.into_iter(),
+-        libc::MAP_PRIVATE,
+-        Some(file),
+-        track_dirty_pages,
+-    )
++    let guest_regions = anonymous(regions.into_iter(), track_dirty_pages, HugePageConfig::None)?;
++    copy_snapshot_file(&file, &guest_regions)?;
++    Ok(guest_regions)
++}
++
++/// Copies the concatenated region contents of `file` into anonymous `regions`,
++/// skipping all-zero host pages. Dirty tracking starts clean, matching a
++/// restore whose baseline is the loaded file.
++fn copy_snapshot_file(file: &File, regions: &[GuestRegionMmap]) -> Result<(), MemoryError> {
++    use std::os::unix::fs::FileExt;
++    use std::os::unix::io::AsRawFd;
++
++    const CHUNK: usize = 2 << 20;
++    let page_size = host_page_size();
++    let mut buffer = vec![0u8; CHUNK];
++    let mut file_offset = 0u64;
++
++    for region in regions {
++        let region_size = u64_to_usize(region.len());
++        let mut done = 0usize;
++        while done < region_size {
++            let count = CHUNK.min(region_size - done);
++            let chunk = &mut buffer[..count];
++            file.read_exact_at(chunk, file_offset + done as u64)
++                .map_err(MemoryError::SnapshotFileRead)?;
++            for (index, page) in chunk.chunks(page_size).enumerate() {
++                if page.iter().any(|byte| *byte != 0) {
++                    let address = MemoryRegionAddress((done + index * page_size) as u64);
++                    region
++                        .write_slice(page, address)
++                        .map_err(MemoryError::WriteMemory)?;
++                }
++            }
++            done += count;
++        }
++        if let Some(bitmap) = Deref::deref(region).bitmap() {
++            bitmap.reset();
++        }
++        file_offset += region_size as u64;
++    }
++
++    // Best effort: drop any page cache the reads created. ZFS reads through
++    // its ARC; other filesystems leave clean unmapped pages charged to this
++    // cgroup until reclaim, which the copy no longer needs.
++    // SAFETY: the descriptor is owned by `file` for the duration of the call.
++    let _ = unsafe { libc::posix_fadvise(file.as_raw_fd(), 0, 0, libc::POSIX_FADV_DONTNEED) };
++    Ok(())
+ }
+ 
+ /// Defines the interface for snapshotting memory.
+@@ -947,6 +1004,93 @@
+     }
+ 
+     #[test]
++    fn test_snapshot_file_restores_into_anonymous_memory() {
++        let page_size = host_page_size();
++        let mut contents = vec![0u8; 5 * page_size];
++        contents[page_size..2 * page_size].fill(0x42);
++        contents[3 * page_size + 17] = 0x17;
++        contents[4 * page_size + page_size - 1] = 0x99;
++        let mut file = TempFile::new().unwrap().into_file();
++        file.write_all(&contents).unwrap();
++
++        // Two regions so the per-region file offset is exercised.
++        let regions = vec![
++            (GuestAddress(0), 2 * page_size),
++            (GuestAddress(0x100000), 3 * page_size),
++        ];
++        let guest_regions = snapshot_file(file, regions.into_iter(), true).unwrap();
++        assert_eq!(guest_regions.len(), 2);
++
++        let mut resident = Vec::new();
++        for region in &guest_regions {
++            // Anonymous memory: no file is mapped behind guest RAM.
++            assert!(region.file_offset().is_none());
++            assert_ne!(region.flags() & libc::MAP_ANONYMOUS, 0);
++            // Restored pages are not reported dirty.
++            let bitmap = Deref::deref(region).bitmap().as_ref().unwrap();
++            for page in 0..u64_to_usize(region.len()) / page_size {
++                assert!(!bitmap.dirty_at(page * page_size));
++            }
++            let pages = u64_to_usize(region.len()) / page_size;
++            let mut vector = vec![0u8; pages];
++            // SAFETY: the address and length describe this live mapping.
++            let ret = unsafe {
++                libc::mincore(
++                    region.as_ptr().cast(),
++                    u64_to_usize(region.len()),
++                    vector.as_mut_ptr(),
++                )
++            };
++            assert_eq!(ret, 0);
++            resident.extend(vector.into_iter().map(|byte| byte & 1 == 1));
++        }
++        // Only pages holding non-zero bytes were populated.
++        assert_eq!(resident, vec![false, true, false, true, true]);
++
++        let memory = into_region_ext(guest_regions);
++        let mut actual = vec![0u8; 2 * page_size];
++        memory.read(&mut actual[..], GuestAddress(0)).unwrap();
++        assert_eq!(actual, contents[..2 * page_size]);
++        let mut actual = vec![0u8; 3 * page_size];
++        memory
++            .read(&mut actual[..], GuestAddress(0x100000))
++            .unwrap();
++        assert_eq!(actual, contents[2 * page_size..]);
++    }
++
++    #[test]
++    fn test_snapshot_file_copies_across_chunk_boundary() {
++        let page_size = host_page_size();
++        let size = (2 << 20) + 2 * page_size;
++        let mut contents = vec![0u8; size];
++        contents[(2 << 20) - 1] = 0x11;
++        contents[2 << 20] = 0x22;
++        contents[size - 1] = 0x33;
++        let mut file = TempFile::new().unwrap().into_file();
++        file.write_all(&contents).unwrap();
++
++        let memory = into_region_ext(
++            snapshot_file(file, std::iter::once((GuestAddress(0), size)), false).unwrap(),
++        );
++        let mut actual = vec![0u8; size];
++        memory.read(&mut actual[..], GuestAddress(0)).unwrap();
++        assert_eq!(actual, contents);
++    }
++
++    #[test]
++    fn test_snapshot_file_refuses_short_file() {
++        let page_size = host_page_size();
++        let mut file = TempFile::new().unwrap().into_file();
++        file.write_all(&vec![0x42u8; page_size]).unwrap();
++        let regions = vec![
++            (GuestAddress(0), page_size),
++            (GuestAddress(0x10000), page_size),
++        ];
++        let result = snapshot_file(file, regions.into_iter(), false);
++        assert!(matches!(result.unwrap_err(), MemoryError::OffsetTooLarge));
++    }
++
++    #[test]
+     fn test_snapshot_file_offset_too_large() {
+         let page_size = 0x1000;
+         let mut file = TempFile::new().unwrap().into_file();
+@@ -1811,5 +1955,72 @@
+                 }
+             }
+         }
++
++        fn resident_pages(region: &GuestRegionMmap) -> Vec<bool> {
++            let page_size = host_page_size();
++            let mut vector = vec![0u8; u64_to_usize(region.len()) / page_size];
++            // SAFETY: the address and length describe this live mapping.
++            let ret = unsafe {
++                libc::mincore(
++                    region.as_ptr().cast(),
++                    u64_to_usize(region.len()),
++                    vector.as_mut_ptr(),
++                )
++            };
++            assert_eq!(ret, 0);
++            vector.into_iter().map(|byte| byte & 1 == 1).collect()
++        }
++
++        proptest! {
++            #![proptest_config(ProptestConfig::with_cases(256))]
++
++            /// Overalls (ADR-0266): a restore copies exactly the file's bytes
++            /// into anonymous memory and populates only pages holding a
++            /// non-zero byte, for any region layout.
++            #[test]
++            fn snapshot_file_copy_matches_file_and_populates_nonzero_pages(
++                layout in proptest::collection::vec(
++                    proptest::collection::vec(
++                        proptest::option::of((any::<usize>(), 1u8..=255)),
++                        1..=8,
++                    ),
++                    1..=3,
++                ),
++            ) {
++                let page_size = host_page_size();
++                let mut contents = Vec::new();
++                let mut regions = Vec::new();
++                let mut expected = Vec::new();
++                for (index, pages) in layout.iter().enumerate() {
++                    regions.push((GuestAddress((index as u64) << 30), pages.len() * page_size));
++                    for page in pages {
++                        let mut bytes = vec![0u8; page_size];
++                        if let Some((offset, value)) = page {
++                            bytes[offset % page_size] = *value;
++                        }
++                        contents.extend_from_slice(&bytes);
++                        expected.push(page.is_some());
++                    }
++                }
++                let mut file = TempFile::new().unwrap().into_file();
++                file.write_all(&contents).unwrap();
++
++                let guest_regions = snapshot_file(file, regions.clone().into_iter(), false).unwrap();
++                let resident: Vec<bool> = guest_regions.iter().flat_map(resident_pages).collect();
++                prop_assert_eq!(resident, expected);
++                for region in &guest_regions {
++                    prop_assert!(region.file_offset().is_none());
++                }
++
++                let memory = into_region_ext(guest_regions);
++                let mut offset = 0;
++                for (address, size) in regions {
++                    let mut actual = vec![0u8; size];
++                    memory.read(&mut actual[..], address).unwrap();
++                    prop_assert_eq!(&actual[..], &contents[offset..offset + size]);
++                    offset += size;
++                }
++            }
++        }
+     }
+ }

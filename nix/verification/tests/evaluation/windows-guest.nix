@@ -362,6 +362,7 @@ assert firmware.pname == "cloudhv-firecracker-firmware";
 assert packages.vmm.version == "1.16.1";
 assert firmwarePatches == [
   "firecracker-snapshot-block-barrier.patch"
+  "firecracker-snapshot-anonymous-restore.patch"
   "firecracker-pvh-rsdp-paddr.patch"
   "firecracker-acpi-pm-timer.patch"
   "firecracker-hyperv-cpuid.patch"
