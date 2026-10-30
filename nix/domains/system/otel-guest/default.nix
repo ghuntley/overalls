@@ -1,7 +1,8 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.overallsOtelGuest;
-  receiver = pkgs.callPackage ./receiver.nix {};
+  receiver = packages.otelReceiver;
 in {
   options.services.overallsOtelGuest = {
     enable = lib.mkEnableOption "bounded guest OTLP intake behind Audi";

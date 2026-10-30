@@ -1,15 +1,15 @@
-{ pkgs, nixpkgs }:
+# packageSet is lib.assemble's single package-set constructor (ADR-0269); the
+# harness variants differ from production only by their explicit flags.
+{ pkgs, nixpkgs, packageSet }:
 let
   inherit (pkgs) lib;
-  productionPackages = import ../../nix/domains/artifacts/default.nix { inherit pkgs; };
-  packages = import ../../nix/domains/artifacts/default.nix { inherit pkgs; antithesisSdk = true; };
-  guestPackages = import ../../nix/domains/artifacts/default.nix {
-    inherit pkgs;
+  productionPackages = packageSet { };
+  packages = packageSet { antithesisSdk = true; };
+  guestPackages = packageSet {
     antithesisSdk = true;
     antithesisGuest = true;
   };
-  hostPackages = import ../../nix/domains/artifacts/default.nix {
-    inherit pkgs;
+  hostPackages = packageSet {
     antithesisSdk = true;
     antithesisGuest = true;
     antithesisIntegratedHost = true;

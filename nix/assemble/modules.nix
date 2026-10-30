@@ -48,7 +48,7 @@ let
       logging = ../domains/system/logging/default.nix;
       cloudwatch = ../domains/system/cloudwatch/default.nix;
       fleet-exporter = ../domains/system/fleet-exporter/default.nix;
-      otel-guest = ../domains/system/otel-guest/default.nix;
+      otel-guest = import ../domains/system/otel-guest/default.nix { inherit packages; };
       otel-fleet = ../domains/system/otel-fleet/default.nix;
       underclass = import ../domains/system/underclass.nix { packages = packages; };
       log-store = ../domains/system/log-store/default.nix;

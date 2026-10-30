@@ -28,6 +28,9 @@
   digest_algorithms = SHA256
 
 [project]
-  ignore = .git, .buck-cells, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical
+# Wrapper state is never a source: .buck-cells.gcroot points at the cells
+# closure, and globbing it would copy buck2 and the prelude into every
+# assembled tree. .buckconfig.local holds per-checkout overrides.
+  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical
 
 <file:.buck-cells/toolchains.buckconfig>

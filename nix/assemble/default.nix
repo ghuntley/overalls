@@ -22,7 +22,12 @@ let
   packageSet = variant: import ../domains/artifacts/default.nix
     ({ inherit pkgs; artifacts = imported; } // variant);
 
+  # Memoised so the default variant is evaluated once for every consumer.
   packages = packageSet { };
+  antithesis = import ../../antithesis/nix {
+    inherit pkgs nixpkgs;
+    packageSet = variant: if variant == { } then packages else packageSet variant;
+  };
   modules = import ./modules.nix {
     inherit packages nixpkgs pkgs tribuchet nix-grpc-store;
     nixCompact = nix-compact;
@@ -34,10 +39,24 @@ let
 
   inventory = import ../platform/hosts/inventory.nix { inherit lib; };
 
+  # @cc [owner:ghuntley,label:build] host-params-match-artifacts
+  # A host that enables encrypted crash dumps for an application whose plain
+  # release is a Buck2 artifact MUST also receive its encrypted-<app>
+  # artifact; otherwise the host would mix a Buck2 build with a Nix build of
+  # the same component (ADR-0269).
+  artifactVariants = { config, ... }: {
+    assertions = lib.concatMap (application:
+      let enabled = lib.attrByPath [ "services" application "crashDumps" "enable" ] false config;
+      in lib.optional (enabled && !(artifacts ? "encrypted-${application}")) {
+        assertion = false;
+        message = "${application} enables encrypted crash dumps, but assembly has a Buck2 ${application} release and no encrypted-${application} artifact";
+      }) (lib.filter (name: !(lib.hasPrefix "encrypted-" name)) (lib.attrNames artifacts));
+  };
+
   hostSystem = name: enrolled: nixpkgs.lib.nixosSystem {
     inherit system;
     specialArgs = { overallsPackages = hostPackages; };
-    modules = [ modules.default fleetBuilds
+    modules = [ modules.default fleetBuilds artifactVariants
       # Telemetry and backups name the deployed source revision.
       { system.configurationRevision = revision; }
       (import ../platform/hosts/profile.nix {
@@ -72,7 +91,7 @@ let
   };
 in
 {
-  inherit packages hostPackages imported kexec checks modules;
+  inherit packages hostPackages imported kexec checks modules antithesis;
   systems = lib.mapAttrs (name: _: hostSystem name true) enrolledHosts
     // lib.mapAttrs' (name: _: lib.nameValuePair "${name}-base" (hostSystem name false)) inventory.hosts;
 }

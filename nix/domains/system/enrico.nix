@@ -3,7 +3,7 @@
 let
   inherit (lib) mkEnableOption mkIf mkOption types;
   cfg = config.services.enrico;
-  gitOwner = pkgs.callPackage ../artifacts/applications/enrico-git-owner.nix {};
+  gitOwner = packages.enricoGitOwner;
   otelEnabled = lib.attrByPath [ "services" "overallsOtelFleet" "enable" ] false config;
   runtime = pkgs.writeText "enrico-config.json" (builtins.toJSON {
     bind = cfg.bindAddress;

@@ -31,3 +31,4 @@ erl_crash.dump
 .buck-cells.key
 .buck-cells.gcroot
 buck-out/
+.buckconfig.local

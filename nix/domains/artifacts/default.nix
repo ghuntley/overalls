@@ -329,8 +329,13 @@ let
         platforms = [ "x86_64-linux" ];
       };
     };
+  # Builds that modules used to make for themselves; modules take them from
+  # this set so every system and test shares one build (ADR-0269).
+  otelReceiver = pkgs.callPackage ../system/otel-guest/receiver.nix { };
+  enricoGitOwner = import ./applications/enrico-git-owner.nix { inherit pkgs; };
 in
 rec {
+  inherit otelReceiver enricoGitOwner;
   inherit dependencies cedarCargo cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
@@ -498,5 +503,10 @@ rec {
     ];
   };
 } // lib.optionalAttrs (!encryptedCrashDumps) {
-  encrypted = import ./. { inherit pkgs privateServiceRoots; encryptedCrashDumps = true; };
+  # Buck2's encrypted-crash-dump releases arrive as `encrypted-<app>`.
+  encrypted = import ./. {
+    inherit pkgs privateServiceRoots; encryptedCrashDumps = true;
+    artifacts = lib.mapAttrs' (name: value: lib.nameValuePair (lib.removePrefix "encrypted-" name) value)
+      (lib.filterAttrs (name: _: lib.hasPrefix "encrypted-" name) artifacts);
+  };
 }

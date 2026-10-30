@@ -4,7 +4,7 @@ let
   inherit (lib) mkOption mkEnableOption mkIf types;
   cfg = config.services.ziggy;
   otelEnabled = lib.attrByPath [ "services" "overallsOtelFleet" "enable" ] false config;
-  otelExporter = pkgs.callPackage ./otel-guest/receiver.nix {};
+  otelExporter = packages.otelReceiver;
   paths = import ./types.nix { inherit lib; };
   runtime = pkgs.writeText "ziggy-public-config.json" (builtins.toJSON {
     version = 1;

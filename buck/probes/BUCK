@@ -21,16 +21,19 @@ nix_assemble(
     attr = "packages.hostTools",
 )
 
+_PROBE_SELF = "/nix/store/00000000000000000000000000000000-probe"
+
 genrule(
     name = "artifact_dir",
     out = "artifact",
-    cmd = "mkdir -p $OUT/bin && printf '#!%s\\necho probe\\n' {} > $OUT/bin/probe && chmod +x $OUT/bin/probe".format(read_root_config("nix", "bash")),
+    cmd = "mkdir -p $OUT/bin && printf '#!%s\\necho %s\\n' {} {} > $OUT/bin/probe && chmod +x $OUT/bin/probe".format(read_root_config("nix", "bash"), _PROBE_SELF),
 )
 
 nix_store_import(
     name = "artifact_import",
     src = ":artifact_dir",
     runtime_refs = [read_root_config("nix", "bash")],
+    self_reference = _PROBE_SELF,
 )
 
 nix_assemble(

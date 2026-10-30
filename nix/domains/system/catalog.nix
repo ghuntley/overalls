@@ -5,7 +5,7 @@
     ./fleet-exporter/default.nix
     (import ./brady { inherit packages; })
     ./logging/default.nix
-    ./otel-guest/default.nix
+    (import ./otel-guest/default.nix { inherit packages; })
     ./otel-fleet/default.nix
     ./otel-fleet/request-recorder.nix
     ./log-store/default.nix

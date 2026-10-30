@@ -41,7 +41,7 @@
       pkgs = buildNixpkgs.legacyPackages.${system};
       # The single package set (ADR-0269), also used by every module.
       built = assembled.packages;
-      antithesisImages = import ./antithesis/nix { inherit pkgs nixpkgs; };
+      antithesisImages = assembled.antithesis;
       assemble = import ./nix/assemble {
         inherit nixpkgs buildNixpkgs disko nixos-images nix-compact tribuchet nix-grpc-store;
       };

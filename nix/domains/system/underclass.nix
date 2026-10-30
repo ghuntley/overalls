@@ -8,7 +8,7 @@ let
   tailscaleExe = lib.getExe tailscale.package;
   localOrigin = "http://127.0.0.1:${toString cfg.port}";
   otelEnabled = lib.attrByPath [ "services" "overallsOtelFleet" "enable" ] false config;
-  otelProbe = pkgs.callPackage ./otel-guest/receiver.nix {};
+  otelProbe = packages.otelReceiver;
   egress = cfg.egress;
   egressRouted = egress.route;
   egressSocket = "/run/underclass-egress/tailscaled.sock";

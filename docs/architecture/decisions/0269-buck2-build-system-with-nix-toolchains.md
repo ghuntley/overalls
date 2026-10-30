@@ -178,6 +178,20 @@ the approved migration plan.
   - The flake's `nixosConfigurations`, `nixosModules`, `checks` and
     `host-kexec` are now views of it. For the same revision, all six host
     systems have the same drvPaths as before.
+- The antithesis harness takes lib.assemble's package-set constructor instead
+  of importing the set four times; its 21 contexts are drvPath-identical.
+- The OTLP receiver and Enrico's git-owner helper are built once in the
+  package set and taken from `packages` by the ziggy, underclass, enrico and
+  otel-guest modules. Previously each module built its own copy with the
+  system's nixpkgs.
+- Encrypted-crash-dump variants are part of the same set. Buck2 supplies them
+  as `encrypted-<app>` artifacts. An assembly assertion
+  (`host-params-match-artifacts`) refuses a host that enables encrypted dumps
+  for an application whose plain release is a Buck2 artifact when no
+  encrypted artifact exists.
+- Imported artifacts keep their own store-path references:
+  `selfReference` is rewritten from the build placeholder to the import's
+  `$out`, with lengths checked.
 - [import-artifact.nix](../../../nix/assemble/import-artifact.nix) re-records
   the runtime references of imported artifacts. The leaf hook in
   [default.nix](../../../nix/domains/artifacts/default.nix) swaps Mix
@@ -195,11 +209,10 @@ Remaining gaps, by milestone of the migration plan:
 
 - rust-overlay toolchain and Rust and Elixir rules (M5, M6);
 - the remaining M3 items:
-  - moving the in-module builds into the package set;
-  - per-host parameter targets;
-  - antithesis hub consolidation;
-  - Inception store-name filters;
-  - deployment and machine-test targets on `nix_assemble`;
+  - moving the logging, fleet-exporter, trace-spool and fleet-test builds
+    into the package set (the ziggy, underclass, enrico and otel-guest
+    builds already moved);
+  - deployment and machine-test targets on `nix_assemble` (M2, M4a);
 - M7 leftovers:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`

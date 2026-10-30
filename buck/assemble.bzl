@@ -7,14 +7,15 @@ load(":nix.bzl", "OwnedSrcsInfo")
 RuntimeRefsInfo = provider(fields = {"refs": list[str]})
 
 # A Buck2 artifact imported into the Nix store.
-NixStorePathInfo = provider(fields = {"store_path": Artifact, "runtime_refs": list[str]})
+NixStorePathInfo = provider(fields = {"store_path": Artifact, "runtime_refs": list[str], "self_reference": str | None})
 
 def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
     src = ctx.attrs.src[DefaultInfo].default_outputs[0]
     out = ctx.actions.declare_output("store-path")
     script = ctx.actions.write("import.sh", [
         "set -euo pipefail",
-        "\"$1\" --add-fixed --recursive sha256 \"$2\" > \"$3\"",
+        # Outputs can be symlinks into content-hashed directories; import the tree.
+        "\"$1\" --add-fixed --recursive sha256 \"$(realpath \"$2\")\" > \"$3\"",
     ])
     ctx.actions.run(
         cmd_args(ctx.attrs._bash[RunInfo], script, ctx.attrs._nix_store[RunInfo], src, out.as_output()),
@@ -23,17 +24,25 @@ def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
         allow_cache_upload = False,
     )
     refs = ctx.attrs.runtime_refs + (ctx.attrs.src[RuntimeRefsInfo].refs if RuntimeRefsInfo in ctx.attrs.src else [])
-    return [DefaultInfo(default_output = out), NixStorePathInfo(store_path = out, runtime_refs = refs)]
+    return [DefaultInfo(default_output = out), NixStorePathInfo(store_path = out, runtime_refs = refs, self_reference = ctx.attrs.self_reference)]
 
 nix_store_import = rule(
     impl = _nix_store_import_impl,
     attrs = {
         "runtime_refs": attrs.list(attrs.string(), default = []),
+        # Placeholder store path the artifact embeds for itself; assembly
+        # rewrites it to the imported path (see nix/assemble/import-artifact.nix).
+        "self_reference": attrs.option(attrs.string(), default = None),
         "src": attrs.dep(),
         "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
         "_nix_store": attrs.default_only(attrs.exec_dep(default = "toolchains//:nix_store")),
     },
 )
+
+# GC roots live outside the repository: a store symlink under buck-out makes
+# the notify file watcher crawl and watch the whole closure on every start.
+def _gcroot_name(ctx: AnalysisContext) -> str:
+    return str(ctx.label.raw_target()).replace("/", "_").replace(":", "__")
 
 def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
     dirs = [pair for d in ctx.attrs.srcs for pair in d[OwnedSrcsInfo].dirs]
@@ -41,11 +50,12 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
     manifest = ctx.actions.write("srcs.txt", srcs)
     names = ctx.actions.write("srcs-names.txt", [package or "." for package, _ in dirs])
     artifacts = ctx.actions.write_json("artifacts.json", {
-        name: {"path": dep[NixStorePathInfo].store_path, "runtimeRefs": dep[NixStorePathInfo].runtime_refs}
+        name: {"path": dep[NixStorePathInfo].store_path, "runtimeRefs": dep[NixStorePathInfo].runtime_refs} | (
+            {"selfReference": dep[NixStorePathInfo].self_reference} if dep[NixStorePathInfo].self_reference else {}
+        )
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)
     out = ctx.actions.declare_output("store-path")
-    link = ctx.actions.declare_output("result")
     ctx.actions.run(
         cmd_args(
             ctx.attrs._bash[RunInfo],
@@ -57,7 +67,7 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
             artifacts,
             ctx.attrs.attr,
             ctx.attrs.revision,
-            link.as_output(),
+            _gcroot_name(ctx),
             out.as_output(),
             hidden = srcs,
         ),
@@ -66,7 +76,7 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
         local_only = True,
         allow_cache_upload = False,
     )
-    return [DefaultInfo(default_output = out, other_outputs = [link])]
+    return [DefaultInfo(default_output = out)]
 
 _nix_assemble = rule(
     impl = _nix_assemble_impl,

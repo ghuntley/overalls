@@ -1,6 +1,6 @@
 { pkgs, module, packages }:
 let
-  otelExporter = pkgs.callPackage ../../../../domains/system/otel-guest/receiver.nix {};
+  otelExporter = packages.otelReceiver;
   tls = pkgs.runCommand "ziggy-isolated-provider-tls" { nativeBuildInputs = [ pkgs.openssl ]; } ''
     mkdir -p $out
     openssl req -x509 -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes -days 3650 \

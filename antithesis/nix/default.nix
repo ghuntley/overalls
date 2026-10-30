@@ -1,2 +1,2 @@
-{ pkgs, nixpkgs }:
-import ./images.nix { inherit pkgs nixpkgs; }
+{ pkgs, nixpkgs, packageSet }:
+import ./images.nix { inherit pkgs nixpkgs packageSet; }
