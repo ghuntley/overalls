@@ -1,5 +1,5 @@
 //! Hegel properties for the private lexer and quoting (ADR-0265).
-use super::{lex, quote};
+use crate::lex::{lex, quote};
 use hegel::{generators as gs, TestCase};
 
 /// @cc [owner:ghuntley,label:verification;protocol;security] mila-protocol-lex-quote-roundtrip
