@@ -131,13 +131,13 @@ defmodule Overalls.RustLints do
         {path, adoption, findings}
       end)
 
-    adopted_dirs = for {path, :adopted, _} <- results, do: Path.dirname(path)
+    adoption = Map.new(results, fn {path, adoption, _} -> {Path.dirname(path), adoption} end)
     pending = for {path, :pending, _} <- results, do: path
 
     attribute_findings =
       paths
       |> Enum.filter(&(Path.extname(&1) == ".rs" and not vendored?(&1)))
-      |> Enum.filter(fn rs -> Enum.any?(adopted_dirs, &String.starts_with?(rs, &1 <> "/")) end)
+      |> Enum.filter(&(owning_adoption(&1, adoption) == :adopted))
       |> Enum.flat_map(&attribute_findings(&1, File.read!(&1)))
 
     strict_findings =
@@ -146,6 +146,18 @@ defmodule Overalls.RustLints do
         else: []
 
     {pending, Enum.flat_map(results, &elem(&1, 2)) ++ attribute_findings ++ strict_findings}
+  end
+
+  @doc """
+  The adoption of the crate that owns `rs`: the nearest enclosing manifest, so
+  a workspace member that has not opted in stays pending under an adopted root.
+  """
+  @spec owning_adoption(Path.t(), %{Path.t() => adoption()}) :: adoption() | nil
+  def owning_adoption(rs, adoption) do
+    adoption
+    |> Enum.filter(fn {dir, _} -> String.starts_with?(rs, dir <> "/") end)
+    |> Enum.max_by(fn {dir, _} -> byte_size(dir) end, fn -> {nil, nil} end)
+    |> elem(1)
   end
 
   @spec tracked() :: [Path.t()]

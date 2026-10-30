@@ -90,6 +90,12 @@ defmodule Overalls.RustLintsTest do
              "lyra/Cargo.toml"
            ]
 
+    adoption = %{"w" => :adopted, "w/held" => :pending, "w/m" => :adopted}
+    assert RustLints.owning_adoption("w/held/src/lib.rs", adoption) == :pending
+    assert RustLints.owning_adoption("w/m/src/lib.rs", adoption) == :adopted
+    assert RustLints.owning_adoption("w/build.rs", adoption) == :adopted
+    assert RustLints.owning_adoption("other/src/lib.rs", adoption) == nil
+
     assert RustLints.kind("mila/rust/m/Cargo.toml", @package, ["mila/rust"]) == :member
     assert RustLints.kind("mila/rustacean/Cargo.toml", @package, ["mila/rust"]) == :standalone
   end
