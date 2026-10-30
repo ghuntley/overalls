@@ -70,8 +70,8 @@ rules and reindeer, and the approved migration plan (T2 and M5).
 
 ## Implementation evidence
 
-Partial: decisions 1 and 4 are implemented by track T2. Decision 2 is partial
-and decision 3 planned, both in milestone M5.
+Partial: decisions 1 and 4 are implemented by track T2. Decisions 2 and 3 are
+partial, in milestone M5.
 
 - **One workspace, one lock.** The root [`Cargo.toml`](../../../Cargo.toml)
   lists all 32 first-party crates as members: the 13 Lilly helpers, Lyra,
@@ -141,6 +141,24 @@ and decision 3 planned, both in milestone M5.
   rebuilt under it; the musl terminald output is byte-identical (same store
   path). Remaining: the other `buildRustPackage` leaves still use nixpkgs
   `rustPlatform` (1.99).
+- **Buck2 builds (decision 3, partial).** [rust.nix](../../../nix/buck/rust.nix)
+  generates the `rust//` cell in Nix from the root lock:
+  [rust_cell.py](../../../nix/buck/rust_cell.py) writes a pseudo-package of
+  every member's direct third-party dependencies at their locked versions,
+  refuses any version the root lock did not resolve, and `reindeer buckify`
+  ([reindeer.toml](../../../nix/buck/rust/reindeer.toml)) runs over the
+  `importCargoLock` sources. Nothing generated is committed, so the lock stays
+  the only pin. [rust.bzl](../../../toolchains/rust.bzl) defines the prelude
+  Rust toolchain over the single toolchain and a C toolchain over the Nix cc
+  wrapper. [buck/rust.bzl](../../../buck/rust.bzl)'s `overalls_rust_crate`
+  builds members from the generated `workspace.bzl` table with the workspace
+  lints and Cargo profiles, and adds per-crate `clippy` and `rustfmt`
+  precommit checks. The 13 Lilly helpers, Enrico's git owner, the guest
+  telemetry receiver, observability-runtimes and the trace spool build and pass
+  their tests (60 Buck2 test targets). `rust_leaf_parity_test` compares an
+  imported Buck2 leaf with its Nix build. Remaining: the leaf swaps,
+  terminald, the editor broker and Lyra (musl and cross targets), Marshall's
+  Cedar NIF and Mila.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.

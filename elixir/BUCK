@@ -1,4 +1,5 @@
 load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:rust.bzl", "overalls_rust_crate")
 
 nix_owned()
 
@@ -8,3 +9,6 @@ filegroup(name = "cargo_manifests", srcs = ["diagnostics/native/spool/Cargo.toml
 
 # Read by nix/domains/system/otel-fleet/trace-spool.nix in every assembly.
 filegroup(name = "trace_schema", srcs = ["diagnostics/priv/trace-schema.json"], visibility = ["PUBLIC"])
+
+# The diagnostics trace spool, built by Buck2 (ADR-0273, M5).
+overalls_rust_crate("elixir/diagnostics/native/spool")

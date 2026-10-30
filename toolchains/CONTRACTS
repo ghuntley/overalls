@@ -3,3 +3,11 @@ Every Nix tool MUST resolve through read_root_config("nix", name) at load
 time so its store path is a target attribute and part of each consuming
 action's key; a missing entry fails rather than falling back to PATH
 (ADR-0269).
+
+@cc [owner:ghuntley,label:build] nix-rust-toolchain
+nix_rust_toolchain MUST take rustc, rustdoc and clippy-driver only from the
+`[nix] rust` store path, the single rust-overlay toolchain that
+nix/rust-toolchain.nix defines, and nix_cxx_toolchain MUST link with the Nix
+stdenv cc wrapper and binutils from `[nix] cc` and `[nix] bintools`, so a
+Buck2 Rust binary links glibc and native libraries the way buildRustPackage
+does and no tool resolves through PATH (ADR-0273, ADR-0269).

@@ -64,6 +64,8 @@ owned_set(
 
 filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
 
+export_file(name = "clippy.toml", src = "clippy.toml", visibility = ["PUBLIC"])
+
 # Root manifests that Nix builds read: the Cargo workspace (ADR-0273), its
 # clippy.toml, and pyproject.toml for the ruff checks inside machine tests.
 filegroup(name = "workspace_files", srcs = ["Cargo.lock", "Cargo.toml", "clippy.toml", "pyproject.toml"], visibility = ["PUBLIC"])

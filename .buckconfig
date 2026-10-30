@@ -4,6 +4,7 @@
   root = .
   prelude = .buck-cells/prelude
   toolchains = toolchains
+  rust = .buck-cells/rust
   none = none
 
 [cell_aliases]
@@ -18,7 +19,7 @@
   prelude = disabled
 
 [parser]
-  target_platform_detector_spec = target:root//...->prelude//platforms:default
+  target_platform_detector_spec = target:root//...->prelude//platforms:default target:rust//...->prelude//platforms:default
 
 [build]
   execution_platforms = toolchains//:execution_platform

@@ -130,3 +130,26 @@ PrecommitInfo, or by owner rdeps and package for checks without it), MUST
 select every check for a build-graph or toolchain change or --scope all, MUST
 build the selection in one ctx.build call, and MUST fail naming each failed
 check (ADR-0269).
+
+@cc [owner:ghuntley,label:build] rust-crate-from-workspace
+overalls_rust_crate MUST define a member's Buck2 targets only from the
+generated rust//:workspace.bzl table, so each crate's targets, features,
+editions, workspace lints and dependencies (first-party and the rust// cell's
+locked third-party crates) match the root Cargo workspace; it MUST refuse a
+path that is not a member and a crate with a build script it cannot run, and
+binaries MUST use the Cargo profile their Nix build selects (ADR-0273).
+
+@cc [owner:ghuntley,label:build;verification] rust-checks-precommit
+Each crate's `<name>-clippy` check MUST fail on any clippy diagnostic of any of
+its targets (the `cargo clippy --all-targets -- -D warnings` gate with the
+workspace lints and root clippy.toml), and `<name>-rustfmt` MUST fail on any
+unformatted Rust source; both are `check`/`precommit` labelled, with
+per-target and per-file `[rustfmt/<path>]` sub-targets (ADR-0265, ADR-0273).
+
+@cc [owner:ghuntley,label:build;verification] rust-leaf-parity
+rust_leaf_parity_test MUST fail when an imported Buck2 Rust leaf's
+executables differ from the Nix build it replaces in name, ELF interpreter,
+NEEDED libraries (the loader excepted) or RUNPATH, or when an rpath store path
+is outside the closure of the import's declared runtime references. It builds
+the Nix side, so it is labelled heavy and is deleted with that build at M11
+(ADR-0269).

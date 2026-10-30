@@ -9,6 +9,8 @@ let
   python = import ./python.nix { inherit pkgs; };
   # The one Rust toolchain (ADR-0273), shared with the Nix builds and devenv.
   rust = (import ../rust-toolchain.nix { inherit pkgs; }).toolchain;
+  # The reindeer third-party cell (rust//), generated from the root Cargo.lock.
+  rustCell = import ./rust.nix { inherit pkgs; };
   githubTools = import ../domains/artifacts/guest/github { inherit pkgs; };
   # Third-party npm trees from each committed package-lock.json (importNpmLock);
   # Buck2 npm_package actions link them as node_modules.
@@ -55,6 +57,22 @@ let
     # cargo) and the binutils its links and archives use (M5).
     rust = "${rust}";
     bintools = "${pkgs.stdenv.cc.bintools.bintools}/bin";
+    # The cc wrapper with an empty environment: it reads NIX_LDFLAGS and
+    # friends, so a Buck2 daemon started in a dev shell would otherwise link
+    # that shell's rpaths into every binary.
+    cc_hermetic = "${pkgs.writeShellScript "overalls-buck-cc" ''
+      exec ${pkgs.coreutils}/bin/env -i PATH=${pkgs.coreutils}/bin ${pkgs.stdenv.cc}/bin/cc "$@"
+    ''}";
+    # Libraries every Buck2-linked Rust binary records in its rpath (the cc
+    # wrapper's glibc and libgcc_s); imports declare them as runtime refs.
+    glibc_lib = "${lib.getLib pkgs.stdenv.cc.libc}/lib";
+    gcc_lib = "${lib.getLib pkgs.stdenv.cc.cc}/lib";
+    # Session fixture utility for enrico git-owner's tests.
+    setsid = "${pkgs.util-linux}/bin/setsid";
+    # Native libraries first-party crates link (overalls_rust_crate native_libs),
+    # the same packages their Nix builds take as buildInputs.
+    zfs_lib = "${lib.getLib pkgs.zfs}/lib";
+    netfilter_conntrack_lib = "${lib.getLib pkgs.libnetfilter_conntrack}/lib";
     # M7: Go, JavaScript, Python and script checks.
     go = "${pkgs.go_1_27}";
     patch = "${pkgs.gnupatch}/bin/patch";
@@ -85,6 +103,7 @@ pkgs.runCommand "overalls-buck-cells" { } ''
     ln -s ${path} "$out/${cell}/${name}"
   '') group)) inputs)}
   ln -s ${pkgs.buck2}/bin/buck2 "$out/bin/buck2"
+  ln -s ${rustCell} "$out/rust"
   tar -xzf ${pkgs.buck2.prelude} -C "$out/prelude" --strip-components=1
   cp ${buckconfig} "$out/toolchains.buckconfig"
 ''

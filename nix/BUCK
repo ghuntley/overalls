@@ -1,5 +1,6 @@
 load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:rust.bzl", "overalls_rust_crate")
 
 nix_owned()
 
@@ -12,3 +13,9 @@ script_check(
     path = ["toolchains//:bash", "toolchains//:pwsh", "toolchains//:gnused", "toolchains//:gnugrep"],
     srcs = ["verification/tests/overalls-install-ps1.sh", "//marshall:overalls-install.ps1"],
 )
+
+# Rust leaves under nix/ built by Buck2 (ADR-0273, M5).
+[overalls_rust_crate(path) for path in [
+    "nix/domains/system/observability-runtimes",
+    "nix/domains/system/otel-guest/receiver",
+]]

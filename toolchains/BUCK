@@ -5,6 +5,7 @@ load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_toolchain")
 load(":nix.bzl", "nix_tool")
 load("@root//buck:platforms.bzl", "overalls_execution_platform")
+load(":rust.bzl", "nix_cxx_toolchain", "nix_rust_toolchain")
 
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
 
@@ -17,6 +18,20 @@ system_python_bootstrap_toolchain(
 remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"])
 
 noop_test_toolchain(name = "test", visibility = ["PUBLIC"])
+
+# The single rust-overlay Rust toolchain and the Nix stdenv C toolchain that
+# links its outputs (ADR-0273). clippy-driver reads the root clippy.toml.
+# Cargo's release optimisation for every crate; build scripts read it as
+# OPT_LEVEL. The prelude already remaps each crate's sources to its cell path
+# (`.buck-cells/rust/vendor/<crate>`), so panic locations hold no store path.
+nix_rust_toolchain(
+    name = "rust",
+    clippy_toml = "root//:clippy.toml",
+    rustc_flags = ["-Copt-level=3"],
+    visibility = ["PUBLIC"],
+)
+
+nix_cxx_toolchain(name = "cxx", visibility = ["PUBLIC"])
 
 # Local execution, plus the NativeLink cache when configured (ADR-0272).
 overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"])

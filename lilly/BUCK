@@ -1,7 +1,57 @@
 load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
 
 nix_owned()
 
 # Root Cargo workspace members' manifests (ADR-0273), which every Nix Rust
 # build reads through cargo-workspace.nix; machine-test assembly declares them.
 filegroup(name = "cargo_manifests", srcs = glob(["native/*/Cargo.toml"]), visibility = ["PUBLIC"])
+
+# The Lilly host helpers, built by Buck2 with the workspace `hardened` profile
+# their Nix builds select (ADR-0273, M5).
+[overalls_rust_crate("lilly/native/" + helper, profile = "hardened") for helper in [
+    "boot-log", "export-channel", "hostd", "image-copy", "ingress-bridge",
+    "kvm-probe", "launch-guard", "source-export", "transfer-stream", "vm-watch",
+    "zfs-namespace-unmount",
+]]
+
+overalls_rust_crate("lilly/native/flow-label", profile = "hardened", native_libs = ["netfilter_conntrack_lib"])
+
+overalls_rust_crate("lilly/native/resume-token", profile = "hardened", native_libs = ["zfs_lib"])
+
+_HELPERS = [
+    "lilly-boot-log", "lilly-export-channel", "lilly-flow-label", "lilly-hostd",
+    "lilly-image-copy", "lilly-ingress-bridge", "lilly-kvm-probe",
+    "lilly-launch-guard", "lilly-resume-token", "lilly-source-export",
+    "lilly-transfer-stream", "lilly-vm-watch", "lilly-zfs-namespace-unmount",
+]
+
+# The 13 helpers as one bin/ tree, the layout host-tools.nix installs.
+genrule(
+    name = "host-helpers",
+    out = "host-helpers",
+    cmd = "mkdir -p $OUT/bin && " + " && ".join([
+        "cp $(location :{h}) $OUT/bin/{h}".format(h = h)
+        for h in _HELPERS
+    ]),
+)
+
+# Every store path the helpers' rpaths name (glibc, libgcc_s, libzfs and
+# libnvpair, libnetfilter_conntrack), so the imported closure keeps them.
+nix_store_import(
+    name = "host-helpers-import",
+    src = ":host-helpers",
+    runtime_refs = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib", "zfs_lib", "netfilter_conntrack_lib"]],
+    visibility = ["PUBLIC"],
+)
+
+# Parity with the Nix-built helpers this bundle replaces (deleted at M11):
+# same executables, ELF interpreter, NEEDED libraries and RUNPATH, and every
+# rpath store path inside the imported closure. Builds the Nix side.
+rust_leaf_parity_test(
+    name = "host-helpers-parity",
+    buck = ":host-helpers-import",
+    nix_attr = "legacyPackages.x86_64-linux.hostTools",
+    labels = ["heavy"],
+)

@@ -126,6 +126,37 @@ match Nix byte for byte. Compare them with `diff -r`.
 - `nix_store_run(package, program)` makes a Nix-built program runnable with
   `buck2 run`, for example `//mila:journey-fixture`.
 
+**Rust** (`buck/rust.bzl`, ADR-0273):
+- **One toolchain.** `toolchains//:rust` is the rust-overlay toolchain from
+  `nix/rust-toolchain.nix` (`[nix] rust`), and `toolchains//:cxx` links with
+  the Nix cc wrapper under `env -i` (`[nix] cc_hermetic`), so a dev-shell
+  `NIX_LDFLAGS` never reaches a link.
+- **Third-party crates** come from the generated `rust//` cell
+  (`nix/buck/rust.nix`): `reindeer buckify` over a pseudo-package of every
+  member's direct dependencies at the root `Cargo.lock` versions, with
+  sources from `importCargoLock`. It is generated because the lock is the
+  only pin; nothing under `rust//` is committed. A crate needing a fixup gets
+  `nix/buck/rust/fixups/<crate>/fixups.toml` (libc's is the example).
+- **First-party crates.** In the top-level directory's `BUCK`, call
+  `overalls_rust_crate("<member path>", profile = "hardened"|"release",
+  native_libs = [...], test_env = {...})`. It reads the member from
+  `rust//:workspace.bzl` and defines `<pkg>-lib`, one target per binary,
+  `<pkg>-unittest`, `<pkg>-test-<name>`, and the `<pkg>-clippy` and
+  `<pkg>-rustfmt` precommit checks (`[rustfmt/<path>]` checks one file).
+  Native libraries are `[nix] <name>_lib` directories in `cells.nix`.
+  Adding a crate, dependency or Rust file name rebuilds the cell.
+- **Replacing a Nix leaf.** Bundle the binaries in the layout the Nix
+  consumer expects, `nix_store_import` it with every rpath store path in
+  `runtime_refs`, add the name to `RUST_ARTIFACTS`
+  (`buck/rust_artifacts.bzl`) and to `rustArtifactNames` in
+  `nix/domains/artifacts/default.nix`, and make the consumer read
+  `artifacts.<name> or <Nix build>`. Add a `rust_leaf_parity_test` (label
+  `heavy`) against the flake attribute. The flake (host self-deploy) keeps
+  the Nix build until the M2 activation gate; deletions wait for M11.
+- **Machine tests** receive `ASSEMBLY_ARTIFACTS` (`buck/artifacts.bzl`), the
+  merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`; every key must be a name the
+  package set consumes, or evaluation fails.
+
 **Not yet Buck2.** Checks that evaluate NixOS (`nix-compact-*`,
 `fleet-builds-configuration`) stay bootstrap targets until `nix_assemble`
 (M3).

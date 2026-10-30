@@ -13,9 +13,14 @@ key_inputs() {
     nix/domains/artifacts/dependency-hashes.json \
     nix/domains/artifacts/infrastructure/toolchain.nix \
     nix/rust-toolchain.nix \
+    nix/domains/artifacts/infrastructure/cargo-workspace.nix \
+    nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix \
+    lyra/vendor/fs2 \
     nix/domains/artifacts/guest/github/default.nix \
     antithesis/nix/python-wheels.nix \
-    '**/Cargo.lock' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 sha256sum
+    '**/Cargo.lock' '**/Cargo.toml' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 sha256sum
+  # The rust cell discovers Cargo targets from Rust file names, not contents.
+  git ls-files -- '*.rs' | sort
 }
 key=$(key_inputs | sha256sum | cut -d' ' -f1)
 state=.buck-cells.key

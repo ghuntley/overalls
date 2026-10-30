@@ -8,6 +8,9 @@ export_file(name = "nix_assemble.sh", visibility = ["PUBLIC"])
 # The machine-test generator and test command (buck/nixos.bzl).
 export_file(name = "machine_tests.py", visibility = ["PUBLIC"])
 
+# Buck2 Rust leaf parity with the Nix builds they replace (buck/rust.bzl).
+export_file(name = "rust_parity.py", visibility = ["PUBLIC"])
+
 # M1 follow-up: bootstrap_attrs.bzl matches the flake's output names.
 script_test(
     name = "bootstrap_attrs_fresh",
