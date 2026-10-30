@@ -155,6 +155,15 @@ establishes. The headless journey signs in through the same driver, and the
 journey has a recorded fixture run; see the
 [Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
 
+[ADR-0264](0264-hermetic-mila-journey-fixture.md) adds the hermetic journey
+fixture. The `mila-journey` machine test drives the Rust core's C ABI through
+Porsche against source-built Marshall and asserts each effect in the ledger.
+That covers enrollment with browser approval, reconnect, forget, listing,
+lifecycle admission, sharing, threads, web policy, SSH keys and notification
+devices. `nix run .#mila-journey-fixture` exposes the same backend for platform
+journeys. The terminal PTY path, checkpoint restore and the macOS/Windows
+tunnel remain open there.
+
 ## Open questions
 
 None blocking the direction; platform key-storage and release-signing details
@@ -165,7 +174,8 @@ remain implementation work under ADR-0235.
 [ADR-0220](0220-mila-client-over-porsche-ssh.md),
 [ADR-0222](0222-porsche-client-commands.md),
 [ADR-0225](0225-marshall-notifications-domain.md),
-[ADR-0235](0235-mila-desktop-clients.md).
+[ADR-0235](0235-mila-desktop-clients.md),
+[ADR-0264](0264-hermetic-mila-journey-fixture.md).
 
 The native Apple [device signer](../../../mila/native/apple/Sources/MilaNativeUI/MilaDeviceSigner.swift)
 ports deployment-scoped Secure Enclave custody without a software fallback.

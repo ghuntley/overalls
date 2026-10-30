@@ -71,4 +71,6 @@ None.
 
 [ADR-0124](0124-unified-ssh-host-ca.md),
 [ADR-0220](0220-mila-client-over-porsche-ssh.md),
-[ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md).
+[ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md),
+[ADR-0264](0264-hermetic-mila-journey-fixture.md) (hermetic journey that
+exercises strict certificate enrollment and browser approval end to end).

@@ -1,5 +1,9 @@
 # Architecture decision records
 
+[ADR-0264](0264-hermetic-mila-journey-fixture.md) adds a hermetic Mila journey
+fixture: source-built Marshall, Porsche and a browser approver, used by the
+`mila-journey` machine test and the `mila-journey-fixture` launcher.
+
 [ADR-0253](0253-artifacts-domain.md) adds the Marshall Artifacts domain for
 versioned, Cedar-shared agent-published pages with per-artifact storage.
 [ADR-0254](0254-isolated-artifact-content-origin.md) serves their content from a
@@ -1096,6 +1100,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0259](0259-deployment-revision-telemetry.md) | accepted | partial | Deployment revision in telemetry provenance |
 | [ADR-0260](0260-underclass-egress-without-exit-node.md) | accepted | partial | Underclass egress proxy without an exit node |
 | [ADR-0261](0261-thread-feed-turn-notifications-and-subscription-revocation.md) | accepted | partial | Thread feed turn notifications and subscription revocation |
+| [ADR-0264](0264-hermetic-mila-journey-fixture.md) | accepted | partial | Hermetic Mila journey fixture |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

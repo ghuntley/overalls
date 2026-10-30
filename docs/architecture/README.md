@@ -1,5 +1,10 @@
 # Architecture
 
+[ADR-0264](decisions/0264-hermetic-mila-journey-fixture.md) verifies Mila's Rust
+core against source-built Marshall and Porsche in a hermetic NixOS fixture. It
+proves admission, authorization and ledger effects, but not guest execution,
+the PTY, push delivery or device biometrics.
+
 [ADR-0249](decisions/0249-mila-rust-core-native-clients.md) moves Mila toward
 thin native clients over Rust. The separate `mila-session` crate composes pure
 runtime projections with certificate-pinned SSH machine reads and pagination;
