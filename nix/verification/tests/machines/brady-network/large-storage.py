@@ -7,7 +7,7 @@ import time
 # require publication and hits, and retain exact bytes after origin loss/restart.
 # Veth peers are native network fixtures, not Firecracker attribution evidence.
 router.succeed(
-    "zpool create -f -o autotrim=on -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
+    "zpool create -f -O compression=lz4 -O mountpoint=/tank tank mirror /dev/vdb /dev/vdc",
     "zfs create -o mountpoint=/pool -o quota=64G tank/lilly",
     "zfs create -o mountpoint=/clients -o quota=24G tank/clients",
 )
@@ -33,6 +33,17 @@ router.wait_until_succeeds(
     "jq -e '.gauges.cache_writable == 1' /run/brady/metrics.json", timeout=45
 )
 large_curl = "/run/current-system/sw/bin/ip netns exec guest /run/current-system/sw/bin/curl --noproxy '*' -fsS --max-time 900 --cacert /run/brady-fixture/ca.pem"
+
+
+# @cc [owner:ghuntley,label:verification;capacity] brady-large-host-space-reclaim
+# Each subtest MUST start by trimming the pool, so blocks freed by earlier
+# rewritten bodies, evicted cache objects and removed reader files return to
+# the host (the vdevs use discard=unmap) before the next multi-gigabyte write.
+# The trim MUST run between subtests, never during a measured write: with
+# autotrim the pressure producer missed its three-second freshness window and
+# the first 4 GiB publication was abandoned in both CI runs.
+def reclaim_host_space() -> None:
+    router.succeed("zpool trim -w tank", timeout=900)
 
 
 def digest_segment(size: int, start: int = 0, length: int | None = None) -> str:
@@ -93,6 +104,7 @@ sizes = [
 for kind in ("fixed", "chunked"):
     for size in sizes:
         with subtest(f"{kind} exact {size} bytes publish and reuse"):
+            reclaim_host_space()
             before_objects = int(
                 router.succeed("jq '.gauges.cache_objects' /run/brady/metrics.json")
             )
@@ -148,6 +160,7 @@ for kind in ("fixed", "chunked"):
             assert rss() - baseline_rss < 128 * 1024**2
 
 with subtest("stale pressure pauses writes without losing completed native reads"):
+    reclaim_host_space()
     router.succeed("systemctl freeze brady-pressure-test")
     router.wait_until_succeeds(
         "jq -e '.gauges.cache_writable == 0' /run/brady/metrics.json", timeout=15
@@ -170,6 +183,7 @@ with subtest("stale pressure pauses writes without losing completed native reads
     )
 
 with subtest("public pinned GitHub-shape archive caches without explicit freshness or length"):
+    reclaim_host_space()
     before_objects = int(router.succeed("jq '.gauges.cache_objects' /run/brady/metrics.json"))
     archive_url = "https://codeload.github.com/NixOS/nixpkgs/legacy.tar.gz/" + "a" * 40
     router.succeed(large_curl + " " + archive_url + " -o /clients/archive-body")
@@ -225,6 +239,7 @@ archive_histories.extend(
 )
 for history_index, (mode, size, form) in enumerate(archive_histories):
     with subtest(f"generated pinned archive {history_index} mode {mode} size {size}"):
+        reclaim_host_space()
         revision = f"{mode:x}{size:08x}{history_index:031x}"
         archive_url = f"https://codeload.github.com/Property/fixture/{form}/{revision}"
         before_objects = int(router.succeed("jq '.gauges.cache_objects' /run/brady/metrics.json"))
@@ -254,6 +269,7 @@ for history_index, (mode, size, form) in enumerate(archive_histories):
         assert count_origins() == origins + (1 if mode == 0 else 2)
 
 with subtest("large completed HTTPS representations survive proxy restart and origin loss"):
+    reclaim_host_space()
     router.succeed(
         "systemctl stop brady-rss-test brady-origin-test", "systemctl restart brady-network-test"
     )
@@ -287,6 +303,7 @@ with subtest("large completed HTTPS representations survive proxy restart and or
     router.wait_until_succeeds("ip netns exec origin ss -lnt | grep :443", timeout=15)
 
 with subtest("four large reads and one slow reader do not stall a small cache hit"):
+    reclaim_host_space()
     url = "https://origin.brady.test/stream/chunked/4294967296"
     origins = count_origins()
     for index in range(4):
@@ -329,6 +346,7 @@ with subtest("four large reads and one slow reader do not stall a small cache hi
     router.succeed("rm " + " ".join(f"/clients/reader-{index}" for index in range(4)))
 
 with subtest("incomplete and sensitive chunked bodies never publish"):
+    reclaim_host_space()
     for kind in ("truncated", "trailer", "private"):
         before = count_origins()
         command = (
@@ -355,6 +373,7 @@ with subtest("incomplete and sensitive chunked bodies never publish"):
     assert "origin.brady.test" not in journal
 
 with subtest("native reduced quota bypasses chunked storage while full streaming survives"):
+    reclaim_host_space()
     quota = int(router.succeed("zfs get -Hpo value quota tank/brady").strip())
     router.succeed(
         "zfs set quota=10M tank/lilly",
