@@ -15,7 +15,7 @@ pub use sweep::*;
 
 pub const MAX_NAMESPACES: usize = 512;
 pub const MAX_PROCESSES: usize = 32768;
-pub const MAX_DESCRIPTORS: usize = 131072;
+pub const MAX_DESCRIPTORS: usize = 131_072;
 pub const MAX_LINE: usize = 65536;
 
 #[cfg(test)]

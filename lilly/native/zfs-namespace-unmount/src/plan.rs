@@ -108,7 +108,7 @@ pub fn classify_line(line: &[u8], dataset: &[u8], target: &[u8]) -> MountState {
     let fields: Vec<Vec<u8>> = line
         .split(|byte| *byte == b' ' || *byte == b'\n')
         .filter(|field| !field.is_empty())
-        .map(|field| field.to_vec())
+        .map(<[u8]>::to_vec)
         .collect();
     if fields.len() > 256 || fields.len() < 10 {
         return MountState::InspectError;

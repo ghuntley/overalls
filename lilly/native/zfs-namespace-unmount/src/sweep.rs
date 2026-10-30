@@ -21,9 +21,8 @@ struct Retained {
 }
 
 pub(crate) fn inspect_path(mountinfo: &Path, dataset: &str, target: &str) -> MountState {
-    let file = match std::fs::File::open(mountinfo) {
-        Err(_) => return MountState::InspectError,
-        Ok(file) => file,
+    let Ok(file) = std::fs::File::open(mountinfo) else {
+        return MountState::InspectError;
     };
     inspect_file(file, dataset, target)
 }
@@ -32,9 +31,8 @@ fn inspect_file(file: std::fs::File, dataset: &str, target: &str) -> MountState 
     let reader = BufReader::new(file);
     let mut seen: Option<MountState> = None;
     for line in reader.lines() {
-        let line = match line {
-            Err(_) => return MountState::InspectError,
-            Ok(line) => line,
+        let Ok(line) = line else {
+            return MountState::InspectError;
         };
         if line.len() > MAX_LINE {
             return MountState::InspectError;
@@ -132,38 +130,36 @@ fn sweeper_step(
 /// namespace pinned by a descriptor can retain the dataset after its last
 /// inhabitant exits. Descriptor discovery MUST precede every unmount and retain
 /// the same exact-root, race, busy and inventory bounds as inhabited namespaces.
+#[expect(
+    clippy::too_many_lines,
+    reason = "one reviewed fail-closed walk: identity, inventory, retention, plan and unmount stay in order"
+)]
 pub fn sweep(dataset: &str, path: &str) -> Result<SweepResult, Setup> {
-    let host_id = match namespace_id("/proc/self/ns/mnt") {
-        Some(id) => id,
-        None => return Err(Setup::InventoryUnavailable),
+    let Some(host_id) = namespace_id("/proc/self/ns/mnt") else {
+        return Err(Setup::InventoryUnavailable);
     };
-    let initial_id = match namespace_id("/proc/1/ns/mnt") {
-        Some(id) => id,
-        None => return Err(Setup::InventoryUnavailable),
+    let Some(initial_id) = namespace_id("/proc/1/ns/mnt") else {
+        return Err(Setup::InventoryUnavailable);
     };
     if host_id != initial_id {
         return Err(Setup::WrongCallerNamespace);
     }
-    let host = match std::fs::File::open("/proc/self/ns/mnt") {
-        Err(_) => return Err(Setup::InventoryUnavailable),
-        Ok(file) => file,
+    let Ok(host) = std::fs::File::open("/proc/self/ns/mnt") else {
+        return Err(Setup::InventoryUnavailable);
     };
-    let proc_root = match std::fs::File::open("/proc") {
-        Err(_) => return Err(Setup::InventoryUnavailable),
-        Ok(file) => file,
+    let Ok(proc_root) = std::fs::File::open("/proc") else {
+        return Err(Setup::InventoryUnavailable);
     };
-    let listing = match std::fs::read_dir("/proc") {
-        Err(_) => return Err(Setup::InventoryUnavailable),
-        Ok(listing) => listing,
+    let Ok(listing) = std::fs::read_dir("/proc") else {
+        return Err(Setup::InventoryUnavailable);
     };
     let mut retained: Vec<Retained> = Vec::new();
     let mut inspected = 0_usize;
     let mut descriptors = 0_usize;
     let mut observed: Vec<NamespaceObservation> = Vec::new();
     for entry in listing {
-        let entry = match entry {
-            Err(_) => return Ok(SweepResult::Unconfirmed),
-            Ok(entry) => entry,
+        let Ok(entry) = entry else {
+            return Ok(SweepResult::Unconfirmed);
         };
         let name_bytes = entry.file_name();
         if !name_bytes
@@ -190,9 +186,8 @@ pub fn sweep(dataset: &str, path: &str) -> Result<SweepResult, Setup> {
             if descriptors > MAX_DESCRIPTORS {
                 return Ok(SweepResult::Unconfirmed);
             }
-            let descriptor = match descriptor {
-                Err(_) => return Ok(SweepResult::Unconfirmed),
-                Ok(descriptor) => descriptor,
+            let Ok(descriptor) = descriptor else {
+                return Ok(SweepResult::Unconfirmed);
             };
             let link = match std::fs::read_link(descriptor.path()) {
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => continue,
@@ -214,16 +209,15 @@ pub fn sweep(dataset: &str, path: &str) -> Result<SweepResult, Setup> {
                 Err(_) => return Ok(SweepResult::Unconfirmed),
                 Ok(file) => file,
             };
-            let metadata = match ns_file.metadata() {
-                Err(_) => return Ok(SweepResult::Unconfirmed),
-                Ok(metadata) => metadata,
+            let Ok(metadata) = ns_file.metadata() else {
+                return Ok(SweepResult::Unconfirmed);
             };
             let key = (metadata.dev(), metadata.ino());
             if key == host_id || retained.iter().any(|prior| prior.observation.key == key) {
                 continue;
             }
             let state = match inspect_namespace(&ns_file, &host, &proc_root, dataset, path) {
-                Err(_) => return Ok(SweepResult::Unconfirmed),
+                Err(()) => return Ok(SweepResult::Unconfirmed),
                 Ok(state) => state,
             };
             match state {
@@ -248,9 +242,8 @@ pub fn sweep(dataset: &str, path: &str) -> Result<SweepResult, Setup> {
             Err(_) => return Ok(SweepResult::Unconfirmed),
             Ok(file) => file,
         };
-        let metadata = match ns_file.metadata() {
-            Err(_) => return Ok(SweepResult::Unconfirmed),
-            Ok(metadata) => metadata,
+        let Ok(metadata) = ns_file.metadata() else {
+            return Ok(SweepResult::Unconfirmed);
         };
         if metadata.dev() == host_id.0 && metadata.ino() == host_id.1 {
             continue;
@@ -298,7 +291,7 @@ pub fn sweep(dataset: &str, path: &str) -> Result<SweepResult, Setup> {
         };
         match sweeper_step(retained_ns, &host, &proc_root, dataset, path) {
             StepOutcome::Unmounted => cleaned += 1,
-            StepOutcome::Absent => continue,
+            StepOutcome::Absent => {}
             StepOutcome::Busy => return Ok(SweepResult::Busy),
             StepOutcome::Unconfirmed => return Ok(SweepResult::Unconfirmed),
         }

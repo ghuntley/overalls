@@ -80,7 +80,7 @@ fn dataset_and_path_validators_match_independent_spec(tc: TestCase) {
         ]))
         .to_string(),
     );
-    let candidate: String = tc.draw(gs::sampled_from(&words)).to_string();
+    let candidate: String = tc.draw(gs::sampled_from(&words)).clone();
     let bytes = candidate.as_bytes();
     let charset = bytes
         .iter()
