@@ -183,8 +183,15 @@ defmodule Marshall.Compute.HostReports do
               do: Ledger.update!(pool, :extend_freshness, %{reported_at: reported_at}),
               else: pool
 
+          %{unavailable: true} = snapshot ->
+            Ledger.update!(pool, :report, pool_attributes(snapshot, reported_at, nil))
+
           snapshot ->
-            Ledger.update!(pool, :report, pool_attributes(snapshot, reported_at))
+            observed = observed_at(snapshot, reported_at)
+
+            if current_observation?(pool, observed, reported_at),
+              do: Ledger.update!(pool, :report, pool_attributes(snapshot, reported_at, observed)),
+              else: pool
         end
       end)
 
@@ -227,6 +234,7 @@ defmodule Marshall.Compute.HostReports do
     # whole exchange, losing the host's outcomes and acknowledgements (ADR-0140).
     age >= -1000 and age <= Marshall.Compute.HostLiveness.authority_ms() and
       Enum.all?(snapshots, &valid_pool?/1) and
+      Enum.all?(snapshots, &observed_before?(&1, sampled_at)) and
       Enum.sort(Enum.map(snapshots, & &1.id)) == Enum.sort(Enum.map(pools, & &1.id)) and
       Enum.all?(snapshots, fn snapshot ->
         storage_matches?(snapshot, Enum.find(pools, &(&1.id == snapshot.id)))
@@ -234,6 +242,12 @@ defmodule Marshall.Compute.HostReports do
   end
 
   defp valid?(_, _, _), do: false
+
+  # A pool observation cannot postdate the report that carries it.
+  defp observed_before?(%{observed_at: %DateTime{} = observed}, sampled_at),
+    do: DateTime.compare(observed, sampled_at) != :gt
+
+  defp observed_before?(_snapshot, _sampled_at), do: true
 
   # @cc [owner:ghuntley,label:capacity] unavailable-pool-revokes-freshness
   # An unavailable entry MUST clear only its pool's freshness, allocation credit
@@ -251,7 +265,30 @@ defmodule Marshall.Compute.HostReports do
 
   defp within_busy_grace?(_pool, _reported_at), do: false
 
-  defp pool_attributes(%{unavailable: true}, _reported_at),
+  # @cc [owner:ghuntley,label:capacity] pool-observation-time-bounds-freshness
+  # An observed entry's observed_at (absent means the report's sampled_at)
+  # MUST be recorded as the pool's observed_at, never later than the report.
+  # It MUST refresh the pool only while observed_at is within the busy grace
+  # window of the report and not older than the pool's recorded observation;
+  # otherwise the row is left unchanged and ages out (ADR-0140, ADR-0163).
+  defp observed_at(%{observed_at: %DateTime{} = observed}, reported_at),
+    do: if(DateTime.compare(observed, reported_at) == :gt, do: reported_at, else: observed)
+
+  defp observed_at(_snapshot, reported_at), do: reported_at
+
+  defp current_observation?(pool, observed, reported_at) do
+    not_older =
+      case pool do
+        %{observed_at: %DateTime{} = recorded} -> DateTime.compare(observed, recorded) != :lt
+        _ -> true
+      end
+
+    not_older and
+      DateTime.diff(reported_at, observed, :millisecond) <=
+        Marshall.Compute.HostLiveness.busy_grace_ms()
+  end
+
+  defp pool_attributes(%{unavailable: true}, _reported_at, _observed),
     do: %{
       reported_at: nil,
       observed_at: nil,
@@ -260,13 +297,13 @@ defmodule Marshall.Compute.HostReports do
       storage_observation: %{}
     }
 
-  defp pool_attributes(snapshot, reported_at) do
+  defp pool_attributes(snapshot, reported_at, observed) do
     snapshot
     |> Map.take([:total_bytes, :free_bytes, :allocations])
     |> Map.put(:checkpoint_allocations, Map.get(snapshot, :checkpoint_allocations, %{}))
     |> Map.put(:storage_observation, storage_observation(snapshot))
     |> Map.put(:reported_at, reported_at)
-    |> Map.put(:observed_at, reported_at)
+    |> Map.put(:observed_at, observed)
   end
 
   defp valid_pool?(%{id: id, storage: storage} = snapshot)

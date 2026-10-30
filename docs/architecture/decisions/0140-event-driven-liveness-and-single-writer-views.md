@@ -556,6 +556,41 @@ measurement for at most `pool_busy_grace_ms` (15 s);
 refuses at start if that grace plus the capacity window exceeds host authority,
 so slowness still never becomes evidence beyond the authority window.
 
+**Update (2026-10-30, pool observer):** pool snapshots leave the host
+report path. `Lilly.Host.Collector` read every pool inline, under its pool
+lock, before each report, and took `sampled_at` before those reads. Fleet
+machine-test runs on 8-vCPU CI runners measured snapshot lock holds of p50
+1.5 s and p90 2.0-2.6 s (max 2.7 s), so reports arrived 2-3 s old and the
+steady-state enrollment check failed at 5.0-5.2 s (run 41126173301,
+audi-ubuntu-relocation-fleet). The decision: each configured ZFS pool gets its
+own background observer on its own `Cadence`. The observer reads the pool off
+the report path and publishes the latest entry to an `OverallsProtocol.View`,
+stamped with the time the read began. Collection reads that view without
+waiting. A pool with no published observation, including one whose observer
+is not running, is reported `busy`, and a missing observer is announced by a
+catalogued event, never by silently reading inline.
+
+The wire gains an optional per-pool `observed_at`
+([protocol](../../../protocol/lib/overalls_protocol.ex),
+`pool-observed-at-optional`). When it is absent it means `sampled_at`.
+Marshall ([HostReports](../../../marshall/lib/marshall/compute/host_reports.ex),
+`pool-observation-time-bounds-freshness`) records the real observation time as
+the pool's `observed_at`. A re-sent or delayed observation refreshes the pool
+only within `pool_busy_grace_ms` of that time, the bound ADR-0163 already sets
+for busy entries. An observation older than the recorded one never replaces
+it.
+
+Hosts self-deploy trunk independently, with up to five minutes of random
+delay, so the same revision can reach a Lilly host before the Marshall host.
+An older Marshall rejects the new field. Delivery is therefore two-phase:
+(1) protocol and Marshall accept and honour `observed_at`, with Lilly
+unchanged; (2) only after (1) has deployed does Lilly's observer start
+emitting it. Phase 1 evidence: the protocol round-trip property
+(`pool-observed-at-round-trip`) and
+[host_reports_test.exs](../../../marshall/test/marshall/compute/host_reports_test.exs)
+(`pool-observed-at-ingest`). Phase 2 and native fleet evidence are pending.
+Review: [2026-10-30 pool observer](../reviews/2026-10-30-pool-observer.md).
+
 ## Open questions
 
 - The backstop lengths for each tier are settled per phase from measurements.

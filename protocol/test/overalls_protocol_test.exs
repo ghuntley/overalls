@@ -86,6 +86,76 @@ defmodule OverallsProtocolTest do
     assert {:ok, ^report} = Protocol.report(wire)
   end
 
+  # @cc [owner:ghuntley,label:verification;protocol] pool-observed-at-round-trip
+  # observed_at MUST round trip on observed pools, stay absent when absent, and
+  # reject the whole report when malformed or attached to a busy pool.
+  property "observed pools carry an optional observation time",
+    database: :disabled,
+    print_blob: false,
+    test_cases: 100,
+    seed: 412_907_311 do
+    lag = draw("lag_us", integer(0..3_600_000_000))
+    sampled = ~U[2026-10-30 21:00:00.000000Z]
+    observed = DateTime.add(sampled, -lag, :microsecond)
+
+    pool = %{
+      id: @id,
+      total_bytes: 100,
+      free_bytes: 60,
+      allocations: %{},
+      checkpoint_allocations: %{},
+      storage: %{
+        backend: :zfs,
+        zpool_guid: "1",
+        dataset_guid: "2",
+        dataset: "tank/lilly",
+        used_bytes: 40,
+        quota_bytes: 100
+      }
+    }
+
+    report = %{
+      sequence: 1,
+      sampled_at: sampled,
+      effective_cores: 4,
+      effective_memory_bytes: 100,
+      inventory: %{
+        "architecture" => "x86_64",
+        "images" => [],
+        "execution_ready" => false,
+        "terminal_protocol" => 0,
+        "inception_image_id" => nil,
+        "checkpoint_image_ids" => [],
+        "checkpoint_compatibility" => nil
+      },
+      pools: [Map.put(pool, :observed_at, observed)]
+    }
+
+    wire = report |> Protocol.encode_report() |> JSON.encode!() |> JSON.decode!()
+    assert {:ok, ^report} = Protocol.report(wire)
+
+    legacy = %{report | pools: [pool]}
+    legacy_wire = Protocol.encode_report(legacy) |> JSON.encode!() |> JSON.decode!()
+    refute Map.has_key?(hd(legacy_wire["pools"]), "observed_at")
+    assert {:ok, ^legacy} = Protocol.report(legacy_wire)
+
+    [entry] = wire["pools"]
+
+    for bad <- ["2026-10-30T21:00:00+01:00", "yesterday", 7, nil] do
+      assert {:error, :invalid_message} =
+               Protocol.report(%{wire | "pools" => [%{entry | "observed_at" => bad}]})
+    end
+
+    busy = %{
+      "id" => @id,
+      "busy" => true,
+      "storage" => entry["storage"] |> Map.take(~w(backend zpool_guid dataset_guid dataset)),
+      "observed_at" => entry["observed_at"]
+    }
+
+    assert {:error, :invalid_message} = Protocol.report(%{wire | "pools" => [busy]})
+  end
+
   test "unavailable pools round trip without invented counters or credit" do
     pool = %{
       id: @id,

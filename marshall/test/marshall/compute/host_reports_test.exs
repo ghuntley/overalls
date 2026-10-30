@@ -278,6 +278,89 @@ defmodule Marshall.Compute.HostReportsTest do
              })
   end
 
+  # @cc [owner:ghuntley,label:verification;capacity] pool-observed-at-ingest
+  # A pool entry's observed_at MUST become the pool's observed_at while the row
+  # takes the report's freshness; a re-sent observation MUST extend it only
+  # within the busy grace, an older observation MUST leave the row unchanged,
+  # and an observation after its report MUST reject the whole report.
+  test "pool observation times bound freshness independently of the report", %{
+    host: host,
+    pool: pool,
+    epoch: epoch,
+    report: report
+  } do
+    # Report times stay in the past, as a real host's would: the observation
+    # follows the fixture's own, and the report comes 2.5 s after it.
+    [fixture_pool] = Ledger.read!(StoragePool, id: pool.id)
+    observed = DateTime.add(fixture_pool.observed_at, 1, :millisecond)
+    Process.sleep(2500)
+    sampled = Ledger.now()
+    entry = Map.put(hd(report.pools), :observed_at, observed)
+
+    assert {:ok, decoded} =
+             %{report | sequence: 2, sampled_at: sampled, pools: [entry]}
+             |> OverallsProtocol.encode_report()
+             |> JSON.encode!()
+             |> JSON.decode!()
+             |> OverallsProtocol.report()
+
+    assert {:ok, :ok} = HostReports.ingest(host.id, epoch, decoded)
+    [first] = Ledger.read!(StoragePool, id: pool.id)
+    assert first.observed_at == observed
+    assert first.reported_at == sampled
+    assert Marshall.Compute.HostLiveness.capacity_fresh?(first.reported_at, sampled)
+
+    # The same observation re-sent with a later report extends freshness.
+    Process.sleep(1000)
+    resent = Ledger.now()
+
+    assert {:ok, :ok} =
+             HostReports.ingest(host.id, epoch, %{
+               decoded
+               | sequence: 3,
+                 sampled_at: resent
+             })
+
+    [extended] = Ledger.read!(StoragePool, id: pool.id)
+    assert extended.observed_at == observed and extended.reported_at == resent
+
+    # An observation older than the recorded one never replaces it.
+    older = put_in(decoded, [:pools, Access.at(0), :observed_at], DateTime.add(observed, -1))
+
+    assert {:ok, :ok} =
+             HostReports.ingest(host.id, epoch, %{
+               older
+               | sequence: 4,
+                 sampled_at: Ledger.now()
+             })
+
+    assert [^extended] = Ledger.read!(StoragePool, id: pool.id)
+
+    # Past the busy grace a re-sent observation no longer refreshes the pool.
+    grace = Application.get_env(:marshall, :pool_busy_grace_ms)
+    Application.put_env(:marshall, :pool_busy_grace_ms, 1000)
+
+    try do
+      assert {:ok, :ok} =
+               HostReports.ingest(host.id, epoch, %{
+                 decoded
+                 | sequence: 5,
+                   sampled_at: Ledger.now()
+               })
+    after
+      Application.put_env(:marshall, :pool_busy_grace_ms, grace)
+    end
+
+    assert [^extended] = Ledger.read!(StoragePool, id: pool.id)
+    assert [%{report_sequence: 5}] = Ledger.read!(Host, id: host.id)
+
+    now = Ledger.now()
+    future = put_in(decoded, [:pools, Access.at(0), :observed_at], DateTime.add(now, 4, :second))
+
+    assert {:error, :invalid_report} =
+             HostReports.ingest(host.id, epoch, %{future | sequence: 6, sampled_at: now})
+  end
+
   test "partial, duplicate, malformed or delayed snapshots never refresh capacity", %{
     host: host,
     pool: pool,

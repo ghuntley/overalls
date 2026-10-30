@@ -121,6 +121,14 @@ shape (ADR-0159).
   activation (standby count converging to 64 per host, withheld rate) are
   recorded in the [review](../reviews/2026-10-13-storage-churn-and-capacity-damping.md)
   when they run.
+- Observed entries (2026-10-30): pools are now observed off the report path
+  ([ADR-0140 update](0140-event-driven-liveness-and-single-writer-views.md)),
+  and an observed entry carries the time its read began. The busy grace bounds
+  those entries too: a re-sent or delayed observation refreshes the pool only
+  within `pool_busy_grace_ms` of that time
+  ([host reports](../../../marshall/lib/marshall/compute/host_reports.ex),
+  `pool-observation-time-bounds-freshness`). The grace and its start check are
+  unchanged.
 
 ## Open questions
 

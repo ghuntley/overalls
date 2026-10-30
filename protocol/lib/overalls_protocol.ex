@@ -5,6 +5,7 @@ defmodule OverallsProtocol do
   @max_commands 16
   @type uuid :: String.t()
   @type observed_pool :: %{
+          optional(:observed_at) => DateTime.t(),
           storage: OverallsProtocol.Storage.wire_observation(),
           id: uuid(),
           total_bytes: non_neg_integer(),
@@ -141,7 +142,7 @@ defmodule OverallsProtocol do
   end
 
   defp encode_pool(pool) do
-    %{
+    encoded = %{
       "id" => pool.id,
       "total_bytes" => pool.total_bytes,
       "free_bytes" => pool.free_bytes,
@@ -149,6 +150,14 @@ defmodule OverallsProtocol do
       "checkpoint_allocations" => Map.get(pool, :checkpoint_allocations, %{}),
       "storage" => OverallsProtocol.Storage.encode(pool.storage)
     }
+
+    case Map.fetch(pool, :observed_at) do
+      {:ok, %DateTime{} = observed} ->
+        Map.put(encoded, "observed_at", DateTime.to_iso8601(observed))
+
+      :error ->
+        encoded
+    end
   end
 
   @spec uuid?(term()) :: boolean()
@@ -189,6 +198,23 @@ defmodule OverallsProtocol do
   # pool/1 MUST reject allocation credit exceeding total_bytes minus free_bytes, free bytes
   # exceeding total, or more than 4096 VM allocations. Required ZFS observations
   # MUST bind explicit identity and agree with physical totals and quota.
+
+  # @cc [owner:ghuntley,label:capacity;protocol] pool-observed-at-optional
+  # An observed pool MAY carry observed_at, the UTC time its native read began
+  # (ADR-0140, pool observer). It MUST be an ISO 8601 UTC timestamp; any other
+  # value rejects the report. An absent observed_at means the report's
+  # sampled_at, so reports from hosts without a pool observer keep their meaning.
+  defp pool(%{"observed_at" => observed} = value) when map_size(value) == 7 do
+    with true <- is_binary(observed),
+         {:ok, %DateTime{} = time, 0} <- DateTime.from_iso8601(observed),
+         {:ok, decoded} <- pool(Map.delete(value, "observed_at")),
+         false <- Map.has_key?(decoded, :busy) or Map.has_key?(decoded, :unavailable) do
+      {:ok, Map.put(decoded, :observed_at, time)}
+    else
+      _ -> {:error, :invalid_message}
+    end
+  end
+
   defp pool(
          %{
            "id" => id,
