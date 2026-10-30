@@ -8,6 +8,10 @@ defmodule InceptionOuterFixture do
   # Capacity admission waits for Lilly's fresh host report after enrollment;
   # keep this bounded but longer than one reporting interval plus cold startup.
   @provision_retry_ms 900_000
+  # A newly enrolled host must publish a fresh execution-ready report before
+  # Marshall will enable admission. Keep retrying that authoritative check
+  # while Lilly's credentialed control connection converges.
+  @enable_retry_ms 900_000
 
   def run do
     Application.put_env(:marshall, :operator_mode, true)
@@ -57,7 +61,9 @@ defmodule InceptionOuterFixture do
         end
       "enable" ->
         config = read("lilly.json")
-        {:ok, _} = Enrollment.set_enabled(config["host_id"], true)
+
+        :ok =
+          enable_host(config["host_id"], System.monotonic_time(:millisecond) + @enable_retry_ms)
       "create" ->
         actor = Ash.Seed.seed!(Marshall.Accounts.User, %{email: "outer-native-#{instance()}@example.test"})
         image = System.fetch_env!("MARSHALL_INCEPTION_IMAGE_ID")
@@ -131,6 +137,31 @@ defmodule InceptionOuterFixture do
   end
 
   defp await(id, state), do: await(id, state, System.monotonic_time(:millisecond) + 2_700_000)
+
+  # @cc [owner:ghuntley,label:verification;recovery] inception-enable-readiness-retry
+  # The fixture MUST retry only the authoritative `:host_not_ready` result
+  # within a bounded deadline. Every other enable refusal MUST fail closed.
+  @spec enable_host(String.t(), integer()) :: :ok
+  defp enable_host(host_id, deadline) do
+    case Enrollment.set_enabled(host_id, true) do
+      {:ok, _} ->
+        :ok
+
+      {:error, :host_not_ready} ->
+        if System.monotonic_time(:millisecond) < deadline do
+          Process.sleep(1_000)
+          enable_host(host_id, deadline)
+        else
+          raise "Inception host did not become ready before the enable deadline"
+        end
+
+      {:error, _reason} ->
+        raise "Inception host enable was refused"
+
+      _other ->
+        raise "Inception host enable failed"
+    end
+  end
 
   defp provision_retry(request, actor, deadline) do
     case Marshall.Compute.provision(request, actor: actor) do
