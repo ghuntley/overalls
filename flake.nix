@@ -164,6 +164,16 @@
         pkgs.lib.nameValuePair "antithesis-${name}-context" context
       ) antithesisImages.contexts);
 
+      # Hermetic Mila journey backend for platform journey tests (ADR-0264).
+      apps.${system}.mila-journey-fixture = {
+        type = "app";
+        program = "${import ./nix/verification/tests/machines/mila-journey/launcher.nix {
+          inherit nixpkgs; pkgs = nixpkgs.legacyPackages.${system};
+          module = self.nixosModules.default; packages = built;
+        }}/bin/mila-journey-fixture";
+        meta.description = "Boot the hermetic Mila journey backend and print its descriptor";
+      };
+
       legacyPackages.${system} = built;
 
       nixosModules = {

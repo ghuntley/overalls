@@ -103,6 +103,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   underclass-slo = import ./machines/underclass-slo service;
   porsche-service = import ./machines/porsche-service service;
   push-notifications = import ./machines/push-notifications service;
+  mila-journey = import ./machines/mila-journey service;
   push-relay = import ./machines/push-relay service;
   porsche-secrets = import ./machines/porsche-secrets service;
   # Susan push relay (ADR-0224): service limits/replay/audit, SOPS custody and
