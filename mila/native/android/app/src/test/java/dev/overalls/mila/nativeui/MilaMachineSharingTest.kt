@@ -6,9 +6,14 @@ import org.junit.Test
 import java.util.UUID
 
 private class SharingAdapter(private val accepted: Boolean = true) : MilaFfiAdapter {
+    val calls = mutableListOf<Triple<UUID, String, MilaShareRole?>>()
     override suspend fun call(request: MilaFfiRequest) = MilaFfiResult.Failure(MilaFfiError.Unavailable)
     override suspend fun machineAction(machineId: UUID, command: MilaMachineCommand): Result<Unit> =
-        if (accepted) Result.success(Unit) else Result.failure(IllegalStateException("rejected"))
+        error("sharing must not use the lifecycle action seam")
+    override suspend fun machineShare(machineId: UUID, principal: MilaSharePrincipal, role: MilaShareRole?): Result<Unit> {
+        calls += Triple(machineId, principal.value, role)
+        return if (accepted) Result.success(Unit) else Result.failure(IllegalStateException("rejected"))
+    }
 }
 
 class MilaMachineSharingTest {
@@ -32,6 +37,24 @@ class MilaMachineSharingTest {
         assertTrue((c.state as MilaMachineSharingState.Applied).principal.value.contains("@"))
         assertTrue(c.submit("person@example.test", remove = true))
         assertTrue((c.state as MilaMachineSharingState.Applied).remove)
+    }
+
+    @Test fun addCarriesClosedRoleAndRemoveCarriesNone() = runBlocking {
+        val adapter = SharingAdapter()
+        val c = MilaMachineSharingController(adapter)
+        c.setSession(true, listing)
+        c.setMachine(row)
+        assertTrue(c.submit("person@example.test", role = MilaShareRole.Operator))
+        assertTrue(c.submit("person@example.test", remove = true, role = MilaShareRole.Manager))
+        assertEquals(listOf(Triple(id, "person@example.test", MilaShareRole.Operator), Triple<UUID, String, MilaShareRole?>(id, "person@example.test", null)), adapter.calls)
+    }
+
+    @Test fun rejectedShareIsReportedAsFailure() = runBlocking {
+        val c = MilaMachineSharingController(SharingAdapter(accepted = false))
+        c.setSession(true, listing)
+        c.setMachine(row)
+        assertFalse(c.submit("person@example.test"))
+        assertTrue(c.state is MilaMachineSharingState.Failed)
     }
 
     @Test fun selectResolvesOnlyMachinesInAuthenticatedListing() {

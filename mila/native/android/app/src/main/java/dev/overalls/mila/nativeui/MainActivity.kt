@@ -16,6 +16,20 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 
+/** Authenticators accepted by the app lock: a strong biometric or the device credential. */
+internal const val MILA_LOCK_AUTHENTICATORS: Int = BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL
+
+/**
+ * @cc [owner:ghuntley,label:security] android-lock-availability
+ * App lock is available only when the platform reports that a strong biometric or the device
+ * credential can authenticate now; every other BiometricManager status (no hardware, none enrolled,
+ * security update required, unsupported) MUST project as unavailable so the lock cannot strand the
+ * user behind an unusable prompt.
+ */
+internal fun milaLockAvailability(manager: BiometricManager): MilaLockAvailability =
+    if (manager.canAuthenticate(MILA_LOCK_AUTHENTICATORS) == BiometricManager.BIOMETRIC_SUCCESS) MilaLockAvailability.Available
+    else MilaLockAvailability.Unavailable
+
 class MainActivity : FragmentActivity() {
     private val nativeAdapter: MilaFfiAdapter by lazy { LinkedMilaFfiAdapter() }
     private lateinit var lockController: MilaAppLockController
@@ -24,18 +38,18 @@ class MainActivity : FragmentActivity() {
     private val deepLinks = MilaDeepLinkController()
     private val routeState = mutableStateOf<MilaRoute>(MilaRoute.Machines)
     private var deepLinkGeneration: Long = 0
+    private var sessionAuthenticated = false
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deepLinkGeneration = deepLinks.beginSession()
-        acceptExternalIntent(deepLinks, intent, deepLinkGeneration)
+        deliverExternalIntent(deepLinks, intent, deepLinkGeneration, signedIn = false)
         routeState.value = deepLinks.target
         val persisted = MilaSettingsController(
             MilaSharedPreferencesStore(getSharedPreferences("mila.settings", MODE_PRIVATE)),
         ).load()
         MilaStrings.configure(this, Locale.forLanguageTag(persisted.locale))
         lockController = MilaAppLockController(MilaAppLockPreferencesStore(getSharedPreferences("mila.app-lock", MODE_PRIVATE)))
-        val capability = BiometricManager.from(this).canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL)
-        lockController.setAvailability(if (capability == BiometricManager.BIOMETRIC_SUCCESS) MilaLockAvailability.Available else MilaLockAvailability.Unavailable)
+        lockController.setAvailability(milaLockAvailability(BiometricManager.from(this)))
         lockState.value = lockController.state
         prompt = BiometricPrompt(this, ContextCompat.getMainExecutor(this), object : BiometricPrompt.AuthenticationCallback() {
             override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) { lockController.pendingAttempt()?.let { lockController.finishUnlock(it, true) }; lockState.value = lockController.state }
@@ -51,7 +65,16 @@ class MainActivity : FragmentActivity() {
                     Button(onClick = ::authenticate) { Text(MilaStrings.text(MilaMessage.LockUnlock)) }
                     if (state.lastFailed) Text(MilaStrings.text(MilaMessage.LockFailed))
                 } else MilaNativeRoot(adapter = nativeAdapter, routeState = routeState, appLockController = lockController, onAuthenticatedRoute = {
+                    sessionAuthenticated = true
                     if (deepLinks.acceptPending(deepLinkGeneration)) routeState.value = deepLinks.target
+                }, onSessionEnded = {
+                    // Only an authenticated session can end; the initial signed-out state must keep
+                    // a link that launched the app pending until the first sign-in.
+                    if (sessionAuthenticated) {
+                        sessionAuthenticated = false
+                        deepLinkGeneration = deepLinks.endSession()
+                        routeState.value = deepLinks.target
+                    }
                 })
             }
         }
@@ -60,16 +83,24 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (acceptExternalIntent(deepLinks, intent, deepLinkGeneration)) {
+        if (deliverExternalIntent(deepLinks, intent, deepLinkGeneration, sessionAuthenticated) == MilaLinkDelivery.Applied) {
             routeState.value = deepLinks.target
         }
     }
 
     override fun onPause() { lockController.onBackground(SystemClock.elapsedRealtime()); lockState.value = lockController.state; super.onPause() }
-    override fun onResume() { super.onResume(); if (::lockController.isInitialized) { lockController.onForeground(SystemClock.elapsedRealtime()); lockState.value = lockController.state } }
+    override fun onResume() {
+        super.onResume()
+        if (::lockController.isInitialized) {
+            // Enrollment can change while Mila is backgrounded; re-read it before deciding to lock.
+            lockController.setAvailability(milaLockAvailability(BiometricManager.from(this)))
+            lockController.onForeground(SystemClock.elapsedRealtime())
+            lockState.value = lockController.state
+        }
+    }
     private fun authenticate() {
         if (lockController.requestUnlock() == null) return
         lockState.value = lockController.state
-        prompt?.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle(MilaStrings.text(MilaMessage.LockTitle)).setSubtitle(MilaStrings.text(MilaMessage.LockExplain)).setAllowedAuthenticators(BiometricManager.Authenticators.BIOMETRIC_STRONG or BiometricManager.Authenticators.DEVICE_CREDENTIAL).build())
+        prompt?.authenticate(BiometricPrompt.PromptInfo.Builder().setTitle(MilaStrings.text(MilaMessage.LockTitle)).setSubtitle(MilaStrings.text(MilaMessage.LockExplain)).setAllowedAuthenticators(MILA_LOCK_AUTHENTICATORS).build())
     }
 }

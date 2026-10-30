@@ -24,3 +24,11 @@ internal fun acceptAuthenticatedExternalIntent(
     generation: Long,
     signedIn: Boolean,
 ): Boolean = signedIn && acceptExternalIntent(controller, intent, generation) && controller.acceptPending(generation)
+
+/** Hands one external VIEW/SEND intent to [MilaDeepLinkController.deliver] for the current session. */
+internal fun deliverExternalIntent(
+    controller: MilaDeepLinkController,
+    intent: Intent,
+    generation: Long,
+    signedIn: Boolean,
+): MilaLinkDelivery = externalMilaUri(intent)?.let { controller.deliver(it, generation, signedIn) } ?: MilaLinkDelivery.Refused

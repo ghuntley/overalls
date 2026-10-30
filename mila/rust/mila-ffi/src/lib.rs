@@ -958,6 +958,98 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     }
 }
 
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-machine-create
+/// Android machine creation MUST reach `mila_session_machine_create` on the
+/// caller's authenticated handle with the caller-minted request id; negative
+/// JNI resource values are refused before the C ABI, which keeps the Rust
+/// session bounds authoritative.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionMachineCreate(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    name: jni::objects::JString<'_>,
+    cpu: jni::sys::jint,
+    memory: jni::sys::jint,
+    disk: jni::sys::jint,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    if cpu < 0 || memory < 0 || disk < 0 {
+        return -4;
+    }
+    let name = match env.get_string(&name) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -4,
+    };
+    let request_id = match env.get_string(&request_id) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -4,
+    };
+    unsafe {
+        session::mila_session_machine_create(
+            handle as u64,
+            name.as_ptr(),
+            name.len(),
+            cpu as u32,
+            memory as u64,
+            disk as u64,
+            request_id.as_ptr(),
+            request_id.len(),
+        ) as jni::sys::jint
+    }
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-share-mutation
+/// Android sharing MUST reach `mila_session_share_mutation` on the caller's
+/// authenticated handle. A null role selects removal; the C ABI and session
+/// still validate the closed role set, principal bounds and request id.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionShareMutation(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    email: jni::objects::JString<'_>,
+    role: jni::objects::JString<'_>,
+    add: jni::sys::jboolean,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    let machine = match env.get_string(&machine) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -4,
+    };
+    let email = match env.get_string(&email) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -4,
+    };
+    let role = if role.is_null() {
+        Vec::new()
+    } else {
+        match env.get_string(&role) {
+            Ok(v) => v.to_bytes().to_vec(),
+            Err(_) => return -4,
+        }
+    };
+    let request_id = match env.get_string(&request_id) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -4,
+    };
+    unsafe {
+        session::mila_session_share_mutation(
+            handle as u64,
+            machine.as_ptr(),
+            machine.len(),
+            email.as_ptr(),
+            email.len(),
+            role.as_ptr(),
+            role.len(),
+            u8::from(add != 0),
+            request_id.as_ptr(),
+            request_id.len(),
+        ) as jni::sys::jint
+    }
+}
+
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionWebShow(
     mut env: jni::JNIEnv<'_>,

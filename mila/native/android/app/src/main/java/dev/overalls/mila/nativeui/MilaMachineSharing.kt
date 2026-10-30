@@ -15,6 +15,9 @@ data class MilaSharePrincipal private constructor(val value: String) {
     }
 }
 
+/** Closed Porsche share roles; the wire value is the only form that crosses JNI. */
+enum class MilaShareRole(val wire: String) { Viewer("viewer"), Operator("operator"), Manager("manager") }
+
 sealed interface MilaMachineSharingState {
     data object SignedOut : MilaMachineSharingState
     data object Idle : MilaMachineSharingState
@@ -57,7 +60,12 @@ class MilaMachineSharingController(private val adapter: MilaFfiAdapter) {
         return true
     }
 
-    suspend fun submit(rawPrincipal: String, remove: Boolean = false): Boolean {
+    /**
+     * @cc [owner:ghuntley,label:security] android-share-authenticated-mutation
+     * Share add/remove MUST dispatch the validated principal and closed role through the
+     * authenticated session's share mutation, never through the lifecycle action seam.
+     */
+    suspend fun submit(rawPrincipal: String, remove: Boolean = false, role: MilaShareRole = MilaShareRole.Viewer): Boolean {
         val current = machine ?: return false
         val principal = MilaSharePrincipal.parse(rawPrincipal).getOrElse {
             state = MilaMachineSharingState.Failed(current, null, remove, "invalid share principal")
@@ -65,8 +73,7 @@ class MilaMachineSharingController(private val adapter: MilaFfiAdapter) {
         }
         if (!authenticated) { state = MilaMachineSharingState.SignedOut; return false }
         state = MilaMachineSharingState.Submitting(current, principal, remove)
-        val command = if (remove) MilaMachineCommand.ShareRemove else MilaMachineCommand.ShareAdd
-        return adapter.machineAction(current.id, command).fold(
+        return adapter.machineShare(current.id, principal, if (remove) null else role).fold(
             onSuccess = { state = MilaMachineSharingState.Applied(current, principal, remove); true },
             onFailure = { error -> state = MilaMachineSharingState.Failed(current, principal, remove, error.message ?: "sharing rejected"); false },
         )

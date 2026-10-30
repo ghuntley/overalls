@@ -85,6 +85,10 @@ interface MilaFfiAdapter {
     fun sshKeyStore(): MilaSshKeyStore? = null
     /** Executes a Rust-classified action for an authenticated machine session. */
     suspend fun machineResize(machineId: UUID, cpu: Int, memoryMiB: Int, diskGiB: Int): Result<Unit> = Result.failure(IllegalStateException("machine resize unavailable"))
+    /** Creates a machine through the authenticated session; unauthenticated adapters refuse. */
+    suspend fun machineCreate(request: MilaMachineCreateRequest): Result<Unit> = Result.failure(IllegalStateException("machine create unavailable"))
+    /** Adds ([role] non-null) or removes ([role] null) one principal through the authenticated session. */
+    suspend fun machineShare(machineId: UUID, principal: MilaSharePrincipal, role: MilaShareRole?): Result<Unit> = Result.failure(IllegalStateException("machine sharing unavailable"))
     suspend fun machineAction(machineId: UUID, command: MilaMachineCommand): Result<Unit> =
         when (call(MilaFfiRequest(MilaFfiOperation.MachineAction, MilaFfiPayload(
             "{\"machine_id\":\"$machineId\",\"command\":${command.tag}}".toByteArray(Charsets.UTF_8)
@@ -119,6 +123,8 @@ interface MilaFfiAdapter {
         }
     }
     suspend fun threadListing(): Result<MilaThreadListing> = Result.failure(IllegalStateException("thread listing unavailable"))
+    /** Re-reads the first machine page on the authenticated session that produced the current listing. */
+    suspend fun refreshListing(): Result<MilaSessionListing> = Result.failure(IllegalStateException("session listing unavailable"))
 
     private fun String.jsonEscaped(): String = buildString(length) {
         for (character in this@jsonEscaped) when (character) {
@@ -197,6 +203,9 @@ interface MilaRustBindings {
     fun reconcileTrust(pinned: ByteArray?, fetched: ByteArray?, host: String, now: Long): ByteArray? = null
     fun sessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int = -12
     fun sessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = -12
+    fun sessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = -12
+    /** A null [role] selects removal; Rust validates the closed role set and principal bounds. */
+    fun sessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int = -12
     fun sessionWebShow(handle: Long, machine: String): ByteArray? = null
     fun sessionWebSet(handle: Long, machine: String, port: Int, public: Boolean, revision: Long, requestId: String): Int = -12
     fun sessionThreadAction(handle: Long, thread: String, command: String, secondary: String?, input: String?, requestId: String?): ByteArray? = null
@@ -266,6 +275,8 @@ internal object MilaRustFfi : MilaRustBindings {
     }
     override fun sessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int = nativeSessionMachineAction(handle, machine, action, requestId)
     override fun sessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = nativeSessionMachineResize(handle, machine, cpu, memory, disk, requestId)
+    override fun sessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = nativeSessionMachineCreate(handle, name, cpu, memory, disk, requestId)
+    override fun sessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int = nativeSessionShareMutation(handle, machine, email, role, add, requestId)
     override fun sessionWebShow(handle: Long, machine: String): ByteArray? = nativeSessionWebShow(handle, machine)
     override fun sessionWebSet(handle: Long, machine: String, port: Int, public: Boolean, revision: Long, requestId: String): Int = nativeSessionWebSet(handle, machine, port, public, revision, requestId)
     override fun sessionThreadAction(handle: Long, thread: String, command: String, secondary: String?, input: String?, requestId: String?): ByteArray? = nativeSessionThreadAction(handle, thread, command, secondary, input, requestId)
@@ -318,6 +329,8 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionWhoami(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int
     @JvmStatic external fun nativeSessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int
+    @JvmStatic external fun nativeSessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int
+    @JvmStatic external fun nativeSessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int
     @JvmStatic external fun nativeSessionWebShow(handle: Long, machine: String): ByteArray?
     @JvmStatic external fun nativeSessionWebSet(handle: Long, machine: String, port: Int, public: Boolean, revision: Long, requestId: String): Int
     @JvmStatic external fun nativeSessionThreadAction(handle: Long, thread: String, command: String, secondary: String?, input: String?, requestId: String?): ByteArray?
@@ -350,6 +363,12 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionTerminalClose(handle: Long): Int
 }
 
+/** Porsche at-most-once request identity accepted by every authenticated mutation. */
+internal val MILA_REQUEST_ID: Regex = Regex("^porsche-[0-9a-f]{32}$")
+
+/** Mints one fresh request id per user submission; callers never reuse it across submissions. */
+internal fun milaRequestId(): String = "porsche-" + UUID.randomUUID().toString().replace("-", "")
+
 /** Opaque, one-shot authority for a live Rust session. */
 /**
  * @cc [owner:ghuntley,label:architecture] mila-android-session-binding-parity
@@ -379,6 +398,14 @@ class MilaSessionHandle internal constructor(
     @Synchronized fun machineResize(machine: UUID, cpu: Int, memoryMiB: Int, diskGiB: Int, requestId: String): Result<Unit> = runCatching {
         check(!closed); require(cpu in 1..256); require(memoryMiB in 256..1_048_576); require(diskGiB in 1..65_536); require(requestId.matches(Regex("^porsche-[0-9a-f]{32}$")))
         check(bindings.sessionMachineResize(nativeHandle, machine.toString(), cpu, memoryMiB, diskGiB, requestId) == 0)
+    }
+    @Synchronized fun machineCreate(request: MilaMachineCreateRequest, requestId: String): Result<Unit> = runCatching {
+        check(!closed); require(requestId.matches(MILA_REQUEST_ID))
+        check(bindings.sessionMachineCreate(nativeHandle, request.name, request.cpu, request.memoryMiB, request.diskGiB, requestId) == 0) { "machine create rejected" }
+    }
+    @Synchronized fun shareMutation(machine: UUID, principal: MilaSharePrincipal, role: MilaShareRole?, requestId: String): Result<Unit> = runCatching {
+        check(!closed); require(requestId.matches(MILA_REQUEST_ID))
+        check(bindings.sessionShareMutation(nativeHandle, machine.toString(), principal.value, role?.wire, role != null, requestId) == 0) { "sharing rejected" }
     }
     @Synchronized fun webShow(machine: UUID): Result<ByteArray> = runCatching {
         check(!closed)
@@ -494,6 +521,14 @@ class LinkedMilaFfiAdapter(
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
         return session.machineResize(machineId, cpu, memoryMiB, diskGiB, "porsche-" + UUID.randomUUID().toString().replace("-", ""))
     }
+    override suspend fun machineCreate(request: MilaMachineCreateRequest): Result<Unit> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        return session.machineCreate(request, milaRequestId())
+    }
+    override suspend fun machineShare(machineId: UUID, principal: MilaSharePrincipal, role: MilaShareRole?): Result<Unit> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        return session.shareMutation(machineId, principal, role, milaRequestId())
+    }
     override suspend fun machineAction(machineId: UUID, command: MilaMachineCommand): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
         val requestId = "porsche-" + java.util.UUID.randomUUID().toString().replace("-", "")
@@ -511,6 +546,13 @@ class LinkedMilaFfiAdapter(
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
         val payload = session.threadAction(threadId, command, secondary = secondary, input = input, requestId = if (command == MilaThreadCommand.Prompt || command == MilaThreadCommand.Answer || command == MilaThreadCommand.PlanApprove || command == MilaThreadCommand.PlanRevise) "porsche-" + UUID.randomUUID().toString().replace("-", "") else null)
         return payload.map { Unit }
+    }
+    override suspend fun refreshListing(): Result<MilaSessionListing> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        return runCatching {
+            check(session.readMachines() == 0) { "machine refresh refused" }
+            MilaSessionListing.decode(session.listing())
+        }
     }
     override suspend fun threadListing(): Result<MilaThreadListing> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))

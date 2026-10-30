@@ -79,6 +79,7 @@ fun MilaNativeRoot(
     routeState: State<MilaRoute>? = null,
     appLockController: MilaAppLockController? = null,
     onAuthenticatedRoute: (() -> Unit)? = null,
+    onSessionEnded: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -108,9 +109,14 @@ fun MilaNativeRoot(
     val signIn = remember(sessionAdapter) { MilaSignInController(sessionAdapter, deploymentStore) }
     val machineDetail = remember(sessionAdapter) { MilaMachineDetailController(sessionAdapter) }
     val threadDetail = remember(sessionAdapter) { MilaThreadDetailController(sessionAdapter) }
+    val machineForm = remember(sessionAdapter) { MilaMachineFormController(sessionAdapter) }
     var signInState by remember { mutableStateOf<MilaSignInState>(MilaSignInState.SignedOut) }
+    // A listing re-read on the same authenticated session after a mutation. It is discarded on
+    // every sign-in transition so a previous session's machines never stay actionable.
+    var refreshedListing by remember { mutableStateOf<MilaSessionListing?>(null) }
     LaunchedEffect(signInState) {
-        if (signInState is MilaSignInState.SignedIn) onAuthenticatedRoute?.invoke()
+        refreshedListing = null
+        if (signInState is MilaSignInState.SignedIn) onAuthenticatedRoute?.invoke() else onSessionEnded?.invoke()
     }
     var threadListing by remember { mutableStateOf<MilaThreadListing?>(null) }
     // Changing the selected deployment fences the authenticated session immediately. This keeps
@@ -125,6 +131,12 @@ fun MilaNativeRoot(
         onDispose { signIn.close() }
     }
     fun refresh() { scope.launch {
+        val current = signInState
+        if (current is MilaSignInState.SignedIn) {
+            // Authenticated refresh re-reads through the bound Rust session only.
+            sessionAdapter.refreshListing().onSuccess { fresh -> if (signInState === current) refreshedListing = fresh }
+            return@launch
+        }
         connection = MilaSessionConnection.Refreshing
         connection = MilaSessionRefresher.refresh(sessionAdapter)
     } }
@@ -144,9 +156,20 @@ fun MilaNativeRoot(
         is MilaSessionConnection.Connected -> MilaStrings.text(MilaMessage.Connected)
         is MilaSessionConnection.Failed -> MilaStrings.text(MilaMessage.RuntimeUnavailable)
     }
-    val listing = (signInState as? MilaSignInState.SignedIn)?.listing ?: (connection as? MilaSessionConnection.Connected)?.listing
-    machineDetail.setSession(signInState is MilaSignInState.SignedIn, listing)
-    threadDetail.setSession(signInState is MilaSignInState.SignedIn, threadListing)
+    val signedIn = signInState is MilaSignInState.SignedIn
+    val listing = (signInState as? MilaSignInState.SignedIn)?.let { refreshedListing ?: it.listing } ?: (connection as? MilaSessionConnection.Connected)?.listing
+    machineDetail.setSession(signedIn, listing)
+    threadDetail.setSession(signedIn, threadListing)
+    machineForm.setSession(signedIn, (signInState as? MilaSignInState.SignedIn)?.let { listing })
+    val resolution = resolveMilaRoute(route, signedIn, listing, threadListing)
+    LaunchedEffect(route, resolution, listing, threadListing) {
+        if (resolution != MilaRouteResolution.Resolved) return@LaunchedEffect
+        when (val target = route) {
+            is MilaRoute.Machine -> machineDetail.select(target.id)
+            is MilaRoute.Thread -> threadDetail.select(target.id)
+            else -> Unit
+        }
+    }
     Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(MilaStrings.text(MilaMessage.AppName), style = MaterialTheme.typography.headlineSmall)
         MilaDeploymentPicker(
@@ -219,7 +242,9 @@ fun MilaNativeRoot(
             Button({ route = MilaRoute.Machines }) { Text(MilaStrings.text(MilaMessage.Machines)) }
             Button({ route = MilaRoute.Threads }) { Text(MilaStrings.text(MilaMessage.Threads)) }
             Button({ route = MilaRoute.Settings }) { Text(MilaStrings.text(MilaMessage.Settings)) }
-            Button(enabled = signInState is MilaSignInState.SignedIn, onClick = { context.startActivity(MilaShareIntentFactory.authenticatedChooser(route, signInState is MilaSignInState.SignedIn)!!) }) { Text("Share") }
+            Button(enabled = signedIn, onClick = {
+                MilaShareIntentFactory.authenticatedChooser(route, signInState is MilaSignInState.SignedIn)?.let(context::startActivity)
+            }) { Text(MilaStrings.text(MilaMessage.ShareRoute)) }
             Button(::refresh) { Text(MilaStrings.text(MilaMessage.Refresh)) }
         }
         Text(status, style = MaterialTheme.typography.labelSmall)
@@ -239,13 +264,16 @@ fun MilaNativeRoot(
             }
         }
         if (signInState is MilaSignInState.SignedIn) Text(MilaStrings.text(MilaMessage.Connected), style = MaterialTheme.typography.labelSmall)
+        if (resolution == MilaRouteResolution.NotFound) {
+            Text(MilaStrings.text(MilaMessage.MachineNotFound), style = MaterialTheme.typography.bodyMedium)
+        }
         when (val selected = route) {
-            MilaRoute.Machines -> MachineList(sessionAdapter, status, listing, signInState is MilaSignInState.SignedIn, ::refresh) { route = MilaRoute.Machine(it.id); machineDetail.select(it.id) }
-            is MilaRoute.Machine -> MachineDetail(machineDetail, selected.id, sessionAdapter, signInState is MilaSignInState.SignedIn, listing)
+            MilaRoute.Machines -> MachineList(sessionAdapter, machineForm, status, listing, signedIn, ::refresh) { route = MilaRoute.Machine(it.id); machineDetail.select(it.id) }
+            is MilaRoute.Machine -> if (resolution != MilaRouteResolution.NotFound) MachineDetail(machineDetail, machineForm, selected.id, sessionAdapter, signedIn, listing, ::refresh)
             MilaRoute.Threads -> ThreadList(sessionAdapter, signInState is MilaSignInState.SignedIn, threadListing, onRefresh = {
                 scope.launch { threadListing = sessionAdapter.threadListing().getOrNull() }
             }) { route = MilaRoute.Thread(it); threadDetail.select(it) }
-            is MilaRoute.Thread -> ThreadDetail(threadDetail, selected.id) {
+            is MilaRoute.Thread -> if (resolution != MilaRouteResolution.NotFound) ThreadDetail(threadDetail, selected.id) {
                 scope.launch { threadListing = sessionAdapter.threadListing().getOrNull() }
             }
             MilaRoute.Settings -> MilaSettingsScreen(sessionAdapter, signInState is MilaSignInState.SignedIn, appLockController)
@@ -348,7 +376,7 @@ private fun MilaSettingsScreen(adapter: MilaFfiAdapter, signedIn: Boolean, appLo
         }
         appLockController?.let { lock ->
             Text(MilaStrings.text(MilaMessage.LockTitle), style = MaterialTheme.typography.titleMedium)
-            Text(if (lock.state.availability == MilaLockAvailability.Unavailable) MilaStrings.text(MilaMessage.LockExplain) else "${lock.state.phase}: ${lock.state.delay}")
+            Text(if (lock.state.availability == MilaLockAvailability.Unavailable) MilaStrings.text(MilaMessage.LockUnavailable) else "${lock.state.phase}: ${lock.state.delay}")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { lock.setEnabled(!lock.state.enabled) }, enabled = lock.state.availability == MilaLockAvailability.Available && lock.state.phase == MilaLockPhase.Unlocked) {
                     Text(if (lock.state.enabled) "Disable" else "Enable")
@@ -450,14 +478,14 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
-@Composable private fun MachineList(adapter: MilaFfiAdapter, status: String, listing: MilaSessionListing?, signedIn: Boolean, onCreated: () -> Unit, onSelect: (MilaMachineRow) -> Unit) {
+@Composable private fun MachineList(adapter: MilaFfiAdapter, form: MilaMachineFormController, status: String, listing: MilaSessionListing?, signedIn: Boolean, onCreated: () -> Unit, onSelect: (MilaMachineRow) -> Unit) {
     var classified by remember { mutableStateOf<MilaMachineCommand?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(status, style = MaterialTheme.typography.bodyMedium)
         listing?.machines?.forEach { machine ->
             Button({ onSelect(machine) }) { Text("${machine.name} · ${machine.status}", style = MaterialTheme.typography.bodyMedium) }
         }
-        if (signedIn) MachineCreateControls(adapter, onCreated)
+        if (signedIn) MachineCreateControls(form, onCreated)
         Text(MilaStrings.text(MilaMessage.MachineActions), style = MaterialTheme.typography.titleMedium)
         machineCommandChoices.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -472,57 +500,68 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
-@Composable private fun MachineCreateControls(adapter: MilaFfiAdapter, onCreated: () -> Unit) {
+@Composable private fun MachineCreateControls(form: MilaMachineFormController, onCreated: () -> Unit) {
     var name by remember { mutableStateOf("") }
     var cpu by remember { mutableStateOf("2") }
     var memory by remember { mutableStateOf("1024") }
     var disk by remember { mutableStateOf("20") }
-    var result by remember { mutableStateOf("") }
-    var submitting by remember { mutableStateOf(false) }
+    var state by remember(form) { mutableStateOf(form.state) }
     val scope = rememberCoroutineScope()
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(MilaStrings.text(MilaMessage.MachineCreate), style = MaterialTheme.typography.titleMedium)
-        OutlinedTextField(name, { name = it }, label = { Text(MilaStrings.text(MilaMessage.MachineName)) }, singleLine = true)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(cpu, { cpu = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineCpu)) }, singleLine = true, modifier = Modifier.width(120.dp))
-            OutlinedTextField(memory, { memory = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineMemory)) }, singleLine = true, modifier = Modifier.width(120.dp))
-            OutlinedTextField(disk, { disk = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineDisk)) }, singleLine = true, modifier = Modifier.width(120.dp))
-        }
-        Button(enabled = !submitting, onClick = {
-            val request = runCatching { MilaMachineCreateRequest(name, cpu.toInt(), memory.toInt(), disk.toInt()) }
+        OutlinedTextField(name, { name = it.take(128) }, label = { Text(MilaStrings.text(MilaMessage.MachineName)) }, singleLine = true,
+            isError = state == MilaMachineFormState.Invalid(MilaMachineFormKind.Create, MilaMachineField.Name))
+        MachineResourceFields(cpu, memory, disk, MilaMachineFormKind.Create, state, { cpu = it }, { memory = it }, { disk = it })
+        Button(enabled = form.canSubmit(), onClick = {
             scope.launch {
-                submitting = true
-                result = request.fold(
-                    onSuccess = { value -> adapter.createMachine(value).fold({ onCreated(); MilaStrings.text(MilaMessage.MachineCreated) }, { MilaStrings.text(MilaMessage.MachineCreateFailed) }) },
-                    onFailure = { MilaStrings.text(MilaMessage.MachineCreateFailed) },
-                )
-                submitting = false
+                val applied = form.create(name, cpu, memory, disk)
+                state = form.state
+                if (applied) onCreated()
             }
+            state = form.state
         }) { Text(MilaStrings.text(MilaMessage.MachineCreate)) }
-        if (result.isNotEmpty()) Text(result, style = MaterialTheme.typography.labelSmall)
+        machineFormStatus(state, MilaMachineFormKind.Create)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
     }
 }
 
-internal fun validResize(cpu: String, memory: String, disk: String): Boolean = listOf(cpu, memory, disk).all { it.toIntOrNull() in 1..1_000_000 }
+@Composable private fun MachineResourceFields(
+    cpu: String, memory: String, disk: String, kind: MilaMachineFormKind, state: MilaMachineFormState,
+    onCpu: (String) -> Unit, onMemory: (String) -> Unit, onDisk: (String) -> Unit,
+) {
+    fun invalid(field: MilaMachineField) = state == MilaMachineFormState.Invalid(kind, field)
+    // Digits only and at most seven characters: every accepted bound fits without overflow.
+    fun digits(value: String) = value.filter(Char::isDigit).take(7)
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(cpu, { onCpu(digits(it)) }, label = { Text(MilaStrings.text(MilaMessage.MachineCpu)) }, singleLine = true, isError = invalid(MilaMachineField.Cpu), modifier = Modifier.width(120.dp))
+        OutlinedTextField(memory, { onMemory(digits(it)) }, label = { Text(MilaStrings.text(MilaMessage.MachineMemory)) }, singleLine = true, isError = invalid(MilaMachineField.Memory), modifier = Modifier.width(120.dp))
+        OutlinedTextField(disk, { onDisk(digits(it)) }, label = { Text(MilaStrings.text(MilaMessage.MachineDisk)) }, singleLine = true, isError = invalid(MilaMachineField.Disk), modifier = Modifier.width(120.dp))
+    }
+}
 
-@Composable private fun MachineDetail(controller: MilaMachineDetailController, id: java.util.UUID, adapter: MilaFfiAdapter, signedIn: Boolean, listing: MilaSessionListing?) {
+/** Localized status line for one form; other forms' states are not shown here. */
+internal fun machineFormStatus(state: MilaMachineFormState, kind: MilaMachineFormKind): String? = when (state) {
+    MilaMachineFormState.SignedOut -> MilaStrings.text(MilaMessage.RuntimeUnavailable)
+    MilaMachineFormState.Idle -> null
+    is MilaMachineFormState.Invalid -> if (state.kind == kind) MilaStrings.text(MilaMessage.FieldInvalid) else null
+    is MilaMachineFormState.Submitting -> if (state.kind == kind) MilaStrings.text(MilaMessage.RequestWaiting) else null
+    is MilaMachineFormState.Applied -> if (state.kind != kind) null
+        else if (kind == MilaMachineFormKind.Create) MilaStrings.text(MilaMessage.MachineCreated) else MilaStrings.text(MilaMessage.RequestSucceeded)
+    is MilaMachineFormState.Failed -> if (state.kind == kind) MilaStrings.text(MilaMessage.RequestRefused) else null
+}
+
+@Composable private fun MachineDetail(controller: MilaMachineDetailController, form: MilaMachineFormController, id: java.util.UUID, adapter: MilaFfiAdapter, signedIn: Boolean, listing: MilaSessionListing?, onResized: () -> Unit) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(controller.state) }
     var resizeCpu by remember { mutableStateOf("2") }
     var resizeMemory by remember { mutableStateOf("1024") }
     var resizeDisk by remember { mutableStateOf("20") }
-    var resizeResult by remember { mutableStateOf("") }
+    var resizeState by remember(form) { mutableStateOf(form.state) }
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text(MilaStrings.text(MilaMessage.MachineActions), style = MaterialTheme.typography.titleLarge)
         Text(id.toString(), style = MaterialTheme.typography.labelSmall)
-        val currentState = state
-        val machine = when (currentState) {
-            is MilaMachineMutationState.Ready -> (currentState as MilaMachineMutationState.Ready).machine
-            is MilaMachineMutationState.Submitting -> (currentState as MilaMachineMutationState.Submitting).machine
-            is MilaMachineMutationState.Applied -> (currentState as MilaMachineMutationState.Applied).machine
-            is MilaMachineMutationState.Failed -> (currentState as MilaMachineMutationState.Failed).machine
-            else -> null
-        }
+        // The detail row always comes from the authenticated listing, so a deep-linked or refreshed
+        // route projects the current session's machine rather than a value captured earlier.
+        val machine = if (signedIn) listing?.machines?.firstOrNull { it.id == id } else null
         if (machine != null) Text("${machine.name} · ${machine.status}")
         machineCommandChoices.filter { it.command in setOf("start", "stop", "pause", "resume", "rm", "resize") }.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -539,18 +578,16 @@ internal fun validResize(cpu: String, memory: String, disk: String): Boolean = l
         }
         if (machine != null) {
             Text(MilaStrings.text(MilaMessage.Resize), style = MaterialTheme.typography.titleMedium)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                OutlinedTextField(resizeCpu, { resizeCpu = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineCpu)) }, singleLine = true, modifier = Modifier.width(120.dp))
-                OutlinedTextField(resizeMemory, { resizeMemory = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineMemory)) }, singleLine = true, modifier = Modifier.width(120.dp))
-                OutlinedTextField(resizeDisk, { resizeDisk = it.filter(Char::isDigit) }, label = { Text(MilaStrings.text(MilaMessage.MachineDisk)) }, singleLine = true, modifier = Modifier.width(120.dp))
-                Button(enabled = signedIn && validResize(resizeCpu, resizeMemory, resizeDisk), onClick = { scope.launch {
-                    val cpu = resizeCpu.toIntOrNull()!!
-                    val memory = resizeMemory.toIntOrNull()!!
-                    val disk = resizeDisk.toIntOrNull()!!
-                    resizeResult = adapter.machineResize(id, cpu, memory, disk).fold({ "Resize submitted" }, { "Resize rejected" })
-                } }) { Text(MilaStrings.text(MilaMessage.Resize)) }
-            }
-            if (resizeResult.isNotEmpty()) Text(resizeResult, style = MaterialTheme.typography.labelSmall)
+            MachineResourceFields(resizeCpu, resizeMemory, resizeDisk, MilaMachineFormKind.Resize, resizeState, { resizeCpu = it }, { resizeMemory = it }, { resizeDisk = it })
+            Button(enabled = signedIn && form.canSubmit(), onClick = {
+                scope.launch {
+                    val applied = form.resize(id, resizeCpu, resizeMemory, resizeDisk)
+                    resizeState = form.state
+                    if (applied) onResized()
+                }
+                resizeState = form.state
+            }) { Text(MilaStrings.text(MilaMessage.Resize)) }
+            machineFormStatus(resizeState, MilaMachineFormKind.Resize)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
         }
         MachineSharingControls(adapter, machine, signedIn, listing)
         if (machine != null) MilaWebControls(adapter, machine, signedIn)
@@ -571,6 +608,7 @@ internal fun validResize(cpu: String, memory: String, disk: String): Boolean = l
 @Composable
 private fun MachineSharingControls(adapter: MilaFfiAdapter, machine: MilaMachineRow?, signedIn: Boolean, listing: MilaSessionListing?) {
     var principal by remember { mutableStateOf("") }
+    var role by remember { mutableStateOf(MilaShareRole.Viewer) }
     var result by remember { mutableStateOf("") }
     val scope = rememberCoroutineScope()
     // Sharing commands are classified and submitted by the typed controller.
@@ -580,9 +618,21 @@ private fun MachineSharingControls(adapter: MilaFfiAdapter, machine: MilaMachine
         if (machine != null) controller.setMachine(machine)
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        OutlinedTextField(value = principal, onValueChange = { principal = it }, label = { Text(MilaStrings.text(MilaMessage.SharePrincipal)) })
+        OutlinedTextField(value = principal, onValueChange = { principal = it.take(320) }, label = { Text(MilaStrings.text(MilaMessage.SharePrincipal)) })
+        Text(MilaStrings.text(MilaMessage.ShareRole), style = MaterialTheme.typography.labelSmall)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(enabled = signedIn && machine != null, onClick = { scope.launch { result = if (controller.submit(principal)) MilaStrings.text(MilaMessage.ShareAdded) else MilaStrings.text(MilaMessage.ShareRejected) } }) { Text(MilaStrings.text(MilaMessage.ShareAdd)) }
+            MilaShareRole.entries.forEach { choice ->
+                Button(enabled = role != choice, onClick = { role = choice }) {
+                    Text(MilaStrings.text(when (choice) {
+                        MilaShareRole.Viewer -> MilaMessage.ShareRoleViewer
+                        MilaShareRole.Operator -> MilaMessage.ShareRoleOperator
+                        MilaShareRole.Manager -> MilaMessage.ShareRoleManager
+                    }))
+                }
+            }
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(enabled = signedIn && machine != null, onClick = { scope.launch { result = if (controller.submit(principal, role = role)) MilaStrings.text(MilaMessage.ShareAdded) else MilaStrings.text(MilaMessage.ShareRejected) } }) { Text(MilaStrings.text(MilaMessage.ShareAdd)) }
             Button(enabled = signedIn && machine != null, onClick = { scope.launch { result = if (controller.submit(principal, remove = true)) MilaStrings.text(MilaMessage.ShareRemoved) else MilaStrings.text(MilaMessage.ShareRejected) } }) { Text(MilaStrings.text(MilaMessage.ShareRemove)) }
         }
         if (result.isNotEmpty()) Text(result, style = MaterialTheme.typography.labelSmall)

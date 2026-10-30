@@ -60,5 +60,27 @@ class MilaIntentRoutingTest {
         assertFalse(acceptExternalIntent(controller, share, generation))
         assertEquals(MilaRoute.Machines, controller.target)
     }
-}
 
+    @Test fun shareProviderSendCompletesThroughSessionState() {
+        val id = UUID.randomUUID()
+        val controller = MilaDeepLinkController()
+        val generation = controller.beginSession()
+        val share = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "overalls://mila/machines/$id")
+        assertEquals(MilaLinkDelivery.Queued, deliverExternalIntent(controller, share, generation, signedIn = false))
+        assertTrue(controller.acceptPending(generation))
+        assertEquals(MilaRoute.Machine(id), controller.target)
+        val view = Intent(Intent.ACTION_VIEW).setData(android.net.Uri.parse("overalls://mila/threads"))
+        assertEquals(MilaLinkDelivery.Applied, deliverExternalIntent(controller, view, generation, signedIn = true))
+        assertEquals(MilaRoute.Threads, controller.target)
+        assertEquals(MilaLinkDelivery.Refused, deliverExternalIntent(controller, Intent(Intent.ACTION_SEND).setType("image/png"), generation, signedIn = true))
+    }
+
+    @Test fun outboundShareCarriesOnlyCanonicalRouteWhenAuthenticated() {
+        val id = UUID.randomUUID()
+        assertNull(MilaShareIntentFactory.authenticatedChooser(MilaRoute.Machine(id), signedIn = false))
+        val chooser = MilaShareIntentFactory.authenticatedChooser(MilaRoute.Machine(id), signedIn = true)!!
+        @Suppress("DEPRECATION") val inner = chooser.getParcelableExtra<Intent>(Intent.EXTRA_INTENT)!!
+        assertEquals("overalls://mila/machines/$id", inner.getStringExtra(Intent.EXTRA_TEXT))
+        assertEquals("text/plain", inner.type)
+    }
+}
