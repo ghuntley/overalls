@@ -12,7 +12,7 @@ use std::fs::{File, Metadata};
 use std::os::unix::fs::MetadataExt;
 
 pub const MAX_BYTES: u64 = 137_438_953_472;
-/// Largest guest disk (OverallsProtocol.VmShape.maximum_disk_bytes).
+/// Largest guest disk (`OverallsProtocol.VmShape.maximum_disk_bytes`).
 pub const SNAPSHOT_MAX_BYTES: u64 = 536_870_912_000;
 
 /// @cc [owner:ghuntley,label:security;isolation] image-helper-snapshot-source

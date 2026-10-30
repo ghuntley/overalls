@@ -69,7 +69,7 @@ pub(crate) fn source_lease(path: &Path) -> Result<OwnedFd, Error> {
     let directory_owner = path
         .parent()
         .and_then(|parent| std::fs::symlink_metadata(parent).ok())
-        .filter(std::fs::Metadata::is_dir)
+        .filter(Metadata::is_dir)
         .map(|parent| parent.uid());
     let owner = metadata.uid();
     if !metadata.is_file()

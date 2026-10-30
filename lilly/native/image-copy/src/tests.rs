@@ -389,7 +389,7 @@ fn holes_are_skipped_and_bytes_preserved(tc: TestCase) {
     let size = blocks * block;
     let mut expected = vec![0_u8; usize::try_from(size).unwrap()];
     {
-        let file = fs::File::create(&source).expect("source");
+        let file = File::create(&source).expect("source");
         file.set_len(size).expect("sparse length");
         for index in 0..blocks {
             if tc.draw(gs::booleans()) {
@@ -405,7 +405,7 @@ fn holes_are_skipped_and_bytes_preserved(tc: TestCase) {
     }
     fs::set_permissions(&source, fs::Permissions::from_mode(0o444)).expect("readonly source");
     let extents = {
-        let file = fs::File::open(&source).expect("source");
+        let file = File::open(&source).expect("source");
         data_extents(&file, size).expect("extents")
     };
     let inside = |offset: u64, length: usize| {
@@ -442,7 +442,7 @@ fn holes_are_skipped_and_bytes_preserved(tc: TestCase) {
     );
     if mode == Mode::Copy {
         assert_eq!(method, Method::Copy);
-        assert!(asked.is_empty());
+        assert_eq!(asked, Vec::<(u64, usize)>::new());
     }
     assert_eq!(fs::metadata(&target).unwrap().len(), size);
     assert_eq!(fs::read(&target).unwrap(), expected);

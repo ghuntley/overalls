@@ -77,7 +77,10 @@ pub fn materialize_snapshot(
     )
 }
 
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "test seams inject the read-only probe, clone and offload syscalls"
+)]
 pub(crate) fn materialize_with(
     mode: Mode,
     source_path: &Path,
@@ -192,12 +195,12 @@ fn offload_range(
                     transferred += count as u64;
                     interrupts = 0;
                 }
-                Ok(_) => return Err(Error::Copy),
                 Err(Errno::INTR) if interrupts < INTERRUPTS => interrupts += 1,
                 Err(error) if transferred == 0 && offload_unsupported(error) => {
                     return Ok(Method::Copy)
                 }
-                Err(_) => return Err(Error::Copy),
+                // An over-long count or any other error fails the copy.
+                Ok(_) | Err(_) => return Err(Error::Copy),
             }
         }
     }
