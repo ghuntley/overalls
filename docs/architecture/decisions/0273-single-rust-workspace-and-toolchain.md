@@ -93,6 +93,19 @@ partial, in milestone M5.
   unit, `panic = "abort"`) carries the settings that the Lilly helpers, Lyra,
   terminald and the editor broker each declared before. Their Nix builds select
   it with `cargoBuildType = "hardened"` or `--profile hardened`.
+  **Open regression from T2 (a89cde0de).** `cargoBuildType` has no effect:
+  nixpkgs' `buildRustPackage` sets it from its own `buildType` argument
+  (default `release`). Since a89cde0de the 13 Lilly helpers and terminald's
+  and the editor broker's Linux musl builds are therefore `release` builds
+  that unwind on panic, keep their symbol tables and use neither LTO nor one
+  codegen unit (`cargoBuildHook flags: ... --profile release` in their
+  logs). Before T2 each crate's own `[profile.release]` made them abort, strip
+  and use LTO. Lyra, terminald's FreeBSD, illumos and Windows builds and the
+  broker's Windows build pass `--profile hardened` and are unaffected. The
+  deployed helpers are the unwind builds, so the Buck2 helpers match them
+  (`release`) until a later change restores `hardened` in Nix
+  (`buildType = "hardened"`) and Buck2 together, after the panic paths that
+  abort would expose are found.
 - **Nix.** [`cargo-workspace.nix`](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
   vendors the root lock once with `importCargoLock` (through
   [`locked-cargo-vendor.nix`](../../../nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix)).
@@ -160,11 +173,16 @@ partial, in milestone M5.
   machine tests: [rust_artifacts.bzl](../../../buck/rust_artifacts.bzl) maps
   `lilly-host-helpers`, `enrico-git-owner`, `otel-guest-receiver`,
   `observability-runtimes` and `trace-spool` to their imports, and each has a
-  passing `heavy` parity test (see the
+  passing `heavy` parity test, which also compares the panic strategy (see the
   [M5 review](../reviews/2026-10-30-buck2-migration.md#m5-rust-on-buck2)).
   The affected machine tests pass with the swaps except fleet's capacity
   race, which fails identically without them on current trunk (race host
   16.895 GB free against a sub-180 MB slot margin) until overalls-1f's fix.
+  The Buck2 helpers first used `hardened`, matching the declared profile but
+  not the unwind build Nix actually produces; real guest launches failed in
+  machine run 41094831662, and fbb29d9fe held the swap back. An A/B cleared
+  them (the failures were runner oversubscription; see the review), and the
+  helpers now build `release`, with the panic strategy in the parity test.
   Hosts keep the Nix builds until M2. Remaining: terminald, the editor broker
   and Lyra (musl and cross targets), Marshall's Cedar NIF, Mila and its
   cbindgen header.

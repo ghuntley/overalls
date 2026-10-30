@@ -6,8 +6,8 @@ Usage: rust_parity.py NIX READELF NIX_STORE STORE_PATH_FILE FLAKE_ATTR [RUNTIME_
 
 STORE_PATH_FILE holds the imported Buck2 artifact's store path. Its bin/ must
 name the same executables as the Nix build of FLAKE_ATTR, each with the same
-ELF interpreter and RUNPATH, no NEEDED library and no `.debug_*` section the
-Nix build lacks, and
+ELF interpreter, RUNPATH and panic strategy (unwind or abort), no NEEDED
+library and no `.debug_*` section the Nix build lacks, and
 every store path in the RUNPATH or anywhere in the bytes (a vendored crate in
 a panic location, for example) must be in the closure of the import's declared
 runtime references; otherwise assembly would drop it from the closure. Instruction
@@ -64,6 +64,16 @@ def debug_sections(readelf: str, path: Path) -> set[str]:
     return names
 
 
+# The panic_unwind runtime's message, linked only when panics unwind. Symbol
+# tables may be stripped, so the strategy is read from the bytes.
+UNWIND_MARKER = b"Rust cannot catch foreign exceptions"
+
+
+def unwinds(path: Path) -> bool:
+    """Whether the executable links the unwinding panic runtime (panic = unwind)."""
+    return UNWIND_MARKER in path.read_bytes()
+
+
 def embedded_store_paths(path: Path) -> set[str]:
     data = path.read_bytes()
     found: set[str] = set()
@@ -116,6 +126,13 @@ def main(argv: list[str]) -> int:
             or not set(mine.needed) <= set(theirs.needed)
         ):
             failures.append(f"{executable.name}: Buck2 {mine} != Nix {theirs}")
+        # A helper that survives a panic under unwind aborts under abort.
+        if unwinds(executable) != unwinds(other.resolve()):
+            strategy = {True: "unwind", False: "abort"}
+            failures.append(
+                f"{executable.name}: Buck2 panics {strategy[unwinds(executable)]}, "
+                f"Nix panics {strategy[unwinds(other.resolve())]}"
+            )
         # Stripping is part of the interface: debug sections the Nix build
         # strips would multiply the size of every host and guest closure.
         extra = debug_sections(readelf, executable) - debug_sections(readelf, other.resolve())

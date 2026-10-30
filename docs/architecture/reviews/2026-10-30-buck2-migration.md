@@ -555,6 +555,41 @@ import. It also found that `support/zfs-node.nix` reads
 `zfs-lifecycle/probe.exs` without declaring it, so every ZFS-node assembly
 failed to evaluate; d9e423ee4 declared it in `NIX_INPUTS`.
 
+**Profile regression (T2), found through the helper swap.** Full machine run
+41094831662 failed real guest launches in account-lifecycle,
+audi-relocation-fleet, coding-clis-nixos-fleet and artifact-agent-publish
+with the Buck2 helpers, and fbb29d9fe held the swap back. The A/B showed the
+same files, modes, interpreter, NEEDED and RUNPATH, the same rustix and libc
+features and build-script cfgs, and no compile-time environment in the
+helpers. The difference was the profile. Buck2 honoured the declared
+`hardened` (abort, fat LTO, symbols stripped, about 30% smaller), but the Nix
+builds are `release`: `buildRustPackage` overwrites `cargoBuildType` from its
+`buildType` argument, so since T2 (a89cde0de) the helpers and terminald's and
+the broker's Linux builds unwind and keep their symbols, where each crate's
+own `[profile.release]` had made them abort before. The deployed builds are
+the unwind ones, so the Buck2 helpers now build `release`, and the parity
+test compares the panic strategy (the panic_unwind runtime's message, which
+survives stripping). Abort was the deployed strategy until today and the
+helper sources have not changed since, so abort alone does not explain the
+failures, and overalls-1f's A/B cleared the helpers: account-lifecycle passed
+locally on the exact CI derivation with the Buck2 helpers and with the Nix
+helpers at fbb29d9fe, artifact-agent-publish passed twice (once at load
+60-70), and audi-relocation-fleet passed from the identical CI derivations,
+with no "panicked at", SIGABRT or core dump in any run. The same suites had
+failed before Buck2 (runs 40518919452 and 40703103535). The cause was runner
+oversubscription (8-vCPU nested runners carrying about 30 vCPUs of VMs) and
+a Lilly prewarm that never retries after `busy`, which overalls-1f is fixing.
+The swap is restored with the `release` helpers. Restoring `hardened` is a
+follow-up recorded in ADR-0273.
+
+Open item (owner: overalls-1f): hostd's request decoder (`lilly/native/hostd/src/protocol.rs`)
+reads frames by offset (`bytes[9..]`, `rest[..state_length]`,
+`body[4..8]`). Each slice follows a length check today, but nothing proves
+the decoder total over truncated or oversized frames; a missed bound would
+panic the connection thread, and under `hardened` (abort) all of hostd. The
+decoder must use checked `get(..)` with a decode error and gain a property
+test over truncated and oversized frames before `hardened` returns.
+
 **Vendor leak (T2).** A panic location naming a vendored crate keeps the
 whole `importCargoLock` link farm in a closure. Lyra's main zigbuild phase had
 no remap, so `tool-lyra` carried 518 store paths, every crate included; it now

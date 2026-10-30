@@ -8,22 +8,26 @@ nix_owned()
 # build reads through cargo-workspace.nix; machine-test assembly declares them.
 filegroup(name = "cargo_manifests", srcs = glob(["native/*/Cargo.toml"]), visibility = ["PUBLIC"])
 
-# The Lilly host helpers, built by Buck2 with the workspace `hardened` profile
-# their Nix builds select (ADR-0273, M5).
+# The Lilly host helpers, built by Buck2 with the profile their Nix builds
+# actually use (ADR-0273, M5). The Nix files declare `cargoBuildType =
+# "hardened"`, but nixpkgs' buildRustPackage overwrites that attribute from its
+# own `buildType` argument, so the deployed helpers have always been `release`
+# builds that unwind on panic. A hardened (panic = abort) Buck2 build stopped
+# real guests from starting in machine run 41094831662.
 # hostd's fixture scripts run under the pinned bash, not the runner's /bin/sh.
-overalls_rust_crate("lilly/native/hostd", profile = "hardened", test_env = {
+overalls_rust_crate("lilly/native/hostd", profile = "release", test_env = {
     "LILLY_TEST_SHELL": read_root_config("nix", "bash"),
 })
 
-[overalls_rust_crate("lilly/native/" + helper, profile = "hardened") for helper in [
+[overalls_rust_crate("lilly/native/" + helper, profile = "release") for helper in [
     "boot-log", "export-channel", "image-copy", "ingress-bridge",
     "kvm-probe", "launch-guard", "source-export", "transfer-stream", "vm-watch",
     "zfs-namespace-unmount",
 ]]
 
-overalls_rust_crate("lilly/native/flow-label", profile = "hardened", native_libs = ["netfilter_conntrack_lib"])
+overalls_rust_crate("lilly/native/flow-label", profile = "release", native_libs = ["netfilter_conntrack_lib"])
 
-overalls_rust_crate("lilly/native/resume-token", profile = "hardened", native_libs = ["zfs_lib"])
+overalls_rust_crate("lilly/native/resume-token", profile = "release", native_libs = ["zfs_lib"])
 
 _HELPERS = [
     "lilly-boot-log", "lilly-export-channel", "lilly-flow-label", "lilly-hostd",
