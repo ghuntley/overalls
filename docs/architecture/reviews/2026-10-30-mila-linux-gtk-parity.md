@@ -135,8 +135,9 @@ descriptor reported `host_untrusted`.
   twice. It now makes one call into a maximum-size buffer.
 - **Journeys.** Both journeys run the same steps and poll the same
   `journey_checks`. The steps are sharing add/remove, web show/public/private,
-  and create, stop, resize, start, pause, resume and delete of a
-  `mila-journey-<hex>` machine. Then come threads list, prompt, answer and plan
+  and create, stop, start, pause, resume and delete of a `mila-journey-<hex>`
+  machine. A second created machine is resized last, because a pinned resize
+  keeps its machine busy, and then removed. Then come threads list, prompt, answer and plan
   approval, the terminal, and (GTK only) loss on a page action. The fixture's
   provisioner and model stand-ins are requested from
   `<approver>/fixture/<action>`, or `approver.fixture_url`.
@@ -146,22 +147,32 @@ points beyond the `show`/`share show` reads; the rest already existed upstream.
 GTK still decides nothing: decoding, request ids, refusal codes and checks are
 library code that the headless journey shares.
 
-Verification: 136 library and 6 binary tests, with and without `gtk-journey`,
-on Broadway. Both journeys ran locally against `nix run .#mila-journey-fixture`
-(KVM). Sign-in, machines, sharing, web, create/stop/start/delete, the
-`terminal_unavailable` refusal, SSH keys and revoke passed in both, plus
-immediate loss detection and reconnect in the GTK journey. Resize
-(`temporarily_unavailable`) and pause (`workload_not_stable`) are refused
-until the fixture can observe the machine. Threads report `no_thread` until
-the action hook exists.
+Verification: library and binary tests, with and without `gtk-journey`, on
+Broadway. Both journeys ran repeatedly against `nix run .#mila-journey-fixture`
+(KVM) with its action hook, and every step passed in both: sign-in, machines,
+sharing, web, create/stop/start/pause/resume/delete, resize, threads list,
+prompt, answer and plan approval, the `terminal_unavailable` refusal, SSH keys
+and revoke. The GTK journey also detected loss at once on a page action and
+reconnected. Three issues surfaced on the way and are fixed:
+
+- The fixture keeps a deleted machine's capacity until it is observed, so
+  repeated runs hit `insufficient_capacity`. The journeys now observe each
+  deleted machine and remove the resize machine.
+- The heartbeat probe holds the session while it runs, so a concurrent read
+  gets `Busy`. Checks now poll again on `Busy` instead of failing.
+- The GTK composer refused a prompt locally while `thread show` reported the
+  thread busy, though Porsche accepts it. That was client-side policy, which
+  ADR-0249 leaves to the core. Send now always submits, and Porsche's closed
+  `thread_busy` refusal gets the "still working" message.
+- A terminal attach that gets no server answer (the heartbeat held the
+  session) is retried for a bounded number of ticks.
 
 ## Remaining gaps
 
-- Resize, pause and the thread steps need the fixture's host-reachable action
-  hook (`observe`, `thread-create`, `thread-ready`, `thread-question`,
+- Resize, pause and the thread steps depend on the fixture's action hook
+  (`observe`, `thread-create`, `thread-ready`, `thread-question`,
   `thread-proposal`). Without it they record `fixture_hook_unavailable`,
-  `temporarily_unavailable`, `workload_not_stable` or `no_thread`. No CI run
-  has passed yet.
+  `temporarily_unavailable`, `workload_not_stable` or `no_thread`.
 - The fixture runs no guest, so the terminal step passes on Porsche's closed
   `terminal_unavailable` refusal. A live PTY echo is unverified.
 - Resume against a running machine is admitted as a wake request, and the

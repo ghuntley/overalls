@@ -42,6 +42,11 @@ pub struct PageContext {
     pub machine_name: String,
     /// Its id once the listing shows it.
     pub machine: Option<String>,
+    /// A second created machine for the resize step: a pinned resize keeps
+    /// the machine busy (`resize_in_progress`) until a provisioner applies it,
+    /// so it cannot share a machine with the other lifecycle steps.
+    pub resize_machine_name: String,
+    pub resize_machine: Option<String>,
     /// The seeded machine sharing and web steps use.
     pub seed_machine: Option<String>,
     pub share_principal: String,
@@ -61,6 +66,7 @@ impl PageContext {
         let suffix = crate::adapter::new_request_id()?;
         Some(Self {
             machine_name: format!("mila-journey-{}", &suffix[8..20]),
+            resize_machine_name: format!("mila-journey-{}-r", &suffix[8..20]),
             share_principal: share_principal.to_owned(),
             ..Self::default()
         })
@@ -131,15 +137,30 @@ pub fn thread_events(
 fn read_failed(error: SessionError) -> Check {
     match error {
         SessionError::Transport | SessionError::StaleHandle => Check::Fail("session_lost"),
+        // Another operation (the heartbeat probe) holds the session; poll again.
+        SessionError::Busy => Check::Wait,
         _ => Check::Fail("read_refused"),
     }
 }
 
 /// The created machine is listed; records its id.
 pub fn check_created(live: &mut LiveSession, context: &mut PageContext) -> Check {
-    match machine_named(live, &context.machine_name) {
+    check_listed(live, &context.machine_name.clone(), &mut context.machine)
+}
+
+/// The second (resize) machine is listed; records its id.
+pub fn check_resize_created(live: &mut LiveSession, context: &mut PageContext) -> Check {
+    check_listed(
+        live,
+        &context.resize_machine_name.clone(),
+        &mut context.resize_machine,
+    )
+}
+
+fn check_listed(live: &mut LiveSession, name: &str, slot: &mut Option<String>) -> Check {
+    match machine_named(live, name) {
         Ok(Some(id)) => {
-            context.machine = Some(id);
+            *slot = Some(id);
             Check::Pass("listed")
         }
         Ok(None) => Check::Wait,
@@ -178,7 +199,7 @@ pub fn receipt_admitted(live: &mut LiveSession, request_id: &str) -> Result<bool
     Ok(status(&value) || value.get("result").is_some_and(status))
 }
 
-/// The created machine reports the requested size, or (when the deployment
+/// The resize machine reports the requested size, or (when the deployment
 /// records resizes as pinned requests applied by the provisioner) the resize
 /// request `request_id` was admitted.
 pub fn check_resized(
@@ -186,7 +207,7 @@ pub fn check_resized(
     context: &PageContext,
     request_id: Option<&str>,
 ) -> Check {
-    let Some(machine) = context.machine.as_deref() else {
+    let Some(machine) = context.resize_machine.as_deref() else {
         return Check::Fail("machine_missing");
     };
     match machine_detail(live, machine) {
@@ -360,6 +381,8 @@ pub fn refusal_code(code: Option<&str>) -> &'static str {
     match code {
         Some("temporarily_unavailable") => "temporarily_unavailable",
         Some("workload_not_stable") => "workload_not_stable",
+        Some("vm_busy") => "vm_busy",
+        Some("resize_in_progress") => "resize_in_progress",
         Some("terminal_unavailable") => "terminal_unavailable",
         Some("not_found") => "not_found",
         Some("forbidden") => "forbidden",
@@ -383,6 +406,24 @@ pub fn action_failed(error: SessionError) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // See the `linux-journey-backend-effects` contract in CONTRACTS.
+    #[test]
+    fn a_busy_session_is_polled_again_and_a_lost_one_fails() {
+        assert_eq!(read_failed(SessionError::Busy), Check::Wait);
+        assert_eq!(
+            read_failed(SessionError::Transport),
+            Check::Fail("session_lost")
+        );
+        assert_eq!(
+            read_failed(SessionError::StaleHandle),
+            Check::Fail("session_lost")
+        );
+        assert_eq!(
+            read_failed(SessionError::InvalidInput),
+            Check::Fail("read_refused")
+        );
+    }
 
     #[test]
     fn context_names_a_fresh_machine_without_identifying_data() {

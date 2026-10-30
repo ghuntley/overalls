@@ -67,4 +67,5 @@ and starting the next sign-in generation without waiting for the heartbeat.
 @cc [owner:ghuntley,label:verification] linux-journey-backend-effects
 Each lifecycle, sharing, web and thread step of both Linux journeys MUST assert its effect through an
 authenticated read on the same session (`ls`, `show`, `share show`, `web show`, `request show`,
-`thread show`, `thread turns`); a widget change alone MUST NOT pass a step.
+`thread show`, `thread turns`); a widget change alone MUST NOT pass a step. A check that finds the
+session `Busy` (the heartbeat probe holds it) MUST poll again rather than fail.

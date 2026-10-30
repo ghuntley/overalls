@@ -19,17 +19,17 @@ use gtk::{glib, Button, Entry, TextView};
 use mila_native_linux::deep_link::Page;
 use mila_native_linux::device_key::write_private;
 use mila_native_linux::journey::{
-    create_private_workdir, fixture_connection_profile, read_descriptor, sign_in_failure_code,
-    terminal_passed, FixtureApprover, FixtureHook, JourneyDescriptor, JourneyReport,
-    FIXTURE_ANSWER, JOURNEY_PROMPT,
+    create_private_workdir, fixture_connection_profile, read_descriptor, remove_journey_machine,
+    sign_in_failure_code, terminal_passed, FixtureApprover, FixtureHook, JourneyDescriptor,
+    JourneyReport, FIXTURE_ANSWER, JOURNEY_PROMPT,
 };
 use mila_native_linux::journey_checks::{
     check_answered, check_created, check_deleted, check_desired, check_plan_approved,
-    check_prompted, check_resized, check_resumed, check_share, check_web, first_thread,
-    load_thread_controls, machine_named, refusal_code, web_endpoint, Check, PageContext,
-    CREATE_SIZE, RESIZE_SIZE,
+    check_prompted, check_resize_created, check_resized, check_resumed, check_share, check_web,
+    first_thread, load_thread_controls, machine_named, refusal_code, web_endpoint, Check,
+    PageContext, CREATE_SIZE, RESIZE_SIZE,
 };
-use mila_native_linux::session::{LiveSession, SignInPhase};
+use mila_native_linux::session::{LiveSession, SessionError, SignInPhase};
 use mila_native_linux::ssh_keys_view::SshKeysStatus;
 use std::cell::{Cell, RefCell};
 use std::collections::VecDeque;
@@ -38,6 +38,8 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 const TICK: Duration = Duration::from_millis(200);
+/// Attach presses to retry, one per tick, when no server answer arrived.
+const TERMINAL_ATTEMPTS: u32 = 50;
 const SIGN_IN_DEADLINE: Duration = Duration::from_secs(120);
 const STEP_DEADLINE: Duration = Duration::from_secs(30);
 const RECONNECT_DEADLINE: Duration = Duration::from_secs(90);
@@ -441,6 +443,7 @@ fn page_steps() -> VecDeque<PageStep> {
                     Check::Pass("loaded")
                 }
                 Some(Ok(_)) => Check::Wait,
+                Some(Err(SessionError::Busy)) => Check::Wait,
                 _ => Check::Fail("read_refused"),
             }
         },
@@ -505,44 +508,6 @@ fn page_steps() -> VecDeque<PageStep> {
         |state, work| live_check(state, |live| check_created(live, &mut work.context)),
     ));
     steps.push_back(lifecycle("gtk_lifecycle_stop", M::ActionStop, "stopped"));
-    steps.push_back(step(
-        "gtk_lifecycle_resize",
-        |state, work, report| {
-            work.observe(report);
-            let (cpu, memory, disk) = RESIZE_SIZE;
-            select_machine(state, &work.machine())?;
-            fill(
-                state,
-                Page::Machines,
-                pages::MACHINE_SIZE,
-                M::KvCpu,
-                &cpu.to_string(),
-            )?;
-            fill(
-                state,
-                Page::Machines,
-                pages::MACHINE_SIZE,
-                M::MemoryFieldMib,
-                &memory.to_string(),
-            )?;
-            fill(
-                state,
-                Page::Machines,
-                pages::MACHINE_SIZE,
-                M::DiskFieldGib,
-                &disk.to_string(),
-            )?;
-            press(state, Page::Machines, pages::MACHINE_SIZE, M::ActionResize)
-        },
-        |state, work| {
-            let (cpu, memory, disk) = RESIZE_SIZE;
-            let key = pages::resize_key(&work.machine(), Some(cpu), Some(memory), Some(disk));
-            let request = state.requests.borrow().settled(&key).map(str::to_owned);
-            live_check(state, |live| {
-                check_resized(live, &work.context, request.as_deref())
-            })
-        },
-    ));
     steps.push_back(lifecycle("gtk_lifecycle_start", M::ActionStart, "running"));
     let mut pause = lifecycle("gtk_lifecycle_pause", M::ActionPause, "paused");
     let check = pause.check;
@@ -588,6 +553,72 @@ fn page_steps() -> VecDeque<PageStep> {
         },
         |state, work| live_check(state, |live| check_deleted(live, &work.context)),
     ));
+    // Resize a second created machine: a pinned resize keeps its machine
+    // busy, so it runs after the other lifecycle steps on its own machine.
+    steps.push_back(step(
+        "gtk_lifecycle_resize_create",
+        |state, work, _| {
+            // The deletion holds capacity until the stand-in observes it.
+            if let Some(machine) = work.context.machine.as_deref() {
+                work.hook.observe(machine);
+            }
+            let (cpu, memory, disk) = CREATE_SIZE;
+            let name = work.context.resize_machine_name.clone();
+            for (field, value) in [
+                (M::MachineName, name),
+                (M::KvCpu, cpu.to_string()),
+                (M::MemoryFieldMib, memory.to_string()),
+                (M::DiskFieldGib, disk.to_string()),
+            ] {
+                fill(state, Page::Machines, pages::MACHINE_SIZE, field, &value)?;
+            }
+            press(state, Page::Machines, pages::MACHINE_SIZE, M::ActionCreate)
+        },
+        |state, work| live_check(state, |live| check_resize_created(live, &mut work.context)),
+    ));
+    steps.push_back(step(
+        "gtk_lifecycle_resize",
+        |state, work, report| {
+            let resize_machine = work.context.resize_machine.clone().unwrap_or_default();
+            if !work.hook.observe(&resize_machine) && !work.hook_missing {
+                work.hook_missing = true;
+                report.record("gtk_fixture_observe", false, "fixture_hook_unavailable");
+            }
+            let (cpu, memory, disk) = RESIZE_SIZE;
+            select_machine(state, &resize_machine)?;
+            fill(
+                state,
+                Page::Machines,
+                pages::MACHINE_SIZE,
+                M::KvCpu,
+                &cpu.to_string(),
+            )?;
+            fill(
+                state,
+                Page::Machines,
+                pages::MACHINE_SIZE,
+                M::MemoryFieldMib,
+                &memory.to_string(),
+            )?;
+            fill(
+                state,
+                Page::Machines,
+                pages::MACHINE_SIZE,
+                M::DiskFieldGib,
+                &disk.to_string(),
+            )?;
+            press(state, Page::Machines, pages::MACHINE_SIZE, M::ActionResize)
+        },
+        |state, work| {
+            let (cpu, memory, disk) = RESIZE_SIZE;
+            let resize_machine = work.context.resize_machine.clone().unwrap_or_default();
+            let key = pages::resize_key(&resize_machine, Some(cpu), Some(memory), Some(disk));
+            let request = state.requests.borrow().settled(&key).map(str::to_owned);
+            live_check(state, |live| {
+                check_resized(live, &work.context, request.as_deref())
+            })
+        },
+    ));
     steps.push_back(step(
         "gtk_threads_list",
         |state, work, _| {
@@ -615,6 +646,7 @@ fn page_steps() -> VecDeque<PageStep> {
             match listed {
                 Some(Ok(true)) if rows > 1 => Check::Pass("listed"),
                 Some(Ok(_)) => Check::Wait,
+                Some(Err(SessionError::Busy)) => Check::Wait,
                 _ => Check::Fail("read_refused"),
             }
         },
@@ -712,6 +744,9 @@ struct Script {
     work: PageWork,
     steps: VecDeque<PageStep>,
     current: Option<(PageStep, Instant)>,
+    /// Attach presses that failed without a server answer, such as while
+    /// the heartbeat probe held the session.
+    terminal_attempts: u32,
 }
 
 impl Script {
@@ -720,6 +755,12 @@ impl Script {
     fn page_tick(&mut self, state: &NativeState) -> bool {
         if self.current.is_none() {
             let Some(next) = self.steps.pop_front() else {
+                if let Some(machine) = self.work.context.resize_machine.take() {
+                    let hook = &self.work.hook;
+                    let _ = state.with_live(|live| {
+                        Ok::<_, SessionError>(remove_journey_machine(hook, live, &machine))
+                    });
+                }
                 return false;
             };
             if let Some(label) = state.status.borrow().as_ref() {
@@ -890,6 +931,10 @@ impl Script {
                         Some(_) => "attach_refused",
                         None => "attach_failed",
                     };
+                    if code == "attach_failed" && self.terminal_attempts < TERMINAL_ATTEMPTS {
+                        self.terminal_attempts += 1;
+                        return Some(Stage::Terminal);
+                    }
                     report.record("gtk_terminal", terminal_passed(code), code);
                     return Some(Stage::LoseOnAction);
                 }
@@ -1044,6 +1089,7 @@ fn run_window(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) ->
         },
         steps: page_steps(),
         current: None,
+        terminal_attempts: 0,
     }));
     let finished = Rc::new(Cell::new(false));
     let application = adw::Application::builder()

@@ -50,7 +50,8 @@ fixture descriptor (v1: `deployment.{host,ssh_port,https_port}`, `tls.{ca_pem,se
 fetches `https://<server_name>:<https_port>/bin/ssh-trust.json` with the fixture CA, signs in
 with fresh owner-only device keys through the approver hook, and exercises the deployment list,
 deep links, machine listing, share link, sharing add/remove, web show/set, the lifecycle of a
-machine it creates (`mila-journey-<hex>`: create, stop, resize, start, pause, resume, delete),
+machine it creates (`mila-journey-<hex>`: create, stop, start, pause, resume, delete, then
+resize of a second created machine, which the journey removes afterwards),
 threads (list, prompt, answer, plan approval), the terminal, and SSH-key
 listing/protection/revocation. Each action step passes only when an authenticated read shows its
 effect. The fixture's stand-ins for the absent provisioner and model (`observe`, `thread-create`,
@@ -102,4 +103,6 @@ GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory MILA_GTK_TESTS
 Install `data/dev.overalls.Mila.desktop` with the executable on the desktop search path to enable
 system URI activation. CI runs both journeys against `nix run .#mila-journey-fixture` and always
 runs a GTK journey wiring smoke against an unreachable deployment. Locally against the fixture, every
-step passes except resize, pause and threads, which need the fixture's action hook.
+step of both journeys passes, including resize, pause and threads through the fixture's action
+hook. The journeys observe each deleted machine so repeated runs against one fixture do not exhaust
+its capacity.

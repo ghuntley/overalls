@@ -13,9 +13,9 @@ use crate::deployments::{DeploymentHost, DeploymentStore};
 use crate::device_key::{load_or_create, write_private};
 use crate::journey_checks::{
     action_failed, check_answered, check_created, check_deleted, check_desired,
-    check_plan_approved, check_prompted, check_resized, check_resumed, check_share, check_web,
-    first_thread, load_thread_controls, refusal_code, web_endpoint, Check, PageContext,
-    CREATE_SIZE, RESIZE_SIZE,
+    check_plan_approved, check_prompted, check_resize_created, check_resized, check_resumed,
+    check_share, check_web, first_thread, load_thread_controls, refusal_code, web_endpoint, Check,
+    PageContext, CREATE_SIZE, RESIZE_SIZE,
 };
 use crate::machine_view::project_snapshot;
 use crate::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
@@ -982,6 +982,26 @@ fn observe(
     }
 }
 
+/// Best-effort removal of a journey-created machine so repeated runs against
+/// one deployment do not exhaust its capacity. The fixture observes the
+/// machine first; a pinned resize can keep it busy for a while, so removal is
+/// retried until the step deadline. Not a recorded step.
+pub fn remove_journey_machine(hook: &FixtureHook, live: &mut LiveSession, machine: &str) -> bool {
+    let started = Instant::now();
+    while started.elapsed() < PAGE_STEP_DEADLINE {
+        hook.observe(machine);
+        let Some(request) = new_request_id() else {
+            return false;
+        };
+        match live.machine_action(machine, "rm", &request) {
+            Ok(()) => return hook.observe(machine),
+            Err(SessionError::Transport | SessionError::StaleHandle) => return false,
+            Err(_) => std::thread::sleep(PAGE_POLL),
+        }
+    }
+    false
+}
+
 /// Sharing, web, lifecycle and threads against the deployment; every step
 /// asserts its effect through a session read.
 fn run_pages(
@@ -1067,24 +1087,10 @@ fn run_pages(
     report.record("lifecycle_create", created.0, created.1);
     observe(hook, &context, report, &mut hook_missing);
     let machine = context.machine.clone().unwrap_or_default();
-    let steps: [(&'static str, &'static str, &'static str); 2] = [
+    for (step, action, desired) in [
         ("lifecycle_stop", "stop", "stopped"),
         ("lifecycle_start", "start", "running"),
-    ];
-    for (index, (step, action, desired)) in steps.into_iter().enumerate() {
-        if index == 1 {
-            // Resize while stopped, between stop and start.
-            let (cpu, memory, disk) = RESIZE_SIZE;
-            let context = &context;
-            page_step(
-                report,
-                binding,
-                "lifecycle_resize",
-                |live, request| live.machine_resize(&machine, cpu, memory, disk, request),
-                |live, request| check_resized(live, context, request),
-            );
-            observe(hook, context, report, &mut hook_missing);
-        }
+    ] {
         let context_ref = &context;
         page_step(
             report,
@@ -1118,6 +1124,41 @@ fn run_pages(
             |live, request| live.machine_action(&machine, "rm", request),
             |live, _| check_deleted(live, context),
         );
+    }
+    // The deletion holds capacity until the provisioner stand-in observes it.
+    if let Some(machine) = context.machine.as_deref() {
+        hook.observe(machine);
+    }
+    // Resize a second created machine; its pinned request keeps it busy.
+    let name = context.resize_machine_name.clone();
+    let created = match submit(binding, |live, request| {
+        live.machine_create(&name, cpu, memory, disk, request)
+    }) {
+        Ok(_) => await_check(binding, |live| check_resize_created(live, &mut context)),
+        Err(code) => (false, code),
+    };
+    report.record("lifecycle_resize_create", created.0, created.1);
+    if let Some(resize_machine) = context.resize_machine.clone() {
+        if !hook.observe(&resize_machine) && !hook_missing {
+            report.record("fixture_observe", false, "fixture_hook_unavailable");
+        }
+    }
+    {
+        let (cpu, memory, disk) = RESIZE_SIZE;
+        let resize_machine = context.resize_machine.clone().unwrap_or_default();
+        let context = &context;
+        page_step(
+            report,
+            binding,
+            "lifecycle_resize",
+            |live, request| live.machine_resize(&resize_machine, cpu, memory, disk, request),
+            |live, request| check_resized(live, context, request),
+        );
+    }
+    if let Some(resize_machine) = context.resize_machine.clone() {
+        if let Some(live) = binding.borrow_mut().session_mut() {
+            remove_journey_machine(hook, live, &resize_machine);
+        }
     }
 
     // Threads: list, prompt, answer and plan approval.

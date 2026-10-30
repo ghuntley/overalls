@@ -21,7 +21,7 @@ use mila_native_linux::porsche_results::{
     decode_machine_detail, decode_thread_detail, decode_thread_events, decode_thread_rows,
     ThreadDetail,
 };
-use mila_native_linux::session::SessionError;
+use mila_native_linux::session::{LiveSession, SessionError};
 use std::{cell::RefCell, rc::Rc};
 
 /// Widget names the GTK journey uses to find a section's controls.
@@ -864,9 +864,6 @@ pub(super) fn build_threads(state: &NativeState, page: &Box, status: &Label) -> 
             let Some(shown) = detail.borrow().clone() else {
                 return status.set_label(&strings::text(M::ThreadFailed));
             };
-            if shown.busy && matches!(kind, Kind::Prompt) {
-                return status.set_label(&strings::text(M::ThreadBusy));
-            }
             let text = input.as_ref().map(|entry| entry.text().to_string());
             if let Some(text) = text.as_deref() {
                 if text.trim().is_empty() || text.contains('\0') {
@@ -919,7 +916,21 @@ pub(super) fn build_threads(state: &NativeState, page: &Box, status: &Label) -> 
                     Some(request),
                 )
             });
-            status.set_label(&strings::text(outcome_message(&result)));
+            // Porsche decides whether a busy thread takes the request; its
+            // closed `thread_busy` refusal gets the specific message.
+            let busy = matches!(result, Some(Err(SessionError::InvalidInput)))
+                && state
+                    .session
+                    .borrow()
+                    .session()
+                    .and_then(LiveSession::last_refusal)
+                    .as_deref()
+                    == Some("thread_busy");
+            status.set_label(&strings::text(if busy {
+                M::ThreadBusy
+            } else {
+                outcome_message(&result)
+            }));
             if matches!(result, Some(Ok(_))) {
                 if let Some(entry) = input.as_ref() {
                     entry.set_text("");

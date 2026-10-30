@@ -373,11 +373,12 @@ jobs:
         timeout-minutes: 15
         run: |
           set -euo pipefail
-          mila/native/linux/target/release/mila-linux-journey --descriptor "$MILA_JOURNEY_DESCRIPTOR"
+          # Run both journeys even when the first fails, so each prints its report.
+          status=0
+          mila/native/linux/target/release/mila-linux-journey --descriptor "$MILA_JOURNEY_DESCRIPTOR" || status=$?
           gtk4-broadwayd :7 &
           broadway=$!
           sleep 1
-          status=0
           GDK_BACKEND=broadway BROADWAY_DISPLAY=:7 GSETTINGS_BACKEND=memory \
             "$RUNNER_TEMP/mila-native-linux-gtk-journey" --gtk-journey "$MILA_JOURNEY_DESCRIPTOR" || status=$?
           kill "$broadway"
