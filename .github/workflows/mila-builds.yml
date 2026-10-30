@@ -81,7 +81,9 @@ jobs:
 
   apple-native:
     runs-on: macos-15
-    timeout-minutes: 45
+    timeout-minutes: 90
+    env:
+      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Install the pinned Rust toolchain
@@ -109,10 +111,33 @@ jobs:
         run: ./mila/native/mila-build macos dev
       - name: Build the iOS-simulator dev app
         run: ./mila/native/mila-build ios dev
+      # Tunnelled fixture (ADR-0264): the Linux `journey-fixture-tailnet` job
+      # serves the hermetic backend on the tailnet. Skipped without the secret.
+      - name: Join the Mila CI tailnet
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          tags: tag:mila-ci
+          hostname: mila-apple-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Forward the tailnet fixture to localhost
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        timeout-minutes: 35
+        run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
+      - name: Apple journey against the tunnelled fixture
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        working-directory: mila/native/apple
+        timeout-minutes: 20
+        env:
+          MILA_FFI_LIB_DIR: ${{ github.workspace }}/mila/rust/target/release
+          MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
+        run: swift test --filter MilaJourneyTests
 
   windows-native:
     runs-on: windows-2025
-    timeout-minutes: 30
+    timeout-minutes: 75
+    env:
+      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Verify native client is independent of Flutter
@@ -159,8 +184,20 @@ jobs:
       # host/ports, inline CA, approver hook, seed). It is gated until the
       # fixture tunnel step lands and writes MILA_JOURNEY_DESCRIPTOR, so the job
       # stays green without a backend; once enabled a missing descriptor fails.
+      - name: Join the Mila CI tailnet
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          tags: tag:mila-ci
+          hostname: mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Forward the tailnet fixture to localhost
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        timeout-minutes: 35
+        shell: bash
+        run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Windows journey against the tunnelled fixture
-        if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' }}
+        if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' || env.MILA_TAILSCALE_AUTHKEY != '' }}
         shell: pwsh
         env:
           MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
@@ -473,6 +510,65 @@ jobs:
           disable-animations: true
           # Runs the packaged suite, then the fixture journey when MILA_JOURNEY_DESCRIPTOR is set.
           script: bash scripts/run-instrumentation.sh
+
+  # Tunnelled fixture host (ADR-0264). Boots the hermetic backend bound to
+  # this runner's tailnet address and serves only the descriptor beside it
+  # until the Apple and Windows journey nodes have joined and left (or a
+  # deadline passes). Skipped cleanly without MILA_TAILSCALE_AUTHKEY.
+  journey-fixture-tailnet:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
+      PEERS: mila-apple-${{ github.run_id }}-${{ github.run_attempt }} mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - name: Skip without the tailnet secret
+        if: env.MILA_TAILSCALE_AUTHKEY == ''
+        run: echo "MILA_TAILSCALE_AUTHKEY is not configured; tunnelled fixture skipped"
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+      - name: Install Nix for the journey fixture
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Enable KVM for the journey fixture
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+          test -r /dev/kvm -a -w /dev/kvm
+      - name: Join the Mila CI tailnet
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
+        with:
+          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          tags: tag:mila-ci
+          hostname: mila-fixture-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Serve the fixture on the tailnet until the journeys finish
+        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        timeout-minutes: 80
+        run: |
+          set -euo pipefail
+          address="$(tailscale ip -4)"
+          dir="$RUNNER_TEMP/mila-journey"
+          mkdir -p "$dir/public"
+          chmod 700 "$dir"
+          nohup nix run ".#mila-journey-fixture" -- --bind "$address" \
+            --descriptor "$dir/public/descriptor.json" > "$dir/fixture.log" 2>&1 &
+          fixture=$!
+          for _ in $(seq 1 1500); do
+            [ -s "$dir/public/descriptor.json" ] && break
+            kill -0 "$fixture" 2>/dev/null || { tail -n 100 "$dir/fixture.log" >&2; exit 1; }
+            sleep 1
+          done
+          token="$(jq -r .approver.bearer_token "$dir/public/descriptor.json")"
+          echo "::add-mask::$token"
+          # Only tag:mila-ci peers can reach this port (see the tailnet ACL).
+          nohup python3 -I -m http.server 8445 --bind "$address" --directory "$dir/public" \
+            > /dev/null 2>&1 &
+          read -ra peers <<< "$PEERS"
+          python3 -I .github/scripts/mila-tailnet-peers.py 3000 "${peers[@]}"
 
   native-gate:
     name: Native platform gate
