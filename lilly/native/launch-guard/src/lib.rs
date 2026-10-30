@@ -165,6 +165,15 @@ pub fn read_intent(intent: &OwnedFd) -> Result<Intent, IntentError> {
             Ok(count) => used += count,
         }
     }
+    decode_intent(&bytes)
+}
+
+/// Decode one intent frame: exactly INTENT_BYTES, laid out as the 36-byte
+/// placement, big-endian epoch, big-endian generation and the state byte.
+/// Any other length is a framing failure. Pure, so the frame layout can be
+/// checked without a descriptor.
+pub fn decode_intent(bytes: &[u8]) -> Result<Intent, IntentError> {
+    let bytes: &[u8; INTENT_BYTES] = bytes.try_into().map_err(|_| IntentError::Framing)?;
     Ok(Intent {
         placement: bytes[0..36].try_into().map_err(|_| IntentError::Framing)?,
         epoch: u64::from_be_bytes(bytes[36..44].try_into().map_err(|_| IntentError::Framing)?),

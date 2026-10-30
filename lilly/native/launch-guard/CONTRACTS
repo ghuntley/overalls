@@ -11,5 +11,8 @@ generation must equal the requested values and the state byte must mark a
 running generation. Exec MUST fail closed (71) and the shared intent lock MUST
 survive exec so jailer's eventual descriptor close cannot leave an unfenced
 process outside unit cleanup. Hegel properties cover the argument selector,
-frame oracle and file refusal matrix; lock-across-exec is verified with real
+the placement and counter parsers against independent oracles, the pure
+53-byte intent decode round-trip and length refusal, the current-generation
+predicate and the custody-file refusal matrix (size, mode, link count,
+symlink); lock-across-exec and waiter revalidation are verified with real
 processes in the sandbox.
