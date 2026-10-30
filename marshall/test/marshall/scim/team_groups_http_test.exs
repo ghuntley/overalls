@@ -92,6 +92,26 @@ defmodule Marshall.Scim.TeamGroupsHttpTest do
     assert alice_row_id == alice_row.id
   end
 
+  # Regression from TeamScimPropertyTest: an explicitly empty member list used
+  # to be decoded as "members absent", so the PUT left every member in place.
+  test "PUT with an empty member list removes every member but keeps the owner", c do
+    name = Fixture.team_name()
+
+    {201, %{"id" => id}} =
+      Fixture.request(c.token, :post, "/Groups", Fixture.group(name, [c.alice.id, c.bob.id]))
+
+    assert {200, _body} = Fixture.request(c.token, :put, "/Groups/#{id}", Fixture.group(name, []))
+    assert Fixture.memberships(id) == [{c.owner.id, :owner}]
+
+    # A list whose entries carry no member value is ignored, not a clear-all.
+    {201, %{"id" => other}} =
+      Fixture.request(c.token, :post, "/Groups", Fixture.group(Fixture.team_name(), [c.carol.id]))
+
+    body = %{Fixture.group(Fixture.team_name(), []) | "members" => [%{"display" => "x"}]}
+    assert {200, _body} = Fixture.request(c.token, :put, "/Groups/#{other}", body)
+    assert Fixture.memberships(other) == Enum.sort([{c.owner.id, :owner}, {c.carol.id, :member}])
+  end
+
   test "PATCH adds and removes members idempotently and never removes the owner", c do
     {201, %{"id" => id}} =
       Fixture.request(c.token, :post, "/Groups", Fixture.group(Fixture.team_name(), [c.alice.id]))

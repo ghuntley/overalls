@@ -84,7 +84,7 @@ defmodule AshScim.Decoder do
           |> Enum.reject(&(&1 == %{}))
 
         acc
-        |> maybe_put_relationships(rel, rel_inputs)
+        |> maybe_put_relationships(rel, list, rel_inputs)
         |> maybe_mirror_primary(mv, objects)
 
       _ ->
@@ -132,10 +132,18 @@ defmodule AshScim.Decoder do
     end
   end
 
-  defp maybe_put_relationships(acc, nil, _rel_inputs), do: acc
-  defp maybe_put_relationships(acc, _rel, []), do: acc
+  # Marshall-local change: an explicitly empty list (`"members": []`) is a
+  # full replacement with no members, so a PUT clears the relationship. A
+  # non-empty list whose elements all fail to decode is still ignored rather
+  # than treated as a request to remove every related row.
+  defp maybe_put_relationships(acc, nil, _list, _rel_inputs), do: acc
 
-  defp maybe_put_relationships(acc, rel, rel_inputs),
+  defp maybe_put_relationships(acc, rel, [], []),
+    do: %{acc | relationships: Elixir.Map.put(acc.relationships, rel, [])}
+
+  defp maybe_put_relationships(acc, _rel, _list, []), do: acc
+
+  defp maybe_put_relationships(acc, rel, _list, rel_inputs),
     do: %{acc | relationships: Elixir.Map.put(acc.relationships, rel, rel_inputs)}
 
   defp maybe_mirror_primary(acc, %Multivalued{mirror_primary_to: nil}, _objects), do: acc

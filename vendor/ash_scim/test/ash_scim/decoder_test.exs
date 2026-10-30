@@ -104,5 +104,14 @@ defmodule AshScim.DecoderTest do
 
       assert decoded.attrs == %{}
     end
+
+    # Marshall-local: an explicit empty list is a full replacement with no rows.
+    test "an explicitly empty list decodes to an empty relationship input" do
+      assert Decoder.decode(User, %{"emails" => []}).relationships == %{emails: []}
+    end
+
+    test "a non-empty list with no decodable entries is ignored" do
+      assert Decoder.decode(User, %{"emails" => [%{"display" => "x"}]}).relationships == %{}
+    end
   end
 end
