@@ -1,3 +1,6 @@
+# BUCK.v2, not BUCK: on case-insensitive checkouts (macOS APFS, Windows
+# NTFS) a root `BUCK` file and the `buck/` directory collide, and the root
+# package vanishes. Buck2 reads BUCK.v2 before BUCK.
 load("//buck:nix.bzl", "nix_owned")
 load("//nix/buck:bootstrap_attrs.bzl", "BOOTSTRAP_CHECKS", "BOOTSTRAP_PACKAGES")
 load("//buck:nix.bzl", "nix_flake_attr", "owned_set")

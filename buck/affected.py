@@ -50,7 +50,8 @@ UNOWNED_ALLOWED = "docs/"
 
 def needs_owner(path: str) -> bool:
     """BUCK files enter through target hashes rather than ownership."""
-    return not path.startswith(UNOWNED_ALLOWED) and path.rsplit("/", 1)[-1] != "BUCK"
+    name = path.rsplit("/", 1)[-1]
+    return not path.startswith(UNOWNED_ALLOWED) and name not in ("BUCK", "BUCK.v2")
 
 
 class Entry(TypedDict):

@@ -135,7 +135,7 @@ the approved migration plan.
   [nix.bzl](../../../toolchains/nix.bzl) define the Nix tools. The
   [probe](../../../buck/probes/BUCK) runs the pinned Elixir through them.
 - [buck/nix.bzl](../../../buck/nix.bzl) defines `nix_owned`, `owned_set` and the
-  bootstrap `nix_flake_attr`. The root [BUCK](../../../BUCK) generates bootstrap
+  bootstrap `nix_flake_attr`. The root [BUCK.v2](../../../BUCK.v2) generates bootstrap
   targets from [bootstrap_attrs.bzl](../../../nix/buck/bootstrap_attrs.bzl),
   which [bootstrap-attrs.sh](../../../nix/buck/bootstrap-attrs.sh) regenerates.
 - [ownership.bxl](../../../buck/bxl/ownership.bxl) checks file ownership.
@@ -176,7 +176,7 @@ the approved migration plan.
   hook ([devenv.nix](../../../devenv.nix)), and the `precommit` job in
   [ci.yml](../../../.github/workflows/ci.yml) runs it over the selected range.
   - `PrecommitInfo`, `repo_check` and `contract_check` are in
-    [checks.bzl](../../../buck/checks.bzl). The root [BUCK](../../../BUCK) adds
+    [checks.bzl](../../../buck/checks.bzl). The root [BUCK.v2](../../../BUCK.v2) adds
     `//:adrs`, `//:contracts` (with `[contracts/<path>]`), `//:contracts-tests`,
     `//:pins`, `//:rust-lints`, `//:toolchain-versions` and ten
     `//:logging-<app>` targets; `//:py-static` gains `[ty]` and `[fix/<path>]`.

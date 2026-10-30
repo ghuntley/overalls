@@ -31,7 +31,7 @@ _GRAPH_PREFIXES = ["toolchains/", "nix/buck/"]
 def _graph_change(path: str) -> bool:
     name = path.rsplit("/", 1)[-1]
     return (
-        path in _GRAPH_FILES or name == "BUCK" or
+        path in _GRAPH_FILES or name in ("BUCK", "BUCK.v2") or
         path.endswith(".bzl") or path.endswith(".bxl") or
         any([path.startswith(p) for p in _GRAPH_PREFIXES])
     )

@@ -4,7 +4,7 @@ load(":paths.bzl", _label = "file_label")
 
 def _main(ctx: bxl.Context) -> None:
     # BUCK files are covered by target hashes rather than ownership.
-    files = [f for f in ctx.cli_args.files if not f.startswith("docs/") and f.rsplit("/", 1)[-1] != "BUCK"]
+    files = [f for f in ctx.cli_args.files if not f.startswith("docs/") and f.rsplit("/", 1)[-1] not in ("BUCK", "BUCK.v2")]
     owners = ctx.uquery().owner([_label(f) for f in files])
     owned = {str(f): True for f in ctx.uquery().inputs(owners)}
     missing = [f for f in files if _label(f) not in owned]

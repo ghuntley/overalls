@@ -6,7 +6,7 @@ load(":checks.bzl", "owned_files")
 # `<name>_files` exposes the same files individually (OwnedFilesInfo) for the
 # per-file checks: conflict markers and the Python gate.
 def nix_owned(name: str = "srcs", srcs = None, **kwargs):
-    files = srcs if srcs != None else native.glob(["**", "**/.*", "**/.*/**"], exclude = ["BUCK"])
+    files = srcs if srcs != None else native.glob(["**", "**/.*", "**/.*/**"], exclude = ["BUCK", "BUCK.v2"])
     native.filegroup(
         name = name,
         srcs = files,
