@@ -1,9 +1,10 @@
 name: "mila builds"
 
-# Mila's dev targets on every platform (ADR-0235). Linux and Android build in
-# Nix; macOS and iOS use the devenv shell with the runner's Xcode; Windows has
-# no Nix and builds from the mila-source-bundle the Linux job produces, so it
-# sees the same patched dartssh2, fonts, Monocypher and locked pub packages.
+# Mila's dev targets on every platform (ADR-0235). The platform builds are
+# Buck2 targets (ADR-0269 M9, see the buck2 skill): Android, Apple and Windows
+# build the non_hermetic //mila: targets with the runner's SDKs; macOS runs
+# tools/buck2 over buckCells.aarch64-darwin, and Windows, which has no Nix,
+# runs `tools/buck2 --no-nix` with the pinned buck2 and prelude.
 on:
   pull_request:
     paths:
@@ -62,15 +63,17 @@ jobs:
             --output "$RUNNER_TEMP/mila-localization-app"
       - name: Build the source bundle
         run: |
-          nix build -L .#tool-mila-source-bundle --out-link bundle
+          tools/buck2 build //:package-tool-mila-source-bundle --show-full-output | tee bundle.txt
+          bundle=$(cat "$(awk 'END { print $2 }' bundle.txt)")
           mkdir -p out
-          cp -L bundle/* out/
+          cp -L "$bundle"/* out/
           (cd out && sha256sum -c SHA256SUMS)
       - name: Build the native Windows source bundle
         run: |
-          nix build -L .#tool-mila-windows-source-bundle --out-link windows-bundle
+          tools/buck2 build //:package-tool-mila-windows-source-bundle --show-full-output | tee windows-bundle.txt
+          bundle=$(cat "$(awk 'END { print $2 }' windows-bundle.txt)")
           mkdir -p out-windows
-          cp -L windows-bundle/* out-windows/
+          cp -L "$bundle"/* out-windows/
           (cd out-windows && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -92,34 +95,45 @@ jobs:
       MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      # tools/buck2 builds buckCells.aarch64-darwin: buck2, the prelude and a
+      # few host tools, substituted from Cachix (the patched nixpkgs source
+      # from devenv's cache); a miss builds three small derivations.
+      - name: Setup Nix
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
       - name: Install the pinned Rust toolchain
         uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: 1.97.1
           targets: aarch64-apple-ios-sim
           components: clippy
+      # Bounded so a cold cells build fails well inside the job timeout. The
+      # daemon starts here and keeps this step's PATH (cargo, Xcode).
+      - name: Materialise the Buck2 cells
+        timeout-minutes: 20
+        run: tools/buck2 --version
       - name: Build Rust FFI for Apple native tests
-        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-ffi
       - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
-      - name: Generate bundled locale catalogs
-        run: |
-          python3 mila/localization/generate_catalogs.py \
-            --source mila/localization/catalogs \
-            --output mila/native/apple/Sources/MilaNativeUI/Resources
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-ffi-clippy
+      # Generates the bundled locale catalogs, then runs swift test against
+      # the FFI above.
       - name: Swift native package tests
-        working-directory: mila/native/apple
-        env:
-          MILA_FFI_LIB_DIR: ${{ github.workspace }}/mila/rust/target/release
-        run: swift test
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-swift-test
       - name: Apple app InfoPlist localization tests
         run: python3 -m unittest mila/localization/test_apple_infoplist_strings.py
       # The package declares iOS support, so build the app for both platforms;
       # swift test alone compiles only the macOS slice.
       - name: Build the macOS dev app
-        run: ./mila/native/mila-build macos dev
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:macos-dev
       - name: Build the iOS-simulator dev app
-        run: ./mila/native/mila-build ios dev
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:ios-dev
       # Tunnelled fixture (ADR-0264): the Linux `journey-fixture-tailnet` job
       # serves the hermetic backend on the tailnet. Skipped without the secret.
       - name: Join the Mila CI tailnet
@@ -182,28 +196,31 @@ jobs:
         with:
           toolchain: 1.97.1
           components: clippy
-      - name: Build Rust Windows FFI
-        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
-      - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
-      - name: Build native WinUI client (.NET 10)
-        working-directory: mila/windows-dotnet
-        shell: pwsh
+      # No Nix here: `tools/buck2 --no-nix` downloads the pinned buck2 and
+      # prelude (hashes from the pin registry) and builds only non_hermetic
+      # targets. The daemon starts here and keeps this step's PATH.
+      - name: Materialise the Buck2 cells
+        shell: bash
+        timeout-minutes: 10
         run: |
-          dotnet restore
-          $version = dotnet --version
-          if (-not $version.StartsWith("10.")) { throw "Mila requires the latest .NET 10 SDK, found $version" }
-          $ffi = Join-Path $env:GITHUB_WORKSPACE "mila/rust/target/release/mila_ffi.dll"
-          if (-not (Test-Path $ffi)) { throw "Rust FFI DLL was not built: $ffi" }
-          dotnet build --configuration Release --no-restore -p:MilaNativeDll=$ffi
+          dotnet_version=$(cd mila/windows-dotnet && dotnet --version)
+          case "$dotnet_version" in 10.*) ;; *) echo "Mila requires the latest .NET 10 SDK, found $dotnet_version" >&2; exit 1 ;; esac
+          tools/buck2 --no-nix --version
+      - name: Build Rust Windows FFI
+        shell: bash
+        run: tools/buck2 --no-nix build //mila:windows-ffi-msvc
+      - name: Clippy the Rust FFI
+        shell: bash
+        run: tools/buck2 --no-nix build //mila:windows-ffi-msvc-clippy
+      # NuGet restores in locked mode (packages.lock.json); the build stages
+      # the MSVC DLL as mila/windows-dotnet/bin/Release/<tfm>/win-x64/mila_native.dll.
+      - name: Build native WinUI client (.NET 10)
+        shell: bash
+        run: tools/buck2 --no-nix build //mila:windows-dotnet
 
       - name: Invoke staged Rust DLL through production .NET interop
-        shell: pwsh
-        run: |
-          $staged = Join-Path $env:GITHUB_WORKSPACE "mila/windows-dotnet/bin/Release/net10.0-windows10.0.19041.0/win-x64/mila_native.dll"
-          if (-not (Test-Path $staged)) { throw "WinUI build did not stage the Rust DLL: $staged" }
-          dotnet run --project mila/windows-dotnet-smoke --configuration Release -p:MilaNativeDll=$staged
-          if ($LASTEXITCODE -ne 0) { throw "Rust/.NET FFI smoke failed" }
+        shell: bash
+        run: tools/buck2 --no-nix build //mila:windows-smoke
 
       # Journey mode drives the staged Rust session against the hermetic
       # Marshall+Porsche fixture through its descriptor (version 1: deployment
@@ -549,19 +566,16 @@ jobs:
           components: clippy
       - name: Install cargo-ndk
         timeout-minutes: 10
-        run: cargo install cargo-ndk --locked
-      - name: Clippy the Rust FFI for Android
-        # The library only: the test targets' dev-dependencies are host tools.
-        # cargo-ndk reads cargo metadata from the working directory before it
-        # forwards arguments, so run inside the workspace.
-        working-directory: mila/rust
-        run: cargo ndk --platform 26 -t arm64-v8a clippy --locked -p mila-ffi -- -D warnings
+        run: cargo install cargo-ndk --locked --version 4.1.2
+      # Buck2 targets (ADR-0269 M9) over the SDKs above, through the Nix the
+      # journey fixture steps installed: Clippy of the Android FFI library,
+      # then the debug and test APKs and unit tests. Gradle verifies every
+      # dependency against gradle/verification-metadata.xml.
       - name: Assemble native Compose APK
-        timeout-minutes: 20
-        working-directory: mila/native/android
+        timeout-minutes: 30
         run: |
-          gradle --no-daemon --stacktrace assembleDebug assembleDebugAndroidTest testDebugUnitTest
-          test -f app/build/outputs/apk/debug/app-debug.apk
+          tools/buck2 build -c overalls.non_hermetic=true //mila:android-ffi-clippy //mila:android-debug
+          test -f mila/native/android/app/build/outputs/apk/debug/app-debug.apk
       - name: Start hermetic journey fixture
         if: steps.fixture.outputs.built == 'true'
         timeout-minutes: 25
