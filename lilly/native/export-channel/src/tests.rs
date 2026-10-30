@@ -16,7 +16,7 @@ fn good_key(tc: &TestCase) -> String {
 /// @cc [owner:ghuntley,label:verification] hegel-export-record-roundtrip
 /// Generated (key, command) pairs MUST round-trip which preserves equality,
 /// and each decoded record keeps exact fields, byte for byte.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn record_roundtrip_is_exact(tc: TestCase) {
     let key = good_key(&tc);
     let max: usize = tc.draw(
@@ -37,7 +37,7 @@ fn record_roundtrip_is_exact(tc: TestCase) {
 /// @cc [owner:ghuntley,label:verification] hegel-export-record-scrutiny
 /// Generated perturbations (magic, sizes, padding, charsets) MUST be rejected
 /// exactly when the independent model says so.
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn record_refusal_matrix_follows_the_oracle(tc: TestCase) {
     let key = good_key(&tc);
     let command = "zfs send --props".to_string();
@@ -90,7 +90,7 @@ fn record_refusal_matrix_follows_the_oracle(tc: TestCase) {
     assert_eq!(decode(&wire).is_some(), expected, "slot {slot}");
 }
 
-#[hegel::test]
+#[hegel::test(test_cases = 100)]
 fn selector_and_environment_parsing_match_the_spec(tc: TestCase) {
     // bridge: [socket, key]; serve: [account, worker...] with 1..=31 argv.
     let long = "a".repeat(200);
@@ -138,4 +138,67 @@ fn selector_and_environment_parsing_match_the_spec(tc: TestCase) {
         parse_serve(&[OsString::from("acct"), OsString::from("relative")]),
         None
     );
+}
+
+/// @cc [owner:ghuntley,label:verification;protocol] hegel-export-decode-totality
+/// decode MUST be total over arbitrary bytes: it never panics, accepts only
+/// frames of exactly WIRE_BYTES, and every accepted frame is the canonical
+/// encoding of the record it yields. Assertions never print frame or key bytes.
+#[hegel::test(test_cases = 200)]
+fn decode_is_total_and_canonical(tc: TestCase) {
+    let mut wire: Vec<u8> = match tc.draw(gs::integers::<u8>().min_value(0).max_value(3)) {
+        0 => tc.draw(gs::binary().max_size(64)),
+        1 => vec![0_u8; WIRE_BYTES],
+        2 => tc.draw(gs::binary().min_size(WIRE_BYTES).max_size(WIRE_BYTES)),
+        _ => {
+            let command = tc.draw(gs::sampled_from(&["zfs send --props", "x", "a b c"]));
+            let request = build(&good_key(&tc), command).expect("formed record");
+            encode(&request).to_vec()
+        }
+    };
+    let edits = tc.draw(gs::integers::<usize>().min_value(0).max_value(8));
+    for _ in 0..edits {
+        if wire.is_empty() {
+            break;
+        }
+        // Bias half the edits into the header, key and command head, where the
+        // field rules live; the rest land anywhere in the frame.
+        let limit = if tc.draw(gs::booleans()) {
+            wire.len().min(8 + KEY_BYTES + 32)
+        } else {
+            wire.len()
+        };
+        let index = tc.draw(gs::integers::<usize>().min_value(0).max_value(limit - 1));
+        wire[index] = tc.draw(gs::integers::<u8>());
+    }
+    match tc.draw(gs::integers::<u8>().min_value(0).max_value(3)) {
+        0 => {
+            wire.pop();
+        }
+        1 => wire.push(0),
+        _ => {}
+    }
+    let decoded = decode(&wire);
+    if let Some(record) = decoded {
+        assert!(wire.len() == WIRE_BYTES);
+        assert!(encode(&record)[..] == wire[..]);
+    } else {
+        assert!(
+            wire.len() != WIRE_BYTES || wire[..4] != MAGIC[..] || {
+                let key_size = u16::from_be_bytes([wire[4], wire[5]]);
+                let command_size = usize::from(u16::from_be_bytes([wire[6], wire[7]]));
+                key_size != 68
+                    || command_size == 0
+                    || command_size >= COMMAND_BYTES
+                    || !wire[8..8 + 68]
+                        .iter()
+                        .all(|b| b.is_ascii_alphanumeric() || b"+/=".contains(b))
+                    || wire[8 + 68..8 + KEY_BYTES].iter().any(|b| *b != 0)
+                    || !wire[8 + KEY_BYTES..8 + KEY_BYTES + command_size]
+                        .iter()
+                        .all(|b| (32..=126).contains(b))
+                    || wire[8 + KEY_BYTES + command_size..].iter().any(|b| *b != 0)
+            }
+        );
+    }
 }

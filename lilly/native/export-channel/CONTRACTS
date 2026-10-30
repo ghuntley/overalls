@@ -8,7 +8,9 @@ capabilities on either side; worker stderr and data paths never become helper
 diagnostics.
 
 @cc [owner:ghuntley,label:verification] export-channel-hegel-properties
-Hegel properties MUST cover the record encode/decode roundtrip, the selector
-lattice and the charset/bound rules with an independent spec; process fixtures
-cover peercred refusal, listener/socket custody, descriptor forwarding,
-disconnect cancellation and completion authentication.
+Hegel properties MUST cover the record encode/decode roundtrip, decode totality
+over arbitrary bytes (no panic, acceptance only at exactly WIRE_BYTES and only
+for canonical encodings), the selector lattice and the charset/bound rules with
+an independent spec; process fixtures cover peercred refusal, listener/socket
+custody, descriptor forwarding, disconnect cancellation and completion
+authentication.
