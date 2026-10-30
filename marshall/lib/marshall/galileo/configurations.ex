@@ -123,6 +123,7 @@ defmodule Marshall.Galileo.Configurations do
   defp configure(arguments, actor) do
     Marshall.Accounts.AccountLifecycle.admit!(actor.id)
     validated = validated!(arguments)
+    if arguments[:peer_vm_id], do: share_vm!(arguments.peer_vm_id)
     team_authorized!(arguments[:team_id], actor)
 
     Ecto.Adapters.SQL.query!(
@@ -435,11 +436,20 @@ defmodule Marshall.Galileo.Configurations do
     end
   end
 
-  defp live_vm!(id) do
-    case Ledger.read!(VirtualMachine, id: id) do
-      [vm] -> vm
-      _ -> Ledger.rollback(:unknown_machine)
-    end
+  defp live_vm!(id), do: share_vm!(id) || Ledger.rollback(:unknown_machine)
+
+  # @cc [owner:ghuntley,label:concurrency] galileo-vm-before-user-rows
+  # Guest roster and authorized-key pulls lock the VM row and then its writers'
+  # User rows. Configuration and attachment rows reference both a VM and a User,
+  # and their foreign-key checks would take the User key-share lock first. They
+  # MUST therefore take FOR KEY SHARE on the referenced VM before any statement
+  # that locks or references a User row, so the two paths cannot deadlock.
+  @spec share_vm!(String.t()) :: VirtualMachine.t() | nil
+  defp share_vm!(id) do
+    VirtualMachine
+    |> Ash.Query.filter(id == ^id)
+    |> Ash.Query.lock("FOR KEY SHARE")
+    |> Ash.read_one!(actor: SystemActor.compute())
   end
 
   # @cc [owner:ghuntley,label:product] galileo-exclusive-list-cursor

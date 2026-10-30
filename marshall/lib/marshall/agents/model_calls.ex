@@ -27,6 +27,7 @@ defmodule Marshall.Agents.ModelCalls do
           {:ok, ModelCall.t() | :compacted} | {:error, term()}
   def queue(turn_id, model, reasoning_effort \\ :medium) do
     Ledger.transaction(fn ->
+      host_id = share_turn_host!(turn_id)
       turn = Ledger.lock!(Turn, turn_id) || Ledger.rollback(:not_found)
       thread = Ledger.lock!(Thread, turn.thread_id) || Ledger.rollback(:not_found)
 
@@ -35,6 +36,7 @@ defmodule Marshall.Agents.ModelCalls do
 
       [root] = Ledger.read!(Root, id: thread.root_id)
       vm = Ledger.lock!(VirtualMachine, root.vm_id) || Ledger.rollback(:machine_unavailable)
+      unless vm.host_id == host_id, do: Ledger.rollback(:machine_unavailable)
 
       unless vm.desired_state == :running and vm.observed_state == :running and
                vm.archived_at == nil,
@@ -155,6 +157,32 @@ defmodule Marshall.Agents.ModelCalls do
       end
     end)
   end
+
+  # @cc [owner:ghuntley,label:concurrency] model-call-queue-host-before-vm
+  # Host-authenticated calls lock the host and then the VM (ADR-0019). The
+  # queued ModelCall references the host, so its insert takes a host key-share
+  # lock. Queueing MUST take that host lock before the Turn, Thread and VM locks,
+  # resolving the host from unlocked reads, and MUST refuse if the locked VM is
+  # no longer on that host; a VM-then-host order deadlocks with a host fence.
+  @spec share_turn_host!(String.t()) :: String.t()
+  defp share_turn_host!(turn_id) do
+    [turn] = Ledger.read!(Turn, id: turn_id) |> found!()
+    [thread] = Ledger.read!(Thread, id: turn.thread_id) |> found!()
+    [root] = Ledger.read!(Root, id: thread.root_id)
+
+    case Ledger.read!(VirtualMachine, id: root.vm_id) do
+      [%VirtualMachine{host_id: host_id}] when is_binary(host_id) ->
+        Ledger.share_host!(host_id) || Ledger.rollback(:machine_unavailable)
+        host_id
+
+      _ ->
+        Ledger.rollback(:machine_unavailable)
+    end
+  end
+
+  @spec found!([record]) :: [record] when record: Ash.Resource.Record.t()
+  defp found!([_] = rows), do: rows
+  defp found!(_), do: Ledger.rollback(:not_found)
 
   @spec projection_options(Thread.t(), Turn.t(), Context.projection()) :: keyword()
   defp projection_options(thread, turn, projection) do

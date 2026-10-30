@@ -135,6 +135,23 @@ now verifies real guest writer handoff, grant/login revocation and explicit writ
 reacquisition after lost replies and Marshall process death. See the
 [review](../reviews/2026-09-16-terminal-failover.md) for evidence and limits.
 
+Lock-order correction (2026-10-30): two callers violated this ordering and
+deadlocked in fleet machine runs. `ModelCalls.queue/3` locked the VM and then
+the host, through its ModelCall host foreign key; it now takes the host
+key-share lock first
+([`model_calls.ex`](../../../marshall/lib/marshall/agents/model_calls.ex),
+`model-call-queue-host-before-vm`). Galileo configuration referenced its User
+before its peer VM, while guest roster pulls lock the VM and then its writers'
+User rows. Configuration and attachment now take FOR KEY SHARE on the VM first
+([`configurations.ex`](../../../marshall/lib/marshall/galileo/configurations.ex),
+`galileo-vm-before-user-rows`). Committed two-connection regressions block each
+action behind the competing lock and probe the next lock with NOWAIT
+([`model_call_lock_order_test.exs`](../../../marshall/test/marshall/agents/model_call_lock_order_test.exs),
+[`configuration_lock_order_test.exs`](../../../marshall/test/marshall/galileo/configuration_lock_order_test.exs)).
+Without the fix, queue and peer configuration fail that probe with
+`lock_not_available`. The attachment case passed even before the change, so it
+guards the order rather than reproducing a failure.
+
 ## Open questions
 
 Extend the verified three-node, single-host browser path under ADR-0022 with
