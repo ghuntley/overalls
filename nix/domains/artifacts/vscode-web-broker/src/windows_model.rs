@@ -29,10 +29,6 @@ impl<T> CustodianAccounts<T> {
     /// launching. Concurrent admissions for one UID MUST share the same lock
     /// and retained state. Full or poisoned registries MUST refuse; dropping a
     /// connection reference MUST NOT evict or release its worker's ownership.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn slot(
         &self,
         uid: u32,
@@ -75,10 +71,6 @@ impl PipeSlots {
     /// reservations. A reservation MUST remain owned until its operation's
     /// buffer, completion storage and handles may safely be released. Exhaustion
     /// MUST refuse new pipes without evicting an outstanding operation.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn reserve(&self) -> Option<PipeSlot<'_>> {
         let mut used = self.used.load(Ordering::Acquire);
         loop {
@@ -119,10 +111,6 @@ impl AccountSid {
     /// Account custody MUST use a complete S-1-5-21 SID with an ordinary
     /// account RID. SYSTEM, built-in groups and partial SIDs MUST NOT become
     /// editor account identities. Only native SAM lookup establishes locality.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn parse(bytes: &[u8]) -> Result<Self, Refusal> {
         if bytes.len() != 28
             || bytes[..8] != [1, 5, 0, 0, 0, 0, 0, 5]
@@ -158,10 +146,6 @@ impl WorkerIdentity {
     /// A Windows worker identity MUST pass the existing exact boot/package/
     /// origin admission and use the canonical `u<uid>` roster name. A caller
     /// hint or a valid SID alone MUST NOT create a worker identity.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn admitted(
         preface: &Preface,
         boot: &Boot,
@@ -227,10 +211,6 @@ impl WorkerIdentity {
     /// and generation rotation only when its validated stable worker identity
     /// equals the current account, SID, placement/epoch, package and origins.
     /// This comparison MUST NOT authorize receipts from another boot namespace.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn matches_retained_binding(
         &self,
         binding: &Binding,
@@ -307,10 +287,6 @@ impl CustodianGeneration {
     /// A starting custodian MUST take a generation strictly greater than every
     /// generation previously recorded in its boot namespace. Absence starts at
     /// one; overflow MUST refuse rather than wrap or reuse an earlier lifetime.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn successor(previous: Option<Self>) -> Result<Self, Refusal> {
         match previous {
             None => Ok(Self(1)),
@@ -419,10 +395,6 @@ pub enum ProcessClass {
 /// account and kernel-created entries are unrelated and MUST NOT be touched.
 /// A possibly-descendant process whose token or creation is unobservable MUST
 /// be ambiguous, never unrelated.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn classify_process(prior: &PriorWorker, observation: &ProcessObservation) -> ProcessClass {
     match observation {
         ProcessObservation::Exited | ProcessObservation::KernelCreated => ProcessClass::Unrelated,
@@ -453,10 +425,6 @@ pub fn classify_process(prior: &PriorWorker, observation: &ProcessObservation) -
 /// the current admitted worker, and its generation-scoped named job no longer
 /// exists. Current/future generations, identity drift, a surviving job and
 /// observation errors MUST refuse without adoption, termination or deletion.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn prior_receipt_admission(
     current: CustodianGeneration,
     recorded: CustodianGeneration,
@@ -496,10 +464,6 @@ pub const PRIOR_SESSION_ROUNDS: usize = 8;
 /// session. Each pass MAY terminate only planned stragglers; any ambiguous
 /// observation, scan error or termination error MUST refuse. Exhausting the
 /// bounded passes without an empty observation MUST refuse replacement.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn drain_prior_session(
     prior: &PriorWorker,
     rounds: usize,
@@ -537,10 +501,6 @@ pub struct PipePeer {
 /// A pipe MUST be reusable only when its server has the exact retained PID and
 /// creation time, account SID, named-job membership and configured executable.
 /// Matching a name, PID alone or same-account SID alone MUST NOT authorize it.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn verify_peer(
     identity: &WorkerIdentity,
     expected: ProcessIdentity,
@@ -570,10 +530,6 @@ pub enum HeldWorkerDecision {
 /// without authorizing termination. Only a conclusively dead root whose exact
 /// job handle is still held MAY authorize whole-job drainage before replacement.
 /// Process-observation errors MUST propagate without probing or cleanup.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn held_worker_decision(
     root_running: Result<bool, Refusal>,
     probe: impl FnOnce() -> Result<(), Refusal>,
@@ -600,10 +556,6 @@ pub enum RecoveryDecision {
 /// mismatched owned worker may be stopped only after root-owned job/process
 /// custody is established. Incomplete or foreign metadata MUST refuse without
 /// terminating a process, removing a pipe or deleting personal data.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 #[expect(
     clippy::fn_params_excessive_bools,
     reason = "four independent custody observations form the decision truth table"
@@ -693,10 +645,6 @@ impl WorkerPath {
     /// environment-expanded, device and ambiguous entries MUST refuse;
     /// configuration authority alone MUST NOT bypass the native directory
     /// ownership and write-ACL checks.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn parse(value: &str) -> Result<Self, Refusal> {
         if value.is_empty() || value.len() > 4096 || !value.is_ascii() {
             return Err(Refusal::Package);

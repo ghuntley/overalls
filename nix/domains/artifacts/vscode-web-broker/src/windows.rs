@@ -328,10 +328,6 @@ fn ancestors(path: &LocalPath) -> Result<(), Refusal> {
 /// replacement/delete/ACL authority. A caller path or existence alone MUST NOT
 /// establish immutable package custody. Retained-worker adoption and recovery
 /// MUST recheck executable custody before trusting the retained process.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn package_file(path: &LocalPath) -> Result<(), Refusal> {
     ancestors(path)?;
     let file = path_handle(path.as_str())?;
@@ -561,10 +557,6 @@ fn copy_sid(pointer: windows_sys::Win32::Security::PSID) -> Result<AccountSid, R
 /// Resolution MUST use the enabled local SAM account for the exact canonical
 /// `u<uid>` name after fresh roster reconciliation. It MUST NOT resolve a domain
 /// fallback or infer the SID from a name, UID or profile-directory convention.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn resolve_account(uid: u32, username: &str) -> Result<AccountSid, Refusal> {
     if !(200_000..=999_999).contains(&uid) || username != format!("u{uid}") {
         return Err(Refusal::Account);
@@ -693,10 +685,6 @@ fn process_token(process: &OwnedHandle) -> TokenObservation {
 /// A prior generation's exact job name MUST be reported present whenever it
 /// opens, and absent only on `ERROR_FILE_NOT_FOUND`. Any other failure MUST
 /// refuse. The probe MUST NOT retain, adopt, terminate or modify that job.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn prior_job_present(
     identity: &WorkerIdentity,
     generation: CustodianGeneration,
@@ -730,10 +718,6 @@ fn job_name_present(name: &str) -> Result<bool, Refusal> {
 /// unopenable kernel-parented entry, a readable token and its exact kernel
 /// creation identity are the only facts reported. Every other failure MUST be
 /// reported as unobservable/unreadable, and snapshot failure MUST refuse.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn observe_processes() -> Result<Vec<ProcessObservation>, Refusal> {
     let entry_size = u32::try_from(size_of::<PROCESSENTRY32W>()).map_err(|_| Refusal::Custody)?;
     let snapshot = owned(
@@ -818,10 +802,6 @@ fn observe_process(pid: u32, parent: u32) -> ProcessObservation {
 /// has the prior worker's exact account SID and logon session. PID reuse is
 /// left to the next complete observation. Any other mismatch, or failure to
 /// observe exit within two seconds, MUST refuse.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn terminate_straggler(prior: &PriorWorker, target: ProcessIdentity) -> Result<(), Refusal> {
     // SAFETY: SetLastError only writes this thread's last-error value.
     unsafe {
@@ -1566,10 +1546,6 @@ impl Worker {
     /// publishes the receipt. Custodian loss at every intermediate point MUST
     /// kill the child; the TCP gateway MUST never hold a worker job handle.
     #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
-    #[expect(
         clippy::too_many_lines,
         reason = "one atomic launch sequence whose job and handles must be stopped on every failure path"
     )]
@@ -1775,10 +1751,6 @@ impl Worker {
     /// The open MUST permit identification only, so a foreign pipe
     /// server cannot impersonate the `LocalSystem` broker. Failure closes the
     /// connection without killing or deleting the possible server.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn connect(&self) -> Result<Pipe, Refusal> {
         let reservation = Pipe::reserve().map_err(|_| Refusal::Capacity)?;
         let pipe_name = wide(&self.identity.pipe_name(self.generation));

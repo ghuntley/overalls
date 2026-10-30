@@ -50,10 +50,6 @@ trivial_numeric_casts = "warn"
 unreachable_pub = "warn"
 missing_debug_implementations = "warn"
 
-[lints.rustdoc]
-broken_intra_doc_links = "deny"
-private_intra_doc_links = "warn"
-
 [lints.clippy]
 all = { level = "warn", priority = -1 }
 pedantic = { level = "warn", priority = -1 }

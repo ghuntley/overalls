@@ -410,10 +410,6 @@ impl Pipe {
     /// read timeout. Its overlapped read MUST poll shutdown at most every 100ms
     /// and retire/cancel owned kernel storage when either relay direction ends.
     /// Worker pipe loss MUST still complete or fail the retained operation.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-    )]
     pub fn read_until_cancelled(
         &mut self,
         buffer: &mut [u8],

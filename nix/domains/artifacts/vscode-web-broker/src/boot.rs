@@ -10,10 +10,6 @@ use url::Url;
 /// @cc [owner:ghuntley,label:security] editor-preface-bounded-closed-frame
 /// `read_preface` MUST reject empty, oversized, truncated, malformed, duplicate
 /// or additional fields before returning account or execution data.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn read_preface(reader: &mut impl Read) -> Result<Preface, Refusal> {
     let mut length = [0_u8; 4];
     reader.read_exact(&mut length).map_err(|_| Refusal::Frame)?;
@@ -42,10 +38,6 @@ pub fn ready(writer: &mut impl Write) -> io::Result<()> {
 /// `parse_boot` MUST require exactly one current placement, positive execution
 /// epoch and nonreserved profile IPv4 address. A logical generation update MUST
 /// NOT change physical-boot acceptance.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn parse_boot(cmdline: &str) -> Result<Boot, Refusal> {
     if cmdline.len() > 4096 {
         return Err(Refusal::Boot);
@@ -90,10 +82,6 @@ pub fn parse_boot(cmdline: &str) -> Result<Boot, Refusal> {
 /// The origin MUST be the canonical HTTPS hostname bound by the exact label.
 /// The webview template MUST use only that origin's DNS zone and immutable
 /// release; no caller-provided template, path, credentials or redirects enter it.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn webview_template(binding: &Binding) -> Result<String, Refusal> {
     let origin = Url::parse(&binding.editor_origin).map_err(|_| Refusal::Origin)?;
     let host = origin.host_str().ok_or(Refusal::Origin)?;
@@ -125,10 +113,6 @@ pub fn webview_template(binding: &Binding) -> Result<String, Refusal> {
 /// Admission MUST bind all required UUIDs, the current placement/epoch, the
 /// exact installed package tuple and a safe non-system account UID/name. No
 /// missing field, another package, service or port may fall back to a worker.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn validate(preface: &Preface, boot: &Boot, package: &Descriptor) -> Result<(), Refusal> {
     let binding = &preface.binding;
     if preface.version != 1

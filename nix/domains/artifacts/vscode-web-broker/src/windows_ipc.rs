@@ -61,10 +61,6 @@ pub fn name(physical_key: &str) -> Result<String, Refusal> {
 /// The first protected SYSTEM-only pipe instance MUST reserve the fixed boot
 /// name before accepting requests. Remote clients MUST be rejected by the
 /// kernel. No request may choose a pipe path, ACL, executable or process token.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn listener(name: &str, first: bool) -> Result<Pipe, Refusal> {
     let reservation = Pipe::reserve().map_err(|_| Refusal::Capacity)?;
     let sddl: Vec<u16> = "O:SYG:SYD:P(A;;FA;;;SY)"
@@ -217,10 +213,6 @@ fn peer_pid(pipe: &Pipe, server: bool) -> Result<u32, Refusal> {
 /// validate its creation time, SYSTEM token and fixed installed executable.
 /// The closed versioned hello MUST match that kernel identity. Neither side
 /// may impersonate the other or accept a caller-supplied process as authority.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn authenticate(
     pipe: &mut Pipe,
     server: bool,

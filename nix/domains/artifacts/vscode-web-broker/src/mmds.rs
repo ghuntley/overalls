@@ -52,10 +52,6 @@ impl Identity {
 /// MUST refuse; neither the challenge nor metadata text may be returned.
 /// The opaque state namespace MUST change when the physical boot challenge,
 /// placement or execution epoch changes, including reboot at the same epoch.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn parse_document(body: &[u8]) -> Result<Identity, Refusal> {
     if body.is_empty() || body.len() > MAX_RESPONSE {
         return Err(Refusal::Boot);
@@ -277,10 +273,6 @@ fn fetch_at(address: SocketAddrV4, timeout: Duration) -> Result<Identity, Refusa
 /// No proxy, redirect, retry or durable token state is allowed. Token and body
 /// bytes MUST NOT enter diagnostics or returned error values. The supplied
 /// timeout MUST bound both requests together.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
-)]
 pub fn fetch(timeout: Duration) -> Result<Identity, Refusal> {
     fetch_at(SocketAddrV4::new(ADDRESS, 80), timeout)
 }

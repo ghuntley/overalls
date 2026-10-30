@@ -70,10 +70,6 @@ fn parse(arguments: &[String]) -> Option<Request> {
 /// @cc [owner:ghuntley,label:security;recovery] stable-owned-lock-inode
 /// Locks MUST be regular, singly linked, private caller-owned files, opened
 /// without following links; flock descriptors MUST survive utility exec.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
-)]
 fn lock(path: &Path, shared: bool) -> Result<OwnedFd, u8> {
     let fd = open(
         path,
@@ -127,10 +123,6 @@ mod child_fence {
     /// @cc [owner:ghuntley,label:recovery] git-child-parent-death
     /// Before exec, children MUST install parent-death SIGKILL and verify the
     /// recorded parent, closing the setup race. Lock descriptors survive exec.
-    #[expect(
-        rustdoc::broken_intra_doc_links,
-        reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
-    )]
     pub(super) fn install(command: &mut Command, parent: Pid) {
         let fence = move || {
             if set_parent_process_death_signal(Some(Signal::KILL)).is_err()
@@ -157,10 +149,6 @@ mod child_fence {
 /// reuse. Adopted descendants in every process group/session MUST be reaped
 /// before cleanup is confirmed;
 /// unresolved cleanup MUST report failure and retain descendant-held locks.
-#[expect(
-    rustdoc::broken_intra_doc_links,
-    reason = "the @cc contract metadata [owner:…,label:…] is code-contracts syntax, not an intra-doc link"
-)]
 fn terminate(child: &mut Child, pid: Pid) -> Result<(), u8> {
     let _ = kill_process_group(pid, Signal::KILL);
     let _ = child.kill();
@@ -213,7 +201,6 @@ fn run(request: Request) -> Result<u8, u8> {
 /// Forwarding MUST retain at most one bounded chunk, observe caller EOF even
 /// while stdout is blocked, and preserve exact bytes within the command limit.
 #[expect(
-    rustdoc::broken_intra_doc_links,
     clippy::too_many_lines,
     reason = "the @cc metadata is code-contracts syntax, not an intra-doc link; one poll loop owns the caller, child and output state that the bounded-chunk contract reasons about"
 )]
