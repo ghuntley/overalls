@@ -89,7 +89,7 @@ def mila_platform(
         env: dict[str, str] = {},
         path_env: dict[str, str] = {},
         require: list[str] = [],
-        srcs: list[str] | Select = [],
+        srcs: list[str] = [],
         check: bool = False,
         labels: list[str] = [],
         visibility: list[str] = ["PUBLIC"]):
