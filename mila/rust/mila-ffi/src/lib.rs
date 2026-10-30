@@ -1179,6 +1179,42 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     })
 }
 
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-terminal-end
+/// Android MUST end a named terminal session only through `terminal kill` for that
+/// machine and session id, submitted once with the caller's request id; the bounded
+/// receipt is returned unchanged for the adapter to read `closed` from.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalEnd(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    terminal: jni::objects::JString<'_>,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jbyteArray {
+    let (Some(machine), Some(terminal), Some(request_id)) = (
+        jni_string_bytes(&mut env, &machine),
+        jni_string_bytes(&mut env, &terminal),
+        jni_string_bytes(&mut env, &request_id),
+    ) else {
+        return std::ptr::null_mut();
+    };
+    jni_session_bytes(&mut env, |out, capacity, written| unsafe {
+        session::mila_session_terminal_end(
+            handle as u64,
+            machine.as_ptr(),
+            machine.len(),
+            terminal.as_ptr(),
+            terminal.len(),
+            request_id.as_ptr(),
+            request_id.len(),
+            out,
+            capacity,
+            written,
+        )
+    })
+}
+
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalAttachSession(
     mut env: jni::JNIEnv<'_>,
