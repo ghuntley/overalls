@@ -144,7 +144,9 @@ let
     [nix]
   '' + toolLines + "  cells_id = ${cellsId}\n");
 in
-pkgs.runCommand "overalls-buck-cells" { } ''
+# A symlink farm: build it locally rather than through a remote builder
+# (a wedged relay once held every checkout's cells rebuild).
+pkgs.runCommandLocal "overalls-buck-cells" { } ''
   mkdir -p "$out/prelude" "$out/bin"
   ${lib.concatStrings (lib.mapAttrsToList (cell: group: lib.concatStrings (lib.mapAttrsToList (name: path: ''
     mkdir -p "$out/${cell}"
