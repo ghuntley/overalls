@@ -191,6 +191,10 @@ pkgs.stdenv.mkDerivation {
     tar -xJf ${sdk} -C "$TMPDIR"
     export SDKROOT="$TMPDIR/MacOSX11.3.sdk"
     export CARGO_TARGET_DIR="$TMPDIR/target"
+    # Panic locations would otherwise embed vendored-crate store paths, and one
+    # such reference keeps the whole vendor link farm (every crate) in Lyra's
+    # runtime closure, as the cross builds already avoid.
+    export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
     for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu; do
       cargo zigbuild --profile hardened --locked --offline --target "$target" --bin overalls
     done
