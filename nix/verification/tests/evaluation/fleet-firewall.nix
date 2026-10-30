@@ -12,7 +12,7 @@ let
   # Static grants use documentation addresses; fleet hosts take theirs from
   # the SOPS-delivered fleet addresses (runtimeGrant below).
   grants = {
-    overalls = { address = "192.0.2.51"; comment = "Overalls fleet host"; };
+    panterloons = { address = "192.0.2.51"; comment = "Panterloons fleet host"; };
     dungarees = { address = "192.0.2.52"; comment = "Dungarees fleet host"; };
   };
   nft = evaluate {
@@ -142,7 +142,7 @@ let
       iptables.networking.firewall.allowedUDPPortRanges
     ];
     nftRules = lib.all (fragment: lib.hasInfix fragment nft.networking.firewall.extraInputRules) [
-      ''ip saddr 192.0.2.51 meta l4proto { tcp, udp } accept comment "Overalls fleet host"''
+      ''ip saddr 192.0.2.51 meta l4proto { tcp, udp } accept comment "Panterloons fleet host"''
       ''ip saddr 192.0.2.52 meta l4proto { tcp, udp } accept comment "Dungarees fleet host"''
     ] && !(lib.hasInfix "dport" nft.networking.firewall.extraInputRules);
     iptablesRules = lib.all (fragment: lib.hasInfix fragment iptables.networking.firewall.extraCommands) [

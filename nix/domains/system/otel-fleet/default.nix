@@ -153,7 +153,7 @@ let
               { color = "green"; value = slo.target; }
             ]; };
           };
-        }) (builtins.length sloCatalog)) ++ (import ./diagnostic-panels.nix);
+        }) (builtins.length sloCatalog)) ++ (import ./diagnostic-panels.nix { inherit hosts; });
   });
 in {
   imports = [ ../logging/default.nix ./trace-spool.nix ./public-grafana.nix ./grafana-logs.nix ./burn-delivery.nix ./service-levels.nix ./request-recorder.nix ./request-sources.nix ./browser-probes.nix
@@ -177,13 +177,12 @@ in {
     hosts = {
       central = lib.mkOption {
         type = lib.types.strMatching "[a-z][a-z0-9-]*";
-        default = "overalls";
+        # No default: each deployment names its own hosts (nix/policy/fleet/hosts.nix).
         description = "Host name of this deployment's central telemetry host (fleet address 10.90.0.1).";
       };
       worker = lib.mkOption {
         type = lib.types.nullOr (lib.types.strMatching "[a-z][a-z0-9-]*");
-        default = "dungarees";
-        description = "Host name of this deployment's worker telemetry host (fleet address 10.90.0.2), or null for a single-host deployment.";
+        description = "Host name of this deployment's worker telemetry host (fleet address 10.90.0.2), or null for a single-host deployment. Required, like central.";
       };
     };
     roster = lib.mkOption {

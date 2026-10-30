@@ -45,7 +45,7 @@ no Unix account. Secret preparation alone creates host keys without enabling SSH
 Fleet access also enables Mosh on the host and opens UDP ports 60000–61000 in
 the NixOS firewall. Any provider firewall must permit that range too. Install a
 Mosh client locally and connect with `mosh USER@HOST`; where Porsche owns port 22
-(including Overalls), use `mosh --ssh="ssh -p 2222" ghuntley@HOST` to bootstrap
+(including Panterloons), use `mosh --ssh="ssh -p 2222" ghuntley@HOST` to bootstrap
 through administrative OpenSSH. New sessions use the same declared SSH keys.
 Existing Mosh sessions require separate termination after key/account revocation.
 This configuration does not enable Mosh inside guest VMs.

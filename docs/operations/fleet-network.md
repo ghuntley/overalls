@@ -3,21 +3,16 @@
 The [physical deployment](../../fleet/fleet-network.nix) declares one `fleet0`
 tunnel per deployment (ADR-0238, ADR-0239). The Panterloons tunnel assigns
 Panterloons `10.90.0.1/32`, Dungarees `10.90.0.2/32` and Salopettes
-`10.90.0.3/32`; Overalls holds `10.90.0.1/32` alone in its own tunnel until it
-retires. The tunnels never peer, so the same tunnel address names each
-deployment's own control plane.
+`10.90.0.3/32`. Each further deployment would own a separate tunnel; tunnels
+never peer, so the same tunnel address names each deployment's own control plane.
 WireGuard uses UDP 51820 between physical IPv4 addresses. Only declared peers
 may reach that UDP destination; each peer owns exactly one tunnel `/32`. IPv6 is
 disabled. Salopettes peers only with Panterloons, whose Marshall will resolve
 `notifications.overalls.dev` to `10.90.0.3` and reach Susan over the tunnel on
-TCP 443 (ADR-0233). Overalls resolves that name through public DNS.
-
-Until the operator moves `ghuntley.dev` DNS to Panterloons, the public names
-still reach Overalls, and Panterloons and Dungarees cannot serve public
-traffic.
+TCP 443 (ADR-0233).
 
 Public addresses never appear in the repository (ADR-0233). Names such as
-`OVERALLS_PRIMARY_IPV4` below are secrets in
+`PANTERLOONS_PRIMARY_IPV4` below are secrets in
 [`secrets/fleet-addresses.enc.json`](../../secrets/fleet-addresses.enc.json):
 hosts decrypt them into `/run/overalls-secrets/fleet-addresses/`, and operators
 read them with `sops --decrypt` into private storage when a command needs the
@@ -25,11 +20,11 @@ value. Rotating an address is a document change followed by the ordinary
 update; see [the secrets guide](../../secrets/README.md).
 
 ```text
-Public browser -> OVERALLS_PRIMARY_IPV4:443 -> Marshall browser listener (4443)
-Public SSH     -> OVERALLS_PRIMARY_IPV4:22  -> Porsche
-Public apps    -> OVERALLS_SERVICE_IPV4     -> Audi (Overalls)  -> local Lilly connector -> guest
-Public apps    -> DUNGAREES_SERVICE_IPV4     -> Audi (Dungarees) -> local Lilly connector -> guest
-Public DNS     -> OVERALLS_SERVICE_IPV4 / DUNGAREES_SERVICE_IPV4 UDP+TCP 53 -> Audi DNS replicas
+Public browser -> PANTERLOONS_PRIMARY_IPV4:443 -> Marshall browser listener (4443)
+Public SSH     -> PANTERLOONS_PRIMARY_IPV4:22  -> Porsche
+Public apps    -> PANTERLOONS_SERVICE_IPV4     -> Audi (Panterloons) -> local Lilly connector -> guest
+Public apps    -> DUNGAREES_SERVICE_IPV4        -> Audi (Dungarees)   -> local Lilly connector -> guest
+Public DNS     -> PANTERLOONS_SERVICE_IPV4 / DUNGAREES_SERVICE_IPV4 UDP+TCP 53 -> Audi DNS replicas
 
 Worker fleet clients (Dungarees, Panterloons tunnel)
   -> verified HTTPS over fleet0
@@ -47,7 +42,7 @@ between its explicitly enrolled gateway peers on TCP 9445; a single-use Marshall
 capability binds the original peer, destination and inner lease. The destination
 still uses its local restricted Lilly connector.
 
-Overalls retains its loopback DNS mapping for local database and service TLS.
+The control plane retains its loopback DNS mapping for local database and service TLS.
 Dungarees maps `ghuntley.dev` to the tunnel address and uses port 5443 with the
 existing service CA. The public browser hostname and external DNS remain separate
 from this host-local resolution. Lilly, Ziggy, private Audi certificate renewal,
@@ -100,15 +95,15 @@ replace them before activation, following the Ziggy placeholder precedent.
 Operator rollout order:
 
 1. At the external `ghuntley.dev` DNS provider, create
-   `ns1.ghuntley.dev A OVERALLS_SERVICE_IPV4` and `ns2.ghuntley.dev A DUNGAREES_SERVICE_IPV4`,
+   `ns1.ghuntley.dev A PANTERLOONS_SERVICE_IPV4` and `ns2.ghuntley.dev A DUNGAREES_SERVICE_IPV4`,
    then delegate `apps.ghuntley.dev NS ns1.ghuntley.dev, ns2.ghuntley.dev`.
-   Keep the apex `ghuntley.dev A OVERALLS_PRIMARY_IPV4` external: the proxy's HTTP-01
+   Keep the apex `ghuntley.dev A PANTERLOONS_PRIMARY_IPV4` external: the proxy's HTTP-01
    issuance and Porsche's public origin depend on it, and Audi DNS serves no
    apex A record.
-2. On Overalls, enroll services with the Marshall operator CLI, writing each
+2. On Panterloons, enroll services with the Marshall operator CLI, writing each
    token to private storage outside the checkout:
-   `audi-dns-rotate audi-overalls-dns /private/overalls-dns.token`,
-   `audi-gateway-rotate audi-overalls HOST_ID OVERALLS_SERVICE_IPV4 10.90.0.1 9445 /private/overalls.token`,
+   `audi-dns-rotate audi-panterloons-dns /private/panterloons-dns.token`,
+   `audi-gateway-rotate audi-panterloons HOST_ID PANTERLOONS_SERVICE_IPV4 10.90.0.1 9445 /private/panterloons.token`,
    `audi-dns-rotate audi-dungarees-dns /private/dungarees-dns.token`, and
    `audi-gateway-rotate audi-dungarees HOST_ID DUNGAREES_SERVICE_IPV4 10.90.0.2 9445 /private/dungarees.token`.
    `HOST_ID` is the host's enrolled Lilly host UUID. Verify each file with
@@ -121,9 +116,9 @@ Operator rollout order:
 4. Provision the encrypted backup document and S3 destination, enable
    `services.overallsBackups`, and complete a PostgreSQL/keyring recovery point
    before making the shared wildcard key a production dependency. Deploy
-   Overalls first (Marshall gains the wildcard issuer and both local Audi
+   Panterloons first (Marshall gains the wildcard issuer and both local Audi
    roles), then Dungarees (worker roles reach Marshall over `fleet0`).
-5. Validate externally: `dig @OVERALLS_SERVICE_IPV4 apps.ghuntley.dev SOA` and the same
+5. Validate externally: `dig @PANTERLOONS_SERVICE_IPV4 apps.ghuntley.dev SOA` and the same
    against `DUNGAREES_SERVICE_IPV4`; `dig +trace apps.ghuntley.dev NS` from a public resolver;
    confirm TCP 22/443/80 and UDP/TCP 53 reach both addresses from an
    unlisted source; stop one `audi-dns` at a time and confirm the other

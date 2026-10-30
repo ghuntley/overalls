@@ -25,6 +25,7 @@ in pkgs.testers.runNixOSTest {
     services.overallsOtelGuest.enable = lib.mkForce false;
     services.overallsOtelFleet = {
       enable = true; role = "central";
+      hosts = { central = "server"; worker = "worker"; };
       publicGrafana.enable = true;
     };
     services.marshallProxy = {

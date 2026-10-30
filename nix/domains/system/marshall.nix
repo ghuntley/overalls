@@ -38,9 +38,10 @@ let
     acme_nameservers="$(${pkgs.jq}/bin/jq -cn ${acmeArguments} ${lib.escapeShellArg acmeFilter})" || exit 1
   '';
   sloCatalog = pkgs.writeText "marshall-fleet-slo-catalog.json" (builtins.toJSON (import ./otel-fleet/slo-catalog.nix {
-    # The deployment's telemetry roster; hosts without fleet telemetry keep the default.
-    hosts = lib.attrByPath [ "services" "overallsOtelFleet" "roster" ]
-      (import ./otel-fleet/default-roster.nix) config;
+    # The deployment's telemetry roster; a host without fleet telemetry is its own roster.
+    hosts = if lib.attrByPath [ "services" "overallsOtelFleet" "enable" ] false config
+      then config.services.overallsOtelFleet.roster
+      else [ config.networking.hostName ];
   }));
 in
 {

@@ -100,7 +100,7 @@ in
   # @cc [owner:ghuntley,label:security;deployment] overalls-fleet-api-relay
   # The public fleet hostname MUST reach Marshall's authenticated TLS fleet API
   # without an /etc/hosts alias. The relay MUST preserve TLS end to end, bind
-  # only the primary Overalls address, and remain source-restricted by the fleet
+  # only the control-plane host's primary address, and remain source-restricted by the fleet
   # firewall; it MUST NOT expose a plaintext or wildcard listener.
 
   # @cc [owner:ghuntley,label:recovery] overalls-fleet-relay-socket-follows-marshall

@@ -38,7 +38,7 @@ in pkgs.testers.runNixOSTest {
   nodes.gateway = { lib, ... }: {
     imports = [ module (import ../../support/ssh-host-certificate.nix { inherit pkgs; role = "audi"; }) (fleetHost "gateway" "connector" "10.90.0.1" "10.90.0.2") ];
     virtualisation.memorySize = 4096;
-    services.overallsOtelFleet = { enable = true; role = "central"; };
+    services.overallsOtelFleet = { enable = true; role = "central"; hosts = { central = "gateway"; worker = "connector"; }; };
     services.overallsOtelGuest.enable = lib.mkForce false;
     services.openssh = { enable = true; ports = [ 2222 ]; };
     services.audi = {

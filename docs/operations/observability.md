@@ -4,8 +4,8 @@ Each machine runs its own Fluent Bit process and connects directly to its select
 outputs. There is no fleet log relay. Applications, guest consoles and VM lifetimes
 do not depend on the collector. Export is disabled until explicitly configured.
 
-The enrolled Overalls/Dungarees fleet enables independent OpenTelemetry collection
-through `services.overallsOtelFleet`. Overalls stores ninety-day Prometheus metrics
+The enrolled Panterloons/Dungarees fleet enables independent OpenTelemetry collection
+through `services.overallsOtelFleet`. Panterloons stores ninety-day Prometheus metrics
 and ninety-day Tempo traces within its monitored trace quota, plus authenticated
 Grafana and the fleet VictoriaLogs store. Dungarees exports over the pinned fleet
 tunnel. Seven-day objectives retain their existing targets and unknown-data guards;

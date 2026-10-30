@@ -1,4 +1,4 @@
-{ loggingEnabled ? true, fleetExporterEnabled ? true, hosts ? import ./default-roster.nix }:
+{ loggingEnabled ? true, fleetExporterEnabled ? true, hosts }:
 let
   any = builtins.concatStringsSep " or ";
   addresses = import ./roster-addresses.nix hosts;

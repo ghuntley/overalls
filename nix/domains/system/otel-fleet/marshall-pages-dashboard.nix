@@ -3,7 +3,7 @@
 # recordings and catalog queries, which withhold values when the source is not
 # ready. Log-derived gauges and traces MUST appear only in panels titled as
 # diagnostics and MUST NOT be presented as objective compliance.
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   prometheus = { type = "prometheus"; uid = "overalls-prometheus"; };
   tempo = { type = "tempo"; uid = "overalls-tempo"; };

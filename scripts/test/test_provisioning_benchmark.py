@@ -44,7 +44,7 @@ class BenchmarkCustodyTest(unittest.TestCase):
             database_key=output.parent / "database",
             database_known_hosts=output.parent / "database_known_hosts",
             database_port=2222,
-            admin_overalls="ghuntley@ghuntley.dev",
+            admin_panterloons="ghuntley@ghuntley.dev",
             admin_dungarees="ghuntley@198.51.100.35",
             admin_key=output.parent / "admin",
             admin_known_hosts=output.parent / "admin_known_hosts",
@@ -296,7 +296,7 @@ class BenchmarkCustodyTest(unittest.TestCase):
                             "fresh": True,
                             "images": [config.nixos_image, config.ubuntu_image],
                         }
-                        for host in ("overalls", "dungarees")
+                        for host in ("panterloons", "dungarees")
                     ]
                 raise AssertionError("unexpected read-only query")
 
@@ -378,7 +378,7 @@ class BenchmarkCustodyTest(unittest.TestCase):
                             "fresh": True,
                             "images": [config.nixos_image, config.ubuntu_image],
                         }
-                        for host in ("overalls", "dungarees")
+                        for host in ("panterloons", "dungarees")
                     ]
                 raise AssertionError("unexpected read-only query")
 
@@ -422,7 +422,7 @@ class BenchmarkCustodyTest(unittest.TestCase):
                         "fresh": True,
                         "images": [config.nixos_image, config.ubuntu_image],
                     }
-                    for host in ("overalls", "dungarees")
+                    for host in ("panterloons", "dungarees")
                 ]
 
             def invoke(argv: list[str], _seconds: int) -> str:
@@ -1000,7 +1000,7 @@ class BenchmarkCustodyTest(unittest.TestCase):
                     bench,
                     "placement_snapshot",
                     return_value={
-                        "host": "overalls",
+                        "host": "panterloons",
                         "host_id": VM_ID,
                         "pool_id": VM_ID,
                         "placement_id": VM_ID,

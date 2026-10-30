@@ -237,8 +237,8 @@ and does not auto-enroll hosts. The module marks `tailscale0` unmanaged for
 networkd, leaving the reviewed host network configuration untouched. The NixOS
 firewall trusts all traffic arriving on `tailscale0`.
 
-Exit-node routing is separately opt-in and defaults off. Overalls and Dungarees
-enable it explicitly:
+Exit-node routing is separately opt-in and defaults off. Panterloons, Dungarees
+and Salopettes enable it explicitly:
 
 ```nix
 overalls.tailscale.exitNode = true;
@@ -884,7 +884,7 @@ A run executes only when free space on the filesystem holding `/nix` falls
 below `diskThresholdGiB`; it then runs `nix-collect-garbage
 --delete-older-than preserveGenerations --max-freed` capped at `maxFreedGiB`,
 using the host's configured `nix.package`. Generations younger than the
-preservation window always survive. Overalls and Dungarees use the values
+preservation window always survive. Panterloons and Dungarees use the values
 above, reviewed against their 1.73 TiB mirror and 1593 GiB guest quota; the
 default interval is hourly with jitter and missed-run catch-up.
 

@@ -1,4 +1,4 @@
-{ expectedSamples ? (import ./cadence.nix).sevenDaySamples, hosts ? import ./default-roster.nix }:
+{ expectedSamples ? (import ./cadence.nix).sevenDaySamples, hosts }:
 let
   objectives = import ./objectives.nix { inherit hosts; };
   # Burn rate = budget fraction consumed * objective horizon / long window.

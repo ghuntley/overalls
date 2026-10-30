@@ -14,6 +14,7 @@ let
     services.overallsOtelGuest.enable = lib.mkForce false;
     services.overallsOtelFleet = {
       enable = true; role = "central";
+      hosts = { central = "panterloons"; worker = "dungarees"; };
       publicGrafana = { enable = true; inherit port; };
     };
     overalls.fleetNetwork = {

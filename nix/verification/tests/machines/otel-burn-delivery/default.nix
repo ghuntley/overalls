@@ -82,7 +82,7 @@ in hegel.runTest {
       };
       environment.systemPackages = [ pkgs.curl pkgs.jq pkgs.iproute2 pkgs.prometheus-alertmanager ];
       environment.etc."burn-fixture-roster.json".text = builtins.toJSON
-        (map (objective: objective.id) (import ../../../../domains/system/otel-fleet/objectives.nix {}));
+        (map (objective: objective.id) (import ../../../../domains/system/otel-fleet/objectives.nix { hosts = [ "panterloons" "dungarees" ]; }));
     };
   };
   testScript = builtins.readFile ./driver.py;

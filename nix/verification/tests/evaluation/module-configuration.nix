@@ -238,7 +238,7 @@ let
     services.lilly.crashDumps = { enable = true; publicKeyFile = "/run/keys/dump.pem"; };
   };
   sdkHealthModule = {
-    services.overallsOtelFleet = { enable = true; role = "worker"; };
+    services.overallsOtelFleet = { enable = true; role = "worker"; hosts = { central = "panterloons"; worker = "dungarees"; }; };
     services.overallsLogging.enable = true;
     # This observer-only fixture has no Lilly/Audi guest binding. Keep the real
     # fleet/SDK modules and their assertions; guest intake is a separate graph.

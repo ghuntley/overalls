@@ -82,7 +82,7 @@ class Configuration:
     database_key: Path
     database_known_hosts: Path
     database_port: int
-    admin_overalls: str
+    admin_panterloons: str
     admin_dungarees: str
     admin_key: Path
     admin_known_hosts: Path
@@ -151,7 +151,7 @@ def read_config() -> Configuration:
     parser.add_argument("--database-key", type=Path, required=True)
     parser.add_argument("--database-known-hosts", type=Path, required=True)
     parser.add_argument("--database-port", type=int, default=22)
-    parser.add_argument("--admin-overalls", required=True)
+    parser.add_argument("--admin-panterloons", required=True)
     parser.add_argument("--admin-dungarees", required=True)
     parser.add_argument("--admin-key", type=Path, required=True)
     parser.add_argument("--admin-known-hosts", type=Path, required=True)
@@ -212,7 +212,7 @@ def read_config() -> Configuration:
         database_key=args.database_key,
         database_known_hosts=args.database_known_hosts,
         database_port=args.database_port,
-        admin_overalls=checked_target(args.admin_overalls),
+        admin_panterloons=checked_target(args.admin_panterloons),
         admin_dungarees=checked_target(args.admin_dungarees),
         admin_key=args.admin_key,
         admin_known_hosts=args.admin_known_hosts,
@@ -641,7 +641,9 @@ def placement_snapshot(config: Configuration, vm_id: str) -> dict[str, object]:
 
 
 def admin_target(config: Configuration, host: str) -> str:
-    target = {"overalls": config.admin_overalls, "dungarees": config.admin_dungarees}.get(host)
+    target = {"panterloons": config.admin_panterloons, "dungarees": config.admin_dungarees}.get(
+        host
+    )
     if target is None:
         raise ValueError("unknown physical host for read-only observation")
     return target
@@ -727,7 +729,7 @@ def deployed_image_proof(config: Configuration) -> dict[str, str]:
         "SELECT coalesce(json_agg(json_build_object('name',name,'fresh',"
         "reported_at > (statement_timestamp() AT TIME ZONE 'UTC') - interval '30 seconds',"
         "'images',inventory->'images')), '[]'::json) "
-        "FROM compute_hosts WHERE name IN ('overalls','dungarees')",
+        "FROM compute_hosts WHERE name IN ('panterloons','dungarees')",
     )
     if not isinstance(reports, list) or len(reports) != 2:
         raise ValueError("enrolled benchmark host reports are missing")
@@ -739,7 +741,7 @@ def deployed_image_proof(config: Configuration) -> dict[str, str]:
         offered = raw.get("images")
         if (
             not isinstance(name, str)
-            or name not in ("overalls", "dungarees")
+            or name not in ("panterloons", "dungarees")
             or name in seen_hosts
             or raw.get("fresh") is not True
             or not isinstance(offered, list)
@@ -755,7 +757,7 @@ def deployed_image_proof(config: Configuration) -> dict[str, str]:
     # (ADR-0159); a templates-off baseline can only be measured on a historical
     # deployment whose configuration still carries a zero budget.
     expected_budget = 0 if config.mode == "baseline" else 34_359_738_368
-    for name in ("overalls", "dungarees"):
+    for name in ("panterloons", "dungarees"):
         target = admin_target(config, name)
         runtime = invoke(
             [

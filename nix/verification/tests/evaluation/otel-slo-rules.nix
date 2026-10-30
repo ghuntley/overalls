@@ -1,8 +1,10 @@
 { pkgs }:
 let
+  # The fixture deployment roster: central host first, then the worker.
+  fixtureHosts = [ "panterloons" "dungarees" ];
   yaml = pkgs.formats.yaml {};
-  candidateQuery = import ../../../domains/system/otel-fleet/candidate-query.nix {};
-  objectiveQuery = import ../../../domains/system/otel-fleet/objective-query.nix {};
+  candidateQuery = import ../../../domains/system/otel-fleet/candidate-query.nix { hosts = fixtureHosts; };
+  objectiveQuery = import ../../../domains/system/otel-fleet/objective-query.nix { hosts = fixtureHosts; };
   lifecycleSources = builtins.filter (source: builtins.elem source.service [ "marshall_ready" "lilly_physical" "porsche_physical" ])
     (import ../../../domains/system/otel-fleet/candidate-sources.nix);
   lifecycleCase = source: { host, clock, visible }: {
@@ -19,7 +21,7 @@ let
       exp_samples = pkgs.lib.optional visible { labels = "overalls:${source.ratio}:ratio5m"; value = 0.5; };
     }];
   };
-  underclassReady = import ../../../domains/system/otel-fleet/underclass-ready.nix {};
+  underclassReady = import ../../../domains/system/otel-fleet/underclass-ready.nix { hosts = fixtureHosts; };
   # Existing source-marker fixtures represent a live producer unless they
   # explicitly supply a frozen source sampling clock. Keep cadence separate
   # from Prometheus scrape freshness to exercise retained collector values.
@@ -59,7 +61,7 @@ let
     promql_expr_test = [{
       expr = "overalls:underclass_proxy_candidate_completion:ratio5m";
       eval_time = "10m";
-      exp_samples = pkgs.lib.optional (hosts == [ "overalls" "dungarees" ] && !stale && marker) {
+      exp_samples = pkgs.lib.optional (hosts == [ "panterloons" "dungarees" ] && !stale && marker) {
         labels = "overalls:underclass_proxy_candidate_completion:ratio5m";
         value = 0.5;
       };
@@ -70,7 +72,7 @@ let
   # its ordinary request counter. Day-scale durations stay finite; overflow,
   # partial samples, a missing 86400-second bucket (retired seven-bound shape),
   # warmup and a missing replica MUST withhold the candidate.
-  underclassLatencyCase = { name, value ? null, hosts ? [ "overalls" "dungarees" ], start ? "1+0x20",
+  underclassLatencyCase = { name, value ? null, hosts ? [ "panterloons" "dungarees" ], start ? "1+0x20",
       counted ? 10, finite ? 10, lastBucket ? true, zero ? "10.0", bucket ? "30.0" }: {
     interval = "30s";
     input_series = builtins.concatMap (host: let
@@ -107,7 +109,7 @@ let
         values = coverage; }
       { series = ''overalls_outer_underclass_proxy_source_sample_time{overalls_telemetry_origin="application",service_name="underclass_proxy",host_name="${host}"}'';
         values = clock; }
-    ]) [ "overalls" "dungarees" ];
+    ]) [ "panterloons" "dungarees" ];
     promql_expr_test = [{
       expr = objectiveQuery { id = "underclass_proxy"; kind = "candidate"; };
       eval_time = "10m";
@@ -124,7 +126,7 @@ let
         values = "1+0x20"; }
       { series = ''overalls_underclass_monitor_sample_time{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="${host}"}'';
         values = clock; }
-    ]) [ "overalls" "dungarees" ];
+    ]) [ "panterloons" "dungarees" ];
     promql_expr_test = [{
       expr = "overalls:underclass_monitor_local_readiness:ratio5m";
       eval_time = "10m";
@@ -149,13 +151,14 @@ let
     }];
   };
   rules = yaml.generate "overalls-otel-slo-rules.yml" {
-    groups = (import ../../../domains/system/otel-fleet/rules.nix {}).groups
-      ++ (import ../../../domains/system/otel-fleet/objective-rules.nix {}).groups;
+    groups = (import ../../../domains/system/otel-fleet/rules.nix { hosts = fixtureHosts; }).groups
+      ++ (import ../../../domains/system/otel-fleet/objective-rules.nix { hosts = fixtureHosts; }).groups;
   };
   longObjectiveGroup = builtins.head ((import ../../../domains/system/otel-fleet/objective-rules.nix {
     # Promtool caps query samples below production Prometheus. Preserve the
     # full seven-day time window with a two-minute synthetic scrape cadence.
     expectedSamples = 5040;
+    hosts = fixtureHosts;
   }).groups);
   longRules = yaml.generate "overalls-otel-slo-long-rules.yml" {
     groups = [ (longObjectiveGroup // {
@@ -173,18 +176,18 @@ let
       input_series = [
         { series = ''up{job="overalls-otel",instance="10.90.0.1:9464"}''; values = "1+0x5070"; }
         { series = ''up{job="overalls-otel",instance="10.90.0.2:9464"}''; values = "1+0x5070"; }
-        { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+1x5070"; }
-        { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+1x5070"; }
-        { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+0x5070"; }
+        { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+1x5070"; }
+        { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+1x5070"; }
+        { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+0x5070"; }
         { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+1x5070"; }
         { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+1x5070"; }
         { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+0x5070"; }
       ] ++ builtins.concatMap (host: builtins.map (metric: {
         series = ''overalls_outer_underclass_proxy_${metric}{overalls_telemetry_origin="application",service_name="underclass_proxy",host_name="${host}"}'';
         values = if metric == "source_start_time" then "0+0x5070" else "0+1x5070";
-      }) [ "requests_total" "successes_total" "source_start_time" ]) [ "overalls" "dungarees" ]
+      }) [ "requests_total" "successes_total" "source_start_time" ]) [ "panterloons" "dungarees" ]
       ++ builtins.concatMap (source: builtins.map (metric: {
-        series = ''overalls_outer_${source.service}_${metric}{overalls_telemetry_origin="application",service_name="${source.service}",host_name="overalls"}'';
+        series = ''overalls_outer_${source.service}_${metric}{overalls_telemetry_origin="application",service_name="${source.service}",host_name="panterloons"}'';
         values = if metric == "source_start_time" then "0+0x5070" else "0+1x5070";
       }) [ "requests_total" "successes_total" "source_start_time" ]) lifecycleSources;
       promql_expr_test = [
@@ -221,7 +224,7 @@ let
         { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}''; values = "0+0x5100"; }
         { series = ''overalls_outer_brady_source_coverage_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
           values = if host == "dungarees" then "0+0x29 3600+0x5070" else "0+0x5100"; }
-      ]) [ "overalls" "dungarees" ];
+      ]) [ "panterloons" "dungarees" ];
       promql_expr_test = [
         { expr = "overalls:slo_brady:ratio7d"; eval_time = "7d1h"; exp_samples = []; }
         { expr = "overalls:slo_brady:ratio7d"; eval_time = "7d2h";
@@ -231,11 +234,11 @@ let
   };
   productionCollectorRule = builtins.head (builtins.filter
     (rule: (rule.record or "") == "overalls:slo_collectors:ratio7d")
-    (builtins.head (import ../../../domains/system/otel-fleet/objective-rules.nix {}).groups).rules);
+    (builtins.head (import ../../../domains/system/otel-fleet/objective-rules.nix { hosts = fixtureHosts; }).groups).rules);
   productionHistoryRule = builtins.head (builtins.filter
     (rule: (rule.record or "") == "overalls:slo_evidence"
       && (rule.labels.slo or "") == "collectors" && (rule.labels.kind or "") == "history_days")
-    (builtins.head (import ../../../domains/system/otel-fleet/diagnostics.nix {}).groups).rules);
+    (builtins.head (import ../../../domains/system/otel-fleet/diagnostics.nix { hosts = fixtureHosts; }).groups).rules);
   cadenceTest = yaml.generate "overalls-otel-production-cadence.yml" {
     rule_files = []; evaluation_interval = "1h";
     tests = [{
@@ -255,7 +258,7 @@ let
   };
   burnRules = yaml.generate "overalls-otel-burn-rules.yml" {
     groups = builtins.filter (group: group.name == "overalls-otel-budget-burn")
-      (import ../../../domains/system/otel-fleet/objective-rules.nix {}).groups;
+      (import ../../../domains/system/otel-fleet/objective-rules.nix { hosts = fixtureHosts; }).groups;
   };
   burnAlert = window: {
     exp_labels = { severity = "warning"; slo = "brady"; status = "provisional"; inherit window; };
@@ -267,15 +270,15 @@ let
     input_series = (builtins.map (host: {
       series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
       values = if sparse then "0+0x819 1+0x20" else "0+1000x840";
-    }) [ "overalls" "dungarees" ]) ++ (builtins.map (host: {
+    }) [ "panterloons" "dungarees" ]) ++ (builtins.map (host: {
       series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
       values = if sparse then "0+0x840"
         else if recovered then "0+${toString successes}x779 ${toString (successes * 779 + 1000)}+1000x60"
         else "0+${toString successes}x840";
-    }) [ "overalls" "dungarees" ]) ++ (builtins.map (host: {
+    }) [ "panterloons" "dungarees" ]) ++ (builtins.map (host: {
       series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
       values = "-604800+0x840";
-    }) [ "overalls" "dungarees" ]) ++ [{
+    }) [ "panterloons" "dungarees" ]) ++ [{
       # The alert evaluator consumes an eligible recording. Full seven-day
       # eligibility is independently exercised by longTest above.
       series = "overalls:slo_brady:ratio7d";
@@ -283,11 +286,11 @@ let
     }] ++ builtins.map (host: {
       series = ''overalls_outer_brady_source_sample_time{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
       values = "0+30x840";
-    }) [ "overalls" "dungarees" ] ++ builtins.map (host: {
+    }) [ "panterloons" "dungarees" ] ++ builtins.map (host: {
       series = ''overalls_outer_brady_source_coverage_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="${host}"}'';
       # Relative fixture clocks place the eligible source seven days before t=0.
       values = if gap && host == "dungarees" then "-604800+0x799 24000+0x40" else "-604800+0x840";
-    }) [ "overalls" "dungarees" ];
+    }) [ "panterloons" "dungarees" ];
     alert_rule_test = builtins.map (window: {
       eval_time = "7h";
       alertname = "OverallsSLOBurn_${window}_brady";
@@ -323,7 +326,7 @@ let
         # A complete two-host local monitor window retains observed zeros.
         interval = "30s";
         input_series = [
-          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="dungarees"}''; values = "0+0x20"; }
         ];
         promql_expr_test = [
@@ -336,7 +339,7 @@ let
         # One absent host cannot make the other host look fleet ready.
         interval = "30s";
         input_series = [
-          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="panterloons"}''; values = "1+0x20"; }
         ];
         promql_expr_test = [
           { expr = "overalls:underclass_monitor_local_readiness:ratio5m";
@@ -348,7 +351,7 @@ let
         # observed gauge happens to be one.
         interval = "30s";
         input_series = [
-          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="dungarees"}''; values = "1+0x13 _ _ 1+0x4"; }
         ];
         promql_expr_test = [
@@ -361,7 +364,7 @@ let
         interval = "30s";
         input_series = [
           { series = ''overalls:underclass_monitor_local_readiness:ratio5m''; values = "1+0x20"; }
-          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name="panterloons"}''; values = "1+0x20"; }
         ];
         promql_expr_test = [
           { expr = ''overalls:underclass_monitor_local_readiness:ratio5m and on() (${underclassReady})'';
@@ -375,68 +378,68 @@ let
           { series = ''haproxy_frontend_http_responses_total{proxy="marshall_public",code="2xx"}''; values = "0+3x20"; }
           { series = ''haproxy_frontend_http_responses_total{proxy="marshall_public",code="4xx"}''; values = "0+2x20"; }
           { series = ''haproxy_frontend_http_responses_total{proxy="marshall_public",code="5xx"}''; values = "0+5x20"; }
-          { series = ''up{job="overalls-otel",instance="overalls"}''; values = "1+0x20"; }
-          { series = ''up{job="overalls-otel",instance="overalls",overalls_telemetry_origin="host",service_name="haproxy-local"}''; values = "0+0x20"; }
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''up{job="overalls-otel",instance="panterloons"}''; values = "1+0x20"; }
+          { series = ''up{job="overalls-otel",instance="panterloons",overalls_telemetry_origin="host",service_name="haproxy-local"}''; values = "0+0x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.01",host_name="overalls"}''; values = "0+0x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.01",host_name="panterloons"}''; values = "0+0x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.01",host_name="dungarees"}''; values = "0+0x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.05",host_name="overalls"}''; values = "0+2x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.05",host_name="panterloons"}''; values = "0+2x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.05",host_name="dungarees"}''; values = "0+2x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.1",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.1",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.1",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_galileo_requests_total{overalls_telemetry_origin="application",service_name="galileo",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_galileo_requests_total{overalls_telemetry_origin="application",service_name="galileo",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_galileo_requests_total{overalls_telemetry_origin="application",service_name="galileo",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_galileo_source_start_time{overalls_telemetry_origin="application",service_name="galileo",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_galileo_source_start_time{overalls_telemetry_origin="application",service_name="galileo",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_galileo_source_start_time{overalls_telemetry_origin="application",service_name="galileo",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_galileo_successes_total{overalls_telemetry_origin="application",service_name="galileo",host_name="overalls"}''; values = "0+7x20"; }
+          { series = ''overalls_outer_galileo_successes_total{overalls_telemetry_origin="application",service_name="galileo",host_name="panterloons"}''; values = "0+7x20"; }
           { series = ''overalls_outer_galileo_successes_total{overalls_telemetry_origin="application",service_name="galileo",host_name="dungarees"}''; values = "0+7x20"; }
-          { series = ''overalls_outer_enrico_requests_total{overalls_telemetry_origin="application",service_name="enrico",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_enrico_source_start_time{overalls_telemetry_origin="application",service_name="enrico",host_name="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_enrico_successes_total{overalls_telemetry_origin="application",service_name="enrico",host_name="overalls"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_porsche_requests_total{overalls_telemetry_origin="application",service_name="porsche",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_porsche_source_start_time{overalls_telemetry_origin="application",service_name="porsche",host_name="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_porsche_successes_total{overalls_telemetry_origin="application",service_name="porsche",host_name="overalls"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_ziggy_requests_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_enrico_requests_total{overalls_telemetry_origin="application",service_name="enrico",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_enrico_source_start_time{overalls_telemetry_origin="application",service_name="enrico",host_name="panterloons"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_enrico_successes_total{overalls_telemetry_origin="application",service_name="enrico",host_name="panterloons"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_porsche_requests_total{overalls_telemetry_origin="application",service_name="porsche",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_porsche_source_start_time{overalls_telemetry_origin="application",service_name="porsche",host_name="panterloons"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_porsche_successes_total{overalls_telemetry_origin="application",service_name="porsche",host_name="panterloons"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_ziggy_requests_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_ziggy_requests_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_ziggy_source_start_time{overalls_telemetry_origin="application",service_name="ziggy",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_ziggy_source_start_time{overalls_telemetry_origin="application",service_name="ziggy",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_ziggy_source_start_time{overalls_telemetry_origin="application",service_name="ziggy",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_ziggy_successes_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_ziggy_successes_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_ziggy_successes_total{overalls_telemetry_origin="application",service_name="ziggy",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_audi_private_requests_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_audi_private_requests_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_audi_private_requests_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_audi_private_source_start_time{overalls_telemetry_origin="application",service_name="audi_private",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_audi_private_source_start_time{overalls_telemetry_origin="application",service_name="audi_private",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_audi_private_source_start_time{overalls_telemetry_origin="application",service_name="audi_private",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_audi_private_successes_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_audi_private_successes_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_audi_private_successes_total{overalls_telemetry_origin="application",service_name="audi_private",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_audi_dns_source_start_time{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_audi_dns_source_start_time{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="dungarees"}''; values = "0+10x20"; }
           { series = ''overalls_outer_audi_dns_source_start_time{overalls_telemetry_origin="application",service_name="audi_dns",host_name="dungarees"}''; values = "1+0x20"; }
           { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_marshall_web_requests_total{overalls_telemetry_origin="application",service_name="marshall_web",host_name="overalls",service_instance_id="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_marshall_web_source_start_time{overalls_telemetry_origin="application",service_name="marshall_web",host_name="overalls",service_instance_id="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_marshall_web_successes_total{overalls_telemetry_origin="application",service_name="marshall_web",host_name="overalls",service_instance_id="overalls"}''; values = "0+7x20"; }
-          { series = ''overalls_outer_marshall_live_requests_total{overalls_telemetry_origin="application",service_name="marshall_live",host_name="overalls",service_instance_id="overalls"}''; values = "0+8x20"; }
-          { series = ''overalls_outer_marshall_live_source_start_time{overalls_telemetry_origin="application",service_name="marshall_live",host_name="overalls",service_instance_id="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_marshall_live_successes_total{overalls_telemetry_origin="application",service_name="marshall_live",host_name="overalls",service_instance_id="overalls"}''; values = "0+6x20"; }
-          { series = ''overalls_outer_marshall_live_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="marshall_live",host_name="overalls",service_instance_id="overalls",le="1.0"}''; values = "0+4x20"; }
-          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_audi_ssh_source_start_time{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_marshall_web_requests_total{overalls_telemetry_origin="application",service_name="marshall_web",host_name="panterloons",service_instance_id="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_marshall_web_source_start_time{overalls_telemetry_origin="application",service_name="marshall_web",host_name="panterloons",service_instance_id="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_marshall_web_successes_total{overalls_telemetry_origin="application",service_name="marshall_web",host_name="panterloons",service_instance_id="overalls"}''; values = "0+7x20"; }
+          { series = ''overalls_outer_marshall_live_requests_total{overalls_telemetry_origin="application",service_name="marshall_live",host_name="panterloons",service_instance_id="overalls"}''; values = "0+8x20"; }
+          { series = ''overalls_outer_marshall_live_source_start_time{overalls_telemetry_origin="application",service_name="marshall_live",host_name="panterloons",service_instance_id="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_marshall_live_successes_total{overalls_telemetry_origin="application",service_name="marshall_live",host_name="panterloons",service_instance_id="overalls"}''; values = "0+6x20"; }
+          { series = ''overalls_outer_marshall_live_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="marshall_live",host_name="panterloons",service_instance_id="overalls",le="1.0"}''; values = "0+4x20"; }
+          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_audi_ssh_source_start_time{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="dungarees"}''; values = "0+10x20"; }
           { series = ''overalls_outer_audi_ssh_source_start_time{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="dungarees"}''; values = "1+0x20"; }
           { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="dungarees"}''; values = "0+5x20"; }
@@ -449,7 +452,7 @@ let
             exp_samples = [{ labels = "overalls:web_ingress_completion:ratio5m"; value = 0.5; }]; }
           { expr = "overalls:telemetry_collector_up:ratio1h";
             eval_time = "10m";
-            exp_samples = [{ labels = ''overalls:telemetry_collector_up:ratio1h{instance="overalls",job="overalls-otel"}''; value = 1; }]; }
+            exp_samples = [{ labels = ''overalls:telemetry_collector_up:ratio1h{instance="panterloons",job="overalls-otel"}''; value = 1; }]; }
           { expr = "overalls:brady_candidate_completion:ratio5m";
             eval_time = "10m";
             exp_samples = [{ labels = "overalls:brady_candidate_completion:ratio5m"; value = 0.5; }]; }
@@ -518,10 +521,10 @@ let
       {
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+5x20"; }
         ];
         promql_expr_test = [
           { expr = "overalls:audi_dns_candidate_completion:ratio5m"; eval_time = "10m"; exp_samples = []; }
@@ -531,12 +534,12 @@ let
       {
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+10x18 _ _"; }
-          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="overalls"}''; values = "0+5x18 _ _"; }
+          { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+10x18 _ _"; }
+          { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="panterloons"}''; values = "0+5x18 _ _"; }
           { series = ''overalls_outer_audi_dns_requests_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="dungarees"}''; values = "0+10x20"; }
           { series = ''overalls_outer_audi_dns_successes_total{overalls_telemetry_origin="application",service_name="audi_dns",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+10x18 _ _"; }
-          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="overalls"}''; values = "0+5x18 _ _"; }
+          { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+10x18 _ _"; }
+          { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="panterloons"}''; values = "0+5x18 _ _"; }
           { series = ''overalls_outer_audi_ssh_requests_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="dungarees"}''; values = "0+10x20"; }
           { series = ''overalls_outer_audi_ssh_successes_total{overalls_telemetry_origin="application",service_name="audi_ssh",host_name="dungarees"}''; values = "0+5x20"; }
         ];
@@ -548,7 +551,7 @@ let
       {
         interval = "30s";
         input_series = [
-          { series = ''up{job="overalls-otel",instance="overalls",overalls_telemetry_origin="host",service_name="haproxy-local"}''; values = "1+0x20"; }
+          { series = ''up{job="overalls-otel",instance="panterloons",overalls_telemetry_origin="host",service_name="haproxy-local"}''; values = "1+0x20"; }
         ];
         promql_expr_test = [
           { expr = "overalls:telemetry_collector_up:ratio1h"; eval_time = "10m"; exp_samples = []; }
@@ -560,19 +563,19 @@ let
         # A partial duration sample must not create a reassuring latency p95.
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="dungarees"}''; values = "0+5x20"; }
         ];
         promql_expr_test = [
@@ -586,19 +589,19 @@ let
         # Such a window cannot yield a finite p95 candidate.
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "1+0x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_count{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="0.5",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="overalls"}''; values = "0+9x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="panterloons"}''; values = "0+9x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="10.0",host_name="dungarees"}''; values = "0+9x20"; }
-          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_duration_seconds_bucket{overalls_telemetry_origin="application",service_name="brady",le="+Inf",host_name="dungarees"}''; values = "0+10x20"; }
         ];
         promql_expr_test = [
@@ -612,11 +615,11 @@ let
         # A reset inside the window must suppress the candidate ratio.
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x13 0+10x6"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x13 0+10x6"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x13 0+10x6"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x13 0+5x6"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x13 0+5x6"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x13 0+5x6"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x13 420+0x6"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x13 420+0x6"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "1+0x13 420+0x6"; }
         ];
         promql_expr_test = [
@@ -627,9 +630,9 @@ let
         # Legacy or interrupted exports without a trusted marker are unknown.
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
         ];
         promql_expr_test = [
@@ -640,11 +643,11 @@ let
         # Equal series counts cannot substitute a marker from another host.
         interval = "30s";
         input_series = [
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+5x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+5x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_successes_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+5x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="retired"}''; values = "1+0x20"; }
         ];
         promql_expr_test = [
@@ -658,9 +661,9 @@ let
         input_series = [
           { series = ''overalls:brady_candidate_completion:ratio5m''; values = "0.5+0x20"; }
           { series = ''overalls:brady_candidate_duration:p95_5m''; values = "0.46+0x20"; }
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "0+10x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "0+10x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "0+10x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "420+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "420+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "420+0x20"; }
         ];
         promql_expr_test = [
@@ -677,9 +680,9 @@ let
         input_series = [
           { series = ''overalls:brady_candidate_completion:ratio5m''; values = "0.5+0x20"; }
           { series = ''overalls:brady_candidate_duration:p95_5m''; values = "0.46+0x20"; }
-          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "7+0x20"; }
+          { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "7+0x20"; }
           { series = ''overalls_outer_brady_requests_total{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "7+0x20"; }
-          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="overalls"}''; values = "1+0x20"; }
+          { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="panterloons"}''; values = "1+0x20"; }
           { series = ''overalls_outer_brady_source_start_time{overalls_telemetry_origin="application",service_name="brady",host_name="dungarees"}''; values = "1+0x20"; }
         ];
         promql_expr_test = [
@@ -704,16 +707,16 @@ let
         ];
       }
     ] ++ builtins.map proxyCase [
-      { hosts = [ "overalls" "dungarees" ]; }
-      { hosts = [ "overalls" ]; }
-      { hosts = [ "overalls" "dungarees" ]; stale = true; }
-      { hosts = [ "overalls" "dungarees" ]; marker = false; }
+      { hosts = [ "panterloons" "dungarees" ]; }
+      { hosts = [ "panterloons" ]; }
+      { hosts = [ "panterloons" "dungarees" ]; stale = true; }
+      { hosts = [ "panterloons" "dungarees" ]; marker = false; }
     ] ++ builtins.concatMap (source: builtins.map (lifecycleCase source) [
-      { host = "overalls"; clock = "0+30x20"; visible = true; }
+      { host = "panterloons"; clock = "0+30x20"; visible = true; }
       { host = "dungarees"; clock = "0+30x20"; visible = false; }
-      { host = "overalls"; clock = "_"; visible = false; }
-      { host = "overalls"; clock = "1+0x20"; visible = false; }
-      { host = "overalls"; clock = "603+0x20"; visible = false; }
+      { host = "panterloons"; clock = "_"; visible = false; }
+      { host = "panterloons"; clock = "1+0x20"; visible = false; }
+      { host = "panterloons"; clock = "603+0x20"; visible = false; }
     ]) lifecycleSources ++ builtins.map underclassLatencyCase [
       { name = "unified histogram yields a finite thirty-second-bucket p95"; value = 29; }
       { name = "day-scale durations remain inside the finite histogram"; zero = "21600.0"; bucket = "86400.0"; value = 83160; }
@@ -721,7 +724,7 @@ let
       { name = "requests without duration samples withhold p95"; counted = 9; finite = 9; }
       { name = "retired seven-bound shape without the one-day bucket withholds p95"; lastBucket = false; }
       { name = "warming source withholds p95"; start = "420+0x20"; }
-      { name = "missing replica withholds p95"; hosts = [ "overalls" ]; }
+      { name = "missing replica withholds p95"; hosts = [ "panterloons" ]; }
     ] ++ builtins.map cachedProxyCase [
       { clock = "1+0x20"; visible = false; }
       { clock = "0+30x20"; visible = true; }

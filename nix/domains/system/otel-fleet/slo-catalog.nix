@@ -1,4 +1,4 @@
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   sources = import ./candidate-sources.nix;
   candidateQuery = import ./candidate-query.nix { inherit hosts; };

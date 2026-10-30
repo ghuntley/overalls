@@ -22,15 +22,15 @@ Create a unique mode-0700 directory outside Git. Its `run.json` contains:
 ```
 
 `protected_address` is the host's primary public IPv4 address, which guests must
-not reach. It is a fleet secret (`OVERALLS_PRIMARY_IPV4` in
+not reach. It is a fleet secret (for example `PANTERLOONS_PRIMARY_IPV4` in
 `secrets/fleet-addresses.enc.json`); copy it from the decrypted document and keep
 it only in the private directory.
 
 Use an existing registered account key with mode 0600. The runner references it;
 it does not copy, register or revoke keys. `admin_alias` must select an independently
 pinned administrator SSH connection with read-only sudo access to updater state,
-Brady counters/journal and nftables. Overalls administrative OpenSSH uses port
-2222; Porsche uses port 22.
+Brady counters/journal and nftables. The control plane's administrative OpenSSH uses
+port 2222; Porsche uses port 22.
 
 Place a pinned `known_hosts` entry for Porsche in the private directory. Obtain
 its public key from `/var/lib/porsche/keys/ssh_host_ed25519_key.pub` through the

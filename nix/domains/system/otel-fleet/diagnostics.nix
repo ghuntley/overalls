@@ -1,4 +1,4 @@
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   sources = import ./objectives.nix { inherit hosts; };
   collectors = toString (builtins.length hosts);

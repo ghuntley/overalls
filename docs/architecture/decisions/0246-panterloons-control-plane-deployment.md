@@ -95,6 +95,17 @@ The operator directed this on 2026-10-20.
   telemetry worker defaults.
 - [Remote builders](../../../fleet/remote-builders.nix) and its
   [evaluation](../../../nix/verification/tests/evaluation/remote-builders.nix).
+- 2026-10-30: the operator confirmed the Overalls host no longer exists. Its
+  repository remnants were removed: the 22 `secrets/overalls-*.enc.json` host
+  documents (`overalls-susan.enc.json` stays; it is the Salopettes Susan relay
+  document), its WireGuard public key in
+  [`fleet-public-keys.json`](../../../fleet/fleet-public-keys.json), the
+  telemetry roster defaults that named it (see [ADR-0238](0238-panterloons-deployment-and-per-deployment-tunnels.md))
+  and the benchmark's `overalls` host. The four `OVERALLS_*` names in
+  `secrets/fleet-addresses.enc.json` are unused and remain until an operator with
+  a recovery identity deletes them. `secrets/fleet-tailscale.enc.json` is still
+  sealed to the retired host's recipient, so `secrets check` reports recipient
+  drift for it until such an operator runs `secrets rekey`.
 - Remaining: activation, Lilly enrollment against Panterloons' own Marshall,
   the issued credentials, `bootstrap = false`, Dungarees' enrollment, and the
   DNS cutover.

@@ -149,8 +149,8 @@ retain verified input artifacts in your Nix cache for long-term rebuilding.
 
 The shared `fleet/guest-images.nix` list declares NixOS, Ubuntu and the additional
 families described in the [OS matrix](os-matrix.md), with native admission
-filtered by exact reviewed identity. Overalls and Dungarees stage those same
-artifacts on Lilly; Overalls registers their
+filtered by exact reviewed identity. Panterloons and Dungarees stage those same
+artifacts on Lilly; Panterloons registers their
 manifests through Marshall's existing operator API. NixOS remains the configured
 default. Add custom variants to that list with their own names and derivations.
 
@@ -158,8 +158,8 @@ After normal deployment and fresh verified host inventory, select **Ubuntu 26.04
 LTS** in the website's **Image** field, or use the existing Porsche management path:
 
 ```sh
-ssh overalls images --json
-ssh overalls new --image sha256:IMAGE_DIGEST --name ubuntu-work --json
+ssh ghuntley.dev images --json
+ssh ghuntley.dev new --image sha256:IMAGE_DIGEST --name ubuntu-work --json
 ```
 
 Replace the host alias and digest with your configured gateway and catalog ID.

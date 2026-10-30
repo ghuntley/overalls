@@ -34,7 +34,7 @@ in pkgs.testers.runNixOSTest {
     config = {
       virtualisation.memorySize = 2048;
       virtualisation.cores = 2;
-      networking.hostName = "overalls";
+      networking.hostName = "panterloons";
       networking.extraHosts = "127.0.0.1 provider.test\n";
       security.pki.certificateFiles = [ "${tls}/ca.pem" ];
       users.groups.overalls-otel-underclass-proxy = {};
@@ -104,7 +104,7 @@ in pkgs.testers.runNixOSTest {
           processors."resource/application-underclass-proxy".attributes = [
             { key = "service.name"; value = "underclass_proxy"; action = "upsert"; }
             { key = "overalls.telemetry.origin"; value = "application"; action = "upsert"; }
-            { key = "host.name"; value = "overalls"; action = "upsert"; }
+            { key = "host.name"; value = "panterloons"; action = "upsert"; }
           ];
           exporters.prometheus = {
             endpoint = "127.0.0.1:9464";

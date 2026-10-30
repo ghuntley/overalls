@@ -3,11 +3,11 @@
 ## SSH host CA
 
 [`ssh-host-ca.pub`](ssh-host-ca.pub) is the dedicated Ed25519 SSH host authority.
-It is independent of Overalls, Dungarees and the TLS CAs. The private key is stored
+It is independent of the fleet hosts and the TLS CAs. The private key is stored
 in [`ssh-host-ca-recovery.enc.json`](ssh-host-ca-recovery.enc.json) for recovery
-and [`overalls-ssh-host-ca.enc.json`](overalls-ssh-host-ca.enc.json) for Marshall.
+and [`panterloons-ssh-host-ca.enc.json`](panterloons-ssh-host-ca.enc.json) for Marshall.
 Both contain `overalls-ssh-host-ca.production.SSH_HOST_CA_KEY`; the runtime bundle
-adds the authenticated Overalls recipient to the recovery recipient. Dungarees,
+adds the authenticated Panterloons recipient to the recovery recipient. Dungarees,
 gateways and guests receive no CA private material. Physical host SSH keys remain
 SOPS decryption identities only.
 
@@ -28,7 +28,7 @@ and must never be selected by production configuration.
 NixOS/Ubuntu guest images. Its SHA-256 fingerprint is
 `E9:B9:55:0E:39:AC:07:B9:3D:3C:34:08:27:64:D1:B6:03:AA:6D:5E:F4:26:C2:6F:24:2F:C4:A9:A5:A7:F5:7A`;
 it expires 2046-10-11 (regenerated 2026-10-16 with the product rename). `brady-ca-recovery.enc.json` is recovery-only and holds
-the root key and certificate. `overalls-brady.enc.json` and
+the root key and certificate. `panterloons-brady.enc.json` and
 `dungarees-brady.enc.json` hold distinct root-signed P-256 signer certificates
 and keys expiring in 2036. The host bundles publish only the local signer to
 Brady. Brady sends its signer with each leaf, so a guest trusting the root can
@@ -42,11 +42,11 @@ converted age identities and decrypted files outside the checkout and Nix store.
 
 ## Internal service CA
 
-[`fleet/hosts/overalls/service-ca.crt`](../fleet/hosts/overalls/service-ca.crt)
+[`fleet/roles/control-plane/service-ca.crt`](../fleet/roles/control-plane/service-ca.crt)
 holds one P-256 CA, "ghuntley.dev internal service CA" (regenerated with the
 product rename on 2026-10-16). It signs
-Marshall's backend certificate (`overalls-backend-tls.enc.json`, SAN
-`ghuntley.dev`) and the local PostgreSQL certificate (`overalls-database.enc.json`
+Marshall's backend certificate (`panterloons-backend-tls.enc.json`, SAN
+`ghuntley.dev`) and the local PostgreSQL certificate (`panterloons-database.enc.json`
 `DB_CERT`/`DB_KEY`, SANs `localhost`, `127.0.0.1`, `::1`); both leaves expire
 in 2031. The CA key and certificate are recovery-only in
 `service-ca-recovery.enc.json` under
@@ -82,7 +82,9 @@ Tailscale authentication key as `overalls-tailscale.production.TAILSCALE_AUTH_KE
 (ADR-0241). Enrolled hosts that name the `fleet-tailscale` credential decrypt it
 to `/run/overalls-secrets/tailscale/auth-key` and join automatically while their
 daemon needs a login. Rotate it with `encrypt fleet-tailscale --replace` after
-revoking the old key in the Tailscale console.
+revoking the old key in the Tailscale console. The document is still sealed to
+the retired Overalls host's recipient; `secrets check` reports that drift until
+an operator with a recovery identity runs `secrets rekey`.
 
 ## Git deploy key
 
@@ -97,12 +99,12 @@ The current recipient is ghuntley's recovery key from
 [`nix/policy/identity/users.nix`](../nix/policy/identity/users.nix), converted to
 `age1905rqwspmj7v2gw8yvtl0esw7u44yev5v0hcxt3jlyjx463ztv2q3vqdl4`.
 Repository access alone does not permit decryption. This bootstrap document
-remains recovery-only. `overalls-git.enc.json` separately delivers the shared key
-to the authenticated overalls host and ghuntley recovery recipient.
+remains recovery-only. Each host's `HOST-git.enc.json` separately delivers the shared
+key to that authenticated host and the ghuntley recovery recipient.
 
 ## Marshall application keys
 
-`overalls-github-oauth.enc.json` contains a SOPS-encrypted
+`panterloons-github-oauth.enc.json` contains a SOPS-encrypted
 nonfunctional GitHub OAuth client-secret placeholder for the Overalls fleet.
 The fleet wires it through the `github-oauth` secret bundle and
 uses a placeholder client ID; replace both the client ID and secret before
@@ -129,7 +131,7 @@ the inventory tool. These three values alone are not a complete runtime bundle.
 Keep the Cloak key ID and bytes stable while any stored ciphertext uses them;
 re-encrypting SOPS documents changes recipients, not application key values.
 
-`overalls-marshall.enc.json` also contains the production `SERPER_API_KEY`.
+`panterloons-marshall.enc.json` also contains the production `SERPER_API_KEY`.
 The host bundle publishes it as raw `serper.key`, and systemd gives each
 Marshall instance a private credential copy. Rotate this field through private
 decrypt/edit/encrypt custody while preserving the other Marshall secrets.
@@ -252,21 +254,21 @@ root and intermediate signing material. `private-services-root.pem` is its publi
 guest trust anchor. The current root (regenerated 2026-10-16) expires 2046-10-11; its SHA-256 fingerprint is
 `E0:F1:76:66:70:76:E5:76:C5:27:39:55:28:35:DD:F6:14:8B:DC:DD:DD:0D:D3:CC:7F:9C:0D:FB:F3:A1:8C:E5`.
 
-`overalls-audi-private.enc.json` and `dungarees-audi-private.enc.json` contain the
+`panterloons-audi-private.enc.json` and `dungarees-audi-private.enc.json` contain the
 offline-issued fleet wildcard certificate chain and key.
 
-`overalls-audi.enc.json`, `dungarees-audi.enc.json`, `overalls-audi-dns.enc.json`
+`panterloons-audi.enc.json`, `dungarees-audi.enc.json`, `panterloons-audi-dns.enc.json`
 and `dungarees-audi-dns.enc.json` contain **nonfunctional placeholder gateway
 and DNS service tokens** under `overalls-audi.production.AUDI_GATEWAY_TOKEN` and
 `overalls-audi-dns.production.AUDI_DNS_TOKEN`. Before activating the Audi public
-plane, issue real credentials on Overalls with the
+plane, issue real credentials on Panterloons with the
 `audi-gateway-rotate` / `audi-dns-rotate` operator CLI actions into private
 storage, then replace these documents through private decrypt/encrypt custody
 following the [rollout runbook](../docs/operations/fleet-network.md#audi-public-plane-rollout).
 Audi services fail closed and never report readiness while a placeholder is
 installed.
 
-`overalls-ziggy.enc.json` contains a real, verified Ziggy control credential and
+`panterloons-ziggy.enc.json` contains a real, verified Ziggy control credential and
 **nonfunctional placeholder OpenAI and Anthropic API keys**, as requested.
 Replace those two fields through private decrypt/edit/encrypt custody before
 expecting provider readiness. Preserve the existing internal credentials.
@@ -364,13 +366,19 @@ logs. The container form mounts the same file names at `/run/secrets/susan`
 
 | Secret | Use |
 | --- | --- |
-| `OVERALLS_PRIMARY_IPV4`, `DUNGAREES_PRIMARY_IPV4` | control, administration, WireGuard endpoints and reviewed-source grants |
-| `OVERALLS_SERVICE_IPV4`, `DUNGAREES_SERVICE_IPV4` | Audi and Audi DNS listeners |
-| `OVERALLS_PREFIX`, `OVERALLS_GATEWAY_IPV4`, `DUNGAREES_PREFIX`, `DUNGAREES_GATEWAY_IPV4` | each dedicated host's own uplink prefix and gateway |
+| `PANTERLOONS_PRIMARY_IPV4`, `DUNGAREES_PRIMARY_IPV4` | control, administration, WireGuard endpoints and reviewed-source grants |
+| `PANTERLOONS_SERVICE_IPV4`, `DUNGAREES_SERVICE_IPV4` | Audi and Audi DNS listeners |
+| `PANTERLOONS_PREFIX`, `PANTERLOONS_GATEWAY_IPV4`, `DUNGAREES_PREFIX`, `DUNGAREES_GATEWAY_IPV4` | each dedicated host's own uplink prefix and gateway |
 | `SALOPETTES_IPV4` | the Susan listener and the Salopettes WireGuard endpoint |
 | `GEOFFREY_HUNTLEY_IPV4`, `GEOFFREY_HUNTLEY_SECONDARY_IPV4`, `GEOFFREY_HUNTLEY_TERTIARY_IPV4` | the operator's reviewed source grants to every fleet host (ADR-0247) |
 
-Its recipients are the recovery users, Overalls, Dungarees and Salopettes; each
+The document still holds four unused `OVERALLS_*` names from the retired
+Overalls host (`OVERALLS_PRIMARY_IPV4`, `OVERALLS_SERVICE_IPV4`,
+`OVERALLS_PREFIX`, `OVERALLS_GATEWAY_IPV4`). No configuration selects them;
+an operator with a recovery identity should delete them with the rotation flow
+below.
+
+Its recipients are the recovery users, Panterloons, Dungarees and Salopettes; each
 host selects only the names its configuration uses. The repository holds no
 address literal. `overalls.fleetAddresses` validates every value at runtime
 before any listener, firewall rule, WireGuard endpoint or uplink uses it, and a

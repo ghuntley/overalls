@@ -8,7 +8,7 @@ random offset of up to five minutes. Keep twelve complete host recovery points
 
 The implementation and isolated recovery tests follow [ADR-0070](../architecture/decisions/0070-host-recovery-backups.md).
 Production backups are not enabled until an operator supplies the S3 destination
-and provisions the host's encrypted backup document. Overalls and Dungarees
+and provisions the host's encrypted backup document. Panterloons and Dungarees
 already explicitly select `randomizedDelaySec = 300`.
 
 The native backup-recovery test creates an active Marshall wildcard certificate
@@ -43,8 +43,8 @@ services.overallsBackups = {
 };
 ```
 
-For hostname `overalls`, that selects
-`s3:https://objects.example.com/node-recovery/hosts/overalls`. Dungarees uses the
+For hostname `panterloons`, that selects
+`s3:https://objects.example.com/node-recovery/hosts/panterloons`. Dungarees uses the
 same destination with `/dungarees`. Changing a hostname requires an explicit
 repository migration/recovery decision; it does not discover the old repository.
 

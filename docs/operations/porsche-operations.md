@@ -143,7 +143,7 @@ and start Porsche. Expect readiness to remain false between authority rotation
 and loading the replacement. The updater uses the same descriptors and service
 ordering when applying candidate generations.
 
-Overalls enables this module on port 22 and administrative OpenSSH on 2222.
+The control plane enables this module on port 22 and administrative OpenSSH on 2222.
 Its `overalls-porsche-authority.service` applies the encrypted gateway credential
 through the Ash operator before Porsche starts. Repeating an unchanged active
 credential preserves its generation. This declaration is authoritative: starting

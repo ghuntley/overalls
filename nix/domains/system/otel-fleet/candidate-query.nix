@@ -1,4 +1,4 @@
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   sourceReady = import ./source-ready.nix { inherit hosts; };
 in

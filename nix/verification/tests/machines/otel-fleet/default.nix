@@ -105,12 +105,12 @@ in pkgs.testers.runNixOSTest {
       services.lilly.enable = lib.mkOption { type = lib.types.bool; default = false; };
     };
     config = {
-    networking.hostName = "overalls";
+    networking.hostName = "panterloons";
     virtualisation.memorySize = 4096;
     virtualisation.cores = 2;
     services.audiPrivate.enable = true;
     services.lilly.enable = true;
-    services.overallsOtelFleet = { enable = true; role = "central"; };
+    services.overallsOtelFleet = { enable = true; role = "central"; hosts = { central = "panterloons"; worker = "dungarees"; }; };
     services.overallsLogging = {
       enable = true;
       outputs.fixture = { type = "native"; plugin = "stdout"; sources = [ "galileo" "marshall" ]; queueBytes = 8388608; };
@@ -234,7 +234,7 @@ in pkgs.testers.runNixOSTest {
       virtualisation.cores = 1;
       services.audiPrivate.enable = true;
       services.lilly.enable = true;
-      services.overallsOtelFleet = { enable = true; role = "worker"; };
+      services.overallsOtelFleet = { enable = true; role = "worker"; hosts = { central = "panterloons"; worker = "dungarees"; }; };
       services.underclass = { enable = true; tailscaleServe.enable = false; environmentFile = "/etc/underclass-test.env"; };
       environment.etc."underclass-test.env".text = ''
         UNDERCLASS_PROXY_KEY=synthetic-proxy-key
@@ -265,12 +265,12 @@ in pkgs.testers.runNixOSTest {
     central.succeed("systemctl start galileo.service")
     central.succeed("systemctl start marshall-runtime-fixture.service")
     central.wait_until_succeeds("curl -fsS http://127.0.0.1:9468/metrics | grep -E '^overalls_gauge_trace_pending\\{[^}]*service=\"galileo\"[^}]*\\} 17'", timeout=120)
-    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_trace_pending{host_name=\"overalls\",service=\"galileo\",unit=\"galileo.service\"} == 17' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
+    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_trace_pending{host_name=\"panterloons\",service=\"galileo\",unit=\"galileo.service\"} == 17' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
     central.succeed("journalctl -u overalls-logging.service --no-pager | grep 'galileo.observability_health' | grep 'galileo.service'")
     worker.fail("curl --max-time 2 -fsS http://10.90.0.1:9468/metrics")
-    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=time() - overalls_gauge_trace_observed_at_seconds{host_name=\"overalls\",service=\"galileo\",unit=\"galileo.service\"} < 90' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
-    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_beam_memory_bytes{host_name=\"overalls\",service=\"marshall\",unit=\"marshall-runtime-fixture.service\"} == 123456' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
-    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_terminal_host_streams{host_name=\"overalls\",service=\"marshall\",unit=\"marshall-runtime-fixture.service\"} == 4' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
+    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=time() - overalls_gauge_trace_observed_at_seconds{host_name=\"panterloons\",service=\"galileo\",unit=\"galileo.service\"} < 90' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
+    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_beam_memory_bytes{host_name=\"panterloons\",service=\"marshall\",unit=\"marshall-runtime-fixture.service\"} == 123456' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
+    central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls_gauge_terminal_host_streams{host_name=\"panterloons\",service=\"marshall\",unit=\"marshall-runtime-fixture.service\"} == 4' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
     central.wait_for_unit("underclass.service")
     worker.wait_for_unit("underclass.service")
     central.wait_for_unit("underclass-monitor-probe.service")
@@ -278,7 +278,7 @@ in pkgs.testers.runNixOSTest {
     # Confirm the real source clock stays inside the production freshness
     # guard after probe, collector and Prometheus scheduling are active.
     central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=max(time() - overalls_underclass_monitor_sample_time{overalls_telemetry_origin=\"application\",service_name=\"underclass_monitor\"}) < 45' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1'", timeout=120)
-    central.wait_until_succeeds("curl -fsS http://10.90.0.1:9464/metrics | grep -E 'overalls_underclass_monitor_ready\\{[^}]*host_name=\\\"overalls\\\"[^}]*\\} 1'")
+    central.wait_until_succeeds("curl -fsS http://10.90.0.1:9464/metrics | grep -E 'overalls_underclass_monitor_ready\\{[^}]*host_name=\\\"panterloons\\\"[^}]*\\} 1'")
     worker.wait_until_succeeds("curl -fsS http://10.90.0.2:9464/metrics | grep -E 'overalls_underclass_monitor_ready\\{[^}]*host_name=\\\"dungarees\\\"[^}]*\\} 1'")
     central.wait_until_succeeds("curl -fsSG --data-urlencode 'query=overalls:underclass_monitor_local_readiness:ratio5m' http://127.0.0.1:9090/api/v1/query | jq -e '.data.result | length == 1 and .[0].value[1] == \"1\"'", timeout=420)
     worker.succeed("systemctl stop underclass.service")
@@ -312,7 +312,7 @@ in pkgs.testers.runNixOSTest {
     central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-otel-baseline | jq -e '([.dashboard.panels[] | select(.title | startswith(\"Brady admitted terminal request, provisional\"))][0]).targets[0].expr | contains(\"overalls_outer_brady_source_start_time\")'")
     central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-otel-baseline | jq -e '([.dashboard.panels[] | select(.title | startswith(\"Brady admitted terminal request candidate p95\"))][0]).targets[0].expr | (contains(\"overalls:brady_candidate_duration:p95_5m\") and contains(\"overalls_outer_brady_source_start_time\") and contains(\"rate(overalls_outer_brady_requests_total\"))'")
     central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-otel-baseline | jq -e '([.dashboard.panels[] | select(.title | startswith(\"Audi guest SSH establishment candidate p95\"))][0]).targets[0].expr | (contains(\"overalls:audi_ssh_candidate_duration:p95_5m\") and contains(\"overalls_outer_audi_ssh_source_start_time\") and contains(\"rate(overalls_outer_audi_ssh_requests_total\"))'")
-    central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-otel-baseline | jq -e '([.dashboard.panels[] | select(.title | startswith(\"Underclass local monitor readiness candidate\"))][0]).targets[0].expr | (contains(\"overalls:underclass_monitor_local_readiness:ratio5m\") and contains(\"host_name=\\\"overalls\\\"\") and contains(\"host_name=\\\"dungarees\\\"\"))'")
+    central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-otel-baseline | jq -e '([.dashboard.panels[] | select(.title | startswith(\"Underclass local monitor readiness candidate\"))][0]).targets[0].expr | (contains(\"overalls:underclass_monitor_local_readiness:ratio5m\") and contains(\"host_name=\\\"panterloons\\\"\") and contains(\"host_name=\\\"dungarees\\\"\"))'")
     central.succeed("password=$(cat /var/lib/grafana/admin-password); curl -fsS --user \"operator:$password\" http://127.0.0.1:3000/api/dashboards/uid/overalls-marshall-pages | jq -e '(.dashboard.panels | length == 14) and (.dashboard.panels[0].targets[0].expr | contains(\"overalls:slo_marshall_live:ratio7d\")) and (.dashboard.panels[1].targets[0].expr | contains(\"overalls:slo_marshall_live_latency:ratio7d\")) and ([.dashboard.panels[] | select(.title | startswith(\"SLI\")) | .targets[0].expr] | all(contains(\"overalls_outer_marshall_live_source_start_time\"))) and ([.dashboard.panels[] | select(.title | startswith(\"SLI\") or contains(\"objective\")) | .targets[0].expr] | all(contains(\"overalls_gauge_\") | not))'")
     central.succeed("curl --silent --output /dev/null --write-out '%{http_code}' --unix-socket /run/overalls-otel-guest/receiver.sock -H 'Content-Type: application/x-protobuf' -H 'Transfer-Encoding: chunked' --data-binary x http://localhost/v1/metrics | grep -q '^403$'")
     central.succeed("runuser -u audi -- curl --silent --output /dev/null --write-out '%{http_code}' --unix-socket /run/overalls-otel-guest/receiver.sock -H 'Content-Type: application/x-protobuf' -H 'Transfer-Encoding: chunked' --data-binary x http://localhost/v1/metrics | grep -q '^400$'")
@@ -344,7 +344,7 @@ in pkgs.testers.runNixOSTest {
     central.succeed("code=$(runuser -u audi-dns -- curl --silent --output /dev/null --write-out '%{http_code}' --unix-socket /run/overalls-otel-audi-dns/collector.sock http://localhost/v1/metrics || true); test \"$code\" = 000")
     central.succeed("systemctl start otel-test-audi-dns-exporter.service")
     central.wait_until_succeeds("curl -fsS http://10.90.0.1:9464/metrics | grep -E 'overalls_outer_audi_dns_requests_total\\{[^}]*overalls_telemetry_origin=\"application\"[^}]*service_name=\"audi_dns\"[^}]*\\} 2'")
-    central.wait_until_succeeds("curl -fsS http://10.90.0.1:9464/metrics | grep -E 'overalls_outer_audi_dns_requests_total\\{[^}]*host_name=\"overalls\"[^}]*\\} 2'")
+    central.wait_until_succeeds("curl -fsS http://10.90.0.1:9464/metrics | grep -E 'overalls_outer_audi_dns_requests_total\\{[^}]*host_name=\"panterloons\"[^}]*\\} 2'")
     central.succeed("systemctl start otel-test-marshall-snapshot.service")
     print(central.succeed("stat -c 'slo directory mode=%a uid=%u gid=%g' /run/marshall-slo-test"))
     directory_mode = int(central.succeed("stat -c %a /run/marshall-slo-test").strip(), 8)

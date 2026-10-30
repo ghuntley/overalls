@@ -81,8 +81,8 @@ secrets and an empty database, and Dungarees joins it.
 ## Invariants and verification
 
 - Evaluation asserts that tunnel peers share a deployment.
-- The otel rule evaluation tests cover the default roster and single-host and
-  Panterloons rosters.
+- The otel rule evaluation tests cover an explicit Panterloons/Dungarees fixture
+  roster and single-host and Panterloons rosters.
 - `secrets check` confirms fleet-address recipients; the `fleet-addresses`
   machine test continues to exercise runtime uplinks and the firewall chain.
 
@@ -96,7 +96,11 @@ secrets and an empty database, and Dungarees joins it.
 - [`fleet-addresses.nix`](../../../nix/policy/network/fleet-addresses.nix) and
   [`allowed-hosts.nix`](../../../nix/policy/network/allowed-hosts.nix).
 - [`otel-fleet/default.nix`](../../../nix/domains/system/otel-fleet/default.nix)
-  (`hosts` roster) and the rule files it parameterizes.
+  (`hosts` roster) and the rule files it parameterizes. Since the Overalls host
+  retired (2026-10-30), `hosts.central` and `hosts.worker` have no defaults and
+  the rule files take `hosts` as a required argument, so every deployment and
+  fixture names its own roster; production hosts read it from the
+  [fleet host roster](../../../nix/policy/fleet/hosts.nix).
 - Remaining gaps: Panterloons' roles and secrets, Dungarees' enrollment into
   Panterloons, the Susan origin for Panterloons, automatic Tailscale joining,
   and the DNS cutover are not yet implemented.

@@ -833,6 +833,7 @@ let
     services.overallsOtelFleet = lib.mkIf (otelAudiSsh || observabilityRecovery) {
       enable = true;
       role = if name == "l1" then "central" else "worker";
+      hosts = { central = "l1"; worker = "l2"; };
     };
     # @cc [owner:ghuntley,label:verification;security] otel-native-guest-path
     # The dedicated variant MUST collect an actual Lyra tool metric and trace

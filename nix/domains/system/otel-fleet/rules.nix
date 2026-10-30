@@ -1,4 +1,4 @@
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   central = builtins.head hosts;
   # One fresh request series from each roster host.

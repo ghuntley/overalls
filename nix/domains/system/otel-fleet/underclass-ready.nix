@@ -1,4 +1,4 @@
-{ hosts ? import ./default-roster.nix }:
+{ hosts }:
 let
   metric = ''overalls_underclass_monitor_ready{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name=~"${builtins.concatStringsSep "|" hosts}"}'';
   clock = ''overalls_underclass_monitor_sample_time{overalls_telemetry_origin="application",service_name="underclass_monitor",host_name=~"${builtins.concatStringsSep "|" hosts}"}'';

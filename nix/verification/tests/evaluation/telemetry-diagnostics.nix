@@ -2,16 +2,18 @@
 let
   yaml = pkgs.formats.yaml {};
   otel = ../../../domains/system/otel-fleet;
+  # The fixture deployment roster: central host first, then the worker.
+  fixtureHosts = [ "panterloons" "dungarees" ];
   ruleGroups = hosts: (import (otel + "/rules.nix") { inherit hosts; }).groups
     ++ (import (otel + "/diagnostics.nix") { inherit hosts; }).groups
     ++ (import (otel + "/infrastructure-rules.nix") { inherit hosts; }).groups;
   rulesFor = hosts: yaml.generate "telemetry-diagnostics-rules-${builtins.concatStringsSep "-" hosts}.yml" {
     groups = ruleGroups hosts;
   };
-  rules = rulesFor (import (otel + "/default-roster.nix"));
+  rules = rulesFor fixtureHosts;
   sourcesFor = hosts: builtins.filter (s: builtins.elem s.id [ "brady" "marshall_ready" ])
     (import (otel + "/objectives.nix") { inherit hosts; });
-  sources = sourcesFor (import (otel + "/default-roster.nix"));
+  sources = sourcesFor fixtureHosts;
   collectorSeries = hosts: builtins.map (address:
     { series = ''up{job="overalls-otel",instance="${address}:9464"}''; values = "1+0x20"; })
     (import (otel + "/roster-addresses.nix") hosts);
@@ -38,14 +40,14 @@ let
       }];
     }];
   };
-  scenario = scenarioFor (import (otel + "/default-roster.nix"));
+  scenario = scenarioFor fixtureHosts;
   # @cc [owner:ghuntley,label:verification;deployment] telemetry-roster-per-deployment
   # A deployment's rules MUST expect exactly its own roster: no host label or
   # collector from another deployment, and a collector count equal to the roster.
   rosterTest = hosts: let
     text = builtins.toJSON (ruleGroups hosts ++ (import (otel + "/objective-rules.nix") { inherit hosts; }).groups
       ++ [ (import (otel + "/slo-catalog.nix") { inherit hosts; }) ]);
-    foreign = builtins.filter (host: !builtins.elem host hosts) [ "overalls" "dungarees" "panterloons" ];
+    foreign = builtins.filter (host: !builtins.elem host hosts) [ "dungarees" "panterloons" "salopettes" ];
     leaks = builtins.filter (host: contains ''host_name=\"${host}\"'') foreign;
     collectors = toString (builtins.length hosts);
     # Regex-based hasInfix overflows the evaluator stack on megabyte rule text.
@@ -83,7 +85,7 @@ let
         (point "duration_seconds_count" "0+${toString traffic}x20")
         (bucket "10.0" "0+0x20") (bucket "30.0" "0+${toString traffic}x20")
         (bucket "86400.0" "0+${toString traffic}x20") (bucket "+Inf" "0+${toString overflow}x20")
-      ]) [ "overalls" "dungarees" ];
+      ]) [ "panterloons" "dungarees" ];
     promql_expr_test = [{
       expr = "overalls:underclass_proxy_candidate_duration:p95_5m";
       eval_time = "10m";
@@ -97,10 +99,10 @@ let
   sdkCase = { stale ? false, missing ? false, isolated ? false, reset ? false }: {
     interval = "30s";
     input_series = [{
-      series = ''overalls_trace_spool_snapshot_valid{host_name="overalls",producer="galileo"}'';
+      series = ''overalls_trace_spool_snapshot_valid{host_name="panterloons",producer="galileo"}'';
       values = "1+0x20";
     }] ++ pkgs.lib.optionals (!missing) (map (entry: {
-      series = ''overalls_gauge_trace_${entry.name}{host_name="overalls",service="galileo",unit="galileo.service"}'';
+      series = ''overalls_gauge_trace_${entry.name}{host_name="panterloons",service="galileo",unit="galileo.service"}'';
       inherit (entry) values;
     }) [
       { name = "available"; values = "1+0x20"; }
@@ -113,7 +115,7 @@ let
       alertname = entry.name;
       eval_time = "2m";
       exp_alerts = pkgs.lib.optional isolated {
-        exp_labels = { host_name = "overalls"; service = "galileo"; unit = "galileo.service";
+        exp_labels = { host_name = "panterloons"; service = "galileo"; unit = "galileo.service";
           category = "infrastructure"; severity = "warning";
         };
         exp_annotations.summary = entry.summary;
@@ -125,7 +127,7 @@ let
       alertname = "OverallsSDKHealthStale";
       eval_time = "10m";
       exp_alerts = pkgs.lib.optional (stale && !missing) {
-        exp_labels = { host_name = "overalls"; service = "galileo"; unit = "galileo.service";
+        exp_labels = { host_name = "panterloons"; service = "galileo"; unit = "galileo.service";
           category = "infrastructure"; severity = "warning";
         };
         exp_annotations.summary = "SDK health observations are stale or ahead of the trusted clock";
@@ -134,7 +136,7 @@ let
       alertname = "OverallsSDKHealthMissing";
       eval_time = "10m";
       exp_alerts = pkgs.lib.optional missing {
-        exp_labels = { host_name = "overalls"; producer = "galileo"; unit = "galileo.service";
+        exp_labels = { host_name = "panterloons"; producer = "galileo"; unit = "galileo.service";
           category = "infrastructure"; severity = "warning";
         };
         exp_annotations.summary = "A configured trace producer has no SDK health observation";
@@ -142,7 +144,7 @@ let
     }];
   };
   browserCase = service: { idle ? false, success ? false, unknown ? null }: let
-    labels = ''overalls_telemetry_origin="application",service_name="${service}",host_name="overalls"'';
+    labels = ''overalls_telemetry_origin="application",service_name="${service}",host_name="panterloons"'';
     point = suffix: values: { series = "overalls_outer_${service}_${suffix}{${labels}}"; inherit values; };
     completions = "0+0x9 1+0x9 2+0x9 3+0x2";
     diagnostic = kind: value: {
