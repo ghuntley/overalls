@@ -1187,6 +1187,15 @@ let
       # Relocation scenarios need a long write-during-copy window; bootstrap
       # scenarios exercise readiness and retain the ordinary 64 MiB/s limit.
       transferBytesPerSecond = lib.mkIf (relocation || cloning) ((if sshBootstrap then 64 else if cloning then 32 else 16) * 1024 * 1024);
+      # Nested test hosts read the 1.7 GB guest image over the 9p-shared store.
+      # In machine-test run 41111309494 on namespace xl runners, the template
+      # copy ran below about 5.7 MB/s: it had not finished when the 300 s
+      # production default expired (unconfirmed after 311-316 s on both hosts),
+      # so first launches failed. Locally it runs at about 28 MB/s (60 s), or
+      # 123 s with the fleet pinned to 8 CPUs. 900 s covers the measured CI
+      # rate with margin. It applies to these fixtures only; the production
+      # default stays 300 s.
+      imageIoTimeoutSeconds = 900;
       hostId = host.host;
       controlPlane = "https://control.example.test:5443";
       controlPlaneCAFile = "${root}/ca.crt";
