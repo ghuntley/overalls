@@ -1,8 +1,9 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   inherit (lib) mkOption mkEnableOption mkIf types;
   cfg = config.services.overallsFleetExporter;
-  observabilityRuntimes = import ../observability-runtimes.nix { inherit pkgs; };
+  observabilityRuntimes = packages.observabilityRuntimes;
   runtime = pkgs.runCommand "overalls-fleet-exporter" {} ''
     mkdir -p $out
     cp ${./runtime.py} $out/runtime.py

@@ -67,6 +67,23 @@ draft plan:
   so assembly reads its artifact manifest through the copied flake's
   `outPath`.
 
+- **In-module builds.** Modules no longer build first-party packages. The
+  otel-fleet modules, the request-source fixture and the fleet,
+  otel-fleet and otel-request-recorder tests take `otelReceiver`. The
+  logging and fleet-exporter modules take `observabilityRuntimes`. The
+  trace-spool module, its test and the antithesis harness take `traceSpool`.
+  - The `-base` host systems are drvPath-identical at a fixed revision.
+  - The enrolled hosts differ, as intended. Their own nixos-26.05 builds of
+    the receiver, trace spool and observability runtimes (about 900 crate
+    derivations) are gone. Only the package set's builds, made with
+    buildNixpkgs' Rust, remain, plus the units and `etc` that name them.
+    Before this, dungarees and panterloons carried both builds of the
+    receiver.
+  - Of the 21 antithesis contexts, only `recorder-host-vmm` changes: its VM
+    built the spool and recorder with its own nixpkgs.
+  - Fluent Bit stays on the system's nixpkgs. buildNixpkgs has 5.1.0, and the
+    logging route limits were reviewed against 5.0.x.
+
 ## Risks
 
 - **Hosts get heavier.** They need buck2, the cells closure and the cache. The

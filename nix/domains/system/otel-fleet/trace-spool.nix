@@ -1,3 +1,4 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.overallsOtelFleet.traceSpool;
@@ -63,7 +64,7 @@ in {
       description = "Reviewed aggregate per-host producer archive allocation ceiling; evaluation refuses an overcommitted inventory."; };
     retentionDays = lib.mkOption { type = lib.types.ints.between 1 365; default = 90;
       description = "Immutable per-batch retention, including traces already acknowledged upstream."; };
-    package = lib.mkOption { type = lib.types.package; default = import ../../artifacts/infrastructure/trace-spool.nix { inherit pkgs; };
+    package = lib.mkOption { type = lib.types.package; default = packages.traceSpool;
       description = "Reviewed typed OTLP custody implementation."; };
     producers = lib.mkOption { type = lib.types.listOf (lib.types.submodule { options = {
       instance = lib.mkOption { type = lib.types.str; };

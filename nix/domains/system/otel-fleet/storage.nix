@@ -1,7 +1,7 @@
-{ config, lib, pkgs }:
+{ config, lib, pkgs, packages }:
 let
   cfg = config.services.overallsOtelFleet;
-  package = pkgs.callPackage ../otel-guest/receiver.nix {};
+  package = packages.otelReceiver;
   metric = store: ''overalls_telemetry_storage_used_bytes{job="overalls-telemetry-storage",store="${store}"}'';
   used = metric "traces";
   limit = cfg.tempoQuotaGiB * 1024 * 1024 * 1024;

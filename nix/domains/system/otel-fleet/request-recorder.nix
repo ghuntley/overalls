@@ -2,10 +2,11 @@
 # Every configured request source MUST have a separate unprivileged recorder,
 # private permanent state, read-only exporter group and exact producer-unit
 # attribution. Recorder restart MUST NOT restart or stop its application.
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   instances = config.services.overallsRequestRecorder.instances;
-  package = pkgs.callPackage ../otel-guest/receiver.nix {};
+  package = packages.otelReceiver;
   active = lib.filterAttrs (_: instance: instance.enable) instances;
   identities = import ./request-identities.nix;
   group = identities.rpcGroup;
@@ -13,6 +14,10 @@ let
   user = identities.recorderUser;
   runtime = name: "overalls-request-${name}";
 in {
+  # Several modules import this one; the key keeps one instance per system,
+  # as path imports did before it took { packages }.
+  key = toString ./request-recorder.nix;
+  _file = ./request-recorder.nix;
   options.services.overallsRequestRecorder.instances = lib.mkOption {
     default = {};
     description = "Independent durable request recorders; enabling requires reviewed producer hooks and source-specific deadlines.";

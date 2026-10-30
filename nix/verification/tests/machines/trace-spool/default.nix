@@ -1,15 +1,15 @@
-{ pkgs }:
+{ pkgs, packages }:
 let
   lib = pkgs.lib;
   account = "ktr-${builtins.substring 0 16 (builtins.hashString "sha256" "galileo")}";
-  spool = import ../../../../domains/artifacts/infrastructure/trace-spool.nix { inherit pkgs; };
+  spool = packages.traceSpool;
   fixture = ../../fixtures/trace-spool/request.hex;
   source = "/run/overalls-trace-galileo-source/metrics.prom";
   database = "/var/lib/overalls-trace-galileo/archive.sqlite";
 in pkgs.testers.runNixOSTest {
   name = "overalls-independent-trace-custody";
   nodes.machine = { config, ... }: {
-    imports = [ ../../../../domains/system/otel-fleet/trace-spool.nix ];
+    imports = [ (import ../../../../domains/system/otel-fleet/trace-spool.nix { inherit packages; }) ];
     options.services = {
       overallsOtelFleet.enable = lib.mkOption { type = lib.types.bool; default = true; };
       galileo.enable = lib.mkOption { type = lib.types.bool; default = true; };

@@ -200,10 +200,28 @@ the approved migration plan.
     systems have the same drvPaths as before.
 - The antithesis harness takes lib.assemble's package-set constructor instead
   of importing the set four times; its 21 contexts are drvPath-identical.
-- The OTLP receiver and Enrico's git-owner helper are built once in the
-  package set and taken from `packages` by the ziggy, underclass, enrico and
-  otel-guest modules. Previously each module built its own copy with the
-  system's nixpkgs.
+- First-party builds are made once, in the package set, and modules take them
+  from `packages` (contract `package-set-first-party-builds` in
+  [default.nix](../../../nix/domains/artifacts/default.nix)).
+  - The OTLP receiver (`otelReceiver`) serves the ziggy, underclass, enrico,
+    otel-guest and otel-fleet modules: storage, service levels, request
+    recorder, request sources and browser probes.
+  - `observabilityRuntimes` serves the logging and fleet-exporter modules.
+  - `traceSpool` is the default trace-spool package.
+  - `enricoGitOwner` serves the enrico module.
+  - The machine tests (fleet, otel-fleet, otel-request-recorder, trace-spool
+    and the request-source fixture) and the antithesis harness use the same
+    builds.
+  - Previously each module built its own copy with the system's nixpkgs.
+    Enrolled hosts now carry one Rust toolchain's builds instead of two. The
+    `-base` systems are drvPath-identical.
+  - The logging and request-recorder modules take `{ packages }` and set a
+    module `key`, so importing them more than once still yields one
+    instance, as the path imports did.
+- Fluent Bit is a patched nixpkgs package, not a first-party build. It stays
+  on the system's nixpkgs: building it in the package set would move hosts
+  from the reviewed 5.0.x to buildNixpkgs' 5.1.x (contract
+  `logging-chunked-input-routes`).
 - Encrypted-crash-dump variants are part of the same set. Buck2 supplies them
   as `encrypted-<app>` artifacts. An assembly assertion
   (`host-params-match-artifacts`) refuses a host that enables encrypted dumps
@@ -229,9 +247,6 @@ Remaining gaps, by milestone of the migration plan:
 
 - rust-overlay toolchain and Rust and Elixir rules (M5, M6);
 - the remaining M3 items:
-  - moving the logging, fleet-exporter, trace-spool and fleet-test builds
-    into the package set (the ziggy, underclass, enrico and otel-guest
-    builds already moved);
   - deployment and machine-test targets on `nix_assemble` (M2, M4a);
 - M7 leftovers:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and

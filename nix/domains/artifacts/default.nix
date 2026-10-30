@@ -218,13 +218,13 @@ let
           hostLock
           cedarLints
           enricoGitOwner
-          (import ./infrastructure/trace-spool.nix { inherit pkgs; })
+          traceSpool
           (import ./vscode-web-broker { inherit pkgs; })
           windowsEditorBroker
           (import ./mila/rust.nix { inherit pkgs; }).package
           (import ./mila { inherit pkgs; }).linuxNative
           otelReceiver
-          (import ../system/observability-runtimes.nix { inherit pkgs; })
+          observabilityRuntimes
         ];
         hashes = { };
       };
@@ -319,11 +319,19 @@ let
     };
   # Builds that modules used to make for themselves; modules take them from
   # this set so every system and test shares one build (ADR-0269).
+
+  # @cc [owner:ghuntley,label:build] package-set-first-party-builds
+  # NixOS modules, machine tests and the antithesis harness MUST take these
+  # first-party builds from this set, never build their own copy. Patched
+  # third-party nixpkgs packages (Fluent Bit) stay on the system's nixpkgs so
+  # a host keeps the version its configuration was reviewed against.
   otelReceiver = pkgs.callPackage ../system/otel-guest/receiver.nix { };
   enricoGitOwner = import ./applications/enrico-git-owner.nix { inherit pkgs; };
+  observabilityRuntimes = import ../system/observability-runtimes.nix { inherit pkgs; };
+  traceSpool = import ./infrastructure/trace-spool.nix { inherit pkgs; };
 in
 rec {
-  inherit otelReceiver enricoGitOwner;
+  inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool;
   inherit dependencies cedarLints hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;

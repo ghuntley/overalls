@@ -214,8 +214,8 @@ let
     cp ${../../nix/verification/tests/fixtures/trace-spool/request.hex} "$out/request.hex"
     cp ${../../nix/verification/tests/fixtures/trace-spool/batch.hex} "$out/batch.hex"
   '';
-  requestRecorder = pkgs.callPackage ../../nix/domains/system/otel-guest/receiver.nix {};
-  traceSpool = pkgs.callPackage ../../nix/domains/artifacts/infrastructure/trace-spool.nix {};
+  requestRecorder = productionPackages.otelReceiver;
+  traceSpool = productionPackages.traceSpool;
   otpNames = [ "marshall" "lilly" "audi" "porsche" "ziggy" "galileo" "brady" "enrico" ];
   otpContext = name: closure.mkContext {
     inherit name;

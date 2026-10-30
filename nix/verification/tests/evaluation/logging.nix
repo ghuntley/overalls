@@ -12,7 +12,7 @@ let
   eval = extra: (import (pkgs.path + "/nixos/lib/eval-config.nix") {
     inherit pkgs;
     system = pkgs.stdenv.hostPlatform.system;
-    modules = [ ../../../domains/system/logging { system.stateVersion = "26.05"; } extra ];
+    modules = [ (import ../../../domains/system/logging { inherit packages; }) { system.stateVersion = "26.05"; } extra ];
   }).config;
   local = eval { services.overallsLogging.enable = true; };
   overflow = eval { services.overallsLogging = {

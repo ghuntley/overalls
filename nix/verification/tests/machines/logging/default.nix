@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, packages }:
 let
   tls = pkgs.runCommand "logging-fixture-tls" { nativeBuildInputs = [ pkgs.openssl ]; } ''
     mkdir -p $out
@@ -6,7 +6,7 @@ let
       -subj /CN=sink -addext subjectAltName=DNS:sink -days 36500 >/dev/null 2>&1
   '';
   host = { ... }: {
-    imports = [ ../../../../domains/system/logging ];
+    imports = [ (import ../../../../domains/system/logging { inherit packages; }) ];
     environment.systemPackages = [ pkgs.curl ];
     services.overallsLogging = {
       enable = true;

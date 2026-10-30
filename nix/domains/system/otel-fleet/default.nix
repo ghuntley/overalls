@@ -1,3 +1,4 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.overallsOtelFleet;
@@ -18,7 +19,7 @@ let
       ++ (import ./diagnostics.nix { inherit hosts; }).groups ++ (import ./infrastructure-rules.nix {
         inherit hosts loggingEnabled fleetExporterEnabled;
       }).groups ++ (import ./storage.nix {
-        inherit config lib pkgs;
+        inherit config lib pkgs packages;
       }).rules;
   });
   dashboard = pkgs.writeText "overalls-otel-baseline.json" (builtins.toJSON {
@@ -156,8 +157,11 @@ let
         }) (builtins.length sloCatalog)) ++ (import ./diagnostic-panels.nix { inherit hosts; });
   });
 in {
-  imports = [ ../logging/default.nix ./trace-spool.nix ./public-grafana.nix ./grafana-logs.nix ./burn-delivery.nix ./service-levels.nix ./request-recorder.nix ./request-sources.nix ./browser-probes.nix
-    (import ./storage.nix { inherit config lib pkgs; }).module ];
+  imports = [ (import ../logging/default.nix { inherit packages; }) (import ./trace-spool.nix { inherit packages; })
+    ./public-grafana.nix ./grafana-logs.nix ./burn-delivery.nix (import ./service-levels.nix { inherit packages; })
+    (import ./request-recorder.nix { inherit packages; }) (import ./request-sources.nix { inherit packages; })
+    (import ./browser-probes.nix { inherit packages; })
+    (import ./storage.nix { inherit config lib pkgs packages; }).module ];
   options.services.overallsOtelFleet = {
     metricsRetentionDays = lib.mkOption {
       type = lib.types.ints.between 7 365;

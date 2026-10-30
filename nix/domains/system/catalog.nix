@@ -2,14 +2,14 @@
 {
   imports = [
     (import ./backups { inherit packages; })
-    ./fleet-exporter/default.nix
+    (import ./fleet-exporter/default.nix { inherit packages; })
     (import ./brady { inherit packages; })
-    ./logging/default.nix
+    (import ./logging/default.nix { inherit packages; })
     (import ./otel-guest/default.nix { inherit packages; })
-    ./otel-fleet/default.nix
-    ./otel-fleet/request-recorder.nix
+    (import ./otel-fleet/default.nix { inherit packages; })
+    (import ./otel-fleet/request-recorder.nix { inherit packages; })
     ./log-store/default.nix
-    ./cloudwatch/default.nix
+    (import ./cloudwatch/default.nix { inherit packages; })
     ./security-audit.nix
     ./access.nix
     ./fleet-firewall.nix

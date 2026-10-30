@@ -2,8 +2,9 @@
 # The native fixture MUST use the production Rust recorder and Nix module with
 # real Unix peer/cgroup attribution and SIGKILL recovery. No application outcome
 # or production seven-day compliance claim follows from this isolated fixture.
-{ pkgs, toolchain, hegel, commitReplyLoss ? false }:
+{ pkgs, packages, hegel, commitReplyLoss ? false }:
 let
+  inherit (packages) toolchain;
   identities = import ../../../../domains/system/otel-fleet/request-identities.nix;
   driverSource = builtins.readFile ./driver.py;
   corruptionBoundary = "with subtest(\"corrupt producer storage cannot confer complete coverage through old completions\"):";
@@ -16,7 +17,7 @@ let
       ${../../../../../elixir/request_accounting/lib/overalls/request_accounting}/*.ex \
       ${../../../../../elixir/request_accounting/lib/overalls/request_accounting}/producer/*.ex
   '';
-  recorder = pkgs.callPackage ../../../../domains/system/otel-guest/receiver.nix {};
+  recorder = packages.otelReceiver;
   fixture = recorder.overrideAttrs (previous: {
     pname = "overalls-request-recorder-native-fixture";
     postPatch = (previous.postPatch or "") + pkgs.lib.optionalString commitReplyLoss ''
@@ -61,7 +62,7 @@ hegel.runTest {
     derandomize = true;
   };
   nodes.machine = { ... }: {
-    imports = [ ../../../../domains/system/otel-fleet/request-recorder.nix ];
+    imports = [ (import ../../../../domains/system/otel-fleet/request-recorder.nix { inherit packages; }) ];
     virtualisation.memorySize = 1536;
     virtualisation.cores = 2;
     environment.systemPackages = [ fixture pkgs.jq ];

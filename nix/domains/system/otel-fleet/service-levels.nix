@@ -1,8 +1,9 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   cfg = config.services.overallsOtelFleet;
   services = import ./durable-services.nix;
-  exporter = pkgs.callPackage ../otel-guest/receiver.nix {};
+  exporter = packages.otelReceiver;
   socketGroup = service: "overalls-otel-${service}";
   socketDirectory = service: "/run/${socketGroup service}";
   producer = "marshall-overalls";

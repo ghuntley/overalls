@@ -19,7 +19,7 @@ in pkgs.testers.runNixOSTest {
   name = "overalls-audi-dns";
   nodes.server = { ... }: {
     imports = [ module (import ../../support/request-source.nix {
-      inherit pkgs; name = "audi-dns"; source = "audi_dns";
+      inherit pkgs packages; name = "audi-dns"; source = "audi_dns";
       producerUser = "audi-dns"; producerUnit = "audi-dns.service";
       deadlineSeconds = 30; collectorGroup = "overalls-otel-audi-dns";
     }) ];

@@ -1,4 +1,4 @@
-{ pkgs }:
+{ pkgs, packages }:
 let
   # Test-only fixture credentials; never used outside this machine test.
   insertPassword = "fixture-insert-a94f8c2b51d7406e9b3c2f1a7d5e8f00";
@@ -89,7 +89,7 @@ in pkgs.testers.runNixOSTest {
       };
     };
     worker = { ... }: {
-      imports = [ ../../../../domains/system/logging ];
+      imports = [ (import ../../../../domains/system/logging { inherit packages; }) ];
       virtualisation.memorySize = 1024;
       networking.hosts."192.168.1.1" = [ "logs.fleet.internal" ];
       systemd.services.logstore-fixture-credentials = {

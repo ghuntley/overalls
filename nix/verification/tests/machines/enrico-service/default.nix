@@ -16,7 +16,7 @@ in pkgs.testers.runNixOSTest {
   name = "overalls-enrico-service";
   nodes.mirror = { ... }: {
     imports = [ module (import ../../support/request-source.nix {
-      inherit pkgs; name = "enrico"; source = "enrico";
+      inherit pkgs packages; name = "enrico"; source = "enrico";
       producerUser = "enrico"; producerUnit = "enrico.service";
       deadlineSeconds = 3720; collectorGroup = "overalls-otel-enrico";
     }) ];

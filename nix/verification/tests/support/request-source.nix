@@ -2,13 +2,13 @@
 # Native source fixtures MUST use the production recorder module and explicit
 # Rust recorder export selection. Exporters MUST have independent reader
 # accounts, without producer RPC or private checkpoint access.
-{ pkgs, name, source, producerUser, producerUnit, deadlineSeconds, collectorGroup, collectorEnable ? false }:
+{ pkgs, packages, name, source, producerUser, producerUnit, deadlineSeconds, collectorGroup, collectorEnable ? false }:
 { ... }:
 let
   identities = import ../../../domains/system/otel-fleet/request-identities.nix;
-  package = pkgs.callPackage ../../../domains/system/otel-guest/receiver.nix {};
+  package = packages.otelReceiver;
 in {
-  imports = [ ../../../domains/system/otel-fleet/request-recorder.nix ];
+  imports = [ (import ../../../domains/system/otel-fleet/request-recorder.nix { inherit packages; }) ];
   services.overallsRequestRecorder.instances.${name} = {
     inherit source producerUser producerUnit deadlineSeconds;
   };

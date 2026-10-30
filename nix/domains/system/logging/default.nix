@@ -1,8 +1,9 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   inherit (lib) mkOption mkEnableOption mkIf types;
   cfg = config.services.overallsLogging;
-  observabilityRuntimes = import ../observability-runtimes.nix { inherit pkgs; };
+  observabilityRuntimes = packages.observabilityRuntimes;
   fleetEnabled = lib.attrByPath [ "services" "overallsOtelFleet" "enable" ] false config;
   paths = import ../types.nix { inherit lib; };
   sources = [ "marshall" "lilly" "porsche" "audi" "ziggy" "enrico" "brady" "galileo" "underclass" "haproxy" "audit" "firecracker" "auth" "kernel" "storage" "mail" "operations" "system" "metrics" ];
@@ -194,6 +195,10 @@ let
     executable = lib.getExe cfg.package;
   });
 in {
+  # Several modules import this one; the key keeps one instance per system,
+  # as path imports did before it took { packages }.
+  key = toString ./default.nix;
+  _file = ./default.nix;
   options.services.overallsLogging = {
     enable = mkEnableOption "host-local Fluent Bit collection and pluggable direct export";
     package = mkOption { type = types.package; default = import ../../artifacts/fluent-bit { inherit pkgs; }; };

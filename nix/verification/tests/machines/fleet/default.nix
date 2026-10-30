@@ -15,7 +15,7 @@ let
   # Native Node diagnostics MUST execute the selected editor package's own
   # runtime, never the separate NixOS fixture package set's Node installation.
   editorRuntimeNode = "${packages.vscodeWeb}/node";
-  otelExporter = pkgs.callPackage ../../../../domains/system/otel-guest/receiver.nix {};
+  otelExporter = packages.otelReceiver;
   requestIdentities = import ../../../../domains/system/otel-fleet/request-identities.nix;
   # @cc [owner:ghuntley,label:verification;security] fixture-request-export-custody
   # Request fixtures MUST export production recorder snapshots with explicit
@@ -656,7 +656,7 @@ let
     imports = lib.optional (name == "m1") ziggyFixture.provider
       ++ lib.optional (porsche && name == "m1") (import ./porsche.nix { inherit packages; })
       ++ lib.optional (otelPorsche && name == "m1") (import ../../support/request-source.nix {
-        inherit pkgs; name = "porsche"; source = "porsche";
+        inherit pkgs packages; name = "porsche"; source = "porsche";
         producerUser = "porsche"; producerUnit = "porsche.service";
         deadlineSeconds = 3660; collectorGroup = "overalls-otel-porsche";
         collectorEnable = true;

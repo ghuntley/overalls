@@ -18,7 +18,7 @@ let
           cd ${../../elixir/request_accounting}
           find lib -name '*.ex' -type f -print | sort | xargs elixirc --warnings-as-errors -o "$out/ebin"
         '';
-        spool = pkgs.callPackage ../../nix/domains/artifacts/infrastructure/trace-spool.nix {};
+        spool = packages.traceSpool;
         traceAccount = "ktr-${builtins.substring 0 16 (builtins.hashString "sha256" "recorder-peer")}";
         traceGroup = "ktp-${builtins.substring 0 16 (builtins.hashString "sha256" "recorder-peer")}";
         requestIdentities = import ../../nix/domains/system/otel-fleet/request-identities.nix;
@@ -45,7 +45,7 @@ let
         tracePressureRuntime = pkgs.writeText "overalls-recorder-peer-trace-pressure.json"
           (builtins.toJSON (traceSettings // { pending_quota_bytes = 262144; }));
       in {
-        imports = [ ../../nix/domains/system/otel-fleet/request-recorder.nix ];
+        imports = [ (import ../../nix/domains/system/otel-fleet/request-recorder.nix { inherit packages; }) ];
         system.stateVersion = "26.05";
         networking.hostName = "recorder-host";
         networking.useDHCP = true;

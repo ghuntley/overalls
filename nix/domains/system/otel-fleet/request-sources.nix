@@ -2,10 +2,11 @@
 # Enabled fleet request sources MUST use independent recorder/exporter accounts
 # and exact producer units. Exporters MUST receive only snapshot-reader and
 # collector groups, never producer RPC, application identity or checkpoint access.
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   enabled = application: lib.attrByPath [ "services" application "enable" ] false config;
-  package = pkgs.callPackage ../otel-guest/receiver.nix {};
+  package = packages.otelReceiver;
   binding = source: producerUser: producerUnit: deadlineSeconds: collectorGroup: {
     inherit source producerUser producerUnit deadlineSeconds collectorGroup;
     instance = null;

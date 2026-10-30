@@ -121,19 +121,19 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
     python3 ${./evaluation/encrypted-crash-dumps.py} ${packages.encrypted.toolchain.erlang}/bin/erl
     touch $out
   '';
-  logging = import ./machines/logging { pkgs = testPkgs; };
-  log-store = import ./machines/log-store { pkgs = testPkgs; };
+  logging = import ./machines/logging { pkgs = testPkgs; inherit packages; };
+  log-store = import ./machines/log-store { pkgs = testPkgs; inherit packages; };
   public-grafana = import ./machines/public-grafana { pkgs = testPkgs; module = modules.default; };
   public-grafana-configuration = import ./evaluation/public-grafana.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
   proxy-runtime-address = import ./machines/proxy-runtime-address { pkgs = testPkgs; module = modules.default; };
   runtime-socket-configuration =import ./evaluation/runtime-socket.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
-  trace-spool-native = import ./machines/trace-spool { pkgs = testPkgs; };
+  trace-spool-native = import ./machines/trace-spool { pkgs = testPkgs; inherit packages; };
   otel-fleet = import ./machines/otel-fleet { pkgs = testPkgs; inherit packages; };
   otel-burn-delivery = import ./machines/otel-burn-delivery { pkgs = testPkgs; inherit hegel; };
   otel-marshall = import ./machines/otel-marshall service;
-  otel-request-recorder = import ./machines/otel-request-recorder { pkgs = testPkgs; inherit (packages) toolchain; inherit hegel; };
+  otel-request-recorder = import ./machines/otel-request-recorder { pkgs = testPkgs; inherit packages hegel; };
   otel-request-recorder-commit-reply-loss = import ./machines/otel-request-recorder {
-    pkgs = testPkgs; inherit (packages) toolchain; inherit hegel; commitReplyLoss = true;
+    pkgs = testPkgs; inherit packages hegel; commitReplyLoss = true;
   };
   otel-slo-rules = import ./evaluation/otel-slo-rules.nix { pkgs = buildPkgs; };
   telemetry-diagnostics = import ./evaluation/telemetry-diagnostics.nix { pkgs = buildPkgs; };

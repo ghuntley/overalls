@@ -45,11 +45,11 @@ let
       crash-dumps = import ../domains/system/crash-dumps { lib = nixpkgs.lib; pkgs = pkgs; };
     };
     observability = {
-      logging = ../domains/system/logging/default.nix;
-      cloudwatch = ../domains/system/cloudwatch/default.nix;
-      fleet-exporter = ../domains/system/fleet-exporter/default.nix;
+      logging = import ../domains/system/logging/default.nix { inherit packages; };
+      cloudwatch = import ../domains/system/cloudwatch/default.nix { inherit packages; };
+      fleet-exporter = import ../domains/system/fleet-exporter/default.nix { inherit packages; };
       otel-guest = import ../domains/system/otel-guest/default.nix { inherit packages; };
-      otel-fleet = ../domains/system/otel-fleet/default.nix;
+      otel-fleet = import ../domains/system/otel-fleet/default.nix { inherit packages; };
       underclass = import ../domains/system/underclass.nix { packages = packages; };
       log-store = ../domains/system/log-store/default.nix;
     };

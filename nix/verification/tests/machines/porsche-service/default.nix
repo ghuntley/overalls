@@ -4,7 +4,7 @@ pkgs.testers.runNixOSTest {
   nodes.gateway = { lib, ... }: {
     imports = [ module (import ../../support/ssh-host-certificate.nix { inherit pkgs; role = "porsche"; })
       (import ../../support/request-source.nix {
-        inherit pkgs; name = "porsche"; source = "porsche";
+        inherit pkgs packages; name = "porsche"; source = "porsche";
         producerUser = "porsche"; producerUnit = "porsche.service";
         deadlineSeconds = 3660; collectorGroup = "overalls-otel-porsche";
       }) ];

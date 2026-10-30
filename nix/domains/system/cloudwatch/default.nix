@@ -1,3 +1,4 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   inherit (lib) mkOption mkEnableOption mkIf types;
@@ -9,7 +10,7 @@ let
       expectedHosts alarmActions credentialsFile roleArn queueAlarmBytes;
   });
 in {
-  imports = [ ../logging/default.nix ];
+  imports = [ (import ../logging/default.nix { inherit packages; }) ];
   options.services.overallsCloudWatch.management = {
     enable = mkEnableOption "CloudWatch resource reconciliation on the designated environment host";
     environment = mkOption { type = paths.identifier; default = config.services.overallsLogging.environment; };

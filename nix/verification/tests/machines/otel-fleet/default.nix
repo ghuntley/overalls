@@ -3,6 +3,7 @@ let
   sloExporter = packages.otelReceiver;
   underclassModule = import ../../../../domains/system/underclass.nix { inherit packages; };
   otelGuestModule = import ../../../../domains/system/otel-guest { inherit packages; };
+  otelFleetModule = import ../../../../domains/system/otel-fleet { inherit packages; };
   keys = pkgs.runCommand "otel-fleet-disposable-wireguard-keys" {
     nativeBuildInputs = [ pkgs.wireguard-tools ];
   } ''
@@ -98,7 +99,7 @@ let
 in pkgs.testers.runNixOSTest {
   name = "overalls-otel-fleet";
   nodes.central = { lib, ... }: {
-    imports = [ ../../../../domains/system/otel-fleet otelGuestModule underclassModule groupSnapshotFixtures (fleetHost "central" "worker" "10.90.0.1" "10.90.0.2") ];
+    imports = [ otelFleetModule otelGuestModule underclassModule groupSnapshotFixtures (fleetHost "central" "worker" "10.90.0.1" "10.90.0.2") ];
     options = {
       services.audiPrivate.enable = lib.mkOption { type = lib.types.bool; default = false; };
       services.lilly.enable = lib.mkOption { type = lib.types.bool; default = false; };
@@ -222,7 +223,7 @@ in pkgs.testers.runNixOSTest {
     };
   };
   nodes.worker = { lib, ... }: {
-    imports = [ ../../../../domains/system/otel-fleet otelGuestModule underclassModule (fleetHost "worker" "central" "10.90.0.2" "10.90.0.1") ];
+    imports = [ otelFleetModule otelGuestModule underclassModule (fleetHost "worker" "central" "10.90.0.2" "10.90.0.1") ];
     options = {
       services.audiPrivate.enable = lib.mkOption { type = lib.types.bool; default = false; };
       services.lilly.enable = lib.mkOption { type = lib.types.bool; default = false; };

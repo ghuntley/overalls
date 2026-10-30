@@ -1,7 +1,8 @@
+{ packages }:
 { config, lib, pkgs, ... }:
 let
   active = lib.filterAttrs (_: instance: instance.enable) config.services.overallsBrowserProbes.instances;
-  package = pkgs.callPackage ../otel-guest/receiver.nix {};
+  package = packages.otelReceiver;
   driver = import ../otel-guest/browser-driver.nix { inherit pkgs; };
   identities = import ./request-identities.nix;
   identity = name: "overalls-vscode-browser-${name}";

@@ -45,7 +45,7 @@ in pkgs.testers.runNixOSTest {
   nodes = {
   proxy = { lib, ... }: {
     imports = [ module (import ../../support/request-source.nix {
-      inherit pkgs; name = "galileo"; source = "galileo";
+      inherit pkgs packages; name = "galileo"; source = "galileo";
       producerUser = "galileo"; producerUnit = "galileo.service";
       deadlineSeconds = 86400; collectorGroup = "overalls-otel-galileo";
     }) ];
