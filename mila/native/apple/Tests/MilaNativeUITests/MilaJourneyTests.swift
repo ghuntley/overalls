@@ -58,7 +58,7 @@ struct MilaJourneyDescriptor: Decodable {
         guard value.version == 1, !value.deployment.host.isEmpty, value.deployment.sshPort > 0, value.deployment.httpsPort > 0,
               value.tls.caPEM.contains("BEGIN CERTIFICATE"), value.approver.url.scheme == "https" || value.approver.url.scheme == "http",
               !value.approver.bearerToken.isEmpty, !value.seed.machineName.isEmpty,
-              value.approver.fixtureURL.map({ $0.scheme == "https" && $0.path.hasSuffix("/fixture/") }) ?? true else { throw MilaTrustError.invalid }
+              value.approver.fixtureURL.map({ $0.scheme == "https" && $0.absoluteString.hasSuffix("/fixture/") }) ?? true else { throw MilaTrustError.invalid }
         return value
     }
 

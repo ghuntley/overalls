@@ -17,7 +17,7 @@ The generator sorts locales, domains, and messages and writes a schema-versioned
 It validates duplicate identities and interpolation placeholders while preserving
 empty source fallback forms for the existing catalog completeness gate.
 
-The Apple Swift package bundles the generated output directly, because SwiftPM
-resources must exist before the build. After editing a catalog, regenerate it
-with `--output mila/native/apple/Sources/MilaNativeUI/Resources`;
-`test_generate_catalogs.py` fails when that copy is stale.
+The Apple Swift package bundles the generated output as SwiftPM resources.
+`mila/native/apple/build.sh` and the `apple-native` CI job generate it into
+`mila/native/apple/Sources/MilaNativeUI/Resources` (ignored by Git) before
+building; run the same command before a local `swift test`.

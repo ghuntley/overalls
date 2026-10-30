@@ -22,10 +22,9 @@ MUST NOT fall back to ad-hoc signing; and MUST verify the artifact's signature,
 signing team and (macOS) notarization before reporting success.
 
 @cc [owner:ghuntley,label:localization;release] mila-apple-bundled-catalogs
-`Sources/MilaNativeUI/Resources` MUST hold exactly the bundles that
-`mila/localization/generate_catalogs.py` produces from the shared ARB catalogs,
-one per supported locale, so every locale ships in the app. Regenerate them in
-the same change as any catalog edit; `test_generate_catalogs.py` refuses stale
-bundles. Every `MilaMessage` MUST resolve through an existing shared catalog
-identity rather than an Apple-only string, and a supported non-English locale
-MUST render its own catalog form.
+Every Apple build and package test MUST first generate
+`Sources/MilaNativeUI/Resources` from the shared ARB catalogs with
+`mila/localization/generate_catalogs.py`, one bundle per supported locale, so
+every locale ships and no stale copy is committed. Every `MilaMessage` MUST
+resolve through an existing shared catalog identity rather than an Apple-only
+string, and a supported non-English locale MUST render its own catalog form.

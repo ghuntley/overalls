@@ -89,6 +89,11 @@ jobs:
           targets: aarch64-apple-ios-sim
       - name: Build Rust FFI for Apple native tests
         run: cargo build --manifest-path mila/rust/Cargo.toml -p mila-ffi --release
+      - name: Generate bundled locale catalogs
+        run: |
+          python3 mila/localization/generate_catalogs.py \
+            --source mila/localization/catalogs \
+            --output mila/native/apple/Sources/MilaNativeUI/Resources
       - name: Swift native package tests
         working-directory: mila/native/apple
         env:

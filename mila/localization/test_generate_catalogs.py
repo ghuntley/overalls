@@ -51,26 +51,6 @@ class CatalogGeneratorTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 generate(Path(directory), Path(directory) / "out")
 
-    def test_apple_bundled_catalogs_are_current(self) -> None:
-        # Evidence for the Apple package contract mila-apple-bundled-catalogs.
-        # The Swift package ships the generated bundles as resources; they must
-        # be byte-identical to a fresh generation from the shared ARB catalogs.
-        repo = Path(__file__).resolve().parents[2]
-        bundled = repo / "mila/native/apple/Sources/MilaNativeUI/Resources"
-        with tempfile.TemporaryDirectory() as directory:
-            fresh = Path(directory)
-            generate(repo / "mila/localization/catalogs", fresh)
-            expected = sorted(path.name for path in fresh.iterdir())
-            self.assertEqual(sorted(path.name for path in bundled.iterdir()), expected)
-            for name in expected:
-                self.assertEqual(
-                    (bundled / name).read_bytes(),
-                    (fresh / name).read_bytes(),
-                    f"{name} is stale; regenerate with mila/localization/generate_catalogs.py "
-                    "--source mila/localization/catalogs --output "
-                    "mila/native/apple/Sources/MilaNativeUI/Resources",
-                )
-
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,2 +1,3 @@
 .build/
 DerivedData/
+Sources/MilaNativeUI/Resources/*.json

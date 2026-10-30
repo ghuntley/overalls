@@ -79,6 +79,10 @@ RUSTC=$rustc "${CARGO:-cargo}" build --locked --release \
   -p mila-ffi --target "$rust_target"
 export MILA_FFI_LIB_DIR="$repo/mila/rust/target/$rust_target/release"
 
+# Bundle every shared locale catalog (mila-apple-bundled-catalogs).
+python3 "$repo/mila/localization/generate_catalogs.py" \
+  --source "$repo/mila/localization/catalogs" --output "$package_dir/Sources/MilaNativeUI/Resources"
+
 swift_config=debug
 [[ "$mode" == release ]] && swift_config=release
 swift_args=(--package-path "$package_dir/App" --scratch-path "$package_dir/App/.build/$platform-$mode"
