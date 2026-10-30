@@ -172,15 +172,26 @@ def main() -> None:
             f"UPDATE tokens SET expires_at = clock_timestamp() - interval '1 second' WHERE subject = 'user?id={admin_id}' AND purpose = 'user';"
         )
         expect(admin).to_have_url(ORIGIN + "/sign-in", timeout=15000)
-        assert export_status(admin) == 404
-        # Independent remembered authority can resume an expired login.
-        # Revoke it through the application's real sign-out before fresh refusal.
+        # The mounted socket refused the expired login and the sign-in request
+        # dropped it from the session. Independent remembered authority then
+        # resumes a new stored login for an ordinary read (ADR-0123, carried
+        # forward by ADR-0160); it is neither email authentication nor elevation.
         assert (
             sql(
                 f"SELECT count(*) FROM tokens WHERE subject = 'user?id={admin_id}' AND purpose = 'remember_me';"
             )
             == "1"
         )
+        assert export_status(admin) == 200
+        assert (
+            int(
+                sql(
+                    f"SELECT count(*) FROM tokens WHERE subject = 'user?id={admin_id}' AND purpose = 'user' AND expires_at > clock_timestamp();"
+                )
+            )
+            >= 1
+        )
+        # Revoke remembered authority through the real sign-out before fresh refusal.
         revoked_before = int(
             sql(
                 f"SELECT count(*) FROM tokens WHERE subject = 'user?id={admin_id}' AND purpose = 'revocation' AND expires_at > clock_timestamp();"

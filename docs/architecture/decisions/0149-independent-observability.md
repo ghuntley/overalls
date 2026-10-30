@@ -279,6 +279,17 @@ login expiry, application remembered revocation and subsequent admin/export
 refusals. Packaged browser typing, composed-driver checks, Ruff and contract
 checks pass; the tested packaged helper is byte-identical to the current fixture.
 
+A later fixture still asserted an export refusal immediately after the
+current login expired. The mounted page correctly leaves for sign-in, which
+drops the expired login from the session; the next request then exchanges the
+still-valid remembered credential for a new stored login, so the ordinary
+export read succeeds as ADR-0123 and ADR-0160 require. The fixture now asserts
+that resumption (200 and a new unexpired login) before the real sign-out
+revocation and the final admin/export refusals. No Marshall behavior changed.
+The corrected native gate passed locally on 2026-10-30 at
+`/nix/store/bjpadwzarfg15q2wwbfqnifjbfdpbn9x-vm-test-run-overalls-control-room-browser`
+(browser subtest 38.78 seconds).
+
 The current Marshall observability native gate also passed with exit 0 in
 113.32 seconds, at
 `/nix/store/q4qgzxakvmrc90kjg5n3vxh9kddsbvx2-vm-test-run-overalls-otel-marshall`.
