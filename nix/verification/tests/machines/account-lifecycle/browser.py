@@ -4,7 +4,6 @@ import json
 import sys
 import time
 from pathlib import Path
-from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 from playwright._impl._api_structures import SetCookieParam
@@ -189,22 +188,16 @@ def run() -> None:
         stage = "owned Customer creation"
         signal("owned-create-ready")
         wait("owned-create-go")
-        visit(invited, "/machines/new")
-        invited.locator("#machine_profile").select_option("customer")
-        invited.locator("#machine_vcpu").fill("1")
-        invited.locator("#machine_memory_mib").fill("512")
-        invited.locator("#machine_disk_gib").fill("5")
-        invited.locator("#provision-submit").click()
-        invited.wait_for_url(
-            lambda url: (
-                urlsplit(url).path.startswith("/machines/")
-                and urlsplit(url).path != "/machines/new"
-            )
-        )
-        owned = str(UUID(urlsplit(invited.url).path.split("/")[-1]))
-        (ROOT / "owned-id").write_text(owned)
+        # The driver admits the invited user's Customer machine as that user;
+        # the form offers only agent profiles. Prove the owner can open it.
+        owned = str(UUID((ROOT / "owned-id").read_text().strip()))
+        visit(invited, "/machines/" + owned + "/access")
+        expect(invited.locator("#machine-detail")).to_have_count(1)
+        expect(invited.locator("#customer-isolation")).to_have_count(1)
+        stage = "ordinary administration refusal"
         visit(invited, "/admin/users")
         expect(invited.locator("#invite-user")).to_have_count(0)
+        stage = "remembered authority"
         # Prove remembered authority works before testing its retirement. Keep
         # the virtual authenticator but discard the completed browser session.
         remembered = [
@@ -215,9 +208,11 @@ def run() -> None:
         assert len(remembered) == 1
         invited_context.clear_cookies()
         invited_context.add_cookies(remembered)
-        invited.goto(ORIGIN + "/overview")
-        expect(invited).to_have_url(ORIGIN + "/settings")
-        connected(invited)
+        # A remembered credential establishes an ordinary login without passkey
+        # proof: the account page offers no continue link until it re-verifies.
+        visit(invited, "/overview")
+        expect(invited.locator("#main-content")).to_have_count(1)
+        visit(invited, "/settings")
         expect(invited.locator("#security-continue")).to_have_count(0)
         verify(invited)
         visit(invited, "/admin/users")

@@ -986,11 +986,27 @@ with subtest("installed bootstrap and verified browser invitation create an ordi
     private_transfer("invitation-token", "invitation-token")
     browser_signal("invitation-ready")
     browser_wait("owned-create-ready", timeout=180)
-    fresh_admission_reports()
+    old_id = identifier(sql("SELECT id FROM users WHERE email='retirement-invited@example.test'"))
+    # The web form opens agent setup threads, and Customer VMs have no agent
+    # root (ADR-0099), so the invited user's Customer machine is admitted through
+    # the real authorized action as that user; the browser then proves it owns
+    # and can open it.
+    owned = provision_after_capacity(
+        {
+            "action": "provision",
+            "owner_id": old_id,
+            "image_id": image_id,
+            "profile": "customer",
+            "disk_bytes": 5_368_709_120,
+            "key": str(uuid.uuid4()),
+        }
+    )
+    assert owned["accepted"] is True
+    owned_id = identifier(owned["vm_id"])
+    client.succeed("printf '%s' " + shlex.quote(owned_id) + " >" + browser_root + "/owned-id")
+    client.succeed("chown tester:users " + browser_root + "/owned-id")
     browser_signal("owned-create-go")
     browser_wait("owned-admitted")
-    owned_id = identifier(client.succeed("cat " + browser_root + "/owned-id").strip())
-    old_id = identifier(sql("SELECT id FROM users WHERE email='retirement-invited@example.test'"))
     assert sql(f"SELECT administrator,mfa_enabled FROM users WHERE id='{old_id}'") == "f|t"
     assert (
         sql(f"SELECT profile,owner_id FROM compute_virtual_machines WHERE id='{owned_id}'")
