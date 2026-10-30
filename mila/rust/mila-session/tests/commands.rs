@@ -16,6 +16,7 @@ use russh::{
     },
     server, Channel, ChannelId,
 };
+use std::future::Future;
 use std::sync::{Arc, LazyLock, Mutex, PoisonError};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
@@ -45,7 +46,7 @@ static HARNESS: LazyLock<Mutex<Harness>> = LazyLock::new(|| Mutex::new(harness()
 fn observe<T>(
     call: impl for<'a> FnOnce(
         &'a mut ApplicationSession,
-    ) -> std::pin::Pin<Box<dyn std::future::Future<Output = T> + 'a>>,
+    ) -> std::pin::Pin<Box<dyn Future<Output = T> + 'a>>,
 ) -> (T, Vec<Exec>) {
     let mut harness = HARNESS.lock().unwrap_or_else(PoisonError::into_inner);
     let Harness {
@@ -59,6 +60,10 @@ fn observe<T>(
     (result, execs)
 }
 
+#[expect(
+    clippy::expect_used,
+    reason = "integration-test helper outside #[test]; an ungrammatical sent line must fail the calling property"
+)]
 fn parsed(line: &str) -> mila_protocol::Command {
     mila_protocol::Command::parse(line).expect("sent line satisfies the shared grammar")
 }
@@ -118,6 +123,10 @@ fn machine_id(tc: &TestCase, fault: bool) -> &'static str {
 
 /// `length` copies of `fill`, with one byte replaced from `bad` when `fault`,
 /// or else from `good` half of the time.
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test helper outside #[test]; generated lengths are at most a few thousand"
+)]
 fn text(
     tc: &TestCase,
     length: u64,
@@ -176,13 +185,13 @@ fn machine_create_sends_only_bounded_commands(tc: TestCase) {
         && (1..=500).contains(&disk);
     assert_eq!(result.is_ok(), expected, "{result:?}");
     if !expected {
-        assert!(execs.is_empty());
+        assert_eq!(execs, Vec::<Exec>::new());
         return;
     }
     assert_eq!(execs.len(), 1);
     let command = parsed(&execs[0].line);
     assert_eq!(command.command, "new");
-    assert!(command.arguments.is_empty());
+    assert_eq!(command.arguments, Vec::<String>::new());
     assert_eq!(
         string_option(&command, "name").as_deref(),
         Some(name.as_str())
@@ -194,7 +203,7 @@ fn machine_create_sends_only_bounded_commands(tc: TestCase) {
         string_option(&command, "request-id").as_deref(),
         Some(REQUEST)
     );
-    assert!(execs[0].stdin.is_empty());
+    assert_eq!(execs[0].stdin, Vec::<u8>::new());
 }
 
 /// @cc [owner:ghuntley,label:verification;protocol;security] mila-session-machine-resize-bounds
@@ -223,7 +232,7 @@ fn machine_resize_sends_only_bounded_commands(tc: TestCase) {
         && (1..=500).contains(&disk);
     assert_eq!(result.is_ok(), expected, "{result:?}");
     if !expected {
-        assert!(execs.is_empty());
+        assert_eq!(execs, Vec::<Exec>::new());
         return;
     }
     assert_eq!(execs.len(), 1);
@@ -261,10 +270,12 @@ fn device_register_sends_the_push_key_only_on_stdin(tc: TestCase) {
         &['+', '/', '='],
     );
     let enc_pubkey = if fault == 3 {
+        // ENC_KEY is 43 'A's; vary its final symbol or drop it.
+        let prefix = "A".repeat(42);
         tc.draw(gs::sampled_from(vec![
-            format!("{}B", &ENC_KEY[..42]),
-            ENC_KEY[..42].to_owned(),
-            format!("{}+", &ENC_KEY[..42]),
+            format!("{prefix}B"),
+            prefix.clone(),
+            format!("{prefix}+"),
         ]))
     } else {
         ENC_KEY.to_owned()
@@ -303,7 +314,7 @@ fn device_register_sends_the_push_key_only_on_stdin(tc: TestCase) {
             .is_none_or(|l| (1..=64).contains(&l.len()) && !l.chars().any(char::is_control));
     assert_eq!(result.is_ok(), expected, "{result:?}");
     if !expected {
-        assert!(execs.is_empty());
+        assert_eq!(execs, Vec::<Exec>::new());
         return;
     }
     assert_eq!(execs.len(), 1);
@@ -454,13 +465,17 @@ struct HardwareStandIn {
 }
 
 impl DeviceSigner for HardwareStandIn {
-    async fn sign(&mut self, message: &[u8]) -> Result<[u8; 64], SshError> {
+    fn sign(&mut self, message: &[u8]) -> impl Future<Output = Result<[u8; 64], SshError>> + Send {
         use p256::ecdsa::signature::Signer;
         let signature: p256::ecdsa::Signature = self.key.sign(message);
-        Ok(signature.to_bytes().into())
+        std::future::ready(Ok(signature.to_bytes().into()))
     }
 }
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn identity() -> (String, HardwareStandIn) {
     let key = p256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
     let mut blob = Vec::new();
@@ -486,12 +501,12 @@ struct Recorder {
 
 impl server::Handler for Recorder {
     type Error = russh::Error;
-    async fn auth_publickey(
+    fn auth_publickey(
         &mut self,
         _: &str,
         _: &russh::keys::PublicKey,
-    ) -> Result<server::Auth, Self::Error> {
-        Ok(server::Auth::Accept)
+    ) -> impl Future<Output = Result<server::Auth, Self::Error>> + Send {
+        std::future::ready(Ok(server::Auth::Accept))
     }
     async fn channel_open_session(
         &mut self,
@@ -502,49 +517,54 @@ impl server::Handler for Recorder {
         reply.accept().await;
         Ok(())
     }
-    async fn exec_request(
+    fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         self.pending = Some(Exec {
             line: String::from_utf8_lossy(data).into_owned(),
             stdin: Vec::new(),
         });
-        session.channel_success(channel)?;
-        Ok(())
+        std::future::ready(session.channel_success(channel))
     }
-    async fn data(
+    fn data(
         &mut self,
         _: ChannelId,
         data: &[u8],
         _: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         if let Some(pending) = self.pending.as_mut() {
             pending.stdin.extend_from_slice(data);
         }
-        Ok(())
+        std::future::ready(Ok(()))
     }
-    async fn channel_eof(
+    fn channel_eof(
         &mut self,
         channel: ChannelId,
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         if let Some(exec) = self.pending.take() {
             self.log
                 .lock()
                 .unwrap_or_else(PoisonError::into_inner)
                 .push(exec);
         }
-        session.data(channel, b"{}".to_vec())?;
-        session.exit_status_request(channel, 0)?;
-        session.eof(channel)?;
-        session.close(channel)?;
-        Ok(())
+        std::future::ready((|| {
+            session.data(channel, b"{}".to_vec())?;
+            session.exit_status_request(channel, 0)?;
+            session.eof(channel)?;
+            session.close(channel)?;
+            Ok(())
+        })())
     }
 }
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 fn harness() -> Harness {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
@@ -559,6 +579,10 @@ fn harness() -> Harness {
     }
 }
 
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 async fn connect(log: Log) -> ApplicationSession {
     let now = SystemTime::now()
         .duration_since(UNIX_EPOCH)

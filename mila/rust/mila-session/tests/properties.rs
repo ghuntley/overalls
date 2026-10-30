@@ -2,11 +2,20 @@ use hegel::{generators as gs, TestCase};
 use mila_session::decode_listing;
 use serde_json::{json, Value};
 
+#[expect(
+    clippy::fn_params_excessive_bools,
+    reason = "test fixture mirrors the listing row flags one-to-one"
+)]
 fn row(index: u8, write: bool, manage: bool, owner: bool, pinned: bool) -> Value {
     json!({"id": format!("00000000-0000-0000-0000-{index:012x}"), "name": "machine",
         "desired_state": "running", "observed_state": "running", "pinned": pinned,
         "owner": owner, "permissions": {"read": true, "write": write, "manage": manage}})
 }
+#[expect(
+    clippy::unwrap_used,
+    clippy::needless_pass_by_value,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test; it takes owned rows so call sites can build them inline"
+)]
 fn envelope(rows: Vec<Value>, cursor: Option<String>) -> Vec<u8> {
     serde_json::to_vec(&json!({"version": 1, "status": "succeeded", "result": {"items": rows, "next_cursor": cursor}})).unwrap()
 }
@@ -72,7 +81,7 @@ fn valid_cursor_is_preserved_without_changing_authority(tc: TestCase) {
     for machine in listing.machines() {
         assert!(!machine.write);
         assert!(!machine.manage);
-        assert!(!machine.owner.is_some());
+        assert!(machine.owner.is_none());
         assert!(!machine
             .available_actions()
             .contains(&mila_runtime::MachineAction::Delete));

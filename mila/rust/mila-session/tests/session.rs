@@ -15,6 +15,7 @@ use serde_json::{json, Value};
 use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::{
+    future::Future,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -33,6 +34,11 @@ fn machine(id: &str, name: &str) -> Value {
     json!({"id": id, "name": name, "desired_state": "running", "observed_state": "running",
         "owner": true, "pinned": false, "permissions": {"read": true, "write": true, "manage": true}})
 }
+#[expect(
+    clippy::unwrap_used,
+    clippy::needless_pass_by_value,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test; it takes owned rows so call sites can build them inline"
+)]
 fn page(items: Vec<Value>, cursor: Option<&str>) -> Vec<u8> {
     serde_json::to_vec(&json!({"version": 1, "status": "succeeded", "result": {"items": items, "next_cursor": cursor}})).unwrap()
 }
@@ -134,12 +140,7 @@ async fn invalid_refused_and_interrupted_refresh_never_replace_the_last_good_lis
         Err(SessionError::Transport(SshError::MissingExit))
     ));
     assert_eq!(session.listing().unwrap().machines()[0].name, "kept");
-    assert!(session
-        .refresh_machines()
-        .await
-        .unwrap()
-        .machines()
-        .is_empty());
+    assert_eq!(session.refresh_machines().await.unwrap().machines(), []);
     assert!(responses.lock().unwrap().is_empty());
     session.close().await.unwrap();
     task.abort();
@@ -266,13 +267,18 @@ async fn cyclic_pagination_keeps_previous_rows_and_cursor() {
     task.abort();
 }
 impl DeviceSigner for HardwareStandIn {
-    async fn sign(&mut self, message: &[u8]) -> Result<[u8; 64], SshError> {
+    fn sign(&mut self, message: &[u8]) -> impl Future<Output = Result<[u8; 64], SshError>> + Send {
         use p256::ecdsa::signature::Signer;
         self.calls.fetch_add(1, Ordering::SeqCst);
         let signature: p256::ecdsa::Signature = self.key.sign(message);
-        Ok(signature.to_bytes().into())
+        std::future::ready(Ok(signature.to_bytes().into()))
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    clippy::cast_possible_truncation,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test, and the three SSH key fields are under 100 bytes"
+)]
 fn identity(calls: Arc<AtomicUsize>) -> (String, HardwareStandIn) {
     let key = p256::ecdsa::SigningKey::from_slice(&[7; 32]).unwrap();
     let mut blob = Vec::new();
@@ -301,13 +307,13 @@ struct Handler {
 }
 impl server::Handler for Handler {
     type Error = russh::Error;
-    async fn auth_publickey(
+    fn auth_publickey(
         &mut self,
         _: &str,
         _: &russh::keys::PublicKey,
-    ) -> Result<server::Auth, Self::Error> {
+    ) -> impl Future<Output = Result<server::Auth, Self::Error>> + Send {
         self.authentications.fetch_add(1, Ordering::SeqCst);
-        Ok(server::Auth::Accept)
+        std::future::ready(Ok(server::Auth::Accept))
     }
     async fn channel_open_session(
         &mut self,
@@ -318,12 +324,17 @@ impl server::Handler for Handler {
         reply.accept().await;
         Ok(())
     }
-    async fn exec_request(
+    #[expect(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "scripted test server: an unexpected command must fail the calling test"
+    )]
+    fn exec_request(
         &mut self,
         channel: ChannelId,
         data: &[u8],
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         let response = self
             .responses
             .lock()
@@ -332,25 +343,34 @@ impl server::Handler for Handler {
             .expect("unexpected command");
         assert_eq!(data, response.command.as_bytes());
         self.pending = Some(response);
-        session.channel_success(channel)?;
-        Ok(())
+        std::future::ready(session.channel_success(channel))
     }
-    async fn channel_eof(
+    #[expect(
+        clippy::unwrap_used,
+        reason = "scripted test server: EOF always follows the exec that set the pending response"
+    )]
+    fn channel_eof(
         &mut self,
         channel: ChannelId,
         session: &mut server::Session,
-    ) -> Result<(), Self::Error> {
-        session.extended_data(channel, 1, b"discard progress".to_vec())?;
-        let response = self.pending.take().unwrap();
-        session.data(channel, response.bytes)?;
-        if let Some(exit) = response.exit {
-            session.exit_status_request(channel, exit)?;
-        }
-        session.eof(channel)?;
-        session.close(channel)?;
-        Ok(())
+    ) -> impl Future<Output = Result<(), Self::Error>> + Send {
+        std::future::ready((|| {
+            session.extended_data(channel, 1, b"discard progress".to_vec())?;
+            let response = self.pending.take().unwrap();
+            session.data(channel, response.bytes)?;
+            if let Some(exit) = response.exit {
+                session.exit_status_request(channel, exit)?;
+            }
+            session.eof(channel)?;
+            session.close(channel)?;
+            Ok(())
+        })())
     }
 }
+#[expect(
+    clippy::unwrap_used,
+    reason = "integration-test fixture helper outside #[test]; a failed fixture setup must abort the calling test"
+)]
 async fn endpoint(
     responses: Arc<Mutex<VecDeque<Response>>>,
 ) -> (

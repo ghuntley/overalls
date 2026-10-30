@@ -19,6 +19,10 @@ impl ApplicationSession {
         let arg = secondary
             .map(|v| Identifier::parse(v).map_err(|_| SessionError::InvalidThreadAction))
             .transpose()?;
+        #[expect(
+            clippy::expect_used,
+            reason = "every arm that unwraps thread_id or arg is guarded by its is_some() check"
+        )]
         let (line, stdin) = match command {
             "thread ls" if thread_id.is_none() && secondary.is_none() && input.is_none() => {
                 ("thread ls --json".to_string(), Vec::new())

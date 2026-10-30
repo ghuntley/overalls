@@ -31,6 +31,17 @@ pub struct ApplicationSession {
     last_refusal: std::sync::Mutex<Option<String>>,
 }
 
+impl std::fmt::Debug for ApplicationSession {
+    /// Shows only the deployment endpoint; listings, refusals and the SSH
+    /// session stay out of diagnostics.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ApplicationSession")
+            .field("host", &self.host)
+            .field("port", &self.port)
+            .finish_non_exhaustive()
+    }
+}
+
 /// @cc [owner:ghuntley,label:security;protocol] mila-session-closed-refusal
 /// Only a closed server refusal code (`[a-z][a-z0-9_]{0,63}` from a v1
 /// `status: error` envelope) may be retained for presentation; server
