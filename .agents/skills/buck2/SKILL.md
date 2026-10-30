@@ -20,7 +20,15 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
   - query: `tools/buck2 uquery 'owner(path/to/file)'`,
     `tools/buck2 uquery 'rdeps(//..., //lilly:srcs)'`
 - **Target hashes,** which feed the selector:
-  `tools/buck2 targets //... --show-unconfigured-target-hash --target-hash-file-mode=paths_and_contents --target-hash-modified-paths=<files>`.
+  `tools/buck2 targets //... --show-unconfigured-target-hash --target-hash-file-mode=paths_and_contents --target-hash-recursive=true`.
+  Pass `--target-hash-recursive=true` explicitly: without it a dependency's
+  change (including a toolchain path) does not change the hash.
+  `--target-hash-modified-paths` only applies in `paths_only` mode.
+- **Affected targets:** `tools/affected [--base REV] [--all] [--output FILE]`
+  compares the base revision with the working tree and prints JSON grouped
+  as `machine_tests` (with labels), `tests` and `builds`. It only loads targets;
+  it never builds. `buck2` and `affected` in the devenv shell are these
+  wrappers.
 - **Ownership:**
   `tools/buck2 bxl //buck/bxl/ownership.bxl:main -- --files $(git ls-files)`.
   Pass list arguments after `--`; an `@argfile` is not expanded there.
@@ -53,7 +61,8 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
 5. **`nix_flake_attr` is bootstrap only.** When you move an output to a real
    rule, delete its bootstrap use in the same change. Never add new uses.
    After the flake gains or loses an output, regenerate the list with
-   `nix/buck/bootstrap-attrs.sh`.
+   `nix/buck/bootstrap-attrs.sh`; `//buck:bootstrap_attrs_fresh` fails until
+   you do.
 6. **`.buckconfig` ignores are root-relative.** Use `**/name` for nested
    build directories.
 7. **Default globs skip dotfiles.** `nix_owned` adds `**/.*` patterns; do the
@@ -110,6 +119,36 @@ match Nix byte for byte. Compare them with `diff -r`.
 **Not yet Buck2.** Checks that evaluate NixOS (`nix-compact-*`,
 `fleet-builds-configuration`) stay bootstrap targets until `nix_assemble`
 (M3).
+
+## NixOS machine tests
+
+- **Targets.** Every machine check in `nix/verification/tests/catalog.nix` is a
+  `nixos_machine_test` (`buck/nixos.bzl`) in
+  `nix/verification/tests/machines/<suite>/BUCK`, named after the check. Fleet
+  variants carry their flags as `params` and only their own scenario files as
+  inputs. Each target builds `lib.assemble {}.checks.<name>` through
+  `nix_assemble` over a copy of its declared `inputs` only, so reading an
+  undeclared file is an evaluation error: add the owning group to `inputs`
+  (in `buck/inputs.bzl` or the generator), not a workaround.
+- **Run one:** `tools/buck2 test //nix/verification/tests/machines/sysctl:sysctl`.
+  Buck2 builds the assembly (the VM run) first; the test command then checks
+  that the `nested_kvm` label matches Nix's `meta.ci.nestedKvm` and, for fleet
+  variants, that the declared scenarios match the composed script.
+- **Never edit the generated BUCK files.** After changing `catalog.nix` or a
+  suite's `requiredFeatures`, run `python3 buck/machine_tests.py generate`.
+  After changing which scenario files a fleet variant reads, run
+  `python3 buck/machine_tests.py refresh-scenarios` (evaluation only, a few
+  minutes) and then `generate`. `//buck:machine_tests_fresh` fails when they
+  are stale.
+- **Labels.** `machine_test` and `nested_kvm` come from the macro.
+  `known_inception_failure` keeps Inception (known broken) out of `ci.yml`;
+  the daily run reports it without failing.
+- **CI.** `ci.yml` runs on every trunk push and on dispatch:
+  affected → build → test → one job per affected machine test. When
+  everything is selected it leaves the machine tests to the daily run unless
+  dispatched with `-f machine_all=true`. The daily
+  backstop is `nixos-machine-tests.yml`; dispatch it with
+  `gh workflow run nixos-machine-tests.yml --ref trunk -f checks="a b"`.
 
 ## Troubleshooting
 

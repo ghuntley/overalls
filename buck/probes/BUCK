@@ -8,6 +8,7 @@ nix_owned()
 genrule(
     name = "elixir_version",
     out = "version.txt",
+    visibility = ["//buck:"],
     cmd = "$(exe toolchains//:elixir)/bin/elixir -e 'IO.puts System.version()' > $OUT",
 )
 

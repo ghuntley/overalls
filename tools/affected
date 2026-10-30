@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Prints the Buck2 targets affected by the change from --base (default HEAD^)
+# to the working tree as JSON (ADR-0270). See buck/affected.py.
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+# The cells' pinned Python runs the selector; link the cells on first use.
+[[ -e "$root/.buck-cells" ]] || "$root/tools/buck2" --version > /dev/null
+python=$(sed -n 's/^ *python = //p' "$root/.buck-cells/toolchains.buckconfig")
+exec "$python" "$root/buck/affected.py" "$@"

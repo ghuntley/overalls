@@ -47,6 +47,7 @@ include = [
     "nix/domains/artifacts",
     "nix/verification/tests/evaluation",
     "nix/verification/tests/support",
+    "buck",
     "audi",
     "scripts",
     "marshall/scripts",

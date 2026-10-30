@@ -1,8 +1,11 @@
 name: "nixos machine tests"
 
-# Fans out one job per NixOS machine test. The matrix is derived by evaluating
-# meta.ci on the flake checks (nix/verification/tests/ci.nix): every check with
-# ci.enable and ci.machine runs here; nothing is listed by hand.
+# The daily full run of every NixOS machine test, and the dispatch path for a
+# chosen subset; ci.yml runs the affected ones on each trunk push (ADR-0270).
+# The matrix lists every nixos_machine_test target from the Buck2 graph
+# (tools/affected --all), which loads targets only; each job runs
+# `tools/buck2 test` on one target, so a check that fails to evaluate fails
+# its own job.
 on:
   schedule:
     # Daily at 14:00 UTC
@@ -26,41 +29,51 @@ jobs:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 60
     outputs:
-      checks: ${{ steps.select.outputs.checks }}
-      errors: ${{ steps.discover.outputs.errors }}
+      tests: ${{ steps.select.outputs.tests }}
+      errors: ${{ steps.select.outputs.errors }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-      - name: Discover machine tests
-        id: discover
-        run: .github/scripts/select-checks.sh machine
+      - name: List machine tests
+        run: tools/affected --all --output all.json
       - name: Apply requested subset
         id: select
         env:
-          ALL: ${{ steps.discover.outputs.checks }}
           REQUESTED: ${{ inputs.checks }}
         run: |
           set -euo pipefail
-          if [ -z "${REQUESTED:-}" ]; then
-            echo "checks=$ALL" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          checks=$(jq -cn --argjson all "$ALL" --arg req "$REQUESTED" '$req | split(" ") | map(select(. != "")) as $r | ($r - $all) as $unknown | if ($unknown | length) > 0 then error("not evaluable CI machine tests: \($unknown | join(", "))") else $r end')
-          echo "checks=$checks" >> "$GITHUB_OUTPUT"
+          all=$(jq -c '[.machine_tests[] | {target, name: (.target | split(":") | last),
+            nested_kvm: (.labels | index("nested_kvm") != null),
+            known: (.labels | index("known_inception_failure") != null)}] | sort_by(.name)' all.json)
+          tests=$(jq -cn --argjson all "$all" --arg req "${REQUESTED:-}" '
+            ($req | split(" ") | map(select(. != ""))) as $r
+            | if ($r | length) == 0 then $all
+              else ($r - ($all | map(.name))) as $unknown
+                | if ($unknown | length) > 0 then error("not CI machine tests: \($unknown | join(", "))")
+                  else $all | map(select(.name as $n | $r | index($n))) end
+              end')
+          echo "Selected $(jq length <<<"$tests") machine tests"
+          {
+            echo "tests=$tests"
+            echo "errors=$(jq '.errors | length' all.json)"
+          } >> "$GITHUB_OUTPUT"
+          jq -r '.errors[] | "::error title=selection error in \(.package)::\(.error | split("\n") | first)"' all.json
 
   machine:
     needs: discover
-    if: needs.discover.outputs.checks != '[]'
-    name: ${{ matrix.check }}
+    if: needs.discover.outputs.tests != '[]'
+    name: ${{ matrix.test.name }}
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 240
+    # Known Inception failures (AGENTS.md) are reported but do not fail the run.
+    continue-on-error: ${{ matrix.test.known }}
     strategy:
       fail-fast: false
       matrix:
-        check: ${{ fromJSON(needs.discover.outputs.checks) }}
+        test: ${{ fromJSON(needs.discover.outputs.tests) }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -72,23 +85,25 @@ jobs:
         run: |
           ls -l /dev/kvm
           grep -c -w -E 'vmx|svm' /proc/cpuinfo || echo "no vmx/svm CPU flag exposed"
-      - name: Run ${{ matrix.check }}
+      - name: Run ${{ matrix.test.name }}
         # Pushes the guest images, packages and test drivers built for this
         # scenario to the overalls cache as they are realised.
-        run: cachix watch-exec overalls -- nix build -L --no-link .#checks.x86_64-linux.${{ matrix.check }}
+        env:
+          TARGET: ${{ matrix.test.target }}
+        run: cachix watch-exec overalls -- tools/buck2 test "$TARGET"
 
-  # Fails the run when any check did not evaluate, after every check that did
-  # evaluate has had its machine run.
+  # Fails the run when any package failed to load, after every machine test
+  # that did load has run.
   evaluation:
     needs: [discover, machine]
     if: always() && needs.discover.result == 'success'
     runs-on: namespace-profile-cached-amd64
     steps:
-      - name: Require every check to evaluate
+      - name: Require every package to load
         env:
           ERRORS: ${{ needs.discover.outputs.errors }}
         run: |
           if [ "${ERRORS:-0}" -gt 0 ]; then
-            echo "::error::$ERRORS checks failed to evaluate; see the discover job summary"
+            echo "::error::$ERRORS packages failed to load; see the discover job"
             exit 1
           fi

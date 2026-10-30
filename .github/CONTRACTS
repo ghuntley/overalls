@@ -1,0 +1,13 @@
+@cc [owner:ghuntley,label:verification] ci-affected-workflow
+ci.yml MUST run on every trunk push and on dispatch, select from the pushed
+range with tools/affected (everything when the range has no usable base), and
+run the affected builds, tests and machine tests, each machine test as its own
+job wrapped in `cachix watch-exec`. Known Inception failures, and the full
+machine-test set when everything is selected (unless dispatched with
+machine_all), run only in the daily backstop. A selection error, or any failed job, MUST fail the ci job
+(ADR-0270).
+
+@cc [owner:ghuntley,label:verification] machine-tests-daily-backstop
+nixos-machine-tests.yml MUST run every nixos_machine_test target daily, and
+on dispatch the space-separated check names given in `checks`, each through
+`tools/buck2 test` in its own job (ADR-0270).

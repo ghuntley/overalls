@@ -1,0 +1,393 @@
+{
+  "account-lifecycle": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-roster-matrix.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "account-lifecycle-ubuntu": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-roster-matrix.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "agent-cli-journey": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "agent-fleet": [
+    "scenarios/agent.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "agent-ubuntu-fleet": [
+    "scenarios/agent.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "artifact-agent-publish": [
+    "scenarios/agent.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/server-tool-setup.py"
+  ],
+  "audi-fleet": [
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "audi-relocation-fleet": [
+    "scenarios/audi-relocation.py",
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "audi-ubuntu-fleet": [
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "audi-ubuntu-relocation-fleet": [
+    "scenarios/audi-relocation.py",
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "brady-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/brady.py",
+    "scenarios/enrollment.py"
+  ],
+  "clone-cancellation": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "clone-destination-loss": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "clone-marshall-restart": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py"
+  ],
+  "cloning-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py"
+  ],
+  "coding-clis-nixos-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/coding-clis.py",
+    "scenarios/enrollment.py"
+  ],
+  "coding-clis-ubuntu-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/coding-clis.py",
+    "scenarios/enrollment.py"
+  ],
+  "customer-isolation-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/customer-recovery.py",
+    "scenarios/customer-setup.py",
+    "scenarios/enrollment.py",
+    "scenarios/network.py",
+    "scenarios/provisioner-recovery.py",
+    "scenarios/updates.py"
+  ],
+  "default-oss-creation": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "executor-loss": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/capacity.py",
+    "scenarios/control-plane-recovery.py",
+    "scenarios/credential-revocation.py",
+    "scenarios/enrollment.py",
+    "scenarios/idempotency.py",
+    "scenarios/lifecycle.py",
+    "scenarios/network.py",
+    "scenarios/provisioner-recovery.py",
+    "scenarios/socket-custody.py",
+    "scenarios/staleness.py",
+    "scenarios/storage-failures.py",
+    "scenarios/terminal.py",
+    "scenarios/updates.py"
+  ],
+  "fleet-guest-trust": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "galileo-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/galileo.py"
+  ],
+  "github-integration-almalinux-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "github-integration-arch-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "github-integration-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "github-integration-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "github-integration-windows-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "guest-cli-recovery": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "guest-cli-recovery-ubuntu": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "host-replacement": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/host-replacement.py"
+  ],
+  "integration-renewals": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "lilly-observability-recovery": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/observability-recovery.py",
+    "scenarios/observability-setup.py",
+    "scenarios/submission-recovery.py"
+  ],
+  "lilly-runtime-readiness": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/customer-setup.py",
+    "scenarios/enrollment.py",
+    "scenarios/runtime-readiness.py",
+    "scenarios/submission-recovery.py"
+  ],
+  "maintenance-evacuation": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "memory-suspension-fleet": [
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/suspension.py"
+  ],
+  "mila-journey-terminal": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/mila-terminal.py",
+    "scenarios/porsche.py",
+    "scenarios/terminal-setup.py"
+  ],
+  "otel-audi-ssh-native": [
+    "scenarios/audi.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "otel-galileo-native": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/galileo.py"
+  ],
+  "otel-guest-native": [
+    "scenarios/agent.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "otel-porsche-native": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py"
+  ],
+  "porsche-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/capacity.py",
+    "scenarios/control-plane-recovery.py",
+    "scenarios/credential-revocation.py",
+    "scenarios/enrollment.py",
+    "scenarios/idempotency.py",
+    "scenarios/lifecycle.py",
+    "scenarios/network.py",
+    "scenarios/porsche.py",
+    "scenarios/provisioner-recovery.py",
+    "scenarios/socket-custody.py",
+    "scenarios/staleness.py",
+    "scenarios/storage-failures.py",
+    "scenarios/terminal.py",
+    "scenarios/updates.py"
+  ],
+  "porsche-lifecycle-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py"
+  ],
+  "porsche-lifecycle-ubuntu-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py"
+  ],
+  "porsche-terminal-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche-terminal.py",
+    "scenarios/porsche.py",
+    "scenarios/terminal-setup.py"
+  ],
+  "porsche-threads": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche-threads.py",
+    "scenarios/porsche.py"
+  ],
+  "private-web": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "relocation-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/relocation-failures.py",
+    "scenarios/relocation.py"
+  ],
+  "repository-launch": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "repository-launch-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "resize-browser": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py"
+  ],
+  "sharing-surfaces": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/sharing-surfaces.py"
+  ],
+  "ssh-bootstrap-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-bootstrap.py"
+  ],
+  "ssh-bootstrap-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-bootstrap.py"
+  ],
+  "ssh-roster-matrix-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-roster-matrix.py"
+  ],
+  "ssh-roster-matrix-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/ssh-roster-matrix.py"
+  ],
+  "team-resources": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "terminal-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/terminal-setup.py",
+    "scenarios/terminal.py"
+  ],
+  "terminal-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/terminal-setup.py",
+    "scenarios/terminal.py"
+  ],
+  "thread-tool": [
+    "scenarios/agent.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/server-tool-setup.py"
+  ],
+  "ubuntu-fleet": [
+    "scenarios/boot-trust-services.py",
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/porsche.py",
+    "scenarios/relocation.py"
+  ],
+  "user-ssh-journey-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "user-ssh-journey-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "vscode-web-almalinux-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "vscode-web-arch-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "vscode-web-nixos-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ],
+  "vscode-web-ubuntu-fleet": [
+    "scenarios/bootstrap.py",
+    "scenarios/enrollment.py",
+    "scenarios/user-ssh-journey.py"
+  ]
+}

@@ -53,3 +53,39 @@ root, and MUST report every gate's findings before failing. Its
 conflict_markers MUST run scripts/check_conflict_markers.exs over every
 owned file, including the toolchains cell, and MUST expose one sub-target per
 file so precommit checks only changed files (ADR-0269).
+
+@cc [owner:ghuntley,label:verification] nixos-machine-test-labels
+Every nixos_machine_test target MUST carry the machine_test label, and MUST
+carry nested_kvm exactly when its suite declares requiredFeatures.nested-kvm.
+The macro derives both labels from nested_kvm and refuses them in labels; the
+test command fails when Nix's meta.ci.nestedKvm or machine disagree,
+and when a fleet variant's declared scenario files differ from its composed
+test script (ADR-0270).
+
+@cc [owner:ghuntley,label:verification] machine-test-targets-generated
+nix/verification/tests/machines/**/BUCK and suites.bzl MUST be exactly what
+buck/machine_tests.py generates from catalog.nix, the suites' Nix sources and
+fleet/scenarios.json; every fleet variant MUST have a scenario entry and every
+fleet scenario file a variant. //buck:machine_tests_fresh enforces it. Each
+target's declared inputs are both what selection sees and the only tree its
+nix_assemble build may read.
+
+@cc [owner:ghuntley,label:verification] affected-targets-selection
+tools/affected MUST select every target whose recursive unconfigured hash
+(paths_and_contents) differs between base and head, plus the reverse
+dependencies of every changed file's owners. Deleted files MUST be resolved
+against the base graph. A changed file without an owner outside docs/, or a
+change to the cells' inputs, toolchains or rule files, MUST select every
+target. Selection MUST only load targets and run queries, never build an
+action or a Nix derivation, and MUST report each package that fails to load
+instead of hiding it.
+
+@cc [owner:ghuntley,label:build] script-tests-run-locally
+script_test and nixos_machine_test commands MUST run locally from the project
+root, never remotely or from the remote cache, because they talk to the Nix
+daemon (ADR-0269).
+
+@cc [owner:ghuntley,label:build] bootstrap-attrs-fresh
+nix/buck/bootstrap_attrs.bzl MUST list exactly the flake's x86_64-linux
+package and check names; //buck:bootstrap_attrs_fresh evaluates the names
+only and fails when they differ.

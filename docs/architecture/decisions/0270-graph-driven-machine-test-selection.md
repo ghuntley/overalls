@@ -102,14 +102,74 @@ PR runs the affected machine-test set, and the approved migration plan.
 - [ownership.bxl](../../../buck/bxl/ownership.bxl) and the `nix_owned` targets
   in [buck/nix.bzl](../../../buck/nix.bzl) give every tracked file an owner.
 - The [toolchain probe](../../../buck/probes/BUCK) is the configuration-sensitive
-  target from the M1 spike; the [migration review](../reviews/2026-10-30-buck2-migration.md)
-  records the content-hash results.
+  target from the M1 spike. [toolchain_hash.py](../../../buck/tests/toolchain_hash.py)
+  (`//buck:toolchain_hash`) now asserts that substituting the elixir store path
+  changes its recursive hash.
+- **Machine tests are targets (M4a).** [buck/nixos.bzl](../../../buck/nixos.bzl)
+  defines `nixos_machine_test`. [machine_tests.py](../../../buck/machine_tests.py)
+  generated one `BUCK` per suite under
+  [nix/verification/tests/machines](../../../nix/verification/tests/machines/BUCK)
+  from `catalog.nix`: 204 targets (two are KVM evaluation checks outside `machines/`), 67 of them fleet variants whose flags are
+  `params` and whose own scenario files are `srcs`
+  ([scenarios.json](../../../nix/verification/tests/machines/fleet/scenarios.json),
+  derived by evaluating each variant's composed script). Each target's inputs
+  are its suite (for a fleet variant, the shared files and its own scenarios),
+  the suites it references, `NIX_INPUTS` and, when it takes application
+  packages, `PACKAGE_INPUTS` ([buck/inputs.bzl](../../../buck/inputs.bzl)). The
+  macro builds `lib.assemble {}.checks.<name>` with `nix_assemble` over a copy
+  of exactly those inputs under restrict-eval, so the build fails when the test
+  reads an undeclared file; the test command then checks the labels.
+- **Labels equal requiredFeatures.** The macro derives `nested_kvm` from the
+  suite's `requiredFeatures.nested-kvm`, and `//buck:machine_tests_fresh`
+  fails when a generated file is stale. Each run also compares the label with
+  Nix's `meta.ci.nestedKvm`, and a fleet variant's declared scenarios with its
+  composed script, and fails on a mismatch.
+- **Selection.** [affected.py](../../../buck/affected.py) (`tools/affected`) and
+  [affected.bxl](../../../buck/bxl/affected.bxl). Correction to decision 3:
+  `--target-hash-modified-paths` only applies in `paths_only` mode, so the
+  selector hashes full contents (`paths_and_contents`) on both sides, and it
+  must pass `--target-hash-recursive=true`, without which a dependency's change
+  leaves the hash unchanged. Rule files (`buck/*.bzl`) are not part of
+  unconfigured hashes, so changing one selects everything, as the cells'
+  inputs do. Selection takes about a second per side and builds nothing.
+- **Fixtures.** [affected_fixtures.py](../../../buck/tests/affected_fixtures.py)
+  (`//buck:affected_fixtures`): docs-only selects no machine test, and only
+  repository-wide targets (the whole-tree flake checks and assembly probes,
+  and the per-file conflict-marker and Python checks over every owned file);
+  `flake.lock` selects everything; a `lilly/lib` change selects the
+  package-taking suites and every fleet variant but not `sysctl`, `nix-ld` or
+  `fleet-network`; one fleet scenario selects exactly the variants that read
+  it; a deleted file resolves on base; an unowned file selects everything.
+- **CI.** [ci.yml](../../../.github/workflows/ci.yml) runs on every trunk push
+  and on dispatch. Pull requests are not possible under the trunk-only
+  ruleset, so "each pull request" in decision 4 applies to each push. The
+  daily backstop, [nixos-machine-tests.yml](../../../.github/workflows/nixos-machine-tests.yml),
+  lists every target from the graph and keeps its `checks` dispatch input.
+  When everything is selected (a change to the cells, toolchains or rule
+  files), `ci.yml` runs the builds and tests but leaves the full machine-test
+  set to that daily run unless dispatched with `machine_all`; about 200
+  nested-KVM jobs per such push would exceed the runner pool.
+- **Executed:** `tools/buck2 test` of `sysctl` and `nix-ld` booted their VMs
+  and passed; through `nix_assemble`, `sysctl` produced the same store path as
+  the flake check, so the declared-only tree evaluates the same test.
 
 Remaining gaps:
 
-- `nixos_machine_test` and the per-suite BUCK files (M4a);
-- `buck/bxl/affected.bxl` and its fixtures;
-- the CI workflow, and deleting `catalog.nix`, `ci.nix` and `select-checks.sh`.
+- Declared inputs are coarse (`NIX_INPUTS` covers all of `nix/`) until modules
+  have targets (M11). Most suites have not yet been built through their
+  declared-only tree; a suite that reads an undeclared file fails its first
+  run, which the daily backstop surfaces.
+- `catalog.nix`, `ci.nix` and `select-checks.sh` stay:
+  the flake's checks still come from the catalog, and `publish-cache.yml`
+  still selects its builds with `select-checks.sh build`. They go when the
+  checks move to Buck2 rules.
+- `ci.yml` has no precommit job yet (M8), and its build job skips
+  bootstrap builds, which `publish-cache.yml` already builds.
+- Known Inception failures (`inception`, `inception-checkout`,
+  `inception-ssh-host-ca`, and `zfs-guest`/`ubuntu-guest`, which carry the
+  known-failing Inception subtest) are labelled `known_inception_failure`:
+  `ci.yml` skips them, and the daily run reports them without failing.
+- Replays of `ab3816ebb` and `8fab8c411` are not yet recorded.
 
 ## Open questions
 

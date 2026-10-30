@@ -104,6 +104,15 @@ in
   scripts.hello.exec = ''
     echo hello from $GREET
   '';
+  # @cc [owner:ghuntley,label:build] devenv-buck2-is-the-wrapper
+  # `buck2` in the shell MUST be tools/buck2, which runs the flake-pinned buck2
+  # from .buck-cells; the shell MUST NOT install a second buck2 (ADR-0269).
+  scripts.buck2.exec = ''
+    exec "$DEVENV_ROOT/tools/buck2" "$@"
+  '';
+  scripts.affected.exec = ''
+    exec "$DEVENV_ROOT/tools/affected" "$@"
+  '';
   # @cc [owner:ghuntley,label:build] marvin-development-commands
   # Development commands MUST install only lockfile-pinned tools, with install
   # scripts disabled, and invoke the same build/check source as release packaging.

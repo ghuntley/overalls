@@ -137,3 +137,53 @@ of the action key.
   coverage checks.
 
 No NixOS machine test covers this change, because no deployed module changes.
+
+## M4a: machine tests as targets, selection and CI
+
+Scope: `nixos_machine_test` ([buck/nixos.bzl](../../../buck/nixos.bzl)), the
+generated suite `BUCK` files (each test built through `nix_assemble`), `tools/affected`, `ci.yml`, the adapted daily
+run and the M1 follow-ups. Architecture impact: implements
+[ADR-0270](../decisions/0270-graph-driven-machine-test-selection.md)
+(implementation stays partial) and adds evidence to
+[ADR-0269](../decisions/0269-buck2-build-system-with-nix-toolchains.md). No
+deployed module changes.
+
+Findings:
+
+- **Hash flags.** `--target-hash-modified-paths` only applies in `paths_only`
+  mode, and hashes are not recursive by default. Without
+  `--target-hash-recursive=true` a toolchain path change left
+  `//buck/probes:elixir_version`'s hash unchanged. The selector hashes full
+  contents recursively; a cold daemon takes about a second.
+- **Rule files are invisible to target hashes,** so a `buck/*.bzl` change
+  selects everything.
+- **Fleet scenarios cannot be read from the Nix source alone.** The variant
+  conditionals in `fleet/default.nix` choose scenario files. Evaluating each
+  variant's `config.testScript` (about 15 s each, no build) and matching the
+  scenarios' distinctive lines gives the per-variant `srcs`; each test run
+  re-checks it.
+- **`catalog.nix`, `ci.nix` and `select-checks.sh` cannot go yet.** The flake's
+  checks come from the catalog, and `publish-cache.yml` (owned by another
+  stream) selects its builds with `select-checks.sh build`.
+- **Docs.** Repository-wide targets read `docs/`: the whole-tree flake
+  checks and assembly probes, and the per-file conflict-marker and Python
+  checks. A docs-only change selects those and no machine test.
+
+Verification:
+
+- `tools/buck2 test` of `//nix/verification/tests/machines/sysctl:sysctl` and
+  `//nix/verification/tests/machines/nix-ld:nix-ld` booted their VMs and passed.
+  A deliberately wrong `nested_kvm` made the test command fail.
+- `//buck:toolchain_hash`, `//buck:bootstrap_attrs_fresh`,
+  `//buck:machine_tests_fresh` and `//buck:affected_fixtures` pass.
+- Ownership over every tracked file, `elixir scripts/check_adrs.exs`, contract
+  format and coverage, and `prek run --all-files`.
+
+- **Assembly backing.** Each machine test builds `lib.assemble {}.checks.<name>`
+  through `nix_assemble` (M3) over a copy of its declared inputs only, so a
+  test that reads an undeclared file fails to evaluate. `sysctl` built that way
+  produced the same store path as the flake check.
+
+Remaining risks: until M11 a change anywhere under `nix/` selects every machine
+test, and most suites have not yet run through their declared-only tree, so an
+undeclared read surfaces as a first-run failure.

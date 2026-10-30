@@ -1,5 +1,41 @@
 load(":nix.bzl", "nix_owned")
+load(":nixos.bzl", "script_test")
 
 nix_owned()
 
 export_file(name = "nix_assemble.sh", visibility = ["PUBLIC"])
+
+# The machine-test generator and test command (buck/nixos.bzl).
+export_file(name = "machine_tests.py", visibility = ["PUBLIC"])
+
+# M1 follow-up: bootstrap_attrs.bzl matches the flake's output names.
+script_test(
+    name = "bootstrap_attrs_fresh",
+    script = "tests/bootstrap_attrs_fresh.py",
+    deps = ["//:flake", "//nix:srcs"],
+    labels = ["nix_eval"],
+)
+
+# M1 follow-up: a toolchain path change changes a consumer's target hash.
+script_test(
+    name = "toolchain_hash",
+    script = "tests/toolchain_hash.py",
+    deps = ["//buck/probes:elixir_version"],
+)
+
+# The per-suite BUCK files match catalog.nix and the suites' requiredFeatures.
+script_test(
+    name = "machine_tests_fresh",
+    script = "machine_tests.py",
+    args = ["check"],
+    deps = ["//nix:srcs", "//nix/verification/tests/machines:suites"],
+)
+
+# Selection fixtures for tools/affected (ADR-0270).
+script_test(
+    name = "affected_fixtures",
+    script = "tests/affected_fixtures.py",
+    srcs = ["affected.py", "bxl/affected.bxl", "inputs.bzl", "nixos.bzl"],
+    deps = ["//nix/verification/tests/machines:suites"],
+    labels = ["slow"],
+)

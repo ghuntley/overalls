@@ -3,6 +3,7 @@ load("//nix/buck:bootstrap_attrs.bzl", "BOOTSTRAP_CHECKS", "BOOTSTRAP_PACKAGES")
 load("//buck:nix.bzl", "nix_flake_attr", "owned_set")
 load("//buck:checks.bzl", "conflict_markers", "script_check")
 load("//buck:python.bzl", "py_static")
+load("//nix/verification/tests/machines:suites.bzl", "MACHINE_PACKAGES", "MACHINE_TESTS")
 
 # Repository-root files: flake, lock files, configuration.
 nix_owned()
@@ -40,7 +41,7 @@ OWNED_PACKAGES = [
     "//buck",
     "//nix/domains/artifacts/guest/github",
     "//buck/probes",
-]
+] + MACHINE_PACKAGES
 
 ALL_OWNED_FILES = [":srcs_files", "toolchains//:srcs_files"] + [p + ":srcs_files" for p in OWNED_PACKAGES]
 
@@ -61,7 +62,10 @@ owned_set(
     visibility = ["//mila:"] if attr == "mila-journey-fixture" else [],
 ) for attr in BOOTSTRAP_PACKAGES]
 
-[nix_flake_attr(name = "check-" + attr, attr = "checks.x86_64-linux." + attr, labels = ["bootstrap", "check"]) for attr in BOOTSTRAP_CHECKS]
+filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
+
+# Machine checks are nixos_machine_test targets (nix/verification/tests/machines).
+[nix_flake_attr(name = "check-" + attr, attr = "checks.x86_64-linux." + attr, labels = ["bootstrap", "check"]) for attr in BOOTSTRAP_CHECKS if attr not in MACHINE_TESTS]
 
 # Repository-wide checks (M7). Each is a cached build action; `buck2 test`
 # reads its stamp. Sub-targets check single files for precommit (M8).

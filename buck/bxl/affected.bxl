@@ -1,0 +1,71 @@
+# Owners, reverse dependencies and grouping for affected-target selection
+# (ADR-0270). tools/affected supplies the changed files and the targets whose
+# unconfigured hashes differ between base and head; this script runs on head.
+# Contract affected-targets-selection: see buck/CONTRACTS.
+
+_CELLS = ["toolchains", "none"]
+
+# Source groups and tool shims are not work to run.
+_PASSIVE = ["export_file", "filegroup", "owned_files", "owned_set", "_nix_tool", "_owned_set"]
+
+def _label(path: str) -> str:
+    cell, _, rest = path.partition("/")
+    return "{}//{}".format(cell, rest) if cell in _CELLS else "root//" + path
+
+def _kind(node) -> str:
+    return node.rule_type.rsplit(":", 1)[-1]
+
+def _labels(node) -> list[str]:
+    value = node.get_attr("labels")
+    return list(value) if value else []
+
+def _main(ctx: bxl.Context) -> None:
+    q = ctx.uquery()
+    owners = {}
+    unowned = []
+    for f in ctx.cli_args.files:
+        found = [str(t.label) for t in q.owner(_label(f))]
+        if found:
+            owners[f] = found
+        else:
+            unowned.append(f)
+    if ctx.cli_args.all:
+        affected = q.eval("//...")
+    else:
+        seeds = [t for ts in owners.values() for t in ts] + list(ctx.cli_args.targets)
+        affected = q.rdeps(q.eval("//..."), q.eval("set({})".format(" ".join(seeds)))) if seeds else []
+    machine_tests = []
+    tests = []
+    builds = []
+    for node in affected:
+        if node.label.cell != "root" or _kind(node) in _PASSIVE:
+            continue
+        labels = _labels(node)
+        # A machine test's assembly runs as part of the test itself.
+        if "machine_test_assembly" in labels:
+            continue
+        entry = {"target": str(node.label), "labels": labels}
+        if "machine_test" in labels:
+            machine_tests.append(entry)
+        elif "bootstrap" in labels:
+            builds.append(entry)
+        elif _kind(node).endswith("_test") or "check" in labels:
+            tests.append(entry)
+        else:
+            builds.append(entry)
+    ctx.output.print_json({
+        "owners": owners,
+        "unowned": unowned,
+        "machine_tests": sorted(machine_tests, key = lambda e: e["target"]),
+        "tests": sorted(tests, key = lambda e: e["target"]),
+        "builds": sorted(builds, key = lambda e: e["target"]),
+    })
+
+main = bxl_main(
+    impl = _main,
+    cli_args = {
+        "all": cli_args.bool(False),
+        "files": cli_args.list(cli_args.string(), default = []),
+        "targets": cli_args.list(cli_args.string(), default = []),
+    },
+)
