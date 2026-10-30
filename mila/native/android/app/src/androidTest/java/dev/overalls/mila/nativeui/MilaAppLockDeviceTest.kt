@@ -104,8 +104,13 @@ class MilaAppLockDeviceTest {
         // Cancelling the platform prompt is a failed attempt and keeps the shell obscured.
         device.findObject(By.text(MilaStrings.text(MilaMessage.LockUnlock))).click()
         awaitPlatformPrompt()
+        // Let the prompt finish its entry animation; an early Back is dropped by System UI.
+        Thread.sleep(1_500)
         device.pressBack()
-        assertNotNull(device.wait(Until.findObject(By.text(MilaStrings.text(MilaMessage.LockFailed))), WAIT_MS))
+        assertNotNull(
+            "cancel must record a failed attempt; focused=${device.currentPackageName}",
+            device.wait(Until.findObject(By.text(MilaStrings.text(MilaMessage.LockFailed))), WAIT_MS),
+        )
         assertTrue(device.findObject(By.text(MilaStrings.text(MilaMessage.SignIn))) == null)
 
         // The device credential completes the prompt and reveals the shell.

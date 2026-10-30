@@ -36,7 +36,9 @@ data class MilaJourneyDescriptor(
     val approverUrl: URI,
     val approverToken: String,
     val seedMachineName: String?,
+    val seedMachineId: java.util.UUID?,
     val sharePrincipal: String?,
+    val accountEmail: String?,
 ) {
     init {
         require(host.isNotEmpty() && host.length <= 253 && host.all { it.isLetterOrDigit() || it == '.' || it == '-' }) { "invalid host" }
@@ -98,7 +100,9 @@ data class MilaJourneyDescriptor(
                 approverUrl = URI(approver.getString("url")),
                 approverToken = approver.getString("bearer_token"),
                 seedMachineName = seed?.optString("machine_name")?.takeIf { it.isNotBlank() },
+                seedMachineId = seed?.optString("machine_id")?.takeIf { it.isNotBlank() }?.let(java.util.UUID::fromString),
                 sharePrincipal = seed?.optString("share_principal")?.takeIf { it.isNotBlank() },
+                accountEmail = seed?.optString("account_email")?.takeIf { it.isNotBlank() },
             )
         }
     }
@@ -136,3 +140,27 @@ suspend fun MilaJourneyDescriptor.approve(approval: MilaApprovalInfo): Unit = wi
         (connection as HttpURLConnection).disconnect()
     }
 }
+
+/**
+ * Asks the fixture to stand in for the absent provisioner for one machine (`observe`), so the next
+ * lifecycle intent is admissible. Returns false when the fixture does not offer the hook (404).
+ */
+suspend fun MilaJourneyDescriptor.observe(machine: java.util.UUID): Boolean = withContext(Dispatchers.IO) {
+    val connection = open(approverUrl.resolve("/observe").toURL()).apply {
+        requestMethod = "POST"
+        doOutput = true
+        setRequestProperty("Content-Type", "application/json")
+        setRequestProperty("Authorization", "Bearer $approverToken")
+    }
+    try {
+        connection.outputStream.use { it.write(JSONObject().put("machine_id", machine.toString()).toString().toByteArray(Charsets.UTF_8)) }
+        when (val code = connection.responseCode) {
+            in 200..299 -> true
+            404 -> false
+            else -> error("observe hook refused ($code)")
+        }
+    } finally {
+        (connection as HttpURLConnection).disconnect()
+    }
+}
+

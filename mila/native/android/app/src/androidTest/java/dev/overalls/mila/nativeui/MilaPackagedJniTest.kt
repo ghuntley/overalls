@@ -31,6 +31,15 @@ class MilaPackagedJniTest {
     }
 
     @Test
+    fun namedTerminalDeviceRegisterAndRefusalAreLinkedAndRefusedWithoutSession() {
+        org.junit.Assert.assertNull(MilaRustFfi.sessionTerminalNew(0L, machine, requestId))
+        assertEquals(0L, MilaRustFfi.sessionTerminalAttachSession(0L, machine, machine, 80, 24))
+        val reply = "{\"push_key\":\"" + "a".repeat(64) + "\",\"key_id\":\"k\",\"expires_at\":\"2099-01-01T00:00:00Z\"}"
+        org.junit.Assert.assertNull(MilaRustFfi.sessionDeviceRegister(0L, 1, reply, "b".repeat(43), null, 0L))
+        org.junit.Assert.assertNull(MilaRustFfi.sessionLastRefusal(0L))
+    }
+
+    @Test
     fun packagedAdapterRefusesCreateAndShareWhileSignedOut() = kotlinx.coroutines.runBlocking<Unit> {
         val adapter = LinkedMilaFfiAdapter()
         assert(adapter.machineCreate(MilaMachineCreateRequest("devbox", 1, 512, 5)).isFailure)

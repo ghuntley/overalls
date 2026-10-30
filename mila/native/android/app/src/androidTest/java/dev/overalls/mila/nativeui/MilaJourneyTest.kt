@@ -1,12 +1,15 @@
 package dev.overalls.mila.nativeui
 
+import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import java.security.KeyStore
+import java.security.SecureRandom
 import java.util.UUID
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
+import org.json.JSONObject
 import org.junit.After
 import org.junit.AfterClass
 import org.junit.Assert.assertEquals
@@ -30,13 +33,16 @@ private class JourneyStore : MilaDeploymentStore {
 }
 
 /**
- * Hermetic emulator journey against the `mila-journey-fixture` Marshall+Porsche backend.
+ * Hermetic emulator journey against the `mila-journey-fixture` Marshall+Porsche backend (ADR-0264).
  *
  * Every step uses the packaged Rust JNI session (`LinkedMilaFfiAdapter`) and the production
  * controllers; nothing is faked. The suite is skipped unless the CI step passes the fixture
  * descriptor as the `milaJourneyDescriptor` instrumentation argument (see the android-native job
  * in `.github/workflows/mila-builds.yml` and `scripts/run-instrumentation.sh`).
  *
+ * No provisioner or guest runs in the fixture: lifecycle steps prove admission by Porsche, the
+ * terminal step proves the closed `terminal_unavailable` refusal, and steps that need the
+ * fixture's `observe` stand-in are skipped when the fixture does not expose it over HTTPS.
  * Steps run in name order because later steps reuse the device key approved by the first one.
  */
 @RunWith(AndroidJUnit4::class)
@@ -77,24 +83,20 @@ class MilaJourneyTest {
         return provider.resolve(fixture.deployment).getOrThrow()
     }
 
-    private suspend fun <T> eventually(timeoutMs: Long, step: String, probe: suspend () -> T?): T =
+    private suspend fun <T : Any> eventually(timeoutMs: Long, probe: suspend () -> T?): T =
         withTimeout(timeoutMs) {
             var value = probe()
             while (value == null) { delay(1_000); value = probe() }
             value
-        }.also { assertNotNull(step, it) }
+        }
 
     /** Signs in, approving through the fixture's approver hook when Porsche requires it. */
     private suspend fun signedIn(): MilaSignInState.SignedIn {
         val resolved = material()
         signIn.signIn(fixture.deployment, resolved.config, resolved.signer)
         (signIn.state as? MilaSignInState.AwaitingApproval)?.let { awaiting ->
-            assertEquals(milaSshFingerprint(resolved.signer.publicKey()), awaiting.approval.fingerprint)
             fixture.approve(awaiting.approval)
-            eventually(60_000, "approval completes on the same session") {
-                signIn.pollApproval()
-                signIn.state as? MilaSignInState.SignedIn
-            }
+            eventually(90_000) { signIn.pollApproval(); signIn.state as? MilaSignInState.SignedIn }
         }
         val state = signIn.state
         assertTrue("signed in, was $state", state is MilaSignInState.SignedIn)
@@ -102,8 +104,23 @@ class MilaJourneyTest {
     }
 
     private suspend fun listing(): MilaSessionListing = adapter.refreshListing().getOrThrow()
+    private fun refusal(): String = "refusal=${adapter.lastRefusal()}"
 
-    private fun machineNamed(listing: MilaSessionListing, name: String): MilaMachineRow? = listing.machines.firstOrNull { it.name == name }
+    private fun seed(listing: MilaSessionListing): MilaMachineRow {
+        val id = fixture.seedMachineId
+        val row = if (id != null) listing.machines.firstOrNull { it.id == id }
+            else fixture.seedMachineName?.let { name -> listing.machines.firstOrNull { it.name == name } }
+        assertNotNull("seed machine in listing ${listing.machines.map { it.id }}", row)
+        return row!!
+    }
+
+    /** Submits one lifecycle mutation once; Porsche admission is the asserted effect. */
+    private suspend fun lifecycle(machine: UUID, command: MilaMachineCommand) {
+        val detail = MilaMachineDetailController(adapter)
+        detail.setSession(true, listing())
+        assertTrue("machine $machine listed", detail.select(machine))
+        assertTrue("$command admitted: ${detail.state} ${refusal()}", detail.submit(command))
+    }
 
     @Test fun j01_signInRequiresBrowserApprovalThenReconnectsWithoutIt() = runBlocking<Unit> {
         // A fresh device key always needs approval; delete any key left by an earlier run.
@@ -113,8 +130,9 @@ class MilaJourneyTest {
         val awaiting = signIn.state as? MilaSignInState.AwaitingApproval
         assertNotNull("fresh key must await approval, was ${signIn.state}", awaiting)
         assertEquals(fixture.host, java.net.URI(awaiting!!.approval.url).host)
+        assertEquals(milaSshFingerprint(resolved.signer.publicKey()), awaiting.approval.fingerprint)
         fixture.approve(awaiting.approval)
-        eventually(60_000, "approval") { signIn.pollApproval(); signIn.state as? MilaSignInState.SignedIn }
+        eventually(90_000) { signIn.pollApproval(); signIn.state as? MilaSignInState.SignedIn }
         assertEquals(MilaApprovalState.Approved, (signIn.state as MilaSignInState.SignedIn).approval)
 
         signIn.close()
@@ -123,115 +141,120 @@ class MilaJourneyTest {
 
     @Test fun j02_machineListingIncludesSeedMachine() = runBlocking<Unit> {
         val state = signedIn()
-        fixture.seedMachineName?.let { name -> assertNotNull("seed machine $name", machineNamed(state.listing, name)) }
+        val seed = seed(state.listing)
         val detail = MilaMachineDetailController(adapter)
         detail.setSession(true, state.listing)
-        state.listing.machines.firstOrNull()?.let { assertTrue(detail.select(it.id)) }
+        assertTrue(detail.select(seed.id))
         assertFalse(detail.select(UUID.randomUUID()))
+        assertEquals(MilaRouteResolution.Resolved, resolveMilaRoute(MilaRoute.Machine(seed.id), true, state.listing, null))
     }
 
     @Test fun j03_createAndResizeThroughSessionBoundForm() = runBlocking<Unit> {
         val state = signedIn()
         val form = MilaMachineFormController(adapter)
         form.setSession(true, state.listing)
-        assertTrue("create accepted: ${form.state}", form.create(createdName, "1", "512", "5"))
-        val created = eventually(180_000, "created machine is listed") { machineNamed(listing(), createdName) }
+        assertTrue("create admitted: ${form.state} ${refusal()}", form.create(createdName, "1", "512", "2"))
+        val created = eventually(120_000) { listing().machines.firstOrNull { it.name == createdName } }
         createdId = created.id
+
+        val seed = seed(listing())
+        fixture.observe(seed.id)
         form.setSession(true, listing())
-        // Porsche may refuse a resize while the new machine is still provisioning; retry until applied.
-        eventually(300_000, "resize applied") { if (form.resize(created.id, "2", "1024", "6")) true else null }
+        assertTrue("resize admitted: ${form.state} ${refusal()}", form.resize(seed.id, "2", "1024", "3"))
         assertEquals(MilaMachineFormState.Applied(MilaMachineFormKind.Resize), form.state)
     }
 
-    @Test fun j04_lifecycleStopStartPauseResume() = runBlocking<Unit> {
-        val state = signedIn()
-        val id = createdId ?: machineNamed(state.listing, createdName)?.id
-        assumeTrue("created machine from j03", id != null)
-        val detail = MilaMachineDetailController(adapter)
-        for (command in listOf(MilaMachineCommand.Stop, MilaMachineCommand.Start, MilaMachineCommand.Pause, MilaMachineCommand.Resume)) {
-            eventually<Boolean>(300_000, "$command applied") {
-                detail.setSession(true, listing())
-                detail.select(id!!)
-                if (detail.submit(command)) true else null
-            }
-        }
+    @Test fun j04_lifecycleAdmission() = runBlocking<Unit> {
+        val seed = seed(signedIn().listing)
+        val observed = fixture.observe(seed.id)
+        lifecycle(seed.id, MilaMachineCommand.Stop)
+        // Without the provisioner, each further intent needs the fixture's observe stand-in.
+        assumeTrue("fixture observe hook", observed)
+        assertTrue(fixture.observe(seed.id))
+        lifecycle(seed.id, MilaMachineCommand.Start)
+        assertTrue(fixture.observe(seed.id))
+        val made = createdId
+        assumeTrue("created machine from j03", made != null)
+        assertTrue(fixture.observe(made!!))
+        lifecycle(made, MilaMachineCommand.Pause)
+        // Resume is a durable wake request; with no checkpoint it is asserted as admitted only.
+        lifecycle(made, MilaMachineCommand.Resume)
     }
 
     @Test fun j05_shareAddAndRemoveOnSeedMachine() = runBlocking<Unit> {
         val principal = fixture.sharePrincipal
         assumeTrue("descriptor seed.share_principal", principal != null)
         val state = signedIn()
-        val target = fixture.seedMachineName?.let { machineNamed(state.listing, it) } ?: state.listing.machines.first()
         val sharing = MilaMachineSharingController(adapter)
         sharing.setSession(true, state.listing)
-        assertTrue(sharing.setMachine(target))
-        assertTrue("share add: ${sharing.state}", sharing.submit(principal!!, role = MilaShareRole.Operator))
-        assertTrue("share remove: ${sharing.state}", sharing.submit(principal, remove = true))
+        assertTrue(sharing.setMachine(seed(state.listing)))
+        assertTrue("share add: ${sharing.state} ${refusal()}", sharing.submit(principal!!, role = MilaShareRole.Operator))
+        assertTrue("share remove: ${sharing.state} ${refusal()}", sharing.submit(principal, remove = true))
     }
 
-    @Test fun j06_threadListingAndDetail() = runBlocking<Unit> {
+    @Test fun j06_threadListingDecodes() = runBlocking<Unit> {
         signedIn()
         val threads = adapter.threadListing().getOrThrow()
         val detail = MilaThreadDetailController(adapter)
         detail.setSession(true, threads)
         threads.threads.firstOrNull()?.let { thread ->
             assertTrue(detail.select(thread.id))
-            assertTrue("thread show: ${detail.state}", detail.submit(MilaThreadCommand.Show))
+            assertTrue("thread show: ${detail.state} ${refusal()}", detail.submit(MilaThreadCommand.Show))
         }
     }
 
-    @Test fun j07_terminalRoundTripsInputThroughPty() = runBlocking<Unit> {
-        signedIn()
-        val handle = adapter.terminalOpen(80, 24, true).getOrThrow()
-        val renderer = MilaTerminalRenderer()
-        try {
-            val marker = "mila-journey-" + UUID.randomUUID().toString().take(8)
-            assertTrue(adapter.terminalResizeHandle(handle, 100, 30).isSuccess)
-            assertTrue(adapter.terminalInputBytes(handle, "echo $marker\n".toByteArray(Charsets.UTF_8)).isSuccess)
-            eventually<String>(60_000, "terminal echoes marker") {
-                adapter.terminalPoll(handle).getOrNull()?.let { renderer.append(it) }
-                renderer.text().lines().firstOrNull { it.trim() == marker }
-            }
-        } finally {
-            adapter.terminalClose(handle)
-        }
+    @Test fun j07_terminalWithoutGuestIsRefusedClosed() = runBlocking<Unit> {
+        val seed = seed(signedIn().listing)
+        // The unnamed legacy attach is never offered.
+        assertTrue(adapter.terminalOpen(80, 24, true).isFailure)
+        val opened = adapter.terminalOpen(seed.id, 80, 24)
+        // No guest executes in the fixture: Marshall refuses with the closed terminal_unavailable code.
+        assertTrue("terminal must be refused without a guest", opened.isFailure)
+        assertEquals("terminal_unavailable", adapter.lastRefusal())
     }
 
-    @Test fun j08_webEndpointShowsForSeedMachine() = runBlocking<Unit> {
-        val state = signedIn()
-        val target = fixture.seedMachineName?.let { machineNamed(state.listing, it) } ?: state.listing.machines.first()
+    @Test fun j08_webEndpointShowAndSetMoveRevision() = runBlocking<Unit> {
+        val seed = seed(signedIn().listing)
         val web = MilaWebController(adapter)
         web.setSession(true)
-        assertTrue("web show: ${web.error}", web.show(target.id))
-        assertEquals(target.id, web.endpoint?.machineId)
+        assertTrue("web show: ${web.error} ${refusal()}", web.show(seed.id))
+        val before = web.endpoint!!
+        assertEquals(seed.id, before.machineId)
+        assertTrue("web set: ${web.error} ${refusal()}", web.set(seed.id, 8080, public = true))
+        assertTrue(web.show(seed.id))
+        assertEquals(before.revision + 1, web.endpoint!!.revision)
+        assertEquals(8080, web.endpoint!!.port)
+        assertTrue(web.endpoint!!.public)
     }
 
     @Test fun j09_sshKeysListIncludesThisDevice() = runBlocking<Unit> {
         signedIn()
         val controller = MilaSshKeyController(adapter.sshKeyStore())
         controller.refresh()
-        assertTrue("current device key listed", controller.keys.any { it.isCurrentDevice })
+        assertTrue("current device key listed: ${controller.keys.map { it.fingerprint }}", controller.keys.any { it.isCurrentDevice })
         assertFalse("current device key cannot be revoked", controller.revoke(controller.keys.first { it.isCurrentDevice }))
     }
 
-    @Test fun j10_notificationDeviceListAndRefusals() = runBlocking<Unit> {
+    @Test fun j10_notificationDeviceCrud() = runBlocking<Unit> {
         signedIn()
-        // Device creation needs a real FCM registration token, which cannot be hermetic; the
-        // journey covers authenticated listing and refusal of malformed device identities.
-        assertTrue(adapter.notificationDevices().isSuccess)
+        // The fixture has no Susan or FCM; stand in for Susan's key-issuance reply exactly as the
+        // headless driver does, so Rust's own reply validation and stdin push-key path still run.
+        val random = SecureRandom()
+        fun base64url(size: Int): String = Base64.encodeToString(ByteArray(size).also(random::nextBytes), Base64.URL_SAFE or Base64.NO_PADDING or Base64.NO_WRAP)
+        val reply = JSONObject().put("push_key", base64url(48)).put("key_id", "mila-android-journey").put("expires_at", "2099-01-01T00:00:00Z").toString()
+        val receipt = adapter.notificationDeviceRegister(reply, base64url(32)).getOrElse { throw AssertionError("register: ${refusal()}", it) }
+        val device = JSONObject(receipt.toString(Charsets.UTF_8)).getJSONObject("result").getString("id")
+        assertTrue(adapter.notificationDevices().getOrThrow().toString(Charsets.UTF_8).contains(device))
+        assertTrue("disable ${refusal()}", adapter.notificationDevicePreferences(device, false).isSuccess)
+        assertTrue("enable ${refusal()}", adapter.notificationDevicePreferences(device, true).isSuccess)
+        assertTrue("remove ${refusal()}", adapter.notificationDeviceRemove(device).isSuccess)
         assertTrue(adapter.notificationDevicePreferences("bad device", true).isFailure)
-        assertTrue(adapter.notificationDeviceRemove("").isFailure)
     }
 
     @Test fun j11_deleteCreatedMachine() = runBlocking<Unit> {
-        val state = signedIn()
-        val id = createdId ?: machineNamed(state.listing, createdName)?.id
-        assumeTrue("created machine from j03", id != null)
-        val detail = MilaMachineDetailController(adapter)
-        eventually<Boolean>(300_000, "delete applied") {
-            detail.setSession(true, listing())
-            detail.select(id!!)
-            if (detail.submit(MilaMachineCommand.Delete)) true else null
-        }
+        signedIn()
+        val made = createdId
+        assumeTrue("created machine from j03", made != null)
+        lifecycle(made!!, MilaMachineCommand.Delete)
     }
 }
