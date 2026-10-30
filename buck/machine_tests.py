@@ -57,9 +57,22 @@ PLAIN_MODULES = frozenset(
     }
 )
 # Owned groups a suite reads beyond NIX_INPUTS and PACKAGE_INPUTS.
+# The offline Buck2 repository that support/update-fixture.nix copies (ADR-0271).
+UPDATE_FIXTURE_INPUTS = (
+    "//:buck_project",
+    "//buck:srcs",
+    "//buck:buck_file",
+    "//tools:srcs",
+    "toolchains//:srcs",
+    "toolchains//:buck_file",
+)
 SUITE_INPUTS: Mapping[str, tuple[str, ...]] = {
     # The real Buck2 execution platform rule (ADR-0272).
     "buck-remote-cache": ("//buck:srcs",),
+    "auto-update": UPDATE_FIXTURE_INPUTS,
+    "credential-rotation": UPDATE_FIXTURE_INPUTS,
+    "fleet": UPDATE_FIXTURE_INPUTS,
+    "host-enrollment": UPDATE_FIXTURE_INPUTS,
 }
 PACKAGE_INPUT = re.compile(r"\b(service|storage|packages)\b")
 MODULE_REF = re.compile(r"\bmodules\.[A-Za-z0-9_.-]+")

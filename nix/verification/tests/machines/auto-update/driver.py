@@ -1,31 +1,21 @@
-"""Actual Git polling and NixOS activation against isolated, prebuilt candidate systems."""
+"""Actual Git polling, Buck2 deployment builds and NixOS activation against
+isolated, prebuilt candidate systems (support/update.py is prepended)."""
 
 import json
 
 start_all()
 host.wait_for_unit("multi-user.target")
-host.succeed("systemctl stop overalls-auto-update.timer")
-candidates = json.loads(host.succeed("cat /etc/overalls-update-candidates.json"))
-root = "/var/lib/overalls-update-test"
-repo = root + "/git"
-host.succeed(f"mkdir -p {repo}")
-host.succeed(f"git -C {repo} init -b main")
-host.succeed(f"git -C {repo} config user.email fixture@example.test")
-host.succeed(f"git -C {repo} config user.name Fixture")
+repo, candidates = update_repository(host)
+cells = host.succeed(f"cat {UPDATE_FIXTURE}/cells").strip()
 
 
 def publish(name: str) -> str:
-    flake = f"""{{
-      inputs.deployment = {{ url = "path:{candidates[name]}"; flake = false; }};
-      outputs = {{ self, deployment }}: {{
-        nixosConfigurations.host.config.system.build.overallsDeployment = deployment.outPath;
-      }};
-    }}"""
-    host.succeed(f"cat > {repo}/flake.nix <<'NIX'\n{flake}\nNIX")
-    host.succeed(f"git -C {repo} add flake.nix")
-    host.succeed(f"cd {repo} && nix flake lock --offline")
-    host.succeed(f"git -C {repo} add flake.lock && git -C {repo} commit -m {name}")
-    return host.succeed(f"git -C {repo} rev-parse HEAD").strip()
+    return update_publish(host, repo, candidates[name], name)
+
+
+def no_buck2_daemon() -> None:
+    # buckd and its forkserver leave the updater's process group.
+    host.succeed("! pgrep -f 'buck2[d][[]|buck2-forkserve[r]'")
 
 
 def status() -> dict[str, object]:
@@ -58,6 +48,13 @@ def update() -> None:
         # This suite has no credentials or application processes. Only its
         # public Git/Nix build diagnostics may be printed here.
         print(host.succeed("cat /var/lib/overalls-auto-update/attempt.log"))
+        # buckd's own diagnostics name no credentials in this fixture.
+        print(
+            host.succeed(
+                "find /var/lib/overalls-auto-update/buck2-home -type f -name 'buckd.*' "
+                "-exec sh -c 'echo == $1; tail -n 60 $1' _ {} \\; ; ps -eo pid,args | grep -i buck || true"
+            )
+        )
         failure = status().get("failure")
         raise AssertionError(
             "candidate update failed: " + (failure if isinstance(failure, str) else "unknown")
@@ -69,6 +66,16 @@ with subtest("fixed candidate switches and records verified success"):
     update()
     assert last_healthy_revision() == first
     host.succeed("test $(cat /etc/overalls-update-generation) = one")
+    # The bundle came from the Buck2 deployment target of the fixed checkout.
+    assert status().get("builder") == "buck2"
+    host.succeed("test $(git -C /var/lib/overalls-auto-update/checkout rev-parse HEAD) = " + first)
+    host.succeed("test ! -e /var/lib/overalls-auto-update/checkouts")
+    candidate = host.succeed("readlink /var/lib/overalls-auto-update/candidate").strip()
+    reported = host.succeed(
+        "cat /var/lib/overalls-auto-update/checkout/buck-out/overalls-update/art/root/*/fleet/hosts/host/__deployment__/store-path"
+    ).strip()
+    assert candidate == reported, (candidate, reported)
+    no_buck2_daemon()
 
 with subtest("unchanged successful revision does not activate again"):
     generation = host.succeed("readlink /nix/var/nix/profiles/system").strip()
@@ -122,6 +129,38 @@ with subtest("failed build preserves active system and backs off"):
     host.succeed("systemctl start overalls-auto-update.service", timeout=120)
     assert status()["failures"] == 1
     host.succeed("test $(cat /etc/overalls-update-generation) = one")
+    no_buck2_daemon()
+
+with subtest("a candidate without its build tool fails closed without another build path"):
+    publish("one")
+    host.succeed(f"git -C {repo} rm -q tools/buck2 && git -C {repo} commit -qm no-buck2")
+    host.fail("systemctl start overalls-auto-update.service", timeout=120)
+    failed = status()
+    assert failed["failedPhase"] == "build"
+    assert failed["failure"] == "build_tool_unavailable"
+    assert '"reason": "build_tool_unavailable"' in host.succeed(
+        "journalctl -u overalls-auto-update.service -o cat --no-pager"
+    )
+    host.succeed("test $(cat /etc/overalls-update-generation) = one")
+    host.succeed(f"git -C {repo} checkout -q HEAD~1 -- tools/buck2")
+
+with subtest("a hanging candidate build times out and leaves no Buck2 daemon"):
+    hanging = update_fixture_flake(
+        candidates["two"],
+        cells,
+        '{ host.config.system.build.overallsDeployment = derivation { name = "overalls-deployment"; '
+        'system = "x86_64-linux"; builder = "/bin/sh"; args = [ "-c" "kill -STOP $$" ]; }; }',
+    )
+    host.succeed(f"cat > {repo}/flake.nix <<'NIX'\n{hanging}\nNIX")
+    host.succeed(f"git -C {repo} add -A && git -C {repo} commit -qm hanging")
+    host.fail("systemctl start overalls-auto-update.service", timeout=240)
+    failed = status()
+    assert failed["failedPhase"] == "build"
+    assert failed["failure"] == "build_failed"
+    no_buck2_daemon()
+    # The stopped builder goes with its cancelled build.
+    host.wait_until_fails("pgrep -f 'kill -ST[O]P'", timeout=60)
+    host.succeed("test $(cat /etc/overalls-update-generation) = one")
 
 with subtest("new corrective revision bypasses old backoff and updater survives self-switch"):
     host.succeed("systemd-run --unit=retained-guest --slice=lilly.slice sleep infinity")
@@ -169,6 +208,8 @@ with subtest("failed activation does not advance last healthy"):
 with subtest("health failure retries the active system without another activation"):
     unready = publish("unready")
     host.fail("systemctl start overalls-auto-update.service", timeout=240)
+    if status()["failedPhase"] != "verify":
+        print(host.succeed("cat /var/lib/overalls-auto-update/attempt.log"))
     assert status()["failedPhase"] == "verify"
     assert last_healthy_revision() == second
     generation = host.succeed("readlink /nix/var/nix/profiles/system").strip()

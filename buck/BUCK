@@ -5,6 +5,9 @@ nix_owned()
 
 export_file(name = "nix_assemble.sh", visibility = ["PUBLIC"])
 
+# This package's BUCK file, which offline updater fixtures copy (ADR-0271).
+filegroup(name = "buck_file", srcs = ["BUCK"], visibility = ["PUBLIC"])
+
 # The machine-test generator and test command (buck/nixos.bzl).
 export_file(name = "machine_tests.py", visibility = ["PUBLIC"])
 

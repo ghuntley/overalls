@@ -125,13 +125,15 @@ let
     };
   });
   configuration = pkgs.writeText "overalls-auto-update.json" (builtins.toJSON {
-    inherit (cfg) repository branch flakeAttr healthTimeout verbose secretUnits;
+    inherit (cfg) repository branch flakeAttr healthTimeout buildTimeout verbose secretUnits;
     secretHelper = "${../secrets/prepare.py}";
     resourcePolicyHelper = "${./resources.py}";
   });
   python = pkgs.python3;
+  # git, Nix, bash and findutils run the candidate's tools/buck2, which
+  # realises the candidate's pinned buck2 and cells (ADR-0271).
   commandPath = lib.makeBinPath [ pkgs.git pkgs.nix pkgs.nixos-rebuild pkgs.openssh
-    pkgs.systemd pkgs.curl pkgs.coreutils config.boot.zfs.package python ];
+    pkgs.systemd pkgs.curl pkgs.coreutils pkgs.bash pkgs.findutils config.boot.zfs.package python ];
   runner = pkgs.writeShellScriptBin "overalls-auto-update" ''
     export PATH=${commandPath}
     exec ${python}/bin/python ${./runtime.py} "$@"
@@ -148,9 +150,10 @@ in
       description = "Trusted Git repository. HTTPS credentials in URLs are forbidden; local paths support isolated fixtures.";
     };
     branch = mkOption { type = types.strMatching "[A-Za-z0-9][A-Za-z0-9._/-]*"; default = "main"; };
-    flakeAttr = mkOption { type = localTypes.identifier; description = "Host attribute under nixosConfigurations."; };
+    flakeAttr = mkOption { type = localTypes.identifier; description = "Fleet host name; the updater builds //fleet/hosts/<name>:deployment (ADR-0271)."; };
     interval = mkOption { type = types.strMatching "[1-9][0-9]*(s|min|h)"; default = "10s"; };
     healthTimeout = mkOption { type = types.ints.between 10 1800; default = 120; };
+    buildTimeout = mkOption { type = types.ints.between 30 10800; default = 7200; description = "Seconds before a candidate build is stopped, its Buck2 daemon included."; };
     verbose = mkOption { type = types.bool; default = false; description = "Retain verbose build output in the private attempt log."; };
     sshKeyFile = mkOption { type = types.nullOr localTypes.privatePath; default = null; };
     knownHostsFile = mkOption { type = localTypes.absolutePath; default = "/etc/ssh/ssh_known_hosts"; };
@@ -204,6 +207,9 @@ in
       # Every imported host MUST retain its public deployment descriptor in its
       # system closure, including while polling is disabled. Secrets remain runtime
       # paths; candidate bundles MUST bind this descriptor to the exact system.
+      # overallsDeployment is the output of //fleet/hosts/<host>:deployment, the
+      # only bundle the updater activates (revised for ADR-0271: it was the
+      # nixosConfigurations attribute the updater built).
       system.systemBuilderCommands = ''
         ln -s ${manifest} $out/overalls-deployment.json
       '';
@@ -247,7 +253,10 @@ in
         # @cc [owner:ghuntley,label:isolation;recovery] update-builds-use-isolated-daemon
         # Root would otherwise build in the local store from this service's
         # namespace, whose sandboxes take locked copies of guest dataset mounts
-        # and stall fenced deletion (ADR-0144). Builds MUST go through nix-daemon.
+        # and stall fenced deletion (ADR-0144). Builds MUST go through nix-daemon,
+        # including the Nix actions of the updater's Buck2 daemon: the updater
+        # restarts buckd before each build so it inherits this environment
+        # (revised for ADR-0271).
         environment = {
           NIX_REMOTE = "daemon";
           GIT_SSH_COMMAND = "${pkgs.openssh}/bin/ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ${lib.escapeShellArg "UserKnownHostsFile=${cfg.knownHostsFile}"}"

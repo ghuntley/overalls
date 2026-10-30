@@ -1,0 +1,13 @@
+load("@root//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
+load("@root//buck:assemble.bzl", "nix_assemble")
+load("@root//buck:nix.bzl", "nix_owned")
+
+nix_owned()
+
+# The host installer's kexec tarball (ADR-0271).
+nix_assemble(
+    name = "kexec",
+    attr = "kexec",
+    artifacts = ASSEMBLY_ARTIFACTS,
+    visibility = ["PUBLIC"],
+)

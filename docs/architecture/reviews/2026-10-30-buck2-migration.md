@@ -84,6 +84,109 @@ draft plan:
   - Fluent Bit stays on the system's nixpkgs. buildNixpkgs has 5.1.0, and the
     logging route limits were reviewed against 5.0.x.
 
+## M2 host self-deployment
+
+- **Scope.** M2 changes the updater's build path, the fleet host targets and
+  the in-VM updater fixtures.
+  - Decisions: [ADR-0271](../decisions/0271-buck2-host-self-deployment.md),
+    with [ADR-0259](../decisions/0259-deployment-revision-telemetry.md) and
+    [ADR-0144](../decisions/0144-nix-builds-exclude-guest-datasets.md).
+  - Boundaries that stay intact: activation, secret custody, migrations and
+    health checks.
+- **Design.** Each host builds `//fleet/hosts/<host>:deployment` through the
+  candidate checkout's own `tools/buck2`.
+  - It uses one fixed checkout and one isolation directory, and activates
+    exactly the reported bundle.
+  - A missing or unstartable build tool fails closed. There is no fallback
+    to a flake build.
+  - The Nix daemon contract still holds, because the updater restarts buckd
+    before each build, so its actions inherit `NIX_REMOTE=daemon`.
+- **Accepted deviations.**
+  - The target is the `overallsDeployment` bundle rather than `toplevel`. The
+    updater reads the descriptor beside the system, and some fixtures pair a
+    system with an edited descriptor.
+  - In-VM fixtures name candidates with `builtins.storePath`, because
+    restrict-eval refuses `path:` inputs.
+- **Finding.** `nix_assemble.sh` dropped executable bits when it copied the
+  tree. Assembled systems then forked from the flake build (Susan's
+  dependency source hash). This is now fixed. For the same tree and revision,
+  `:deployment` equals `lib.assemble`'s `overallsDeployment`.
+- **Finding.** The root package glob owned `.buck-cells.gcroot`, which is
+  tools/buck2's link to the cells store path. `nix_assemble`'s `cp -RL` then
+  copied the whole Buck2 closure into every assembled tree, and the updater
+  test VM ran out of disk after a few builds. M3's 7f4a33af7 makes `.buckconfig`
+  ignore the wrapper's state files and `.buckconfig.local`.
+- **Finding.** buckd's `notify` watcher followed buck-out result links into
+  the system closure, which took about 100 s per daemon start on a 9p store.
+  The updater writes a `.buckconfig.local` that selects `fs_hash_crawler`, and
+  it sets `OVERALLS_GCROOT_DIR` to its own root-owned state.
+- **Gaps.**
+  - Per-host parameters still use fleet-wide `lib.assemble` defaults.
+  - The operator CLI still builds `nixosConfigurations`.
+  - There is no NativeLink cache yet.
+  - The root `OWNED_PACKAGES` lists host packages by hand, which repeats the
+    inventory.
+  - The activation gate remains open.
+- **Machine tests.**
+  - Pass: auto-update, credential-rotation, host-conversion and
+    audi-relocation-fleet, rebased on 7f4a33af7. auto-update was rerun on the
+    pushed base.
+  - Pass: host-enrollment, through both the nix check and `tools/buck2 test`.
+    auto-update, credential-rotation, host-enrollment and
+    customer-isolation-fleet were rerun through `tools/buck2 test` rebased
+    on e5fe2ffde. The enrolled host's published updates build
+    through `//fleet/hosts/fixture-enrollment:deployment`.
+  - Pass: the auto-update-custody, auto-update-compatibility and
+    host-planning evaluation checks.
+  - customer-isolation-fleet failed once and then passed three times, the
+    last time rebased on e5fe2ffde. The trunk baseline on the same base passed.
+    - The failure: after "Lilly daemon death preserves every independently
+      supervised VMM" passed, l2's restarted Lilly logged
+      `lilly.control_request_refused` and `control_exchange_failed`
+      (`http_error`). `fleet-op` start in "Customer egress denial survives
+      guest stop/start" then got `vm.lifecycle_refused` `host_unavailable`
+      until its 180 s retry expired.
+    - This is recorded as intermittent. M2 changes nothing in Lilly,
+      Marshall, the control protocol or the units it restarts. Every updater
+      attempt and Buck2 daemon had finished before that subtest ran.
+- **Finding.** New Buck2 packages remove their files from the parent's
+  `srcs`. `//nix/platform` and `//fleet/hosts/<host>` had to be added to
+  `NIX_INPUTS`, or every machine-test assembly would miss
+  `nix/platform/hosts/profile.nix`. `owned_set` also placed toolchains-cell
+  files at the tree root until it learned the cell prefix.
+- **Finding.** `builtins.storePath` names a store path but does not admit
+  reads under restrict-eval. Offline fixtures therefore expose the sources
+  they read through lookup-path entries.
+- **Evaluation sweep.** `nix_assemble` gained a `[drv]` sub-target. It copies
+  the same declared tree, evaluates under the same restrict-eval options and
+  writes only the derivation path. It builds nothing beyond
+  import-from-derivation and roots nothing (contract
+  `nix-assemble-drv-evaluation`).
+  - Every assembly in
+    `attrfilter(labels, machine_test_assembly, //...)` (205 targets) was
+    evaluated in one `tools/buck2 build -j 24 --keep-going` run. It took 844 s
+    of wall time while other builds shared the machine, and Inception's
+    checkout was the longest single evaluation. This is cheap enough for a CI
+    job.
+  - After rebasing onto e5fe2ffde, a second run took 621 s. It covered all
+    205 assemblies, the nine `//fleet/hosts/<host>` targets and
+    `//nix/platform:kexec`, and it builds the Rust leaves those targets
+    import. Every target evaluated.
+  - Six assemblies failed on trunk, all from cross-suite files that support
+    modules read: `support/zfs-node.nix` reads
+    `machines/zfs-lifecycle/probe.exs`, and `support/native-role-node.nix`
+    reads `machines/service-roles/seal.py`. The affected assemblies were
+    native-zfs, source-export, export-endpoint, both backup-cleanup variants
+    and application-metrics. Trunk d9e423ee4 declares both suites in
+    `NIX_INPUTS`, after which all six evaluate. Trunk 22d1f7ab4 separately
+    restored host-enrollment's `observabilityRuntimes` stand-in, which
+    c170ebcb2 had broken.
+- **Finding.** The updater fixture first copied `toolchains/BUCK` and
+  `nix.bzl` by name. After M5 made `toolchains/BUCK` load `rust.bzl`, every
+  in-VM Buck2 build failed during loading. The fixture now copies the whole
+  toolchains cell and links an empty `rust//` cell, because no fixture target
+  loads Rust.
+
 ## Risks
 
 - **Hosts get heavier.** They need buck2, the cells closure and the cache. The

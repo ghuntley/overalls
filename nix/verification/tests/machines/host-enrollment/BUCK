@@ -16,5 +16,11 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
+        "//:buck_project",
+        "//buck:srcs",
+        "//buck:buck_file",
+        "//tools:srcs",
+        "toolchains//:srcs",
+        "toolchains//:buck_file",
     ],
 )

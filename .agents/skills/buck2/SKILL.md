@@ -174,6 +174,12 @@ match Nix byte for byte. Compare them with `diff -r`.
   `nix_assemble` over a copy of its declared `inputs` only, so reading an
   undeclared file is an evaluation error: add the owning group to `inputs`
   (in `buck/inputs.bzl` or the generator), not a workaround.
+- **Evaluate without running:** `tools/buck2 build '<test>.assembly[drv]'`
+  evaluates the same declared tree under the same restrictions and writes the
+  derivation path, building no VM. To check every machine test's declared
+  inputs, build `[drv]` for each target in
+  `tools/buck2 uquery 'attrfilter(labels, machine_test_assembly, //...)'`.
+  This takes about 15 minutes at `-j 24`.
 - **Run one:** `tools/buck2 test //nix/verification/tests/machines/sysctl:sysctl`.
   Buck2 builds the assembly (the VM run) first; the test command then checks
   that the `nested_kvm` label matches Nix's `meta.ci.nestedKvm` and, for fleet
@@ -275,6 +281,26 @@ command, the single prek hook and CI call it.
    with `shared = ["format", "logging", "gettext", "dialyzer"]` (or the
    default output) and `fix = {path: "fix/" + path}` from `mix format` gives
    `precommit --fix` Elixir formatting.
+
+## Host deployment targets
+
+- **Targets.** `fleet/hosts/<host>/BUCK` calls `fleet_host()` from
+  `buck/fleet.bzl`. That declares `:deployment` (the enrolled
+  `overallsDeployment` bundle the updater activates), `:base` and
+  `:install`. `//nix/platform:kexec` is the installer kexec.
+- **Revision.** Pass `-c overalls.revision=<full commit>` so the system names
+  its source. Without it, the system names `unknown`
+  ([ADR-0271](../../../docs/architecture/decisions/0271-buck2-host-self-deployment.md)).
+- **A new host directory** needs its `BUCK` file and an entry in the root
+  `OWNED_PACKAGES`; otherwise its files are missing from the assembly tree.
+- **The updater** runs the candidate's own `tools/buck2 --isolation-dir
+  overalls-update` in `/var/lib/overalls-auto-update/checkout`, with `HOME`
+  set to `/var/lib/overalls-auto-update/buck2-home` and `OVERALLS_GCROOT_DIR`
+  set to `/var/lib/overalls-auto-update/gcroots`. To inspect the updater's
+  daemon on a host, use the same flags; never leave a daemon running there.
+- **Updater machine tests** build `nix/verification/tests/support/update-fixture.nix`
+  repositories. Restricted evaluation refuses `path:` inputs, so fixture
+  `lib.assemble` names prebuilt candidates with `builtins.storePath`.
 
 ## Troubleshooting
 

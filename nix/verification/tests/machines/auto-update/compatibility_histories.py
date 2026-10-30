@@ -127,6 +127,7 @@ class PreflightFixture(updater.Deployment):
             branch="unused",
             flakeAttr="unused",
             healthTimeout=1,
+            buildTimeout=60,
             verbose=False,
             secretUnits=[],
             secretHelper="unused",

@@ -3,7 +3,7 @@
 - ID: ADR-0271
 - Date: 2026-10-30
 - Status: accepted
-- Implementation: planned
+- Implementation: partial
 - Components: host updates, build, NixOS deployment
 - Supersedes: none
 - Superseded by: none
@@ -67,10 +67,10 @@ the approved migration plan (M2).
 
 - The updater activates only the closure printed by the deployment target for
   the verified candidate revision.
-- buckd never survives an updater timeout. A test is planned for the
-  auto-update machine suite.
+- buckd never survives an updater timeout. The auto-update machine suite's
+  hanging-candidate subtest checks this.
 - Telemetry names the candidate revision. Checked by the
-  `deployment-revision-source` contract, which will be updated in M2.
+  `deployment-revision-source` contract, revised in M2.
 - **Failure case:** a cache entry produced from a different revision would be
   activated without being caught. Actions are content-addressed and hosts
   never upload, so a poisoned entry would need a compromised CI uploader.
@@ -79,7 +79,111 @@ the approved migration plan (M2).
 
 ## Implementation evidence
 
-No implementation yet (milestone M2).
+Milestone M2 (2026-10-30) implements decisions 1, 2, 4 and the updater side of 5.
+
+- **Targets.** [buck/fleet.bzl](../../../buck/fleet.bzl) declares
+  `:deployment`, `:base` and `:install` in each
+  `fleet/hosts/<host>/BUCK`. It uses `nix_assemble`
+  ([buck/assemble.bzl](../../../buck/assemble.bzl)) over `lib.assemble`.
+  `//nix/platform:kexec` assembles `kexec`. Every one of them passes
+  `ASSEMBLY_ARTIFACTS` ([buck/artifacts.bzl](../../../buck/artifacts.bzl)),
+  as machine tests do. Since e5fe2ffde that dict names five Buck2-built Rust
+  leaves: lilly-host-helpers, enrico-git-owner, otel-guest-receiver,
+  observability-runtimes and trace-spool. A host's first post-M2 update
+  therefore activates those binaries instead of their Nix builds, and the
+  updater compiles them locally through the pinned Rust toolchain and the
+  `rust//` cell.
+  - `:deployment` builds `systems.<host>.config.system.build.overallsDeployment`.
+    That is the system closure plus its deployment descriptor, which is the
+    bundle the updater activates. It is not the bare `toplevel`.
+  - For the same tree and revision, `//fleet/hosts/salopettes:deployment`
+    produced the same store path as
+    `lib.assemble { revision; }.systems.salopettes…overallsDeployment`. This
+    holds once [nix_assemble.sh](../../../buck/nix_assemble.sh) keeps
+    executable bits. Before that fix, Susan's dependency source hash forked.
+- **Updater.** In [runtime.py](../../../nix/domains/system/auto-update/runtime.py),
+  `Deployment.build` checks out the candidate at the fixed `checkout` path.
+  It then runs the candidate's `tools/buck2 --isolation-dir overalls-update build -c overalls.revision=<rev> //fleet/hosts/<host>:deployment --show-full-output`.
+  - It validates the single reported `store-path`, roots that path and
+    activates exactly it.
+  - If the wrapper is missing or cannot start, the attempt fails closed as
+    `build_tool_unavailable`. If the report is unexpected, it fails as
+    `build_output_invalid`. There is no other build path.
+  - `stop_buck2` runs `buck2 kill` before and after every build, including
+    after timeouts. The post-stop cleanup does the same.
+  - `buildTimeout` bounds each build command.
+  - Every Buck2 invocation runs with private state. `HOME` is
+    `buck2-home` and `OVERALLS_GCROOT_DIR` is the root-owned `gcroots`
+    directory, both under the updater's 0700 state directory. The updater
+    reads only the `store-path` output and never a `result` link.
+  - The updater writes the checkout's `.buckconfig.local` to select the
+    `fs_hash_crawler` file watcher. `notify` follows buck-out links into the
+    system closure, and on a 9p store that took about 100 s per daemon start.
+  - `.buckconfig` ignores `.buck-cells.key`, `.buck-cells.gcroot` and
+    `.buckconfig.local` (7f4a33af7). The M2 updater test found the need:
+    without it, the root package glob picked up the cells GC-root link, and
+    `nix_assemble`'s `cp -RL` copied the whole Buck2 closure into every
+    assembled tree. That filled the test VM's disk after a few builds.
+  - The contracts `updater-buck2-deployment-build` and
+    `updater-buck2-daemon-stopped` cover this. `updater-candidate-identity`,
+    `deployment-descriptor-baseline`, `deployment-revision-source` and
+    `update-builds-use-isolated-daemon` are revised in place, with their
+    reasons stated in the text.
+  - `status.json` records `builder: "buck2"` after each Buck2 build. This is
+    the per-host signal for the activation gate.
+- **Fixtures.** [support/update-fixture.nix](../../../nix/verification/tests/support/update-fixture.nix)
+  builds an offline Buck2 fixture repository. It contains the real wrapper,
+  `.buckconfig`, toolchains and rules, plus the pinned buck2 with cut-down
+  cells. [support/update.py](../../../nix/verification/tests/support/update.py)
+  publishes candidates through it.
+  - The users are the auto-update, credential-rotation and fleet suites, and
+    host-enrollment's published update.
+  - restrict-eval refuses `path:` inputs, so fixtures name their prebuilt
+    candidates with `builtins.storePath`.
+- **Machine tests.** The [auto-update driver](../../../nix/verification/tests/machines/auto-update/driver.py)
+  adds four checks:
+  - the activated bundle equals the target's report;
+  - no buckd survives a run;
+  - a candidate without `tools/buck2` fails closed;
+  - a hanging build times out with its daemon and builder gone.
+
+  The M2 change records each suite's run result in the
+  [migration review](../reviews/2026-10-30-buck2-migration.md). auto-update,
+  credential-rotation, host-conversion, host-enrollment (nix check and
+  `tools/buck2 test`), audi-relocation-fleet and customer-isolation-fleet
+  pass. In host-enrollment, the enrolled host's published update builds
+  through the Buck2 target.
+  - Offline fixtures read their preloaded sources through lookup-path
+    entries (`nix.settings.extra-nix-path`), because restrict-eval refuses
+    `path:` and `file:` inputs and `builtins.storePath` names a path without
+    admitting reads. Production inputs are `github:` and are covered by
+    `allowed-uris`.
+  - Machine-test assembly declares the new packages. `NIX_INPUTS` names the
+    host and `nix/platform` packages, which now own their directories. The
+    suites that copy the update fixture also declare `//:buck_project`, the
+    `//buck` and `//tools` sources, the toolchains cell and the two BUCK files
+    the fixture copies. `owned_set` places toolchains-cell files under
+    `toolchains/`.
+
+Remaining:
+
+- Hosts do not read the NativeLink cache yet (decision 3, M4b). The updater
+  runs Buck2 with `HOME` set to its private `buck2-home`, so a host's cache
+  client configuration must go there, not in root's `~/.buckconfig.d`.
+- The per-host parameters stay fleet-wide `lib.assemble` defaults, because
+  no host sets crash-dump encryption, antithesis flags or private service
+  roots individually today. `nix_assemble` has no `params` channel yet.
+- The operator CLI ([cli.py](../../../nix/domains/artifacts/host/cli.py))
+  still builds `nixosConfigurations`. It moves to `:base` and `:install`
+  before the gate.
+- Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater, because they
+  read no shared Buck2 cache. The offline update fixture holds no
+  application sources, so it replaces `buck/artifacts.bzl` with an empty
+  dict. Its assemblies take every leaf from Nix, which means the in-VM tests
+  do not exercise Buck2-built leaves on the update path. Machine-test
+  assemblies and the `[drv]` evaluation of the real host targets do cover
+  them.
+- The activation gate itself is still open.
 
 ## Open questions
 

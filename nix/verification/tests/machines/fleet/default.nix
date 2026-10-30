@@ -612,7 +612,8 @@ let
     tsc --allowJs --checkJs --noEmit --strict --target es2022 --lib es2022,dom "$out/browser.js"
   '';
   common = { config, lib, nodes, ... }: {
-    imports = [ module ];
+    # Offline Buck2 fixture repositories for updater scenarios (ADR-0271).
+    imports = [ module (import ../../support/update-fixture.nix { inherit pkgs; inherit (packages) buck2; }).module ];
     system.stateVersion = "26.05";
     networking.enableIPv6 = false;
     virtualisation.memorySize = lib.mkDefault 1024;

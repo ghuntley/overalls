@@ -29,7 +29,7 @@ pkgs.testers.runNixOSTest {
         ''}";
       };
     in {
-      imports = [ module ];
+      imports = [ module (import ../../support/update-fixture.nix { inherit pkgs; inherit (packages) buck2; }).module ];
       system.stateVersion = "26.05";
       system.switch.enable = true;
       virtualisation.memorySize = 2048;
@@ -38,6 +38,8 @@ pkgs.testers.runNixOSTest {
         repository = "/var/lib/overalls-update-test/git";
         flakeAttr = "host";
         healthTimeout = 10;
+        # Bounds the hanging-candidate subtest; fixture builds take seconds.
+        buildTimeout = 90;
         activationSockets = [ "update-relay.socket" ];
       };
       # The driver controls update boundaries. Production timer wiring remains
@@ -85,5 +87,5 @@ pkgs.testers.runNixOSTest {
         };
       });
     };
-  testScript = builtins.readFile ./driver.py;
+  testScript = pkgs.lib.concatMapStringsSep "\n" builtins.readFile [ ../../support/update.py ./driver.py ];
 }

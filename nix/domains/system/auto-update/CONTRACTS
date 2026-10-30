@@ -1,7 +1,8 @@
 @cc [owner:ghuntley,label:deployment] updater-candidate-identity
-The updater MUST build one fixed Git revision with committed locks, use that
-candidate's secret descriptors and migrator, and activate its exact system
-closure. Only successful activation followed by bounded role health checks, or
+The updater MUST build one fixed Git revision with committed locks, as that
+revision's //fleet/hosts/<host>:deployment Buck2 target (ADR-0271; it was the
+nixosConfigurations attribute), use that candidate's secret descriptors and
+migrator, and activate exactly the system closure the target reports. Only successful activation followed by bounded role health checks, or
 verification of an identical already-active system and manifest, may advance
 lastHealthy. Every candidate secret-preparation service MUST also be
 active before marking a deployment healthy, including when its unit definition

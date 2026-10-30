@@ -1,7 +1,9 @@
 # @cc [owner:ghuntley,label:observability] deployment-revision-source
-# Telemetry MUST name the host build's flake source revision, taken from
+# Telemetry MUST name the host build's source revision, taken from
 # system.configurationRevision, and MUST fall back to "unknown" rather than
 # guess. The value is restricted to the spool's simple identifier alphabet.
+# Buck2 deployment targets pass the candidate revision to lib.hostSystem in
+# place of self.rev; without one the revision is null (ADR-0271).
 { config, lib }:
 let
   revision = config.system.configurationRevision or null;

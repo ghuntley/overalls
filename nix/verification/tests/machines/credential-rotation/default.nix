@@ -9,6 +9,7 @@ let
     "MARSHALL_SMTP_CA_CERTFILE" "MARSHALL_MAIL_FROM"
   ];
   marshall = name: { config, ... }: {
+    imports = [ (import ../../support/update-fixture.nix { inherit pkgs; inherit (packages) buck2; }).module ];
     system.switch.enable = true;
     services.overallsAutoUpdate = {
       enable = true;

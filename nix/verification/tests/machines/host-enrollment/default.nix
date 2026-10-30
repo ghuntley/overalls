@@ -3,6 +3,9 @@ let
   lib = pkgs.lib;
   key = imageSource + "/nix/kexec-installer/ssh-keys/id_ed25519";
   public = lib.removeSuffix "\n" (builtins.readFile (imageSource + "/nix/kexec-installer/ssh-keys/id_ed25519.pub"));
+  # Offline Buck2 fixture: the updater builds published revisions through the
+  # candidate's tools/buck2 and //fleet/hosts/<host>:deployment (ADR-0271).
+  buck2Fixture = import ../../support/update-fixture.nix { inherit pkgs; inherit (packages) buck2; };
   original = import ../../fixtures/hosts { platform = "hetzner"; firmware = "bios"; };
   ids = [ "disk-a7442feada5c5e87c3db0c92" "disk-4dbb9b95b4622be2eba057e6" ];
   host = original // {
@@ -26,6 +29,13 @@ let
       boot.kernelParams = [ "console=ttyS0" ];
       boot.loader.grub.extraConfig = "serial; terminal_output serial";
       nix.settings.experimental-features = [ "nix-command" "flakes" ];
+      # The published lib.assemble reads these preloaded sources. nix_assemble
+      # evaluates under restrict-eval, which refuses this offline fixture's
+      # path and file inputs but admits lookup-path entries.
+      nix.settings.extra-nix-path = lib.concatStringsSep " " [
+        "overalls-fixture-nixpkgs=${nixpkgs}" "overalls-fixture-project=${source}"
+        "overalls-fixture-disko=${diskoSource}" "overalls-fixture-nix-compact=${nixCompactSource}"
+      ];
       disko.devices.disk.system0.device = lib.mkForce "/dev/vda";
       disko.devices.disk.system1.device = lib.mkForce "/dev/vdb";
     }
@@ -67,9 +77,11 @@ let
         sops = { url = "path:${packages.secretTools.sops}"; flake = false; };
         sshToAge = { url = "path:${packages.secretTools.ssh-to-age}"; flake = false; };
         observabilityRuntimes = { url = "path:${packages.observabilityRuntimes}"; flake = false; };
+        cells = { url = "path:${buck2Fixture.cells}"; flake = false; };
       };
-      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: {
-        nixosConfigurations.fixture-enrollment = import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
+      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes, cells }:
+      let
+        system = { nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
           system = "x86_64-linux";
           modules = [
             (import (project.outPath + "/nix/domains/system/catalog.nix") {
@@ -102,6 +114,24 @@ let
               system.nixos.revision = ${builtins.toJSON target.config.system.nixos.revision};
             })
           ];
+        };
+        # nix_assemble evaluates under restrict-eval, which refuses path and
+        # file inputs; the same preloaded store paths are named directly, and
+        # sources it reads come through the fixture's lookup path.
+        store = path: { outPath = builtins.storePath path; };
+        source = name: store (toString (builtins.findFile builtins.nixPath name));
+      in {
+        buckCells.x86_64-linux = cells.outPath;
+        nixosConfigurations.fixture-enrollment = system { inherit nixpkgs project disko nixCompact marshall lilly secretspec sops sshToAge observabilityRuntimes; };
+        lib.assemble = { revision ? null, artifacts ? { }, params ? { } }: {
+          systems.fixture-enrollment = system {
+            nixpkgs = source "overalls-fixture-nixpkgs"; project = source "overalls-fixture-project";
+            disko = source "overalls-fixture-disko"; nixCompact = source "overalls-fixture-nix-compact";
+            marshall = store "${pkgs.hello}"; lilly = store "${pkgs.hello}";
+            secretspec = store "${packages.secretTools.secretspec}"; sops = store "${packages.secretTools.sops}";
+            sshToAge = store "${packages.secretTools.ssh-to-age}";
+            observabilityRuntimes = store "${packages.observabilityRuntimes}";
+          };
         };
       };
     }
@@ -143,7 +173,7 @@ let
       })
     ];
   };
-  extraTools = [ nixpkgsArchive target.config.system.build.toplevel enrolled.config.system.build.toplevel
+  extraTools = [ nixpkgsArchive buck2Fixture.skeleton target.config.system.build.toplevel enrolled.config.system.build.toplevel
     (pkgs.perl.withPackages (p: with p; [ ConfigIniFiles FileSlurp ]))
     pkgs.remarshal pkgs.cpio pkgs.zstd pkgs.nixos-rebuild pkgs.curl pkgs.jq
     pkgs.desktop-file-utils pkgs.getconf pkgs.texinfo pkgs.libxslt.bin pkgs.lndir ] ++ pkgs.bind.all;
@@ -186,5 +216,6 @@ in pkgs.testers.runNixOSTest {
     extra_paths = ${builtins.toJSON extraTools}
     registration = "${pkgs.closureInfo { rootPaths = extraTools; }}/registration"
     test_program = "${./exercise.py}"
+    buck2_fixture = "${buck2Fixture.skeleton}"
   '' + builtins.readFile ./driver.py;
 }

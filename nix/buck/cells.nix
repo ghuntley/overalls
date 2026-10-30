@@ -1,4 +1,4 @@
-{ pkgs, toolchain }:
+{ pkgs, toolchain, buck2 ? pkgs.buck2, fixture ? null }:
 # @cc [owner:ghuntley,label:build] buck-cells-from-pins
 # Buck2's prelude and every toolchain path MUST come from this derivation,
 # built only from flake.lock-pinned nixpkgs and the dependency registry, so
@@ -22,7 +22,7 @@ let
   };
   # Pinned third-party inputs, grouped as the plan's go/, npm/ and python/
   # cells. Each is also a [nix] entry so its store path enters action keys.
-  inputs = {
+  pinnedInputs = {
     go = {
       gh_source = "${githubTools.gh.linux-amd64.src}";
       gh_vendor = "${githubTools.gh.linux-amd64.goModules}";
@@ -40,7 +40,14 @@ let
       antithesis_wheels = "${python.antithesisWheels}";
     };
   };
-  tools = lib.foldl' (acc: group: acc // group) {
+  # `fixture` is for offline machine-test repositories only (ADR-0271):
+  # { tools = { <name> = <path>; }; stub = <store path>; }. Named tools keep
+  # their paths; every other tool and pinned input becomes `stub`, and the
+  # rust// cell is empty (fixtures load no Rust targets), so the cells closure
+  # stays small and nothing outside it is realised.
+  inputs = if fixture == null then pinnedInputs
+    else lib.mapAttrs (_: lib.mapAttrs (_: _: fixture.stub)) pinnedInputs;
+  allTools = lib.foldl' (acc: group: acc // group) {
     bash = "${pkgs.bash}/bin/bash";
     coreutils = "${pkgs.coreutils}/bin";
     python = "${pkgs.python3}/bin/python3";
@@ -92,6 +99,8 @@ let
     unzip = "${pkgs.unzip}/bin";
     fonts_conf = "${pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; }}";
   } (lib.attrValues inputs);
+  tools = if fixture == null then allTools
+    else lib.mapAttrs (name: _: fixture.tools.${name} or fixture.stub) allTools;
   buckconfig = pkgs.writeText "toolchains.buckconfig" (''
     [nix]
   '' + lib.concatStrings (lib.mapAttrsToList (name: path: "  ${name} = ${path}\n") tools));
@@ -102,8 +111,8 @@ pkgs.runCommand "overalls-buck-cells" { } ''
     mkdir -p "$out/${cell}"
     ln -s ${path} "$out/${cell}/${name}"
   '') group)) inputs)}
-  ln -s ${pkgs.buck2}/bin/buck2 "$out/bin/buck2"
-  ln -s ${rustCell} "$out/rust"
-  tar -xzf ${pkgs.buck2.prelude} -C "$out/prelude" --strip-components=1
+  ln -s ${buck2}/bin/buck2 "$out/bin/buck2"
+  ln -s ${if fixture == null then rustCell else pkgs.emptyDirectory} "$out/rust"
+  tar -xzf ${buck2.prelude} -C "$out/prelude" --strip-components=1
   cp ${buckconfig} "$out/toolchains.buckconfig"
 ''

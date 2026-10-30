@@ -4,6 +4,7 @@ import importlib.util
 import json
 import os
 import shlex
+import shutil
 import subprocess
 import time
 from collections.abc import Sequence
@@ -41,11 +42,24 @@ repo = Path("/home/tester/public-fleet")
 run(["sudo", "-u", "tester", "git", "init", "-b", "trunk", repo])
 run(["sudo", "-u", "tester", "git", "-C", repo, "config", "user.name", "Fixture"])
 run(["sudo", "-u", "tester", "git", "-C", repo, "config", "user.email", "fixture@example.test"])
+# Offline Buck2 fixture: the real tools/buck2, rules and host package file.
+fixture = Path((root / "buck2-fixture").read_text().strip())
+shutil.copytree(fixture, repo, dirs_exist_ok=True, symlinks=False)
+# copytree copies the read-only store mode onto the existing repository root.
+repo.chmod(0o755)
+(repo / "cells").unlink()
+(repo / "fleet/hosts/host").rename(repo / "fleet/hosts" / host["name"])
+(repo / "BUCK").chmod(0o644)
+(repo / "BUCK").write_text(
+    (repo / "BUCK")
+    .read_text()
+    .replace("//fleet/hosts/host:", "//fleet/hosts/" + host["name"] + ":")
+)
 (repo / "flake.nix").write_text((root / "flake.nix").read_text())
 (repo / "common.nix").write_text((root / "common.nix").read_text())
 (repo / "generation").write_text("one")
 declaration = repo / "fleet/hosts" / host["name"] / "host.json"
-declaration.parent.mkdir(parents=True)
+declaration.parent.mkdir(parents=True, exist_ok=True)
 (repo / "secrets").mkdir()
 url = "ssh://tester@127.0.0.1/home/tester/public-fleet"
 host["identity"]["sshKeys"] = [public]
@@ -92,7 +106,11 @@ def publish(generation: str, good_pin: bool = True) -> str:
             assert private_line not in path.read_bytes()
     for path in repo.rglob("*"):
         if ".git" not in path.parts:
-            path.chmod(0o755 if path.is_dir() else 0o644)
+            executable = path.is_dir() or path in {
+                repo / "tools/buck2",
+                repo / "buck/nix_assemble.sh",
+            }
+            path.chmod(0o755 if executable else 0o644)
     run(["chown", "-R", "tester:users", repo])
     run(["sudo", "-u", "tester", "git", "-C", repo, "add", "."])
     run(["sudo", "-u", "tester", "nix", "flake", "lock", "--offline", str(repo)])
@@ -168,6 +186,10 @@ while time.monotonic() < deadline:
             break
     time.sleep(2)
 else:
+    # This fixture's build diagnostics name only public test inputs.
+    attempt = Path("/var/lib/overalls-auto-update/attempt.log")
+    if attempt.exists():
+        print(attempt.read_text()[-12000:], flush=True)
     raise AssertionError("Published update did not become healthy")
 remote.verify(json.loads(Path("/etc/overalls-host.json").read_text()), receipt=True)
 assert remote.public_key("/etc/ssh/ssh_host_ed25519_key") == public

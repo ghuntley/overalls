@@ -7,7 +7,12 @@ NIX_INPUTS = [
     "//:flake",
     "//:workspace_files",
     "//fleet:srcs",
+    # Host and platform packages (ADR-0271) own their directories' files.
+    "//fleet/hosts/dungarees:srcs",
+    "//fleet/hosts/panterloons:srcs",
+    "//fleet/hosts/salopettes:srcs",
     "//nix:srcs",
+    "//nix/platform:srcs",
     "//nix/domains/artifacts/guest/github:srcs",
     # support/zfs-node.nix installs these suites' probes for every ZFS node.
     "//nix/verification/tests/machines/native-zfs:srcs",

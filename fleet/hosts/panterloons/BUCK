@@ -1,0 +1,5 @@
+load("@root//buck:fleet.bzl", "fleet_host")
+
+# //fleet/hosts/<host>:deployment is what this host's updater builds and
+# activates (ADR-0271). Per-host parameters are attributes here.
+fleet_host()

@@ -23,6 +23,19 @@ from typing import Protocol, TypedDict, cast
 STATE = Path("/var/lib/overalls-auto-update")
 RUNTIME = Path("/run/overalls-auto-update")
 ACTIVE = Path("/run/current-system")
+# One fixed checkout and Buck2 isolation directory, so buck-out and the cells
+# stay warm across revisions (ADR-0271). HOME keeps buckd state private.
+CHECKOUT = STATE / "checkout"
+BUCK2_HOME = STATE / "buck2-home"
+# Buck2 Nix rules root their outputs here, in the root-owned state directory,
+# rather than in the checkout or the invoking user's home.
+BUCK2_GCROOTS = STATE / "gcroots"
+BUCK2_ISOLATION = "overalls-update"
+BUCK2_PRESERVED = ["/buck-out", "/.buck-cells", "/.buck-cells.key", "/.buck-cells.gcroot"]
+BUCK2_LOCAL_CONFIG = (
+    "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
+)
+DEPLOYMENT_PATH = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]{1,180}")
 
 
 def unit_identity(system: Path, unit: str) -> tuple[str | None, tuple[tuple[str, str], ...]]:
@@ -47,6 +60,7 @@ class Configuration(TypedDict):
     branch: str
     flakeAttr: str
     healthTimeout: int
+    buildTimeout: int
     verbose: bool
     secretUnits: list[str]
     secretHelper: str
@@ -232,6 +246,7 @@ def configuration_value(raw: object) -> Configuration:
         branch=string_value(row["branch"]),
         flakeAttr=string_value(row["flakeAttr"]),
         healthTimeout=integer_value(row["healthTimeout"]),
+        buildTimeout=integer_value(row.get("buildTimeout", 7200)),
         verbose=bool(row["verbose"]),
         secretUnits=[string_value(item) for item in list_value(row["secretUnits"])],
         secretHelper=string_value(row["secretHelper"]),
@@ -428,40 +443,109 @@ class Deployment:
             capture=True,
         )
 
+    # @cc [owner:ghuntley,label:deployment;recovery] updater-buck2-deployment-build
+    # The candidate MUST be built only by the candidate checkout's own
+    # tools/buck2 from the fixed checkout path and isolation directory, as
+    # //fleet/hosts/<host>:deployment with the fetched revision, and the
+    # activated bundle MUST be exactly the store path that target reports.
+    # A missing or unstartable build tool, an unexpected report or a failed
+    # build fails closed in the build phase; there is no fallback build path.
     def build(self, revision: str) -> Path:
-        checkout = STATE / "checkouts" / revision
-        checkout.parent.mkdir(mode=0o700, exist_ok=True)
-        if not checkout.exists():
+        repository = STATE / "repository.git"
+        if not (CHECKOUT / ".git").exists():
+            # --force reclaims a registration whose directory has gone.
             self.command(
                 [
                     "git",
-                    "--git-dir=" + str(STATE / "repository.git"),
+                    "--git-dir=" + str(repository),
                     "worktree",
                     "add",
+                    "--force",
                     "--detach",
-                    str(checkout),
+                    str(CHECKOUT),
                     revision,
                 ]
             )
-        target = (
-            str(checkout)
-            + "#nixosConfigurations."
-            + self.config["flakeAttr"]
-            + ".config.system.build.overallsDeployment"
-        )
-        command = [
-            "nix",
-            "build",
-            "--no-update-lock-file",
-            "--no-write-lock-file",
-            "--out-link",
-            str(STATE / "candidate"),
-            target,
+        else:
+            self.command(
+                ["git", "-C", str(CHECKOUT), "checkout", "--quiet", "--force", "--detach", revision]
+            )
+            # Drop every untracked file except Buck2's output and cells links,
+            # so only committed sources reach the build.
+            self.command(
+                ["git", "-C", str(CHECKOUT), "clean", "-ffdxq"]
+                + ["--exclude=" + path for path in BUCK2_PRESERVED]
+            )
+        if (
+            self.command(["git", "-C", str(CHECKOUT), "rev-parse", "HEAD"], capture=True)
+            != revision
+        ):
+            raise UpdateError("checkout_mismatch")
+        # One build per daemon needs no inotify watcher, and notify would follow
+        # buck-out's Nix result links through the whole system closure.
+        local = CHECKOUT / ".buckconfig.local"
+        local.write_text(BUCK2_LOCAL_CONFIG)
+        local.chmod(0o600)
+        wrapper = CHECKOUT / "tools" / "buck2"
+        if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
+            raise UpdateError("build_tool_unavailable")
+        BUCK2_HOME.mkdir(mode=0o700, exist_ok=True)
+        BUCK2_GCROOTS.mkdir(mode=0o700, exist_ok=True)
+        buck2 = buck2_command(wrapper)
+        target = "//fleet/hosts/" + self.config["flakeAttr"] + ":deployment"
+        timeout = self.config["buildTimeout"]
+        # A daemon started by anyone else could carry another environment.
+        self.stop_buck2()
+        try:
+            try:
+                # Realises the candidate's pinned cells and starts nothing.
+                self.command([*buck2, "--version"], timeout=timeout)
+            except UpdateError as error:
+                raise UpdateError("build_tool_unavailable") from error
+            command = [
+                *buck2,
+                "build",
+                "--console=simple",
+                "-c",
+                "overalls.revision=" + revision,
+                target,
+                "--show-full-output",
+            ]
+            if self.config["verbose"]:
+                command += ["-v", "4"]
+            output = self.command(command, timeout=timeout, capture=True)
+        finally:
+            self.stop_buck2()
+        reported = [
+            line.split(" ", 1)[1]
+            for line in output.splitlines()
+            if line.split(" ", 1)[0] in {target, "root" + target} and " " in line
         ]
-        if self.config["verbose"]:
-            command += ["--verbose", "--print-build-logs"]
-        self.command(command)
-        return (STATE / "candidate").resolve(strict=True)
+        if len(reported) != 1:
+            raise UpdateError("build_output_invalid")
+        report = Path(reported[0])
+        if not report.is_relative_to(CHECKOUT / "buck-out") or not report.is_file():
+            raise UpdateError("build_output_invalid")
+        bundle = report.read_text().strip()
+        if not DEPLOYMENT_PATH.fullmatch(bundle):
+            raise UpdateError("build_output_invalid")
+        self.command(["nix-store", "--add-root", str(STATE / "candidate"), "--realise", bundle])
+        if str((STATE / "candidate").resolve(strict=True)) != bundle:
+            raise UpdateError("build_output_invalid")
+        self.save(builder="buck2")
+        return Path(bundle)
+
+    # @cc [owner:ghuntley,label:recovery] updater-buck2-daemon-stopped
+    # buckd leaves the command's process group, so timeout group cleanup
+    # cannot reach it. The updater MUST stop the isolated daemon before and
+    # after every build, including after a timeout or failure, and in the
+    # post-stop cleanup, so no daemon outlives an update attempt.
+    def stop_buck2(self) -> None:
+        binary = CHECKOUT / ".buck-cells" / "bin" / "buck2"
+        if not binary.exists():
+            return
+        with suppress(UpdateError):
+            self.command(buck2_kill_command(binary), timeout=60)
 
     def stage(self) -> None:
         # Retire a previous attempt's handoff before reusing its private staging
@@ -1241,6 +1325,40 @@ class Deployment:
         )
 
 
+def buck2_command(binary: Path) -> list[str]:
+    """A Buck2 invocation in the fixed checkout, isolation directory and state."""
+    return [
+        "env",
+        "-C",
+        str(CHECKOUT),
+        "HOME=" + str(BUCK2_HOME),
+        "OVERALLS_GCROOT_DIR=" + str(BUCK2_GCROOTS),
+        str(binary),
+        "--isolation-dir",
+        BUCK2_ISOLATION,
+    ]
+
+
+def buck2_kill_command(binary: Path) -> list[str]:
+    return [*buck2_command(binary), "kill"]
+
+
+def stop_buck2_daemon() -> None:
+    """Post-stop counterpart of Deployment.stop_buck2, without a deployment."""
+    binary = CHECKOUT / ".buck-cells" / "bin" / "buck2"
+    if not binary.exists():
+        return
+    with suppress(OSError, subprocess.SubprocessError):
+        subprocess.run(
+            buck2_kill_command(binary),
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            timeout=60,
+            check=False,
+        )
+
+
 def main() -> int:
     if len(sys.argv) == 2 and sys.argv[1] == "status":
         print(
@@ -1262,6 +1380,7 @@ def main() -> int:
                 fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
             except BlockingIOError:
                 return 0
+            stop_buck2_daemon()
             staging = RUNTIME / "staging"
             if staging.exists():
                 helper.safe_directory(staging)

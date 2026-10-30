@@ -376,6 +376,8 @@ rec {
   # as for the Android SDK (ADR-0272).
   nativelink = androidPkgs.callPackage ./nativelink {};
   secretTools = { inherit (pkgs) secretspec sops ssh-to-age age; };
+  # The buck2 that buckCells pins, for offline updater fixtures (ADR-0271).
+  inherit (pkgs) buck2;
   userRecipients = secretPackages.recipients;
   secrets = secretPackages.command;
   inherit mixReleases dependencyPins;

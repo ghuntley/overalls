@@ -383,6 +383,7 @@ class World:
     pending_mutations: list[Mutation] = field(default_factory=list)
     handoff_at_switch: dict[str, str] = field(default_factory=dict)
     staged_snapshot: dict[str, dict[str, bytes]] = field(default_factory=dict)
+    checked_out: str | None = None
 
     def publish(self, bundle: Bundle) -> str:
         revision = "fx-rev-" + hashlib.sha256(bundle.label.encode()).hexdigest()[:12]
@@ -491,8 +492,10 @@ class World:
         head = arguments[0]
         if head == "git":
             return self.git_command(arguments, capture_flag)
-        if head == "nix":
-            return self.nix_command(arguments)
+        if head == "env":
+            return self.buck2_command(arguments)
+        if head == "nix-store":
+            return self.nix_store_command(arguments)
         if head == "nixos-rebuild":
             require(arguments[1:4] == ["switch", "--no-reexec", "--store-path"], "switch args")
             self.switch(arguments[4], "updater")
@@ -517,12 +520,17 @@ class World:
             if rest[0] == "fetch":
                 return ""
             if rest[0] == "worktree":
-                if rest[1:3] != ["add", "--detach"]:
+                if rest[1:4] != ["add", "--force", "--detach"]:
                     return impossible("worktree arguments")
-                checkout = Path(rest[3])
-                if checkout.exists():
-                    return impossible("checkout must be created once")
-                checkout.mkdir(mode=0o700)
+                checkout = Path(rest[4])
+                if checkout != updater.CHECKOUT or checkout.exists():
+                    return impossible("the fixed checkout must be created once")
+                (checkout / "tools").mkdir(mode=0o700, parents=True)
+                (checkout / ".git").write_text("gitdir: fixture\n")
+                wrapper = checkout / "tools" / "buck2"
+                wrapper.write_text("#!/bin/false\n")
+                wrapper.chmod(0o700)
+                self.checked_out = rest[5]
                 return ""
             if rest[0] == "rev-parse":
                 if not capture_flag:
@@ -530,16 +538,49 @@ class World:
                 if self.head is None:
                     raise HarnessError("nothing published")
                 return self.head
+        if arguments[1:3] == ["-C", str(updater.CHECKOUT)]:
+            rest = arguments[3:]
+            if rest[:4] == ["checkout", "--quiet", "--force", "--detach"]:
+                self.checked_out = rest[4]
+                return ""
+            if rest[0] == "clean":
+                return ""
+            if rest == ["rev-parse", "HEAD"] and capture_flag and self.checked_out:
+                return self.checked_out
         return impossible("unexpected git command: " + " ".join(arguments))
 
-    def nix_command(self, arguments: list[str]) -> str:
-        require(arguments[1] == "build", "only nix build is modeled")
-        out_link = arguments[arguments.index("--out-link") + 1]
-        revision = Path(arguments[-1].split("#", 1)[0]).name
-        bundle = self.revisions[revision]
-        link = Path(out_link)
+    def buck2_command(self, arguments: list[str]) -> str:
+        """Models the candidate checkout's tools/buck2 deployment build."""
+        wrapper = str(updater.CHECKOUT / "tools" / "buck2")
+        require(arguments[1:3] == ["-C", str(updater.CHECKOUT)], "buck2 runs in the checkout")
+        require(
+            arguments[3:5]
+            == [
+                "HOME=" + str(updater.BUCK2_HOME),
+                "OVERALLS_GCROOT_DIR=" + str(updater.BUCK2_GCROOTS),
+            ],
+            "private buckd state and GC roots",
+        )
+        require(arguments[5:8] == [wrapper, "--isolation-dir", updater.BUCK2_ISOLATION], "wrapper")
+        rest = arguments[8:]
+        if rest == ["--version"]:
+            return ""
+        require(rest[:2] == ["build", "--console=simple"], "only deployment builds are modeled")
+        if self.checked_out is None:
+            raise HarnessError("build before checkout")
+        require(rest[2:4] == ["-c", "overalls.revision=" + self.checked_out], "revision")
+        target = "//fleet/hosts/host:deployment"
+        require(rest[4:6] == [target, "--show-full-output"], "deployment target")
+        report = updater.CHECKOUT / "buck-out" / "store-path"
+        report.parent.mkdir(exist_ok=True)
+        report.write_text(str(self.revisions[self.checked_out].folder) + "\n")
+        return "root" + target + " " + str(report)
+
+    def nix_store_command(self, arguments: list[str]) -> str:
+        require(arguments[1] == "--add-root" and arguments[3] == "--realise", "root the bundle")
+        link = Path(arguments[2])
         link.unlink(missing_ok=True)
-        os.symlink(bundle.folder, link)
+        os.symlink(arguments[4], link)
         return ""
 
     def systemctl(self, arguments: list[str], capture_flag: bool) -> str:
@@ -641,6 +682,7 @@ def make_config() -> updater.Configuration:
         branch="main",
         flakeAttr="host",
         healthTimeout=120,
+        buildTimeout=7200,
         verbose=False,
         secretUnits=[],
         secretHelper=str(PREPARE_PATH),
@@ -669,6 +711,7 @@ STATE_KEYS = {
     "lastHealthy",
     "lastHealthySystem",
     "activeSystem",
+    "builder",
 }
 
 
@@ -719,6 +762,7 @@ class Model:
             return 0, events
         events.append({"event": "update.phase", "phase": "build"})
         state["phase"] = "build"
+        state["builder"] = "buck2"
         system = str((bundle.folder / "system").resolve())
         if same and state.get("lastHealthy") == identity and active_system == system:
             state.update(
@@ -838,6 +882,8 @@ def tick(world: World, model: Model) -> tuple[int, list[dict[str, object]]]:
     with (
         patch.object(updater, "Deployment", factory),
         patch.object(updater, "time", world.clock),
+        # Fixture bundles are temporary folders rather than store paths.
+        patch.object(updater, "DEPLOYMENT_PATH", re.compile(r"/.+-bundle")),
         patch.object(sys, "argv", ["overalls-auto-update", str(config_path)]),
         contextlib.redirect_stdout(output),
     ):

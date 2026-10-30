@@ -55,28 +55,37 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
         )
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)
+    def run(output: OutputArtifact, mode: str, category: str):
+        ctx.actions.run(
+            cmd_args(
+                ctx.attrs._bash[RunInfo],
+                ctx.attrs._script,
+                ctx.attrs._nix[RunInfo],
+                ctx.attrs._jq[RunInfo],
+                manifest,
+                names,
+                artifacts,
+                ctx.attrs.attr,
+                ctx.attrs.revision,
+                _gcroot_name(ctx),
+                output,
+                mode,
+                hidden = srcs,
+            ),
+            category = category,
+            identifier = ctx.attrs.attr,
+            local_only = True,
+            allow_cache_upload = False,
+        )
+
     out = ctx.actions.declare_output("store-path")
-    ctx.actions.run(
-        cmd_args(
-            ctx.attrs._bash[RunInfo],
-            ctx.attrs._script,
-            ctx.attrs._nix[RunInfo],
-            ctx.attrs._jq[RunInfo],
-            manifest,
-            names,
-            artifacts,
-            ctx.attrs.attr,
-            ctx.attrs.revision,
-            _gcroot_name(ctx),
-            out.as_output(),
-            hidden = srcs,
-        ),
-        category = "nix_assemble",
-        identifier = ctx.attrs.attr,
-        local_only = True,
-        allow_cache_upload = False,
-    )
-    return [DefaultInfo(default_output = out)]
+    run(out.as_output(), "build", "nix_assemble")
+    # `[drv]` evaluates the same declared tree under the same restrictions
+    # and writes the derivation path without building it (contract
+    # nix-assemble-drv-evaluation).
+    drv = ctx.actions.declare_output("drv-path")
+    run(drv.as_output(), "drv", "nix_assemble_drv")
+    return [DefaultInfo(default_output = out, sub_targets = {"drv": [DefaultInfo(default_output = drv)]})]
 
 _nix_assemble = rule(
     impl = _nix_assemble_impl,

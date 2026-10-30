@@ -20,6 +20,9 @@ OWNED_PACKAGES = [
     "//elixir",
     "//enrico",
     "//fleet",
+    "//fleet/hosts/dungarees",
+    "//fleet/hosts/panterloons",
+    "//fleet/hosts/salopettes",
     "//galileo",
     "//.github",
     "//lilly",
@@ -28,6 +31,7 @@ OWNED_PACKAGES = [
     "//marvin",
     "//mila",
     "//nix",
+    "//nix/platform",
     "//.oss-scanner",
     "//peach",
     "//porsche",
@@ -65,6 +69,9 @@ owned_set(
 filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
 
 export_file(name = "clippy.toml", src = "clippy.toml", visibility = ["PUBLIC"])
+
+# The Buck2 project files that offline updater fixtures copy (ADR-0271).
+filegroup(name = "buck_project", srcs = [".buckconfig", ".gitignore"], visibility = ["PUBLIC"])
 
 # Root manifests that Nix builds read: the Cargo workspace (ADR-0273), its
 # clippy.toml, and pyproject.toml for the ruff checks inside machine tests.

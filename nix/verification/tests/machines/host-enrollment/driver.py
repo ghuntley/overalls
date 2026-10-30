@@ -110,6 +110,8 @@ subprocess.run(
     check=True,
     timeout=180,
 )
+# The copied Buck2 fixture skeleton for published repository revisions.
+host.succeed(f"printf %s {shlex.quote(buck2_fixture)} > /root/enrollment-test/buck2-fixture")
 # Exercise transport, SOPS, exact published builds and activation inside the VM.
 # Its authenticated SSH target is the same host over loopback; no calls are mocked.
 host.succeed("python3 /root/enrollment-test/exercise.py", timeout=2400)

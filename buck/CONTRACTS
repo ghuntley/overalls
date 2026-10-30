@@ -155,3 +155,18 @@ anywhere in their bytes) a store path outside the closure of the import's
 declared runtime references. It builds
 the Nix side, so it is labelled heavy and is deleted with that build at M11
 (ADR-0269).
+
+@cc [owner:ghuntley,label:deployment] fleet-host-deployment-target
+//fleet/hosts/<host>:deployment MUST assemble that host's enrolled
+overallsDeployment bundle (the system closure plus its deployment
+descriptor) through nix_assemble, so the overalls.revision it is given names
+the system in place of self.rev. Its store-path output is the only bundle the
+updater activates (ADR-0271).
+
+@cc [owner:ghuntley,label:verification] nix-assemble-drv-evaluation
+Every nix_assemble target MUST expose a `[drv]` sub-target that copies the
+same declared sources, evaluates the same attribute with the same
+restrict-eval and allowed-uris options, and writes only its derivation path:
+it builds nothing beyond import-from-derivation and roots nothing, so every
+machine-test assembly can be checked for undeclared inputs without running
+its VMs (ADR-0270).

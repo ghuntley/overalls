@@ -57,3 +57,6 @@ overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"]
 ]]
 
 nix_owned()
+
+# This package's BUCK file, which offline updater fixtures copy (ADR-0271).
+filegroup(name = "buck_file", srcs = ["BUCK"], visibility = ["PUBLIC"])
