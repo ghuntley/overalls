@@ -1137,10 +1137,41 @@ defmodule FleetOperator do
         %{requested: true}
 
       {:error, error} ->
-        true = kind == :start and capacity_failure?(error)
-        %{requested: false, reason: "insufficient_capacity"}
+        true = kind == :start
+        %{requested: false, reason: start_refusal(error, vm)}
     end
   end
+
+  # @cc [owner:ghuntley,label:verification;capacity] fleet-restart-stale-report-refusal
+  # Restart refusals MUST be classified only as insufficient_capacity or as a
+  # host_report_stale host_unavailable: the VM's host is still enabled, in
+  # normal mode and execution-ready, so only its last report aged past the
+  # capacity window. A disabled, draining or not-ready host MUST stay a failure.
+  @spec start_refusal(term(), String.t()) :: String.t()
+  defp start_refusal(error, vm) do
+    cond do
+      capacity_failure?(error) ->
+        "insufficient_capacity"
+
+      lifecycle_reason(error) == :host_unavailable ->
+        [%{host_id: host_id}] = Ledger.read!(Marshall.Compute.VirtualMachine, id: vm)
+        [host] = Ledger.read!(Host, id: host_id)
+
+        true =
+          host.enabled and host.maintenance_mode == :normal and
+            Map.get(host.inventory, "execution_ready") == true
+
+        "host_report_stale"
+    end
+  end
+
+  @spec lifecycle_reason(term()) :: atom() | nil
+  defp lifecycle_reason(%Marshall.Compute.Error{reason: reason}), do: reason
+
+  defp lifecycle_reason(%Ash.Error.Invalid{errors: errors}),
+    do: Enum.find_value(errors, &lifecycle_reason/1)
+
+  defp lifecycle_reason(_), do: nil
 
   # @cc [owner:ghuntley,label:verification;security] fleet-team-membership-real-owner-actions
   # Team creation and membership changes MUST use the public Teams domain actions

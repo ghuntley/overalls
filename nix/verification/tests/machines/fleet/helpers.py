@@ -328,7 +328,11 @@ def lifecycle(vm: str, kind: str) -> None:
     # Restart setup MUST retry only explicit capacity refusals with the same
     # request key and a bounded deadline; every other failure MUST fail the test.
     # Retained disks still need fresh full-shape compute headroom on restart.
-    # Retry only an explicit capacity refusal, keeping the idempotency key stable.
+    # A restart needs a host report inside the 5s capacity window; a transient
+    # control-plane stall can age a live host's report past it, which Marshall
+    # refuses as host_unavailable. The operator reports that only as
+    # host_report_stale after proving the host is still enabled, normal-mode and
+    # execution-ready, so it is retried like a capacity refusal.
     request = dict(
         action="lifecycle", owner_id=users["owner_id"], vm_id=vm, kind=kind, key=str(uuid.uuid4())
     )
@@ -337,7 +341,10 @@ def lifecycle(vm: str, kind: str) -> None:
         result = operator(m2, request)
         if result["requested"]:
             return True
-        assert kind == "start" and result["reason"] == "insufficient_capacity", result
+        assert kind == "start" and result["reason"] in (
+            "insufficient_capacity",
+            "host_report_stale",
+        ), result
         return False
 
     eventually(attempt, timeout=180)
