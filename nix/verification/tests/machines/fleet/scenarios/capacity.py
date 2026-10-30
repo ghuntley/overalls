@@ -24,6 +24,74 @@ with subtest("capacity races spend pending startup headroom only once"):
         )
     )
 
+    # Why the sizes are derived: zroot also holds the host's installed system
+    # closure, so the evaluation-time pool size alone left free space within
+    # 180 MB of three slots, and an unrelated closure change crossed it.
+    target_machine = next(
+        machine for machine in provisioners if host_bindings[machine.name]["host"] == target
+    )
+    race_filler = "zroot/capacity-race-filler"
+
+    def race_disk_measure() -> tuple[int, int] | None:
+        """@cc [owner:ghuntley,label:verification;capacity] fleet-race-runtime-derived-slots
+        The race window MUST be derived at runtime from the target's fresh
+        reported free-minus-overhead bytes and the real preceding reservation,
+        never from incidental free space. When more than two and a half
+        reservations are free, a sibling ZFS refreservation (a real pool writer
+        outside Lilly's dataset, as on a shared production root) MUST trim the
+        reported space to two and a half, half a reservation from each bound,
+        and MUST be destroyed once admission is decided. Returns None until a
+        fresh report exists.
+        """
+        row = sql(
+            "SELECT p.free_bytes - p.overhead_bytes, r.disk_bytes "
+            "FROM compute_storage_pools p JOIN compute_reservations r ON r.pool_id=p.id "
+            f"WHERE r.vm_id='{results[0]['vm_id']}' AND p.reported_at > "
+            "(statement_timestamp() AT TIME ZONE 'UTC') - interval '3 seconds'"
+        )
+        if not row:
+            return None
+        available, reservation = (int(value) for value in row.split("|"))
+        return available, reservation
+
+    measured: list[tuple[int, int]] = []
+
+    def race_measured() -> bool:
+        measure = race_disk_measure()
+        if measure is None:
+            return False
+        measured[:] = [measure]
+        return True
+
+    eventually(race_measured)
+    available, reservation = measured[0]
+    filler_bytes = available - (5 * reservation) // 2
+    print(
+        "Race disk slots: available",
+        available,
+        "reservation",
+        reservation,
+        "filler",
+        max(0, filler_bytes),
+    )
+    if filler_bytes > 0:
+        target_machine.succeed(
+            "zfs create -o canmount=off -o mountpoint=none "
+            f"-o refreservation={filler_bytes} {race_filler}"
+        )
+        # Only a report sampled after the reservation may open the race.
+        filled_at = sql("SELECT (statement_timestamp() AT TIME ZONE 'UTC')::text")
+        eventually(
+            lambda: (
+                sql(
+                    "SELECT count(*) FROM compute_storage_pools p JOIN compute_reservations r "
+                    f"ON r.pool_id=p.id WHERE r.vm_id='{results[0]['vm_id']}' "
+                    f"AND p.reported_at > '{filled_at}'::timestamp + interval '1 second'"
+                )
+                == "1"
+            )
+        )
+
     def race_has_two_disk_slots() -> bool:
         """@cc [owner:ghuntley,label:verification] fleet-race-real-disk-slots
         The race MUST start with fresh native physical headroom sufficient for
@@ -57,6 +125,9 @@ with subtest("capacity races spend pending startup headroom only once"):
     assert [result["reason"] for result in raced if not result["accepted"]] == [
         "insufficient_capacity"
     ]
+    # Admission is decided; later stages run on the host's natural free space.
+    if filler_bytes > 0:
+        target_machine.succeed(f"zfs destroy {race_filler}")
     vms.extend(accepted_placement(result) for result in raced if result["accepted"])
     for vm in vms:
         await_running(vm["vm_id"])

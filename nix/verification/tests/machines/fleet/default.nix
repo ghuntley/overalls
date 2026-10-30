@@ -110,7 +110,10 @@ let
   # for two startup reservations but not three, so its pool is derived from the
   # real reservation rather than fixed: a fixed 16 GiB pool fit only rootfs
   # images up to 4 GiB, and the 4.29 GiB guest (6 GiB reservation, 11.08 GB
-  # free) left the race waiting for two slots forever.
+  # free) left the race waiting for two slots forever. The pool also holds the
+  # host's installed system closure, so its free space cannot be pinned here:
+  # it is sized for about three reservations and the race trims it at runtime
+  # to two and a half (fleet-race-runtime-derived-slots in capacity.py).
   GiB = 1024 * 1024 * 1024;
   ceilDiv = a: b: (a + b - 1) / b;
   # @cc [owner:ghuntley,label:verification;build] fleet-guest-minima-from-pinned-manifest
@@ -129,7 +132,7 @@ let
   # Measured: the template, the first guest and pool metadata use the rootfs
   # plus about 0.9 GB; the enrolled overhead is 512 MiB.
   raceUsed = guestManifest.minimum_disk_bytes + GiB + GiB / 2;
-  raceGiB = ceilDiv (raceUsed + raceReservation * 5 / 2) GiB;
+  raceGiB = ceilDiv (raceUsed + raceReservation * 3) GiB;
   # @cc [owner:ghuntley,label:verification;capacity] fleet-guest-trust-derived-nixos-shape
   # The guest-trust NixOS root request MUST be the alternative image's minimum
   # disk rounded up to whole GiB (at least 4 GiB), and its pool MUST hold three
@@ -1450,14 +1453,16 @@ assert !(defaultOss || resize || accountLifecycle || teamResources || maintenanc
 # support; selecting the journey cannot substitute synthetic rosters.
 assert !sshRosterMatrix || (audi && relocation && !porsche && !cloning);
 # @cc [owner:ghuntley,label:verification;capacity] fleet-race-pool-fits-reservation
-# The plain fleet's pool MUST leave free space, after the template, first guest
-# and overhead, of at least two and fewer than three real startup reservations
-# for the selected image, so image growth fails here rather than as a timeout.
+# The plain fleet's pool MUST leave estimated free space, after the template,
+# first guest and overhead, of at least three real startup reservations for the
+# selected image, so image growth fails here rather than as a timeout. The race
+# itself trims the reported free space at runtime to two and a half
+# reservations; this bound only guarantees that there is room to trim.
 # Guest trust runs no startup race; its pool is sized for three NixOS guests.
 assert builtins.isInt guestManifest.minimum_disk_bytes
   && (let free = storageGiB * GiB - raceUsed;
       in suspension || cloning || codingClis || cloneDestinationLoss || cloneMarshallRestart || guestTrust
-        || (free >= 2 * raceReservation && free < 3 * raceReservation));
+        || free >= 3 * raceReservation);
 # @cc [owner:ghuntley,label:verification] resize-fixture-image-minima
 # The selected real image's numeric disk/memory minima MUST fit the fixed
 # initial resize/team-resource request before its scenario may run.
