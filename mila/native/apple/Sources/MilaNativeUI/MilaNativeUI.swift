@@ -71,7 +71,11 @@ private struct MilaRootContent: View {
     @StateObject private var appLock = MilaAppLockController()
     @Environment(\.scenePhase) private var scenePhase
     @AppStorage("mila.appearance") private var appearance = "system"
-    @AppStorage("mila.locale") private var locale = "en"
+    @AppStorage(MilaStrings.localeOverrideKey) private var locale = ""
+
+    private var activeLocale: String {
+        MilaStrings.activeLocale(override: locale, preferredLanguages: Locale.preferredLanguages)
+    }
 
     var body: some View {
         MilaAppLockView(controller: appLock) {
@@ -113,7 +117,11 @@ private struct MilaRootContent: View {
         }
         .milaDesignSystem()
         .preferredColorScheme(appearance == "light" ? .light : appearance == "dark" ? .dark : nil)
-        .environment(\.locale, Locale(identifier: MilaStrings.canonicalLocale(locale)))
+        .environment(\.locale, Locale(identifier: activeLocale))
+        .environment(\.layoutDirection, MilaStrings.isRightToLeft(activeLocale) ? .rightToLeft : .leftToRight)
+        // Catalog text is resolved when a view body runs, so rebuild the tree
+        // when the active language changes.
+        .id(activeLocale)
         .onChange(of: signIn.phase) { _, phase in
             let signedIn: Bool
             if case .signedIn = phase { signedIn = true } else { signedIn = false }
@@ -146,7 +154,7 @@ private struct MilaRootContent: View {
         switch machines.state {
         case .signedOut: return MilaStrings.text(.ready)
         case .loading: return MilaStrings.text(.connecting)
-        case .loaded: return MilaStrings.text(.snapshotLoaded)
+        case .loaded: return ""
         case .failed: return MilaStrings.text(.noSnapshotLoaded)
         }
     }
@@ -164,7 +172,7 @@ private struct MachinesView: View {
                     Button(MilaStrings.text(.retry)) { Task { await controller.refresh() } }
                 }
             } else if controller.machines.isEmpty, controller.state != .loading {
-                ContentUnavailableView(MilaStrings.text(.machinesEmpty), systemImage: "desktopcomputer", description: Text(MilaStrings.text(.machinesHint)))
+                ContentUnavailableView(MilaStrings.text(.machinesEmpty), systemImage: "desktopcomputer")
             }
             ForEach(controller.machines) { machine in
                 Button { select(machine.id) } label: {
@@ -199,9 +207,9 @@ private struct MilaMachineCreateView: View {
     var body: some View {
         NavigationStack { Form {
             TextField("Name", text: $name).textContentType(.nickname)
-            TextField("CPU", text: $cpu)
-            TextField("Memory (MiB)", text: $memory)
-            TextField("Disk (GiB)", text: $disk)
+            TextField(MilaStrings.text(.fieldCpu), text: $cpu)
+            TextField(MilaStrings.text(.fieldMemory), text: $memory)
+            TextField(MilaStrings.text(.fieldDisk), text: $disk)
             if error { Text(MilaStrings.text(.actionNotSubmitted)).foregroundStyle(.secondary) }
         }.navigationTitle(MilaStrings.text(.actionCreate)).toolbar {
             ToolbarItem(placement: .cancellationAction) { Button(MilaStrings.text(.cancel)) { dismiss() } }
@@ -267,9 +275,9 @@ private struct MachineDetailView: View {
             }
             Section {
                 HStack {
-                    TextField("CPU", text: $resizeCPU).frame(width: 60)
-                    TextField("MiB", text: $resizeMemory).frame(width: 110)
-                    TextField("GiB", text: $resizeDisk).frame(width: 100)
+                    TextField(MilaStrings.text(.fieldCpu), text: $resizeCPU).frame(width: 60)
+                    TextField(MilaStrings.text(.fieldMemory), text: $resizeMemory).frame(width: 110)
+                    TextField(MilaStrings.text(.fieldDisk), text: $resizeDisk).frame(width: 100)
                     Button(MilaStrings.text(.actionResize)) { resize() }.disabled(!machine.machine.write)
                 }
                 Text(resizeStatus).font(.caption).foregroundStyle(.secondary)
@@ -281,7 +289,7 @@ private struct MachineDetailView: View {
             }
             Section {
                 TextField(MilaStrings.text(.sharePrincipal), text: $sharePrincipal).autocorrectionDisabled()
-                Picker(MilaStrings.text(.sharePrincipal), selection: $shareRole) {
+                Picker(MilaStrings.text(.shareRole), selection: $shareRole) {
                     ForEach(MilaShareRole.allCases) { role in Text(Self.roleTitle(role)).tag(role) }
                 }
                 HStack {
@@ -453,7 +461,7 @@ private struct SettingsView: View {
     @ObservedObject var signIn: MilaSignInController
     @Environment(\.openURL) private var openURL
     @AppStorage("mila.appearance") private var appearance = "system"
-    @AppStorage("mila.locale") private var locale = "en"
+    @AppStorage(MilaStrings.localeOverrideKey) private var locale = ""
     @AppStorage("mila.appLockEnabled") private var appLockEnabled = false
     @State private var notificationToken = ""
     @State private var notificationEndpoint = ""
@@ -479,8 +487,8 @@ private struct SettingsView: View {
                     Button(MilaStrings.text(.signInSignOut)) { signIn.signOut() }.disabled(signIn.phase == .signedOut)
                 }
             }
-            Section("Deployment") {
-                TextField("Host", text: $deploymentHost)
+            Section(MilaStrings.text(.deployments)) {
+                TextField(MilaStrings.text(.deploymentHost), text: $deploymentHost)
                 TextField("Port", text: $deploymentPort)
                 TextField("Pinned trust", text: $deploymentTrust)
                 Button("Save deployment") {
@@ -493,7 +501,7 @@ private struct SettingsView: View {
                             VStack(alignment: .leading) { Text("\(deployment.host):\(deployment.port)"); Text(deployment.id == session.selectedDeployment?.id ? "Selected" : "") .font(.caption).foregroundStyle(.secondary) }
                         }.buttonStyle(.plain)
                         Spacer()
-                        Button("Remove") { _ = session.remove(deployment.id) }
+                        Button(MilaStrings.text(.deploymentRemove)) { _ = session.remove(deployment.id) }
                     }
                 }
                 Text(deploymentStatus).font(.caption)
@@ -508,11 +516,15 @@ private struct SettingsView: View {
             }
             Section("Language") {
                 Picker("Language", selection: $locale) {
+                    // The empty tag follows the device language; it is labelled
+                    // with that language's autonym.
+                    Text(MilaStrings.localeDisplayName(MilaStrings.activeLocale(override: nil, preferredLanguages: Locale.preferredLanguages))).tag("")
                     ForEach(MilaStrings.supportedLocales, id: \.self) { candidate in
                         Text(MilaStrings.localeDisplayName(candidate)).tag(candidate)
                     }
                 }
                 .onChange(of: locale) { _, value in
+                    guard !value.isEmpty else { return }
                     let canonical = MilaStrings.canonicalLocale(value)
                     if canonical != value { locale = canonical }
                 }
@@ -547,7 +559,7 @@ private struct SettingsView: View {
                             let controller = MilaNotificationController(adapter: model.adapter ?? UnavailableMilaFFIAdapter(), appID: "com.overalls.mila", deployment: "current")
                             controller.register(token: notificationToken, endpoint: notificationEndpoint)
                             notificationsEnabled = controller.state == .on
-                            notificationStatus = notificationsEnabled ? MilaStrings.text(.notificationsTurnOn) : MilaStrings.text(.runtimeUnavailable)
+                            notificationStatus = notificationsEnabled ? MilaStrings.text(.notificationsTurnOn) : MilaStrings.text(.notificationsFailed)
                             notificationToken = ""
                         }
                     }
@@ -562,14 +574,14 @@ private struct SettingsView: View {
                                 Text(device.enabled ? "Enabled" : "Disabled").font(.caption).foregroundStyle(.secondary)
                             }
                             Spacer()
-                            Button("Remove") {
+                            Button(MilaStrings.text(.notificationsRemoveDevice)) {
                                 let store = MilaUserDefaultsNotificationStore()
                                 _ = store.remove(id: device.id)
                                 notificationDevices = store.list()
                             }
                         }
                     }
-                    Button("Refresh devices") { notificationDevices = MilaUserDefaultsNotificationStore().list() }
+                    Button(MilaStrings.text(.refresh)) { notificationDevices = MilaUserDefaultsNotificationStore().list() }
                 }
             }
             NavigationLink(MilaStrings.text(.sshKeysTitle)) {
@@ -591,7 +603,7 @@ private struct SettingsView: View {
             notificationDevices = signIn.isSignedIn ? MilaUserDefaultsNotificationStore().list() : []
             // Defaults may contain values written by an older build. Normalize
             // them at the read boundary before they reach SwiftUI.
-            let canonicalLocale = MilaStrings.canonicalLocale(locale)
+            let canonicalLocale = locale.isEmpty ? "" : MilaStrings.canonicalLocale(locale)
             if canonicalLocale != locale { locale = canonicalLocale }
             if !["system", "light", "dark"].contains(appearance) { appearance = "system" }
         }
@@ -636,7 +648,7 @@ public struct MilaSSHKeysView: View {
             switch controller.state {
             case .signedOut: Text(MilaStrings.text(.sshKeysEmpty))
             case .loading: ProgressView()
-            case .failed: Text(MilaStrings.text(.runtimeUnavailable))
+            case .failed: Text(MilaStrings.text(.sshKeysFailed))
             case .loaded(let keys):
                 if keys.isEmpty { Text(MilaStrings.text(.sshKeysEmpty)) }
                 ForEach(keys) { key in

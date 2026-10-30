@@ -16,3 +16,8 @@ The generator sorts locales, domains, and messages and writes a schema-versioned
 `manifest.json`; rerunning it with the same catalogs is byte-for-byte identical.
 It validates duplicate identities and interpolation placeholders while preserving
 empty source fallback forms for the existing catalog completeness gate.
+
+The Apple Swift package bundles the generated output directly, because SwiftPM
+resources must exist before the build. After editing a catalog, regenerate it
+with `--output mila/native/apple/Sources/MilaNativeUI/Resources`;
+`test_generate_catalogs.py` fails when that copy is stale.

@@ -1,0 +1,2169 @@
+{
+  "domains": {
+    "mila": {
+      "messages": [
+        {
+          "context": null,
+          "forms": [
+            "Klooni"
+          ],
+          "id": "actionClone",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Loo"
+          ],
+          "id": "actionCreate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kustuta"
+          ],
+          "id": "actionDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Uus masin"
+          ],
+          "id": "actionNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Peata"
+          ],
+          "id": "actionPause",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kinnita"
+          ],
+          "id": "actionPin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Muuda suurust"
+          ],
+          "id": "actionResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jätka"
+          ],
+          "id": "actionResume",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Käivita"
+          ],
+          "id": "actionStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seiska"
+          ],
+          "id": "actionStop",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Eemalda kinnitus"
+          ],
+          "id": "actionUnpin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lisa juurutus"
+          ],
+          "id": "addDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila"
+          ],
+          "id": "appTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Välimus"
+          ],
+          "id": "appearance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tume"
+          ],
+          "id": "appearanceDark",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hele"
+          ],
+          "id": "appearanceLight",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Süsteem"
+          ],
+          "id": "appearanceSystem",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tagasi"
+          ],
+          "id": "back",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tühista"
+          ],
+          "id": "cancel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kas kustutada {name} ja selle ketas? Seda ei saa tagasi võtta."
+          ],
+          "id": "confirmDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 vCPU} other{{count} vCPU-d}}"
+          ],
+          "id": "cpuCount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "overalls.example"
+          ],
+          "id": "deploymentHostHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutuse host"
+          ],
+          "id": "deploymentHostLabel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava"
+          ],
+          "id": "deploymentOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Eemalda"
+          ],
+          "id": "deploymentRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kas eemaldada {host} Milast? Selle salvestatud masinate loend ja selle seadme teavitused eemaldatakse. Sinu konto ja masinad ei muutu."
+          ],
+          "id": "deploymentRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Valitud"
+          ],
+          "id": "deploymentSelected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutusi veel pole."
+          ],
+          "id": "deploymentsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutused"
+          ],
+          "id": "deploymentsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ketas (GiB)"
+          ],
+          "id": "diskFieldGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{gib} GiB"
+          ],
+          "id": "diskGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sisesta hosti nimi, näiteks overalls.example."
+          ],
+          "id": "invalidHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "CPU"
+          ],
+          "id": "kvCpu",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ketas"
+          ],
+          "id": "kvDisk",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tõmmis"
+          ],
+          "id": "kvImage",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mälu"
+          ],
+          "id": "kvMemory",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH-host"
+          ],
+          "id": "kvSshHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Olek"
+          ],
+          "id": "kvState",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Link kopeeritud."
+          ],
+          "id": "linkCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kopeeri link"
+          ],
+          "id": "linkCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila ei saa seda linki avada."
+          ],
+          "id": "linkRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Selle lingi avamiseks logi sisse teenusesse {host}."
+          ],
+          "id": "linkSignInRequired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Selle lingi avamiseks lisa {host} juurutusena."
+          ],
+          "id": "linkUnknownDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lukusta pärast"
+          ],
+          "id": "lockAfter",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "5 minutit"
+          ],
+          "id": "lockAfterFiveMinutes",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "1 minut"
+          ],
+          "id": "lockAfterOneMinute",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Küsi enne Mila näitamist sõrmejälge, nägu või seadme pääsukoodi."
+          ],
+          "id": "lockExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lukku ei avatud. Proovi uuesti."
+          ],
+          "id": "lockFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kohe"
+          ],
+          "id": "lockImmediately",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava Mila lukk"
+          ],
+          "id": "lockReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rakenduse lukk"
+          ],
+          "id": "lockTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rakenduse lukk pole selles seadmes saadaval."
+          ],
+          "id": "lockUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila on lukus"
+          ],
+          "id": "lockedTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurdepääs"
+          ],
+          "id": "machineAccess",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sinu oma"
+          ],
+          "id": "machineAccessOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sinuga jagatud"
+          ],
+          "id": "machineAccessShared",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Arhitektuur"
+          ],
+          "id": "machineArchitecture",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pooleli"
+          ],
+          "id": "machineChanging",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Loodud"
+          ],
+          "id": "machineCreated",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Soovitud"
+          ],
+          "id": "machineDesired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tõrge"
+          ],
+          "id": "machineFailure",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tõrge: {reason}"
+          ],
+          "id": "machineFailureReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kontrolli seda väärtust."
+          ],
+          "id": "machineFieldInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ID"
+          ],
+          "id": "machineId",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vaikimisi"
+          ],
+          "id": "machineImageDefault",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Masina laadimine…"
+          ],
+          "id": "machineLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Näita rohkem"
+          ],
+          "id": "machineMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nimi (valikuline)"
+          ],
+          "id": "machineNameOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See masin pole saadaval."
+          ],
+          "id": "machineNotFound",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Profiil"
+          ],
+          "id": "machineProfile",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hosti vahetus"
+          ],
+          "id": "machineRelocating",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Suuruse muutmine"
+          ],
+          "id": "machineResizing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hoidla URL (valikuline)"
+          ],
+          "id": "machineSourceOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Meeskond"
+          ],
+          "id": "machineTeam",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Isiklik"
+          ],
+          "id": "machineTeamPersonal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Masinaid veel pole."
+          ],
+          "id": "machinesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ükski masin ei sobi."
+          ],
+          "id": "machinesNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võrguühenduseta. Kuvatakse viimane teadaolev loend."
+          ],
+          "id": "machinesOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "kinnitatud"
+          ],
+          "id": "machinesPinned",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Salvestatud {time}."
+          ],
+          "id": "machinesSavedAt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Otsi masinaid"
+          ],
+          "id": "machinesSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Masinad"
+          ],
+          "id": "machinesTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mälu (MiB)"
+          ],
+          "id": "memoryFieldMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{mib} MiB"
+          ],
+          "id": "memoryMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "see seade"
+          ],
+          "id": "notificationsCurrentDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Registreeritud seadmed"
+          ],
+          "id": "notificationsDevices",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühtegi seadet pole registreeritud."
+          ],
+          "id": "notificationsDevicesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Teavitused annavad teada, kui agent vajab sinu sisendit. Need on otspunktkrüpteeritud: neid edastav relee ei näe kunagi nende sisu."
+          ],
+          "id": "notificationsExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kuidas teavitused sinu privaatsust kaitsevad"
+          ],
+          "id": "notificationsPrivacyLink",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Eemalda"
+          ],
+          "id": "notificationsRemoveDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logi sellesse juurutusse sisse, et selle teavitusi hallata."
+          ],
+          "id": "notificationsSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See seade"
+          ],
+          "id": "notificationsThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Teavitused"
+          ],
+          "id": "notificationsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lülita välja"
+          ],
+          "id": "notificationsTurnOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lülita sisse"
+          ],
+          "id": "notificationsTurnOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Teavitused on süsteemi seadetes blokeeritud."
+          ],
+          "id": "pushDenied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See juurutus on teavitused välja lülitanud."
+          ],
+          "id": "pushFailedDisabled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila ei saanud vastusest aru."
+          ],
+          "id": "pushFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus või teavituste relee keeldus sellest seadmest."
+          ],
+          "id": "pushFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vastamiseks ava Mila."
+          ],
+          "id": "pushNeedsInputBody",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent vajab sinu sisendit"
+          ],
+          "id": "pushNeedsInputTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus ei saada sellele seadmele enam teavitusi. Lülita need uuesti sisse, et seade registreerida."
+          ],
+          "id": "pushRevokedExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "nurjus"
+          ],
+          "id": "pushStateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "väljas"
+          ],
+          "id": "pushStateOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "sees"
+          ],
+          "id": "pushStateOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "registreerimine"
+          ],
+          "id": "pushStateRegistering",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "väljalülitamine"
+          ],
+          "id": "pushStateRemoving",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "tühistatud"
+          ],
+          "id": "pushStateRevoked",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Teavitused pole sellel platvormil saadaval."
+          ],
+          "id": "pushUnsupported",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Värskenda"
+          ],
+          "id": "refresh",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Taotlus nurjus."
+          ],
+          "id": "requestFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus keeldus taotlusest."
+          ],
+          "id": "requestRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Valmis."
+          ],
+          "id": "requestSucceeded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ootan taotluse lõpetamist…"
+          ],
+          "id": "requestWaiting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jäta suurus tühjaks, et see säilitada. Töötav masin peatub ja käivitub uuesti; ketas saab ainult kasvada."
+          ],
+          "id": "resizeExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sisesta uus suurus; ketast ei saa vähendada."
+          ],
+          "id": "resizeNothing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Proovi uuesti"
+          ],
+          "id": "retry",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võrguühenduseta"
+          ],
+          "id": "settingsOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sisse logitud"
+          ],
+          "id": "settingsSignedIn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seaded"
+          ],
+          "id": "settingsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "haldur"
+          ],
+          "id": "shareRoleManager",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "operaator"
+          ],
+          "id": "shareRoleOperator",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "omanik"
+          ],
+          "id": "shareRoleOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "vaataja"
+          ],
+          "id": "shareRoleViewer",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jaga"
+          ],
+          "id": "sharingAdd",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "E-post"
+          ],
+          "id": "sharingEmail",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sisesta e-posti aadress."
+          ],
+          "id": "sharingEmailInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pole kellegagi jagatud."
+          ],
+          "id": "sharingEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jagamist ei õnnestunud laadida."
+          ],
+          "id": "sharingFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Näita rohkem"
+          ],
+          "id": "sharingMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Eemalda"
+          ],
+          "id": "sharingRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kas eemaldada kasutaja {email} juurdepääs?"
+          ],
+          "id": "sharingRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Roll"
+          ],
+          "id": "sharingRole",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jagamine"
+          ],
+          "id": "sharingTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Konto"
+          ],
+          "id": "signInAccount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kinnita see seade brauseris ja tule siis siia tagasi. Hoia Mila avatuna, kuni oled seadme kinnitanud."
+          ],
+          "id": "signInApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühendamine hostiga {host}…"
+          ],
+          "id": "signInConnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühendus selle juurutusega katkes."
+          ],
+          "id": "signInDisconnected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kinnituslink ei kehti enam. Alusta uuesti, et saada uus link."
+          ],
+          "id": "signInExpired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila ei saanud selle seadme võtit avada, seega ühendust ei loodud."
+          ],
+          "id": "signInFailedDeviceKey",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See host ei esitanud oma avaldatud sertifitseerijalt pärit sertifikaati, seega Mila ei loonud ühendust."
+          ],
+          "id": "signInFailedHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus saatis vastuse, millest Mila aru ei saa."
+          ],
+          "id": "signInFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus keeldus sellest seadmest."
+          ],
+          "id": "signInFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutusega ei saa ühendust."
+          ],
+          "id": "signInFailedUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võtme sõrmejälg"
+          ],
+          "id": "signInFingerprint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava kinnitusleht"
+          ],
+          "id": "signInOpenBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava masinad"
+          ],
+          "id": "signInOpenMachines",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Selle juurutuse ühenduse sätted on vigased, seega Mila ühendust ei loonud."
+          ],
+          "id": "signInProfileInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühenda uuesti"
+          ],
+          "id": "signInReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logi välja"
+          ],
+          "id": "signInSignOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logi sisse brauseriga"
+          ],
+          "id": "signInStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logi sisse"
+          ],
+          "id": "signInTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tüüp"
+          ],
+          "id": "sshKeyAlgorithm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tühista"
+          ],
+          "id": "sshKeyRevoke",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kas tühistada võti {fingerprint}? Seda kasutav seade tuleb sisselogimiseks uuesti kinnitada."
+          ],
+          "id": "sshKeyRevokeConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See seade"
+          ],
+          "id": "sshKeyThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nimetu võti"
+          ],
+          "id": "sshKeyUnlabelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kinnitatud võtmeid pole."
+          ],
+          "id": "sshKeysEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võtmed, millel on lubatud sinu kontole selles juurutuses sisse logida. Tühistatud võti tuleb enne sisselogimist uuesti kinnitada."
+          ],
+          "id": "sshKeysExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võtmeid ei õnnestunud laadida."
+          ],
+          "id": "sshKeysFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Võtmete laadimine…"
+          ],
+          "id": "sshKeysLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logi sisse, et näha selle konto võtmeid."
+          ],
+          "id": "sshKeysSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH-võtmed"
+          ],
+          "id": "sshKeysTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "kustutatud"
+          ],
+          "id": "stateDeleted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "kustutamisel"
+          ],
+          "id": "stateDeleting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "nurjunud"
+          ],
+          "id": "stateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "peatatud"
+          ],
+          "id": "statePaused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ootel"
+          ],
+          "id": "statePending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "jätkamine"
+          ],
+          "id": "stateResuming",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "töötab"
+          ],
+          "id": "stateRunning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "käivitumisel"
+          ],
+          "id": "stateStarting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "seiskunud"
+          ],
+          "id": "stateStopped",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "seiskumisel"
+          ],
+          "id": "stateStopping",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "peatamine"
+          ],
+          "id": "stateSuspending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "pole saadaval"
+          ],
+          "id": "stateUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "teadmata"
+          ],
+          "id": "stateUnknown",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Teave"
+          ],
+          "id": "tabInfo",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminalid"
+          ],
+          "id": "tabTerminals",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lõimed"
+          ],
+          "id": "tabThreads",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Veeb"
+          ],
+          "id": "tabWeb",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühenda"
+          ],
+          "id": "terminalAttach",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ühendamine"
+          ],
+          "id": "terminalAttaching",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sulge"
+          ],
+          "id": "terminalClose",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kas sulgeda see terminaliseanss kõigi ühendatute jaoks? Selles töötavad programmid peatuvad."
+          ],
+          "id": "terminalCloseConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "sulgub"
+          ],
+          "id": "terminalClosing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminaliseanss lõppes."
+          ],
+          "id": "terminalEnded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila ei saanud selle terminaliseansiga ühendust."
+          ],
+          "id": "terminalInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "otse"
+          ],
+          "id": "terminalLive",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "minu"
+          ],
+          "id": "terminalMine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juhi"
+          ],
+          "id": "terminalModeControl",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vaata"
+          ],
+          "id": "terminalModeView",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Uus terminal"
+          ],
+          "id": "terminalNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kleebi"
+          ],
+          "id": "terminalPaste",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ainult vaatamine"
+          ],
+          "id": "terminalReadOnly",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ühenda uuesti"
+          ],
+          "id": "terminalReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "taasühendamine"
+          ],
+          "id": "terminalReconnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutus keeldus selle terminaliseansiga ühendamast."
+          ],
+          "id": "terminalRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Muuda suurust"
+          ],
+          "id": "terminalResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saada"
+          ],
+          "id": "terminalSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See seade pole enam volitatud. Ühendamiseks logi uuesti sisse."
+          ],
+          "id": "terminalSignedOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Juurutusega ei saa ühendust."
+          ],
+          "id": "terminalUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{vaatajaid pole} =1{1 vaataja} other{{count} vaatajat}}"
+          ],
+          "id": "terminalViewers",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminaliseansse veel pole."
+          ],
+          "id": "terminalsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminaliseansse ei saanud laadida."
+          ],
+          "id": "terminalsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent"
+          ],
+          "id": "threadAgent",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sinu vastus"
+          ],
+          "id": "threadAnswerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saada vastus"
+          ],
+          "id": "threadAnswerSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent alles töötab. Proovi uuesti, kui ta lõpetab."
+          ],
+          "id": "threadBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent töötab…"
+          ],
+          "id": "threadComposerBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kirjuta agendile"
+          ],
+          "id": "threadComposerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Küsimusele vastati"
+          ],
+          "id": "threadEventAnswered",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent vastas"
+          ],
+          "id": "threadEventAssistant",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Abiline käivitati"
+          ],
+          "id": "threadEventChild",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kontekst uuendati"
+          ],
+          "id": "threadEventMaintenance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Uuendus"
+          ],
+          "id": "threadEventOther",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Plaan esitati"
+          ],
+          "id": "threadEventPlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Viip saadetud"
+          ],
+          "id": "threadEventPrompt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent esitas küsimuse"
+          ],
+          "id": "threadEventQuestions",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Küsimus võeti tagasi"
+          ],
+          "id": "threadEventQuestionsCancelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tööriista kasutati"
+          ],
+          "id": "threadEventTool",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Käik nurjus"
+          ],
+          "id": "threadEventTurnFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Käik lõppes"
+          ],
+          "id": "threadEventTurnFinished",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Käik algas"
+          ],
+          "id": "threadEventTurnStarted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Masina ootamine"
+          ],
+          "id": "threadEventWaitingForMachine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seda lõime ei saanud laadida."
+          ],
+          "id": "threadFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Planeeri"
+          ],
+          "id": "threadModePlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tööta"
+          ],
+          "id": "threadModeWork",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Siin pole veel midagi. Alustamiseks saada viip."
+          ],
+          "id": "threadNoTurns",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kinnita"
+          ],
+          "id": "threadPlanApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Palu muudatusi"
+          ],
+          "id": "threadPlanRevise",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mida tuleks muuta?"
+          ],
+          "id": "threadPlanRevisionHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pakutud plaan"
+          ],
+          "id": "threadPlanTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent küsib"
+          ],
+          "id": "threadQuestionTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saada"
+          ],
+          "id": "threadSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "arhiveeritud"
+          ],
+          "id": "threadStatusArchived",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ettevalmistamisel"
+          ],
+          "id": "threadStatusProvisioning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "valmis"
+          ],
+          "id": "threadStatusReady",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seda teksti ei saa saata."
+          ],
+          "id": "threadTextInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See tekst on saatmiseks liiga pikk."
+          ],
+          "id": "threadTextTooLarge",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 uus} other{{count} uut}}"
+          ],
+          "id": "threadUnread",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pealkirjata lõim"
+          ],
+          "id": "threadUntitled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "töötab"
+          ],
+          "id": "threadWorking",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sina"
+          ],
+          "id": "threadYou",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lõimi veel pole."
+          ],
+          "id": "threadsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lõimed alustatakse brauseris ja need ilmuvad siia."
+          ],
+          "id": "threadsEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lõimi ei saanud laadida."
+          ],
+          "id": "threadsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Siia ilmuvad lõimed, mis töötavad selles masinas."
+          ],
+          "id": "threadsMachineEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ükski lõim ei sobi."
+          ],
+          "id": "threadsNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hiljutised lõimed"
+          ],
+          "id": "threadsRecentTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Otsi lõimi"
+          ],
+          "id": "threadsSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Alusta lõime brauseris"
+          ],
+          "id": "threadsStartInBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{Lugemata pole midagi} =1{1 lugemata uuendus} other{{count} lugemata uuendust}}"
+          ],
+          "id": "threadsUnreadTotal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava lukk"
+          ],
+          "id": "unlock",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aadress"
+          ],
+          "id": "webAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Keegi teine muutis seda seadet. Kuvatakse praegune väärtus; proovi uuesti."
+          ],
+          "id": "webConflict",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aadress kopeeriti."
+          ],
+          "id": "webCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kopeeri"
+          ],
+          "id": "webCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Veebiaadressi ei saanud laadida."
+          ],
+          "id": "webFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "See juurutus ei avalda veebiaadresse."
+          ],
+          "id": "webNoAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ava"
+          ],
+          "id": "webOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Port"
+          ],
+          "id": "webPort",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sisesta port vahemikus 1 kuni 65535."
+          ],
+          "id": "webPortInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Privaatne"
+          ],
+          "id": "webPrivate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seda saavad avada ainult need, kes saavad seda masinat kasutada, pärast brauseris sisselogimist."
+          ],
+          "id": "webPrivateExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Avalik"
+          ],
+          "id": "webPublic",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Igaüks, kellel on see aadress, saab selle avada."
+          ],
+          "id": "webPublicExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Salvesta"
+          ],
+          "id": "webSave",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seaded"
+          ],
+          "id": "webSettings",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Jaga"
+          ],
+          "id": "webShare",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nähtavus"
+          ],
+          "id": "webVisibility",
+          "plural": null
+        }
+      ]
+    }
+  },
+  "locale": "et"
+}

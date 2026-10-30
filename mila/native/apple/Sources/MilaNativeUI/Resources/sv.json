@@ -1,0 +1,2169 @@
+{
+  "domains": {
+    "mila": {
+      "messages": [
+        {
+          "context": null,
+          "forms": [
+            "Klona"
+          ],
+          "id": "actionClone",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skapa"
+          ],
+          "id": "actionCreate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort"
+          ],
+          "id": "actionDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ny maskin"
+          ],
+          "id": "actionNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pausa"
+          ],
+          "id": "actionPause",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fäst"
+          ],
+          "id": "actionPin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ändra storlek"
+          ],
+          "id": "actionResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Återuppta"
+          ],
+          "id": "actionResume",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Starta"
+          ],
+          "id": "actionStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Stoppa"
+          ],
+          "id": "actionStop",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lossa"
+          ],
+          "id": "actionUnpin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lägg till driftsättning"
+          ],
+          "id": "addDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila"
+          ],
+          "id": "appTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Utseende"
+          ],
+          "id": "appearance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mörkt"
+          ],
+          "id": "appearanceDark",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ljust"
+          ],
+          "id": "appearanceLight",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "System"
+          ],
+          "id": "appearanceSystem",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tillbaka"
+          ],
+          "id": "back",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Avbryt"
+          ],
+          "id": "cancel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort {name} och dess disk? Det går inte att ångra."
+          ],
+          "id": "confirmDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 vCPU} other{{count} vCPU:er}}"
+          ],
+          "id": "cpuCount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "overalls.example"
+          ],
+          "id": "deploymentHostHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningens värd"
+          ],
+          "id": "deploymentHostLabel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Öppna"
+          ],
+          "id": "deploymentOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort"
+          ],
+          "id": "deploymentRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort {host} från Mila? Den sparade maskinlistan och den här enhetens aviseringar tas bort. Ditt konto och dina maskiner ändras inte."
+          ],
+          "id": "deploymentRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vald"
+          ],
+          "id": "deploymentSelected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga driftsättningar ännu."
+          ],
+          "id": "deploymentsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningar"
+          ],
+          "id": "deploymentsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Disk (GiB)"
+          ],
+          "id": "diskFieldGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{gib} GiB"
+          ],
+          "id": "diskGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ange ett värdnamn som overalls.example."
+          ],
+          "id": "invalidHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "CPU"
+          ],
+          "id": "kvCpu",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Disk"
+          ],
+          "id": "kvDisk",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Avbildning"
+          ],
+          "id": "kvImage",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Minne"
+          ],
+          "id": "kvMemory",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH-värd"
+          ],
+          "id": "kvSshHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tillstånd"
+          ],
+          "id": "kvState",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Länken kopierades."
+          ],
+          "id": "linkCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kopiera länk"
+          ],
+          "id": "linkCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila kan inte öppna den här länken."
+          ],
+          "id": "linkRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga in på {host} för att öppna den här länken."
+          ],
+          "id": "linkSignInRequired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lägg till {host} som driftsättning för att öppna den här länken."
+          ],
+          "id": "linkUnknownDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lås efter"
+          ],
+          "id": "lockAfter",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "5 minuter"
+          ],
+          "id": "lockAfterFiveMinutes",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "1 minut"
+          ],
+          "id": "lockAfterOneMinute",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Be om fingeravtryck, ansikte eller enhetens lösenkod innan Mila visas."
+          ],
+          "id": "lockExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inte upplåst. Försök igen."
+          ],
+          "id": "lockFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Direkt"
+          ],
+          "id": "lockImmediately",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lås upp Mila"
+          ],
+          "id": "lockReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Applås"
+          ],
+          "id": "lockTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Applås är inte tillgängligt på den här enheten."
+          ],
+          "id": "lockUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila är låst"
+          ],
+          "id": "lockedTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Åtkomst"
+          ],
+          "id": "machineAccess",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Din"
+          ],
+          "id": "machineAccessOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Delad med dig"
+          ],
+          "id": "machineAccessShared",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Arkitektur"
+          ],
+          "id": "machineArchitecture",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Pågår"
+          ],
+          "id": "machineChanging",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skapad"
+          ],
+          "id": "machineCreated",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Begärt"
+          ],
+          "id": "machineDesired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fel"
+          ],
+          "id": "machineFailure",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fel: {reason}"
+          ],
+          "id": "machineFailureReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kontrollera det här värdet."
+          ],
+          "id": "machineFieldInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ID"
+          ],
+          "id": "machineId",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Standard"
+          ],
+          "id": "machineImageDefault",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Läser in maskinen …"
+          ],
+          "id": "machineLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Visa fler"
+          ],
+          "id": "machineMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Namn (valfritt)"
+          ],
+          "id": "machineNameOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här maskinen är inte tillgänglig."
+          ],
+          "id": "machineNotFound",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Profil"
+          ],
+          "id": "machineProfile",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Byter värd"
+          ],
+          "id": "machineRelocating",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Storleken ändras"
+          ],
+          "id": "machineResizing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Arkiv-URL (valfritt)"
+          ],
+          "id": "machineSourceOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Team"
+          ],
+          "id": "machineTeam",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Personlig"
+          ],
+          "id": "machineTeamPersonal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga maskiner ännu."
+          ],
+          "id": "machinesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga maskiner matchar."
+          ],
+          "id": "machinesNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Offline. Visar den senast kända listan."
+          ],
+          "id": "machinesOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "fäst"
+          ],
+          "id": "machinesPinned",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sparad {time}."
+          ],
+          "id": "machinesSavedAt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sök maskiner"
+          ],
+          "id": "machinesSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Maskiner"
+          ],
+          "id": "machinesTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Minne (MiB)"
+          ],
+          "id": "memoryFieldMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{mib} MiB"
+          ],
+          "id": "memoryMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "den här enheten"
+          ],
+          "id": "notificationsCurrentDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Registrerade enheter"
+          ],
+          "id": "notificationsDevices",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga enheter är registrerade."
+          ],
+          "id": "notificationsDevicesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aviseringar talar om när en agent behöver ditt svar. De är krypterade från ände till ände: reläet som levererar dem ser aldrig vad de säger."
+          ],
+          "id": "notificationsExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Så skyddar aviseringar din integritet"
+          ],
+          "id": "notificationsPrivacyLink",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort"
+          ],
+          "id": "notificationsRemoveDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga in på den här driftsättningen för att hantera dess aviseringar."
+          ],
+          "id": "notificationsSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här enheten"
+          ],
+          "id": "notificationsThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aviseringar"
+          ],
+          "id": "notificationsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Stäng av"
+          ],
+          "id": "notificationsTurnOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Slå på"
+          ],
+          "id": "notificationsTurnOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aviseringar är blockerade i systeminställningarna."
+          ],
+          "id": "pushDenied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här driftsättningen har stängt av aviseringar."
+          ],
+          "id": "pushFailedDisabled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila kunde inte förstå svaret."
+          ],
+          "id": "pushFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen eller aviseringsreläet nekade den här enheten."
+          ],
+          "id": "pushFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Öppna Mila för att svara."
+          ],
+          "id": "pushNeedsInputBody",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "En agent behöver ditt svar"
+          ],
+          "id": "pushNeedsInputTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen skickar inte längre aviseringar till den här enheten. Slå på dem igen för att registrera den."
+          ],
+          "id": "pushRevokedExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "misslyckades"
+          ],
+          "id": "pushStateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "av"
+          ],
+          "id": "pushStateOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "på"
+          ],
+          "id": "pushStateOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "registrerar"
+          ],
+          "id": "pushStateRegistering",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "stänger av"
+          ],
+          "id": "pushStateRemoving",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "återkallad"
+          ],
+          "id": "pushStateRevoked",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aviseringar är inte tillgängliga på den här plattformen."
+          ],
+          "id": "pushUnsupported",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Uppdatera"
+          ],
+          "id": "refresh",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Begäran misslyckades."
+          ],
+          "id": "requestFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen nekade begäran."
+          ],
+          "id": "requestRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Klart."
+          ],
+          "id": "requestSucceeded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Väntar på att begäran ska slutföras…"
+          ],
+          "id": "requestWaiting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lämna en storlek tom för att behålla den. En maskin som körs stoppas och startas om; disken kan bara växa."
+          ],
+          "id": "resizeExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ange en ny storlek; disken kan inte krympa."
+          ],
+          "id": "resizeNothing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Försök igen"
+          ],
+          "id": "retry",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Offline"
+          ],
+          "id": "settingsOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inloggad"
+          ],
+          "id": "settingsSignedIn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inställningar"
+          ],
+          "id": "settingsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "förvaltare"
+          ],
+          "id": "shareRoleManager",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "operatör"
+          ],
+          "id": "shareRoleOperator",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ägare"
+          ],
+          "id": "shareRoleOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "läsare"
+          ],
+          "id": "shareRoleViewer",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Dela"
+          ],
+          "id": "sharingAdd",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "E-post"
+          ],
+          "id": "sharingEmail",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ange en e-postadress."
+          ],
+          "id": "sharingEmailInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inte delad med någon."
+          ],
+          "id": "sharingEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Delningen kunde inte läsas in."
+          ],
+          "id": "sharingFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Visa fler"
+          ],
+          "id": "sharingMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort"
+          ],
+          "id": "sharingRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ta bort åtkomsten för {email}?"
+          ],
+          "id": "sharingRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Roll"
+          ],
+          "id": "sharingRole",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Delning"
+          ],
+          "id": "sharingTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Konto"
+          ],
+          "id": "signInAccount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Godkänn den här enheten i webbläsaren och återvänd sedan hit. Håll Mila öppen tills du har godkänt den."
+          ],
+          "id": "signInApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ansluter till {host}…"
+          ],
+          "id": "signInConnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Anslutningen till den här driftsättningen stängdes."
+          ],
+          "id": "signInDisconnected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Godkännandelänken är inte längre giltig. Börja om för att få en ny."
+          ],
+          "id": "signInExpired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila kunde inte öppna den här enhetens nyckel och anslöt därför inte."
+          ],
+          "id": "signInFailedDeviceKey",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Värden visade inget certifikat från sin publicerade utfärdare, så Mila anslöt inte."
+          ],
+          "id": "signInFailedHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen skickade ett svar som Mila inte förstår."
+          ],
+          "id": "signInFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen nekade den här enheten."
+          ],
+          "id": "signInFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen kan inte nås."
+          ],
+          "id": "signInFailedUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nyckelns fingeravtryck"
+          ],
+          "id": "signInFingerprint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Öppna godkännandesidan"
+          ],
+          "id": "signInOpenBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Öppna maskiner"
+          ],
+          "id": "signInOpenMachines",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Anslutningsinställningarna för den här driftsättningen är ogiltiga, så Mila anslöt inte."
+          ],
+          "id": "signInProfileInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Anslut igen"
+          ],
+          "id": "signInReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga ut"
+          ],
+          "id": "signInSignOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga in med webbläsaren"
+          ],
+          "id": "signInStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga in"
+          ],
+          "id": "signInTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Typ"
+          ],
+          "id": "sshKeyAlgorithm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Återkalla"
+          ],
+          "id": "sshKeyRevoke",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Återkalla nyckeln {fingerprint}? En enhet som använder den måste godkännas igen för att logga in."
+          ],
+          "id": "sshKeyRevokeConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här enheten"
+          ],
+          "id": "sshKeyThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Namnlös nyckel"
+          ],
+          "id": "sshKeyUnlabelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga godkända nycklar."
+          ],
+          "id": "sshKeysEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nycklar som får logga in på ditt konto i den här driftsättningen. En återkallad nyckel måste godkännas igen innan den kan logga in."
+          ],
+          "id": "sshKeysExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Det gick inte att läsa in nycklarna."
+          ],
+          "id": "sshKeysFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Läser in nycklar…"
+          ],
+          "id": "sshKeysLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Logga in för att se kontots nycklar."
+          ],
+          "id": "sshKeysSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH-nycklar"
+          ],
+          "id": "sshKeysTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "borttagen"
+          ],
+          "id": "stateDeleted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "tas bort"
+          ],
+          "id": "stateDeleting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "misslyckad"
+          ],
+          "id": "stateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "pausad"
+          ],
+          "id": "statePaused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "väntar"
+          ],
+          "id": "statePending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "återupptar"
+          ],
+          "id": "stateResuming",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "körs"
+          ],
+          "id": "stateRunning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "startar"
+          ],
+          "id": "stateStarting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "stoppad"
+          ],
+          "id": "stateStopped",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "stoppas"
+          ],
+          "id": "stateStopping",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "försätter i viloläge"
+          ],
+          "id": "stateSuspending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "otillgänglig"
+          ],
+          "id": "stateUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "okänd"
+          ],
+          "id": "stateUnknown",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Info"
+          ],
+          "id": "tabInfo",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminaler"
+          ],
+          "id": "tabTerminals",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Trådar"
+          ],
+          "id": "tabThreads",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Webb"
+          ],
+          "id": "tabWeb",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Anslut"
+          ],
+          "id": "terminalAttach",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ansluter"
+          ],
+          "id": "terminalAttaching",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Stäng"
+          ],
+          "id": "terminalClose",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Stänga den här terminalsessionen för alla som är anslutna? Program som körs i den stoppas."
+          ],
+          "id": "terminalCloseConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "stängs"
+          ],
+          "id": "terminalClosing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminalsessionen avslutades."
+          ],
+          "id": "terminalEnded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila kunde inte ansluta till den här terminalsessionen."
+          ],
+          "id": "terminalInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "live"
+          ],
+          "id": "terminalLive",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "min"
+          ],
+          "id": "terminalMine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Styr"
+          ],
+          "id": "terminalModeControl",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Visa"
+          ],
+          "id": "terminalModeView",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ny terminal"
+          ],
+          "id": "terminalNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Klistra in"
+          ],
+          "id": "terminalPaste",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "endast visning"
+          ],
+          "id": "terminalReadOnly",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Anslut igen"
+          ],
+          "id": "terminalReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "återansluter"
+          ],
+          "id": "terminalReconnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen nekade anslutning till den här terminalsessionen."
+          ],
+          "id": "terminalRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ändra storlek"
+          ],
+          "id": "terminalResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skicka"
+          ],
+          "id": "terminalSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här enheten är inte längre auktoriserad. Logga in igen för att ansluta."
+          ],
+          "id": "terminalSignedOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Driftsättningen kan inte nås."
+          ],
+          "id": "terminalUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{inga tittare} =1{1 tittare} other{{count} tittare}}"
+          ],
+          "id": "terminalViewers",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga terminalsessioner ännu."
+          ],
+          "id": "terminalsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminalsessionerna kunde inte läsas in."
+          ],
+          "id": "terminalsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent"
+          ],
+          "id": "threadAgent",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ditt svar"
+          ],
+          "id": "threadAnswerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skicka svar"
+          ],
+          "id": "threadAnswerSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agenten arbetar fortfarande. Försök igen när den är klar."
+          ],
+          "id": "threadBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agenten arbetar…"
+          ],
+          "id": "threadComposerBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skriv till agenten"
+          ],
+          "id": "threadComposerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Frågan besvarad"
+          ],
+          "id": "threadEventAnswered",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agenten svarade"
+          ],
+          "id": "threadEventAssistant",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hjälpagent startad"
+          ],
+          "id": "threadEventChild",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kontext uppdaterad"
+          ],
+          "id": "threadEventMaintenance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Uppdatering"
+          ],
+          "id": "threadEventOther",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Plan föreslagen"
+          ],
+          "id": "threadEventPlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Prompt skickad"
+          ],
+          "id": "threadEventPrompt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agenten ställde en fråga"
+          ],
+          "id": "threadEventQuestions",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Frågan återkallad"
+          ],
+          "id": "threadEventQuestionsCancelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Verktyg använt"
+          ],
+          "id": "threadEventTool",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tur misslyckades"
+          ],
+          "id": "threadEventTurnFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tur klar"
+          ],
+          "id": "threadEventTurnFinished",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tur påbörjad"
+          ],
+          "id": "threadEventTurnStarted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Väntar på maskinen"
+          ],
+          "id": "threadEventWaitingForMachine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här tråden kunde inte läsas in."
+          ],
+          "id": "threadFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Planera"
+          ],
+          "id": "threadModePlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Arbeta"
+          ],
+          "id": "threadModeWork",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inget här ännu. Skicka en prompt för att börja."
+          ],
+          "id": "threadNoTurns",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Godkänn"
+          ],
+          "id": "threadPlanApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Be om ändringar"
+          ],
+          "id": "threadPlanRevise",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vad ska ändras?"
+          ],
+          "id": "threadPlanRevisionHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Föreslagen plan"
+          ],
+          "id": "threadPlanTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agenten frågar"
+          ],
+          "id": "threadQuestionTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Skicka"
+          ],
+          "id": "threadSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "arkiverad"
+          ],
+          "id": "threadStatusArchived",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "förbereds"
+          ],
+          "id": "threadStatusProvisioning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "redo"
+          ],
+          "id": "threadStatusReady",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här texten kan inte skickas."
+          ],
+          "id": "threadTextInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här texten är för lång för att skickas."
+          ],
+          "id": "threadTextTooLarge",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 ny} other{{count} nya}}"
+          ],
+          "id": "threadUnread",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Namnlös tråd"
+          ],
+          "id": "threadUntitled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "arbetar"
+          ],
+          "id": "threadWorking",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Du"
+          ],
+          "id": "threadYou",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga trådar ännu."
+          ],
+          "id": "threadsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Trådar startas i webbläsaren och visas här."
+          ],
+          "id": "threadsEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Trådarna kunde inte läsas in."
+          ],
+          "id": "threadsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Trådar som arbetar på den här maskinen visas här."
+          ],
+          "id": "threadsMachineEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inga trådar matchar."
+          ],
+          "id": "threadsNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Senaste trådar"
+          ],
+          "id": "threadsRecentTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sök trådar"
+          ],
+          "id": "threadsSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Starta en tråd i webbläsaren"
+          ],
+          "id": "threadsStartInBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{Inget oläst} =1{1 oläst uppdatering} other{{count} olästa uppdateringar}}"
+          ],
+          "id": "threadsUnreadTotal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lås upp"
+          ],
+          "id": "unlock",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Adress"
+          ],
+          "id": "webAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Någon annan ändrade den här inställningen. Det aktuella värdet visas; försök igen."
+          ],
+          "id": "webConflict",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Adressen kopierades."
+          ],
+          "id": "webCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Kopiera"
+          ],
+          "id": "webCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Webbadressen kunde inte läsas in."
+          ],
+          "id": "webFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Den här driftsättningen publicerar inga webbadresser."
+          ],
+          "id": "webNoAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Öppna"
+          ],
+          "id": "webOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Port"
+          ],
+          "id": "webPort",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ange en port från 1 till 65535."
+          ],
+          "id": "webPortInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Privat"
+          ],
+          "id": "webPrivate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Bara de som kan använda den här maskinen kan öppna den, efter inloggning i webbläsaren."
+          ],
+          "id": "webPrivateExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Offentlig"
+          ],
+          "id": "webPublic",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Alla som har den här adressen kan öppna den."
+          ],
+          "id": "webPublicExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Spara"
+          ],
+          "id": "webSave",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Inställningar"
+          ],
+          "id": "webSettings",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Dela"
+          ],
+          "id": "webShare",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Synlighet"
+          ],
+          "id": "webVisibility",
+          "plural": null
+        }
+      ]
+    }
+  },
+  "locale": "sv"
+}

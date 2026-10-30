@@ -42,7 +42,7 @@ public final class MilaAppLockController: ObservableObject {
 
     /// The controller is the single lifecycle boundary for app locking. The enabled preference
     /// is durable, while an unlocked state is deliberately process-scoped and never persisted.
-    public init(enabled: Bool? = nil, reason: String = MilaStrings.text(.lockExplain), evaluator: any MilaBiometricEvaluator = LocalAuthenticationEvaluator(), defaults: UserDefaults = .standard) {
+    public init(enabled: Bool? = nil, reason: String = MilaStrings.text(.lockReason), evaluator: any MilaBiometricEvaluator = LocalAuthenticationEvaluator(), defaults: UserDefaults = .standard) {
         self.evaluator = evaluator
         self.reason = reason
         self.defaults = defaults
@@ -116,7 +116,7 @@ public struct MilaAppLockView<Content: View>: View {
             case .locked, .failed:
                 VStack(spacing: 12) {
                     Image(systemName: "lock.fill")
-                    Text(MilaStrings.text(.lockTitle)).font(.title2)
+                    Text(MilaStrings.text(.lockedTitle)).font(.title2)
                     Button(MilaStrings.text(.lockUnlock)) { Task { await controller.unlock() } }
                     if controller.state == .failed { Text(MilaStrings.text(.lockFailed)).font(.caption) }
                 }.padding()

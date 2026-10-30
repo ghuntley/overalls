@@ -1,0 +1,2169 @@
+{
+  "domains": {
+    "mila": {
+      "messages": [
+        {
+          "context": null,
+          "forms": [
+            "Cloner"
+          ],
+          "id": "actionClone",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Créer"
+          ],
+          "id": "actionCreate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Supprimer"
+          ],
+          "id": "actionDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nouvelle machine"
+          ],
+          "id": "actionNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Suspendre"
+          ],
+          "id": "actionPause",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Épingler"
+          ],
+          "id": "actionPin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Redimensionner"
+          ],
+          "id": "actionResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Reprendre"
+          ],
+          "id": "actionResume",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Démarrer"
+          ],
+          "id": "actionStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Arrêter"
+          ],
+          "id": "actionStop",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Désépingler"
+          ],
+          "id": "actionUnpin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ajouter un déploiement"
+          ],
+          "id": "addDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila"
+          ],
+          "id": "appTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Apparence"
+          ],
+          "id": "appearance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sombre"
+          ],
+          "id": "appearanceDark",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Clair"
+          ],
+          "id": "appearanceLight",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Système"
+          ],
+          "id": "appearanceSystem",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retour"
+          ],
+          "id": "back",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Annuler"
+          ],
+          "id": "cancel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Supprimer {name} et son disque ? Cette action est irréversible."
+          ],
+          "id": "confirmDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 vCPU} other{{count} vCPU}}"
+          ],
+          "id": "cpuCount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "overalls.example"
+          ],
+          "id": "deploymentHostHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hôte du déploiement"
+          ],
+          "id": "deploymentHostLabel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ouvrir"
+          ],
+          "id": "deploymentOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retirer"
+          ],
+          "id": "deploymentRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retirer {host} de Mila ? Sa liste de machines enregistrée et les notifications de cet appareil sont supprimées. Votre compte et vos machines ne changent pas."
+          ],
+          "id": "deploymentRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Sélectionné"
+          ],
+          "id": "deploymentSelected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucun déploiement pour l’instant."
+          ],
+          "id": "deploymentsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Déploiements"
+          ],
+          "id": "deploymentsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Disque (Gio)"
+          ],
+          "id": "diskFieldGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{gib} GiB"
+          ],
+          "id": "diskGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saisissez un nom d’hôte tel que overalls.example."
+          ],
+          "id": "invalidHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "CPU"
+          ],
+          "id": "kvCpu",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Disque"
+          ],
+          "id": "kvDisk",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Image"
+          ],
+          "id": "kvImage",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mémoire"
+          ],
+          "id": "kvMemory",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hôte SSH"
+          ],
+          "id": "kvSshHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "État"
+          ],
+          "id": "kvState",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lien copié."
+          ],
+          "id": "linkCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Copier le lien"
+          ],
+          "id": "linkCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila ne peut pas ouvrir ce lien."
+          ],
+          "id": "linkRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connectez-vous à {host} pour ouvrir ce lien."
+          ],
+          "id": "linkSignInRequired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ajoutez {host} comme déploiement pour ouvrir ce lien."
+          ],
+          "id": "linkUnknownDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Verrouiller après"
+          ],
+          "id": "lockAfter",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "5 minutes"
+          ],
+          "id": "lockAfterFiveMinutes",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "1 minute"
+          ],
+          "id": "lockAfterOneMinute",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Demander votre empreinte, votre visage ou le code de l'appareil avant d'afficher Mila."
+          ],
+          "id": "lockExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Non déverrouillée. Réessayez."
+          ],
+          "id": "lockFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Immédiatement"
+          ],
+          "id": "lockImmediately",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Déverrouiller Mila"
+          ],
+          "id": "lockReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Verrouillage de l'app"
+          ],
+          "id": "lockTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le verrouillage de l'app n'est pas disponible sur cet appareil."
+          ],
+          "id": "lockUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila est verrouillée"
+          ],
+          "id": "lockedTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Accès"
+          ],
+          "id": "machineAccess",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "À vous"
+          ],
+          "id": "machineAccessOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Partagée avec vous"
+          ],
+          "id": "machineAccessShared",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Architecture"
+          ],
+          "id": "machineArchitecture",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "En cours"
+          ],
+          "id": "machineChanging",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Créée"
+          ],
+          "id": "machineCreated",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Demandé"
+          ],
+          "id": "machineDesired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Échec"
+          ],
+          "id": "machineFailure",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Échec : {reason}"
+          ],
+          "id": "machineFailureReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vérifiez cette valeur."
+          ],
+          "id": "machineFieldInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ID"
+          ],
+          "id": "machineId",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Par défaut"
+          ],
+          "id": "machineImageDefault",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Chargement de cette machine…"
+          ],
+          "id": "machineLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Afficher plus"
+          ],
+          "id": "machineMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nom (facultatif)"
+          ],
+          "id": "machineNameOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Cette machine n’est pas disponible."
+          ],
+          "id": "machineNotFound",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Profil"
+          ],
+          "id": "machineProfile",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Changement d’hôte"
+          ],
+          "id": "machineRelocating",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Redimensionnement"
+          ],
+          "id": "machineResizing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "URL du dépôt (facultatif)"
+          ],
+          "id": "machineSourceOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Équipe"
+          ],
+          "id": "machineTeam",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Personnelle"
+          ],
+          "id": "machineTeamPersonal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucune machine pour l’instant."
+          ],
+          "id": "machinesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucune machine ne correspond."
+          ],
+          "id": "machinesNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hors ligne. Affichage de la dernière liste connue."
+          ],
+          "id": "machinesOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "épinglée"
+          ],
+          "id": "machinesPinned",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Enregistrée à {time}."
+          ],
+          "id": "machinesSavedAt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rechercher des machines"
+          ],
+          "id": "machinesSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Machines"
+          ],
+          "id": "machinesTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mémoire (Mio)"
+          ],
+          "id": "memoryFieldMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{mib} MiB"
+          ],
+          "id": "memoryMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "cet appareil"
+          ],
+          "id": "notificationsCurrentDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Appareils enregistrés"
+          ],
+          "id": "notificationsDevices",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucun appareil n'est enregistré."
+          ],
+          "id": "notificationsDevicesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les notifications vous préviennent quand un agent a besoin de votre réponse. Elles sont chiffrées de bout en bout : le relais qui les distribue ne voit jamais leur contenu."
+          ],
+          "id": "notificationsExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Comment les notifications protègent votre vie privée"
+          ],
+          "id": "notificationsPrivacyLink",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retirer"
+          ],
+          "id": "notificationsRemoveDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connectez-vous à ce déploiement pour gérer ses notifications."
+          ],
+          "id": "notificationsSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Cet appareil"
+          ],
+          "id": "notificationsThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Notifications"
+          ],
+          "id": "notificationsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Désactiver"
+          ],
+          "id": "notificationsTurnOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Activer"
+          ],
+          "id": "notificationsTurnOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les notifications sont bloquées dans les réglages du système."
+          ],
+          "id": "pushDenied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ce déploiement a désactivé les notifications."
+          ],
+          "id": "pushFailedDisabled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila n'a pas compris la réponse."
+          ],
+          "id": "pushFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement ou le relais de notifications a refusé cet appareil."
+          ],
+          "id": "pushFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ouvrez Mila pour répondre."
+          ],
+          "id": "pushNeedsInputBody",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Un agent a besoin de votre réponse"
+          ],
+          "id": "pushNeedsInputTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement n'envoie plus de notifications à cet appareil. Réactivez-les pour l'enregistrer."
+          ],
+          "id": "pushRevokedExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "échec"
+          ],
+          "id": "pushStateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "désactivées"
+          ],
+          "id": "pushStateOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "activées"
+          ],
+          "id": "pushStateOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "enregistrement"
+          ],
+          "id": "pushStateRegistering",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "désactivation"
+          ],
+          "id": "pushStateRemoving",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "révoqué"
+          ],
+          "id": "pushStateRevoked",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les notifications ne sont pas disponibles sur cette plateforme."
+          ],
+          "id": "pushUnsupported",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Actualiser"
+          ],
+          "id": "refresh",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "La demande a échoué."
+          ],
+          "id": "requestFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement a refusé la demande."
+          ],
+          "id": "requestRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminé."
+          ],
+          "id": "requestSucceeded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "En attente de la fin de la demande…"
+          ],
+          "id": "requestWaiting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Laissez une taille vide pour la conserver. Une machine en marche s’arrête puis redémarre ; le disque ne peut que grandir."
+          ],
+          "id": "resizeExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saisissez une nouvelle taille ; le disque ne peut pas rétrécir."
+          ],
+          "id": "resizeNothing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Réessayer"
+          ],
+          "id": "retry",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Hors ligne"
+          ],
+          "id": "settingsOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connecté"
+          ],
+          "id": "settingsSignedIn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Réglages"
+          ],
+          "id": "settingsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "gestionnaire"
+          ],
+          "id": "shareRoleManager",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "opérateur"
+          ],
+          "id": "shareRoleOperator",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "propriétaire"
+          ],
+          "id": "shareRoleOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "lecteur"
+          ],
+          "id": "shareRoleViewer",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Partager"
+          ],
+          "id": "sharingAdd",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "E-mail"
+          ],
+          "id": "sharingEmail",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saisissez une adresse e-mail."
+          ],
+          "id": "sharingEmailInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Partagée avec personne."
+          ],
+          "id": "sharingEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger le partage."
+          ],
+          "id": "sharingFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Afficher plus"
+          ],
+          "id": "sharingMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retirer"
+          ],
+          "id": "sharingRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Retirer l’accès de {email} ?"
+          ],
+          "id": "sharingRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rôle"
+          ],
+          "id": "sharingRole",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Partage"
+          ],
+          "id": "sharingTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Compte"
+          ],
+          "id": "signInAccount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Approuvez cet appareil dans votre navigateur, puis revenez ici. Gardez Mila ouverte jusqu’à ce que vous l’ayez approuvé."
+          ],
+          "id": "signInApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connexion à {host}…"
+          ],
+          "id": "signInConnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "La connexion à ce déploiement a été fermée."
+          ],
+          "id": "signInDisconnected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le lien d’approbation n’est plus valide. Recommencez pour en obtenir un nouveau."
+          ],
+          "id": "signInExpired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila n'a pas pu ouvrir la clé de cet appareil et ne s'est donc pas connecté."
+          ],
+          "id": "signInFailedDeviceKey",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Cet hôte n’a pas présenté de certificat émis par son autorité publiée, Mila ne s’est donc pas connectée."
+          ],
+          "id": "signInFailedHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement a envoyé une réponse que Mila ne comprend pas."
+          ],
+          "id": "signInFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement a refusé cet appareil."
+          ],
+          "id": "signInFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement est injoignable."
+          ],
+          "id": "signInFailedUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Empreinte de la clé"
+          ],
+          "id": "signInFingerprint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ouvrir la page d’approbation"
+          ],
+          "id": "signInOpenBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ouvrir les machines"
+          ],
+          "id": "signInOpenMachines",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les paramètres de connexion de ce déploiement ne sont pas valides, Mila ne s'est donc pas connecté."
+          ],
+          "id": "signInProfileInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Se reconnecter"
+          ],
+          "id": "signInReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Se déconnecter"
+          ],
+          "id": "signInSignOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Se connecter avec le navigateur"
+          ],
+          "id": "signInStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connexion"
+          ],
+          "id": "signInTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Type"
+          ],
+          "id": "sshKeyAlgorithm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Révoquer"
+          ],
+          "id": "sshKeyRevoke",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Révoquer la clé {fingerprint} ? L’appareil qui l’utilise devra être de nouveau approuvé pour se connecter."
+          ],
+          "id": "sshKeyRevokeConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Cet appareil"
+          ],
+          "id": "sshKeyThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Clé sans nom"
+          ],
+          "id": "sshKeyUnlabelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucune clé approuvée."
+          ],
+          "id": "sshKeysEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Clés autorisées à se connecter à votre compte sur ce déploiement. Une clé révoquée doit être de nouveau approuvée avant de pouvoir se connecter."
+          ],
+          "id": "sshKeysExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger les clés."
+          ],
+          "id": "sshKeysFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Chargement des clés…"
+          ],
+          "id": "sshKeysLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Connectez-vous pour voir les clés de ce compte."
+          ],
+          "id": "sshKeysSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Clés SSH"
+          ],
+          "id": "sshKeysTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "supprimée"
+          ],
+          "id": "stateDeleted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "suppression"
+          ],
+          "id": "stateDeleting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "en échec"
+          ],
+          "id": "stateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "en pause"
+          ],
+          "id": "statePaused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "en attente"
+          ],
+          "id": "statePending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "reprise en cours"
+          ],
+          "id": "stateResuming",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "en marche"
+          ],
+          "id": "stateRunning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "démarrage"
+          ],
+          "id": "stateStarting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "arrêtée"
+          ],
+          "id": "stateStopped",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "arrêt"
+          ],
+          "id": "stateStopping",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "suspension en cours"
+          ],
+          "id": "stateSuspending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "indisponible"
+          ],
+          "id": "stateUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "inconnu"
+          ],
+          "id": "stateUnknown",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Infos"
+          ],
+          "id": "tabInfo",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Terminaux"
+          ],
+          "id": "tabTerminals",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fils"
+          ],
+          "id": "tabThreads",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Web"
+          ],
+          "id": "tabWeb",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rejoindre"
+          ],
+          "id": "terminalAttach",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "connexion"
+          ],
+          "id": "terminalAttaching",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fermer"
+          ],
+          "id": "terminalClose",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fermer cette session de terminal pour toutes les personnes connectées ? Les programmes qui y tournent s’arrêtent."
+          ],
+          "id": "terminalCloseConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "fermeture"
+          ],
+          "id": "terminalClosing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "La session de terminal est terminée."
+          ],
+          "id": "terminalEnded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila n’a pas pu rejoindre cette session de terminal."
+          ],
+          "id": "terminalInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "en direct"
+          ],
+          "id": "terminalLive",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "à moi"
+          ],
+          "id": "terminalMine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Contrôler"
+          ],
+          "id": "terminalModeControl",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Regarder"
+          ],
+          "id": "terminalModeView",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Nouveau terminal"
+          ],
+          "id": "terminalNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Coller"
+          ],
+          "id": "terminalPaste",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "lecture seule"
+          ],
+          "id": "terminalReadOnly",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Se reconnecter"
+          ],
+          "id": "terminalReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "reconnexion"
+          ],
+          "id": "terminalReconnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement a refusé l’accès à cette session de terminal."
+          ],
+          "id": "terminalRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Redimensionner"
+          ],
+          "id": "terminalResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Envoyer"
+          ],
+          "id": "terminalSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Cet appareil n’est plus autorisé. Reconnectez-vous pour rejoindre la session."
+          ],
+          "id": "terminalSignedOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Le déploiement est injoignable."
+          ],
+          "id": "terminalUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{aucun spectateur} =1{1 spectateur} other{{count} spectateurs}}"
+          ],
+          "id": "terminalViewers",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucune session de terminal pour l’instant."
+          ],
+          "id": "terminalsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger les sessions de terminal."
+          ],
+          "id": "terminalsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Agent"
+          ],
+          "id": "threadAgent",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Votre réponse"
+          ],
+          "id": "threadAnswerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Envoyer la réponse"
+          ],
+          "id": "threadAnswerSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "L’agent travaille encore. Réessayez quand il aura fini."
+          ],
+          "id": "threadBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "L’agent travaille…"
+          ],
+          "id": "threadComposerBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Écrire à l’agent"
+          ],
+          "id": "threadComposerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Question répondue"
+          ],
+          "id": "threadEventAnswered",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "L’agent a répondu"
+          ],
+          "id": "threadEventAssistant",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Assistant démarré"
+          ],
+          "id": "threadEventChild",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Contexte mis à jour"
+          ],
+          "id": "threadEventMaintenance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mise à jour"
+          ],
+          "id": "threadEventOther",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Plan proposé"
+          ],
+          "id": "threadEventPlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Message envoyé"
+          ],
+          "id": "threadEventPrompt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "L’agent a posé une question"
+          ],
+          "id": "threadEventQuestions",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Question retirée"
+          ],
+          "id": "threadEventQuestionsCancelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Outil utilisé"
+          ],
+          "id": "threadEventTool",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tour en échec"
+          ],
+          "id": "threadEventTurnFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tour terminé"
+          ],
+          "id": "threadEventTurnFinished",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Tour commencé"
+          ],
+          "id": "threadEventTurnStarted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "En attente de la machine"
+          ],
+          "id": "threadEventWaitingForMachine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger ce fil."
+          ],
+          "id": "threadFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Planifier"
+          ],
+          "id": "threadModePlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Travailler"
+          ],
+          "id": "threadModeWork",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rien pour l’instant. Envoyez un message pour commencer."
+          ],
+          "id": "threadNoTurns",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Approuver"
+          ],
+          "id": "threadPlanApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Demander des modifications"
+          ],
+          "id": "threadPlanRevise",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Que faut-il changer ?"
+          ],
+          "id": "threadPlanRevisionHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Plan proposé"
+          ],
+          "id": "threadPlanTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "L’agent demande"
+          ],
+          "id": "threadQuestionTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Envoyer"
+          ],
+          "id": "threadSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "archivé"
+          ],
+          "id": "threadStatusArchived",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "préparation"
+          ],
+          "id": "threadStatusProvisioning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "prêt"
+          ],
+          "id": "threadStatusReady",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ce texte ne peut pas être envoyé."
+          ],
+          "id": "threadTextInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ce texte est trop long pour être envoyé."
+          ],
+          "id": "threadTextTooLarge",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1 nouveau} other{{count} nouveaux}}"
+          ],
+          "id": "threadUnread",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fil sans titre"
+          ],
+          "id": "threadUntitled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "au travail"
+          ],
+          "id": "threadWorking",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Vous"
+          ],
+          "id": "threadYou",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucun fil pour l’instant."
+          ],
+          "id": "threadsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les fils se lancent dans le navigateur et apparaissent ici."
+          ],
+          "id": "threadsEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger les fils."
+          ],
+          "id": "threadsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Les fils qui travaillent sur cette machine apparaissent ici."
+          ],
+          "id": "threadsMachineEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Aucun fil ne correspond."
+          ],
+          "id": "threadsNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Fils récents"
+          ],
+          "id": "threadsRecentTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Rechercher des fils"
+          ],
+          "id": "threadsSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Lancer un fil dans le navigateur"
+          ],
+          "id": "threadsStartInBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{Rien de non lu} =1{1 mise à jour non lue} other{{count} mises à jour non lues}}"
+          ],
+          "id": "threadsUnreadTotal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Déverrouiller"
+          ],
+          "id": "unlock",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Adresse"
+          ],
+          "id": "webAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Quelqu’un d’autre a modifié ce paramètre. La valeur actuelle est affichée ; réessayez."
+          ],
+          "id": "webConflict",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Adresse copiée."
+          ],
+          "id": "webCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Copier"
+          ],
+          "id": "webCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Impossible de charger l’adresse web."
+          ],
+          "id": "webFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ce déploiement ne publie pas d’adresses web."
+          ],
+          "id": "webNoAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Ouvrir"
+          ],
+          "id": "webOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Port"
+          ],
+          "id": "webPort",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Saisissez un port entre 1 et 65535."
+          ],
+          "id": "webPortInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Privée"
+          ],
+          "id": "webPrivate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Seules les personnes pouvant utiliser cette machine peuvent l’ouvrir, après connexion dans leur navigateur."
+          ],
+          "id": "webPrivateExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Publique"
+          ],
+          "id": "webPublic",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Toute personne disposant de cette adresse peut l’ouvrir."
+          ],
+          "id": "webPublicExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Enregistrer"
+          ],
+          "id": "webSave",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Paramètres"
+          ],
+          "id": "webSettings",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Partager"
+          ],
+          "id": "webShare",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Visibilité"
+          ],
+          "id": "webVisibility",
+          "plural": null
+        }
+      ]
+    }
+  },
+  "locale": "fr"
+}

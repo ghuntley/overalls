@@ -1,0 +1,2169 @@
+{
+  "domains": {
+    "mila": {
+      "messages": [
+        {
+          "context": null,
+          "forms": [
+            "ক্লোন করুন"
+          ],
+          "id": "actionClone",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "তৈরি করুন"
+          ],
+          "id": "actionCreate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মুছুন"
+          ],
+          "id": "actionDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নতুন মেশিন"
+          ],
+          "id": "actionNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "স্থগিত করুন"
+          ],
+          "id": "actionPause",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পিন করুন"
+          ],
+          "id": "actionPin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আকার বদলান"
+          ],
+          "id": "actionResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পুনরায় চালু করুন"
+          ],
+          "id": "actionResume",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চালু করুন"
+          ],
+          "id": "actionStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ করুন"
+          ],
+          "id": "actionStop",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পিন সরান"
+          ],
+          "id": "actionUnpin",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট যোগ করুন"
+          ],
+          "id": "addDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila"
+          ],
+          "id": "appTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চেহারা"
+          ],
+          "id": "appearance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "গাঢ়"
+          ],
+          "id": "appearanceDark",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "হালকা"
+          ],
+          "id": "appearanceLight",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সিস্টেম"
+          ],
+          "id": "appearanceSystem",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পিছনে"
+          ],
+          "id": "back",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বাতিল"
+          ],
+          "id": "cancel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{name} ও তার ডিস্ক মুছবেন? এটি আর ফেরানো যাবে না।"
+          ],
+          "id": "confirmDelete",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1টি vCPU} other{{count}টি vCPU}}"
+          ],
+          "id": "cpuCount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "overalls.example"
+          ],
+          "id": "deploymentHostHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট হোস্ট"
+          ],
+          "id": "deploymentHostLabel",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "খুলুন"
+          ],
+          "id": "deploymentOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সরান"
+          ],
+          "id": "deploymentRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila থেকে {host} সরাবেন? এর সংরক্ষিত মেশিনের তালিকা এবং এই ডিভাইসের বিজ্ঞপ্তি সরানো হবে। আপনার অ্যাকাউন্ট ও মেশিন বদলাবে না।"
+          ],
+          "id": "deploymentRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নির্বাচিত"
+          ],
+          "id": "deploymentSelected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এখনও কোনো ডিপ্লয়মেন্ট নেই।"
+          ],
+          "id": "deploymentsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট"
+          ],
+          "id": "deploymentsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিস্ক (GiB)"
+          ],
+          "id": "diskFieldGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{gib} GiB"
+          ],
+          "id": "diskGib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "overalls.example-এর মতো একটি হোস্ট নাম লিখুন।"
+          ],
+          "id": "invalidHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "CPU"
+          ],
+          "id": "kvCpu",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিস্ক"
+          ],
+          "id": "kvDisk",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ইমেজ"
+          ],
+          "id": "kvImage",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেমরি"
+          ],
+          "id": "kvMemory",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH হোস্ট"
+          ],
+          "id": "kvSshHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অবস্থা"
+          ],
+          "id": "kvState",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "লিংক কপি হয়েছে।"
+          ],
+          "id": "linkCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "লিংক কপি করুন"
+          ],
+          "id": "linkCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila এই লিঙ্কটি খুলতে পারে না।"
+          ],
+          "id": "linkRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই লিংকটি খুলতে {host}-এ সাইন ইন করুন।"
+          ],
+          "id": "linkSignInRequired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই লিঙ্কটি খুলতে {host} ডিপ্লয়মেন্ট হিসেবে যোগ করুন।"
+          ],
+          "id": "linkUnknownDeployment",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "লক হবে"
+          ],
+          "id": "lockAfter",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "৫ মিনিট পরে"
+          ],
+          "id": "lockAfterFiveMinutes",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "১ মিনিট পরে"
+          ],
+          "id": "lockAfterOneMinute",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila দেখানোর আগে আঙুলের ছাপ, মুখ বা ডিভাইসের পাসকোড চাওয়া হবে।"
+          ],
+          "id": "lockExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আনলক হয়নি। আবার চেষ্টা করুন।"
+          ],
+          "id": "lockFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সঙ্গে সঙ্গে"
+          ],
+          "id": "lockImmediately",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila আনলক করুন"
+          ],
+          "id": "lockReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অ্যাপ লক"
+          ],
+          "id": "lockTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিভাইসে অ্যাপ লক পাওয়া যায় না।"
+          ],
+          "id": "lockUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila লক করা আছে"
+          ],
+          "id": "lockedTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অ্যাক্সেস"
+          ],
+          "id": "machineAccess",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আপনার"
+          ],
+          "id": "machineAccessOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আপনার সাথে শেয়ার করা"
+          ],
+          "id": "machineAccessShared",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আর্কিটেকচার"
+          ],
+          "id": "machineArchitecture",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চলমান"
+          ],
+          "id": "machineChanging",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "তৈরি"
+          ],
+          "id": "machineCreated",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুরোধ করা"
+          ],
+          "id": "machineDesired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যর্থতা"
+          ],
+          "id": "machineFailure",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যর্থতা: {reason}"
+          ],
+          "id": "machineFailureReason",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই মানটি যাচাই করুন।"
+          ],
+          "id": "machineFieldInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আইডি"
+          ],
+          "id": "machineId",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিফল্ট"
+          ],
+          "id": "machineImageDefault",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই মেশিনটি লোড হচ্ছে…"
+          ],
+          "id": "machineLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আরও দেখুন"
+          ],
+          "id": "machineMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নাম (ঐচ্ছিক)"
+          ],
+          "id": "machineNameOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই মেশিনটি উপলব্ধ নয়।"
+          ],
+          "id": "machineNotFound",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রোফাইল"
+          ],
+          "id": "machineProfile",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "হোস্ট বদলানো হচ্ছে"
+          ],
+          "id": "machineRelocating",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আকার পরিবর্তন হচ্ছে"
+          ],
+          "id": "machineResizing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "রিপোজিটরি URL (ঐচ্ছিক)"
+          ],
+          "id": "machineSourceOptional",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "টিম"
+          ],
+          "id": "machineTeam",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যক্তিগত"
+          ],
+          "id": "machineTeamPersonal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এখনও কোনো মেশিন নেই।"
+          ],
+          "id": "machinesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো মেশিন মেলেনি।"
+          ],
+          "id": "machinesNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অফলাইন। সর্বশেষ জানা তালিকা দেখানো হচ্ছে।"
+          ],
+          "id": "machinesOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পিন করা"
+          ],
+          "id": "machinesPinned",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{time}-এ সংরক্ষিত।"
+          ],
+          "id": "machinesSavedAt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেশিন খুঁজুন"
+          ],
+          "id": "machinesSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেশিন"
+          ],
+          "id": "machinesTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেমরি (MiB)"
+          ],
+          "id": "memoryFieldMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{mib} MiB"
+          ],
+          "id": "memoryMib",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিভাইস"
+          ],
+          "id": "notificationsCurrentDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নিবন্ধিত ডিভাইস"
+          ],
+          "id": "notificationsDevices",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো ডিভাইস নিবন্ধিত নেই।"
+          ],
+          "id": "notificationsDevicesEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো এজেন্টের আপনার ইনপুট দরকার হলে বিজ্ঞপ্তি আপনাকে জানায়। এগুলো এন্ড-টু-এন্ড এনক্রিপ্টেড: যে রিলে এগুলো পৌঁছে দেয় সে কখনো এগুলোর বিষয়বস্তু দেখে না।"
+          ],
+          "id": "notificationsExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বিজ্ঞপ্তি কীভাবে আপনার গোপনীয়তা রক্ষা করে"
+          ],
+          "id": "notificationsPrivacyLink",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সরান"
+          ],
+          "id": "notificationsRemoveDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এর বিজ্ঞপ্তি পরিচালনা করতে এই ডিপ্লয়মেন্টে সাইন ইন করুন।"
+          ],
+          "id": "notificationsSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিভাইস"
+          ],
+          "id": "notificationsThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বিজ্ঞপ্তি"
+          ],
+          "id": "notificationsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ করুন"
+          ],
+          "id": "notificationsTurnOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চালু করুন"
+          ],
+          "id": "notificationsTurnOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সিস্টেম সেটিংসে বিজ্ঞপ্তি ব্লক করা আছে।"
+          ],
+          "id": "pushDenied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিপ্লয়মেন্ট বিজ্ঞপ্তি বন্ধ করেছে।"
+          ],
+          "id": "pushFailedDisabled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila উত্তরটি বুঝতে পারেনি।"
+          ],
+          "id": "pushFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট বা বিজ্ঞপ্তি রিলে এই ডিভাইস প্রত্যাখ্যান করেছে।"
+          ],
+          "id": "pushFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "উত্তর দিতে Mila খুলুন।"
+          ],
+          "id": "pushNeedsInputBody",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "একটি এজেন্টের আপনার ইনপুট দরকার"
+          ],
+          "id": "pushNeedsInputTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট আর এই ডিভাইসে বিজ্ঞপ্তি পাঠায় না। নিবন্ধন করতে আবার চালু করুন।"
+          ],
+          "id": "pushRevokedExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যর্থ"
+          ],
+          "id": "pushStateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ"
+          ],
+          "id": "pushStateOff",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চালু"
+          ],
+          "id": "pushStateOn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নিবন্ধন হচ্ছে"
+          ],
+          "id": "pushStateRegistering",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ হচ্ছে"
+          ],
+          "id": "pushStateRemoving",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রত্যাহার করা হয়েছে"
+          ],
+          "id": "pushStateRevoked",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই প্ল্যাটফর্মে বিজ্ঞপ্তি পাওয়া যায় না।"
+          ],
+          "id": "pushUnsupported",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নতুন করে লোড করুন"
+          ],
+          "id": "refresh",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুরোধ ব্যর্থ হয়েছে।"
+          ],
+          "id": "requestFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট অনুরোধটি প্রত্যাখ্যান করেছে।"
+          ],
+          "id": "requestRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সম্পন্ন।"
+          ],
+          "id": "requestSucceeded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুরোধ সম্পূর্ণ হওয়ার অপেক্ষায়…"
+          ],
+          "id": "requestWaiting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো আকার রাখতে ঘরটি খালি রাখুন। চালু মেশিন বন্ধ হয়ে আবার চালু হবে; ডিস্ক শুধু বাড়ানো যায়।"
+          ],
+          "id": "resizeExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নতুন আকার লিখুন; ডিস্ক ছোট করা যায় না।"
+          ],
+          "id": "resizeNothing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আবার চেষ্টা করুন"
+          ],
+          "id": "retry",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অফলাইন"
+          ],
+          "id": "settingsOffline",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সাইন ইন করা আছে"
+          ],
+          "id": "settingsSignedIn",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সেটিংস"
+          ],
+          "id": "settingsTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ম্যানেজার"
+          ],
+          "id": "shareRoleManager",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অপারেটর"
+          ],
+          "id": "shareRoleOperator",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মালিক"
+          ],
+          "id": "shareRoleOwner",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "দর্শক"
+          ],
+          "id": "shareRoleViewer",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শেয়ার করুন"
+          ],
+          "id": "sharingAdd",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ইমেল"
+          ],
+          "id": "sharingEmail",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "একটি ইমেল ঠিকানা লিখুন।"
+          ],
+          "id": "sharingEmailInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কারও সঙ্গে শেয়ার করা নেই।"
+          ],
+          "id": "sharingEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শেয়ারিং লোড করা যায়নি।"
+          ],
+          "id": "sharingFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আরও দেখুন"
+          ],
+          "id": "sharingMore",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সরান"
+          ],
+          "id": "sharingRemove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{email}-এর অ্যাক্সেস সরাবেন?"
+          ],
+          "id": "sharingRemoveConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ভূমিকা"
+          ],
+          "id": "sharingRole",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শেয়ারিং"
+          ],
+          "id": "sharingTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অ্যাকাউন্ট"
+          ],
+          "id": "signInAccount",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্রাউজারে এই ডিভাইস অনুমোদন করুন, তারপর এখানে ফিরে আসুন। অনুমোদন না করা পর্যন্ত Mila খোলা রাখুন।"
+          ],
+          "id": "signInApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{host}-এ সংযোগ করা হচ্ছে…"
+          ],
+          "id": "signInConnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিপ্লয়মেন্টের সাথে সংযোগ বন্ধ হয়ে গেছে।"
+          ],
+          "id": "signInDisconnected",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুমোদনের লিঙ্কটি আর বৈধ নয়। নতুন লিঙ্ক পেতে আবার শুরু করুন।"
+          ],
+          "id": "signInExpired",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila এই ডিভাইসের কী খুলতে পারেনি, তাই সংযোগ করেনি।"
+          ],
+          "id": "signInFailedDeviceKey",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই হোস্ট তার প্রকাশিত কর্তৃপক্ষের সার্টিফিকেট দেখায়নি, তাই Mila সংযোগ করেনি।"
+          ],
+          "id": "signInFailedHost",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট এমন উত্তর পাঠিয়েছে যা Mila বোঝে না।"
+          ],
+          "id": "signInFailedProtocol",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট এই ডিভাইস প্রত্যাখ্যান করেছে।"
+          ],
+          "id": "signInFailedRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্টে পৌঁছানো যাচ্ছে না।"
+          ],
+          "id": "signInFailedUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কী ফিঙ্গারপ্রিন্ট"
+          ],
+          "id": "signInFingerprint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুমোদনের পৃষ্ঠা খুলুন"
+          ],
+          "id": "signInOpenBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেশিন খুলুন"
+          ],
+          "id": "signInOpenMachines",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিপ্লয়মেন্টের সংযোগ সেটিংস অবৈধ, তাই Mila সংযোগ করেনি।"
+          ],
+          "id": "signInProfileInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আবার সংযোগ করুন"
+          ],
+          "id": "signInReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সাইন আউট"
+          ],
+          "id": "signInSignOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্রাউজার দিয়ে সাইন ইন করুন"
+          ],
+          "id": "signInStart",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সাইন ইন"
+          ],
+          "id": "signInTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ধরন"
+          ],
+          "id": "sshKeyAlgorithm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রত্যাহার করুন"
+          ],
+          "id": "sshKeyRevoke",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{fingerprint} কী প্রত্যাহার করবেন? এটি ব্যবহারকারী ডিভাইসকে সাইন ইন করতে আবার অনুমোদন করতে হবে।"
+          ],
+          "id": "sshKeyRevokeConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিভাইস"
+          ],
+          "id": "sshKeyThisDevice",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নামহীন কী"
+          ],
+          "id": "sshKeyUnlabelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো অনুমোদিত কী নেই।"
+          ],
+          "id": "sshKeysEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিপ্লয়মেন্টে আপনার অ্যাকাউন্টে সাইন ইন করার জন্য অনুমোদিত কী। প্রত্যাহার করা কী সাইন ইন করার আগে আবার অনুমোদন করতে হবে।"
+          ],
+          "id": "sshKeysExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কী লোড করা যায়নি।"
+          ],
+          "id": "sshKeysFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কী লোড হচ্ছে…"
+          ],
+          "id": "sshKeysLoading",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই অ্যাকাউন্টের কী দেখতে সাইন ইন করুন।"
+          ],
+          "id": "sshKeysSignInFirst",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "SSH কী"
+          ],
+          "id": "sshKeysTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মোছা হয়েছে"
+          ],
+          "id": "stateDeleted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মোছা হচ্ছে"
+          ],
+          "id": "stateDeleting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যর্থ"
+          ],
+          "id": "stateFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বিরত আছে"
+          ],
+          "id": "statePaused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অপেক্ষমাণ"
+          ],
+          "id": "statePending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পুনরায় চালু হচ্ছে"
+          ],
+          "id": "stateResuming",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চলছে"
+          ],
+          "id": "stateRunning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "চালু হচ্ছে"
+          ],
+          "id": "stateStarting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ"
+          ],
+          "id": "stateStopped",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ হচ্ছে"
+          ],
+          "id": "stateStopping",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সাময়িকভাবে বন্ধ হচ্ছে"
+          ],
+          "id": "stateSuspending",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুপলব্ধ"
+          ],
+          "id": "stateUnavailable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অজানা"
+          ],
+          "id": "stateUnknown",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "তথ্য"
+          ],
+          "id": "tabInfo",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "টার্মিনাল"
+          ],
+          "id": "tabTerminals",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "থ্রেড"
+          ],
+          "id": "tabThreads",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ওয়েব"
+          ],
+          "id": "tabWeb",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "যুক্ত হন"
+          ],
+          "id": "terminalAttach",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "যুক্ত হচ্ছে"
+          ],
+          "id": "terminalAttaching",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ করুন"
+          ],
+          "id": "terminalClose",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই টার্মিনাল সেশনটি যুক্ত সবার জন্য বন্ধ করবেন? এতে চলা প্রোগ্রামগুলো থেমে যাবে।"
+          ],
+          "id": "terminalCloseConfirm",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "বন্ধ হচ্ছে"
+          ],
+          "id": "terminalClosing",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "টার্মিনাল সেশন শেষ হয়েছে।"
+          ],
+          "id": "terminalEnded",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "Mila এই টার্মিনাল সেশনে যুক্ত হতে পারেনি।"
+          ],
+          "id": "terminalInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "লাইভ"
+          ],
+          "id": "terminalLive",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আমার"
+          ],
+          "id": "terminalMine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নিয়ন্ত্রণ"
+          ],
+          "id": "terminalModeControl",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "দেখুন"
+          ],
+          "id": "terminalModeView",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "নতুন টার্মিনাল"
+          ],
+          "id": "terminalNew",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পেস্ট"
+          ],
+          "id": "terminalPaste",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শুধু দেখা"
+          ],
+          "id": "terminalReadOnly",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আবার সংযোগ করুন"
+          ],
+          "id": "terminalReconnect",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আবার সংযোগ হচ্ছে"
+          ],
+          "id": "terminalReconnecting",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্ট এই টার্মিনাল সেশনে যুক্ত হওয়া প্রত্যাখ্যান করেছে।"
+          ],
+          "id": "terminalRefused",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আকার বদলান"
+          ],
+          "id": "terminalResize",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পাঠান"
+          ],
+          "id": "terminalSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিভাইসটি আর অনুমোদিত নয়। যুক্ত হতে আবার সাইন ইন করুন।"
+          ],
+          "id": "terminalSignedOut",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ডিপ্লয়মেন্টে পৌঁছানো যাচ্ছে না।"
+          ],
+          "id": "terminalUnreachable",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{কোনো দর্শক নেই} =1{1 জন দর্শক} other{{count} জন দর্শক}}"
+          ],
+          "id": "terminalViewers",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এখনও কোনো টার্মিনাল সেশন নেই।"
+          ],
+          "id": "terminalsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "টার্মিনাল সেশন লোড করা যায়নি।"
+          ],
+          "id": "terminalsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট"
+          ],
+          "id": "threadAgent",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আপনার উত্তর"
+          ],
+          "id": "threadAnswerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "উত্তর পাঠান"
+          ],
+          "id": "threadAnswerSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট এখনও কাজ করছে। শেষ হলে আবার চেষ্টা করুন।"
+          ],
+          "id": "threadBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট কাজ করছে…"
+          ],
+          "id": "threadComposerBusy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্টকে বার্তা দিন"
+          ],
+          "id": "threadComposerHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রশ্নের উত্তর দেওয়া হয়েছে"
+          ],
+          "id": "threadEventAnswered",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট উত্তর দিয়েছে"
+          ],
+          "id": "threadEventAssistant",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সহায়ক শুরু হয়েছে"
+          ],
+          "id": "threadEventChild",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রসঙ্গ হালনাগাদ হয়েছে"
+          ],
+          "id": "threadEventMaintenance",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আপডেট"
+          ],
+          "id": "threadEventOther",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পরিকল্পনা প্রস্তাব করা হয়েছে"
+          ],
+          "id": "threadEventPlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রম্পট পাঠানো হয়েছে"
+          ],
+          "id": "threadEventPrompt",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট একটি প্রশ্ন করেছে"
+          ],
+          "id": "threadEventQuestions",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রশ্ন প্রত্যাহার করা হয়েছে"
+          ],
+          "id": "threadEventQuestionsCancelled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "টুল ব্যবহার করা হয়েছে"
+          ],
+          "id": "threadEventTool",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পালা ব্যর্থ হয়েছে"
+          ],
+          "id": "threadEventTurnFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পালা শেষ হয়েছে"
+          ],
+          "id": "threadEventTurnFinished",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পালা শুরু হয়েছে"
+          ],
+          "id": "threadEventTurnStarted",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "মেশিনের জন্য অপেক্ষা"
+          ],
+          "id": "threadEventWaitingForMachine",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই থ্রেডটি লোড করা যায়নি।"
+          ],
+          "id": "threadFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পরিকল্পনা"
+          ],
+          "id": "threadModePlan",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কাজ"
+          ],
+          "id": "threadModeWork",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এখানে এখনও কিছু নেই। শুরু করতে একটি প্রম্পট পাঠান।"
+          ],
+          "id": "threadNoTurns",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অনুমোদন করুন"
+          ],
+          "id": "threadPlanApprove",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পরিবর্তন চান"
+          ],
+          "id": "threadPlanRevise",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কী বদলানো উচিত?"
+          ],
+          "id": "threadPlanRevisionHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রস্তাবিত পরিকল্পনা"
+          ],
+          "id": "threadPlanTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এজেন্ট জানতে চায়"
+          ],
+          "id": "threadQuestionTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পাঠান"
+          ],
+          "id": "threadSend",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আর্কাইভ করা"
+          ],
+          "id": "threadStatusArchived",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রস্তুত হচ্ছে"
+          ],
+          "id": "threadStatusProvisioning",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "প্রস্তুত"
+          ],
+          "id": "threadStatusReady",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই লেখাটি পাঠানো যাবে না।"
+          ],
+          "id": "threadTextInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই লেখাটি পাঠানোর জন্য অনেক বড়।"
+          ],
+          "id": "threadTextTooLarge",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =1{1টি নতুন} other{{count}টি নতুন}}"
+          ],
+          "id": "threadUnread",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শিরোনামহীন থ্রেড"
+          ],
+          "id": "threadUntitled",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কাজ করছে"
+          ],
+          "id": "threadWorking",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আপনি"
+          ],
+          "id": "threadYou",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এখনও কোনো থ্রেড নেই।"
+          ],
+          "id": "threadsEmpty",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "থ্রেড ব্রাউজারে শুরু হয় এবং এখানে দেখা যায়।"
+          ],
+          "id": "threadsEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "থ্রেড লোড করা যায়নি।"
+          ],
+          "id": "threadsFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই মেশিনে কাজ করা থ্রেডগুলো এখানে দেখা যায়।"
+          ],
+          "id": "threadsMachineEmptyHint",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কোনো থ্রেড মেলেনি।"
+          ],
+          "id": "threadsNoMatch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সাম্প্রতিক থ্রেড"
+          ],
+          "id": "threadsRecentTitle",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "থ্রেড খুঁজুন"
+          ],
+          "id": "threadsSearch",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্রাউজারে একটি থ্রেড শুরু করুন"
+          ],
+          "id": "threadsStartInBrowser",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "{count, plural, =0{অপঠিত কিছু নেই} =1{1টি অপঠিত আপডেট} other{{count}টি অপঠিত আপডেট}}"
+          ],
+          "id": "threadsUnreadTotal",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "আনলক করুন"
+          ],
+          "id": "unlock",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ঠিকানা"
+          ],
+          "id": "webAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "অন্য কেউ এই সেটিংটি বদলেছে। বর্তমান মান দেখানো হচ্ছে; আবার চেষ্টা করুন।"
+          ],
+          "id": "webConflict",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ঠিকানা কপি হয়েছে।"
+          ],
+          "id": "webCopied",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "কপি করুন"
+          ],
+          "id": "webCopy",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ওয়েব ঠিকানা লোড করা যায়নি।"
+          ],
+          "id": "webFailed",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ডিপ্লয়মেন্ট ওয়েব ঠিকানা প্রকাশ করে না।"
+          ],
+          "id": "webNoAddress",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "খুলুন"
+          ],
+          "id": "webOpen",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "পোর্ট"
+          ],
+          "id": "webPort",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "1 থেকে 65535 এর মধ্যে একটি পোর্ট লিখুন।"
+          ],
+          "id": "webPortInvalid",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "ব্যক্তিগত"
+          ],
+          "id": "webPrivate",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শুধু যারা এই মেশিন ব্যবহার করতে পারে, তারা ব্রাউজারে সাইন ইন করার পর এটি খুলতে পারে।"
+          ],
+          "id": "webPrivateExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সর্বজনীন"
+          ],
+          "id": "webPublic",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "এই ঠিকানা যার কাছে আছে সে-ই এটি খুলতে পারে।"
+          ],
+          "id": "webPublicExplain",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সংরক্ষণ করুন"
+          ],
+          "id": "webSave",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "সেটিংস"
+          ],
+          "id": "webSettings",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "শেয়ার করুন"
+          ],
+          "id": "webShare",
+          "plural": null
+        },
+        {
+          "context": null,
+          "forms": [
+            "দৃশ্যমানতা"
+          ],
+          "id": "webVisibility",
+          "plural": null
+        }
+      ]
+    }
+  },
+  "locale": "bn"
+}
