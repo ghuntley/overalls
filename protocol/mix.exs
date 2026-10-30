@@ -34,7 +34,7 @@ defmodule OverallsProtocol.MixProject do
           "format --check-formatted",
           "test --warnings-as-errors",
           "covenant.check --no-run",
-          "dialyzer"
+          "dialyzer --force-check"
         ]
       ]
     ]
