@@ -1,9 +1,9 @@
 {
   "apps": {
     "enrico": {
-      "active": 3,
+      "active": 5,
       "coverage": 1.0,
-      "covered": 3
+      "covered": 5
     },
     "system": {
       "active": 0,
@@ -13,10 +13,10 @@
   },
   "components": {
     "enrico.mirror": {
-      "active": 3,
+      "active": 5,
       "app": "enrico",
       "coverage": 1.0,
-      "covered": 3,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "enrico.mirror.I1": {
@@ -48,6 +48,26 @@
           "tests": [
             "test validations reject shell and git metacharacters"
           ]
+        },
+        "enrico.mirror.I4": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test manager rejects malformed refresh requests before admission"
+          ]
+        },
+        "enrico.mirror.I5": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test configuration rejects non-string bind without raising"
+          ]
         }
       }
     },
@@ -62,8 +82,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 3,
+    "active": 5,
     "coverage": 1.0,
-    "covered": 3
+    "covered": 5
   }
 }

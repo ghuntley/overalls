@@ -393,8 +393,11 @@ defmodule Enrico.ManagerHistoryPropertyTest do
     end
   end
 
-  # Six fixed native histories measured 164 seconds. Preserve all 100 generated
-  # histories with roughly 2x aggregate headroom; each await remains bounded.
+  # Serial neighbor refreshes made all 100 generated histories outlast the CI
+  # job (over 48 minutes locally). Seven-wide waves measured 35 seconds for
+  # the six fixed histories and 638 seconds for 100 generated ones on a loaded
+  # host. Preserve every case; the aggregate budget keeps slow-runner
+  # headroom and each await remains bounded.
   @tag timeout: 5_400_000
   property "real refresh workers preserve reuse against retired generation messages",
     profile: :ci do
@@ -451,10 +454,21 @@ defmodule Enrico.ManagerHistoryPropertyTest do
         assert :sys.get_state(Manager) == current
         assert {:ok, :running} = Manager.refresh(@id, @attempt, "NixOS", "nixpkgs")
 
-        Enum.each(1..neighbors, fn index ->
-          id = neighbor(index)
-          assert {:ok, :running} = Manager.refresh(id, @attempt, "NixOS", "nixpkgs")
-          await(fn -> Manager.status(id, @attempt) == %{state: :succeeded, head: head} end)
+        # Neighbors fill the receipt cap through real workers. The held @id
+        # refresh owns one admission slot, so waves use the remaining seven
+        # concurrently. Neighbor 1 settles alone first: it stays the oldest
+        # receipt, which keeps the eviction oracle below deterministic.
+        [[1] | Enum.chunk_every(Enum.to_list(2..neighbors//1), Manager.refresh_limit() - 1)]
+        |> Enum.each(fn wave ->
+          ids = Enum.map(wave, &neighbor/1)
+
+          for id <- ids do
+            assert {:ok, :running} = Manager.refresh(id, @attempt, "NixOS", "nixpkgs")
+          end
+
+          await(fn ->
+            Enum.all?(ids, &(Manager.status(&1, @attempt) == %{state: :succeeded, head: head}))
+          end)
         end)
 
         assert Manager.status(@id, @attempt) == :running

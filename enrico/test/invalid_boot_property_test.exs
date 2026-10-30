@@ -6,6 +6,11 @@ defmodule Enrico.InvalidBootPropertyTest do
   # A full matrix takes tens of seconds in fresh VMs; preserve all 100 cases.
   # The aggregate budget includes shared-host headroom; each boot stays bounded.
   @moduletag timeout: 10_800_000
+  # Every probe VM is pinned to two schedulers; bound the fan-out to the host.
+  @boot_concurrency min(8, max(1, div(System.schedulers_online(), 2)))
+  # A boot is bounded at 30 s plus a 5 s kill grace by timeout(1); the await
+  # only backstops that bound.
+  @boot_await_ms 45_000
   @probe Path.expand("../scripts/invalid_boot_probe.exs", __DIR__)
   @fields ~w(bind port state_dir token_file certificate_file key_file status_socket)
   @paths ~w(state_dir token_file certificate_file key_file status_socket)
@@ -74,18 +79,34 @@ defmodule Enrico.InvalidBootPropertyTest do
 
     credential = String.slice(String.duplicate(token, 8), 0, valid_length)
 
-    for mutation <- order do
-      directory = Path.join(root, Integer.to_string(System.unique_integer([:positive])))
-      File.mkdir!(directory)
-      File.chmod!(directory, 0o700)
-      config = configuration(directory, credential)
-      path = Path.join(directory, "config.json")
-      write_config(path, config)
-      assert {:ok, _} = Enrico.Config.load(path)
-      mutate(mutation, path, config, invalid_length)
-      credentials = credential_bytes(config["token_file"])
-      before = snapshot(directory)
-      {output, status} = boot(path, config["status_socket"])
+    prepared =
+      for mutation <- order do
+        directory = Path.join(root, Integer.to_string(System.unique_integer([:positive])))
+        File.mkdir!(directory)
+        File.chmod!(directory, 0o700)
+        config = configuration(directory, credential)
+        path = Path.join(directory, "config.json")
+        write_config(path, config)
+        assert {:ok, _} = Enrico.Config.load(path)
+        mutate(mutation, path, config, invalid_length)
+        credentials = credential_bytes(config["token_file"])
+        {directory, path, config["status_socket"], credentials, snapshot(directory)}
+      end
+
+    # Each mutation owns a private directory and a fresh VM, so boots are
+    # independent; running them concurrently keeps every case and oracle
+    # while the serial matrix (3,300 one-second boots) outran the CI job.
+    booted =
+      Task.async_stream(
+        prepared,
+        fn {_directory, path, socket, _credentials, _before} -> boot(path, socket) end,
+        max_concurrency: @boot_concurrency,
+        ordered: true,
+        timeout: @boot_await_ms
+      )
+
+    for {{directory, _path, _socket, credentials, before}, result} <- Enum.zip(prepared, booted) do
+      assert {:ok, {output, status}} = result
       assert status == 0
       assert projection(output) == expected("rejected", false, true)
 
@@ -160,6 +181,8 @@ defmodule Enrico.InvalidBootPropertyTest do
   # Each probe MUST run in a fresh VM with the complete startup oracle. A boot
   # exceeding 30 seconds MUST fail; its process group gets at most five seconds
   # to terminate before forced cleanup, independently of the aggregate budget.
+  # A case MAY run its independent probes concurrently, bounded by host
+  # schedulers, but MUST assert every probe's oracle in drawn order.
   @spec boot(Path.t() | nil, Path.t()) :: {String.t(), non_neg_integer()}
   defp boot(path, socket) do
     System.cmd(
