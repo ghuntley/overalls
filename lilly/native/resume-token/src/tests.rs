@@ -9,6 +9,10 @@ use std::os::unix::ffi::OsStringExt;
 /// ≤8192 bytes, two ≤16-digit lowercase hex fields (second within 1..16384),
 /// then an even lowercase-hex payload.
 #[hegel::test(test_cases = 100)]
+#[expect(
+    clippy::string_slice,
+    reason = "every sampled token is ASCII, so each index is a char boundary"
+)]
 fn bounded_matches_independent_spec(tc: TestCase) {
     let size_class = tc.draw(gs::sampled_from(&[0usize, 1, 2, 3, 15, 16, 17, 8190]));
     let fill = "0".repeat(size_class);
@@ -26,7 +30,7 @@ fn bounded_matches_independent_spec(tc: TestCase) {
         format!("1-a-1-{fill}0"),
         String::from_utf8(b"1-a-1-".to_vec()).unwrap() + &"ff".repeat(size_class / 2),
     ];
-    let token = tc.draw(gs::sampled_from(&variants)).to_string();
+    let token = tc.draw(gs::sampled_from(&variants)).clone();
     let expected = (|| {
         if token.len() > TOKEN_MAX_BYTES || !token.starts_with("1-") {
             return false;
@@ -143,6 +147,10 @@ fn oracle(pairs: &[Pair], name: &str, to: u64) -> bool {
             return false;
         }
         seen[index] = true;
+        #[expect(
+            clippy::match_same_arms,
+            reason = "the accepted arms carry different patterns and a guard, so they cannot merge"
+        )]
         match (index, pair) {
             (0, Pair::Str(_, value)) if value == name => {}
             (0, _) => return false,

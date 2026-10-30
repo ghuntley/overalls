@@ -21,7 +21,7 @@ pub(crate) fn veil_stderr() -> Result<(), ()> {
 /// The production evaluator: bounds first, library second, questions never echo.
 pub fn matches_current(request: &Request) -> Result<bool, u8> {
     debug_assert!(bounded(&request.token), "selectors keep bounded tokens");
-    veil_stderr().map_err(|_| EXIT_SETUP)?;
+    veil_stderr().map_err(|()| EXIT_SETUP)?;
     let library = pairs::Library::init().ok_or(EXIT_INVALID)?;
     let Some(list) = library.decode_token(&request.token) else {
         return Ok(false);

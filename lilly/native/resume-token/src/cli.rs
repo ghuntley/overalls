@@ -7,7 +7,7 @@ pub(crate) fn decimal(text: &OsStr) -> Option<u64> {
     if bytes.is_empty() || (bytes[0] == b'0' && bytes.len() > 1) {
         return None;
     }
-    if !bytes.iter().all(|b| b.is_ascii_digit()) {
+    if !bytes.iter().all(u8::is_ascii_digit) {
         return None;
     }
     let text = std::str::from_utf8(bytes).ok()?;

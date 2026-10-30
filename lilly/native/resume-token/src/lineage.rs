@@ -1,7 +1,7 @@
 use crate::{TOKEN_MAX_BYTES, UNPACKED_MAX_BYTES};
 
 /// @cc [owner:ghuntley,label:security] resume-token-bounded-decoding
-/// Before calling OpenZFS, tokens MUST have the version-1 envelope, at most
+/// Before calling `OpenZFS`, tokens MUST have the version-1 envelope, at most
 /// 8192 ASCII bytes, even lowercase hexadecimal payload and a declared unpacked
 /// size of 1..16384 bytes. The library MUST verify checksum, decompression and
 /// nvlist encoding. Failures MUST NOT print the token, arguments or library
@@ -93,6 +93,10 @@ pub fn matches(pairs: &[Pair], name: &str, to: u64) -> bool {
             return false;
         }
         seen |= 1 << index;
+        #[expect(
+            clippy::match_same_arms,
+            reason = "the accepted arms carry different patterns and a guard, so they cannot merge"
+        )]
         match (index, pair) {
             (0, Pair::Str(_, value)) if value.as_str() == name => {}
             (0, _) => return false,
