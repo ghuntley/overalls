@@ -336,7 +336,11 @@ fn drain_pending(store: &Mutex<Store>, sink: &Path, health: &Path) -> Result<(),
     }
 }
 
-fn run(config: Config, replay_only: bool) -> Result<(), Error> {
+#[expect(
+    clippy::too_many_lines,
+    reason = "ordered daemon start-up: configuration, custody, socket ownership, then the accept loop"
+)]
+fn run(config: &Config, replay_only: bool) -> Result<(), Error> {
     let simple = |value: &str| {
         !value.is_empty()
             && value
@@ -420,14 +424,14 @@ fn run(config: Config, replay_only: bool) -> Result<(), Error> {
                     .set_write_timeout(Some(Duration::from_millis(250)))
                     .map_err(|_| Error::Storage)?;
                 let result = (|| {
-                    let authenticated = authenticate(&stream, &config);
+                    let authenticated = authenticate(&stream, config);
                     // Drain the bounded request before a closed refusal, so
                     // Unix close cannot reset an unread request and erase the
                     // explicit status. No decoding/storage precedes authority.
                     let requested = request(&mut stream);
                     let producer = authenticated?;
                     let body = requested?;
-                    if authenticate(&stream, &config)? != producer {
+                    if authenticate(&stream, config)? != producer {
                         return Err(Error::Foreign);
                     }
                     let body =
@@ -451,7 +455,7 @@ fn run(config: Config, replay_only: bool) -> Result<(), Error> {
                 );
             }
             Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
-                std::thread::sleep(Duration::from_millis(5))
+                std::thread::sleep(Duration::from_millis(5));
             }
             Err(_) => return Err(Error::Storage),
         }
@@ -473,7 +477,7 @@ fn main() {
             }
             serde_json::from_slice::<Config>(&bytes).map_err(|_| Error::Invalid)
         })
-        .and_then(|config| run(config, replay));
+        .and_then(|config| run(&config, replay));
     if result.is_err() {
         std::process::exit(2);
     }

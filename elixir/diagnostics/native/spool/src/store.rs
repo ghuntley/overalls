@@ -1,7 +1,8 @@
-//! Durable SQLite custody: admission, delivery, replay and expiry.
+//! Durable `SQLite` custody: admission, delivery, replay and expiry.
 
 use crate::{sys, Error, BODY_LIMIT, NS_PER_SECOND};
 use sha2::{Digest, Sha256};
+use std::fmt::Write as _;
 use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::os::unix::fs::{MetadataExt, OpenOptionsExt};
@@ -25,6 +26,7 @@ pub struct Health {
     pub exported: u64,
 }
 
+#[derive(Debug)]
 pub struct Store {
     _lock: File,
     pub(crate) db: rusqlite::Connection,
@@ -71,6 +73,10 @@ pub(crate) fn number(row: &rusqlite::Row<'_>, index: usize) -> rusqlite::Result<
 }
 
 impl Store {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "ordered custody bring-up: each private-file, schema and checksum check must precede the next"
+    )]
     pub fn open(directory: &Path, quota: u64, retention_seconds: u64) -> Result<Self, Error> {
         use rusqlite::OptionalExtension;
         let metadata = std::fs::symlink_metadata(directory).map_err(|_| Error::Storage)?;
@@ -306,9 +312,13 @@ impl Store {
     }
 
     /// @cc [owner:ghuntley,label:recovery] trace-spool-sqlite-custody
-    /// ACK MUST follow SQLite WAL FULL synchronous commit. Indexed immutable
+    /// ACK MUST follow `SQLite` WAL FULL synchronous commit. Indexed immutable
     /// payloads MUST survive delivery ACKs and retention policy changes. Capacity
     /// exhaustion MUST refuse new data without deleting accepted custody.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn accept(&mut self, body: &[u8], now_ns: u64) -> Result<String, Error> {
         use rusqlite::OptionalExtension;
         if self.poisoned {
@@ -429,6 +439,10 @@ impl Store {
 
     /// @cc [owner:ghuntley,label:recovery] trace-archive-replay
     /// Replay MUST preserve accepted bytes and identity after upstream ACK.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
     pub fn replay(&mut self) -> Result<(), Error> {
         if self.poisoned {
             return Err(Error::Poisoned);
@@ -506,7 +520,10 @@ impl Store {
         ];
         values
             .iter()
-            .map(|(name, value)| format!("overalls_trace_spool_{name} {value}\n"))
-            .collect()
+            .fold(String::new(), |mut text, (name, value)| {
+                // Writing to a String cannot fail.
+                let _ = writeln!(text, "overalls_trace_spool_{name} {value}");
+                text
+            })
     }
 }

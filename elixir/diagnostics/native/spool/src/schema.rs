@@ -54,6 +54,14 @@ impl Schema {
     /// The resource MUST be exactly the configured service, host, application
     /// origin and deployment revision; the revision comes from the host build,
     /// never from the producer.
+    #[expect(
+        rustdoc::broken_intra_doc_links,
+        reason = "the @cc contract tag is bracketed metadata, not an intra-doc link"
+    )]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one linear reviewed admission path; splitting it would scatter the closed provenance checks"
+    )]
     pub fn sanitize(
         &self,
         body: &[u8],

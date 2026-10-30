@@ -29,7 +29,11 @@ pub fn peer_credentials(stream: &impl AsRawFd) -> Option<libc::ucred> {
         uid: 0,
         gid: 0,
     };
-    let mut size = std::mem::size_of::<libc::ucred>() as libc::socklen_t;
+    #[expect(
+        clippy::cast_possible_truncation,
+        reason = "size_of::<ucred>() is 12 bytes, far below socklen_t::MAX"
+    )]
+    let mut size = size_of::<libc::ucred>() as libc::socklen_t;
     // SAFETY: the descriptor is borrowed from a live socket for the call;
     // `credentials` is a valid, writable `ucred` and `size` holds its exact
     // byte length, so the kernel writes at most `size` bytes into it.
@@ -38,11 +42,11 @@ pub fn peer_credentials(stream: &impl AsRawFd) -> Option<libc::ucred> {
             stream.as_raw_fd(),
             libc::SOL_SOCKET,
             libc::SO_PEERCRED,
-            (&mut credentials as *mut libc::ucred).cast(),
-            &mut size,
+            (&raw mut credentials).cast(),
+            &raw mut size,
         )
     };
-    (status == 0 && size as usize == std::mem::size_of::<libc::ucred>()).then_some(credentials)
+    (status == 0 && size as usize == size_of::<libc::ucred>()).then_some(credentials)
 }
 
 /// UID of the named local account, or `None` when no such account exists.
