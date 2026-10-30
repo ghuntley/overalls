@@ -167,6 +167,31 @@ reconnected. Three issues surfaced on the way and are fixed:
 - A terminal attach that gets no server answer (the heartbeat held the
   session) is retried for a bounded number of ticks.
 
+## Deployment picker journey
+
+The GTK Deployments page already had Add deployment, Open and confirmed
+Remove over the durable `DeploymentList`. The GTK journey now drives it with
+two deployments: the fixture host and its IP-literal alias `127.0.0.1`. The
+fixture certificate names the alias, and it gets its own connection profile.
+
+- `gtk_deployments_add` adds both through the picker and requires both to be
+  listed and persisted, with the alias selected.
+- `gtk_deployment_select` presses the fixture's Open button and requires it
+  selected before sign-in.
+- `gtk_deployment_switch` comes after the signed-in pages, the terminal and
+  reconnect. It presses Open on the alias, which must release the session,
+  sign-in generation, listing, terminal and SSH-key rows at once
+  (`linux-authority-drop-on-switch`). Signing in there must then fail closed
+  with `host_untrusted`: the trust document's `management_host` is
+  `localhost`, so the alias's pin cannot be reused for another name.
+- `gtk_deployment_switch_back` presses Open on the fixture, signs in again
+  and requires a fresh `ls` to list the seed machine.
+
+The Add button's policy error now uses the catalog's `invalidHost` message
+instead of an English literal. A second fixture identity would be needed to
+show a live session on two different deployments; the fixture has one
+management host.
+
 ## Remaining gaps
 
 - Resize, pause and the thread steps depend on the fixture's action hook

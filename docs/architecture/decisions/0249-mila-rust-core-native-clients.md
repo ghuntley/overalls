@@ -169,6 +169,9 @@ provisioner and model stand-ins, pass every step of both journeys: sign-in,
 machines, sharing, web, create/stop/start/pause/resume/delete, resize, threads
 (list, prompt, answer, plan approval), the terminal's closed
 `terminal_unavailable` refusal, SSH keys and loss detection on a page action.
+The GTK journey also adds two deployments through the picker and switches
+between them. Each switch releases all authority, and the alias's sign-in
+fails closed because the fixture's trust document names one management host.
 A live PTY echo stays unverified because the fixture runs no guest; see the
 [Linux parity review](../reviews/2026-10-30-mila-linux-gtk-parity.md).
 

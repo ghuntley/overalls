@@ -74,11 +74,16 @@ generation (three attempts). A refusal ends the session without retrying.
 Built with `--features gtk-journey`, `mila-native-linux --gtk-journey <descriptor> [--workdir
 <new-dir>]` drives the real window against the fixture. It confines `XDG_CONFIG_HOME` and
 `XDG_DATA_HOME` to a private work directory, writes the fixture CA and connection profile there,
-and replaces the browser with the fixture approver. It presses Sign in, the SSH-key Refresh, then
+and replaces the browser with the fixture approver. It first uses the deployment picker: Add
+deployment for the fixture and for its IP-literal alias `127.0.0.1` (which the fixture certificate
+also names, with its own connection profile), then Open on the fixture. It presses Sign in, the SSH-key Refresh, then
 the Machines and Threads page controls in the same order as the headless journey. After each press
 it polls the same backend-effect check through the window's session. Then it uses Attach terminal
 and Send. It severs the bound session and presses Refresh: the page action's transport error must
-release the session and start a new generation at once, before the reconnect completes. Finally it
+release the session and start a new generation at once, before the reconnect completes. It then
+presses Open on the alias, which must release every authority at once, and signs in there. The
+fixture's trust document names one management host, so that sign-in must fail closed with
+`host_untrusted`. Open on the fixture then signs in again and lists the seed. Finally it
 presses Sign out. It prints the same redacted report shape. Release
 builds leave the feature off.
 

@@ -15,7 +15,7 @@
 use super::strings::Message as M;
 use super::{pages, strings, NativeState};
 use adw::prelude::*;
-use gtk::{glib, Button, Entry, TextView};
+use gtk::{glib, Box, Button, Entry, TextView};
 use mila_native_linux::deep_link::Page;
 use mila_native_linux::device_key::write_private;
 use mila_native_linux::journey::{
@@ -29,6 +29,7 @@ use mila_native_linux::journey_checks::{
     first_thread, load_thread_controls, machine_named, refusal_code, web_endpoint, Check,
     PageContext, CREATE_SIZE, RESIZE_SIZE,
 };
+use mila_native_linux::machine_view::project_snapshot;
 use mila_native_linux::session::{LiveSession, SessionError, SignInPhase};
 use mila_native_linux::ssh_keys_view::SshKeysStatus;
 use std::cell::{Cell, RefCell};
@@ -114,10 +115,87 @@ fn prepare_environment(descriptor: &JourneyDescriptor, workdir: &Path) -> Option
     write_private(&ca_path, descriptor.tls.ca_pem.as_bytes()).ok()?;
     write_private(
         &config.join("mila").join("connections.json"),
-        fixture_connection_profile(descriptor, &ca_path).as_bytes(),
+        two_deployment_profiles(descriptor, &ca_path)?.as_bytes(),
     )
     .ok()?;
     Some(ca_path)
+}
+
+/// The second deployment the picker steps add: the fixture under its IP
+/// literal, which its certificate also names. It is a separate list entry,
+/// connection profile, trust pin and sign-in against the same backend.
+const SECOND_DEPLOYMENT: &str = "127.0.0.1";
+
+/// The fixture's connection profile plus one for [`SECOND_DEPLOYMENT`] on
+/// the same ports and CA.
+fn two_deployment_profiles(descriptor: &JourneyDescriptor, ca_path: &Path) -> Option<String> {
+    let mut document: serde_json::Value =
+        serde_json::from_str(&fixture_connection_profile(descriptor, ca_path)).ok()?;
+    let profiles = document.get_mut("profiles")?.as_array_mut()?;
+    let mut second = profiles.first()?.clone();
+    *second.get_mut("host")? = serde_json::Value::from(SECOND_DEPLOYMENT);
+    profiles.push(second);
+    Some(document.to_string())
+}
+
+/// Presses `host`'s Open button in the deployment list.
+fn open_deployment(state: &NativeState, host: &str) -> bool {
+    let Some(root) = page(state, Page::Deployments) else {
+        return false;
+    };
+    let open = strings::text(strings::Message::DeploymentOpen);
+    widgets::<Box>(&root)
+        .into_iter()
+        .find(|row| {
+            row.first_child()
+                .and_then(|child| child.downcast::<gtk::Label>().ok())
+                .is_some_and(|label| label.text() == host)
+        })
+        .and_then(|row| {
+            widgets::<Button>(row.upcast_ref())
+                .into_iter()
+                .find(|button| button.label().as_deref() == Some(open.as_str()))
+        })
+        .map(|button| button.emit_clicked())
+        .is_some()
+}
+
+/// Types `host` into the deployment field and presses Add deployment.
+fn add_deployment(state: &NativeState, host: &str) -> bool {
+    if let Some(targets) = state.links.borrow().as_ref() {
+        targets.deployment.set_text(host);
+    }
+    click(
+        state,
+        Page::Deployments,
+        &strings::text(strings::Message::DeploymentAddAndSelect),
+    )
+}
+
+/// The persisted deployment hosts and the selected one.
+fn deployment_state(state: &NativeState) -> (Vec<String>, Option<String>) {
+    state
+        .deployment_list()
+        .map(|list| {
+            let rows = list.rows();
+            let selected = rows
+                .iter()
+                .find(|row| row.selected)
+                .map(|row| row.host.clone());
+            (rows.into_iter().map(|row| row.host).collect(), selected)
+        })
+        .unwrap_or_default()
+}
+
+/// No authority survives a deployment switch: no session, sign-in
+/// generation, listing, terminal or SSH-key rows.
+// See the `linux-authority-drop-on-switch` contract in CONTRACTS.
+fn released(state: &NativeState) -> bool {
+    !state.session.borrow().is_authenticated()
+        && state.machine_listing.borrow().is_none()
+        && state.terminal.borrow().is_none()
+        && state.ssh_keys.borrow().status() == SshKeysStatus::SignInRequired
+        && state.driver.borrow().flow().phase == SignInPhase::SignedOut
 }
 
 fn print_report(report: &JourneyReport) -> glib::ExitCode {
@@ -725,6 +803,7 @@ fn page_steps() -> VecDeque<PageStep> {
 }
 
 enum Stage {
+    Deployments,
     SignIn,
     AwaitSignedIn(Instant),
     SshKeys,
@@ -733,7 +812,33 @@ enum Stage {
     AwaitMarker(Instant, String),
     LoseOnAction,
     AwaitReconnect(Instant, u64),
+    /// Opens `host` in the deployment list, then signs in to it.
+    Switch(Switch),
+    AwaitSwitched(Switch, Instant, u32),
     SignOut,
+}
+
+/// One deployment switch step.
+#[derive(Clone, Copy)]
+struct Switch {
+    name: &'static str,
+    host: Target,
+    next: Option<Target>,
+}
+
+impl Switch {
+    /// The fixture's trust document names one management host, so signing
+    /// in to its IP-literal alias must fail closed; the fixture itself must
+    /// sign in again.
+    fn host_bound(self) -> bool {
+        matches!(self.host, Target::Second)
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Target {
+    Fixture,
+    Second,
 }
 
 struct Script {
@@ -749,7 +854,21 @@ struct Script {
     terminal_attempts: u32,
 }
 
+/// Switch to the second deployment, then back to the fixture.
+const SWITCH_AWAY: Switch = Switch {
+    name: "gtk_deployment_switch",
+    host: Target::Second,
+    next: Some(Target::Fixture),
+};
+
 impl Script {
+    fn host(&self, target: Target) -> String {
+        match target {
+            Target::Fixture => self.descriptor.deployment.host.clone(),
+            Target::Second => SECOND_DEPLOYMENT.to_owned(),
+        }
+    }
+
     /// Presses the next page step or polls the current one; `true` while
     /// page steps remain.
     fn page_tick(&mut self, state: &NativeState) -> bool {
@@ -807,6 +926,35 @@ impl Script {
     fn step(&mut self, state: &NativeState) -> Option<Stage> {
         let stage = self.stage.take()?;
         match stage {
+            Stage::Deployments => {
+                // Add both deployments through the picker, then select the
+                // fixture again with its Open button.
+                let fixture = self.descriptor.deployment.host.clone();
+                let added =
+                    add_deployment(state, &fixture) && add_deployment(state, SECOND_DEPLOYMENT);
+                let (hosts, selected) = deployment_state(state);
+                let both = added
+                    && hosts.len() == 2
+                    && hosts.contains(&fixture)
+                    && selected.as_deref() == Some(SECOND_DEPLOYMENT);
+                self.report.record(
+                    "gtk_deployments_add",
+                    both,
+                    if both { "two_listed" } else { "not_listed" },
+                );
+                let reselected = open_deployment(state, &fixture)
+                    && deployment_state(state).1.as_deref() == Some(fixture.as_str());
+                self.report.record(
+                    "gtk_deployment_select",
+                    reselected,
+                    if reselected {
+                        "selected"
+                    } else {
+                        "not_selected"
+                    },
+                );
+                Some(Stage::SignIn)
+            }
             Stage::SignIn => {
                 let report = &mut self.report;
                 if let Some(targets) = state.links.borrow().as_ref() {
@@ -1023,7 +1171,7 @@ impl Script {
                     && state.session.borrow().is_authenticated()
                 {
                     report.record("gtk_reconnect", true, "reestablished");
-                    return Some(Stage::SignOut);
+                    return Some(Stage::Switch(SWITCH_AWAY));
                 }
                 if !driver.is_active() {
                     report.record(
@@ -1038,6 +1186,85 @@ impl Script {
                     return Some(Stage::SignOut);
                 }
                 Some(Stage::AwaitReconnect(started, generation))
+            }
+            Stage::Switch(switch) => {
+                let host = self.host(switch.host);
+                // Open switches the selection and must release every
+                // authority at once, before any new sign-in.
+                let opened = open_deployment(state, &host);
+                let selected = deployment_state(state).1.as_deref() == Some(host.as_str());
+                if !(opened && selected && released(state)) {
+                    self.report.record(switch.name, false, "retained");
+                    return Some(Stage::SignOut);
+                }
+                let before = self.approver.opened();
+                if !click(
+                    state,
+                    Page::SignIn,
+                    &strings::text(strings::Message::SignInStart),
+                ) {
+                    self.report.record(switch.name, false, "button_missing");
+                    return Some(Stage::SignOut);
+                }
+                Some(Stage::AwaitSwitched(switch, Instant::now(), before))
+            }
+            Stage::AwaitSwitched(switch, started, before) => {
+                let host = self.host(switch.host);
+                let (phase, failure, target) = {
+                    let driver = state.driver.borrow();
+                    let flow = driver.flow();
+                    (
+                        flow.phase,
+                        flow.failure,
+                        driver.target().map(|target| target.host().to_owned()),
+                    )
+                };
+                let next = switch.next.map_or(Stage::SignOut, |host| {
+                    Stage::Switch(Switch {
+                        name: "gtk_deployment_switch_back",
+                        host,
+                        next: None,
+                    })
+                });
+                if phase == SignInPhase::SignedIn && state.session.borrow().is_authenticated() {
+                    // The new session reads the deployment's listing.
+                    let seed = self.work.seed();
+                    let listed = state
+                        .with_live(|live| live.refresh())
+                        .and_then(Result::ok)
+                        .is_some_and(|bytes| {
+                            project_snapshot(&bytes)
+                                .is_ok_and(|rows| rows.iter().any(|row| row.id == seed))
+                        });
+                    let code = match (target.as_deref() == Some(host.as_str()), listed) {
+                        _ if switch.host_bound() => "host_binding_bypassed",
+                        (false, _) => "wrong_deployment",
+                        (true, false) => "seed_missing",
+                        (true, true) if self.approver.opened() > before => "approved",
+                        (true, true) => "already",
+                    };
+                    self.report
+                        .record(switch.name, code == "approved" || code == "already", code);
+                    return Some(next);
+                }
+                if phase != SignInPhase::Connecting && phase != SignInPhase::AwaitingApproval {
+                    let code = sign_in_failure_code(phase, failure);
+                    let bound = switch.host_bound()
+                        && code == "host_untrusted"
+                        && !state.session.borrow().is_authenticated()
+                        && target.as_deref() == Some(host.as_str());
+                    self.report.record(
+                        switch.name,
+                        bound,
+                        if bound { "host_bound_refused" } else { code },
+                    );
+                    return Some(next);
+                }
+                if started.elapsed() > SIGN_IN_DEADLINE {
+                    self.report.record(switch.name, false, "approval_timeout");
+                    return Some(next);
+                }
+                Some(Stage::AwaitSwitched(switch, started, before))
             }
             Stage::SignOut => {
                 let clicked = click(
@@ -1078,7 +1305,7 @@ fn run_window(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) ->
         descriptor: descriptor.clone(),
         approver,
         report: JourneyReport::new(),
-        stage: Some(Stage::SignIn),
+        stage: Some(Stage::Deployments),
         work: PageWork {
             context,
             hook: FixtureHook::new(descriptor, workdir, ca_path),

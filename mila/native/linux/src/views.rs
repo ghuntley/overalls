@@ -252,7 +252,7 @@ pub(super) fn build_deployments(
                     deployment.set_text(canonical.as_str());
                     status.set_label(&strings::text(strings::Message::SignInDeploymentRequired));
                 }
-                Err(_) => status.set_label("Deployment host rejected by Rust policy."),
+                Err(_) => status.set_label(&strings::text(strings::Message::DeploymentHostInvalid)),
             }
             render();
         });

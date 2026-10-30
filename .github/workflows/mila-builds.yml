@@ -301,7 +301,11 @@ jobs:
           with open(sys.argv[1], encoding="utf-8") as handle:
               report: object = json.load(handle)
           steps = report.get("steps") if isinstance(report, dict) else None
-          expected = [{"name": "gtk_sign_in", "ok": False, "outcome": "host_untrusted"}]
+          expected = [
+              {"name": "gtk_deployments_add", "ok": True, "outcome": "two_listed"},
+              {"name": "gtk_deployment_select", "ok": True, "outcome": "selected"},
+              {"name": "gtk_sign_in", "ok": False, "outcome": "host_untrusted"},
+          ]
           if steps != expected:
               raise SystemExit(f"unexpected GTK journey smoke report: {steps!r}")
           PY
