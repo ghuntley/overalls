@@ -117,7 +117,7 @@ defmodule MilaJourneyFixture do
     id = System.fetch_env!("MILA_FIXTURE_MACHINE")
 
     {:ok, vm} =
-      Ledger.transaction(fn ->
+      retrying(fn ->
         vm = Ledger.lock!(Marshall.Compute.VirtualMachine, id)
 
         Ledger.read!(Marshall.Compute.Operation, vm_id: id)
@@ -174,7 +174,7 @@ defmodule MilaJourneyFixture do
     [thread] = Ledger.read!(Marshall.Threads.Thread, id: System.fetch_env!("MILA_FIXTURE_THREAD"))
 
     {:ok, question} =
-      Ledger.transaction(fn ->
+      retrying(fn ->
         agent = Ledger.lock!(Marshall.Agents.Thread, thread.agent_thread_id)
         turns = Ledger.read!(Marshall.Agents.Turn, thread_id: agent.id)
         Enum.each(turns, &settle_turn/1)
@@ -218,7 +218,7 @@ defmodule MilaJourneyFixture do
     [thread] = Ledger.read!(Marshall.Threads.Thread, id: System.fetch_env!("MILA_FIXTURE_THREAD"))
 
     {:ok, proposal} =
-      Ledger.transaction(fn ->
+      retrying(fn ->
         agent = Ledger.lock!(Marshall.Agents.Thread, thread.agent_thread_id)
         turns = Ledger.read!(Marshall.Agents.Turn, thread_id: agent.id)
         Enum.each(turns, &settle_turn/1)
@@ -269,6 +269,23 @@ defmodule MilaJourneyFixture do
     do: Ledger.update!(turn, :transition, %{status: :completed, finished_at: Ledger.now()})
 
   defp settle_turn(turn), do: turn
+
+  # A stand-in transaction can deadlock with Marshall's own workers on the
+  # same rows; PostgreSQL rolled it back, so retrying it is safe.
+  defp retrying(fun, attempts \\ 5) do
+    case Ledger.transaction(fun) do
+      {:error, %Ash.Error.Unknown{} = error} when attempts > 1 ->
+        if Exception.message(error) =~ "deadlock_detected" do
+          Process.sleep(200)
+          retrying(fun, attempts - 1)
+        else
+          {:error, error}
+        end
+
+      result ->
+        result
+    end
+  end
 
   defp seed, do: Path.join(@root, "seed.json") |> File.read!() |> JSON.decode!()
 

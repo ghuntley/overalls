@@ -8,6 +8,7 @@ never logs tokens, approval links or fingerprints.
 
 import hmac
 import json
+import os
 import re
 import secrets
 import ssl
@@ -23,6 +24,17 @@ ROOT = Path("/run/mila-fixture")
 LOCK = threading.Lock()
 FINGERPRINT = re.compile(r"\ASHA256:[A-Za-z0-9+/]{43}\Z")
 TOKEN_PATH = re.compile(r"\A/ssh/approve/[A-Za-z0-9_-]{16,256}\Z")
+UUID = re.compile(r"\A[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\Z")
+# Fixture stand-in actions exposed to platform journeys outside the VM: the
+# action name, the request member it needs (if any) and the environment
+# variable that carries it to `mila-fixture-action`.
+FIXTURE_ACTIONS: dict[str, tuple[str, str] | None] = {
+    "observe": ("machine_id", "MILA_FIXTURE_MACHINE"),
+    "thread-create": None,
+    "thread-ready": ("thread_id", "MILA_FIXTURE_THREAD"),
+    "thread-question": ("thread_id", "MILA_FIXTURE_THREAD"),
+    "thread-proposal": ("thread_id", "MILA_FIXTURE_THREAD"),
+}
 
 
 def as_object(value: object) -> dict[str, object] | None:
@@ -79,6 +91,36 @@ def approve(approval_url: str, fingerprint: str) -> None:
             browser.close()
 
 
+def fixture_action(action: str, body: dict[str, object]) -> dict[str, object] | None:
+    """@cc [owner:ghuntley,label:verification;security] mila-approver-fixture-actions
+    Fixture hooks MUST run only the closed stand-in actions of
+    `mila-journey-fixture-authority` with canonical UUID inputs, and MUST
+    return only that action's JSON result. Invalid input is refused (None).
+    """
+    spec = FIXTURE_ACTIONS[action]
+    environment: dict[str, str] = {}
+    if spec is not None:
+        member, variable = spec
+        value = body.get(member)
+        if not isinstance(value, str) or not UUID.match(value):
+            return None
+        environment[variable] = value
+    elif body:
+        return None
+    result = ROOT / (action + ".json")
+    result.unlink(missing_ok=True)
+    subprocess.run(
+        [Settings.login_command, action],
+        check=True,
+        timeout=300,
+        env={**os.environ, **environment},
+    )
+    parsed = as_object(json.loads(result.read_text()))
+    if parsed is None:
+        raise RuntimeError("fixture action result unavailable")
+    return parsed
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         pass
@@ -93,7 +135,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         supplied = self.headers.get("authorization", "")
-        if self.path != "/approve" or not hmac.compare_digest(
+        action = self.path.removeprefix("/fixture/") if self.path.startswith("/fixture/") else None
+        if (self.path != "/approve" and action is None) or not hmac.compare_digest(
             supplied.encode(), ("Bearer " + Settings.token).encode()
         ):
             return self.reply(403, {"approved": False, "error": "forbidden"})
@@ -106,6 +149,27 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(400, {"approved": False, "error": "invalid_request"})
         if body is None:
             return self.reply(400, {"approved": False, "error": "invalid_request"})
+        if action is not None:
+            if action not in FIXTURE_ACTIONS:
+                return self.reply(404, {"error": "unknown_action"})
+            with LOCK:
+                try:
+                    result = fixture_action(action, body)
+                except Exception as error:
+                    print(
+                        json.dumps(
+                            {
+                                "event": "mila_fixture_action_failed",
+                                "category": type(error).__name__,
+                            }
+                        ),
+                        file=sys.stderr,
+                        flush=True,
+                    )
+                    return self.reply(502, {"error": "fixture_action_failed"})
+            if result is None:
+                return self.reply(400, {"error": "invalid_request"})
+            return self.reply(200, result)
         url = body.get("approval_url")
         fingerprint = body.get("fingerprint")
         if (

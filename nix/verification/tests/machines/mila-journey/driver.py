@@ -221,6 +221,10 @@ with subtest("pause records checkpoint intent and resume admits a wake"):
     paused = mila("action", made, "pause")
     receipt_operation(paused)
     assert desired(made) == "paused"
+    # The unobserved pause keeps an operation open, so Marshall refuses a
+    # resize with its closed vm_busy reason (not temporarily_unavailable).
+    busy = mila_refusal("resize", made, "2", "1024", "3")
+    assert "(vm_busy)" in busy, busy
     # Resume is a durable wake request. A synthetic host records no
     # checkpoint, so the wake is asserted as admitted, not as restored.
     resumed = mila("action", made, "resume")
@@ -298,6 +302,35 @@ with subtest("threads list, prompt, answer and plan approval"):
         )
         == "t"
     )
+
+
+def hook(action: str, body: str, bearer: bool = True) -> tuple[int, str]:
+    """POSTs to the descriptor's fixture hook; the bearer stays in a private file."""
+    header = "-H @/run/mila-fixture/hook.header " if bearer else ""
+    output = node.succeed(
+        "curl -sS --cacert /run/overalls-test/ca.crt -o /run/mila-fixture/hook.out "
+        "-w '%{http_code}' -H 'content-type: application/json' "
+        + header
+        + "--data "
+        + shlex.quote(body)
+        + " "
+        + shlex.quote(text(descriptor, "approver", "fixture_url") + action)
+    )
+    return int(output), node.succeed("cat /run/mila-fixture/hook.out")
+
+
+with subtest("bearer-protected fixture hooks run only closed stand-in actions"):
+    node.succeed(
+        "umask 077; printf 'Authorization: Bearer %s\\n' "
+        '"$(jq -r .approver.bearer_token /run/mila-fixture/descriptor.json)" > /run/mila-fixture/hook.header'
+    )
+    status, body = hook("observe", json.dumps({"machine_id": machine}))
+    assert status == 200 and text(json.loads(body), "observed_state") == desired(machine), body
+    assert hook("observe", json.dumps({"machine_id": machine}), bearer=False)[0] == 403
+    assert hook("observe", json.dumps({"machine_id": "not-a-uuid"}))[0] == 400
+    assert hook("thread-create", json.dumps({"extra": 1}))[0] == 400
+    assert hook("shell", "{}")[0] == 404
+
 
 with subtest("terminal attach is refused with Marshall's closed reason without a guest"):
     reason = mila_refusal("terminal", machine)

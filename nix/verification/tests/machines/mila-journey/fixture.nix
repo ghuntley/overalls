@@ -42,7 +42,9 @@ let
       '{version: 1,
         deployment: {host: "${host}", ssh_port: ${toString sshPort}, https_port: ${toString httpsPort}},
         tls: {ca_pem: $ca, server_name: "${host}"},
-        approver: {url: "https://${host}:${toString approverPort}/approve", bearer_token: ($token | rtrimstr("\n"))},
+        approver: {url: "https://${host}:${toString approverPort}/approve",
+                   fixture_url: "https://${host}:${toString approverPort}/fixture/",
+                   bearer_token: ($token | rtrimstr("\n"))},
         seed: {machine_name: $seed[0].machine_name, machine_id: $seed[0].machine_id,
                share_principal: $seed[0].member_email, account_email: $seed[0].owner_email}}' \
       > /run/mila-fixture/descriptor.json.tmp
