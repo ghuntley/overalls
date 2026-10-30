@@ -1,0 +1,6 @@
+@cc [owner:ghuntley,label:verification] mila-journey-hegel-properties
+Hegel properties MUST cover the device-key file hex codec: the `hex`/`unhex`
+round-trip over arbitrary bytes, and `unhex` refusing odd-length and
+non-ASCII text, accepting every even-length hex string and decoding to half
+the input length. The FFI-driven steps, trust fetch and approval flow are
+covered by the mila-journey machine tests, not by properties.

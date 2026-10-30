@@ -1175,6 +1175,7 @@ name = "mila-journey"
 version = "0.1.0"
 dependencies = [
  "base64",
+ "hegeltest",
  "mila-ffi",
  "mila-transport",
  "p256 0.13.2",

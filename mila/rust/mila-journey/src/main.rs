@@ -925,3 +925,43 @@ fn main() {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{hex, unhex};
+    use hegel::{generators as gs, TestCase};
+
+    /// @cc [owner:ghuntley,label:verification;security] mila-journey-key-hex-codec
+    /// The device-key file codec MUST round-trip arbitrary bytes through
+    /// lowercase hex, and `unhex` MUST refuse odd-length and non-ASCII text,
+    /// accept every even-length hex string and decode to half the input length.
+    #[hegel::test(test_cases = 128)]
+    fn device_key_hex_round_trips_and_refuses_malformed_text(tc: TestCase) {
+        let bytes = tc.draw(gs::vecs(gs::default::<u8>()).max_size(64));
+        let encoded = hex(&bytes);
+        assert_eq!(encoded.len(), bytes.len() * 2);
+        assert!(encoded
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+        assert_eq!(unhex(&encoded), Some(bytes));
+        assert_eq!(unhex(&encoded.to_ascii_uppercase()), unhex(&encoded));
+
+        let text = if tc.draw(gs::booleans()) {
+            tc.draw(gs::text().max_size(66))
+        } else {
+            let alphabet: Vec<char> = "0123456789abcdefABCDEFg+- \u{e9}".chars().collect();
+            tc.draw(gs::vecs(gs::sampled_from(alphabet)).max_size(66))
+                .into_iter()
+                .collect()
+        };
+        match unhex(&text) {
+            Some(decoded) => {
+                assert!(text.is_ascii());
+                assert_eq!(decoded.len() * 2, text.len());
+            }
+            None => {
+                assert!(text.len() % 2 == 1 || !text.bytes().all(|byte| byte.is_ascii_hexdigit()))
+            }
+        }
+    }
+}
