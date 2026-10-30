@@ -36,6 +36,22 @@ FIXTURE_ACTIONS: dict[str, tuple[str, str] | None] = {
     "thread-proposal": ("thread_id", "MILA_FIXTURE_THREAD"),
 }
 
+# Closed failure codes a failed fixture hook may return (see the fixture's
+# `mila-fixture-closed-failure`); anything else is reported as action_exception.
+THREAD_FAILURE_REASONS = (
+    "invalid_machine_spec",
+    "invalid_profile",
+    "capacity",
+    "machine_unavailable",
+    "provision_failed",
+    "agent_unavailable",
+    "unknown",
+)
+FAILURE_CODES = frozenset(
+    {"action_exception", "thread_failed_other"}
+    | {"thread_failed_" + reason for reason in THREAD_FAILURE_REASONS}
+)
+
 
 def as_object(value: object) -> dict[str, object] | None:
     """Narrows parsed JSON to a string-keyed object, or None."""
@@ -121,6 +137,32 @@ def fixture_action(action: str, body: dict[str, object]) -> dict[str, object] | 
     return parsed
 
 
+def failure_code(action: str) -> str:
+    """The closed code a failed action left as its result, else action_exception."""
+    try:
+        parsed = as_object(json.loads((ROOT / (action + ".json")).read_text()))
+    except (OSError, ValueError):
+        return "action_exception"
+    code = parsed.get("error") if parsed is not None else None
+    return code if isinstance(code, str) and code in FAILURE_CODES else "action_exception"
+
+
+def report_failure(event: str, error: Exception) -> None:
+    """@cc [owner:ghuntley,label:verification;security] mila-approver-failure-category
+    A failed hook MUST report only its event name and the exception's class
+    name, to the journal and to the kernel console (the launcher's
+    console.log), never the raised message, inputs, payloads or credentials.
+    """
+    line = json.dumps({"event": event, "category": type(error).__name__})
+    print(line, file=sys.stderr, flush=True)
+    try:
+        # Priority 3 (err) passes NixOS's default console log level.
+        with open("/dev/kmsg", "w") as kmsg:
+            kmsg.write("<3>" + line + "\n")
+    except OSError:
+        pass
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, format: str, *args: object) -> None:
         pass
@@ -156,17 +198,8 @@ class Handler(BaseHTTPRequestHandler):
                 try:
                     result = fixture_action(action, body)
                 except Exception as error:
-                    print(
-                        json.dumps(
-                            {
-                                "event": "mila_fixture_action_failed",
-                                "category": type(error).__name__,
-                            }
-                        ),
-                        file=sys.stderr,
-                        flush=True,
-                    )
-                    return self.reply(502, {"error": "fixture_action_failed"})
+                    report_failure("mila_fixture_action_failed", error)
+                    return self.reply(502, {"error": failure_code(action)})
             if result is None:
                 return self.reply(400, {"error": "invalid_request"})
             return self.reply(200, result)
@@ -184,11 +217,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 approve(url, fingerprint)
             except Exception as error:
-                print(
-                    json.dumps({"event": "mila_approval_failed", "category": type(error).__name__}),
-                    file=sys.stderr,
-                    flush=True,
-                )
+                report_failure("mila_approval_failed", error)
                 return self.reply(502, {"approved": False, "error": "approval_failed"})
         return self.reply(200, {"approved": True})
 

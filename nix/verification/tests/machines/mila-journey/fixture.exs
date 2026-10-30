@@ -18,14 +18,50 @@ defmodule MilaJourneyFixture do
 
   @type result :: %{optional(String.t()) => term()}
 
+  # Thread failure reasons a failed hook may name; any other is reported as
+  # `thread_failed_other`.
+  @thread_failure_reasons ~w(invalid_machine_spec invalid_profile capacity
+                             machine_unavailable provision_failed agent_unavailable unknown)a
+
+  defmodule ThreadFailed do
+    @moduledoc "A stand-in thread reached Marshall's failed state."
+    defexception [:reason]
+
+    @impl true
+    @spec message(Exception.t()) :: String.t()
+    def message(_error), do: "thread provisioning failed"
+  end
+
   @spec main() :: :ok
   def main do
     {:ok, _} = Application.ensure_all_started(:marshall)
     action = System.fetch_env!("MILA_FIXTURE_ACTION")
-    result = run(action)
-    private_write(Path.join(@root, action <> ".json"), JSON.encode!(result))
+    path = Path.join(@root, action <> ".json")
+
+    result =
+      try do
+        run(action)
+      rescue
+        error ->
+          # @cc [owner:ghuntley,label:verification;security] mila-fixture-closed-failure
+          # A failed action MUST leave only a closed failure code as its result:
+          # `action_exception`, or `thread_failed_<reason>` for an allow-listed
+          # Marshall thread failure reason (else `thread_failed_other`). It MUST
+          # NOT carry the raised message, inputs, payloads or credentials.
+          private_write(path, JSON.encode!(%{"error" => failure_code(error)}))
+          reraise error, __STACKTRACE__
+      end
+
+    private_write(path, JSON.encode!(result))
     :ok
   end
+
+  @spec failure_code(Exception.t()) :: String.t()
+  defp failure_code(%ThreadFailed{reason: reason}) when reason in @thread_failure_reasons,
+    do: "thread_failed_" <> Atom.to_string(reason)
+
+  defp failure_code(%ThreadFailed{}), do: "thread_failed_other"
+  defp failure_code(_error), do: "action_exception"
 
   @spec run(String.t()) :: result()
   def run("seed") do
@@ -272,7 +308,7 @@ defmodule MilaJourneyFixture do
         %{"status" => "ready", "machine_id" => thread.machine_id}
 
       thread.status == :failed ->
-        raise "thread provisioning failed: #{thread.failure_reason}"
+        raise ThreadFailed, reason: thread.failure_reason
 
       is_binary(thread.machine_id) ->
         [vm] = Ledger.read!(Marshall.Compute.VirtualMachine, id: thread.machine_id)

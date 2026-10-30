@@ -336,6 +336,13 @@ with subtest("bearer-protected fixture hooks run only closed stand-in actions"):
     assert hook("observe", json.dumps({"machine_id": "not-a-uuid"}))[0] == 400
     assert hook("thread-create", json.dumps({"extra": 1}))[0] == 400
     assert hook("shell", "{}")[0] == 404
+    # A failing action answers with a closed code only, and its category line
+    # reaches the kernel console without the request's input.
+    absent = "00000000-0000-4000-8000-000000000000"
+    status, body = hook("thread-ready", json.dumps({"thread_id": absent}))
+    assert status == 502 and json.loads(body) == {"error": "action_exception"}, body
+    console = node.succeed("dmesg | grep mila_fixture_action_failed")
+    assert '"category": "CalledProcessError"' in console and absent not in console, console
 
 
 with subtest("guest-backed terminal: new, attach, echo, resize, replay and kill on a real PTY"):
