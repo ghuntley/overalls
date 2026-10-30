@@ -1,6 +1,13 @@
 use super::*;
+use crate::log::open_log;
+use crate::run::{drain, settle};
 use hegel::{generators as gs, TestCase};
+use rustix::pipe::{pipe_with, PipeFlags};
 use std::ffi::OsStr;
+use std::ffi::OsString;
+use std::os::unix::fs::MetadataExt as _;
+use std::os::unix::process::ExitStatusExt as _;
+use std::process::{Command as Process, Stdio};
 use std::time::Duration;
 
 /// @cc [owner:ghuntley,label:verification] hegel-boot-log-selector-oracle
