@@ -18,3 +18,9 @@ not resolve. Unconfigured traversal follows every select branch, as the target
 hashes of tools/affected do, so a dependency that only an unselected branch
 names (toolchains//:cxx_no_default_deps) is caught locally rather than by CI
 target selection (ADR-0270).
+
+@cc [owner:ghuntley,label:verification] machine-test-failure-log
+tools/machine-test-log MUST write the complete Nix build log of a
+nixos_machine_test target's derivation, named by its `.assembly[drv]`
+evaluation, so CI can print and upload the subtest and VM console output of
+a failed machine test after the runner is gone (ADR-0270).

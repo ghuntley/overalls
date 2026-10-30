@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Writes the full Nix build log of a nixos_machine_test target to a file, for
+# CI to print and upload after a failure (contract machine-test-failure-log).
+# Usage: tools/machine-test-log <target> <output-file>
+set -euo pipefail
+
+if [ "$#" -ne 2 ]; then
+  echo "usage: tools/machine-test-log <target> <output-file>" >&2
+  exit 2
+fi
+target=$1
+out=$2
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+
+# `<suite>.assembly[drv]` evaluates the same declared tree as the test and
+# names its derivation without building it.
+drv_target="${target%:*}:${target##*:}.assembly[drv]"
+drv_file=$("$root/tools/buck2" build --show-full-simple-output "$drv_target" | tail -n 1)
+drv=$(tr -d '[:space:]' <"$drv_file")
+if [ -z "$drv" ]; then
+  echo "no derivation path for $target" | tee "$out" >&2
+  exit 1
+fi
+
+{
+  echo "# $target"
+  echo "# $drv"
+  nix log "$drv" 2>&1 || nix-store --read-log "$drv" 2>&1 || echo "no build log for $drv"
+} >"$out"
+echo "wrote the build log of $drv to $out"

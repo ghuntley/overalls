@@ -278,6 +278,20 @@ jobs:
         env:
           TARGET: ${{ matrix.test.target }}
         run: cachix watch-exec overalls -- tools/buck2 test "$TARGET"
+      - name: Full build log on failure
+        if: failure()
+        env:
+          TARGET: ${{ matrix.test.target }}
+        run: |
+          tools/machine-test-log "$TARGET" machine-test.log || true
+          cat machine-test.log || true
+      - name: Upload the build log
+        if: failure()
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: machine-test-log-${{ matrix.test.name }}
+          path: machine-test.log
+          if-no-files-found: ignore
 
   # The repository precommit over the same range (ADR-0269 M8): the commit
   # hook's tools/precommit, so only the checks the range affects run, or every
