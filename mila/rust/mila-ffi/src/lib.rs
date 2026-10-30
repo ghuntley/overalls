@@ -1093,6 +1093,163 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     }
 }
 
+/// Copies one bounded session JSON result into a Java byte array; any refusal
+/// yields null. The call runs exactly once with the ABI's 1 MiB output bound,
+/// so a mutation is never resubmitted to learn its result size.
+fn jni_session_bytes(
+    env: &mut jni::JNIEnv<'_>,
+    call: impl FnOnce(*mut u8, usize, *mut usize) -> session::SessionStatus,
+) -> jni::sys::jbyteArray {
+    let mut data = vec![0u8; 1 << 20];
+    let mut size = 0usize;
+    let status = call(data.as_mut_ptr(), data.len(), &mut size);
+    if status != session::SessionStatus::Ok || size > data.len() {
+        return std::ptr::null_mut();
+    }
+    env.byte_array_from_slice(&data[..size])
+        .map_or(std::ptr::null_mut(), |a| a.into_raw())
+}
+
+fn jni_string_bytes(
+    env: &mut jni::JNIEnv<'_>,
+    value: &jni::objects::JString<'_>,
+) -> Option<Vec<u8>> {
+    if value.is_null() {
+        return None;
+    }
+    env.get_string(value).ok().map(|v| v.to_bytes().to_vec())
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-terminal-named
+/// Android terminals MUST open the caller's named Porsche terminal session
+/// (`terminal new`) and attach to that machine and session id; the unnamed
+/// legacy attach is not used because real Porsche refuses it.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalNew(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jbyteArray {
+    let (Some(machine), Some(request_id)) = (
+        jni_string_bytes(&mut env, &machine),
+        jni_string_bytes(&mut env, &request_id),
+    ) else {
+        return std::ptr::null_mut();
+    };
+    jni_session_bytes(&mut env, |out, capacity, written| unsafe {
+        session::mila_session_terminal_new(
+            handle as u64,
+            machine.as_ptr(),
+            machine.len(),
+            request_id.as_ptr(),
+            request_id.len(),
+            out,
+            capacity,
+            written,
+        )
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalAttachSession(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    terminal: jni::objects::JString<'_>,
+    columns: jni::sys::jint,
+    rows: jni::sys::jint,
+) -> jni::sys::jlong {
+    if handle <= 0 || columns <= 0 || rows <= 0 {
+        return 0;
+    }
+    let (Some(machine), Some(terminal)) = (
+        jni_string_bytes(&mut env, &machine),
+        jni_string_bytes(&mut env, &terminal),
+    ) else {
+        return 0;
+    };
+    let mut out = 0_u64;
+    let status = unsafe {
+        session::mila_session_terminal_attach_session(
+            handle as u64,
+            machine.as_ptr(),
+            machine.len(),
+            terminal.as_ptr(),
+            terminal.len(),
+            columns as u32,
+            rows as u32,
+            &mut out,
+        )
+    };
+    if status == session::SessionStatus::Ok {
+        out as jni::sys::jlong
+    } else {
+        0
+    }
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-device-register
+/// Android device registration MUST pass Susan's key-issuance reply and the
+/// device encryption public key to `mila_session_device_register`, which
+/// validates both before the push key reaches Porsche on stdin only.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceRegister(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    platform: jni::sys::jint,
+    susan_reply: jni::objects::JString<'_>,
+    enc_pubkey: jni::objects::JString<'_>,
+    label: jni::objects::JString<'_>,
+    now: jni::sys::jlong,
+) -> jni::sys::jbyteArray {
+    if !(0..=3).contains(&platform) || now < 0 {
+        return std::ptr::null_mut();
+    }
+    let (Some(reply), Some(enc)) = (
+        jni_string_bytes(&mut env, &susan_reply),
+        jni_string_bytes(&mut env, &enc_pubkey),
+    ) else {
+        return std::ptr::null_mut();
+    };
+    let label = jni_string_bytes(&mut env, &label).unwrap_or_default();
+    jni_session_bytes(&mut env, |out, capacity, written| unsafe {
+        session::mila_session_device_register(
+            handle as u64,
+            platform as u8,
+            reply.as_ptr(),
+            reply.len(),
+            enc.as_ptr(),
+            enc.len(),
+            if label.is_empty() {
+                std::ptr::null()
+            } else {
+                label.as_ptr()
+            },
+            label.len(),
+            now as u64,
+            out,
+            capacity,
+            written,
+        )
+    })
+}
+
+/// Closed refusal code recorded by the session's last Porsche error envelope.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionLastRefusal(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+) -> jni::sys::jbyteArray {
+    jni_session_bytes(&mut env, |out, capacity, written| unsafe {
+        session::mila_session_last_refusal(handle as u64, out, capacity, written)
+    })
+}
+
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionWebShow(
     mut env: jni::JNIEnv<'_>,

@@ -21,7 +21,8 @@ import kotlinx.coroutines.launch
 data class MilaWebEndpoint(val machineId: UUID, val port: Int, val public: Boolean, val revision: Long, val url: String?)
 
 fun parseMilaWebEndpoint(json: String): Result<MilaWebEndpoint> = runCatching {
-    val o = JSONObject(json)
+    // Porsche wraps reads in a `{version, status, result}` envelope; accept the bare form too.
+    val o = JSONObject(json).let { it.optJSONObject("result") ?: it }
     val id = UUID.fromString(o.getString("machine_id"))
     val port = o.getInt("port").also { require(it in 1..65535) }
     val visibility = o.getString("visibility").also { require(it == "public" || it == "private") }

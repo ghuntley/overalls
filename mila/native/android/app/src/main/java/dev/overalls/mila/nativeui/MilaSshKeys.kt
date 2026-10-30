@@ -101,7 +101,8 @@ class MilaSessionSshKeyStore(
 
         fun decode(bytes: ByteArray, currentFingerprint: String?): List<MilaSshKey> {
             require(bytes.size <= 256 * 1024) { "SSH key listing exceeds bound" }
-            val root = JSONObject(bytes.toString(Charsets.UTF_8))
+            // Porsche wraps reads in a `{version, status, result}` envelope; accept the bare form too.
+            val root = JSONObject(bytes.toString(Charsets.UTF_8)).let { it.optJSONObject("result") ?: it }
             val values = root.optJSONArray("keys") ?: throw IllegalArgumentException("keys missing")
             require(values.length() <= 256) { "too many SSH keys" }
             return buildList(values.length()) {

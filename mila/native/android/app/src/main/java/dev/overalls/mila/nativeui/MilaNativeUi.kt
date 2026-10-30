@@ -278,7 +278,6 @@ fun MilaNativeRoot(
             }
             MilaRoute.Settings -> MilaSettingsScreen(sessionAdapter, signInState is MilaSignInState.SignedIn, appLockController)
         }
-        if (route == MilaRoute.Machines && signInState is MilaSignInState.SignedIn) TerminalControls(sessionAdapter)
     }
     LaunchedEffect(signIn) {
         val saved = selectedDeployment
@@ -433,7 +432,7 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
-@Composable private fun TerminalControls(adapter: MilaFfiAdapter) {
+@Composable private fun TerminalControls(adapter: MilaFfiAdapter, machineId: java.util.UUID) {
     var result by remember { mutableStateOf("Terminal idle") }
     var terminalHandle by remember { mutableStateOf<Long?>(null) }
     var input by remember { mutableStateOf("") }
@@ -457,7 +456,7 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button({
                 terminalHandle?.let { adapter.terminalClose(it) }
-                terminalHandle = adapter.terminalOpen(80, 24, true).getOrNull()
+                terminalHandle = adapter.terminalOpen(machineId, 80, 24).getOrNull()
                 result = if (terminalHandle != null) "Attached" else "Attach rejected"
             }) { Text(MilaStrings.text(MilaMessage.Attach)) }
             Button({
@@ -591,6 +590,7 @@ internal fun machineFormStatus(state: MilaMachineFormState, kind: MilaMachineFor
         }
         MachineSharingControls(adapter, machine, signedIn, listing)
         if (machine != null) MilaWebControls(adapter, machine, signedIn)
+        if (machine != null && signedIn) TerminalControls(adapter, machine.id)
         Text(
             when (val current = controller.state) {
                 MilaMachineMutationState.SignedOut -> MilaStrings.text(MilaMessage.RuntimeUnavailable)

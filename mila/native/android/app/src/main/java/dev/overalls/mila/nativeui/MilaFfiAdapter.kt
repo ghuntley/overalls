@@ -145,6 +145,9 @@ interface MilaFfiAdapter {
     /** Opens a real Rust PTY and returns its opaque handle. */
     fun terminalOpen(columns: Int, rows: Int, readWrite: Boolean): Result<Long> =
         terminalAttach(0, columns, rows, readWrite).map { 0L }
+    /** Opens the caller's named terminal session on [machineId] and attaches a PTY to it. */
+    fun terminalOpen(machineId: UUID, columns: Int, rows: Int): Result<Long> =
+        Result.failure(IllegalStateException("terminal unavailable"))
     /** Polls bounded output bytes from the Rust-owned PTY. */
     fun terminalPoll(handle: Long, maxBytes: Int = 64 * 1024): Result<ByteArray> =
         Result.failure(IllegalStateException("terminal output unavailable"))
@@ -222,6 +225,14 @@ interface MilaRustBindings {
     /** Resizes a PTY owned by the authenticated session. */
     fun sessionTerminalResize(handle: Long, columns: Int, rows: Int, readWrite: Boolean): Int = -12
     fun sessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long = 0
+    /** `terminal new`: opens or rejoins the caller's named terminal session; returns its JSON receipt. */
+    fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = null
+    /** Attaches a PTY to one named terminal session of one machine; 0 on refusal. */
+    fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = 0
+    /** Registers this device with Susan's key-issuance reply; returns Porsche's JSON receipt. */
+    fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = null
+    /** `{"error": <closed code or null>}` for the session's last Porsche refusal. */
+    fun sessionLastRefusal(handle: Long): ByteArray? = null
     fun sessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray? = null
     fun sessionTerminalInputBytes(handle: Long, bytes: ByteArray): Int = -12
     fun sessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int = -12
@@ -306,6 +317,10 @@ internal object MilaRustFfi : MilaRustBindings {
     override fun sessionTerminalInput(handle: Long, length: Int, readWrite: Boolean): Int = nativeSessionTerminalInput(handle, length, readWrite)
     override fun sessionTerminalResize(handle: Long, columns: Int, rows: Int, readWrite: Boolean): Int = nativeSessionTerminalResize(handle, columns, rows, readWrite)
     override fun sessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long = nativeSessionTerminalOpen(handle, columns, rows)
+    override fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = nativeSessionTerminalNew(handle, machine, requestId)
+    override fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = nativeSessionTerminalAttachSession(handle, machine, terminal, columns, rows)
+    override fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = nativeSessionDeviceRegister(handle, platform, susanReply, encPubkey, label, now)
+    override fun sessionLastRefusal(handle: Long): ByteArray? = nativeSessionLastRefusal(handle)
     override fun sessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray? = nativeSessionTerminalPoll(handle, maxBytes)
     override fun sessionTerminalInputBytes(handle: Long, bytes: ByteArray): Int = nativeSessionTerminalInputBytes(handle, bytes)
     override fun sessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int = nativeSessionTerminalResizeHandle(handle, columns, rows)
@@ -357,6 +372,10 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionTerminalInput(handle: Long, length: Int, readWrite: Boolean): Int
     @JvmStatic external fun nativeSessionTerminalResize(handle: Long, columns: Int, rows: Int, readWrite: Boolean): Int
     @JvmStatic external fun nativeSessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long
+    @JvmStatic external fun nativeSessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray?
+    @JvmStatic external fun nativeSessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long
+    @JvmStatic external fun nativeSessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray?
+    @JvmStatic external fun nativeSessionLastRefusal(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray?
     @JvmStatic external fun nativeSessionTerminalInputBytes(handle: Long, input: ByteArray): Int
     @JvmStatic external fun nativeSessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int
@@ -457,6 +476,33 @@ class MilaSessionHandle internal constructor(
         bindings.sessionTerminalOpen(nativeHandle, columns, rows).takeIf { it > 0 }
             ?: error("terminal attach rejected")
     }
+    /**
+     * @cc [owner:ghuntley,label:security;protocol] android-terminal-named-session
+     * A packaged terminal MUST open the caller's named Porsche terminal session for one machine
+     * (`terminal new`) and attach to that machine and session id; the unnamed legacy attach is
+     * never used because real Porsche refuses it.
+     */
+    @Synchronized fun terminalOpenSession(machine: UUID, columns: Int, rows: Int, requestId: String): Result<Long> = runCatching {
+        check(!closed); require(requestId.matches(MILA_REQUEST_ID)); require(columns in 1..4096 && rows in 1..512)
+        val receipt = bindings.sessionTerminalNew(nativeHandle, machine.toString(), requestId) ?: error("terminal new refused")
+        require(receipt.size <= 64 * 1024) { "terminal receipt exceeds bound" }
+        val result = org.json.JSONObject(receipt.toString(Charsets.UTF_8)).getJSONObject("result")
+        val terminal = result.getString("session_id")
+        require(terminal.matches(Regex("^[A-Za-z0-9-]{1,64}$"))) { "invalid terminal session id" }
+        bindings.sessionTerminalAttachSession(nativeHandle, machine.toString(), terminal, columns, rows).takeIf { it > 0 }
+            ?: error("terminal attach rejected")
+    }
+    /** Registers this device; the Susan reply carries the push key and never enters UI state. */
+    @Synchronized fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String?, now: Long): Result<ByteArray> = runCatching {
+        check(!closed); require(susanReply.length <= 4096 && encPubkey.length <= 64 && (label == null || label.length <= 256))
+        bindings.sessionDeviceRegister(nativeHandle, 1, susanReply, encPubkey, label, now) ?: error("device registration refused")
+    }
+    /** Closed refusal code from Porsche's last error envelope, or null. Never carries payloads. */
+    @Synchronized fun lastRefusal(): String? = runCatching {
+        check(!closed)
+        val value = bindings.sessionLastRefusal(nativeHandle) ?: return@runCatching null
+        org.json.JSONObject(value.toString(Charsets.UTF_8)).optString("error").takeIf { it.matches(Regex("^[a-z0-9_]{1,64}$")) }
+    }.getOrNull()
     @Synchronized fun terminalPoll(handle: Long, maxBytes: Int): Result<ByteArray> = runCatching {
         check(!closed); require(handle > 0); require(maxBytes in 1..(64 * 1024))
         bindings.sessionTerminalPoll(handle, maxBytes) ?: error("terminal poll rejected")
@@ -608,7 +654,16 @@ class LinkedMilaFfiAdapter(
     override fun terminalAttach(from: Long, columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalAttach(from, columns, rows, readWrite) }
     override fun terminalInput(length: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalInput(length, readWrite) }
     override fun terminalResize(columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalResize(columns, rows, readWrite) }
-    override fun terminalOpen(columns: Int, rows: Int, readWrite: Boolean): Result<Long> = authenticatedValue { authenticatedSession!!.terminalOpen(columns, rows) }
+    // Real Porsche refuses the unnamed attach; terminals must name a machine and session.
+    override fun terminalOpen(columns: Int, rows: Int, readWrite: Boolean): Result<Long> =
+        Result.failure(IllegalStateException("terminal requires a machine"))
+    override fun terminalOpen(machineId: UUID, columns: Int, rows: Int): Result<Long> =
+        authenticatedValue { authenticatedSession!!.terminalOpenSession(machineId, columns, rows, milaRequestId()) }
+    fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String? = null): Result<ByteArray> =
+        authenticatedSession?.notificationDeviceRegister(susanReply, encPubkey, label, System.currentTimeMillis() / 1000)
+            ?: Result.failure(IllegalStateException("session unavailable"))
+    /** Closed refusal code for diagnostics; never includes request payloads. */
+    fun lastRefusal(): String? = authenticatedSession?.lastRefusal()
     override fun terminalPoll(handle: Long, maxBytes: Int): Result<ByteArray> = authenticatedValue { authenticatedSession!!.terminalPoll(handle, maxBytes) }
     override fun terminalInputBytes(handle: Long, bytes: ByteArray): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalInputBytes(handle, bytes) }
     override fun terminalResizeHandle(handle: Long, columns: Int, rows: Int): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalResizeHandle(handle, columns, rows) }
