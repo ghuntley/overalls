@@ -71,10 +71,24 @@ To add a tool:
 
 - **Modules take `{ packages }:`.** Do not build first-party code inside a
   module; take it from `packages`.
-- **Assembly** (`lib.assemble`, milestone M3) evaluates
-  `builtins.getFlake "path:<copied tree>"` under
-  `--option restrict-eval true`, so only declared files are readable. Pass
-  the revision as an argument; never read `self.rev`.
+- **Assembly.** `nix/assemble/default.nix` is `lib.assemble
+  { revision, artifacts, params }`.
+  - It builds one package set, instantiates every module over it
+    (`nix/assemble/modules.nix`), and returns `systems`, `checks`, `kexec`,
+    `packages`, `hostPackages` and `imported`.
+  - The flake outputs are views of it. Add new modules and host wiring there,
+    never in `flake.nix`.
+  - Buck2's `nix_assemble` evaluates it with
+    `builtins.getFlake "path:<copied tree>"` under
+    `--option restrict-eval true`, so only declared files are readable. Pass
+    the revision as an argument; never read `self.rev`.
+- **Swapping in a Buck2 artifact.** Its rule provides `RuntimeRefsInfo`. A
+  `nix_store_import` target imports it, and `nix_assemble`'s `artifacts`
+  passes it on. In `artifacts/default.nix`, the leaf uses
+  `artifacts.<name> or <nix build>`.
+  - Every consumer then gets the imported copy, whose closure is rebuilt from
+    the declared references.
+  - Compare `nix-store -qR` against the Nix build before switching.
 - **Exemptions.** Sealed outputs and evaluation assertions keep literal hashes
   on purpose. Read the exemption reasons in `scripts/pins.ex` before you
   change them.

@@ -140,10 +140,37 @@ the approved migration plan.
   which [bootstrap-attrs.sh](../../../nix/buck/bootstrap-attrs.sh) regenerates.
 - [ownership.bxl](../../../buck/bxl/ownership.bxl) checks file ownership.
 
+- [nix/assemble](../../../nix/assemble/default.nix) is `lib.assemble`.
+  - It holds the single package set and its parameterised variants. Today
+    these are the default set and the host set with private service roots.
+  - The module set is instantiated over that package set in
+    [modules.nix](../../../nix/assemble/modules.nix).
+  - It also builds the host systems, kexec and the machine-test catalog.
+  - The flake's `nixosConfigurations`, `nixosModules`, `checks` and
+    `host-kexec` are now views of it. For the same revision, all six host
+    systems have the same drvPaths as before.
+- [import-artifact.nix](../../../nix/assemble/import-artifact.nix) re-records
+  the runtime references of imported artifacts. The leaf hook in
+  [default.nix](../../../nix/domains/artifacts/default.nix) swaps Mix
+  releases for Buck2 artifacts.
+- [assemble.bzl](../../../buck/assemble.bzl) defines `nix_store_import`,
+  `nix_assemble` and `RuntimeRefsInfo`; the script is
+  [nix_assemble.sh](../../../buck/nix_assemble.sh).
+- The probes in [buck/probes](../../../buck/probes/BUCK) and the
+  [soundness BXL](../../../buck/bxl/assemble_soundness.bxl) show:
+  - an imported artifact keeps its declared reference (bash);
+  - `packages.hostTools` assembles under `restrict-eval`;
+  - a tree that omits `nix/` fails to evaluate.
+
 Remaining gaps, by milestone of the migration plan:
 
 - rust-overlay toolchain and per-language rules (M5–M7);
-- `nix_store_import`, `nix_assemble` and `lib.assemble` (M3);
+- the remaining M3 items:
+  - moving the in-module builds into the package set;
+  - per-host parameter targets;
+  - antithesis hub consolidation;
+  - Inception store-name filters;
+  - deployment and machine-test targets on `nix_assemble`;
 - removal of the flake package, check and configuration outputs (M11);
 - Darwin cells and the Windows mode without Nix (M9);
 - CI and devenv using `tools/buck2` (M1 follow-up, M8).

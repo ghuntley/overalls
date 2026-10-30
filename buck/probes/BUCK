@@ -5,3 +5,43 @@ genrule(
     out = "version.txt",
     cmd = "$(exe toolchains//:elixir)/bin/elixir -e 'IO.puts System.version()' > $OUT",
 )
+
+load("//buck:assemble.bzl", "nix_assemble", "nix_store_import")
+
+# Assembly probes: a package from the single package set, and a Buck2-built
+# directory imported into the store with a declared runtime reference.
+nix_assemble(
+    name = "assemble_host_tools",
+    attr = "packages.hostTools",
+)
+
+genrule(
+    name = "artifact_dir",
+    out = "artifact",
+    cmd = "mkdir -p $OUT/bin && printf '#!%s\\necho probe\\n' {} > $OUT/bin/probe && chmod +x $OUT/bin/probe".format(read_root_config("nix", "bash")),
+)
+
+nix_store_import(
+    name = "artifact_import",
+    src = ":artifact_dir",
+    runtime_refs = [read_root_config("nix", "bash")],
+)
+
+nix_assemble(
+    name = "assemble_imported",
+    attr = "imported.probe",
+    artifacts = {"probe": ":artifact_import"},
+)
+
+load("//buck:nix.bzl", "owned_set")
+
+# Soundness probe: the root package alone does not declare nix/, so assembly
+# must fail to evaluate rather than read the checkout (expected failure).
+owned_set(name = "root_files_only", deps = ["root//:srcs"])
+
+nix_assemble(
+    name = "assemble_undeclared",
+    attr = "packages.hostTools",
+    srcs = [":root_files_only"],
+    labels = ["expected_failure"],
+)

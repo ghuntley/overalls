@@ -49,6 +49,24 @@ draft plan:
 | Do default globs include dotfiles? | No. `nix_owned` adds `**/.*` patterns. Ownership then covers all 7247 tracked files outside `docs/`. |
 | Are `.buckconfig` ignores matched anywhere in the tree? | No, they are root-relative. Nested build directories need `**/` patterns. |
 
+## M3 assembly results
+
+- **Shared source of truth.** `lib.assemble` now holds the package set, the
+  module set, the host systems, kexec and the machine-test catalog, and the
+  flake outputs are views of it. With the same revision, all six host
+  systems have the same drvPaths as on trunk.
+- **Expected differences.** `image-susan` embeds the flake revision, and Mila
+  native Linux takes the whole repository as its source. The pins check and
+  the host-enrollment fixture also differ; both embed the flake source.
+- **Store context.** `builtins.storePath` works under `restrict-eval`.
+  Runtime references passed as JSON strings carry no store context, so
+  `importArtifact` restores it with `storePath`. Without that, Nix records
+  no references and the closure silently loses runtime dependencies. The
+  first probe showed exactly this.
+- **Reading the tree.** `restrict-eval` refuses reads of the temporary tree,
+  so assembly reads its artifact manifest through the copied flake's
+  `outPath`.
+
 ## Risks
 
 - **Hosts get heavier.** They need buck2, the cells closure and the cache. The

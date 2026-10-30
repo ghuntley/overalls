@@ -39,25 +39,14 @@
     let
       system = "x86_64-linux";
       pkgs = buildNixpkgs.legacyPackages.${system};
-      built = import ./nix/domains/artifacts/default.nix { inherit pkgs; };
+      # The single package set (ADR-0269), also used by every module.
+      built = assembled.packages;
       antithesisImages = import ./antithesis/nix { inherit pkgs nixpkgs; };
-      hostPackages = import ./nix/domains/artifacts/default.nix {
-        inherit pkgs;
-        privateServiceRoots = [ ./secrets/private-services-root.pem ./secrets/brady-root.pem ];
+      assemble = import ./nix/assemble {
+        inherit nixpkgs buildNixpkgs disko nixos-images nix-compact tribuchet nix-grpc-store;
       };
-      inventory = import ./nix/platform/hosts/inventory.nix { inherit (nixpkgs) lib; };
-      fixtures = import ./nix/verification/tests/fixtures/hosts/configurations.nix { inherit nixpkgs disko; modules = self.nixosModules; };
-      hostSystem = name: enrolled: nixpkgs.lib.nixosSystem {
-        inherit system;
-        specialArgs = { overallsPackages = hostPackages; };
-        modules = [ self.nixosModules.default self.nixosModules.fleetBuilds
-          # Telemetry and backups name the deployed source revision.
-          { system.configurationRevision = self.rev or self.dirtyRev or null; }
-          (import ./nix/platform/hosts/profile.nix {
-          host = inventory.hosts.${name}; diskoModule = disko.nixosModules.disko; inherit enrolled;
-        }) ] ++ nixpkgs.lib.optionals (enrolled && builtins.pathExists (./fleet/hosts + "/${name}/configuration.nix"))
-          [ (./fleet/hosts + "/${name}/configuration.nix") ];
-      };
+      # Flake-evaluated hosts name the checkout revision; Buck2 passes it.
+      assembled = assemble { revision = self.rev or self.dirtyRev or null; };
     in
     {
       # @cc [owner:ghuntley,label:build] flake-releases-from-source
@@ -80,6 +69,8 @@
       # Lock files, builds and fixed-output hash keys for the scheduled
       # Mix and Cargo security upgrade scripts.
       lib.dependencyPins = built.dependencyPins;
+      # NixOS assembly from Buck2 artifacts (ADR-0269); see nix/assemble.
+      lib.assemble = assemble;
       packages.${system} = {
         default = built.marshall;
         # Hermetic Mila journey backend launcher (ADR-0264); the app runs it.
@@ -124,16 +115,7 @@
         guest-windows = built.windowsGuest;
         host-tools = built.hostTools;
         host = import ./nix/domains/artifacts/host { pkgs = nixpkgs.legacyPackages.${system}; };
-        host-kexec = (nixpkgs.lib.nixosSystem {
-          inherit system;
-            modules = [ nixos-images.nixosModules.kexec-installer nixos-images.nixosModules.noninteractive
-              ./nix/domains/system/nix-cache.nix
-            ({ config, pkgs, ... }: {
-              system.kexec-installer.name = "overalls-host-installer";
-              environment.systemPackages = [ pkgs.python3 config.boot.zfs.package ];
-              boot.kernelModules = [ "kvm-intel" "kvm-amd" ];
-            }) ];
-        }).config.system.build.kexecInstallerTarball;
+        host-kexec = assembled.kexec;
         tool-nix-compact = nix-compact.lib.mkPackage { inherit pkgs; };
         tool-nix-compact-host = nix-compact.lib.mkPackage { pkgs = nixpkgs.legacyPackages.${system}; };
         tool-lyra = built.lyra;
@@ -180,75 +162,11 @@
       # Buck2 prelude and Nix toolchain paths (ADR-0269); tools/buck2 links it.
       buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (built) toolchain; };
 
-      nixosModules = {
-        default = import ./nix/domains/system/catalog.nix { packages = built; nixCompact = nix-compact; };
-        # Kept out of the default catalog: only flake-built hosts and tests that
-        # pass the locked inputs import tribuchet and nix-grpc-store (ADR-0248).
-        fleetBuilds = import ./nix/domains/system/fleet-builds.nix { inherit tribuchet; nixGrpcStore = nix-grpc-store; };
-        services = {
-          marshall = import ./nix/domains/system/marshall.nix { packages = built; };
-          lilly = import ./nix/domains/system/lilly.nix { packages = built; };
-          brady = import ./nix/domains/system/brady { packages = built; };
-          porsche = import ./nix/domains/system/porsche.nix { packages = built; };
-          audi-private = import ./nix/domains/system/audi-private.nix { packages = built; };
-          ziggy = import ./nix/domains/system/ziggy.nix { packages = built; };
-          galileo = import ./nix/domains/system/galileo.nix { packages = built; };
-          enrico = import ./nix/domains/system/enrico.nix { packages = built; };
-          peach = import ./nix/domains/system/peach.nix { packages = built; };
-          susan = import ./nix/domains/system/susan.nix { packages = built; };
-          audi = import ./nix/domains/system/audi.nix { packages = built; };
-        };
-        platform = {
-          nix-cache = ./nix/domains/system/nix-cache.nix;
-          nix-compact = import ./nix/domains/system/nix-compact.nix { nixCompact = nix-compact; };
-          remote-builders = { imports = [ ./nix/domains/system/remote-builders.nix self.nixosModules.security.secrets ]; };
-          sysctl = ./nix/domains/system/sysctl.nix;
-          auto-update = import ./nix/domains/system/auto-update/default.nix { packages = built; };
-        };
-        network = {
-          proxy = { imports = [ self.nixosModules.services.marshall ./nix/domains/system/proxy.nix ]; };
-          acme = { imports = [ self.nixosModules.network.proxy ./nix/domains/system/acme/default.nix ]; };
-          fleet-firewall = ./nix/domains/system/fleet-firewall.nix;
-          tailscale = ./nix/domains/system/tailscale.nix;
-        };
-        security = {
-          access = ./nix/domains/system/access.nix;
-          audit = ./nix/domains/system/security-audit.nix;
-          host-identity = ./nix/domains/system/host-identity.nix;
-          secrets = import ./nix/domains/system/secrets/default.nix { packages = built; };
-        };
-        storage = {
-          backups = { imports = [ (import ./nix/domains/system/backups { packages = built; }) self.nixosModules.services.lilly self.nixosModules.services.marshall self.nixosModules.security.secrets ]; };
-          crash-dumps = import ./nix/domains/system/crash-dumps { lib = nixpkgs.lib; pkgs = pkgs; };
-        };
-        observability = {
-          logging = ./nix/domains/system/logging/default.nix;
-          cloudwatch = ./nix/domains/system/cloudwatch/default.nix;
-          fleet-exporter = ./nix/domains/system/fleet-exporter/default.nix;
-          otel-guest = ./nix/domains/system/otel-guest/default.nix;
-          otel-fleet = ./nix/domains/system/otel-fleet/default.nix;
-          underclass = import ./nix/domains/system/underclass.nix { packages = built; };
-          log-store = ./nix/domains/system/log-store/default.nix;
-        };
-      };
+      nixosModules = assembled.modules;
 
-      nixosConfigurations = nixpkgs.lib.mapAttrs (name: _: hostSystem name true)
-        (nixpkgs.lib.filterAttrs (name: host: host.identity.sshKeys != []
-          && host.git.knownHosts != "" && nixpkgs.lib.any (document: document.name == "${name}-git") host.credentials) inventory.hosts)
-        // nixpkgs.lib.mapAttrs' (name: _: nixpkgs.lib.nameValuePair "${name}-base" (hostSystem name false)) inventory.hosts;
+      nixosConfigurations = assembled.systems;
 
-      checks.${system} = import ./nix/verification/tests/ci.nix { inherit (pkgs) lib; checks = (import ./nix/verification/tests/catalog.nix {
-        buildPkgs = pkgs;
-        testPkgs = nixpkgs.legacyPackages.${system};
-        inherit nixpkgs;
-        packages = built;
-        modules = self.nixosModules;
-        inherit fixtures;
-        diskoModule = disko.nixosModules.disko;
-        diskoSource = disko.outPath;
-        kexec = self.packages.${system}.host-kexec;
-        imageSource = nixos-images.outPath;
-      }) // {
+      checks.${system} = import ./nix/verification/tests/ci.nix { inherit (pkgs) lib; checks = assembled.checks // {
         nix-compact-core = nix-compact.lib.mkCoreCheck { inherit pkgs; };
         nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; };
         # Built (not booted) by the cache job so the linux-native journey

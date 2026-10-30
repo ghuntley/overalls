@@ -11,6 +11,8 @@ let
     coreutils = "${pkgs.coreutils}/bin";
     python = "${pkgs.python3}/bin/python3";
     nix = "${pkgs.nix}/bin/nix";
+    nix_store = "${pkgs.nix}/bin/nix-store";
+    jq = "${pkgs.jq}/bin/jq";
     erlang = "${toolchain.erlang}";
     elixir = "${toolchain.elixir}";
     cc = "${pkgs.stdenv.cc}/bin/cc";

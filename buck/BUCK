@@ -1,3 +1,5 @@
 load(":nix.bzl", "nix_owned")
 
 nix_owned()
+
+export_file(name = "nix_assemble.sh", visibility = ["PUBLIC"])

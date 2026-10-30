@@ -1,4 +1,11 @@
-{ pkgs, encryptedCrashDumps ? false, privateServiceRoots ? [ ], antithesisSdk ? false, antithesisGuest ? false, antithesisIntegratedHost ? false }:
+{ pkgs, encryptedCrashDumps ? false, privateServiceRoots ? [ ], antithesisSdk ? false, antithesisGuest ? false, antithesisIntegratedHost ? false
+  # @cc [owner:ghuntley,label:build] buck2-artifacts-replace-leaves
+  # Buck2-built first-party artifacts imported by lib.assemble. A present key
+  # MUST replace the Nix build of that leaf for every consumer in this set, so
+  # no output mixes a Buck2 build with a Nix build of the same component
+  # (ADR-0269). Absent keys keep the Nix build until their rule lands.
+, artifacts ? { }
+}:
 assert !antithesisGuest || antithesisSdk;
 assert !antithesisIntegratedHost || antithesisGuest;
 let
@@ -170,7 +177,7 @@ let
 
   # Every Mix application with fixed-output dependencies, keyed like
   # dependency-hashes.json; adding one to `dependencies` adds it here.
-  mixReleases = lib.genAttrs (lib.attrNames dependencies) release;
+  mixReleases = lib.genAttrs (lib.attrNames dependencies) (application: artifacts.${application} or (release application));
 
   # @cc [owner:ghuntley,label:build;security] dependency-pin-registry
   # Each entry names the lock files it builds from, the derivation that MUST

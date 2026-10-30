@@ -1,0 +1,16 @@
+# Assembly soundness (ADR-0269; contract assembly-refuses-undeclared-inputs in
+# buck/CONTRACTS): an assembly over a tree that omits nix/ must fail to
+# evaluate, and the declared probes must build.
+
+def _main(ctx: bxl.Context) -> None:
+    bad = ctx.build("root//buck/probes:assemble_undeclared")
+    for result in bad.values():
+        if len(list(result.failures())) == 0:
+            fail("assemble_undeclared built; restrict-eval or the declared tree leaked checkout files")
+    good = ctx.build(["root//buck/probes:assemble_host_tools", "root//buck/probes:assemble_imported"])
+    for label, result in good.items():
+        if len(list(result.failures())) > 0:
+            fail("{} failed to assemble".format(label))
+    ctx.output.print("assemble soundness: undeclared tree refused; probes assembled")
+
+main = bxl_main(impl = _main, cli_args = {})

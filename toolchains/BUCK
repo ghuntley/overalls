@@ -18,7 +18,7 @@ remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["P
 noop_test_toolchain(name = "test", visibility = ["PUBLIC"])
 
 [nix_tool(name = tool, visibility = ["PUBLIC"]) for tool in [
-    "bash", "coreutils", "elixir", "erlang", "nix", "python",
+    "bash", "coreutils", "elixir", "erlang", "jq", "nix", "nix_store", "python",
 ]]
 
 nix_owned()

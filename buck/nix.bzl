@@ -45,8 +45,12 @@ nix_flake_attr = rule(
     },
 )
 
+# Package-relative source directories, so assembly can rebuild the tree.
+OwnedSrcsInfo = provider(fields = {"dirs": list[(str, Artifact)]})
+
 def _owned_set_impl(ctx: AnalysisContext) -> list[Provider]:
-    return [DefaultInfo(other_outputs = [o for d in ctx.attrs.deps for o in d[DefaultInfo].default_outputs])]
+    dirs = [(d.label.package, o) for d in ctx.attrs.deps for o in d[DefaultInfo].default_outputs]
+    return [DefaultInfo(other_outputs = [o for _, o in dirs]), OwnedSrcsInfo(dirs = dirs)]
 
 # Union of owned file groups whose outputs share short paths across packages.
 owned_set = rule(impl = _owned_set_impl, attrs = {"deps": attrs.list(attrs.dep())})

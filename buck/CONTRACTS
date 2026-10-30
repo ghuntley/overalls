@@ -13,3 +13,14 @@ any owned change reruns it.
 ownership MUST fail when a tracked file outside docs/ has no owning target,
 because the affected-target selector selects everything for unowned paths
 (ADR-0270).
+
+@cc [owner:ghuntley,label:build] nix-store-import-local-only
+nix_store_import MUST run locally and never upload its output, because the
+output names a path in the local Nix store; it MUST forward the artifact's
+declared runtime references so assembly can record them (ADR-0269).
+
+@cc [owner:ghuntley,label:build;verification] assembly-refuses-undeclared-inputs
+nix_assemble MUST evaluate lib.assemble over a copied tree of declared
+sources only, under restrict-eval, so an undeclared Nix input is an
+evaluation error rather than a silent read of the checkout. The
+assemble_soundness BXL keeps an undeclared-tree probe failing (ADR-0269).
