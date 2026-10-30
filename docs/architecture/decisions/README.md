@@ -1131,7 +1131,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0269](0269-buck2-build-system-with-nix-toolchains.md) | accepted | partial | Buck2 is the build system; Nix supplies toolchains, pins and NixOS assembly |
 | [ADR-0270](0270-graph-driven-machine-test-selection.md) | accepted | partial | Select pull-request builds and NixOS machine tests from the Buck2 graph |
 | [ADR-0271](0271-buck2-host-self-deployment.md) | accepted | planned | Hosts self-deploy by building their Buck2 deployment target |
-| [ADR-0272](0272-nativelink-remote-cache-and-execution.md) | accepted | planned | NativeLink remote cache and execution for Buck2 |
+| [ADR-0272](0272-nativelink-remote-cache-and-execution.md) | accepted | partial | NativeLink remote cache and execution for Buck2 |
 | [ADR-0273](0273-single-rust-workspace-and-toolchain.md) | accepted | planned | One Cargo workspace and one Rust toolchain |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)

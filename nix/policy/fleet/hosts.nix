@@ -1,7 +1,7 @@
 # @cc [owner:ghuntley,label:deployment;security] fleet-host-roster
 # Fleet roles, tunnel membership and reachability MUST be declared here once
-# and read by the fleet tunnel, remote-builder, fleet-build, telemetry and
-# control-plane consumers. Every roster host MUST have a reviewed host.json
+# and read by the fleet tunnel, remote-builder, fleet-build, build-cache,
+# telemetry and control-plane consumers. Every roster host MUST have a reviewed host.json
 # declaration (fleet/hosts/NAME) and every declared host MUST appear here.
 # Each deployment owns one tunnel (ADR-0239, ADR-0246): tunnel addresses repeat
 # across deployments, peers MUST be reciprocal members of the same tunnel, and
@@ -29,6 +29,9 @@
       telemetry = { central = "panterloons"; worker = "dungarees"; };
       # Panterloons runs the tribuchet hub and the scheduler (ADR-0248).
       builds = { scheduler = "panterloons"; hub = "panterloons"; participants = [ "dungarees" "panterloons" ]; };
+      # Panterloons serves the Buck2 cache; readers hold read-only
+      # identities (ADR-0272).
+      buildCache = { server = "panterloons"; readers = [ "dungarees" "panterloons" ]; };
       tunnel = {
         panterloons = { address = "10.90.0.1"; endpoint = "panterloonsPrimary"; peers = [ "dungarees" "salopettes" ]; };
         dungarees = { address = "10.90.0.2"; endpoint = "dungareesPrimary"; peers = [ "panterloons" ]; };
@@ -71,6 +74,10 @@ let
     assert lib.assertMsg (participants != [] && unique participants && lib.all (host: inTunnel host && hosts.${host}.builder != null) participants
       && builtins.elem deployment.builds.scheduler participants && builtins.elem deployment.builds.hub participants)
       "Fleet deployment ${name}: build participants must be tunnel members with builder capacity, including the scheduler and hub";
+    assert lib.assertMsg (let cache = deployment.buildCache or null; in cache == null
+      || (lib.all (host: inTunnel host && hosts.${host}.tailnetAddress != null) ([ cache.server ] ++ cache.readers)
+        && unique cache.readers))
+      "Fleet deployment ${name}: the build cache server and readers must be tunnel members with tailnet addresses";
     true;
 in
 assert lib.assertMsg (builtins.attrNames hosts == builtins.attrNames inventory)

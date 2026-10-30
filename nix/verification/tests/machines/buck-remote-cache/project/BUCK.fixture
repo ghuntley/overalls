@@ -1,0 +1,8 @@
+load("//:platforms.bzl", "overalls_execution_platform")
+load("//:rules.bzl", "write")
+
+overalls_execution_platform(name = "platform")
+
+write(name = "uploaded", text = "written by the CI uploader")
+
+write(name = "host_attempt", text = "attempted by a read-only host")

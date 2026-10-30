@@ -35,6 +35,8 @@
   "lilly": "sha256-4VL4H0/RF7BGNmcRf1H86dDvRU/dnAE6e3mNGHuEpiM=",
   "macosSdk113": "sha256-mtwTc9OHnhlz0orZ8XyQUbApMWdKPsKiSYEomJ7OLLE=",
   "marshall": "sha256-nKnXtCiyO7bG0ikHpFfpFjoQ/lA1N7gYHt7nAcNm2jI=",
+  "nativelinkCargo": "sha256-6PN2nXDnVr4UIrkZYWYpBzMFCLjCh722RNFcf+vf8T4=",
+  "nativelinkSource": "sha256-k9Vzp5nOq2D/JnYfnG1vlIZrca8dt7F6qz6SwirXLec=",
   "nodeWindowsX64": "sha256-FY92hbRN5R9sDfHRU1JsvNPhvHOajfxgdyHO913p5UE=",
   "omniosBuildSource": "sha256-vx3zvMiKaZiLF9IudtxboOqU8VAkxQMnrho2n0JWcMw=",
   "omniosCloudImage": "sha256-787Bo109Vm7bEyjQd6VKgMHeKobdN+U73hL5bKXGi4s=",

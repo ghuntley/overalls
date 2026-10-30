@@ -56,6 +56,11 @@ PLAIN_MODULES = frozenset(
         "modules.fleetBuilds",
     }
 )
+# Owned groups a suite reads beyond NIX_INPUTS and PACKAGE_INPUTS.
+SUITE_INPUTS: Mapping[str, tuple[str, ...]] = {
+    # The real Buck2 execution platform rule (ADR-0272).
+    "buck-remote-cache": ("//buck:srcs",),
+}
 PACKAGE_INPUT = re.compile(r"\b(service|storage|packages)\b")
 MODULE_REF = re.compile(r"\bmodules\.[A-Za-z0-9_.-]+")
 NESTED_KVM = re.compile(r"^\s*requiredFeatures\.nested-kvm\s*=\s*true\s*;", re.M)
@@ -300,7 +305,11 @@ def render_target(entry: Entry, inputs: str, scenarios: Sequence[str]) -> str:
 
 def _inputs(entry: Entry, own: Sequence[str], siblings: Iterable[str]) -> str:
     groups = "NIX_INPUTS" + (" + PACKAGE_INPUTS" if entry.packages else "")
-    extra = list(own) + [f"//{MACHINES}/{s}:srcs" for s in sorted(siblings)]
+    extra = (
+        list(own)
+        + [f"//{MACHINES}/{s}:srcs" for s in sorted(siblings)]
+        + list(SUITE_INPUTS.get(entry.suite, ()))
+    )
     return f"{groups} + {_string_list(extra, '    ')}" if extra else groups
 
 

@@ -58,6 +58,23 @@ preserving other fields (such as `DB_PASSWORD`), and update the bundle in the
 same change. Without a recovery identity, generate a fresh CA and replace all
 three documents together.
 
+## Buck2 remote cache identities
+
+[`fleet/buck-re`](../fleet/buck-re) holds the public certificates of the
+NativeLink cache ([ADR-0272](../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)).
+`ca.crt` issues the Panterloons server certificate and the read-only host
+client certificates. `uploader-ca.crt` issues only the CI uploader
+certificate. Both CAs were issued on 2026-10-30, expire in 2036, and had their
+private keys discarded after issuance. Leaves expire in 2028.
+`panterloons-buck-re.enc.json` holds `SERVER_KEY` and `CLIENT_IDENTITY`, and
+`dungarees-buck-re.enc.json` holds `CLIENT_IDENTITY`, under
+`overalls-buck-re.production`. A client identity is the PEM certificate
+followed by its key. `buck-re-uploader-recovery.enc.json` is recovery-only. It
+holds `overalls-buck-re-uploader.production.UPLOADER_IDENTITY` for loading into
+CI, and is never delivered to a host. To rotate, or to add a host, issue new
+CAs and every leaf in private storage, replace all three documents with
+`encrypt --replace`, and commit the certificates in the same change.
+
 ## Tailscale auto-join key
 
 [`fleet-tailscale.enc.json`](fleet-tailscale.enc.json) holds the shared

@@ -21,7 +21,7 @@
   target_platform_detector_spec = target:root//...->prelude//platforms:default
 
 [build]
-  execution_platforms = prelude//platforms:default
+  execution_platforms = toolchains//:execution_platform
 
 [buck2]
   file_watcher = notify
@@ -34,3 +34,7 @@
   ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical
 
 <file:.buck-cells/toolchains.buckconfig>
+
+# Optional NativeLink cache client settings ([buck2_re_client]) live in the
+# untracked .buckconfig.local, which Buck2 reads natively, or in root's
+# ~/.buckconfig.d on fleet hosts (ADR-0272). Without them builds stay local.

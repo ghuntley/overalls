@@ -187,3 +187,54 @@ Verification:
 Remaining risks: until M11 a change anywhere under `nix/` selects every machine
 test, and most suites have not yet run through their declared-only tree, so an
 undeclared read surfaces as a first-run failure.
+
+## M4b: NativeLink cache
+
+Scope: the CAS and action cache on Panterloons, client configuration and
+credentials ([ADR-0272](../decisions/0272-nativelink-remote-cache-and-execution.md)).
+Remote-execution workers are M10.
+
+- **No per-identity authorisation.** NativeLink checks a client certificate
+  against a CA but cannot authorise by subject. The write split is therefore
+  structural: two listeners in one process, each trusting one CA. The read
+  listener's action cache is `read_only`. Its CAS is a `fast_slow` store with
+  a `noop` fast tier and a `read_only` reference to the shared CAS, so reads
+  reach the shared blobs and host uploads are drained. A host blob upload
+  therefore returns success but persists nothing. The test asserts this; it
+  is weaker than a refusal, but content-addressed blobs cannot poison
+  anything, and action-cache writes are refused.
+- **Public reachability.** The fleet firewall admits reviewed public fleet
+  sources to every port, and Linux accepts a packet for any local address on
+  any interface. A firewall-only design would therefore leave the cache
+  reachable from fleet peers' public addresses. The module binds the tailnet
+  address with `freebind` and restricts the unit to loopback and
+  `tailscale0`. The machine test routes the tailnet address through the
+  public interface and shows that sshd answers there but the cache does not.
+- **Credentials.** There are two CAs, as in ADR-0248, and both private keys
+  were discarded after issuance. The CI uploader identity is held in a
+  recovery-only document until the CI workflow (M4a) loads it.
+- **Licence.** NativeLink v0.8 and later are FSL-1.1-ALv2. The fleet's
+  internal use is a permitted purpose. v0.7.10, the last Apache-2.0 release,
+  lacks the listener `freebind` option that the tailnet-only binding needs.
+- **Host fallback.** Root's `~/.buckconfig.d` file exists only while the
+  decrypted identity does, so a missing credential means local execution.
+  Buck2 ignores symlinks and includes in that directory, which the first
+  machine-test run exposed; the unit installs a regular copy. Only root reads
+  it, so other users' builds on a host are unaffected. A cache that cannot be
+  reached is not fatal either: buck2 reports the RE error and builds locally.
+
+Residual risks: a compromised CI runner can still poison the action cache
+(see Risks). The cache has no deployment receipt on Panterloons yet.
+
+Verification performed for M4b:
+- The `buck-remote-cache` machine test passed, through `nix build` and
+  through `tools/buck2 test`. Its suite declares `//buck:srcs` as an extra
+  input, because it tests the real `buck/platforms.bzl`.
+- The Panterloons and Dungarees toplevels built, and so did the
+  `fleet-roster` and `fleet-builds-configuration` checks.
+- Before writing the module, a local NativeLink run checked the same
+  configuration with grpcurl and buck2.
+- `check_pins`, `check_adrs`, the contract format and coverage checks,
+  `prek run --all-files`, `//buck/...` tests and the ownership BXL.
+- `nix run .#secrets -- check` reports drift only for `fleet-tailscale`,
+  which trunk already had before this change.

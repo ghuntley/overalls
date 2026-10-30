@@ -49,6 +49,10 @@
       "path": "secrets/dungarees-fleet-builds.enc.json"
     },
     {
+      "name": "dungarees-buck-re",
+      "path": "secrets/dungarees-buck-re.enc.json"
+    },
+    {
       "name": "dungarees-remote-builders",
       "path": "secrets/dungarees-remote-builders.enc.json"
     },

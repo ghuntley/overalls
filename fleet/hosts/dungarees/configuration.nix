@@ -6,6 +6,8 @@ let
 in
 {
   imports = [ ../../fleet-network.nix ];
+  # A read-only client of Panterloons' Buck2 cache (ADR-0272).
+  overalls.buckRemoteCache = (import ../../buck-re.nix { inherit lib; }).forHost "dungarees";
   services.overallsOtelFleet = {
     enable = true;
     role = "worker";

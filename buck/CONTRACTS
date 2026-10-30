@@ -90,3 +90,11 @@ daemon (ADR-0269).
 nix/buck/bootstrap_attrs.bzl MUST list exactly the flake's x86_64-linux
 package and check names; //buck:bootstrap_attrs_fresh evaluates the names
 only and fails when they differ.
+
+@cc [owner:ghuntley,label:build;security] buck2-remote-cache-optional
+The execution platform MUST query the remote cache only when a
+[buck2_re_client] address is configured (the untracked .buckconfig.local, or
+root's ~/.buckconfig.d file on a host, present only with its identity), so
+absent credentials mean plain local execution. Uploads MUST additionally
+require [buck2] default_allow_cache_upload = true; the server, not this flag,
+enforces that only the CI identity can write (ADR-0272).

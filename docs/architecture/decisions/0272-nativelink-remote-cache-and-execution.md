@@ -3,7 +3,7 @@
 - ID: ADR-0272
 - Date: 2026-10-30
 - Status: accepted
-- Implementation: planned
+- Implementation: partial
 - Components: build, fleet infrastructure, CI
 - Supersedes: none
 - Superseded by: none
@@ -28,7 +28,9 @@ chose a NativeLink cache plus remote execution on 2026-10-30.
    each host's client certificate is held in SOPS.
 3. **Who may write.** CI runners may upload and use remote execution. They
    join with an ephemeral Tailscale key. Hosts may only read the cache.
-   Developers use the tailnet.
+   Developers use the tailnet. NativeLink cannot authorise per certificate,
+   so reads and uploads use separate listeners, each trusting only its own
+   CA under `fleet/buck-re/`.
 4. **Workers.**
    - Workers run in the pool-mount-free namespace of
      [ADR-0144](0144-nix-builds-exclude-guest-datasets.md).
@@ -65,9 +67,10 @@ remote execution, and the approved migration plan.
 ## Invariants and verification
 
 - Only CI identities can write to the action cache, and host credentials are
-  read-only. Planned test: a NixOS machine test with a client upload refusal.
-- The listener is never reachable off the tailnet. Planned: a module
-  assertion and a machine test.
+  read-only. Verified by the `buck-remote-cache` machine test.
+- The listener is never reachable off the tailnet. Enforced by the module's
+  address binding, interface restriction and assertions, and verified by the
+  `buck-remote-cache` machine test.
 - Outputs of `local_only` actions are never uploaded (`allow_cache_upload =
   False` in the rules).
 - **Failure case:** a compromised CI runner could upload poisoned action
@@ -77,7 +80,65 @@ remote execution, and the approved migration plan.
 
 ## Implementation evidence
 
-No implementation yet (milestones M4b and M10).
+M4b (cache only) is implemented; remote-execution workers (M10) are not.
+
+- **Package.** NativeLink is not in the pinned nixpkgs. The
+  [package](../../../nix/domains/artifacts/nativelink/default.nix) builds
+  release v1.8.3 from source, with its source and Cargo hashes in the
+  [pin registry](../../../nix/domains/artifacts/dependency-hashes.json). Its
+  licence is FSL-1.1-ALv2: self-hosted internal use is a permitted purpose,
+  and each release becomes Apache-2.0 two years after publication. v1.x is
+  needed for the listener's `freebind` option.
+- **Module.** [buck-remote-execution.nix](../../../nix/domains/system/buck-remote-execution.nix)
+  runs one NativeLink process with one store set and two mTLS listeners.
+  NativeLink cannot authorise per certificate, so the write split is per
+  listener and per CA:
+  - the read listener (50071) trusts only the reader CA, which issues host
+    certificates. Its action cache is `read_only` and refuses updates with
+    `PermissionDenied`; its CAS is a read-only view whose uploads are
+    discarded, never persisted;
+  - the upload listener (50072) trusts only the uploader CA, which issues
+    only the CI certificate. Its CAS verifies size and hash on upload.
+  Both listeners bind the tailnet address with `freebind`, never a wildcard,
+  and `RestrictNetworkInterfaces` limits the process to loopback and
+  `tailscale0`. This matters because the fleet firewall admits reviewed
+  public fleet sources to every port. Assertions refuse a firewall-opened
+  port, a wildcard or loopback address, and storage inside a Lilly pool; the
+  pool paths are also inaccessible to the unit (ADR-0144). Storage is
+  `/var/lib/nativelink`.
+- **Credentials.** The [registry](../../../fleet/buck-re.nix) takes the
+  server, readers, tailnet address and ports from the
+  [fleet roster](../../../nix/policy/fleet/hosts.nix) and
+  [port roster](../../../nix/policy/fleet/ports.nix), and the documents from
+  host inventory. Public certificates are in [fleet/buck-re](../../../fleet/buck-re).
+  Panterloons' document holds the server key and its reader identity, and
+  Dungarees' holds its reader identity. The CI uploader identity is the
+  recovery-only `buck-re-uploader-recovery` document. Both CA private keys
+  were discarded after issuance, as in ADR-0248, so rotation reissues every
+  certificate.
+- **Clients.** The [execution platform](../../../buck/platforms.bzl) enables
+  the remote cache only when a `[buck2_re_client]` address is configured, and
+  uploads only with `[buck2] default_allow_cache_upload = true`. Developers and CI
+  put both in the untracked `.buckconfig.local`. On hosts, a unit installs root's
+  `~/.buckconfig.d/overalls-remote-cache` only while the decrypted identity
+  exists, and withdraws it otherwise. Buck2 ignores symlinks and includes in
+  that directory, so the file is a regular copy.
+- **Machine test.** [buck-remote-cache](../../../nix/verification/tests/machines/buck-remote-cache/default.nix)
+  boots a cache, a CI client, a host and an outsider. It checks the
+  tailnet-only binding, that the listeners are unreachable through the public
+  interface even when routed there, CA separation per listener, a CI
+  action-result and blob write that a host reads, the host's
+  `PermissionDenied` and discarded blob, local fallback without credentials,
+  and buck2 uploads and cache hits through both client configurations.
+  It passed on 2026-10-30, both as the flake check and as the Buck2 target
+  `//nix/verification/tests/machines/buck-remote-cache:buck-remote-cache`.
+
+Remaining gaps:
+- CI does not yet join the tailnet or load the uploader identity. That wiring
+  belongs to the M4a CI workflow.
+- No native deployment receipt on Panterloons yet.
+- Remote-execution workers, the `overalls-cells` platform property and the
+  Cachix cells closure are M10.
 
 ## Open questions
 

@@ -57,7 +57,7 @@ let
   # input with only the package-level license policy changed; no channel or
   # host SDK is consulted.
   androidPkgs = import pkgs.path {
-    system = pkgs.system;
+    system = pkgs.stdenv.hostPlatform.system;
     config.allowUnfree = true;
   };
   androidEnvironment = androidPkgs.callPackage (pkgs.path + "/pkgs/development/mobile/androidenv") {
@@ -347,6 +347,10 @@ rec {
   vscodeWebBroker = import ./vscode-web-broker { inherit pkgs; };
   smtprelay = pkgs.callPackage ./smtprelay {};
   underclass = pkgs.callPackage ./underclass {};
+  # NativeLink is FSL-1.1-ALv2 (source-available, unfree in nixpkgs terms);
+  # build it from the same pinned input with only the licence policy relaxed,
+  # as for the Android SDK (ADR-0272).
+  nativelink = androidPkgs.callPackage ./nativelink {};
   secretTools = { inherit (pkgs) secretspec sops ssh-to-age age; };
   userRecipients = secretPackages.recipients;
   secrets = secretPackages.command;

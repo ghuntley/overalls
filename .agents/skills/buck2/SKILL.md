@@ -150,6 +150,43 @@ match Nix byte for byte. Compare them with `diff -r`.
   backstop is `nixos-machine-tests.yml`; dispatch it with
   `gh workflow run nixos-machine-tests.yml --ref trunk -f checks="a b"`.
 
+## Remote cache (NativeLink)
+
+Panterloons serves a REv2 cache (CAS and action cache) on its tailnet address
+([ADR-0272](../../../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)).
+Remote execution is not available yet (M10).
+
+- **Optional.** `toolchains//:execution_platform` queries the cache only when
+  `[buck2_re_client]` has an address. Without one, every action runs locally.
+- **Developers and CI** write the untracked `.buckconfig.local`, which Buck2
+  reads natively. Never commit it:
+
+  ```ini
+  [buck2_re_client]
+    address = grpc://100.98.214.120:50071
+    tls = true
+    instance_name = main
+    tls_ca_certs = /path/to/overalls/fleet/buck-re/ca.crt
+    tls_client_cert = /private/buck-re-client.pem
+  ```
+
+  `tls_client_cert` is one PEM file holding the certificate and then its key.
+  Keep it outside the checkout and the Nix store.
+- **Reading or uploading.** Port 50071 is read-only and trusts the reader CA,
+  which issues host certificates. Port 50072 trusts only the uploader CA, which
+  issues the CI certificate. The CI certificate lives in the recovery-only
+  `buck-re-uploader-recovery` document. Uploading also needs
+  `[buck2] default_allow_cache_upload = true`.
+- **Hosts.** The `overalls.buckRemoteCache.client` module installs root's
+  `~/.buckconfig.d/overalls-remote-cache` only while the host's decrypted
+  identity exists, so a missing credential means local builds. Buck2 ignores
+  symlinks and `<file:…>` includes in `~/.buckconfig.d`; write regular files
+  there.
+- **What is never uploaded.** `local_only` actions that touch `/nix/store` or
+  the Nix daemon keep `allow_cache_upload = False` (rule 4).
+- **Checking hits.** The build summary prints
+  `Commands: N (cached: C, remote: 0, local: L)`.
+
 ## Troubleshooting
 
 - **Socket path too long** (Chromium, Postgres). `buck-out` paths are deep.
@@ -170,6 +207,10 @@ match Nix byte for byte. Compare them with `diff -r`.
 - **Stale toolchain.** Check that `readlink .buck-cells` matches
   `nix build --print-out-paths .#buckCells.x86_64-linux`, then run
   `tools/buck2 kill`.
+- **Remote cache errors.** Move `.buckconfig.local` aside to confirm the
+  build works locally. Then check the tailnet route to Panterloons, that the
+  PEM holds the certificate and key, and that the port matches the
+  certificate: a host certificate on 50072 fails the TLS handshake.
 - **Bumping buck2.** buck2 comes from `buildNixpkgs`. Bump `flake.lock`, rerun
   the spikes in the [migration review](../../../docs/architecture/reviews/2026-10-30-buck2-migration.md),
   and expect every target to be selected.

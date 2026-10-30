@@ -133,6 +133,7 @@
         tool-vscode-web-broker-windows = built.windowsEditorBroker;
         tool-update-vscode-extensions = built.updateVscodeExtensions;
         tool-underclass = built.underclass;
+        tool-nativelink = built.nativelink;
         tool-smtprelay = built.smtprelay;
         security-user-recipients = built.userRecipients;
         security-secrets = built.secrets;

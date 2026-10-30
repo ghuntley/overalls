@@ -15,4 +15,6 @@
     enable = true;
     localName = "panterloons";
   } // import ../../fleet-builds.nix { inherit lib; };
+  # Panterloons serves the Buck2 NativeLink cache and reads it (ADR-0272).
+  overalls.buckRemoteCache = (import ../../buck-re.nix { inherit lib; }).forHost "panterloons";
 }

@@ -5,7 +5,7 @@
 let
   inventory = (import ../../platform/hosts/inventory.nix { inherit lib; }).secrets;
 in
-assert lib.assertMsg (lib.all (name: !(builtins.hasAttr name inventory.documents)) [ "git-bootstrap" "marshall-bootstrap" "crash-dump-bootstrap" "private-ca-recovery" "brady-ca-recovery" "ssh-host-ca-recovery" "logstore-ca-recovery" "service-ca-recovery" ]) "Bootstrap documents are reserved for recovery-only custody";
+assert lib.assertMsg (lib.all (name: !(builtins.hasAttr name inventory.documents)) [ "git-bootstrap" "marshall-bootstrap" "crash-dump-bootstrap" "private-ca-recovery" "brady-ca-recovery" "ssh-host-ca-recovery" "logstore-ca-recovery" "service-ca-recovery" "buck-re-uploader-recovery" ]) "Bootstrap documents are reserved for recovery-only custody";
 inventory // {
   documents = inventory.documents // {
     ssh-host-ca-recovery = {
@@ -45,6 +45,13 @@ inventory // {
     };
     crash-dump-bootstrap = {
       path = "secrets/crash-dump-bootstrap.enc.json";
+      hosts = [];
+      recoveryOnly = true;
+    };
+    # The CI uploader identity for the Buck2 remote cache (ADR-0272). It is
+    # never delivered to a host; operators load it into CI.
+    buck-re-uploader-recovery = {
+      path = "secrets/buck-re-uploader-recovery.enc.json";
       hosts = [];
       recoveryOnly = true;
     };

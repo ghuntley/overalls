@@ -105,6 +105,10 @@
       "path": "secrets/panterloons-fleet-builds.enc.json"
     },
     {
+      "name": "panterloons-buck-re",
+      "path": "secrets/panterloons-buck-re.enc.json"
+    },
+    {
       "name": "panterloons-remote-builders",
       "path": "secrets/panterloons-remote-builders.enc.json"
     },

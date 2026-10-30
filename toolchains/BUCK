@@ -4,6 +4,7 @@ load("@prelude//toolchains:python.bzl", "system_python_bootstrap_toolchain")
 load("@prelude//tests:test_toolchain.bzl", "noop_test_toolchain")
 load("@prelude//toolchains:remote_test_execution.bzl", "remote_test_execution_toolchain")
 load(":nix.bzl", "nix_tool")
+load("@root//buck:platforms.bzl", "overalls_execution_platform")
 
 system_genrule_toolchain(name = "genrule", visibility = ["PUBLIC"])
 
@@ -16,6 +17,9 @@ system_python_bootstrap_toolchain(
 remote_test_execution_toolchain(name = "remote_test_execution", visibility = ["PUBLIC"])
 
 noop_test_toolchain(name = "test", visibility = ["PUBLIC"])
+
+# Local execution, plus the NativeLink cache when configured (ADR-0272).
+overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"])
 
 [nix_tool(name = tool, visibility = ["PUBLIC"]) for tool in [
     "bash", "coreutils", "elixir", "erlang", "jq", "nix", "nix_store", "python",
