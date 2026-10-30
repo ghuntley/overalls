@@ -22,8 +22,15 @@ class MilaJniSignatureTest {
 
     private data class Export(val name: String, val parameters: List<JniType>, val result: JniType)
 
-    private val source: File = listOf("../../../rust/mila-ffi/src/lib.rs", "../../../../rust/mila-ffi/src/lib.rs")
-        .map(::File).firstOrNull(File::isFile) ?: error("mila-ffi lib.rs not found from ${File(".").absolutePath}")
+    private val sourceRoot: File = listOf("../../../rust/mila-ffi/src", "../../../../rust/mila-ffi/src")
+        .map(::File).firstOrNull { File(it, "lib.rs").isFile }
+        ?: error("mila-ffi src not found from ${File(".").absolutePath}")
+
+    /** Every Rust source in mila-ffi, since the JNI exports live in modules below `src/android`. */
+    private val source: String = sourceRoot.walkTopDown()
+        .filter { it.isFile && it.extension == "rs" }
+        .sortedBy { it.path }
+        .joinToString("\n") { it.readText() }
 
     private fun jniType(rust: String): JniType = when (rust.substringAfterLast("::").substringBefore("<").trim()) {
         "jlong" -> JniType.Exact(java.lang.Long.TYPE)
@@ -40,7 +47,7 @@ class MilaJniSignatureTest {
             """extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_(\w+)\s*\((.*?)\)\s*(?:->\s*([\w:]+))?\s*\{""",
             RegexOption.DOT_MATCHES_ALL,
         )
-        return pattern.findAll(source.readText()).associate { match ->
+        return pattern.findAll(source).associate { match ->
             val (name, parameters, result) = match.destructured
             val types = parameters.split(',').map(String::trim).filter(String::isNotEmpty)
                 .map { it.substringAfter(':').trim() }
