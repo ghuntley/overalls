@@ -6,7 +6,8 @@ defmodule EditorGuestFixture do
 
   @type terminal_operation ::
           :prepare | :custody | :broker_restart | :worker_stop | :saved | :policy
-  @type operation :: terminal_operation() | :boot_capture | :boot_changed | :diagnose
+  @type operation ::
+          terminal_operation() | :boot_capture | :boot_changed | :diagnose | :journal
   @stages [
     :arguments,
     :terminal,
@@ -137,6 +138,7 @@ defmodule EditorGuestFixture do
       :boot_capture -> capture_boot(placement)
       :boot_changed -> changed_boot(placement)
       :diagnose -> diagnose(placement, username, uid)
+      :journal -> journal(placement, uid)
       terminal_operation -> run_terminal(terminal_operation, placement, username, uid)
     end
   end
@@ -333,6 +335,145 @@ defmodule EditorGuestFixture do
       :ok
     after
       Terminal.close(terminal)
+    end
+  end
+
+  # @cc [owner:ghuntley,label:verification;privacy] editor-fixture-broker-journal
+  # Failure capture MUST first prove the current physical boot and an executed
+  # root console assertion, then read only this boot's journal of the editor
+  # broker and the personal worker unit. The guest reduces each line to a
+  # short closed record (timestamp, unit, event token) before it crosses the
+  # console, so console wrapping cannot split it; lines matching neither the
+  # broker's closed event schema nor fixed systemd lifecycle phrases are
+  # dropped in the guest, and unit descriptions, PIDs, paths and request data
+  # never leave it. From the worker's own log only the timestamp of its fixed
+  # auto-shutdown phrase is kept. Capture is bounded in lines, bytes and a
+  # 30-second deadline and MUST NOT change guest state.
+  @journal_lines 400
+  @journal_scan 5000
+  @journal_bytes 262_144
+  @journal_program """
+  s/^([0-9]{10}\\.[0-9]{6}) [^ ]+ [^ ]+: [{]"service":"overalls-vscode-web-broker","event":"editor[.]([a-z_]{1,32})"(,"reason":"([a-z]{1,16})")?[}]$/J \\1 broker \\2 \\4/p
+  s/^([0-9]{10}\\.[0-9]{6}) [^ ]+ systemd\\[1\\]: overalls-vscode-(web|u[0-9]+)[.]service: (Deactivated successfully|Main process exited|Failed with result|Scheduled restart job).*$/J \\1 \\2 \\3/p
+  s/^([0-9]{10}\\.[0-9]{6}) [^ ]+ systemd\\[1\\]: (Started|Starting|Stopping|Stopped) overalls-vscode-(web|u[0-9]+)[.]service.*$/J \\1 \\3 \\2/p
+  """
+  @journal_tokens %{
+    "Started" => "started",
+    "Starting" => "starting",
+    "Stopping" => "stopping",
+    "Stopped" => "stopped",
+    "Deactivated successfully" => "deactivated",
+    "Main process exited" => "main_exited",
+    "Failed with result" => "failed",
+    "Scheduled restart job" => "restart_scheduled"
+  }
+  @spec journal(String.t(), integer()) :: :ok
+  defp journal(placement, uid) do
+    _snapshot = snapshot_boot(placement)
+    :ok = mark(:diagnostics)
+    worker = "overalls-vscode-u#{uid}.service"
+    program = Base.encode64(@journal_program)
+    {:ok, terminal} = Terminal.connect(placement)
+
+    try do
+      until = System.monotonic_time(:millisecond) + 30_000
+      :ok = ready_root(terminal, until)
+      marker = "EDITOR_JOURNAL_" <> Base.encode16(:crypto.strong_rand_bytes(12))
+
+      :ok =
+        Terminal.write(
+          terminal,
+          "overalls_editor_journal_program=$(printf %s #{program} | base64 -d); printf '\\n%s%s\\n' #{marker} _BEGIN; journalctl -b --no-pager -q -o short-unix -n #{@journal_scan} -u overalls-vscode-web.service -u #{worker} 2>/dev/null | tr -cd '\\11\\12\\40-\\176' | sed -n -E -e \"$overalls_editor_journal_program\"; find /home -path '*/.local/share/overalls/vscode-web/*' -name remoteagent.log -type f -print0 2>/dev/null | xargs -0 -r grep -h -F 'ServerLifetime: all consumers inactive, shutting down' 2>/dev/null | cut -c1-23 | sed 's/^/LIFETIME /'; unset overalls_editor_journal_program; printf '\\n%s%s\\n' #{marker} _END\n"
+        )
+
+      lines = terminal |> collect(marker, until, "") |> String.split("\n", trim: true)
+      kept = lines |> Enum.flat_map(&journal_entry(&1, uid)) |> Enum.take(-@journal_lines)
+      Enum.each(kept, &IO.puts/1)
+      IO.puts("Editor broker journal summary lines=#{length(lines)} kept=#{length(kept)}")
+    after
+      Terminal.close(terminal)
+    end
+  end
+
+  @spec journal_entry(String.t(), integer()) :: [String.t()]
+  defp journal_entry(line, uid) do
+    record =
+      ~r/\AJ (?<seconds>\d{10})\.(?<micros>\d{6}) (?<unit>web|u\d+|broker) (?<rest>[A-Za-z_ ]{1,40})\z/
+
+    shutdown =
+      ~r/\ALIFETIME (?<date>\d{4}-\d\d-\d\d) (?<clock>\d\d:\d\d:\d\d\.\d{3})\z/
+
+    worker = "u#{uid}"
+
+    cond do
+      captures = Regex.named_captures(shutdown, line) ->
+        ["Editor broker journal #{captures["date"]}T#{captures["clock"]}000 worker auto_shutdown"]
+
+      captures = Regex.named_captures(record, line) ->
+        time =
+          captures["seconds"]
+          |> String.to_integer()
+          |> DateTime.from_unix!()
+          |> DateTime.to_iso8601()
+          |> String.replace_suffix("Z", ".#{captures["micros"]}Z")
+
+        kind =
+          case captures["unit"] do
+            "broker" -> :event
+            "web" -> "broker"
+            ^worker -> "worker"
+            _ -> nil
+          end
+
+        words = String.split(captures["rest"], " ", trim: true)
+
+        {token, reason} =
+          case {kind, words} do
+            {:event, [event]} -> {event, ""}
+            {:event, [event, reason]} -> {event, " " <> reason}
+            {:event, _} -> {nil, ""}
+            {nil, _} -> {nil, ""}
+            _ -> {Map.get(@journal_tokens, Enum.join(words, " ")), ""}
+          end
+
+        cond do
+          token == nil or not Regex.match?(~r/\A[a-z_]{1,32}\z/, token) or
+              not Regex.match?(~r/\A( [a-z]{1,16})?\z/, reason) ->
+            []
+
+          kind == :event ->
+            ["Editor broker journal #{time} broker editor.#{token}#{reason}"]
+
+          true ->
+            ["Editor broker journal #{time} #{kind} #{token}"]
+        end
+
+      true ->
+        []
+    end
+  end
+
+  @spec collect(Terminal.t(), String.t(), integer(), binary()) :: binary()
+  defp collect(terminal, marker, until, body) do
+    true = System.monotonic_time(:millisecond) < until
+    true = byte_size(body) <= @journal_bytes
+
+    case Terminal.read(terminal, 1000) do
+      {:ok, bytes} ->
+        body = String.replace(body <> bytes, "\r", "")
+
+        case Regex.run(~r/\n#{marker}_BEGIN\n(?<lines>.*)\n#{marker}_END\n/s, body,
+               capture: :all_but_first
+             ) do
+          [lines] -> lines
+          _ -> collect(terminal, marker, until, body)
+        end
+
+      {:error, :timeout} ->
+        collect(terminal, marker, until, body)
+
+      _ ->
+        raise "Editor guest journal transport closed"
     end
   end
 
@@ -572,7 +713,8 @@ try do
         "policy" => :policy,
         "boot-capture" => :boot_capture,
         "boot-changed" => :boot_changed,
-        "diagnose" => :diagnose
+        "diagnose" => :diagnose,
+        "journal" => :journal
       },
       operation
     )

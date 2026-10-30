@@ -730,16 +730,24 @@ fn ensure_worker(
     Err(Refusal::Readiness)
 }
 
-/// Which relay direction reached its end first: the closed record names it
-/// without carrying any byte of either stream.
+/// Which relay direction reached its end first and how: the closed record
+/// names it without carrying any byte of either stream.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 enum Ending {
     /// The worker ended before sending one byte to the gateway.
     Silent,
     /// The worker ended after sending a response.
     Worker,
-    /// The gateway ended first.
+    /// Reading from the worker failed.
+    WorkerFault,
+    /// Writing the worker's bytes to the gateway failed.
+    GatewayWrite,
+    /// The gateway ended its stream.
     Client,
+    /// Reading from the gateway failed.
+    GatewayRead,
+    /// Writing the gateway's bytes to the worker failed.
+    WorkerClosed,
 }
 
 impl Ending {
@@ -747,34 +755,112 @@ impl Ending {
         match self {
             Self::Silent => "silent",
             Self::Worker => "worker",
+            Self::WorkerFault => "workerfault",
+            Self::GatewayWrite => "gatewaywrite",
             Self::Client => "client",
+            Self::GatewayRead => "gatewayread",
+            Self::WorkerClosed => "workerclosed",
         }
     }
 }
 
+/// How one relay direction ended, and how many bytes it moved first.
+enum Pumped {
+    End(u64),
+    Read,
+    Write,
+}
+
+fn pump(source: &mut impl Read, sink: &mut impl Write) -> Pumped {
+    let mut buffer = [0_u8; 16 * 1024];
+    let mut moved = 0_u64;
+    loop {
+        let count = match source.read(&mut buffer) {
+            Ok(0) => return Pumped::End(moved),
+            Ok(count) => count,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => continue,
+            Err(_) => return Pumped::Read,
+        };
+        if sink.write_all(&buffer[..count]).is_err() {
+            return Pumped::Write;
+        }
+        moved += count as u64;
+    }
+}
+
+/// Read and discard the gateway's remaining bytes until it ends its stream.
+fn drain(source: &mut impl Read) {
+    let mut buffer = [0_u8; 16 * 1024];
+    loop {
+        match source.read(&mut buffer) {
+            Ok(0) => return,
+            Ok(_) => {}
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {}
+            Err(_) => return,
+        }
+    }
+}
+
+/// How long a gateway may keep sending after the worker's side ended before
+/// the broker closes the connection regardless.
+const LINGER: Duration = Duration::from_secs(10);
+
+/// @cc [owner:ghuntley,label:recovery;protocol] editor-relay-orderly-close
+/// A failed write of gateway bytes to the worker MUST NOT end the response
+/// direction: every byte the worker sends until its own end of stream MUST
+/// still reach the gateway, then the broker half-closes the gateway for
+/// writing and discards further gateway bytes until the gateway ends or
+/// LINGER passes. A worker that answers early and closes therefore yields
+/// its response, never an empty close the gateway reports as a missing
+/// response. A gateway end of stream or failure still closes both sides.
 fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusal> {
     let mut client_writer = client.try_clone().map_err(|_| Refusal::Transport)?;
     let mut worker_reader = worker.try_clone().map_err(|_| Refusal::Transport)?;
     let ending = Mutex::new(None);
+    let (gateway_done, gateway_ended) = std::sync::mpsc::channel::<()>();
     thread::scope(|scope| {
-        scope.spawn(|| {
-            let moved = std::io::copy(&mut worker_reader, &mut client_writer).unwrap_or(0);
-            ending
+        let ending = &ending;
+        let (client_writer, worker_reader) = (&mut client_writer, &mut worker_reader);
+        scope.spawn(move || {
+            let outcome = match pump(worker_reader, client_writer) {
+                Pumped::End(0) => Ending::Silent,
+                Pumped::End(_) => Ending::Worker,
+                Pumped::Read => Ending::WorkerFault,
+                Pumped::Write => Ending::GatewayWrite,
+            };
+            let recorded = *ending
                 .lock()
                 .unwrap_or_else(std::sync::PoisonError::into_inner)
-                .get_or_insert(if moved == 0 {
-                    Ending::Silent
-                } else {
-                    Ending::Worker
-                });
+                .get_or_insert(outcome);
+            if !matches!(
+                recorded,
+                Ending::Client | Ending::GatewayRead | Ending::GatewayWrite
+            ) {
+                let _ = client_writer.shutdown(Shutdown::Write);
+                if gateway_ended.recv_timeout(LINGER).is_ok() {
+                    return;
+                }
+            }
             let _ = client_writer.shutdown(Shutdown::Both);
-            let _ = worker_reader.shutdown(Shutdown::Both);
         });
-        let _ = std::io::copy(&mut client, &mut worker);
-        ending
+        let outcome = match pump(&mut client, &mut worker) {
+            Pumped::End(_) => Ending::Client,
+            Pumped::Read => Ending::GatewayRead,
+            Pumped::Write => Ending::WorkerClosed,
+        };
+        let recorded = *ending
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get_or_insert(Ending::Client);
+            .get_or_insert(outcome);
+        if matches!(
+            recorded,
+            Ending::Client | Ending::GatewayRead | Ending::GatewayWrite
+        ) {
+            let _ = worker.shutdown(Shutdown::Both);
+        } else {
+            drain(&mut client);
+        }
+        let _ = gateway_done.send(());
         let _ = client.shutdown(Shutdown::Both);
         let _ = worker.shutdown(Shutdown::Both);
     });
@@ -1208,5 +1294,31 @@ mod tests {
             },
         );
         assert_eq!(gateway_first, Ending::Client);
+    }
+
+    #[test]
+    fn response_survives_a_worker_that_stopped_reading_the_request() {
+        // The worker stops reading after the request line, so the broker's
+        // next write of gateway bytes fails, and only then answers and
+        // closes. That response MUST still reach the gateway, followed by
+        // end of stream, rather than an empty close.
+        let ending = relay_ending(
+            |mut gateway| {
+                gateway.write_all(b"GET / HTTP/1.1\r\n\r\n").unwrap();
+                thread::sleep(Duration::from_millis(100));
+                let _ = gateway.write_all(b"trailing request bytes");
+                let mut response = Vec::new();
+                gateway.read_to_end(&mut response).unwrap();
+                assert_eq!(response, b"HTTP/1.1 400 \r\n\r\n");
+            },
+            |mut worker| {
+                let mut request = [0_u8; 18];
+                worker.read_exact(&mut request).unwrap();
+                worker.shutdown(Shutdown::Read).unwrap();
+                thread::sleep(Duration::from_millis(300));
+                worker.write_all(b"HTTP/1.1 400 \r\n\r\n").unwrap();
+            },
+        );
+        assert_eq!(ending, Ending::WorkerClosed);
     }
 }

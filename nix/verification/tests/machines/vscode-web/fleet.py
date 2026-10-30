@@ -22,14 +22,56 @@ def editor_native(operation: str) -> None:
         "boot-capture",
         "boot-changed",
         "diagnose",
+        "journal",
     }
     host, placement = current_placement(editor_vm)
     output = host.succeed(
         shlex.join(["fleet-editor-guest", operation, placement, guest_name, str(guest_uid)]),
-        timeout=60 if operation == "diagnose" else 150,
+        timeout=60 if operation in {"diagnose", "journal"} else 150,
     )
     if operation == "diagnose":
         publish_editor_diagnostics(output)
+    if operation == "journal":
+        publish_editor_journal(output)
+
+
+def publish_editor_journal(output: str) -> None:
+    """@cc [owner:ghuntley,label:verification;privacy] editor-broker-journal-publication
+    Broker journal capture MUST be bounded and every line MUST match the closed
+    timestamp, unit-kind and event-token grammar before any line is printed.
+    Any other line refuses the whole capture without exposing its text.
+    """
+    assert len(output) <= 65_536
+    lines = output.splitlines()
+    assert lines and lines[-1] == "Editor native guest assertions passed"
+    assert len(lines) >= 2
+    summary = re.fullmatch(
+        r"Editor broker journal summary lines=\d{1,4} kept=\d{1,3}",
+        lines[-2],
+    )
+    assert summary is not None
+    entries = lines[:-2]
+    assert len(entries) <= 400
+    pattern = (
+        r"Editor broker journal \d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{6}(?:Z|[+-]\d\d:?\d\d)? "
+        r"(?:broker editor\.[a-z_]{1,32}(?: [a-z]{1,16})?"
+        r"|(?:broker|worker) (?:started|starting|stopping|stopped|deactivated"
+        r"|main_exited|failed|restart_scheduled|auto_shutdown))"
+    )
+    for line in entries:
+        assert re.fullmatch(pattern, line) is not None
+    for line in entries:
+        print(line)
+    print(lines[-2])
+
+
+def editor_failure_evidence() -> None:
+    """Best-effort native evidence after a failed editor acceptance step."""
+    for operation in ("diagnose", "journal"):
+        try:
+            editor_native(operation)
+        except Exception:
+            print("Editor native " + operation + " unavailable")
 
 
 def publish_editor_diagnostics(output: str) -> None:
@@ -158,8 +200,9 @@ def editor_journey() -> None:
     # @cc [owner:ghuntley,label:verification;security] editor-live-failure-diagnosis
     # Failure MUST retain the original browser exception and unchanged deadline.
     # Before teardown, bounded native diagnostics MAY observe only the current
-    # authenticated boot and fixed worker health booleans; diagnostic refusal
-    # MUST NOT replace failed acceptance or expose private terminal state.
+    # authenticated boot, fixed worker health booleans and the closed-grammar
+    # broker journal; diagnostic refusal MUST NOT replace failed acceptance or
+    # expose private terminal state.
     try:
         client.succeed(
             "sudo -u tester env HOME=/home/tester "
@@ -175,10 +218,7 @@ def editor_journey() -> None:
             timeout=240,
         )
     except Exception:
-        try:
-            editor_native("diagnose")
-        except Exception:
-            print("Editor native diagnostic unavailable")
+        editor_failure_evidence()
         raise
 
 
@@ -357,19 +397,23 @@ with subtest("native editor opens from Marshall with personal terminal and isola
     editor_native("custody")
 
 with subtest("the real guest preserves editor policy, personal defaults and direnv approval"):
-    client.succeed(
-        "sudo -u tester env HOME=/home/tester "
-        + shlex.join(
-            [
-                editor_python,
-                editor_browser_artifact + "/fleet_policy.py",
-                editor_root + "/journey.json",
-                "--chromium",
-                "/run/current-system/sw/bin/chromium",
-            ]
-        ),
-        timeout=300,
-    )
+    try:
+        client.succeed(
+            "sudo -u tester env HOME=/home/tester "
+            + shlex.join(
+                [
+                    editor_python,
+                    editor_browser_artifact + "/fleet_policy.py",
+                    editor_root + "/journey.json",
+                    "--chromium",
+                    "/run/current-system/sw/bin/chromium",
+                ]
+            ),
+            timeout=300,
+        )
+    except Exception:
+        editor_failure_evidence()
+        raise
     editor_native("policy")
 
 with subtest("live editor WebSockets survive lilly-hostd and Lilly restarts in detached bridges"):
@@ -445,7 +489,11 @@ with subtest("live editor WebSockets survive lilly-hostd and Lilly restarts in d
     client.wait_until_succeeds(f'! kill -0 "$(cat {live}/pid)"', timeout=180)
     # The helper prints only fixed stage and assertion messages, never browser data.
     print(client.succeed(f"cat {live}/out"))
-    client.succeed(f"grep -qx 'Editor restart survival assertions passed' {live}/out")
+    try:
+        client.succeed(f"grep -qx 'Editor restart survival assertions passed' {live}/out")
+    except Exception:
+        editor_failure_evidence()
+        raise
 
 with subtest("broker restart preserves the independent editor process and user workspace"):
     editor_native("broker-restart")
