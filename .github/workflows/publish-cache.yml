@@ -150,36 +150,47 @@ jobs:
       - name: Verify precommit left no changes
         run: git diff --exit-code
 
-  # Builds every CI-enabled flake check that is not a NixOS machine test
-  # (meta.ci, nix/verification/tests/ci.nix) and publishes it to Cachix.
-  # Machine tests run in nixos-machine-tests.yml.
+  # Builds every assembled flake check (`flake_output` `check` targets in
+  # BUCK.v2: release probes, evaluation checks, nix-compact and
+  # fleet-builds-configuration) through Buck2 and publishes the realised paths
+  # to Cachix. Machine tests run in ci.yml and nixos-machine-tests.yml; the
+  # repository script checks are ci.yml tests. Contract
+  # cache-build-selection: see buck/CONTRACTS.
   #
   # The selected checks are built in shards on separate runners: built on one
   # runner, their evaluation-time images, build directories and outputs
   # outgrew its 116 GB store volume (ENOSPC in run 40999640832) even after
   # selection collected its garbage, and a round-robin shard holding several
-  # 60-80 GB checks did too (run 41034532972), so those checks build alone.
-  # `nix` is the aggregate gate.
+  # 60-80 GB checks did too (run 41034532972), so those checks (label
+  # isolated_build) build alone. `nix` is the aggregate gate.
   nix-select:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    timeout-minutes: 120
+    timeout-minutes: 60
     outputs:
       shards: ${{ steps.shards.outputs.shards }}
-      errors: ${{ steps.select.outputs.errors }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
-        with:
-          fetch-depth: 0
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # Loads targets only; builds and evaluates no derivation.
       - name: Select checks
         id: select
-        run: .github/scripts/select-checks.sh build
-      # Every isolated check (meta.ci.isolated) gets a shard of its own; the
-      # rest are dealt round-robin over SHARDS shards. Each selected check is
-      # in exactly one shard.
+        run: |
+          set -euo pipefail
+          query() { tools/buck2 uquery "$1" --json | jq -c 'sort'; }
+          checks=$(query 'attrfilter(labels, check, attrfilter(labels, flake_output, root//:))')
+          isolated=$(query 'attrfilter(labels, isolated_build, attrfilter(labels, flake_output, root//:))')
+          jq -e 'length > 0' <<<"$checks" > /dev/null
+          echo "Selected $(jq length <<<"$checks") checks: $checks"
+          {
+            echo "checks=$checks"
+            echo "isolated=$isolated"
+          } >> "$GITHUB_OUTPUT"
+      # Every isolated check gets a shard of its own; the rest are dealt
+      # round-robin over SHARDS shards. Each selected check is in exactly one
+      # shard.
       - name: Plan shards
         id: shards
         env:
@@ -189,7 +200,7 @@ jobs:
         run: |
           set -euo pipefail
           shards=$(jq -cn --argjson checks "$CHECKS" --argjson isolated "$ISOLATED" --argjson n "$SHARDS" '
-            ($isolated | map({name: ., checks: [.]}))
+            ($isolated | map({name: (split(":") | last), checks: [.]}))
             + ([($checks - $isolated) | to_entries[] | {shard: (.key % $n), attr: .value}]
                | group_by(.shard) | map({name: "shard \(.[0].shard + 1)/\($n)", checks: map(.attr)}))')
           jq -e --argjson checks "$CHECKS" '[.[].checks[]] | sort == ($checks | sort)' <<<"$shards" > /dev/null
@@ -206,27 +217,65 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.nix-select.outputs.shards) }}
+    # Namespace remote cache (ADR-0276), as in ci.yml's hosts job: the
+    # Buck2-built leaves the assemblies import (ASSEMBLY_ARTIFACTS) come from
+    # the cache instead of compiling in every shard. It is safe for the Nix
+    # paths: nix_store_import and nix_assemble set allow_cache_upload = False,
+    # so no action-cache entry exists for them. Their local_only does not stop
+    # Buck2 looking one up, so "Realise every built check" below proves that
+    # each reported path is in this store or already substitutable from
+    # Cachix. Forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
+      # A shallow checkout suffices: assemblies copy the declared tree without
+      # .git, and no check reads Git history (lib.assemble takes `revision`).
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
-        with:
-          fetch-depth: 0
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # nix_assemble runs `nix build` against this runner's daemon. Its Buck2
+      # output is a small file naming the store path, and the GC root is an
+      # out-link outside buck-out, so a check's closure is stored once, in
+      # /nix/store, where watch-exec sees it.
       - name: Build checks
         env:
           CHECKS: ${{ toJSON(matrix.shard.checks) }}
         run: |
           set -euo pipefail
-          mapfile -t names < <(jq -r '.[]' <<<"$CHECKS")
-          echo "Building ${#names[@]} checks: ${names[*]}"
+          mapfile -t targets < <(jq -r '.[]' <<<"$CHECKS")
+          echo "Building ${#targets[@]} checks: ${targets[*]}"
           # watch-exec uploads everything realised during the build to the
           # overalls cache, including paths a previous job on this cache
-          # volume built but could not push.
-          cachix watch-exec overalls -- \
-            nix build -L --no-link --keep-going "${names[@]/#/.#checks.x86_64-linux.}"
+          # volume built but could not push. --keep-going reports every
+          # failing check, evaluation errors included, by target.
+          cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}" \
+            --build-report "$RUNNER_TEMP/build-report.json"
           df -h /nix/store || true
+      - name: Realise every built check
+        run: |
+          set -euo pipefail
+          # Each target's output is the store path it built. Realising it
+          # either finds it in this store (watch-exec saw it) or substitutes it
+          # from Cachix; a path that is neither fails the shard. Substituted
+          # paths mean Buck2 reported a check this runner did not realise (an
+          # action-cache hit), so their count is logged.
+          present=0 substituted=0
+          while read -r file; do
+            path=$(cat "$file")
+            if nix-store --check-validity "$path" 2> /dev/null; then
+              present=$((present + 1))
+            else
+              nix-store --realise "$path" > /dev/null
+              substituted=$((substituted + 1))
+              echo "substituted (not realised by this build): $path"
+            fi
+          done < <(jq -r '.results[].outputs.DEFAULT[]?' "$RUNNER_TEMP/build-report.json")
+          echo "Realised checks: $present already present, $substituted substituted"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
 
   nix:
     needs: [nix-select, nix-build]
@@ -244,13 +293,5 @@ jobs:
           fi
           if [ "$BUILD" != success ] && [ "$BUILD" != skipped ]; then
             echo "::error::a build shard did not succeed ($BUILD)"
-            exit 1
-          fi
-      - name: Require every check to evaluate
-        env:
-          ERRORS: ${{ needs.nix-select.outputs.errors }}
-        run: |
-          if [ "${ERRORS:-0}" -gt 0 ]; then
-            echo "::error::$ERRORS checks failed to evaluate; see the nix-select job summary"
             exit 1
           fi

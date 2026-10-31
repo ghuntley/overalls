@@ -351,19 +351,14 @@ nix flake check -L --extra-system-features nested-kvm
 
 ### Continuous integration
 
-`ci.nix` wraps every exported check with `meta.ci = { enable, machine,
-nestedKvm }`. A check is a machine test when it has a test driver, requires
-`kvm`, or is listed as a machine aggregate; it is excluded from CI only by name
-in `ci.nix` (the exclusion list is currently empty). GitHub Actions derives its
-matrices by evaluation: `publish-cache.yml` builds every enabled non-machine
-check and publishes it to Cachix. `select-checks.sh build` starts from `meta.ci` alone, never the
-machine-test derivations: machine tests build guest images at evaluation time,
-which belongs to each matrix job rather than to choosing the matrix, and
-evaluating every fleet test together exhausts the runner's memory.
-`select-checks.sh build` then evaluates every check not known to be a machine
-test in isolation with `nix-eval-jobs`, so a check that fails to evaluate is
-reported (and fails the run) without hiding the others. A machine test whose
-derivation does not evaluate fails its own matrix job.
+Every check here is also a Buck2 target (ADR-0270). Machine tests are
+`nixos_machine_test` targets (below); the other checks are `//:check-<name>`
+assemblies of lib.assemble (label `flake_output`, BUCK.v2), which
+`publish-cache.yml` selects with a Buck2 query that loads targets only and
+builds in shards, the five 60-80 GB closures (label `isolated_build`) each on a
+runner of its own. `tools/buck2 build --keep-going` reports every failing
+check by target, evaluation errors included, and `ci.yml` evaluates each
+affected one (`[drv]`) per push.
 
 Machine tests are Buck2 targets (ADR-0270): each machine check is a
 `nixos_machine_test` in `machines/<suite>/BUCK`, generated from this catalog by

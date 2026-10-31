@@ -175,8 +175,11 @@ the approved migration plan.
     [its script](../../../nix/verification/tests/overalls-install-ps1.sh) with
     the Nix check. Planted markers and lock mismatches failed.
   - `tools/buck2 run //mila:journey-fixture` runs
-    `//:package-mila-journey-fixture` (`nix_store_run` over its assembly). Its
-    derivation differs from the flake's only by the imported Lyra artifacts.
+    `//:package-mila-journey-fixture` (`nix_store_run` over its assembly).
+    The fixture alone assembles without Buck2 artifacts, so its drvPath is
+    the flake's: the plain Ubuntu runners in `mila-builds.yml` substitute it
+    from Cachix, where `publish-cache.yml` puts it, and have no Namespace
+    cache to supply Buck2 leaves.
   - `nix-compact-core`, `-native`, `-native-host`, `-configuration` and
     `fleet-builds-configuration` are `//:check-*` assemblies. On 2026-10-31
     their `[drv]` evaluated under restrict-eval with the same drvPaths as the

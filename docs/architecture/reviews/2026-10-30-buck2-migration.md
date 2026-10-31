@@ -1074,5 +1074,46 @@ release job is unchanged.
     `RUST_ARTIFACTS`.
 - **CI.** `ci.yml` evaluates each affected `flake_output` target (`[drv]`) in
   place of the bootstrap ones, so evaluation coverage is kept, now under
-  restrict-eval over the declared tree. `publish-cache.yml` still builds the
-  flake checks through `select-checks.sh` until its selection moves to Buck2.
+  restrict-eval over the declared tree.
+- **Selection check.** Comparing the flake's check names and every
+  non-machine check's `meta.ci` before and after gave identical results: 302
+  names, 96 enabled non-machine checks, and the same five isolated checks.
+  This replaced running `select-checks.sh build` verbatim on panterloons. That
+  script runs `nix store gc`, which would have deleted other sessions'
+  unrooted outputs on the shared host, and its meta pass forces every
+  machine test's image IFD into a store that is 91% full.
+- **publish-cache.yml on Buck2.** `ci.nix` and `select-checks.sh` are
+  deleted. `nix-select` queries the `flake_output` `check` targets (89) and
+  the `isolated_build` ones (5) without evaluating anything. Its shard plan
+  is unchanged: five isolated shards plus seven round-robin shards of 12, and
+  each target is in exactly one. `nix-build` runs `tools/buck2 build
+  --keep-going` per shard. The built set is the former 96 minus the seven
+  script checks, which `ci.yml` runs as Buck2 tests (`//:py-static`,
+  `//:conflict-markers`, `//:pins`, `//:rust-lints`, `//:package-input-lock`,
+  `//nix:overalls-install-ps1`, `//marvin:check`). The `meta.ci` wrapper is
+  gone from the flake's checks.
+- **Cachix publication through Buck2.** `nix_assemble` runs `nix build`
+  against the runner's daemon, so `cachix watch-exec` sees every path it
+  realises. Its Buck2 output is a file naming the store path, and its GC
+  root is an out-link outside buck-out, so the 60-80 GB isolated closures are
+  stored once.
+  - `local_only` does not skip the remote action-cache lookup. The event log
+    of `//:check-otel-slo-rules[drv]` with the Namespace cache configured
+    shows a `CacheQuery` stage before local execution. A hit is impossible
+    only because every `nix_assemble` and `nix_store_import` action has
+    `allow_cache_upload = False`.
+  - `ctx.actions.run` offers no per-action `remote_cache_enabled`; that is an
+    executor setting on the single execution platform. publish-cache.yml
+    therefore realises every reported store path after the build, so a check
+    is in the local store or already in Cachix, or its shard fails.
+  - The shards take the Namespace token, as ci.yml's hosts job does, so the
+    imported Buck2 leaves come from the cache.
+- **Journey fixture.** With Buck2 Lyra leaves, `//:check-mila-journey-fixture`
+  would no longer be the path that `mila-builds.yml` substitutes from Cachix.
+  The fixture alone (`_NIX_LEAF_OUTPUTS` in BUCK.v2) therefore assembles from
+  Nix leaves. Its `[drv]` (package and check) is
+  `xw678rd85zmimd3y0dldib477nayczp6-mila-journey-fixture.drv`, the flake's. The machine-test command reads features
+  through lib.assemble: `sysctl`, `fleet`, `service-roles`, `host-conversion`,
+  `firecracker-patch-tests` and the non-machine
+  `windows-editor-acceptance-harness` gave the expected machine and
+  nested-KVM values.

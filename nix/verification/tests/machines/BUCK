@@ -129,7 +129,7 @@ owned_set(
     visibility = ["PUBLIC"],
 )
 
-# A KVM evaluation check (meta.ci.machine) outside ./machines.
+# A KVM evaluation check (a machine test by its features) outside ./machines.
 nixos_machine_test(
     name = "foreign-linux-pam-helper",
     check = "foreign-linux-pam-helper",
@@ -140,7 +140,7 @@ nixos_machine_test(
     inputs = NIX_INPUTS + PACKAGE_INPUTS,
 )
 
-# A KVM evaluation check (meta.ci.machine) outside ./machines.
+# A KVM evaluation check (a machine test by its features) outside ./machines.
 nixos_machine_test(
     name = "firecracker-patch-tests",
     check = "firecracker-patch-tests",

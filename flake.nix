@@ -101,7 +101,7 @@
 
       # lib.assemble's checks (the machine-test catalog and outputs.nix), plus
       # the repository script checks that are Buck2 targets of their own.
-      checks.${system} = import ./nix/verification/tests/ci.nix { inherit (pkgs) lib; checks = assembled.checks // {
+      checks.${system} = assembled.checks // {
         package-input-lock =
           let
             flakeNodes = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes;
@@ -152,6 +152,6 @@
         '';
         overalls-install-ps1 = import ./nix/verification/tests/overalls-install-ps1.nix { inherit pkgs; };
         marvin = built.marvin.tests;
-      }; };
+      };
     };
 }

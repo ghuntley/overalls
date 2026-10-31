@@ -60,9 +60,16 @@ file so precommit checks only changed files (ADR-0269).
 Every nixos_machine_test target MUST carry the machine_test label, and MUST
 carry nested_kvm exactly when its suite declares requiredFeatures.nested-kvm.
 The macro derives both labels from nested_kvm and refuses them in labels; the
-test command fails when Nix's meta.ci.nestedKvm or machine disagree,
-and when a fleet variant's declared scenario files differ from its composed
-test script (ADR-0270).
+test command fails when the check's features (contract
+machine-test-required-features) disagree, and when a fleet variant's declared
+scenario files differ from its composed test script (ADR-0270).
+
+@cc [owner:ghuntley,label:verification] machine-test-required-features
+buck/machine_tests.py MUST read a check's machine and nested-KVM features from
+lib.assemble's checks without forcing a lazy driver's derivation or guest
+image: requiredSystemFeatures when present, otherwise the NixOS tester's
+enabled config.requiredFeatures. A check is a machine test when it has a
+driver, requires kvm, or is a listed machine aggregate.
 
 @cc [owner:ghuntley,label:verification] machine-test-targets-generated
 nix/verification/tests/machines/**/BUCK and suites.bzl MUST be exactly what
@@ -88,6 +95,20 @@ SDKs exist only on the platform workflows' runners.
 script_test and nixos_machine_test commands MUST run locally from the project
 root, never remotely or from the remote cache, because they talk to the Nix
 daemon (ADR-0269).
+
+@cc [owner:ghuntley,label:verification;capacity] ci-isolated-heavy-builds
+Assembled checks whose build closure alone approaches a CI runner's 116 GB
+store volume (each measured at 60-80 GB) MUST carry the isolated_build label
+(BUCK.v2), and publish-cache.yml MUST build each on a runner of its own;
+sharing one with other checks exhausted it (publish-cache run 41034532972,
+shard 0). Isolation only places a check; it never skips it.
+
+@cc [owner:ghuntley,label:build] cache-build-selection
+publish-cache.yml MUST build every `flake_output` `check` target (BUCK.v2),
+chosen by a Buck2 query that loads targets only, in shards where each target
+is in exactly one shard, and MUST report each failing target instead of
+letting one hide the others (`buck2 build --keep-going`). It replaces the
+flake's meta.ci selection (ADR-0270).
 
 @cc [owner:ghuntley,label:build] assembly-attrs-fresh
 nix/buck/assembly_attrs.bzl MUST list exactly lib.assemble's flake package

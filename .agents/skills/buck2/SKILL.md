@@ -243,7 +243,7 @@ one without building it.
   This takes about 15 minutes at `-j 24`.
 - **Run one:** `tools/buck2 test //nix/verification/tests/machines/sysctl:sysctl`.
   Buck2 builds the assembly (the VM run) first; the test command then checks
-  that the `nested_kvm` label matches Nix's `meta.ci.nestedKvm` and, for fleet
+  that the `nested_kvm` label matches the check's required features and, for fleet
   variants, that the declared scenarios match the composed script.
 - **Never edit the generated BUCK files.** After changing `catalog.nix` or a
   suite's `requiredFeatures`, run `python3 buck/machine_tests.py generate`.

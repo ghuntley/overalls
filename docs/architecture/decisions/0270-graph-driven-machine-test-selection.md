@@ -13,9 +13,8 @@
 About 200 NixOS machine checks, including 66 fleet variants, run only from
 [nixos-machine-tests.yml](../../../.github/workflows/nixos-machine-tests.yml)
 as a daily batch or on dispatch.
-[select-checks.sh](../../../.github/scripts/select-checks.sh) and
-[ci.nix](../../../nix/verification/tests/ci.nix) select by name and feature,
-not by change. A regression in a module or application therefore lands on
+`select-checks.sh` and `ci.nix` (both since deleted) selected by name and
+feature, not by change. A regression in a module or application therefore lands on
 trunk, and the daily run reports it later. Recent examples are the fixes in
 `ab3816ebb` and `8fab8c411`.
 
@@ -171,6 +170,20 @@ PR runs the affected machine-test set, and the approved migration plan.
   [precommit.bxl](../../../buck/bxl/precommit.bxl) selects only
   `precommit`-labelled checks, never machine tests or `flake_output`
   assemblies.
+- `ci.nix` and `select-checks.sh` are deleted. `publish-cache.yml` selects
+  the `flake_output` `check` targets with a Buck2 query that loads targets
+  only, deals them into shards (each `isolated_build` target alone) and
+  builds them with `tools/buck2 build --keep-going` (contracts
+  `cache-build-selection` and `ci-isolated-heavy-builds` in
+  [buck/CONTRACTS](../../../buck/CONTRACTS)). It then realises every reported
+  store path. Buck2 still looks up `local_only` actions in the remote action
+  cache (observed in the event log), and only `allow_cache_upload = False`
+  keeps those lookups missing; the realise step makes publication
+  independent of that. The set is the former `meta.ci`
+  build set minus the seven repository script checks, which are `ci.yml`
+  tests. A machine test's command reads its features from lib.assemble
+  ([machine_tests.py](../../../buck/machine_tests.py), contract
+  `machine-test-required-features`) instead of `meta.ci`.
 
 Remaining gaps:
 
@@ -178,10 +191,10 @@ Remaining gaps:
   have targets (M11). Most suites have not yet been built through their
   declared-only tree; a suite that reads an undeclared file fails its first
   run, which the daily backstop surfaces.
-- `catalog.nix`, `ci.nix` and `select-checks.sh` stay:
-  the flake's checks still come from the catalog, and `publish-cache.yml`
-  still selects its builds with `select-checks.sh build`. They go when the
-  checks move to Buck2 rules.
+- `catalog.nix` stays: it defines the checks that lib.assemble exposes and
+  that the generator reads. Removing it means each suite's `BUCK` `params`
+  instantiating its suite in lib.assemble, which belongs with the per-module
+  targets of M11.
 - `ci.yml` evaluates each affected `flake_output` assembly (`[drv]`, the
   flake package and check targets in [BUCK.v2](../../../BUCK.v2)) but its
   build job skips them, because `publish-cache.yml` builds the checks.
