@@ -75,13 +75,15 @@ jobs:
       # lives outside _build. Without caching it, a restored _build holds the
       # compiled NIF module but a fresh checkout lacks the library, nothing
       # recompiles, and the application cannot start (run 41176375306).
+      # Only Marshall's priv/native is cached: Protocol tracks files under its
+      # priv/native, which a cache-volume mount would hide (run 41180754386).
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-paths: |
             ${{ matrix.project }}/deps
             ${{ matrix.project }}/_build
-            ${{ matrix.project }}/priv/native
+            ${{ matrix.project == 'marshall' && 'marshall/priv/native' || '' }}
             ~/.mix
             ~/.hex
             ~/.cache/rebar3
@@ -127,19 +129,21 @@ jobs:
           # Only Marshall reads these; other projects see them empty.
           MARSHALL_TEST_PARTITIONS: ${{ matrix.partition && '4' || '' }}
           MIX_TEST_PARTITION: ${{ matrix.partition }}
+          NIF_LIBRARY: ${{ matrix.project == 'marshall' && 'priv/native/marshall_cedar.so' || '' }}
         # The cache volume keeps _build across runs, including compile
         # manifests that recorded warnings (such as "already consolidated"
         # from an older in-VM `gettext.extract`), and every later
         # `compile --warnings-as-errors` replays them. A strict compile that
         # fails is retried once with --force, which drops stale replays but
         # still fails on any warning the current source produces.
-        # A project with a Rustler crate (native/) whose library is missing
-        # from priv/native (a cache restored before priv/native was cached)
-        # has its own compiled app dropped, so the NIF module rebuilds it.
+        # When Marshall's Cedar NIF library (NIF_LIBRARY) is missing, as after a
+        # cache restored before priv/native was cached, its compiled app is
+        # dropped so the NIF module rebuilds it. Lilly and Enrico native/ crates
+        # are not Rustler NIFs, so only Marshall sets NIF_LIBRARY.
         run: >-
           devenv shell -- bash -euo pipefail -c 'mix deps.get
-          && { [ ! -d native ] || compgen -G "priv/native/*.so" > /dev/null
-          || rm -rf "_build/test/lib/$(basename "$PWD")"; }
+          && { [ -z "$NIF_LIBRARY" ] || [ -f "$NIF_LIBRARY" ]
+          || rm -rf _build/test/lib/marshall; }
           && { MIX_ENV=test mix compile --warnings-as-errors
           || MIX_ENV=test mix compile --force --warnings-as-errors; }
           && mix precommit'
