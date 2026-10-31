@@ -187,6 +187,25 @@ M10 (2026-10-30) implements decision 3.
     the fixture copies. `owned_set` places toolchains-cell files under
     `toolchains/`.
 
+- **Closure parity (2026-10-31).** Derivation closures of
+  `//fleet/hosts/dungarees:deployment` and the flake's
+  `nixosConfigurations.dungarees` `overallsDeployment` were compared at the
+  same tree.
+  - The Buck2-only derivations are exactly the nine import wrappers of
+    `ASSEMBLY_ARTIFACTS`: the Lilly host helpers, Lyra (client, native and
+    Windows), observability-runtimes, the guest receiver, terminald, the
+    trace spool and the editor broker.
+  - The 1006 flake-only derivations are what those leaves' Nix builds
+    needed: the rust-overlay toolchain and its target libraries, vendored
+    crates and their sources, and the illumos, OmniOS and macOS cross SDKs.
+  - The 93 Buck2-only sources are the imports' declared runtime references.
+  - Moving the flake's packages and checks into lib.assemble left the
+    dungarees toplevel drvPath unchanged.
+- **Activation (2026-10-31).** Dungarees and Panterloons report
+  `"builder": "buck2"` in `status.json`, with `e58f8b6df` activated through
+  their deployment targets. Salopettes was offline in the tailnet and could
+  not be checked.
+
 Remaining:
 
 - The per-host parameters stay fleet-wide `lib.assemble` defaults, because
@@ -203,7 +222,8 @@ Remaining:
   do not exercise Buck2-built leaves on the update path. Machine-test
   assemblies and the `[drv]` evaluation of the real host targets do cover
   them.
-- The activation gate itself is still open.
+- The activation gate stays open until Salopettes and the `-base` fixtures
+  report the Buck2 updater active.
 
 ## Open questions
 
