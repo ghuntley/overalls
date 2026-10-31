@@ -30,6 +30,9 @@ defmodule Marshall.SSH.GuestRosterMigrationHistoryTest do
   # ownership/grants/membership and tombstone state, never from allocator
   # results, and retired users MUST leave the roster before cleanup commits.
   @tag :hegel
+  # Each generated history runs serially through PostgreSQL: 48.6 s alone,
+  # past ExUnit's 60 s default twice under host load.
+  @tag timeout: 180_000
   test "generated grant, team and retirement histories match the PostgreSQL roster oracle", %{
     admin: admin
   } do
