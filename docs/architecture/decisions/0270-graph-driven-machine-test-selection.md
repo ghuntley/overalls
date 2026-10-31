@@ -91,6 +91,12 @@ PR runs the affected machine-test set, and the approved migration plan.
   - replays of `ab3816ebb` and `8fab8c411`.
 - The `nested_kvm` label equals the suite's `requiredFeatures`. A planned
   test checks this.
+- A failure is not cleared by moving the base. A push run compares against
+  the newest earlier started run, so a target that failed there and was not
+  touched again would otherwise not run again. Every target whose job failed
+  or timed out in a trunk push run since the newest green run is therefore
+  selected again (contract `ci-reselect-failed`; `//buck:ci_failures` and the
+  `affected_fixtures` "failed then untouched target is reselected" fixture).
 - **Failure case:** a machine test whose Nix assembly reads a file it does not
   declare would not be selected. `restrict-eval` over a declared-only tree
   ([ADR-0269](0269-buck2-build-system-with-nix-toolchains.md)) makes that an
@@ -153,6 +159,16 @@ PR runs the affected machine-test set, and the approved migration plan.
   run 41059576724 fanned out about 200 jobs for an otel-fleet test fix. This
   is a capacity limit on decision 4, not a change of it; the deferred suites
   run daily, and dispatch with `machine_all` runs them at once.
+  A push run also reselects, through `tools/affected --reselect`, every
+  target whose job failed or timed out in a completed trunk push run since
+  the newest green one, at most 50 runs back.
+  [ci_failures.py](../../../buck/ci_failures.py) maps the failed job names to
+  targets through each run's own `affected` artifact: `build <target>` names
+  its host target, a machine job its suite, `test` and `build` their whole
+  lists, and `evaluate N` its shard. An unreadable history is a selection
+  error, so the `ci` job fails instead of passing on a narrowed set. A
+  precommit failure is not mapped; its range runs again only when a later
+  push touches it.
   Whole host systems build one target per runner in the `hosts` job. A host
   deployment realises about 145 GiB (guest images and the Windows Server
   image), more than Namespace allows a cache volume (about 125 GB; runs

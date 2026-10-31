@@ -64,9 +64,9 @@ def make_repo(tmp: Path) -> Path:
     return repo
 
 
-def select(repo: Path) -> dict[str, object]:
+def select(repo: Path, *extra: str) -> dict[str, object]:
     python = sys.executable
-    out = run(repo, python, "buck/affected.py", "--base", "base")
+    out = run(repo, python, "buck/affected.py", "--base", "base", *extra)
     data: object = json.loads(out)
     if not isinstance(data, dict):
         raise AssertionError("selection is not an object")
@@ -102,12 +102,15 @@ def main() -> int:
     failures: list[str] = []
 
     def fixture(
-        name: str, change: Callable[[], None], check: Callable[[dict[str, object]], None]
+        name: str,
+        change: Callable[[], None],
+        check: Callable[[dict[str, object]], None],
+        extra: tuple[str, ...] = (),
     ) -> None:
         reset(repo)
         change()
         try:
-            check(select(repo))
+            check(select(repo, *extra))
             print(f"ok   {name}")
         except AssertionError as error:
             failures.append(f"{name}: {error}")
@@ -172,6 +175,47 @@ def main() -> int:
         one_scenario,
     )
     fixture("deleted file resolves on base", lambda: (repo / first_lilly_lib(repo)).unlink(), lilly)
+    # A target whose ci.yml job failed since the last green run, untouched by
+    # this range, is selected again; a label head no longer has is dropped.
+    # A fleet scenario change selects only its fleet variants among the
+    # machine tests, so sysctl is selected only through --reselect.
+    failing = "root//nix/verification/tests/machines/sysctl:sysctl"
+    gone = "root//nix/verification/tests/machines/sysctl:removed-since"
+    failed = tmp / "failed.json"
+    failed.write_text(json.dumps([failing, gone]))
+
+    def untouched(s: dict[str, object]) -> None:
+        assert failing not in targets(s, "machine_tests"), "the change already selects it"
+        assert s["reselected"] == [], s["reselected"]
+
+    def reselected(s: dict[str, object]) -> None:
+        assert s["everything"] is False, s["reasons"]
+        assert targets(s, "machine_tests") == expected | {failing}, sorted(
+            targets(s, "machine_tests") ^ expected
+        )
+        assert s["reselected"] == [failing], s["reselected"]
+
+    def unreadable(s: dict[str, object]) -> None:
+        errors = s["errors"]
+        assert isinstance(errors, list) and errors, "an unreadable history must be an error"
+        assert failing not in targets(s, "machine_tests"), "nothing is reselected from it"
+
+    def touch_scenario() -> None:
+        touch(repo, f"nix/verification/tests/machines/fleet/{scenario}")
+
+    fixture("untouched target is not selected without reselection", touch_scenario, untouched)
+    fixture(
+        "failed then untouched target is reselected",
+        touch_scenario,
+        reselected,
+        ("--reselect", str(failed)),
+    )
+    fixture(
+        "unreadable failure history is a selection error",
+        touch_scenario,
+        unreadable,
+        ("--reselect", str(tmp / "missing.json")),
+    )
     fixture("unowned file selects everything", add_unowned, everything)
     fixture("unowned file is reported", add_unowned, unowned)
 

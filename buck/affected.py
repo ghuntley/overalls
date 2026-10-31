@@ -3,8 +3,10 @@
 Compares unconfigured target hashes (file mode paths_and_contents) of the base
 revision against the working tree, adds the reverse dependencies of every
 changed file's owners, and groups the result as machine_tests, tests and
-builds. Only Buck2 loading and queries run: no action and no Nix derivation is
-built. Run it through tools/affected.
+builds. Targets given with --reselect (the failures since the last green CI
+run, buck/ci_failures.py) are selected too while head still has them. Only
+Buck2 loading and queries run: no action and no Nix derivation is built. Run
+it through tools/affected.
 
 Contract affected-targets-selection: see buck/CONTRACTS.
 """
@@ -75,6 +77,7 @@ class Selection(TypedDict):
     tests: list[Entry]
     builds: list[Entry]
     errors: list[Failure]
+    reselected: list[str]
 
 
 @dataclass
@@ -213,7 +216,29 @@ def _entries(value: object) -> list[Entry]:
     return result
 
 
-def select(root: Path, base: str, everything: bool) -> Selection:
+def read_reselect(path: Path | None) -> tuple[list[str], list[Failure]]:
+    """Target labels from a JSON list. A missing or malformed file (the
+    failure history could not be read) is a selection error, so the ci gate
+    fails while the rest of the selection still runs."""
+    if path is None:
+        return [], []
+    try:
+        data: object = json.loads(path.read_text())
+    except (OSError, ValueError) as error:
+        data = error
+    if not isinstance(data, list) or not all(isinstance(x, str) for x in data):
+        detail = f"{path}: expected a JSON list of target labels ({data!r:.200})"
+        return [], [Failure(side="history", package="ci.yml", error=detail)]
+    return [x for x in data if isinstance(x, str)], []
+
+
+def select(
+    root: Path,
+    base: str,
+    everything: bool,
+    reselect: Sequence[str] = (),
+    reselect_errors: Sequence[Failure] = (),
+) -> Selection:
     # The cells' own buck2: selection must not rebuild the cells (a changed
     # global input selects everything regardless of which cells list it).
     cells = root / ".buck-cells" / "bin" / "buck2"
@@ -223,11 +248,15 @@ def select(root: Path, base: str, everything: bool) -> Selection:
     present, deleted = ([], []) if everything else changed_files(root, base)
     files = present + deleted
     reasons = ["requested"] if everything else global_reasons(files)
-    errors: list[Failure] = []
+    errors: list[Failure] = list(reselect_errors)
     seeds: set[str] = set()
     unowned: list[str] = []
     head = target_hashes(buck2, root, "head")
     errors += head.errors
+    # A target that failed since the last green run is selected again even
+    # if this range leaves it untouched; a target since removed is dropped.
+    reselected = sorted(t for t in set(reselect) if t in head.hashes)
+    seeds.update(reselected)
     if not reasons:
         with base_checkout(root, base) as tree:
             old = target_hashes(buck2, tree, "base")
@@ -256,6 +285,7 @@ def select(root: Path, base: str, everything: bool) -> Selection:
         tests=_entries(result.get("tests")),
         builds=_entries(result.get("builds")),
         errors=errors,
+        reselected=[] if reasons else reselected,
     )
 
 
@@ -264,9 +294,16 @@ def main(argv: Sequence[str]) -> int:
     parser.add_argument("--base", default="HEAD^", help="base revision (default HEAD^)")
     parser.add_argument("--all", action="store_true", help="select every target")
     parser.add_argument("--output", type=Path, help="write the JSON here instead of stdout")
+    parser.add_argument(
+        "--reselect",
+        type=Path,
+        help="JSON list of target labels to select as well (buck/ci_failures.py)",
+    )
     args = parser.parse_args(argv)
     root = Path(git(Path.cwd(), "rev-parse", "--show-toplevel").strip())
-    selection = select(root, str(args.base), bool(args.all))
+    reselect_file: Path | None = args.reselect
+    labels, reselect_errors = read_reselect(reselect_file)
+    selection = select(root, str(args.base), bool(args.all), labels, reselect_errors)
     text = json.dumps(selection, indent=2) + "\n"
     output: Path | None = args.output
     if output is None:

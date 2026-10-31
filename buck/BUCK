@@ -51,3 +51,10 @@ script_test(
     deps = ["//nix/verification/tests/machines:suites"],
     labels = ["slow"],
 )
+
+# Failure history for reselection in ci.yml (ADR-0270); pure, no network.
+script_test(
+    name = "ci_failures",
+    script = "tests/ci_failures_test.py",
+    srcs = ["ci_failures.py"],
+)

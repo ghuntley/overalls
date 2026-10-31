@@ -91,6 +91,16 @@ action or a Nix derivation, and MUST report each package that fails to load
 instead of hiding it. Targets labelled non_hermetic are never selected: their
 SDKs exist only on the platform workflows' runners.
 
+@cc [owner:ghuntley,label:verification] ci-reselect-failed
+buck/ci_failures.py MUST list every target whose ci.yml job failed or timed
+out in a completed trunk push run older than the current one and newer than
+the newest successful run (at most 50 runs back), mapping job names to
+targets through that run's own `affected` artifact; it MUST NOT use the
+network beyond the GitHub API and MUST NOT send the token to artifact
+storage. tools/affected --reselect MUST select each listed target that head
+still has, and a missing or malformed list MUST be reported as a selection
+error rather than ignored (ADR-0270).
+
 @cc [owner:ghuntley,label:build] script-tests-run-locally
 script_test and nixos_machine_test commands MUST run locally from the project
 root, never remotely or from the remote cache, because they talk to the Nix

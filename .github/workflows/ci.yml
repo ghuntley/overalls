@@ -106,7 +106,19 @@ jobs:
           fi
           # The same range for tools/precommit in the precommit job.
           echo "range=${args[*]}" >> "$GITHUB_OUTPUT"
-          tools/affected "${args[@]}" --output affected.json
+          # A base run that failed does not make its failures pass: every
+          # target whose job failed in a trunk run since the last green one
+          # is selected again (ADR-0270). If that history cannot be read,
+          # the missing file is a selection error and the ci job fails.
+          reselect=()
+          if [ "$EVENT" = push ] && [ "${args[0]}" != --all ]; then
+            tools/affected failed-in-ci --repo "$REPO" --branch "$REF" \
+              --before "$RUN_NUMBER" --output failed.json || rm -f failed.json
+            reselect=(--reselect failed.json)
+          fi
+          tools/affected "${args[@]}" "${reselect[@]}" --output affected.json
+          jq -r '.reselected | "reselected after earlier failures: \(length) \(join(" "))"' affected.json \
+            >> "$GITHUB_STEP_SUMMARY"
       - name: Plan jobs
         id: plan
         env:
