@@ -79,6 +79,8 @@ let
   underclassEnrolled = enrolled && underclassDocument != null;
   tailscaleDocument = lib.findFirst (d: d.name == "fleet-tailscale") null h.credentials;
   tailscaleEnrolled = enrolled && tailscaleDocument != null;
+  namespaceDocument = lib.findFirst (d: d.name == "fleet-namespace") null h.credentials;
+  namespaceEnrolled = enrolled && namespaceDocument != null;
   fleetExporterInterfaces = lib.unique (map (route: route.dev)
     (lib.filter (route: route.dst == "default") h.discovery.routes));
   lillyPools = if lillyBinding == null then [] else map (p: {
@@ -227,6 +229,14 @@ in {
   # joins only through an explicit operator action.
   services.tailscale.enable = true;
   services.tailscale.authKeyFile = lib.mkIf tailscaleEnrolled "/run/overalls-secrets/tailscale/auth-key";
+  # @cc [owner:ghuntley,label:build;security] namespace-buck2-token-delivery
+  # The Namespace Buck2 token (ADR-0276) MUST reach only root (the host
+  # updater) and wheel, the fleet administrators who already hold sudo, as
+  # /run/overalls-secrets/fleet-namespace/token, where tools/buck2 reads it.
+  # It MUST NOT enter the Nix store; without it Buck2 builds stay local.
+  systemd.services.overalls-secrets-fleet-namespace = lib.mkIf namespaceEnrolled {
+    wantedBy = [ "multi-user.target" ];
+  };
   systemd.services.tailscaled-autoconnect = lib.mkIf tailscaleEnrolled {
     requires = [ "overalls-secrets-tailscale.service" ];
     after = [ "overalls-secrets-tailscale.service" ];
@@ -380,6 +390,11 @@ in {
     bundles.tailscale = lib.mkIf tailscaleEnrolled {
       encryptedFile = toString (encryptedDocument tailscaleDocument);
       outputs.auth-key = { format = "raw"; secrets = [ "TAILSCALE_AUTH_KEY" ]; };
+    };
+    bundles.fleet-namespace = lib.mkIf namespaceEnrolled {
+      encryptedFile = toString (encryptedDocument namespaceDocument);
+      group = "wheel";
+      outputs.token = { format = "raw"; secrets = [ "NAMESPACE_RBE_TOKEN" ]; };
     };
     bundles.underclass = lib.mkIf underclassEnrolled {
       encryptedFile = toString (encryptedDocument underclassDocument);

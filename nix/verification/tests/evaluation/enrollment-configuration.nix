@@ -11,6 +11,7 @@ let
       ++ [
         { name = "${original.name}-underclass"; path = "secrets/${original.name}-git.enc.json"; }
         { name = "fleet-tailscale"; path = "secrets/${original.name}-git.enc.json"; }
+        { name = "fleet-namespace"; path = "secrets/${original.name}-git.enc.json"; }
       ];
     lilly = {
       controlPlane = "https://control.test";
@@ -44,6 +45,7 @@ let
   wrongGroup = evaluate host { services.overallsSecrets.bundles.lilly.group = lib.mkForce "wheel"; };
   wrongTransferPort = evaluate host { services.lillyTransfer.port = lib.mkForce 2225; };
   noTailscale = evaluate (host // { credentials = lib.filter (c: c.name != "fleet-tailscale") host.credentials; }) {};
+  noNamespace = evaluate (host // { credentials = lib.filter (c: c.name != "fleet-namespace") host.credentials; }) {};
   tooLong = evaluate (host // { lilly = host.lilly // { credentialTtlSeconds = 157680001; }; }) {};
 in
 assert lib.assertMsg (valid good) (lib.concatMapStringsSep "\n" (a: a.message) (lib.filter (a: !a.assertion) good.assertions));
@@ -95,4 +97,15 @@ assert builtins.hasContext good.services.overallsSecrets.bundles.tailscale.encry
 assert noTailscale.services.tailscale.authKeyFile == null;
 assert !(noTailscale.systemd.services ? tailscaled-autoconnect);
 assert !(noTailscale.services.overallsSecrets.bundles ? tailscale);
+# @cc [owner:ghuntley,label:verification;security] namespace-buck2-token-evaluation
+# An enrolled host with the fleet-namespace credential publishes the Namespace
+# token to root and wheel only, from its own boot-started secret unit; without
+# the credential no bundle or unit exists (ADR-0276).
+assert good.services.overallsSecrets.bundles.fleet-namespace.outputs.token.secrets == [ "NAMESPACE_RBE_TOKEN" ];
+assert good.services.overallsSecrets.bundles.fleet-namespace.group == "wheel";
+assert good.services.overallsSecrets.bundles.fleet-namespace.directory == "/run/overalls-secrets/fleet-namespace";
+assert builtins.hasContext good.services.overallsSecrets.bundles.fleet-namespace.encryptedFile;
+assert builtins.elem "multi-user.target" good.systemd.services.overalls-secrets-fleet-namespace.wantedBy;
+assert !(noNamespace.services.overallsSecrets.bundles ? fleet-namespace);
+assert !(noNamespace.systemd.services ? overalls-secrets-fleet-namespace);
 pkgs.writeText "enrollment-configuration" "passed\n"

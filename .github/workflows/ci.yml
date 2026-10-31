@@ -54,6 +54,10 @@ jobs:
       host_builds: ${{ steps.plan.outputs.host_builds }}
       errors: ${{ steps.plan.outputs.errors }}
       range: ${{ steps.select.outputs.range }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
@@ -183,25 +187,16 @@ jobs:
     if: needs.affected.outputs.builds != '[]'
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 180
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-      # Remote cache and execution (ADR-0272). Off unless the repository
-      # variable BUCK_RE is "enabled" and both secrets exist; only this
-      # repository's trunk pushes and dispatches use it, and a failure here
-      # leaves Buck2 local instead of failing the job.
-      - if: >-
-          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
-          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
-          || github.event_name == 'workflow_dispatch')
-        continue-on-error: true
-        uses: ./.github/actions/buck-re
-        with:
-          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
-          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Build affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.builds }}
@@ -209,6 +204,9 @@ jobs:
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
 
   hosts:
     needs: affected
@@ -220,6 +218,10 @@ jobs:
       fail-fast: false
       matrix:
         host: ${{ fromJSON(needs.affected.outputs.host_builds) }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -239,25 +241,16 @@ jobs:
     if: needs.affected.outputs.tests != '[]'
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 120
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-      # Remote cache and execution (ADR-0272). Off unless the repository
-      # variable BUCK_RE is "enabled" and both secrets exist; only this
-      # repository's trunk pushes and dispatches use it, and a failure here
-      # leaves Buck2 local instead of failing the job.
-      - if: >-
-          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
-          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
-          || github.event_name == 'workflow_dispatch')
-        continue-on-error: true
-        uses: ./.github/actions/buck-re
-        with:
-          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
-          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Test affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.tests }}
@@ -265,6 +258,9 @@ jobs:
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           cachix watch-exec overalls -- tools/buck2 test --keep-going "${targets[@]}"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
 
   evaluate:
     needs: affected
@@ -276,6 +272,10 @@ jobs:
       fail-fast: false
       matrix:
         shard: ${{ fromJSON(needs.affected.outputs.evaluate_shards) }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -302,6 +302,10 @@ jobs:
       fail-fast: false
       matrix:
         test: ${{ fromJSON(needs.affected.outputs.machine_tests) }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -341,6 +345,10 @@ jobs:
     needs: affected
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 60
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set; forks and pull requests get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
@@ -349,19 +357,6 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-      # Remote cache and execution (ADR-0272). Off unless the repository
-      # variable BUCK_RE is "enabled" and both secrets exist; only this
-      # repository's trunk pushes and dispatches use it, and a failure here
-      # leaves Buck2 local instead of failing the job.
-      - if: >-
-          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
-          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
-          || github.event_name == 'workflow_dispatch')
-        continue-on-error: true
-        uses: ./.github/actions/buck-re
-        with:
-          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
-          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
       - name: Precommit
         env:
           RANGE: ${{ needs.affected.outputs.range }}
@@ -369,6 +364,9 @@ jobs:
           set -euo pipefail
           read -ra range <<<"$RANGE"
           tools/precommit "${range[@]}"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
 
   ci:
     needs: [affected, build, hosts, test, evaluate, machine, precommit]

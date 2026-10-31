@@ -15,6 +15,7 @@
     enable = true;
     localName = "panterloons";
   } // import ../../fleet-builds.nix { inherit lib; };
-  # Panterloons serves the Buck2 NativeLink cache and reads it (ADR-0272).
-  overalls.buckRemoteCache = (import ../../buck-re.nix { inherit lib; }).forHost "panterloons";
+  # The NativeLink cache, scheduler and worker (ADR-0272) are retired:
+  # Namespace is the Buck2 cache and remote-execution backend (ADR-0276).
+  # The module and fleet/buck-re.nix stay for reactivation.
 }

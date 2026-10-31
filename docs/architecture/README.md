@@ -940,14 +940,13 @@ schedules them onto workers on both hosts, Dungarees delegates through
 Panterloons' mTLS `grpc://` store, and the pair substitute from each other over
 `grpc://`. Other hosts remain cache-only. See the
 [fleet build scheduling review](reviews/2026-10-20-fleet-build-scheduling.md).
-Panterloons also serves the Buck2 NativeLink cache
-([ADR-0272](decisions/0272-nativelink-remote-cache-and-execution.md)) on its
-tailnet address: a read-only listener for host certificates and an upload
-listener for the CI certificate, each trusting its own CA. Its remote-execution
-scheduler adds a developer execute listener and a worker listener, again one CA
-each, and NativeLink workers on Panterloons and Dungarees run actions in a
-pool-mount-free namespace (ADR-0144). Host updates read the cache and never
-execute remotely.
+Buck2's remote cache and remote execution are on Namespace
+([ADR-0276](decisions/0276-namespace-buck2-remote-cache-and-execution.md)). It
+supersedes the NativeLink services of
+[ADR-0272](decisions/0272-nativelink-remote-cache-and-execution.md), which
+the fleet no longer runs. Every host decrypts the tenant token for root and
+`wheel`, `tools/buck2` enables the cache whenever a token is present, and
+host updates read and upload but never execute remotely.
 
 The [Dungarees deployment review](reviews/2026-09-18-dungarees-provisioning.md)
 records the second physical Lilly worker, mirrored storage, separate enrollment

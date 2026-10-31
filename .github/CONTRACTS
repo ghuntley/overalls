@@ -15,13 +15,10 @@ nixos-machine-tests.yml MUST run every nixos_machine_test target daily, and
 on dispatch the space-separated check names given in `checks`, each through
 `tools/buck2 test` in its own job (ADR-0270).
 
-@cc [owner:ghuntley,label:security;build] ci-buck-re-optional
-ci.yml's build, test and precommit jobs MAY use the NativeLink cache and
-remote execution only through .github/actions/buck-re, which acts only when
-the repository variable BUCK_RE is "enabled", both the ephemeral Tailscale key
-and the CI uploader identity secrets exist, and the run is a push to trunk or a
-dispatch in ghuntley/overalls (never a pull request or fork); the step continues
-on error, so the ci gate never depends on NativeLink or tailnet reachability. It
-writes the identity to the runner's temporary directory and never to the
-checkout or a log, takes the address and port from the fleet roster, and
-leaves Buck2 local when the upload listener does not answer (ADR-0272).
+@cc [owner:ghuntley,label:security;build] ci-namespace-cache
+ci.yml's affected, build, hosts, test, evaluate, machine and precommit jobs and
+nixos-machine-tests.yml's jobs MUST receive the Namespace token only as the
+job environment variable NAMESPACE_RBE_TOKEN from the repository secret, never
+in argv, a file in the checkout or a log, so tools/buck2 enables the Namespace
+cache. A run without the secret (a fork or pull request) MUST still build
+locally through the same steps (ADR-0276).

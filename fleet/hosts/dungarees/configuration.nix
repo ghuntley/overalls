@@ -6,9 +6,9 @@ let
 in
 {
   imports = [ ../../fleet-network.nix ];
-  # A read-only client of Panterloons' Buck2 cache and a remote-execution
-  # worker (ADR-0272).
-  overalls.buckRemoteCache = (import ../../buck-re.nix { inherit lib; }).forHost "dungarees";
+  # The NativeLink cache client and worker (ADR-0272) are retired: Namespace
+  # is the Buck2 cache and remote-execution backend (ADR-0276). The module and
+  # fleet/buck-re.nix stay for reactivation.
   services.overallsOtelFleet = {
     enable = true;
     role = "worker";

@@ -60,7 +60,8 @@ three documents together.
 
 ## Buck2 remote cache identities
 
-[`fleet/buck-re`](../fleet/buck-re) holds the public certificates of the
+These NativeLink identities are dormant: Namespace replaced the NativeLink
+services on 2026-10-31 (ADR-0276). [`fleet/buck-re`](../fleet/buck-re) holds the public certificates of the
 NativeLink cache ([ADR-0272](../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)).
 `ca.crt` issues the Panterloons server certificate and the read-only host
 client certificates. `uploader-ca.crt` issues only the CI uploader
@@ -92,6 +93,28 @@ same change. For CI, operators load `UPLOADER_IDENTITY` into the
 Tailscale key tagged `tag:buck-re-ci` into `BUCK_RE_TAILSCALE_AUTHKEY`, set
 the tailnet policy so `tag:buck-re-ci` reaches only Panterloons' port 50072,
 and then set the repository variable `BUCK_RE` to `enabled`.
+
+## Namespace Buck2 token
+
+[`fleet-namespace.enc.json`](fleet-namespace.enc.json) holds the tenant-scoped,
+revocable Namespace bearer token as
+`overalls-fleet-namespace.production.NAMESPACE_RBE_TOKEN`
+([ADR-0276](../docs/architecture/decisions/0276-namespace-buck2-remote-cache-and-execution.md)).
+Enrolled hosts that name the `fleet-namespace` credential decrypt it at boot to
+`/run/overalls-secrets/fleet-namespace/token`, readable by root (the host
+updater) and `wheel` (the fleet administrators, who already hold sudo), where
+`tools/buck2` reads it. The same token is the `NAMESPACE_RBE_TOKEN` repository
+secret for CI. It writes the cache every host deploys from, so treat it like
+a deploy credential. The token issued on 2026-10-31 is
+`tok_f8efk0tp7e161163bovldb8j40` and expires after one year.
+
+- **Rotate:** `nsc bazel create-token --scope tenant --expires_in 8760h
+  --token <private file>`, then `overalls-secrets encrypt fleet-namespace
+  --replace` with the new `bearer_token`, `gh secret set NAMESPACE_RBE_TOKEN`
+  from the same file without echoing it, commit, and revoke the old token.
+- **Revoke:** `nsc token revoke <token id>` (ids from `nsc token list`) or
+  cloud.namespace.so/user/sessions. Hosts and CI then fall back to local
+  builds; the host updater retries a failed build once without the cache.
 
 ## Tailscale auto-join key
 

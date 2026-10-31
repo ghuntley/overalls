@@ -31,6 +31,10 @@ jobs:
     outputs:
       tests: ${{ steps.select.outputs.tests }}
       errors: ${{ steps.select.outputs.errors }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -74,6 +78,10 @@ jobs:
       fail-fast: false
       matrix:
         test: ${{ fromJSON(needs.discover.outputs.tests) }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv

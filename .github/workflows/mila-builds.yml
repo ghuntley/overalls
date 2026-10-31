@@ -72,6 +72,11 @@ jobs:
   source-bundle:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 60
+    # Namespace remote cache (ADR-0276) for this hermetic job only: the
+    # non_hermetic platform jobs stay local and receive no token. Pull
+    # requests from forks get no secret and build locally.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       - uses: ./.github/actions/devenv
@@ -101,6 +106,9 @@ jobs:
           mkdir -p out-windows
           cp -L "$bundle"/* out-windows/
           (cd out-windows && sha256sum -c SHA256SUMS)
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: mila-source-bundle

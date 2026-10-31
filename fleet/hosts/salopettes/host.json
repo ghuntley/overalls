@@ -23,6 +23,10 @@
     {
       "name": "fleet-tailscale",
       "path": "secrets/fleet-tailscale.enc.json"
+    },
+    {
+      "name": "fleet-namespace",
+      "path": "secrets/fleet-namespace.enc.json"
     }
   ],
   "discovery": {

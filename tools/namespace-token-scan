@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Contract namespace-token-never-written: see tools/CONTRACTS.
+#
+#   tools/namespace-token-scan [FILE...]
+#
+# Fails when a Namespace token prefix (nsrt_) appears in the generated
+# .buck-remote.buckconfig, Buck2's event and command logs under buck-out, the
+# daemon state under ~/.buck, or any FILE given ("-" reads stdin). It prints
+# only the names of the files that matched, never their contents (ADR-0276).
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+prefix=nsrt_
+# Event logs are zstd-compressed; runners without zstd use the flake's pin.
+if command -v zstd >/dev/null; then zstd=(zstd); else zstd=(nix shell --inputs-from . nixpkgs#zstd -c zstd); fi
+found=0
+hit() { echo "tools/namespace-token-scan: a Namespace token prefix appears in $1" >&2; found=1; }
+scan() {
+  local path=$1
+  case "$path" in
+    -) grep -aq -- "$prefix" && hit stdin || true ;;
+    *.zst) "${zstd[@]}" -qdc -- "$path" | grep -aq -- "$prefix" && hit "$path" || true ;;
+    *) grep -aq -- "$prefix" "$path" && hit "$path" || true ;;
+  esac
+}
+paths=()
+[[ -e .buck-remote.buckconfig ]] && paths+=(.buck-remote.buckconfig)
+for dir in buck-out/v2/log "${HOME:-/nonexistent}/.buck"; do
+  [[ -d "$dir" ]] && while IFS= read -r -d '' file; do paths+=("$file"); done \
+    < <(find "$dir" -type f -print0)
+done
+for path in "${paths[@]}" "$@"; do scan "$path"; done
+if [[ "$found" == 0 ]]; then
+  echo "tools/namespace-token-scan: no Namespace token in ${#paths[@]} Buck2 files$([[ $# -gt 0 ]] && echo " or $# more")"
+fi
+exit "$found"

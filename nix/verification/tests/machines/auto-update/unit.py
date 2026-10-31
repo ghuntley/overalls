@@ -698,7 +698,10 @@ class RemoteCacheConfiguration(unittest.TestCase):
             identity = Path(directory) / "client.pem"
             cache = updater.remote_cache_value(self.cache(identity))
             local, state = updater.buck2_local_config(None)
-            self.assertEqual((local, state), (updater.BUCK2_LOCAL_CONFIG, "not_configured"))
+            self.assertEqual((local, state), (updater.BUCK2_NAMESPACE_CONFIG, "not_configured"))
+            # Namespace decides uploads; remote execution stays off (ADR-0276).
+            self.assertNotIn("default_allow_cache_upload", local)
+            self.assertIn("remote_execution = false", local)
             local, state = updater.buck2_local_config(cache, lambda *_: True)
             self.assertEqual((local, state), (updater.BUCK2_LOCAL_CONFIG, "identity_missing"))
             identity.write_text("")
@@ -742,6 +745,32 @@ class RemoteCacheConfiguration(unittest.TestCase):
         started = time.monotonic()
         self.assertFalse(updater.cache_reachable("127.0.0.1", port))
         self.assertLess(time.monotonic() - started, updater.REMOTE_CACHE_PROBE_TIMEOUT + 1)
+
+
+class NamespaceCache(unittest.TestCase):
+    """tools/buck2 enables Namespace from the host token; the retry turns it off (ADR-0276)."""
+
+    def test_state_follows_a_non_empty_regular_token(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            token = Path(directory) / "token"
+            self.assertEqual(updater.namespace_cache_state(token), "token_missing")
+            token.write_text("")
+            self.assertEqual(updater.namespace_cache_state(token), "token_missing")
+            token.write_text("bearer")
+            self.assertEqual(updater.namespace_cache_state(token), "enabled")
+            token.unlink()
+            token.mkdir()
+            self.assertEqual(updater.namespace_cache_state(token), "token_missing")
+
+    def test_fallback_command_turns_the_remote_cache_off(self) -> None:
+        wrapper = Path("/checkout/tools/buck2")
+        remote = updater.buck2_command(wrapper)
+        local = updater.buck2_command(wrapper, remote=False)
+        self.assertNotIn("OVERALLS_BUCK2_REMOTE=off", remote)
+        self.assertIn("OVERALLS_BUCK2_REMOTE=off", local)
+        # env assignments precede the wrapper, never its arguments.
+        self.assertLess(local.index("OVERALLS_BUCK2_REMOTE=off"), local.index(str(wrapper)))
+        self.assertEqual(remote[remote.index(str(wrapper)) :], local[local.index(str(wrapper)) :])
 
 
 class RemoteCacheFallback(unittest.TestCase):

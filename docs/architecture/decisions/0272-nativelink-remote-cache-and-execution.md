@@ -2,11 +2,19 @@
 
 - ID: ADR-0272
 - Date: 2026-10-30
-- Status: accepted
+- Status: superseded
 - Implementation: partial
 - Components: build, fleet infrastructure, CI
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0276
+
+Superseded on 2026-10-31 by
+[ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md): Namespace is
+now the Buck2 remote cache and execution backend. The fleet no longer runs
+these NativeLink services, and CI no longer uses the `buck-re` action, which
+has been removed. The module, registry, credentials and machine tests below
+stay in the repository, dormant. The rationale and evidence below are
+historical.
 
 ## Context
 
@@ -336,6 +344,7 @@ None.
 
 ## Related decisions
 
+- Superseded by [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md).
 - [ADR-0269](0269-buck2-build-system-with-nix-toolchains.md),
   [ADR-0271](0271-buck2-host-self-deployment.md),
   [ADR-0248](0248-fleet-build-scheduling.md),

@@ -257,93 +257,47 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   backstop is `nixos-machine-tests.yml`; dispatch it with
   `gh workflow run nixos-machine-tests.yml --ref trunk -f checks="a b"`.
 
-## Remote cache and execution (NativeLink)
+## Remote cache and execution (Namespace)
 
-Panterloons serves a REv2 cache (CAS and action cache) and the remote-execution
-scheduler on its tailnet address; workers run on Panterloons and Dungarees
-([ADR-0272](../../../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)).
-Everything is optional: without configuration, credentials or a reachable
-service, every action runs locally.
+Namespace (namespace.so) is the Buck2 remote cache and remote-execution
+backend for developers, hosts and CI under one tenant token
+([ADR-0276](../../../docs/architecture/decisions/0276-namespace-buck2-remote-cache-and-execution.md)).
+The fleet's NativeLink services ([ADR-0272](../../../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md))
+are retired; their module stays dormant.
 
-- **Listeners** (all on 100.98.214.120, mTLS, one CA each; ports come from
-  `nix/policy/fleet/ports.nix`):
-
-  | Port | Who | CA | Can |
-  | --- | --- | --- | --- |
-  | 50071 | hosts | `ca.crt` (reader) | read the cache; uploads refused or discarded |
-  | 50072 | CI | `uploader-ca.crt` | read, upload, execute |
-  | 50073 | developers | `executor-ca.crt` | read, upload inputs, execute; never write the action cache |
-  | 50074 | workers | `worker-ca.crt` | worker API, CAS, action-cache results |
-
-  Every server certificate is issued by `ca.crt`, so clients always trust
-  `fleet/buck-re/ca.crt`.
-- **Developers** write the untracked `.buckconfig.local` (never commit it):
-
-  ```ini
-  [buck2_re_client]
-    address = grpc://100.98.214.120:50073
-    tls = true
-    instance_name = main
-    tls_ca_certs = /path/to/overalls/fleet/buck-re/ca.crt
-    tls_client_cert = /private/buck-re-executor.pem
-  [overalls]
-    remote_execution = true
-  ```
-
-  `tls_client_cert` is one PEM file holding the certificate and then its key,
-  outside the checkout and the Nix store. The developer identity is
-  `overalls-buck-re-executor.production.EXECUTOR_IDENTITY` in the
-  recovery-only `buck-re-executor-recovery` document. Without
-  `remote_execution = true` the same file gives cache reads only.
-- **CI** uses `.github/actions/buck-re` in ci.yml's build, test and precommit
-  jobs. It is off by default and acts only when the repository variable
-  `BUCK_RE` is `enabled`, the `BUCK_RE_TAILSCALE_AUTHKEY` (ephemeral, tagged
-  `tag:buck-re-ci`) and `BUCK_RE_UPLOADER_IDENTITY` secrets exist, and the run
-  is a trunk push or dispatch in this repository. The step continues on
-  error, so a failed join or an unreachable listener leaves CI local. It joins the
-  tailnet, and writes `.buckconfig.local` for port 50072 with
-  `default_allow_cache_upload = true` and `remote_execution = true`.
-- **Hosts** only read. The `overalls.buckRemoteCache.client` module installs
-  root's `~/.buckconfig.d/overalls-remote-cache` while the decrypted identity
-  exists. The host updater runs Buck2 with its own `HOME`, so it writes the
-  same read-only section into its checkout's `.buckconfig.local` itself, only
-  while the identity file exists and the listener accepts a connection
-  (`update.remote_cache` event: `enabled`, `identity_missing`, `unreachable`,
-  `not_configured`; `fallback` when an enabled build failed and was retried
-  once without the cache), always with `default_allow_cache_upload = false` and
-  `remote_execution = false`. Port 50071 has no execution service.
+- **How it turns on.** `tools/buck2` looks for a token in
+  `NAMESPACE_RBE_TOKEN`, then `/run/overalls-secrets/fleet-namespace/token`
+  (fleet hosts: root and `wheel`), then `~/.config/overalls/namespace-rbe-token.json`
+  (`bearer_token`). With one, it writes the untracked
+  `.buck-remote.buckconfig` (`<file:tools/namespace.buckconfig>`), which
+  `.buckconfig` includes optionally, and exports the token for buckd; the
+  tracked config expands `$NAMESPACE_RBE_TOKEN` in its `http_headers`.
+  Without one, or with `OVERALLS_BUCK2_REMOTE=off`, it removes the include and
+  builds stay local. Switching restarts the daemon.
+- **Never write the token** into a file in the checkout, argv or the Nix
+  store. `tools/namespace-token-scan` fails if the `nsrt_` prefix appears in
+  the include, `buck-out/v2/log` or `~/.buck`; CI runs it after each Buck2 job.
+- **Who writes.** Every token holder uploads (`default_allow_cache_upload =
+  true`): developers, the host updater and CI's trunk pushes. `local_only`
+  actions keep `allow_cache_upload = False` (rule 4). The host updater keeps
+  `remote_execution = false` and retries a failed build once with
+  `OVERALLS_BUCK2_REMOTE=off` (`update.namespace_cache` event: `enabled` or
+  `token_missing`; `update.remote_cache` `fallback`).
+- **CI.** ci.yml's Buck2 jobs and nixos-machine-tests.yml set
+  `NAMESPACE_RBE_TOKEN` from the repository secret; mila-builds.yml sets it
+  only on the hermetic source-bundle job. Forks get no secret and build
+  locally.
+- **Rotation and revocation.** See `secrets/README.md` (`nsc bazel
+  create-token`, `overalls-secrets encrypt fleet-namespace --replace`,
+  `nsc token revoke`).
 - **What runs remotely** (`toolchains//:execution_platform`, from
-  `buck/platforms.bzl`): Linux x86_64 only, with a `[buck2_re_client]` address,
-  `[nix] cells_id` and `[overalls] remote_execution = true`. Execution is
-  remote first; Buck2 runs an action locally when remote execution fails as
-  infrastructure (scheduler unreachable, or no worker holds these cells, which
-  the scheduler fails after `unmatchedTimeout`, 15 s). `local_only` actions
-  (`nix_store_import`, `nix_assemble`, `repo_check(local_only)`, anything
-  touching `/nix/store` or the Nix daemon) and test commands
-  (`nixos_machine_test`, script tests, check stamps) never go remote. Rules
-  for non-hermetic targets (`non_hermetic`, the Mila platform builds) must set
-  `local_only = True` on every action.
-- **The cells property.** `nix/buck/cells.nix` writes `[nix] cells_id`, a
-  hash of every toolchain store path, the rust cell and buck2. Every action
-  carries `overalls-cells=<cells_id>` (part of its digest, cached or
-  executed). A worker advertises the id of the one cells closure it holds:
-  the host updater's checkout `.buck-cells` (the deployed revision's cells,
-  realised from Cachix), rooted under `/var/lib/nativelink-worker-cells`. A
-  client on another cells revision runs locally after the scheduler's
-  timeout; set `remote_execution = false` while working on cells changes.
-- **Workers** run in their own mount namespace with every Lilly pool mount
-  removed first (ADR-0144), as `nativelink-worker` without capabilities,
-  reaching only loopback and the scheduler. Actions run through
-  `buck-re-action-sandbox` as `nativelink-action` with no network, no view
-  of other actions or the worker, and a private `/tmp`; they cannot read the
-  worker identity. Execute rights are still trusted like upload rights.
-  Remote actions have no network: anything that needs it must be
-  `local_only`.
-- **What is never uploaded.** `local_only` actions keep
-  `allow_cache_upload = False` (rule 4).
-- **Checking.** The build summary prints
+  `buck/platforms.bzl`): only with a cache configured, `[nix] cells_id` and
+  `[overalls] remote_execution = true`, Linux x86_64. `local_only` actions
+  and test commands never go remote. Every action carries
+  `overalls-cells=<cells_id>` in its digest.
+- **Checking.** The build summary prints `Cache hits: N%` and
   `Commands: N (cached: C, remote: R, local: L)`. Force local with
-  `buck2 build --local-only`, or remote-or-fail with `--remote-only`.
+  `OVERALLS_BUCK2_REMOTE=off` or `buck2 build --local-only`.
 
 ## Precommit
 
@@ -430,13 +384,9 @@ command, the single prek hook and CI call it.
 - **Stale toolchain.** Check that `readlink .buck-cells` matches
   `nix build --print-out-paths .#buckCells.x86_64-linux`, then run
   `tools/buck2 kill`.
-- **Remote cache or execution errors.** Move `.buckconfig.local` aside to
-  confirm the build works locally. Then check the tailnet route to
-  Panterloons, that the PEM holds the certificate and key, and that the port
-  matches the certificate: a host certificate on 50072 fails the TLS
-  handshake. Every remote action falling back after about 15 s means no
-  worker holds your `cells_id` (`grep cells_id .buck-cells/toolchains.buckconfig`
-  against `/var/lib/nativelink-worker-cells/id` on the workers).
+- **Remote cache or execution errors.** Rerun with
+  `OVERALLS_BUCK2_REMOTE=off` to confirm the build works locally, then check
+  that the token has not expired or been revoked (`nsc token list`).
 - **Bumping buck2.** buck2 comes from `buildNixpkgs`. Bump `flake.lock`, rerun
   the spikes in the [migration review](../../../docs/architecture/reviews/2026-10-30-buck2-migration.md),
   and expect every target to be selected. Update `tools/buck2-no-nix.json` and

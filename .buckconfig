@@ -39,10 +39,12 @@
 # closure, and globbing it would copy buck2 and the prelude into every
 # assembled tree. .buckconfig.local holds per-checkout overrides. The mila/
 # entries are the in-tree outputs of the non_hermetic platform builds (M9).
-  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical, mila/build, mila/native/apple/.build, mila/native/apple/App/.build, mila/native/apple/Sources/MilaNativeUI/Resources/*.json, mila/native/android/.gradle, mila/native/android/.kotlin, mila/native/android/build, mila/native/android/app/build, mila/native/android/local.properties, mila/windows-dotnet/bin, mila/windows-dotnet/obj, mila/windows-dotnet-smoke/bin, mila/windows-dotnet-smoke/obj
+  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .buck-remote.buckconfig, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical, mila/build, mila/native/apple/.build, mila/native/apple/App/.build, mila/native/apple/Sources/MilaNativeUI/Resources/*.json, mila/native/android/.gradle, mila/native/android/.kotlin, mila/native/android/build, mila/native/android/app/build, mila/native/android/local.properties, mila/windows-dotnet/bin, mila/windows-dotnet/obj, mila/windows-dotnet-smoke/bin, mila/windows-dotnet-smoke/obj
 
 <file:.buck-cells/toolchains.buckconfig>
 
-# Optional NativeLink cache client settings ([buck2_re_client]) live in the
-# untracked .buckconfig.local, which Buck2 reads natively, or in root's
-# ~/.buckconfig.d on fleet hosts (ADR-0272). Without them builds stay local.
+# The Namespace remote cache and execution client (ADR-0276): tools/buck2
+# writes this untracked include, naming tools/namespace.buckconfig, only while
+# a Namespace token is available. Without it builds stay local. The untracked
+# .buckconfig.local, read after this file, still overrides it per checkout.
+<?file:.buck-remote.buckconfig>

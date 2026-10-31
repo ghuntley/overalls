@@ -36,6 +36,11 @@ on 2026-10-30 that hosts run buck2 locally.
 3. **Cache.** Hosts read the NativeLink cache
    ([ADR-0272](0272-nativelink-remote-cache-and-execution.md)) and fall back to
    building locally. They never upload to it.
+   Revised on 2026-10-31 by
+   [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md). Hosts now
+   read and upload to the Namespace cache with the fleet's tenant token. They
+   still never execute remotely, and they still fall back to building
+   locally.
 4. **Revision.** Assembly receives the candidate revision as an argument in
    place of `self.rev`, so deployment telemetry
    ([ADR-0259](0259-deployment-revision-telemetry.md)) keeps naming the

@@ -13,8 +13,50 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 state=.buck-cells.key
 
+# Namespace remote cache and execution (ADR-0276). The tracked
+# tools/namespace.buckconfig reads the bearer token from the daemon's
+# environment, so the token never enters a file, argv or the Nix store. It is
+# included through the untracked .buck-remote.buckconfig only while a token is
+# available; otherwise, or with OVERALLS_BUCK2_REMOTE=off, builds stay local.
+remote_include=.buck-remote.buckconfig
+remote_config() {
+  if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off ]]; then
+    if [[ -z "${NAMESPACE_RBE_TOKEN:-}" && -r /run/overalls-secrets/fleet-namespace/token ]]; then
+      NAMESPACE_RBE_TOKEN=$(</run/overalls-secrets/fleet-namespace/token)
+    fi
+    local personal="${HOME:-/nonexistent}/.config/overalls/namespace-rbe-token.json"
+    if [[ -z "${NAMESPACE_RBE_TOKEN:-}" && -r "$personal" ]]; then
+      NAMESPACE_RBE_TOKEN=$(sed -n 's/.*"bearer_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$personal")
+    fi
+  fi
+  if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off && -n "${NAMESPACE_RBE_TOKEN:-}" ]]; then
+    export NAMESPACE_RBE_TOKEN
+    local wanted='<file:tools/namespace.buckconfig>'
+    if [[ "$(cat "$remote_include" 2>/dev/null || true)" != "$wanted" ]]; then
+      remote_restart
+      printf '%s\n' "$wanted" > "$remote_include"
+    fi
+  else
+    unset NAMESPACE_RBE_TOKEN
+    if [[ -e "$remote_include" ]]; then
+      remote_restart
+      rm -f "$remote_include"
+    fi
+  fi
+}
+# The include is ignored by the file watcher, and the daemon keeps the
+# environment it started with, so a switch restarts the daemon.
+remote_restart() {
+  local old
+  for old in .buck-cells/bin/buck2 .buck-cells/bin/buck2.exe; do
+    [[ -x "$old" ]] && "$old" kill >/dev/null 2>&1 || true
+  done
+}
+
 if [[ "${1:-}" == --no-nix ]]; then
   shift
+  # Platform builds on runners without Nix are local_only.
+  remote_config off
   case "$(uname -s)-$(uname -m)" in
     MINGW*-x86_64|MSYS*-x86_64|CYGWIN*-x86_64) kit_system=x86_64-windows python=python ;;
     Linux-x86_64) kit_system=x86_64-linux python=python3 ;;
@@ -85,4 +127,5 @@ if [[ ! -e .buck-cells || "$(cat "$state" 2>/dev/null)" != "$key" ]]; then
   fi
   printf '%s\n' "$key" > "$state"
 fi
+remote_config on
 exec "$root/.buck-cells/bin/buck2" "$@"

@@ -32,3 +32,21 @@ OVERALLS_BUCK2_KIT copy of a //tools:buck2-no-nix-<os> kit built from the
 same pins), materialised in .buck-cells as a real directory. Its configuration
 enables only non_hermetic targets, so a runner without Nix never builds a
 hermetic target from PATH tools (ADR-0269 M9).
+
+@cc [owner:ghuntley,label:build;security] buck2-namespace-optional
+tools/buck2 MUST enable the Namespace remote cache only by writing the
+untracked .buck-remote.buckconfig, which names tools/namespace.buckconfig,
+while a token is available from NAMESPACE_RBE_TOKEN,
+/run/overalls-secrets/fleet-namespace/token or
+~/.config/overalls/namespace-rbe-token.json, and MUST remove it otherwise, in
+--no-nix mode and under OVERALLS_BUCK2_REMOTE=off, so builds without a token
+stay local. It MUST restart the daemon when it switches, so buckd holds the
+token it expands (ADR-0276).
+
+@cc [owner:ghuntley,label:security] namespace-token-never-written
+The Namespace token MUST reach Buck2 only through the NAMESPACE_RBE_TOKEN
+environment variable, which tools/namespace.buckconfig names: never argv, the
+generated include, the Nix store or a log. tools/namespace-token-scan MUST
+fail, naming only files, when the token prefix appears in the include,
+buck-out's Buck2 logs, the daemon state under ~/.buck or a given file
+(ADR-0276).

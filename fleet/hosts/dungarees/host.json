@@ -99,6 +99,10 @@
     {
       "name": "dungarees-lilly",
       "path": "secrets/dungarees-lilly.enc.json"
+    },
+    {
+      "name": "fleet-namespace",
+      "path": "secrets/fleet-namespace.enc.json"
     }
   ],
   "discovery": {

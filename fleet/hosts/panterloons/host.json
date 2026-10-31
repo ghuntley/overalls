@@ -131,6 +131,10 @@
     {
       "name": "panterloons-ziggy",
       "path": "secrets/panterloons-ziggy.enc.json"
+    },
+    {
+      "name": "fleet-namespace",
+      "path": "secrets/fleet-namespace.enc.json"
     }
   ],
   "discovery": {

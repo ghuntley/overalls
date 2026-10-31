@@ -32,13 +32,23 @@ BUCK2_HOME = STATE / "buck2-home"
 BUCK2_GCROOTS = STATE / "gcroots"
 BUCK2_ISOLATION = "overalls-update"
 BUCK2_PRESERVED = ["/buck-out", "/.buck-cells", "/.buck-cells.key", "/.buck-cells.gcroot"]
-# Hosts never upload to the Buck2 cache or execute remotely (ADR-0271,
-# ADR-0272): the updater's checkout configuration says so whatever the
-# candidate's committed .buckconfig contains.
+# Hosts never execute remotely (ADR-0271, ADR-0276): the updater's checkout
+# configuration says so whatever the candidate's committed .buckconfig
+# contains. With the Namespace cache they upload what they build, like every
+# other holder of the tenant token, so hosts warm each other (ADR-0276).
+BUCK2_NAMESPACE_CONFIG = (
+    "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
+    "[overalls]\n  remote_execution = false\n"
+)
+# With a NativeLink cache (ADR-0272), and for the local fallback build, they
+# never upload either.
 BUCK2_LOCAL_CONFIG = (
     "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
     "  default_allow_cache_upload = false\n[overalls]\n  remote_execution = false\n"
 )
+# The Namespace token (ADR-0276): the candidate's tools/buck2 reads it and
+# enables the Namespace cache while it exists.
+NAMESPACE_TOKEN = Path("/run/overalls-secrets/fleet-namespace/token")
 # Seconds to wait for the cache listener before building without it.
 REMOTE_CACHE_PROBE_TIMEOUT = 5.0
 IPV4_OCTET = r"(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])"
@@ -308,8 +318,12 @@ def cache_reachable(address: str, port: int) -> bool:
 
 
 # @cc [owner:ghuntley,label:deployment;recovery] updater-remote-cache-read-only
-# The updater's Buck2 configuration MUST always refuse cache uploads and remote
-# execution. It MAY add the host's read-only NativeLink cache client only while
+# The updater's Buck2 configuration MUST always refuse remote execution. With
+# no NativeLink cache configured it leaves uploads to the Namespace include
+# that tools/buck2 adds while the host's Namespace token exists, so hosts read
+# and write that cache like every other token holder (ADR-0276). Otherwise it
+# MUST refuse cache uploads, and MAY add the host's read-only NativeLink cache
+# client only while
 # the host's decrypted client identity is a non-empty regular file and the
 # cache listener accepts a connection; otherwise the build runs locally with
 # no cache section, so a missing credential or an unreachable cache never
@@ -320,7 +334,7 @@ def buck2_local_config(
 ) -> tuple[str, str]:
     """The checkout's .buckconfig.local and why the cache is or is not used."""
     if cache is None:
-        return BUCK2_LOCAL_CONFIG, "not_configured"
+        return BUCK2_NAMESPACE_CONFIG, "not_configured"
     identity = Path(cache["clientIdentity"])
     try:
         info = identity.stat()
@@ -341,10 +355,22 @@ def buck2_local_config(
     return BUCK2_LOCAL_CONFIG + section, "enabled"
 
 
+def namespace_cache_state(token: Path = NAMESPACE_TOKEN) -> str:
+    """Whether the candidate's tools/buck2 will enable the Namespace cache."""
+    try:
+        info = token.stat()
+    except OSError:
+        return "token_missing"
+    if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
+        return "token_missing"
+    return "enabled"
+
+
 # @cc [owner:ghuntley,label:recovery] updater-remote-cache-fail-open
-# A build that fails while the cache section is enabled MUST be retried once
-# with the cache section removed, so a cache that answers but fails (a
-# rejected or corrupt identity, a broken listener) never fails an update.
+# A build that fails while a remote cache is enabled (the NativeLink section
+# or the Namespace token) MUST be retried once with every remote cache
+# removed, so a cache that answers but fails (a rejected, revoked or corrupt
+# credential, a broken endpoint) never fails an update.
 def build_with_cache_fallback(
     run: Callable[[], str], cache_state: str, disable_cache: Callable[[], None]
 ) -> str:
@@ -594,12 +620,19 @@ class Deployment:
         local.chmod(0o600)
         if self.config["remoteCache"] is not None:
             print(json.dumps({"event": "update.remote_cache", "state": cache_state}), flush=True)
+        namespace_state = namespace_cache_state()
+        print(
+            json.dumps({"event": "update.namespace_cache", "state": namespace_state}),
+            flush=True,
+        )
+        if namespace_state == "enabled":
+            cache_state = "enabled"
         wrapper = CHECKOUT / "tools" / "buck2"
         if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
             raise UpdateError("build_tool_unavailable")
         BUCK2_HOME.mkdir(mode=0o700, exist_ok=True)
         BUCK2_GCROOTS.mkdir(mode=0o700, exist_ok=True)
-        buck2 = buck2_command(wrapper)
+        remote = True
         target = "//fleet/hosts/" + self.config["flakeAttr"] + ":deployment"
         timeout = self.config["buildTimeout"]
         # A daemon started by anyone else could carry another environment.
@@ -607,27 +640,32 @@ class Deployment:
         try:
             try:
                 # Realises the candidate's pinned cells and starts nothing.
-                self.command([*buck2, "--version"], timeout=timeout)
+                self.command([*buck2_command(wrapper), "--version"], timeout=timeout)
             except UpdateError as error:
                 raise UpdateError("build_tool_unavailable") from error
-            command = [
-                *buck2,
-                "build",
-                "--console=simple",
-                "-c",
-                "overalls.revision=" + revision,
-                target,
-                "--show-full-output",
-            ]
-            if self.config["verbose"]:
-                command += ["-v", "4"]
+
+            def build_command() -> list[str]:
+                command = [
+                    *buck2_command(wrapper, remote=remote),
+                    "build",
+                    "--console=simple",
+                    "-c",
+                    "overalls.revision=" + revision,
+                    target,
+                    "--show-full-output",
+                ]
+                if self.config["verbose"]:
+                    command += ["-v", "4"]
+                return command
 
             def disable_cache() -> None:
+                nonlocal remote
+                remote = False
                 local.write_text(BUCK2_LOCAL_CONFIG)
                 self.stop_buck2()
 
             output = build_with_cache_fallback(
-                lambda: self.command(command, timeout=timeout, capture=True),
+                lambda: self.command(build_command(), timeout=timeout, capture=True),
                 cache_state,
                 disable_cache,
             )
@@ -1442,14 +1480,18 @@ class Deployment:
         )
 
 
-def buck2_command(binary: Path) -> list[str]:
-    """A Buck2 invocation in the fixed checkout, isolation directory and state."""
+def buck2_command(binary: Path, *, remote: bool = True) -> list[str]:
+    """A Buck2 invocation in the fixed checkout, isolation directory and state.
+
+    Without remote, tools/buck2 leaves the Namespace cache out (ADR-0276).
+    """
     return [
         "env",
         "-C",
         str(CHECKOUT),
         "HOME=" + str(BUCK2_HOME),
         "OVERALLS_GCROOT_DIR=" + str(BUCK2_GCROOTS),
+        *([] if remote else ["OVERALLS_BUCK2_REMOTE=off"]),
         str(binary),
         "--isolation-dir",
         BUCK2_ISOLATION,
