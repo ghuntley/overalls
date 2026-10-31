@@ -34,14 +34,29 @@ def pool(machine: Node, device: str, *, image: bool = True) -> None:
         machine.succeed("chmod 0600 /vms/rootfs.raw && zpool sync tank")
 
 
+GUEST_SMF_LOGS = (
+    "site-overalls-native-growth:default.log",
+    "site-overalls-native-bootstrap:default.log",
+    "site-overalls-native-agents:default.log",
+)
+
+
 def guest_growth_log(machine: Node, disk: str) -> None:
-    """Failure-only diagnostic: read the stopped guest's growth SMF log read-only."""
+    """Failure-only diagnostic: read the stopped guest's boot-chain SMF logs read-only.
+
+    The candidate root dataset has a legacy mountpoint, so it is mounted with
+    plain `mount -t zfs`; the `zfsutil` option is refused for legacy datasets.
+    """
+    tails = "".join(
+        f"echo '--- {name}'; tail -n 80 '/mnt/guest/var/svc/log/{name}'; "
+        for name in GUEST_SMF_LOGS
+    )
     status, output = machine.execute(
         f"loop=$(losetup -fP --show -r {shlex.quote(disk)}) && "
         'zpool import -f -N -o readonly=on -d "${loop}p2" overalls_native_candidate && '
-        "mkdir -p /mnt/guest && mount -t zfs -o ro,zfsutil "
+        "mkdir -p /mnt/guest && mount -t zfs -o ro "
         "overalls_native_candidate/ROOT/overalls-native-candidate /mnt/guest && "
-        "tail -n 80 '/mnt/guest/var/svc/log/site-overalls-native-growth:default.log'; "
+        f"{{ {tails}}}; "
         "umount /mnt/guest; zpool export overalls_native_candidate; "
         'losetup -d "$loop"',
         timeout=120,

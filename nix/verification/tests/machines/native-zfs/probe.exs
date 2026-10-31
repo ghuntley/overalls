@@ -7,9 +7,19 @@
 alias Lilly.Host.{Command, Lock, ZFS}
 alias OverallsProtocol.Storage
 
-if System.get_env("ZFS_OBSERVATION_FAULT") do
-  System.put_env("PATH", "/run/zfs-changing/bin:" <> System.fetch_env!("PATH"))
-  "/run/zfs-changing/bin/zfs" = System.find_executable("zfs")
+# Lilly runs every zfs utility through the private lilly-hostd this BEAM spawns.
+# hostd inherits PATH, so the observation-fault wrapper is found first, but it
+# does not pass ZFS_OBSERVATION_FAULT to utilities. The fault mode therefore
+# travels through the file the wrapper reads; an unset mode clears that file so
+# a stale fault cannot apply to a later check.
+case System.get_env("ZFS_OBSERVATION_FAULT") do
+  nil ->
+    File.rm("/run/zfs-observation-fault-mode")
+
+  mode ->
+    File.write!("/run/zfs-observation-fault-mode", mode)
+    System.put_env("PATH", "/run/zfs-changing/bin:" <> System.fetch_env!("PATH"))
+    "/run/zfs-changing/bin/zfs" = System.find_executable("zfs")
 end
 
 action = System.fetch_env!("ZFS_CHECK")
@@ -117,7 +127,13 @@ case action do
   "reject-snapshot-bindings" ->
     {:error, :incoherent_zfs_observation} = ZFS.observe(read_identity.(), read_snapshot_bindings.())
 
-  "busy-observation" ->
+  # ADR-0163 decision 4: usage drift between the two exact reads is resampled,
+  # not withheld; the latest coherent tree is the observation. A follow-up
+  # observation of the now-quiet pool must agree, so a stale first read fails.
+  "moving-observation" ->
     identity = read_identity.()
-    {:error, :storage_busy} = ZFS.observe(identity)
+    {:ok, observation} = ZFS.observe(identity)
+    {:ok, latest} = ZFS.observe(identity)
+    true = observation.storage.used_bytes == latest.storage.used_bytes
+    true = observation.free_bytes == latest.free_bytes
 end

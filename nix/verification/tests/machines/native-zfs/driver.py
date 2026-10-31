@@ -103,14 +103,14 @@ with subtest("native identity, mirror extents and quota accounting"):
     storage.succeed("umount /alias; ln -s /pool /symlink")
     storage.succeed("zfs-check reject-mount /symlink")
 
-with subtest("changing usage is withheld as retryable while changed policy and identity fail"):
+with subtest("changing usage resamples to the latest tree while changed policy and identity fail"):
     storage.succeed("install -Dm0755 /etc/zfs-observation-fault /run/zfs-changing/bin/zfs")
     transient_child = "tank/lilly/vm-eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee"
     storage.succeed(
         f"zfs create -o mountpoint=/pool/vms/eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee {transient_child}"
     )
     for mode, action in [
-        ("usage", "busy-observation"),
+        ("usage", "moving-observation"),
         ("quota", "reject-observation"),
         ("child-identity", "reject-observation"),
     ]:
