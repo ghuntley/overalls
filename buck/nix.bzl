@@ -18,63 +18,6 @@ def nix_owned(name: str = "srcs", srcs = None, **kwargs):
     prefix = "/".join([p for p in [cell, native.package_name()] if p])
     owned_files(name = name + "_files", prefix = prefix, srcs = files, visibility = ["PUBLIC"])
 
-def _nix_flake_attr_impl(ctx: AnalysisContext) -> list[Provider]:
-    path = ctx.actions.declare_output("store-path")
-    script = ctx.actions.write("build.sh", [
-        "set -euo pipefail",
-        "roots=${OVERALLS_GCROOT_DIR:-${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/overalls-buck2/gcroots}",
-        "mkdir -p \"$roots\"",
-        "out=$(\"$1\" build --print-out-paths --out-link \"$roots/$(pwd | sha256sum | cut -c1-12)-$2\" \".#$3\")",
-        "printf '%s\\n' \"$out\" > \"$4\"",
-    ])
-    ctx.actions.run(
-        cmd_args(
-            ctx.attrs._bash[RunInfo],
-            script,
-            ctx.attrs._nix[RunInfo],
-            str(ctx.label.raw_target()).replace("/", "_").replace(":", "__"),
-            ctx.attrs.attr,
-            path.as_output(),
-            hidden = [s for d in ctx.attrs.srcs for s in d[DefaultInfo].default_outputs + d[DefaultInfo].other_outputs],
-        ),
-        category = "nix_flake_attr",
-        local_only = True,
-        allow_cache_upload = False,
-    )
-    # `[drv]` evaluates the attribute without building it, so CI can check
-    # every affected bootstrap check per push (evaluation-only assertions in
-    # a check are otherwise found only by publish-cache.yml).
-    drv = ctx.actions.declare_output("drv-path")
-    ctx.actions.run(
-        cmd_args(
-            ctx.attrs._bash[RunInfo],
-            "-c",
-            "set -euo pipefail; \"$1\" eval --raw \".#$2.drvPath\" > \"$3\"",
-            "nix_flake_attr_drv",
-            ctx.attrs._nix[RunInfo],
-            ctx.attrs.attr,
-            drv.as_output(),
-            hidden = [s for d in ctx.attrs.srcs for s in d[DefaultInfo].default_outputs + d[DefaultInfo].other_outputs],
-        ),
-        category = "nix_flake_attr_drv",
-        local_only = True,
-        allow_cache_upload = False,
-        weight_percentage = 25,
-    )
-    return [DefaultInfo(default_output = path, sub_targets = {"drv": [DefaultInfo(default_output = drv)]})]
-
-# Contract nix-flake-attr-bootstrap-only: see buck/CONTRACTS.
-nix_flake_attr = rule(
-    impl = _nix_flake_attr_impl,
-    attrs = {
-        "attr": attrs.string(),
-        "labels": attrs.list(attrs.string(), default = []),
-        "srcs": attrs.list(attrs.dep(), default = ["root//:flake_srcs"]),
-        "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
-        "_nix": attrs.default_only(attrs.exec_dep(default = "toolchains//:nix")),
-    },
-)
-
 # Package-relative source directories, so assembly can rebuild the tree.
 OwnedSrcsInfo = provider(fields = {"dirs": list[(str, Artifact)]})
 
@@ -104,9 +47,8 @@ def _nix_store_run_impl(ctx: AnalysisContext) -> list[Provider]:
         )),
     ]
 
-# Runs `program` from a store path that a dependency built: today a bootstrap
-# nix_flake_attr, later the nix_assemble target that replaces it (M3), so the
-# runnable label stays stable across that move.
+# Runs `program` from a store path that a dependency built, such as a
+# nix_assemble target (//mila:journey-fixture runs //:package-mila-journey-fixture).
 nix_store_run = rule(
     impl = _nix_store_run_impl,
     attrs = {

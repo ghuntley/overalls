@@ -80,8 +80,16 @@ let
       }) ];
   }).config.system.build.kexecInstallerTarball;
 
+  systems = lib.mapAttrs (name: _: hostSystem name true) enrolledHosts
+    // lib.mapAttrs' (name: _: lib.nameValuePair "${name}-base" (hostSystem name false)) inventory.hosts;
+
+  # The flake's package outputs and its non-script checks (outputs.nix).
+  outputs = import ./outputs.nix {
+    inherit nixpkgs pkgs revision packages modules systems kexec antithesis nix-compact;
+  };
+
   # NixOS machine and evaluation tests over the same package set.
-  checks = import ../verification/tests/catalog.nix {
+  catalog = import ../verification/tests/catalog.nix {
     buildPkgs = pkgs;
     testPkgs = nixpkgs.legacyPackages.${system};
     inherit nixpkgs packages modules fixtures kexec;
@@ -90,9 +98,12 @@ let
     imageSource = nixos-images.outPath;
     nixCompactSource = nix-compact.outPath;
   };
+  checks = assert lib.assertMsg (lib.intersectLists (lib.attrNames catalog) (lib.attrNames outputs.checks) == [ ])
+    "lib.assemble: a check is defined in both catalog.nix and outputs.nix";
+    catalog // outputs.checks;
 in
 {
-  inherit packages hostPackages imported kexec checks modules antithesis;
-  systems = lib.mapAttrs (name: _: hostSystem name true) enrolledHosts
-    // lib.mapAttrs' (name: _: lib.nameValuePair "${name}-base" (hostSystem name false)) inventory.hosts;
+  inherit packages hostPackages imported kexec checks modules antithesis systems;
+  # Flake package outputs by their flake names (`//:package-<name>`).
+  outputPackages = outputs.packages;
 }

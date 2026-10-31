@@ -50,7 +50,9 @@ def _main(ctx: bxl.Context) -> None:
         entry = {"target": str(node.label), "labels": labels}
         if "machine_test" in labels:
             machine_tests.append(entry)
-        elif "bootstrap" in labels:
+        # lib.assemble's flake package and check outputs are builds: ci.yml
+        # evaluates them and publish-cache.yml builds the checks.
+        elif "flake_output" in labels:
             builds.append(entry)
         elif _kind(node).endswith("_test") or "check" in labels:
             tests.append(entry)

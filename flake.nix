@@ -47,7 +47,6 @@
       pkgs = buildNixpkgs.legacyPackages.${system};
       # The single package set (ADR-0269), also used by every module.
       built = assembled.packages;
-      antithesisImages = assembled.antithesis;
       assemble = import ./nix/assemble {
         inherit nixpkgs buildNixpkgs disko nixos-images nix-compact tribuchet nix-grpc-store;
       };
@@ -77,85 +76,9 @@
       lib.dependencyPins = built.dependencyPins;
       # NixOS assembly from Buck2 artifacts (ADR-0269); see nix/assemble.
       lib.assemble = assemble;
-      packages.${system} = {
-        default = built.marshall;
-        # Hermetic Mila journey backend launcher (ADR-0264); the app runs it.
-        mila-journey-fixture = import ./nix/verification/tests/machines/mila-journey/launcher.nix {
-          inherit nixpkgs; pkgs = nixpkgs.legacyPackages.${system};
-          module = self.nixosModules.default; packages = built;
-        };
-        service-marshall = built.marshall;
-        service-lilly = built.lilly;
-        service-audi = built.audi;
-        service-porsche = built.porsche;
-        service-ziggy = built.ziggy;
-        service-galileo = built.galileo;
-        service-enrico = built.enrico;
-        service-brady = built.brady;
-        service-peach = built.peach;
-        service-susan = built.susan;
-        image-susan = built.mkSusanImage (self.rev or self.dirtyRev or "unknown");
-        guest-nixos = built.guest;
-        android-sdk = built.androidSdk;
-        guest-android = built.androidGuest;
-        guest-ubuntu = built.ubuntuGuest;
-        guest-arch = built.archGuest;
-        guest-alma = built.almaLinuxGuest;
-        freebsd-kernel-receipt = built.nativeKernels.freebsdKernel;
-        freebsd-kernel-candidate = built.nativeKernels.freebsdCandidate;
-        freebsd-image-candidate = built.freebsdImageCandidate;
-        omnios-image-candidate-kit = built.omniosImageCandidateKit;
-        omnios-image-candidate = built.omniosImageCandidate;
-        freebsd-transport-probe-image = built.freebsdTransportProbeImage;
-        freebsd-kernel-fault = built.nativeKernels.freebsdFaultCandidate;
-        freebsd-fault-probe-image = built.freebsdFaultProbeImage;
-        native-vsock-core-check = built.nativeKernels.vsockCoreCheck;
-        illumos-sdk = built.nativeKernels.illumosToolchain.sysroot;
-        illumos-kernel-receipt = built.nativeKernels.illumosKernel;
-        illumos-kernel-candidate-objects = built.nativeKernels.illumosCandidate;
-        illumos-sdk-receipt = built.nativeKernels.illumosSdk;
-        guest-freebsd = built.freebsdGuest;
-        guest-omnios = built.omniosGuest;
-        guest-illumos = built.illumosGuest;
-        guest-inception = built.inceptionGuest;
-        guest-windows = built.windowsGuest;
-        host-tools = built.hostTools;
-        host = import ./nix/domains/artifacts/host { pkgs = nixpkgs.legacyPackages.${system}; };
-        host-kexec = assembled.kexec;
-        tool-nix-compact = nix-compact.lib.mkPackage { inherit pkgs; };
-        tool-nix-compact-host = nix-compact.lib.mkPackage { pkgs = nixpkgs.legacyPackages.${system}; };
-        tool-lyra = built.lyra;
-        # mila-build's Linux dev and release targets (ADR-0235).
-        tool-mila-linux-native = built.mila.linuxNative;
-        tool-mila-linux-release = built.mila.linuxRelease;
-        # Sources and pinned dependencies for the Windows build (ADR-0235).
-        tool-mila-source-bundle = built.mila.sourceBundle;
-        # Native Windows sources (WinUI/Rust/localization only; no Flutter or Dart).
-        tool-mila-windows-source-bundle = built.mila.windowsSourceBundle;
-        tool-mila-rust = built.mila.rust;
-        tool-github-managed = built.githubTools.release;
-        tool-vscode-web = built.vscodeWeb;
-        tool-vscode-web-broker = built.vscodeWebBroker;
-        tool-vscode-web-broker-windows = built.windowsEditorBroker;
-        tool-update-vscode-extensions = built.updateVscodeExtensions;
-        tool-underclass = built.underclass;
-        tool-nativelink = built.nativelink;
-        tool-smtprelay = built.smtprelay;
-        security-user-recipients = built.userRecipients;
-        security-secrets = built.secrets;
-        security-marshall-encrypted-dumps = built.encrypted.marshall;
-        security-lilly-encrypted-dumps = built.encrypted.lilly;
-        security-audi-encrypted-dumps = built.encrypted.audi;
-        security-brady-encrypted-dumps = built.encrypted.brady;
-        security-porsche-encrypted-dumps = built.encrypted.porsche;
-        security-ziggy-encrypted-dumps = built.encrypted.ziggy;
-        security-galileo-encrypted-dumps = built.encrypted.galileo;
-        security-enrico-encrypted-dumps = built.encrypted.enrico;
-        security-peach-encrypted-dumps = built.encrypted.peach;
-        security-susan-encrypted-dumps = built.encrypted.susan;
-      } // (pkgs.lib.mapAttrs' (name: context:
-        pkgs.lib.nameValuePair "antithesis-${name}-context" context
-      ) antithesisImages.contexts);
+      # Package outputs are lib.assemble's (nix/assemble/outputs.nix), which
+      # Buck2 builds as //:package-<name>.
+      packages.${system} = assembled.outputPackages;
 
       # Hermetic Mila journey backend for platform journey tests (ADR-0264).
       apps.${system}.mila-journey-fixture = {
@@ -176,19 +99,9 @@
 
       nixosConfigurations = assembled.systems;
 
+      # lib.assemble's checks (the machine-test catalog and outputs.nix), plus
+      # the repository script checks that are Buck2 targets of their own.
       checks.${system} = import ./nix/verification/tests/ci.nix { inherit (pkgs) lib; checks = assembled.checks // {
-        nix-compact-core = nix-compact.lib.mkCoreCheck { inherit pkgs; };
-        nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; };
-        # Built (not booted) by the cache job so the linux-native journey
-        # substitutes the fixture VM closure instead of building it.
-        mila-journey-fixture = self.packages.${system}.mila-journey-fixture;
-        nix-compact-native-host = nix-compact.lib.mkNativeCheck { pkgs = nixpkgs.legacyPackages.${system}; };
-        nix-compact-configuration = import ./nix/domains/artifacts/nix-compact/configuration-check.nix { inherit nixpkgs; nixCompact = nix-compact; };
-        fleet-builds-configuration = import ./nix/verification/tests/evaluation/fleet-builds.nix {
-          inherit nixpkgs; pkgs = nixpkgs.legacyPackages.${system};
-          module = self.nixosModules.default; fleetModule = self.nixosModules.fleetBuilds;
-          hosts = self.nixosConfigurations;
-        };
         package-input-lock =
           let
             flakeNodes = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes;
@@ -237,13 +150,8 @@
           xargs -0 elixir scripts/check_rust_lints.exs --strict < "$TMPDIR/files"
           touch "$out"
         '';
-        marshall-cedar-lints = built.cedarLints;
-        terminald = built.terminaldChecks;
-        terminald-windows = built.terminaldWindows;
         overalls-install-ps1 = import ./nix/verification/tests/overalls-install-ps1.nix { inherit pkgs; };
-        lyra = built.lyra.tests;
         marvin = built.marvin.tests;
-        mila-rust = built.mila.rustCheck;
       }; };
     };
 }

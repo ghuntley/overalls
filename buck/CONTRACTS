@@ -3,12 +3,6 @@ nix_owned MUST give each tracked file in its package an owning target, so
 uquery owner() maps every changed path to the graph; files without an owner
 select everything (ADR-0270).
 
-@cc [owner:ghuntley,label:build] nix-flake-attr-bootstrap-only
-nix_flake_attr MUST only wrap flake outputs that have not moved to Buck2 rules
-yet; it is deleted with the last flake package output and is never a
-compatibility layer (ADR-0269). Its srcs are the flake's whole source tree, so
-any owned change reruns it.
-
 @cc [owner:ghuntley,label:build] tracked-files-have-owners
 ownership MUST fail when a tracked file outside docs/ has no owning target,
 because the affected-target selector selects everything for unowned paths
@@ -95,10 +89,13 @@ script_test and nixos_machine_test commands MUST run locally from the project
 root, never remotely or from the remote cache, because they talk to the Nix
 daemon (ADR-0269).
 
-@cc [owner:ghuntley,label:build] bootstrap-attrs-fresh
-nix/buck/bootstrap_attrs.bzl MUST list exactly the flake's x86_64-linux
-package and check names; //buck:bootstrap_attrs_fresh evaluates the names
-only and fails when they differ.
+@cc [owner:ghuntley,label:build] assembly-attrs-fresh
+nix/buck/assembly_attrs.bzl MUST list exactly lib.assemble's flake package
+output and check names, so every flake output that Buck2 reaches has a
+nix_assemble target and none names a missing attribute;
+//buck:assembly_attrs_fresh evaluates the names only and fails when they
+differ. No target evaluates the flake itself: the bootstrap nix_flake_attr
+rule is deleted (ADR-0269).
 
 @cc [owner:ghuntley,label:build;security] buck2-remote-cache-optional
 The execution platform MUST query the remote cache only when a

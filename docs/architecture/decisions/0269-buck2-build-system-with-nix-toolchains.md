@@ -134,10 +134,18 @@ the approved migration plan.
 - [toolchains/BUCK](../../../toolchains/BUCK) and
   [nix.bzl](../../../toolchains/nix.bzl) define the Nix tools. The
   [probe](../../../buck/probes/BUCK) runs the pinned Elixir through them.
-- [buck/nix.bzl](../../../buck/nix.bzl) defines `nix_owned`, `owned_set` and the
-  bootstrap `nix_flake_attr`. The root [BUCK.v2](../../../BUCK.v2) generates bootstrap
-  targets from [bootstrap_attrs.bzl](../../../nix/buck/bootstrap_attrs.bzl),
-  which [bootstrap-attrs.sh](../../../nix/buck/bootstrap-attrs.sh) regenerates.
+- [buck/nix.bzl](../../../buck/nix.bzl) defines `nix_owned` and `owned_set`.
+  The bootstrap `nix_flake_attr` rule is deleted: no Buck2 target evaluates
+  a flake output. The root [BUCK.v2](../../../BUCK.v2) declares
+  `//:package-<name>` and `//:check-<name>` as `nix_assemble` targets (label
+  `flake_output`) over lib.assemble's `outputPackages` and `checks`, listed
+  in [assembly_attrs.bzl](../../../nix/buck/assembly_attrs.bzl), which
+  [assembly-attrs.sh](../../../nix/buck/assembly-attrs.sh) regenerates and
+  `//buck:assembly_attrs_fresh` checks. They take `ASSEMBLY_ARTIFACTS` like
+  hosts and machine tests. The seven script checks with Buck2 rules of their
+  own (`py-static`, `conflict-markers`, `pins`, `rust-lints`,
+  `package-input-lock`, `overalls-install-ps1`, `//marvin:check`) have no
+  assembly twin.
 - [ownership.bxl](../../../buck/bxl/ownership.bxl) checks file ownership.
 - **M7 (Go, JavaScript, Python, scripts).** `buckCells` adds the go, node,
   esbuild, ruff, ty, pwsh and Chromium tools, plus pinned inputs: the
@@ -166,8 +174,13 @@ the approved migration plan.
     `//nix:overalls-install-ps1`, which shares
     [its script](../../../nix/verification/tests/overalls-install-ps1.sh) with
     the Nix check. Planted markers and lock mismatches failed.
-  - `tools/buck2 run //mila:journey-fixture` runs the same store path as
-    `.#mila-journey-fixture` (`nix_store_run` over the bootstrap target).
+  - `tools/buck2 run //mila:journey-fixture` runs
+    `//:package-mila-journey-fixture` (`nix_store_run` over its assembly). Its
+    derivation differs from the flake's only by the imported Lyra artifacts.
+  - `nix-compact-core`, `-native`, `-native-host`, `-configuration` and
+    `fleet-builds-configuration` are `//:check-*` assemblies. On 2026-10-31
+    their `[drv]` evaluated under restrict-eval with the same drvPaths as the
+    flake checks.
 
 - **M8 (precommit).** [precommit.bxl](../../../buck/bxl/precommit.bxl) selects
   the `precommit`-labelled checks that the changed files affect and builds
@@ -195,8 +208,13 @@ the approved migration plan.
   - The module set is instantiated over that package set in
     [modules.nix](../../../nix/assemble/modules.nix).
   - It also builds the host systems, kexec and the machine-test catalog.
-  - The flake's `nixosConfigurations`, `nixosModules`, `checks` and
-    `host-kexec` are now views of it. For the same revision, all six host
+  - [outputs.nix](../../../nix/assemble/outputs.nix) holds the flake's
+    package outputs (`outputPackages`) and its non-script extra checks, which
+    join the catalog in `checks` (contract `assembly-flake-outputs`). On
+    2026-10-31 all 89 flake packages, the moved checks and the dungarees
+    toplevel kept their drvPaths when they moved there.
+  - The flake's `nixosConfigurations`, `nixosModules`, `packages`, `checks`
+    and `host-kexec` are now views of it. For the same revision, all six host
     systems have the same drvPaths as before.
 - The antithesis harness takes lib.assemble's package-set constructor instead
   of importing the set four times; its 21 contexts are drvPath-identical.
@@ -285,19 +303,16 @@ Remaining gaps, by milestone of the migration plan:
 
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
   NIF, Mila) and the Elixir rules (M5, M6);
-- the remaining M3 items:
-  - deployment and machine-test targets on `nix_assemble` (M2, M4a);
+- the remaining M3 item: `nix_assemble` has no per-host `params` channel, so
+  hosts take lib.assemble's fleet-wide defaults
+  ([ADR-0271](0271-buck2-host-self-deployment.md));
 - M7 leftovers:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`
     through Nix until assembly takes Buck2 artifacts (M3).
   - The `marvin`, `python-static`, `conflict-markers`, `package-input-lock`
     and `overalls-install-ps1` checks stay in the flake until M11, and
-    `mila-builds.yml` still runs `nix build .#mila-journey-fixture`. CI calls
-    the Buck2 targets once the `ci.yml` from M4a exists.
-  - `nix-compact-*` and `fleet-builds-configuration` evaluate NixOS
-    configurations rather than run scripts. They stay bootstrap
-    `//:check-*` targets until `nix_assemble` (M3).
+    `mila-builds.yml` still runs `nix build .#mila-journey-fixture`.
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
 - removal of the flake package, check and configuration outputs (M11);

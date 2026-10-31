@@ -1,7 +1,8 @@
-"""Fails when nix/buck/bootstrap_attrs.bzl differs from the flake's package and
-check names (ADR-0269). Evaluates attribute names only; builds nothing.
+"""Fails when nix/buck/assembly_attrs.bzl differs from lib.assemble's flake
+package output and check names (ADR-0269). Evaluates attribute names only;
+builds nothing.
 
-Contract bootstrap-attrs-fresh: see buck/CONTRACTS.
+Contract assembly-attrs-fresh: see buck/CONTRACTS.
 """
 
 from __future__ import annotations
@@ -13,12 +14,23 @@ import subprocess
 import sys
 from pathlib import Path
 
-ATTRS = Path("nix/buck/bootstrap_attrs.bzl")
+ATTRS = Path("nix/buck/assembly_attrs.bzl")
+OUTPUTS: tuple[tuple[str, str], ...] = (
+    ("outputPackages", "ASSEMBLY_PACKAGES"),
+    ("checks", "ASSEMBLY_CHECKS"),
+)
 
 
-def flake_names(nix: str, output: str) -> list[str]:
+def assembly_names(nix: str, output: str) -> list[str]:
     out = subprocess.run(
-        [nix, "eval", "--json", f".#{output}.x86_64-linux", "--apply", "builtins.attrNames"],
+        [
+            nix,
+            "eval",
+            "--json",
+            ".#lib.assemble",
+            "--apply",
+            f"assemble: builtins.attrNames (assemble {{ }}).{output}",
+        ],
         check=True,
         capture_output=True,
         text=True,
@@ -41,13 +53,13 @@ def committed(name: str) -> list[str]:
 def main() -> int:
     nix = os.environ.get("BUCK2_TEST_NIX", "nix")
     stale = False
-    for output, name in (("packages", "BOOTSTRAP_PACKAGES"), ("checks", "BOOTSTRAP_CHECKS")):
-        actual, recorded = flake_names(nix, output), committed(name)
+    for output, name in OUTPUTS:
+        actual, recorded = assembly_names(nix, output), committed(name)
         if actual != recorded:
             stale = True
             print(
                 f"{ATTRS} {name} is stale: missing {sorted(set(actual) - set(recorded))}, "
-                f"extra {sorted(set(recorded) - set(actual))}; run nix/buck/bootstrap-attrs.sh",
+                f"extra {sorted(set(recorded) - set(actual))}; run nix/buck/assembly-attrs.sh",
                 file=sys.stderr,
             )
     return 1 if stale else 0

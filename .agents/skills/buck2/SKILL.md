@@ -58,10 +58,13 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
    ([ADR-0270](../../../docs/architecture/decisions/0270-graph-driven-machine-test-selection.md)).
 4. **Actions that touch `/nix/store` or the Nix daemon** are `local_only = True`
    and `allow_cache_upload = False`.
-5. **`nix_flake_attr` is bootstrap only.** When you move an output to a real
-   rule, delete its bootstrap use in the same change. Never add new uses.
-   After the flake gains or loses an output, regenerate the list with
-   `nix/buck/bootstrap-attrs.sh`; `//buck:bootstrap_attrs_fresh` fails until
+5. **Nothing evaluates the flake.** Every Nix output Buck2 builds goes
+   through `nix_assemble` over `lib.assemble` (the bootstrap `nix_flake_attr`
+   is gone). Flake package outputs and non-script checks are defined in
+   `nix/assemble/outputs.nix`, never in `flake.nix`, and BUCK.v2 declares
+   `//:package-<name>` and `//:check-<name>` for each (label `flake_output`).
+   After lib.assemble gains or loses one, regenerate the list with
+   `nix/buck/assembly-attrs.sh`; `//buck:assembly_attrs_fresh` fails until
    you do.
 6. **`.buckconfig` ignores are root-relative.** Use `**/name` for nested
    build directories.
@@ -217,9 +220,10 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   SDK and NDK and cargo-ndk on `PATH`, then
   `tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug`.
 
-**Not yet Buck2.** Checks that evaluate NixOS (`nix-compact-*`,
-`fleet-builds-configuration`) stay bootstrap targets until `nix_assemble`
-(M3).
+**Checks that evaluate NixOS** (`nix-compact-*`,
+`fleet-builds-configuration`) are `//:check-<name>` assemblies of
+lib.assemble's `checks`; `tools/buck2 build '//:check-<name>[drv]'` evaluates
+one without building it.
 
 ## NixOS machine tests
 
@@ -327,7 +331,7 @@ command, the single prek hook and CI call it.
 ### Adding a check to precommit (the convention)
 
 1. Label the target `precommit` (and `check`, so `buck2 test` reads it). Never
-   label bootstrap flake checks or machine tests `precommit`.
+   label `flake_output` assemblies or machine tests `precommit`.
 2. The default output runs the whole check and fails on any violation.
 3. Name sub-targets `[<kind>/<repo path>]` for one file (`[ruff/<path>]`,
    `[contracts/<path>]`, `[format/<path>]`), `[<kind>]` for one part of the

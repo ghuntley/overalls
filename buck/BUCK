@@ -20,10 +20,10 @@ export_file(name = "cargo_workspace_stubs.py", visibility = ["PUBLIC"])
 # The non_hermetic Mila platform build driver (buck/mila.bzl).
 export_file(name = "mila_platform.py", visibility = ["PUBLIC"])
 
-# M1 follow-up: bootstrap_attrs.bzl matches the flake's output names.
+# assembly_attrs.bzl matches lib.assemble's package output and check names.
 script_test(
-    name = "bootstrap_attrs_fresh",
-    script = "tests/bootstrap_attrs_fresh.py",
+    name = "assembly_attrs_fresh",
+    script = "tests/assembly_attrs_fresh.py",
     deps = ["//:flake", "//nix:srcs"],
     labels = ["nix_eval"],
 )

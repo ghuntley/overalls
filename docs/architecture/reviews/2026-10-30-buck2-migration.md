@@ -1043,3 +1043,36 @@ directory, when the identity is in an action's command or environment, or
 when any of those places holds a copy of the iOS export options. No uploaded
 artifact contains buck-out or a Buck2 log. The legacy Flutter Windows
 release job is unchanged.
+
+## M3/M7 follow-up: flake outputs assemble, the bootstrap rule is gone
+
+- **Change.** The flake's package outputs and its non-script extra checks
+  moved from `flake.nix` into lib.assemble
+  ([outputs.nix](../../../nix/assemble/outputs.nix)): `outputPackages`, and
+  `checks` = the catalog plus those checks. The flake's `packages` and
+  `checks` are views of them until M11. `//:package-<name>` and
+  `//:check-<name>` are `nix_assemble` targets over `ASSEMBLY_ARTIFACTS`
+  (label `flake_output`), and `nix_flake_attr` is deleted. No Buck2 target
+  evaluates a flake output any more.
+- **Scope kept.** The seven repository script checks with Buck2 rules of
+  their own (`//:py-static`, `//:conflict-markers`, `//:pins`,
+  `//:rust-lints`, `//:package-input-lock`, `//nix:overalls-install-ps1`,
+  `//marvin:check`) get no assembly twin. The script ones stay flake-only
+  until M11.
+- **Parity (2026-10-31, panterloons).**
+  - The flake view is unchanged: all 89 package drvPaths, the moved checks
+    and the dungarees toplevel are identical before and after.
+    `python-static` changes because it hashes the whole source tree, which
+    this change edits. The check names and every non-machine check's
+    `meta.ci` are compared below.
+  - Through Buck2, `[drv]` of `check-nix-compact-{core,native,native-host,configuration}`,
+    `check-fleet-builds-configuration`, `check-marshall-release`,
+    `package-host-kexec` and `package-image-susan` evaluated under
+    restrict-eval with the flake's drvPaths (7 min 26 s for nine targets,
+    cold). `package-mila-journey-fixture` differs only by the three imported
+    Lyra artifacts (`lyra`, `lyra-native`, `lyra-windows`) from
+    `RUST_ARTIFACTS`.
+- **CI.** `ci.yml` evaluates each affected `flake_output` target (`[drv]`) in
+  place of the bootstrap ones, so evaluation coverage is kept, now under
+  restrict-eval over the declared tree. `publish-cache.yml` still builds the
+  flake checks through `select-checks.sh` until its selection moves to Buck2.

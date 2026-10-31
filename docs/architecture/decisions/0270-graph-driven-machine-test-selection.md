@@ -169,7 +169,8 @@ PR runs the affected machine-test set, and the approved migration plan.
 
 - Precommit uses the same ownership for its own selection:
   [precommit.bxl](../../../buck/bxl/precommit.bxl) selects only
-  `precommit`-labelled checks, never machine tests or bootstrap targets.
+  `precommit`-labelled checks, never machine tests or `flake_output`
+  assemblies.
 
 Remaining gaps:
 
@@ -181,8 +182,9 @@ Remaining gaps:
   the flake's checks still come from the catalog, and `publish-cache.yml`
   still selects its builds with `select-checks.sh build`. They go when the
   checks move to Buck2 rules.
-- `ci.yml` has no precommit job yet (M8), and its build job skips
-  bootstrap builds, which `publish-cache.yml` already builds.
+- `ci.yml` evaluates each affected `flake_output` assembly (`[drv]`, the
+  flake package and check targets in [BUCK.v2](../../../BUCK.v2)) but its
+  build job skips them, because `publish-cache.yml` builds the checks.
 - The known-broken Inception machine tests (`inception`, `inception-checkout`,
   `inception-ssh-host-ca`) are labelled `known_inception_failure`: `ci.yml`
   skips them, and the daily run reports them without failing. `zfs-guest` and

@@ -117,7 +117,7 @@ def main() -> int:
         assert s["everything"] is False, s["reasons"]
         assert not targets(s, "machine_tests"), "docs selected machine tests"
         # Only repository-wide targets read docs/: the whole-tree flake
-        # (bootstrap checks, assembly probes) and the per-file checks over
+        # (flake package and check assemblies, assembly probes) and the per-file checks over
         # every owned file. Both also depend on the root package's files.
         query = "rdeps(//..., set(//:flake_srcs //:srcs_files))"
         wide = set(json.loads(run(repo, BUCK2, "uquery", query, "--json")))

@@ -2,8 +2,10 @@
 # NTFS) a root `BUCK` file and the `buck/` directory collide, and the root
 # package vanishes. Buck2 reads BUCK.v2 before BUCK.
 load("//buck:nix.bzl", "nix_owned")
-load("//nix/buck:bootstrap_attrs.bzl", "BOOTSTRAP_CHECKS", "BOOTSTRAP_PACKAGES")
-load("//buck:nix.bzl", "nix_flake_attr", "owned_set")
+load("//nix/buck:assembly_attrs.bzl", "ASSEMBLY_CHECKS", "ASSEMBLY_PACKAGES")
+load("//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
+load("//buck:assemble.bzl", "nix_assemble")
+load("//buck:nix.bzl", "owned_set")
 load("//buck:checks.bzl", "conflict_markers", "contract_check", "repo_check")
 load("//buck:python.bzl", "py_static")
 load("//nix/verification/tests/machines:suites.bzl", "MACHINE_PACKAGES", "MACHINE_TESTS")
@@ -52,22 +54,24 @@ OWNED_PACKAGES = [
 
 ALL_OWNED_FILES = [":srcs_files", "toolchains//:srcs_files"] + [p + ":srcs_files" for p in OWNED_PACKAGES]
 
-# Owned sources that the flake reads. Bootstrap targets depend on all of them
-# until per-component rules replace them (ADR-0269).
+# Owned sources that the flake reads. The package and check assemblies below
+# copy all of them until per-component rules narrow their inputs (M11).
 owned_set(
     name = "flake_srcs",
     deps = [":srcs"] + [p + ":srcs" for p in OWNED_PACKAGES],
     visibility = ["PUBLIC"],
 )
 
-# Runnable wrappers elsewhere (//mila:journey-fixture) consume these until
-# their outputs move to Buck2 rules.
-[nix_flake_attr(
+# lib.assemble's flake package outputs (nix/assemble/outputs.nix), assembled
+# over the Buck2 artifacts like hosts and machine tests (ADR-0269). CI
+# evaluates each affected one (`[drv]`); //mila:journey-fixture runs one.
+[nix_assemble(
     name = "package-" + attr,
-    attr = "packages.x86_64-linux." + attr,
-    labels = ["bootstrap"],
+    attr = "outputPackages.\"{}\"".format(attr),
+    artifacts = ASSEMBLY_ARTIFACTS,
+    labels = ["flake_output"],
     visibility = ["//mila:"] if attr == "mila-journey-fixture" else [],
-) for attr in BOOTSTRAP_PACKAGES]
+) for attr in ASSEMBLY_PACKAGES]
 
 filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
 
@@ -80,8 +84,22 @@ filegroup(name = "buck_project", srcs = [".buckconfig", ".gitignore"], visibilit
 # clippy.toml, and pyproject.toml for the ruff checks inside machine tests.
 filegroup(name = "workspace_files", srcs = ["Cargo.lock", "Cargo.toml", "clippy.toml", "pyproject.toml"], visibility = ["PUBLIC"])
 
-# Machine checks are nixos_machine_test targets (nix/verification/tests/machines).
-[nix_flake_attr(name = "check-" + attr, attr = "checks.x86_64-linux." + attr, labels = ["bootstrap", "check"]) for attr in BOOTSTRAP_CHECKS if attr not in MACHINE_TESTS]
+# lib.assemble's checks that are neither machine tests (nixos_machine_test
+# targets under nix/verification/tests/machines) nor repository script checks
+# with a Buck2 rule of their own: release probes, evaluation checks, the
+# nix-compact checks and fleet-builds-configuration. publish-cache.yml builds
+# them; ci.yml evaluates each affected one (`[drv]`).
+_BUCK2_NATIVE_CHECKS = {
+    # //:py-static runs the same ruff format, ruff check and ty gate.
+    "python-static": "//:py-static",
+}
+
+[nix_assemble(
+    name = "check-" + attr,
+    attr = "checks.\"{}\"".format(attr),
+    artifacts = ASSEMBLY_ARTIFACTS,
+    labels = ["flake_output", "check"],
+) for attr in ASSEMBLY_CHECKS if attr not in MACHINE_TESTS and attr not in _BUCK2_NATIVE_CHECKS]
 
 # Repository-wide checks (M7). Each is a cached build action; `buck2 test`
 # reads its stamp. Sub-targets check single files for precommit (M8).
