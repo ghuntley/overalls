@@ -230,7 +230,9 @@ jobs:
     # image): more than the ~125 GB Namespace allows a cache volume (ENOSPC in
     # runs 41169053536 and 41194732683). The hosts-only 16x64 profile has a
     # 288 GB root disk, and its store stays there instead of on the volume.
-    runs-on: namespace-profile-cached-amd64-hosts;container.privileged=true
+    # It takes half the workspace's Linux memory, so only deployments use it;
+    # base, install and kexec fit the xl cache volume.
+    runs-on: ${{ endsWith(matrix.host.name, ':deployment') && 'namespace-profile-cached-amd64-hosts;container.privileged=true' || 'namespace-profile-cached-amd64-xl;container.privileged=true' }}
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -246,7 +248,7 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-          nix-on-cache-volume: "false"
+          nix-on-cache-volume: ${{ endsWith(matrix.host.name, ':deployment') && 'false' || 'true' }}
       - name: Build ${{ matrix.host.name }}
         env:
           TARGETS: ${{ toJSON(matrix.host.targets) }}
