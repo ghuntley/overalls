@@ -104,15 +104,23 @@ in
                 raise RuntimeError("Packaged localization SSH request failed")
             return output
 
-        baseline: object | None = None
+        def json_fields(value: object) -> dict[str, object]:
+            assert isinstance(value, dict), "Porsche JSON help is not an object"
+            fields: dict[str, object] = {}
+            for key, field in value.items():
+                assert isinstance(key, str), "Porsche JSON help has a non-string key"
+                fields[key] = field
+            return fields
+
+        baseline: dict[str, object] | None = None
         for locale, translated in expected.items():
             web.succeed("systemd-run --quiet --wait --pipe --property=EnvironmentFile=/run/overalls-test/marshall.env --setenv=LOCALIZATION_TEST_LOCALE=" + locale + " --setenv=MARSHALL_INSTANCE_ID=localization-locale --setenv=MARSHALL_DB_TLS=verify ${pkgs.coreutils}/bin/env -u PORT ${packages.marshall}/bin/marshall eval 'Code.eval_file(\"/etc/localization-set-locale.exs\")'")
             human = ssh_reply("help")
             assert translated in human, "Porsche help did not use the saved account language"
             assert "show" in human, "Localized help changed command tokens"
             raw = ssh_reply("help --json")
-            decoded: object = json.loads(raw)
-            assert isinstance(decoded, dict) and decoded.get("version") == 1
+            decoded = json_fields(json.loads(raw))
+            assert decoded.get("version") == 1
             if baseline is None:
                 baseline = decoded
             else:

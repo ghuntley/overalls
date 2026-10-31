@@ -4,14 +4,14 @@ import hashlib
 import sys
 from pathlib import Path
 
-HOST_REPORTS_SHA256 = "66ef2fa3b9b4755dd3da43aa5061bfd56dd0bd43b8b2106e85ea1c896f30f572"
+HOST_REPORTS_SHA256 = "f31e1a86d889731f31bf37cdd26225e97c7d684440c546cd1772e4b8a1ed8f45"
 EXCHANGE_SHA256 = "580a288a8b91f692b5d4aed87459be2471a70717a3cc301d008e9aac720bf6b3"
 
 # Original operands remain in the original and-chain, evaluated exactly once.
 REPLACEMENTS: tuple[tuple[str, str], ...] = (
     (
-        "    age >= -1000 and age <= Marshall.Compute.HostLiveness.authority_ms() and\n      Enum.all?(snapshots, &valid_pool?/1) and\n      Enum.sort(Enum.map(snapshots, & &1.id)) == Enum.sort(Enum.map(pools, & &1.id)) and\n      Enum.all?(snapshots, fn snapshot ->\n        storage_matches?(snapshot, Enum.find(pools, &(&1.id == snapshot.id)))\n      end)",
-        "    Marshall.CloneReportRejectionFixture.check(:sample_future, age >= -1000, age) and\n      Marshall.CloneReportRejectionFixture.check(\n        :sample_expired, age <= Marshall.Compute.HostLiveness.authority_ms(), age\n      ) and\n      Marshall.CloneReportRejectionFixture.check(:pool_schema, Enum.all?(snapshots, &valid_pool?/1), age) and\n      Marshall.CloneReportRejectionFixture.check(\n        :pool_set,\n        Enum.sort(Enum.map(snapshots, & &1.id)) == Enum.sort(Enum.map(pools, & &1.id)), age\n      ) and\n      Marshall.CloneReportRejectionFixture.check(\n        :storage_identity,\n        Enum.all?(snapshots, fn snapshot ->\n          storage_matches?(snapshot, Enum.find(pools, &(&1.id == snapshot.id)))\n        end), age\n      )",
+        "    age >= -1000 and age <= Marshall.Compute.HostLiveness.authority_ms() and\n      Enum.all?(snapshots, &valid_pool?/1) and\n      Enum.all?(snapshots, &observed_before?(&1, sampled_at)) and\n      Enum.sort(Enum.map(snapshots, & &1.id)) == Enum.sort(Enum.map(pools, & &1.id)) and\n      Enum.all?(snapshots, fn snapshot ->\n        storage_matches?(snapshot, Enum.find(pools, &(&1.id == snapshot.id)))\n      end)",
+        "    Marshall.CloneReportRejectionFixture.check(:sample_future, age >= -1000, age) and\n      Marshall.CloneReportRejectionFixture.check(\n        :sample_expired, age <= Marshall.Compute.HostLiveness.authority_ms(), age\n      ) and\n      Marshall.CloneReportRejectionFixture.check(:pool_schema, Enum.all?(snapshots, &valid_pool?/1), age) and\n      Marshall.CloneReportRejectionFixture.check(\n        :pool_observed_at,\n        Enum.all?(snapshots, &observed_before?(&1, sampled_at)), age\n      ) and\n      Marshall.CloneReportRejectionFixture.check(\n        :pool_set,\n        Enum.sort(Enum.map(snapshots, & &1.id)) == Enum.sort(Enum.map(pools, & &1.id)), age\n      ) and\n      Marshall.CloneReportRejectionFixture.check(\n        :storage_identity,\n        Enum.all?(snapshots, fn snapshot ->\n          storage_matches?(snapshot, Enum.find(pools, &(&1.id == snapshot.id)))\n        end), age\n      )",
     ),
     (
         "defp valid?(_, _, _), do: false",

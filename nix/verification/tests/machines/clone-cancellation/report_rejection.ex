@@ -2,12 +2,13 @@ defmodule Marshall.CloneReportRejectionFixture do
   @moduledoc false
   import Bitwise
 
-  @stages ~w(report_shape sample_future sample_expired pool_schema pool_set storage_identity capacity_schema capacity_bounds image_ids architecture)a
+  @stages ~w(report_shape sample_future sample_expired pool_schema pool_observed_at pool_set storage_identity capacity_schema capacity_bounds image_ids architecture)a
   @type stage ::
           :report_shape
           | :sample_future
           | :sample_expired
           | :pool_schema
+          | :pool_observed_at
           | :pool_set
           | :storage_identity
           | :capacity_schema

@@ -150,7 +150,7 @@ defmodule Marshall.CloneReportRejectionFixtureTest do
 
   test "concurrent publication stays private, finite and bounded", %{root: root} do
     stages =
-      ~w(report_shape sample_future sample_expired pool_schema pool_set storage_identity capacity_schema capacity_bounds image_ids architecture)a
+      ~w(report_shape sample_future sample_expired pool_schema pool_observed_at pool_set storage_identity capacity_schema capacity_bounds image_ids architecture)a
 
     for stage <- stages do
       age = if stage == :report_shape, do: nil, else: -1234
@@ -161,7 +161,7 @@ defmodule Marshall.CloneReportRejectionFixtureTest do
     end
 
     files = File.ls!(root)
-    assert length(files) == 11
+    assert length(files) == 12
     refute Enum.any?(files, &String.ends_with?(&1, ".tmp"))
 
     for stage <- stages do
@@ -252,6 +252,12 @@ defmodule Marshall.CloneReportRejectionFixtureTest do
       {:sample_future,
        %{base | sampled_at: DateTime.add(Ledger.now(), 10, :second), pools: [nil]}},
       {:pool_schema, %{base | pools: [nil]}},
+      {:pool_observed_at,
+       put_in(
+         base,
+         [:pools, Access.at(0), :observed_at],
+         DateTime.add(base.sampled_at, 1, :second)
+       )},
       {:pool_set, %{base | pools: []}},
       {:storage_identity, put_in(base, [:pools, Access.at(0), :storage, :dataset_guid], "999")},
       {:capacity_schema, %{base | capacity: %{}}},

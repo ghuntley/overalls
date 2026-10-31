@@ -998,6 +998,15 @@ an overload explanation. Architecture impact remains diagnostic verification und
 ADR-0055, preserving the capacity/freshness requirements carried through ADR-0013,
 ADR-0031 and subsequent storage/capacity decisions. No accepted decision changes.
 
+Update 2026-10-31: commit `048bee858` added the per-pool `observed_at` guard
+(`observed_before?/2`) to `valid?/3` between pool schema and pool set, so the
+pinned `HostReports` hash no longer matched and scheduled run 41208554953 failed
+to build the clone-cancellation Marshall release. The instrumenter now pins the
+new source and wraps that operand in place as the `pool_observed_at` stage, with
+order, short circuit and single evaluation preserved. The fixture accepts that
+stage alongside the others; its dedicated tests add the stage to guard ordering and
+bounded publication. No guard, rollback or accepted decision changes.
+
 The exact helper and instrumented `HostReports` compiled against current Marshall;
 forced success typing across current application BEAMs plus both fixture BEAMs
 reported **zero findings**, `/tmp/verify020-report-types.log`, session `96205`,
