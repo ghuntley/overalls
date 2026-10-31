@@ -1146,6 +1146,8 @@ with subtest("real Customer and shared-only OSS guests precede offline busy clea
 
 with subtest("fresh same-email registration inherits nothing while old cleanup remains pinned"):
     # Respect the real shared recipient cooldown instead of mutating its clock.
+    # Marshall stamps inserted_at with its node clock and this compares it with
+    # the database VM's clock, so allow nested-VM skew beyond the 60 s cooldown.
     eventually(
         lambda: (
             sql(
@@ -1153,7 +1155,6 @@ with subtest("fresh same-email registration inherits nothing while old cleanup r
             )
             == "t"
         ),
-        timeout=65,
     )
     browser_signal("request-replacement")
     browser_wait("replacement-invited")
