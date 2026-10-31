@@ -1,0 +1,36 @@
+# Contract rust-artifacts-have-parity: see buck/CONTRACTS.
+#
+# Every Buck2 Rust leaf that replaces a Nix build in assembly (RUST_ARTIFACTS,
+# buck/rust_artifacts.bzl) MUST have a rust_leaf_parity_test whose `buck`
+# attribute is that leaf's import target, until M11 deletes the Nix side
+# (ADR-0273). Unconfigured queries only: nothing is built.
+#
+#   tools/buck2 bxl //buck/bxl/rust_parity_coverage.bxl:main
+#
+# tools/precommit runs it on every invocation.
+
+load("//buck:rust_artifacts.bzl", "RUST_ARTIFACTS")
+
+# The rule kind of buck/rust.bzl's rust_leaf_parity_test macro.
+_PARITY_KIND = "_rust_leaf_parity_test"
+
+def _covered(ctx: bxl.Context) -> dict[str, list[str]]:
+    """Import target -> the parity tests that compare it."""
+    tests = ctx.uquery().kind(_PARITY_KIND, "root//...")
+    covered = {}
+    for test in tests:
+        imported = str(test.get_attr("buck"))
+        covered.setdefault(imported, []).append(str(test.label))
+    return covered
+
+def _main(ctx: bxl.Context) -> None:
+    covered = _covered(ctx)
+    missing = []
+    for name, imported in sorted(RUST_ARTIFACTS.items()):
+        if imported not in covered:
+            missing.append("{} ({})".format(name, imported))
+    if missing:
+        fail("RUST_ARTIFACTS entries without a rust_leaf_parity_test over their import target: {}".format(", ".join(missing)))
+    ctx.output.print("rust parity coverage: {} artifacts, each with a parity test".format(len(RUST_ARTIFACTS)))
+
+main = bxl_main(impl = _main, cli_args = {})

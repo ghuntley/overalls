@@ -737,6 +737,13 @@ differ.
 | terminald (static musl) | `//nix:terminald-import` | `//nix:terminald-parity` passes; 61 binary tests pass |
 | Editor broker (static musl) | `//nix:vscode-web-broker-import` | `//nix:vscode-web-broker-parity` passes; binary tests pass |
 
+Parity coverage is enforced rather than conventional:
+`//buck/bxl/rust_parity_coverage.bxl:main`, which `tools/precommit` runs on
+every invocation, queries every `rust_leaf_parity_test` and fails when a
+`RUST_ARTIFACTS` import is not the `buck` attribute of one. It passes for the
+seven entries above; adding an entry without a test fails with the entry
+named.
+
 **Static musl leaves.** `rust_musl_binary` applies a transition that adds
 `toolchains//:musl`; the Rust toolchain's target triple and flags and the C
 toolchain's linker select on it, so the binary and its third-party crates

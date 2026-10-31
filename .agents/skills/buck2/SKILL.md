@@ -154,7 +154,9 @@ match Nix byte for byte. Compare them with `diff -r`.
   `passthru.nixBuild`). Anything that patches or rebuilds the source must
   override `.nixBuild`, never the import. Add a `rust_leaf_parity_test`
   (label `heavy`) against a flake attribute with exactly the same
-  executables. The flake (host self-deploy) keeps
+  executables; `tools/precommit` runs
+  `//buck/bxl/rust_parity_coverage.bxl:main`, which fails when a
+  `RUST_ARTIFACTS` import has no parity test. The flake (host self-deploy) keeps
   the Nix build until the M2 activation gate; deletions wait for M11.
 - **Machine tests** receive `ASSEMBLY_ARTIFACTS` (`buck/artifacts.bzl`), the
   merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`; every key must be a name the

@@ -157,4 +157,7 @@ if ! "$root/tools/buck2" uquery --console simple 'deps(//...)' >/dev/null; then
   echo "tools/precommit: buck2 uquery 'deps(//...)' failed; the unconfigured graph must resolve for tools/affected" >&2
   exit 1
 fi
+# Contract rust-artifacts-have-parity: see buck/CONTRACTS. Unconfigured
+# queries only, so it runs on every invocation.
+"$root/tools/buck2" bxl --console simple //buck/bxl/rust_parity_coverage.bxl:main
 bxl --mode check

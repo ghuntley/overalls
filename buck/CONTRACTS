@@ -19,6 +19,12 @@ nix_store_import MUST run locally and never upload its output, because the
 output names a path in the local Nix store; it MUST forward the artifact's
 declared runtime references so assembly can record them (ADR-0269).
 
+@cc [owner:ghuntley,label:build;verification] rust-artifacts-have-parity
+Every RUST_ARTIFACTS entry (buck/rust_artifacts.bzl) MUST have a
+rust_leaf_parity_test whose `buck` attribute is its import target, so a Buck2
+Rust leaf never replaces its Nix build in assembly unchecked. The
+rust_parity_coverage BXL, run by tools/precommit, fails otherwise (ADR-0273).
+
 @cc [owner:ghuntley,label:build;verification] assembly-refuses-undeclared-inputs
 nix_assemble MUST evaluate lib.assemble over a copied tree of declared
 sources only, under restrict-eval, so an undeclared Nix input is an

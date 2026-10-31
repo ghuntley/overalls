@@ -220,6 +220,9 @@ partial, in milestone M5.
   (`//nix:terminald-parity`, `//nix:vscode-web-broker-parity`) and are
   swapped. Every testable binary now also gets a `<bin>-bin-unittest` target,
   so bin-only crates such as terminald run their own tests under Buck2.
+  [`rust_parity_coverage.bxl`](../../../buck/bxl/rust_parity_coverage.bxl),
+  run by [`tools/precommit`](../../../tools/precommit), fails when a
+  `RUST_ARTIFACTS` entry has no `rust_leaf_parity_test` over its import target.
   Remaining: Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
