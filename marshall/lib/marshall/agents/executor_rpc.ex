@@ -17,6 +17,8 @@ defmodule Marshall.Agents.ExecutorRPC do
   def request(token, route, input) when route in @routes and is_map(input) do
     with {:ok, binding} <- parse_binding(input),
          {:ok, operation} <- operation(route, input) do
+      :ok = verify_releases_before_locks(route)
+
       Ledger.transaction(
         fn ->
           authority = Credentials.authenticate_locked!(token)
@@ -36,6 +38,24 @@ defmodule Marshall.Agents.ExecutorRPC do
   end
 
   def request(_, _, _), do: {:error, :invalid_request}
+
+  # @cc [owner:ghuntley,label:concurrency;recovery] executor-release-verification-before-locks
+  # Routes that may read the GitHub tool or executor bootstrap release MUST
+  # complete that release's artifact size and SHA256 verification before the
+  # request transaction takes host credential or VM row locks. A cold release
+  # cache MUST NOT hold the executor's VM lock while large artifacts are hashed,
+  # because roster, SSH and inference authority for the same VM wait on that
+  # lock. This only warms the validated cache: the in-transaction loads still
+  # decide the response, and a failed verification still fails closed there.
+  @spec verify_releases_before_locks(String.t()) :: :ok
+  defp verify_releases_before_locks(route)
+       when route in @maintenance_routes or route in ["claim", "transition"] do
+    _ = Marshall.Operations.GitHubTools.load()
+    _ = Marshall.Operations.ExecutorBootstrap.load()
+    :ok
+  end
+
+  defp verify_releases_before_locks(_route), do: :ok
 
   defp parse_binding(%{"binding" => wire}) when is_map(wire),
     do: OverallsProtocol.PrivateServices.binding(wire)

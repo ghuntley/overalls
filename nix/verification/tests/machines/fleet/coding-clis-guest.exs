@@ -1,5 +1,31 @@
+defmodule FleetCodingCLIsGuest.Failure do
+  @moduledoc false
+
+  @typedoc "Closed failure classes; never terminal bytes or exception text."
+  @type reason ::
+          :invalid_arguments
+          | :connect_failed
+          | :shell_not_ready
+          | :command_failed
+          | :command_timed_out
+          | :terminal_unavailable
+
+  defexception phase: :setup, reason: :command_failed, status: nil
+
+  @type t :: %__MODULE__{
+          phase: atom(),
+          reason: reason(),
+          status: non_neg_integer() | nil
+        }
+
+  @impl true
+  @spec message(t()) :: String.t()
+  def message(%__MODULE__{}), do: "Coding CLI guest assertion failed; terminal bytes withheld"
+end
+
 defmodule FleetCodingCLIsGuest do
   @moduledoc false
+  alias FleetCodingCLIsGuest.Failure
   alias FleetTerminal, as: Terminal
 
   @type mode :: :prepare | :terminal | :gc | :customer | :tls_refusal | :token_count
@@ -13,19 +39,33 @@ defmodule FleetCodingCLIsGuest do
   # credentials or routing authority may be installed by this fixture.
   @spec run(String.t(), String.t(), String.t()) :: :ok
   def run(mode, placement, username) do
-    true = OverallsProtocol.uuid?(placement)
-    true = Regex.match?(~r/\A[a-z][a-z0-9_-]{0,30}\z/, username)
-    true = username != "root"
+    unless OverallsProtocol.uuid?(placement) and
+             Regex.match?(~r/\A[a-z][a-z0-9_-]{0,30}\z/, username) and username != "root",
+           do: raise(Failure, phase: :setup, reason: :invalid_arguments)
+
     action = parse_mode(mode)
     account = if action in [:prepare, :gc], do: "root", else: username
-    {:ok, socket} = Terminal.connect(placement, account)
+    socket = classified(:connect, :connect_failed, fn -> Terminal.connect(placement, account) end)
 
     try do
-      :ok = Terminal.ready(socket, 120_000)
+      :ok = classified(:shell_ready, :shell_not_ready, fn -> Terminal.ready(socket, 120_000) end)
       dispatch(socket, action, username)
     after
       Terminal.close(socket)
     end
+  end
+
+  # Fixture terminal helpers raise free-form errors; only a closed class leaves.
+  @spec classified(atom(), Failure.reason(), (-> {:ok, term()} | :ok)) :: term()
+  defp classified(phase, reason, fun) do
+    case fun.() do
+      {:ok, value} -> value
+      :ok -> :ok
+      _ -> raise Failure, phase: phase, reason: reason
+    end
+  rescue
+    error in Failure -> reraise error, __STACKTRACE__
+    _ -> raise Failure, phase: phase, reason: reason
   end
 
   @spec parse_mode(String.t()) :: mode()
@@ -35,18 +75,26 @@ defmodule FleetCodingCLIsGuest do
   defp parse_mode("customer"), do: :customer
   defp parse_mode("tls-refusal"), do: :tls_refusal
   defp parse_mode("token-count"), do: :token_count
-  defp parse_mode(_), do: raise("Invalid coding CLI fixture mode")
+  defp parse_mode(_), do: raise(Failure, phase: :setup, reason: :invalid_arguments)
 
   @spec dispatch(Terminal.t(), mode(), String.t()) :: :ok
   defp dispatch(socket, :prepare, username) do
+    # Separate phases name whether the verified roster reconciliation or the
+    # resulting local account failed, without returning guest output.
     command(
       socket,
-      :prepare,
+      :prepare_roster,
       "test \"$(id -u)\" = 0 && " <>
         "if test -x /run/overalls-ssh-authorize; then authorize=/run/overalls-ssh-authorize; " <>
         "else authorize=/usr/local/bin/overalls-ssh-authorize; fi && " <>
-        "\"$authorize\" ensure #{username} && " <>
-        "uid=$(id -u #{username}) && test \"$uid\" -ge 200000 && test \"$uid\" -le 999999 && " <>
+        "\"$authorize\" ensure #{username}",
+      60_000
+    )
+
+    command(
+      socket,
+      :prepare_account,
+      "uid=$(id -u #{username}) && test \"$uid\" -ge 200000 && test \"$uid\" -le 999999 && " <>
         "test \"$(getent passwd #{username} | cut -d: -f6)\" = /home/#{username} && " <>
         "test -d /home/#{username} && test \"$(stat -c %u /home/#{username})\" = \"$uid\"",
       60_000
@@ -270,8 +318,9 @@ defmodule FleetCodingCLIsGuest do
   # Native-client timeouts MUST preserve the foreground PTY process group so
   # client terminal inspection cannot suspend a background process group.
   # Status matching MUST require a newline-delimited random marker, retain only
-  # bounded matching state and report only fixed phase names; failures MUST NOT
-  # expose terminal bytes, native client output or exception details.
+  # bounded matching state and report only fixed phase names, a closed failure
+  # reason class and the bounded numeric shell status; failures MUST NOT expose
+  # terminal bytes, native client output or exception details.
   @spec command(Terminal.t(), atom(), String.t(), pos_integer()) :: :ok
   defp command(socket, phase, shell, timeout \\ 30_000) do
     IO.puts(:stderr, "Coding CLI fixture stage: #{phase}")
@@ -284,16 +333,16 @@ defmodule FleetCodingCLIsGuest do
           "else false; fi; status=$?; printf '\\n#{marker}:%s\\n' \"$status\"\n"
       )
 
-    case wait_status(socket, marker, System.monotonic_time(:millisecond) + timeout, "") do
+    case wait_status(socket, phase, marker, System.monotonic_time(:millisecond) + timeout, "") do
       0 -> :ok
-      _ -> raise "Coding CLI guest assertion failed; terminal bytes withheld"
+      status -> raise Failure, phase: phase, reason: :command_failed, status: min(status, 255)
     end
   end
 
-  @spec wait_status(Terminal.t(), String.t(), integer(), binary()) :: non_neg_integer()
-  defp wait_status(socket, marker, deadline, tail) do
+  @spec wait_status(Terminal.t(), atom(), String.t(), integer(), binary()) :: non_neg_integer()
+  defp wait_status(socket, phase, marker, deadline, tail) do
     if System.monotonic_time(:millisecond) >= deadline,
-      do: raise("Coding CLI guest assertion timed out; terminal bytes withheld")
+      do: raise(Failure, phase: phase, reason: :command_timed_out)
 
     case Terminal.read(socket, 1000) do
       {:ok, bytes} ->
@@ -308,6 +357,7 @@ defmodule FleetCodingCLIsGuest do
 
             wait_status(
               socket,
+              phase,
               marker,
               deadline,
               binary_part(body, byte_size(body) - retained, retained)
@@ -315,10 +365,10 @@ defmodule FleetCodingCLIsGuest do
         end
 
       {:error, :timeout} ->
-        wait_status(socket, marker, deadline, tail)
+        wait_status(socket, phase, marker, deadline, tail)
 
       _ ->
-        raise "Coding CLI guest terminal unavailable; terminal bytes withheld"
+        raise Failure, phase: phase, reason: :terminal_unavailable
     end
   end
 end
@@ -328,7 +378,20 @@ try do
   :ok = FleetCodingCLIsGuest.run(mode, placement, username)
   IO.puts("Coding CLI guest assertion passed")
 rescue
+  # Only the fixed phase atom, closed reason class and bounded exit status are
+  # reported; any other exception is classified without its message.
+  failure in FleetCodingCLIsGuest.Failure ->
+    status = if is_integer(failure.status), do: " status=#{failure.status}", else: ""
+
+    IO.puts(
+      :stderr,
+      "Coding CLI guest assertion failed: phase=#{failure.phase} reason=#{failure.reason}" <>
+        status <> "; terminal bytes withheld"
+    )
+
+    System.halt(1)
+
   _ ->
-    IO.puts(:stderr, "Coding CLI guest assertion failed; terminal bytes withheld")
+    IO.puts(:stderr, "Coding CLI guest assertion failed: phase=unknown reason=unexpected; terminal bytes withheld")
     System.halt(1)
 end
