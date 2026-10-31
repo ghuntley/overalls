@@ -242,16 +242,21 @@ assert !(lib.hasInfix "overalls-terminald.exe" mediaScript);
 assert lib.hasInfix "schtasks /Create /TN \"Overalls\\Terminald\" /SC ONSTART /RU SYSTEM" setupComplete;
 # Gate 5: the workspace receiver task and the pinned MinGit, on windows-v1 media only.
 assert lib.hasInfix "schtasks /Create /TN \"Overalls\\Workspaced\" /SC ONSTART /RU SYSTEM" setupComplete;
-assert lib.hasInfix "\"overalls-workspaced-windows\"" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra.nix);
+assert lib.hasInfix "  overalls-workspaced-windows\n" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra-build.sh);
 # The image's runtime closure is its disk and firmware only; agents carry no store paths.
 assert image.passthru.disk.drvAttrs.allowedReferences == [ ];
 assert packages.lyraWindows.drvAttrs.allowedReferences == [ ];
 assert packages.terminaldWindows.drvAttrs.allowedReferences == [ ];
-assert lib.hasInfix "--remap-path-prefix" (plain packages.lyraWindows.buildPhase);
+# Lyra's Windows agents are built by lyra-build.sh (Nix and Buck2 run the same
+# script): the build runs it in windows mode, and the script remaps the
+# vendored crates and the source out of panic locations, so no store path is
+# embedded (allowedReferences above enforces it).
+assert lib.hasInfix "lyra-build.sh windows" (plain packages.lyraWindows.buildPhase);
+assert lib.hasInfix "--remap-path-prefix=$LYRA_VENDOR=/vendor --remap-path-prefix=$PWD=/source" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra-build.sh);
 assert lib.hasInfix "STORE_HASH.sub" installDriver;
 # Gate 5: the agent executor task, and private names through the local resolver only.
 assert lib.hasInfix "schtasks /Create /TN \"Overalls\\Agentd\" /SC ONSTART /RU SYSTEM" setupComplete;
-assert lib.hasInfix "\"overalls-agentd-windows\"" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra.nix);
+assert lib.hasInfix "  overalls-agentd-windows\n" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra-build.sh);
 assert lib.hasInfix "Add-DnsClientNrptRule -Namespace '.internal' -NameServers '169.254.254.1'" bootstrap;
 # The private endpoint lives on the host side's loopback: reach it through the
 # gateway, never on-link (nothing answers ARP for it on the tap).
