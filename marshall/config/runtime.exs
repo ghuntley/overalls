@@ -61,6 +61,12 @@ if fault_gate = System.get_env("MARSHALL_CONTROL_FAULT_GATE_FILE") do
   config :marshall, control_fault_gate_file: fault_gate
 end
 
+# Lilly control requests running at once per host socket (ADR-0275). The value
+# stays a string here; Marshall.Control.Concurrency validates it at boot.
+if lilly_running = System.get_env("MARSHALL_CONTROL_LILLY_RUNNING") do
+  config :marshall, Marshall.Control.Concurrency, lilly_running: lilly_running
+end
+
 if enrico_url = System.get_env("MARSHALL_ENRICO_URL") do
   config :marshall,
     enrico_url: enrico_url,

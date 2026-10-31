@@ -49,6 +49,7 @@ defmodule Marshall.Application do
     :ok = Marshall.Operations.Privacy.install()
     :ok = Marshall.Operations.Health.install()
     :ok = Marshall.Compute.HostLiveness.check_windows!()
+    %Marshall.Control.Concurrency{} = Marshall.Control.Concurrency.fetch!()
 
     children =
       if Application.get_env(:marshall, :operator_mode, false) do

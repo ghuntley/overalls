@@ -1,9 +1,9 @@
 {
   "apps": {
     "marshall": {
-      "active": 42,
+      "active": 48,
       "coverage": 1.0,
-      "covered": 42
+      "covered": 48
     },
     "system": {
       "active": 0,
@@ -12,11 +12,70 @@
     }
   },
   "components": {
-    "marshall.compute": {
-      "active": 4,
+    "marshall.artifacts": {
+      "active": 5,
       "app": "marshall",
       "coverage": 1.0,
-      "covered": 4,
+      "covered": 5,
+      "form": "light",
+      "obligations": {
+        "marshall.artifacts.I1": {
+          "failing": 0,
+          "kind": "non_functional",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test declared modules compile and remain loadable"
+          ]
+        },
+        "marshall.artifacts.I2": {
+          "failing": 0,
+          "kind": "functional",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test edits apply all or none"
+          ]
+        },
+        "marshall.artifacts.I3": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test paths are normalized without traversal"
+          ]
+        },
+        "marshall.artifacts.I4": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test tool requests are closed"
+          ]
+        },
+        "marshall.artifacts.I5": {
+          "failing": 0,
+          "kind": "security",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test content responses carry the lockdown header set"
+          ]
+        }
+      }
+    },
+    "marshall.compute": {
+      "active": 5,
+      "app": "marshall",
+      "coverage": 1.0,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "marshall.compute.I1": {
@@ -57,6 +116,16 @@
           "testable": true,
           "tests": [
             "test the owner-pin refusal is a closed compute reason across the SSH control API"
+          ]
+        },
+        "marshall.compute.I5": {
+          "failing": 0,
+          "kind": "non_functional",
+          "passing": 0,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Lilly-limited socket runs a bounded FIFO and expires stale queued requests"
           ]
         }
       }
@@ -516,8 +585,8 @@
   "covenant": "0.2.0",
   "mode": "static",
   "totals": {
-    "active": 42,
+    "active": 48,
     "coverage": 1.0,
-    "covered": 42
+    "covered": 48
   }
 }

@@ -119,6 +119,7 @@ defmodule MarshallComputeContractTest do
       Marshall.Compute.WorkflowServiceLevels,
       Marshall.Compute.WorkloadPlacement,
       Marshall.Compute.WorkspaceSource,
+      Marshall.Control.Concurrency,
       Marshall.Control.FaultGate,
       Marshall.Control.Hints,
       Marshall.Control.Hints.Change,
@@ -214,5 +215,79 @@ defmodule MarshallComputeContractTest do
 
     assert {:error, 409, "pin_limit"} =
              Marshall.SSH.ControlRequests.classify({:error, :pin_limit})
+  end
+
+  @tag obligation: "marshall.compute.I5"
+  test "a Lilly-limited socket runs a bounded FIFO and expires stale queued requests" do
+    previous = Application.get_env(:marshall, Marshall.Control.Concurrency)
+
+    on_exit(fn ->
+      if previous,
+        do: Application.put_env(:marshall, Marshall.Control.Concurrency, previous),
+        else: Application.delete_env(:marshall, Marshall.Control.Concurrency)
+    end)
+
+    Application.put_env(:marshall, Marshall.Control.Concurrency,
+      lilly_running: 2,
+      queue_deadline_ms: 5_000
+    )
+
+    state = Marshall.ControlSocketDriver.bound(%{test: self()})
+
+    state =
+      Enum.reduce(1..5, state, fn id, state ->
+        {state, []} = Marshall.ControlSocketDriver.request(state, id, "stub.wait")
+        state
+      end)
+
+    assert map_size(state.tasks) == 2 and :queue.len(state.queue) == 3
+    assert_receive {:control_stub_started, 1, first}
+    assert_receive {:control_stub_started, 2, second}
+    refute_received {:control_stub_started, 3, _}
+
+    send(first, :release)
+
+    {state, [{1, {:ok, %{"n" => 1}}}]} =
+      receive do
+        {ref, _} = reply when is_reference(ref) ->
+          Marshall.ControlSocketDriver.deliver(state, reply)
+      end
+
+    assert_receive {:control_stub_started, 3, third}
+    assert map_size(state.tasks) == 2 and :queue.len(state.queue) == 2
+    # The queued requests never start; stop the two blocked stub tasks.
+    on_exit(fn -> Enum.each([second, third], &Process.exit(&1, :kill)) end)
+
+    full =
+      Enum.reduce(6..65, state, fn id, state ->
+        {state, []} = Marshall.ControlSocketDriver.request(state, id, "stub.wait")
+        state
+      end)
+
+    # Request 1 was answered, so 2..65 fill the advertised in_flight of 64.
+    assert {_full, [{66, {:error, "busy"}}]} =
+             Marshall.ControlSocketDriver.request(full, 66, "stub.wait")
+
+    Application.put_env(:marshall, Marshall.Control.Concurrency,
+      lilly_running: 1,
+      queue_deadline_ms: 1
+    )
+
+    stale = Marshall.ControlSocketDriver.bound(%{test: self()})
+    {stale, []} = Marshall.ControlSocketDriver.request(stale, 100, "stub.wait")
+    {stale, []} = Marshall.ControlSocketDriver.request(stale, 101, "stub.wait")
+    assert_receive {:control_stub_started, 100, holder}
+    Process.sleep(5)
+    send(holder, :release)
+
+    reply =
+      receive do
+        {ref, {:ok, %{"n" => 100}}} = reply when is_reference(ref) -> reply
+      end
+
+    assert {_stale, [{100, {:ok, _}}, {101, {:error, "temporarily_unavailable"}}]} =
+             Marshall.ControlSocketDriver.deliver(stale, reply)
+
+    refute_received {:control_stub_started, 101, _}
   end
 end

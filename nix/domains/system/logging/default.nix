@@ -9,7 +9,7 @@ let
   sources = [ "marshall" "lilly" "porsche" "audi" "ziggy" "enrico" "brady" "galileo" "underclass" "haproxy" "audit" "firecracker" "auth" "kernel" "storage" "mail" "operations" "system" "metrics" ];
   traceHealthNames = [ "trace_available" "trace_pending" "trace_queue_dropped" "trace_export_failed" "trace_observed_at_seconds" ];
   metricNames = [ "beam_memory_bytes" "beam_processes" "beam_atoms" "beam_run_queue" "agent_stuck_turns"
-    "terminal_host_streams" "terminal_viewer_sockets" "terminal_peer_sockets"
+    "terminal_host_streams" "terminal_viewer_sockets" "terminal_peer_sockets" "database_queue_max_us"
     "firecracker_dropped_logs" "firecracker_evicted_files" "queue_bytes" "oldest_chunk_seconds" "free_bytes" "export_errors" "export_retries" "export_dropped" ]
     ++ traceHealthNames ++ [ "runtime_observed_at_seconds" ]
     ++ lib.concatMap (prefix: map (suffix: "${prefix}_${suffix}") [ "count" "duration_ms" "errors" ])

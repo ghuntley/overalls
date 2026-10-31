@@ -1337,6 +1337,12 @@ defmodule Marshall.Events do
     metadata: [reason: :atom]
   )
 
+  defevent("control.request_expired",
+    level: :warning,
+    message: "Queued control request refused after its queue deadline",
+    metadata: [service: :atom]
+  )
+
   defevent("control.hints_resynced",
     level: :info,
     message: "Control hint subscribers resynced after notifier recovery",
@@ -1402,6 +1408,7 @@ defmodule Marshall.Events do
       database_queue_count: {:int64, :optional},
       database_queue_duration_us: {:int64, :optional},
       database_queue_errors: {:int64, :optional},
+      database_queue_max_us: {:int64, :optional},
       jobs_count: {:int64, :optional},
       jobs_duration_us: {:int64, :optional},
       jobs_errors: {:int64, :optional},

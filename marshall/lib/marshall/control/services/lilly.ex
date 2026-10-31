@@ -15,7 +15,9 @@ defmodule Marshall.Control.Services.Lilly do
 
   # Bodies are bounded by OverallsProtocol.max_body/0; the envelope adds a few
   # bytes. Every relocation, clone and inception loop may have one
-  # exchange in flight beside the execution exchange.
+  # exchange in flight beside the execution exchange. Only `running` of them
+  # execute at once (ADR-0275): each exchange holds this host's row lock for
+  # its whole transaction, so the rest would only park pooled connections.
   @limits %{
     frame: OverallsProtocol.max_body() + 4_096,
     inbound: OverallsProtocol.max_body() + 4_096,
@@ -45,7 +47,8 @@ defmodule Marshall.Control.Services.Lilly do
   def bind(_principal, _bind), do: {:close, :refused}
 
   @impl true
-  def limits, do: @limits
+  def limits,
+    do: Map.put(@limits, :running, Marshall.Control.Concurrency.fetch!().lilly_running)
 
   @impl true
   def handle_request("lilly." <> route, body, %{token: token}) do

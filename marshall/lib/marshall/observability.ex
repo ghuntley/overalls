@@ -10,7 +10,7 @@ defmodule Marshall.Observability do
     {[:marshall, :terminal, :authority], :terminal_authority, :duration, :http},
     {[:marshall, :terminal, :input], :terminal_input, :duration, :none},
     {[:marshall, :repo, :query], :database, :total_time, :database},
-    {[:marshall, :repo, :query], :database_queue, :queue_time, :none},
+    {[:marshall, :repo, :query], :database_queue, :queue_time, :checkout},
     {[:oban, :job, :stop], :jobs, :duration, :none},
     {[:oban, :job, :exception], :job_failures, :duration, :exception}
   ]
@@ -33,7 +33,7 @@ defmodule Marshall.Observability do
                     @live_keys,
                     &["#{&1}_count", "#{&1}_duration_ms", "#{&1}_queries"]
                   ) ++
-                  ~w(beam_memory_bytes beam_processes beam_atoms beam_run_queue terminal_host_streams terminal_viewer_sockets terminal_peer_sockets)
+                  ~w(beam_memory_bytes beam_processes beam_atoms beam_run_queue terminal_host_streams terminal_viewer_sockets terminal_peer_sockets database_queue_max_us)
 
   # @cc [owner:ghuntley,label:security] metric-summary-numeric-allowlist
   # Metric summaries MUST contain only the fixed observation names and bounded,
@@ -100,11 +100,24 @@ defmodule Marshall.Observability do
       error = error_count(classifier, metadata)
 
       :ets.update_counter(__MODULE__, key, [{2, 1}, {3, duration}, {4, error}], {key, 0, 0, 0})
+      if classifier == :checkout, do: record_max(:database_queue_max, duration)
     end
 
     :ok
   rescue
     ArgumentError -> :ok
+  end
+
+  # Atomic per-row maximum: insert the first value, then replace only a smaller one.
+  @spec record_max(atom(), non_neg_integer()) :: :ok
+  defp record_max(key, value) do
+    unless :ets.insert_new(__MODULE__, {key, value}) do
+      :ets.select_replace(__MODULE__, [
+        {{key, :"$1"}, [{:<, :"$1", value}], [{{key, value}}]}
+      ])
+    end
+
+    :ok
   end
 
   @spec count_live(atom(), map()) :: :ok
@@ -125,9 +138,21 @@ defmodule Marshall.Observability do
     ArgumentError -> :ok
   end
 
-  @spec error_count(:http | :database | :exception | :none, map()) :: 0 | 1
+  # @cc [owner:ghuntley,label:observability;capacity] database-pool-pressure-visible
+  # Pool checkout timeouts (DBConnection queue_timeout drops, which never reach
+  # PostgreSQL) MUST count as database_queue errors, and the interval's longest
+  # pool wait MUST be reported as database_queue_max_us, so pool exhaustion
+  # shows in runtime_metrics without inference from other symptoms (ADR-0275).
+  @spec error_count(:http | :database | :checkout | :exception | :none, map()) :: 0 | 1
   defp error_count(:exception, _metadata), do: 1
   defp error_count(:none, _metadata), do: 0
+
+  defp error_count(:checkout, %{
+         result: {:error, %DBConnection.ConnectionError{reason: :queue_timeout}}
+       }),
+       do: 1
+
+  defp error_count(:checkout, _metadata), do: 0
 
   defp error_count(:http, metadata) do
     case metadata do
@@ -185,6 +210,15 @@ defmodule Marshall.Observability do
         end
       end)
 
+    metrics =
+      case if(mode == :interval,
+             do: :ets.take(__MODULE__, :database_queue_max),
+             else: :ets.lookup(__MODULE__, :database_queue_max)
+           ) do
+        [{:database_queue_max, max}] -> Map.put(metrics, "database_queue_max_us", max)
+        [] -> metrics
+      end
+
     Map.merge(metrics, %{
       "beam_memory_bytes" => :erlang.memory(:total),
       "beam_processes" => :erlang.system_info(:process_count),
@@ -222,6 +256,7 @@ defmodule Marshall.Observability do
       database_queue_count: metric_value(metrics, "database_queue_count", 1),
       database_queue_duration_us: metric_value(metrics, "database_queue_duration_ms", 1000),
       database_queue_errors: metric_value(metrics, "database_queue_errors", 1),
+      database_queue_max_us: metric_value(metrics, "database_queue_max_us", 1),
       jobs_count: metric_value(metrics, "jobs_count", 1),
       jobs_duration_us: metric_value(metrics, "jobs_duration_ms", 1000),
       jobs_errors: metric_value(metrics, "jobs_errors", 1),

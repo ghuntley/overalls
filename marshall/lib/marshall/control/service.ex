@@ -29,14 +29,23 @@ defmodule Marshall.Control.Service do
   @callback handle_request(op :: String.t(), body :: map(), identity()) ::
               {:ok, map()} | {:error, String.t()}
 
-  @type limits :: %{frame: pos_integer(), inbound: pos_integer(), in_flight: pos_integer()}
+  @type limits :: %{
+          frame: pos_integer(),
+          inbound: pos_integer(),
+          in_flight: pos_integer(),
+          running: pos_integer()
+        }
 
   @doc """
   Per-connection limits: the largest server-to-client frame (advertised in the
-  welcome), the largest client-to-server frame (enforced at upgrade) and the
-  most concurrent requests. A service names only the limits it changes.
+  welcome), the largest client-to-server frame (enforced at upgrade), the most
+  accepted requests (`in_flight`, advertised) and the most of those running at
+  once (`running`, server-side only; ADR-0275). Accepted requests beyond
+  `running` wait in FIFO order in the socket. `running` defaults to and never
+  exceeds `in_flight`. A service names only the limits it changes.
   """
-  @callback limits() :: %{optional(:frame | :inbound | :in_flight) => pos_integer()}
+  @callback limits() ::
+              %{optional(:frame | :inbound | :in_flight | :running) => pos_integer()}
 
   @optional_callbacks limits: 0
 
@@ -54,9 +63,15 @@ defmodule Marshall.Control.Service do
   @doc "The limits of a service module over the defaults."
   @spec limits(module()) :: limits()
   def limits(module) do
-    if function_exported?(module, :limits, 0),
-      do: Map.merge(@default_limits, module.limits()),
-      else: @default_limits
+    # function_exported?/3 does not load modules; an unloaded service would
+    # otherwise silently fall back to the defaults.
+    declared =
+      if Code.ensure_loaded?(module) and function_exported?(module, :limits, 0),
+        do: module.limits(),
+        else: %{}
+
+    limits = Map.merge(@default_limits, declared)
+    Map.put(limits, :running, min(Map.get(limits, :running, limits.in_flight), limits.in_flight))
   end
 
   @doc "The service module for a declared service name."

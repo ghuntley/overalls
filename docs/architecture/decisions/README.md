@@ -15,6 +15,12 @@ NativeLink cache and remote execution, and
 [ADR-0273](0273-single-rust-workspace-and-toolchain.md) merges Rust into one
 workspace and toolchain.
 
+[ADR-0275](0275-bounded-control-request-execution.md) bounds each Lilly control
+socket to two running requests, queueing the rest in FIFO order with a deadline
+inside Lilly's own. It amends ADR-0142's per-request concurrency after
+hint-triggered bursts exhausted Marshall's database pool. Pool checkout
+timeouts and the longest wait are now in runtime metrics.
+
 [ADR-0268](0268-cedar-single-authorization-source.md) makes Cedar Marshall's single
 authorization source: one Marshall-owned authorizer with per-resource Cedar
 mappings, record decisions and list filters translated from Cedar residuals into
@@ -1139,6 +1145,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0272](0272-nativelink-remote-cache-and-execution.md) | accepted | partial | NativeLink remote cache and execution for Buck2 |
 | [ADR-0273](0273-single-rust-workspace-and-toolchain.md) | accepted | partial | One Cargo workspace and one Rust toolchain |
 | [ADR-0274](0274-fenced-capacity-snapshots.md) | accepted | partial | Fenced capacity snapshots outside the pool lock |
+| [ADR-0275](0275-bounded-control-request-execution.md) | accepted | partial | Bounded control request execution per Lilly socket |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

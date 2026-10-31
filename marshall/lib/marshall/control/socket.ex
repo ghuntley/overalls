@@ -5,6 +5,10 @@ defmodule Marshall.Control.Socket do
   The first frame must be a hello for the service authenticated at upgrade.
   Requests run in supervised tasks, so a domain transaction always completes
   even if the socket dies; only its response can be lost, as with HTTPS.
+  At most the service's `running` limit execute at once; further accepted
+  requests wait in FIFO order here and start as running ones finish
+  (ADR-0275). One that waited past the queue deadline is answered
+  `temporarily_unavailable` without running.
   Hints for the bound identity are pushed as they arrive, and a notifier
   recovery pushes a resync.
   """
@@ -27,8 +31,10 @@ defmodule Marshall.Control.Socket do
        module: module,
        principal: principal,
        limits: Marshall.Control.Service.limits(module),
+       queue_deadline_ms: Marshall.Control.Concurrency.fetch!().queue_deadline_ms,
        identity: nil,
        tasks: %{},
+       queue: :queue.new(),
        last_seen: now(),
        ping: 0
      }}
@@ -80,9 +86,8 @@ defmodule Marshall.Control.Socket do
 
       {id, tasks} ->
         Process.demonitor(ref, [:flush])
-
-        {:push, {:text, Envelope.encode({:res, %{id: id, result: result}})},
-         %{state | tasks: tasks}}
+        response = {:text, Envelope.encode({:res, %{id: id, result: result}})}
+        dispatch(%{state | tasks: tasks}, [response])
     end
   end
 
@@ -93,9 +98,8 @@ defmodule Marshall.Control.Socket do
 
       {id, tasks} ->
         result = {:error, "unavailable"}
-
-        {:push, {:text, Envelope.encode({:res, %{id: id, result: result}})},
-         %{state | tasks: tasks}}
+        response = {:text, Envelope.encode({:res, %{id: id, result: result}})}
+        dispatch(%{state | tasks: tasks}, [response])
     end
   end
 
@@ -118,7 +122,7 @@ defmodule Marshall.Control.Socket do
   defp message({:req, %{id: id, op: op, body: body}}, %{identity: identity} = state)
        when identity != nil do
     cond do
-      map_size(state.tasks) >= state.limits.in_flight ->
+      map_size(state.tasks) + :queue.len(state.queue) >= state.limits.in_flight ->
         {:push, {:text, Envelope.encode({:res, %{id: id, result: {:error, "busy"}}})}, state}
 
       Marshall.Control.FaultGate.blocked?(op) ->
@@ -126,20 +130,8 @@ defmodule Marshall.Control.Socket do
         {:push, {:text, Envelope.encode({:res, %{id: id, result: result}})}, state}
 
       true ->
-        module = state.module
-        service = state.service
-
-        task =
-          Task.Supervisor.async_nolink(Marshall.Control.TaskSupervisor, fn ->
-            # @cc [owner:ghuntley,label:security;observability] control-request-log-redaction
-            # Request tasks MUST carry the authentication redaction metadata
-            # the upgrade set: Logger metadata does not cross process
-            # boundaries, and domain queries carry credentials and arguments.
-            Logger.metadata(marshall_authentication: true)
-            measured(service, fn -> request(module, op, body, identity) end)
-          end)
-
-        {:ok, %{state | tasks: Map.put(state.tasks, task.ref, id)}}
+        queue = :queue.in({id, op, body, identity, now()}, state.queue)
+        dispatch(%{state | queue: queue}, [])
     end
   end
 
@@ -167,6 +159,61 @@ defmodule Marshall.Control.Socket do
       {:close, reason} ->
         close(state, reason)
     end
+  end
+
+  # @cc [owner:ghuntley,label:capacity;protocol] control-bounded-fifo-dispatch
+  # Accepted requests MUST start in arrival order, with at most limits.running
+  # of them running at once; running plus queued MUST stay within the
+  # advertised in_flight, so the busy refusal fires exactly where it did
+  # before. Every accepted request MUST be answered exactly once: with its
+  # result, `unavailable` if its task dies, or `temporarily_unavailable` when it
+  # waited queue_deadline_ms or longer, in which case it MUST NOT start. Frames
+  # and reply names are unchanged; only their timing differs (ADR-0275).
+  @spec dispatch(map(), [WebSock.message()]) :: WebSock.handle_result()
+  defp dispatch(state, responses) do
+    if map_size(state.tasks) < state.limits.running do
+      case :queue.out(state.queue) do
+        {:empty, _queue} ->
+          push(state, responses)
+
+        {{:value, {id, op, body, identity, received}}, queue} ->
+          state = %{state | queue: queue}
+
+          if now() - received >= state.queue_deadline_ms do
+            Marshall.Events.emit("control.request_expired", service: service_atom(state.service))
+            result = {:error, "temporarily_unavailable"}
+            response = {:text, Envelope.encode({:res, %{id: id, result: result}})}
+            dispatch(state, [response | responses])
+          else
+            dispatch(start(state, id, op, body, identity), responses)
+          end
+      end
+    else
+      push(state, responses)
+    end
+  end
+
+  @spec push(map(), [WebSock.message()]) :: WebSock.handle_result()
+  defp push(state, []), do: {:ok, state}
+  defp push(state, [response]), do: {:push, response, state}
+  defp push(state, responses), do: {:push, Enum.reverse(responses), state}
+
+  @spec start(map(), term(), String.t(), map(), term()) :: map()
+  defp start(state, id, op, body, identity) do
+    module = state.module
+    service = state.service
+
+    task =
+      Task.Supervisor.async_nolink(Marshall.Control.TaskSupervisor, fn ->
+        # @cc [owner:ghuntley,label:security;observability] control-request-log-redaction
+        # Request tasks MUST carry the authentication redaction metadata
+        # the upgrade set: Logger metadata does not cross process
+        # boundaries, and domain queries carry credentials and arguments.
+        Logger.metadata(marshall_authentication: true)
+        measured(service, fn -> request(module, op, body, identity) end)
+      end)
+
+    %{state | tasks: Map.put(state.tasks, task.ref, id)}
   end
 
   @spec request(module(), String.t(), map(), term()) :: {:ok, map()} | {:error, String.t()}

@@ -437,6 +437,18 @@ interpret HTTP, so upgraded sockets stay open and TLS is end to end.
 - It `requires` the Marshall unit, so a Marshall restart drops every socket.
   Clients reconnect and resynchronize, as for a node loss.
 
+## Amendment 2026-10-30: bounded Lilly request execution
+
+[ADR-0275](0275-bounded-control-request-execution.md) replaces this record's
+"runs each request in a supervised task" concurrency for Lilly sockets. At
+most `running` accepted requests (default 2) execute at once. The rest wait in
+FIFO order in the socket, and one that waited past the queue deadline is
+answered `temporarily_unavailable` without running. The advertised
+`in_flight` of 64, the frames and the reply names are unchanged. Other
+services keep `running = in_flight`. The trigger was pool exhaustion from
+hint-triggered bursts of 14 host-locked exchanges in machine-test run
+41126173301.
+
 ## Open questions
 
 - Whether the relay's 256-connection cap needs raising once Lilly, Audi,
@@ -444,6 +456,8 @@ interpret HTTP, so upgraded sockets stay open and TLS is end to end.
 
 ## Related decisions
 
+- [ADR-0275](0275-bounded-control-request-execution.md): bounded execution of
+  accepted Lilly requests (amends this record's per-request task concurrency)
 - [ADR-0141](0141-control-plane-hints-and-resync.md)
 - [ADR-0140](0140-event-driven-liveness-and-single-writer-views.md)
 - [ADR-0126](0126-bounded-database-client-recovery.md)

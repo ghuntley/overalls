@@ -1,9 +1,9 @@
 {
   "apps": {
     "marshall": {
-      "active": 47,
+      "active": 48,
       "coverage": 1.0,
-      "covered": 47
+      "covered": 48
     },
     "system": {
       "active": 0,
@@ -72,10 +72,10 @@
       }
     },
     "marshall.compute": {
-      "active": 4,
+      "active": 5,
       "app": "marshall",
       "coverage": 1.0,
-      "covered": 4,
+      "covered": 5,
       "form": "light",
       "obligations": {
         "marshall.compute.I1": {
@@ -116,6 +116,16 @@
           "testable": true,
           "tests": [
             "test the owner-pin refusal is a closed compute reason across the SSH control API"
+          ]
+        },
+        "marshall.compute.I5": {
+          "failing": 0,
+          "kind": "non_functional",
+          "passing": 1,
+          "status": "active",
+          "testable": true,
+          "tests": [
+            "test a Lilly-limited socket runs a bounded FIFO and expires stale queued requests"
           ]
         }
       }
@@ -574,8 +584,8 @@
   },
   "covenant": "0.2.0",
   "totals": {
-    "active": 47,
+    "active": 48,
     "coverage": 1.0,
-    "covered": 47
+    "covered": 48
   }
 }

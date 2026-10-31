@@ -24,6 +24,48 @@ defmodule Marshall.ObservabilityTest do
     refute Map.has_key?(Marshall.Observability.snapshot(), "control_count")
   end
 
+  # @cc [owner:ghuntley,label:verification;observability] database-pool-pressure-test
+  # Checkout timeouts MUST count as database_queue errors (other query errors
+  # MUST NOT), and database_queue_max_us MUST report the interval's longest
+  # wait and reset with the interval.
+  test "pool checkout timeouts and the longest pool wait are reported" do
+    if Process.whereis(Marshall.Observability) == nil,
+      do: start_supervised!(Marshall.Observability)
+
+    Marshall.Observability.snapshot()
+    microsecond = System.convert_time_unit(1, :microsecond, :native)
+    dropped = DBConnection.ConnectionError.exception("dropped", :queue_timeout)
+    closed = DBConnection.ConnectionError.exception("closed", :error)
+
+    for {queue_us, result} <- [
+          {700, {:error, dropped}},
+          {25_000_000, {:error, dropped}},
+          {40, {:error, closed}},
+          {90, {:ok, %{}}}
+        ] do
+      Marshall.Observability.observe(
+        [:marshall, :repo, :query],
+        %{queue_time: queue_us * microsecond, total_time: 1_000 * microsecond},
+        %{result: result},
+        nil
+      )
+    end
+
+    # The application's own background queries share these global counters,
+    # so counts are lower bounds; the 25 s wait dominates any real one.
+    snapshot = Marshall.Observability.snapshot()
+    assert snapshot["database_queue_count"] >= 4
+    assert snapshot["database_queue_errors"] == 2
+    assert snapshot["database_errors"] >= 3
+    assert snapshot["database_queue_max_us"] == 25_000_000
+
+    assert Marshall.Observability.sanitize_metrics(snapshot)["database_queue_max_us"] ==
+             25_000_000
+
+    # The interval snapshot resets the maximum; later real waits may refill it.
+    assert Map.get(Marshall.Observability.snapshot(), "database_queue_max_us", 0) < 25_000_000
+  end
+
   test "terminal authority and input aggregation keeps only counts and durations" do
     if Process.whereis(Marshall.Observability) == nil,
       do: start_supervised!(Marshall.Observability)
