@@ -29,6 +29,26 @@ use std::{
 const OUTPUT: usize = 1 << 20;
 const TIMEOUT_MS: u32 = 60_000;
 
+/// @cc [owner:ghuntley,label:reliability] mila-journey-terminal-open-readiness
+/// `terminal new` MAY be retried only after a closed readiness refusal
+/// (Marshall's `terminal_open_pending` while the guest settles, or the
+/// `terminal_unavailable`/`temporarily_unavailable` codes the Porsche terminal
+/// machine test retries), each attempt with a fresh request id, until a
+/// 180-second deadline. Every other failure, including one without a closed
+/// refusal code, ends the step on its first occurrence.
+const TERMINAL_READINESS_REFUSALS: [&str; 3] = [
+    "terminal_open_pending",
+    "terminal_unavailable",
+    "temporarily_unavailable",
+];
+const TERMINAL_OPEN_DEADLINE: Duration = Duration::from_mins(3);
+const TERMINAL_OPEN_INTERVAL: Duration = Duration::from_secs(2);
+
+/// Whether a closed refusal code only means the guest terminal is not ready yet.
+fn terminal_open_retryable(code: Option<&str>) -> bool {
+    code.is_some_and(|code| TERMINAL_READINESS_REFUSALS.contains(&code))
+}
+
 /// Fixture descriptor v1 shared with the platform journey modes.
 #[derive(Clone, Debug, Deserialize)]
 struct Descriptor {
@@ -496,16 +516,20 @@ impl Driver {
         })
     }
 
-    /// Attach the session's closed refusal code to a failed step.
-    fn refused(session: &Session, failure: Failure) -> Failure {
+    /// The closed refusal code of the session's most recent command, if refused.
+    fn last_refusal(session: &Session) -> Option<String> {
         // SAFETY: `out`, `capacity` and `written` are read_json's live buffer, its
         // length and its counter for the duration of the call.
-        let code = read_json("refusal", |out, capacity, written| unsafe {
+        read_json("refusal", |out, capacity, written| unsafe {
             ffi::mila_session_last_refusal(session.0, out, capacity, written)
         })
         .ok()
-        .and_then(|value| value["error"].as_str().map(str::to_owned));
-        match code {
+        .and_then(|value| value["error"].as_str().map(str::to_owned))
+    }
+
+    /// Attach the session's closed refusal code to a failed step.
+    fn refused(session: &Session, failure: Failure) -> Failure {
+        match Self::last_refusal(session) {
             Some(code) => Failure {
                 stage: failure.stage,
                 reason: format!("{} ({code})", failure.reason),
@@ -851,22 +875,38 @@ impl Driver {
 
     /// Terminal: open personal session, attach a PTY, type a marker command,
     /// resize, detach, reattach and see the replayed marker, then kill it.
+    /// Open the owner's personal session, retrying only readiness refusals.
+    fn terminal_new(session: &Session, machine: &str) -> Outcome<Value> {
+        let deadline = Instant::now() + TERMINAL_OPEN_DEADLINE;
+        loop {
+            let rid = request_id();
+            // SAFETY: each pointer/length pair borrows a live string for the call, and
+            // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
+            let failure = match read_json("terminal new", |out, capacity, written| unsafe {
+                ffi::mila_session_terminal_new(
+                    session.0,
+                    machine.as_ptr(),
+                    machine.len(),
+                    rid.as_ptr(),
+                    rid.len(),
+                    out,
+                    capacity,
+                    written,
+                )
+            }) {
+                Ok(created) => return Ok(created),
+                Err(failure) => failure,
+            };
+            let retryable = terminal_open_retryable(Self::last_refusal(session).as_deref());
+            if !retryable || Instant::now() + TERMINAL_OPEN_INTERVAL >= deadline {
+                return Err(failure);
+            }
+            std::thread::sleep(TERMINAL_OPEN_INTERVAL);
+        }
+    }
+
     fn terminal(session: &Session, machine: &str) -> Outcome<Value> {
-        let rid = request_id();
-        // SAFETY: each pointer/length pair borrows a live string for the call, and
-        // `out`, `capacity` and `written` are read_json's live buffer, length and counter.
-        let created = read_json("terminal new", |out, capacity, written| unsafe {
-            ffi::mila_session_terminal_new(
-                session.0,
-                machine.as_ptr(),
-                machine.len(),
-                rid.as_ptr(),
-                rid.len(),
-                out,
-                capacity,
-                written,
-            )
-        })?;
+        let created = Self::terminal_new(session, machine)?;
         let terminal_id = created["result"]["session_id"]
             .as_str()
             .ok_or(Failure {
@@ -999,8 +1039,46 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
-    use super::{hex, unhex};
+    use super::{hex, terminal_open_retryable, unhex, TERMINAL_READINESS_REFUSALS};
     use hegel::{generators as gs, TestCase};
+
+    /// @cc [owner:ghuntley,label:verification;reliability] mila-journey-terminal-readiness-closed
+    /// Only the exact closed readiness codes are retryable: an absent refusal,
+    /// any other closed code and any near-miss spelling of a readiness code end
+    /// the terminal step.
+    #[hegel::test(test_cases = 128)]
+    fn terminal_open_retries_only_exact_readiness_refusals(tc: TestCase) {
+        assert!(!terminal_open_retryable(None));
+        let readiness = tc.draw(gs::sampled_from(TERMINAL_READINESS_REFUSALS.to_vec()));
+        assert!(terminal_open_retryable(Some(readiness)));
+        let alphabet: Vec<char> = "abcdefghijklmnopqrstuvwxyz0123456789_".chars().collect();
+        let suffix: String = tc
+            .draw(
+                gs::vecs(gs::sampled_from(alphabet.clone()))
+                    .min_size(1)
+                    .max_size(8),
+            )
+            .into_iter()
+            .collect();
+        assert!(!terminal_open_retryable(Some(&format!(
+            "{readiness}{suffix}"
+        ))));
+        assert!(!terminal_open_retryable(Some(
+            &readiness.to_ascii_uppercase()
+        )));
+        let other: String = tc
+            .draw(
+                gs::vecs(gs::sampled_from(alphabet))
+                    .min_size(1)
+                    .max_size(64),
+            )
+            .into_iter()
+            .collect();
+        assert_eq!(
+            terminal_open_retryable(Some(&other)),
+            TERMINAL_READINESS_REFUSALS.contains(&other.as_str())
+        );
+    }
 
     /// @cc [owner:ghuntley,label:verification;security] mila-journey-key-hex-codec
     /// The device-key file codec MUST round-trip arbitrary bytes through
