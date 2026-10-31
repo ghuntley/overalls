@@ -41,7 +41,27 @@ def _nix_flake_attr_impl(ctx: AnalysisContext) -> list[Provider]:
         local_only = True,
         allow_cache_upload = False,
     )
-    return [DefaultInfo(default_output = path)]
+    # `[drv]` evaluates the attribute without building it, so CI can check
+    # every affected bootstrap check per push (evaluation-only assertions in
+    # a check are otherwise found only by publish-cache.yml).
+    drv = ctx.actions.declare_output("drv-path")
+    ctx.actions.run(
+        cmd_args(
+            ctx.attrs._bash[RunInfo],
+            "-c",
+            "set -euo pipefail; \"$1\" eval --raw \".#$2.drvPath\" > \"$3\"",
+            "nix_flake_attr_drv",
+            ctx.attrs._nix[RunInfo],
+            ctx.attrs.attr,
+            drv.as_output(),
+            hidden = [s for d in ctx.attrs.srcs for s in d[DefaultInfo].default_outputs + d[DefaultInfo].other_outputs],
+        ),
+        category = "nix_flake_attr_drv",
+        local_only = True,
+        allow_cache_upload = False,
+        weight_percentage = 25,
+    )
+    return [DefaultInfo(default_output = path, sub_targets = {"drv": [DefaultInfo(default_output = drv)]})]
 
 # Contract nix-flake-attr-bootstrap-only: see buck/CONTRACTS.
 nix_flake_attr = rule(

@@ -129,8 +129,12 @@ jobs:
           # Every selected machine test, deferred or not, evaluates per push:
           # `<suite>.assembly[drv]` runs the declared-only, restricted
           # evaluation without booting a VM, so a missing input or module
-          # argument fails here rather than in the daily run.
-          evaluate=$(jq -c '[.machine_tests[].target | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]' affected.json)
+          # argument fails here rather than in the daily run. Affected
+          # bootstrap flake checks evaluate the same way (`<check>[drv]`):
+          # an evaluation-time assertion broke every check in publish-cache
+          # after a Lyra build change (cache run 41155406148).
+          evaluate=$(jq -c '[.machine_tests[].target | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]
+            + [.builds[] | select(.labels | index("bootstrap")) | "\(.target)[drv]"]' affected.json)
           # One runner evaluating all ~200 suites hit the 60-minute timeout
           # (run 41102561512), so evaluations shard 20 per runner.
           evaluate_shards=$(jq -c '[range(0; length; 20) as $i | {index: ($i / 20 + 1), targets: .[$i:$i + 20]}]' <<<"$evaluate")
