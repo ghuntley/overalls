@@ -524,9 +524,12 @@ with subtest("explicit fresh browser-approved CLI retry executes exactly one new
         )
     )
     assert retry_turn != lost_turn
+    # The pre-model context collection records internal context_* commands on
+    # the same turn; exactly one guest tool effect ran under the new fence.
     assert (
         sql(
-            f"SELECT count(*) FROM agent_commands WHERE turn_id='{retry_turn}' AND status='completed' AND fence_epoch > {old_fence}"
+            f"SELECT count(*) FROM agent_commands WHERE turn_id='{retry_turn}' AND status='completed' "
+            f"AND fence_epoch > {old_fence} AND tool NOT IN ('context_inventory', 'context_read')"
         )
         == "1"
     )

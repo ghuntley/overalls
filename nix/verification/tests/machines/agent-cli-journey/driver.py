@@ -511,7 +511,15 @@ with subtest("a fresh approved CLI invocation preserves the profile child-agent 
         f"SELECT id FROM agent_turns WHERE {thread_filter} AND status='failed' AND failure_reason='capability_denied'"
     )
     assert str(uuid.UUID(denied)) == denied
-    assert sql(f"SELECT count(*) FROM agent_commands WHERE turn_id='{denied}'") == "0"
+    # Context collection is a Marshall-owned pre-model step recorded as
+    # internal context_* commands; the refused turn ran no guest tool.
+    assert (
+        sql(
+            f"SELECT count(*) FROM agent_commands WHERE turn_id='{denied}' "
+            "AND tool NOT IN ('context_inventory', 'context_read')"
+        )
+        == "0"
+    )
     assert (
         sql(
             f"SELECT count(*) FROM agent_threads WHERE root_id=(SELECT id FROM agent_roots WHERE vm_id='{vm_id}') AND parent_thread_id IS NOT NULL"

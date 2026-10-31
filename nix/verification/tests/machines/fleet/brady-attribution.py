@@ -9,14 +9,17 @@ import struct
 import sys
 
 # @cc [owner:ghuntley,label:verification;security] brady-fixture-native-peer
-# Query the production endpoint as its configured Brady UID, verify the root
-# peer, and emit only the closed identity. Never replace the kernel lookup or
-# actor proof with fixture metadata.
+# Query the production endpoint as its configured Brady UID, verify the peer is
+# the configured unprivileged Lilly service UID (ADR-0182, as Brady.Attribution
+# requires), and emit only the closed identity. Never replace the kernel lookup
+# or actor proof with fixture metadata.
 source, source_port, destination, destination_port = sys.argv[1:]
 source = ipaddress.IPv4Address(source)
 destination = ipaddress.IPv4Address(destination)
 source_port, destination_port = int(source_port), int(destination_port)
 assert 1 <= source_port <= 65535 and 1 <= destination_port <= 65535
+lilly_uid = int(os.environ["LILLY_SERVICE_UID"])
+assert lilly_uid > 0
 user = pwd.getpwnam("brady")
 os.setgroups([])
 os.setgid(user.pw_gid)
@@ -27,7 +30,10 @@ request = struct.pack(
 with socket.socket(socket.AF_UNIX) as client:
     client.settimeout(2)
     client.connect("/run/lilly-brady/attribution.sock")
-    assert struct.unpack("3i", client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[1] == 0
+    assert (
+        struct.unpack("3i", client.getsockopt(socket.SOL_SOCKET, socket.SO_PEERCRED, 12))[1]
+        == lilly_uid
+    )
     client.sendall(struct.pack("!H", len(request)) + request)
 
     def receive(size: int) -> bytes:

@@ -1242,6 +1242,7 @@ let
     ] ++ lib.optionals observabilityRecovery [ pkgs.sqlite ] ++ lib.optionals brady [
       pkgs.conntrack-tools
       (pkgs.writeShellScriptBin "fleet-brady-attribution" ''
+        export LILLY_SERVICE_UID=${toString config.users.users.lilly.uid}
         exec ${pkgs.python3}/bin/python3 ${./brady-attribution.py} "$@"
       '')
       (pkgs.writeShellScriptBin "fleet-brady-watcher" ''

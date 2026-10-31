@@ -103,7 +103,11 @@ defmodule FleetTerminal do
 
     try do
       Process.put(:fixture_stage, :terminal_create)
-      {:ok, created} = Vsock.create(control, username, "xterm-256color", 80, 24)
+
+      {:ok, created} =
+        Vsock.create(control, username, "xterm-256color", 80, 24,
+          timeout: create_timeout(username)
+        )
 
       Process.put(:fixture_stage, :terminal_attach)
 
@@ -122,6 +126,16 @@ defmodule FleetTerminal do
         raise "Fixture terminal unavailable"
     end
   end
+
+  # @cc [owner:ghuntley,label:verification] fleet-terminal-account-create-deadline
+  # Non-root creation MUST wait past terminald's 10 s account-helper bound:
+  # the guest runs `overalls-ssh-authorize ensure` (a Ziggy roster round trip)
+  # before it replies, so Vsock.create's 2 s default fails a healthy create.
+  # Root creation keeps the default because terminald runs no helper for root.
+  @account_create_timeout_ms 15_000
+  @spec create_timeout(String.t()) :: pos_integer()
+  defp create_timeout("root"), do: 2_000
+  defp create_timeout(_username), do: @account_create_timeout_ms
 
   @spec write(t(), binary()) :: :ok | {:error, term()}
   def write(terminal, bytes), do: Vsock.write(terminal.socket, bytes)

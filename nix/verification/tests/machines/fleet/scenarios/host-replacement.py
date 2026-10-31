@@ -299,10 +299,9 @@ with subtest("baseline: the enrolled host serves llm.internal to a real guest"):
     print("replacement scenario stage: baseline guest reached llm.internal")
 
 with subtest("retirement runs the real drain chain and persists the row"):
-    old_credential_path = "/run/overalls-secrets/lilly/credential"
-    old_host.succeed(
-        "install -m 0600 " + old_credential_path + " " + root + "/retired-lilly-credential.json"
-    )
+    # The fleet's services.lilly.credentialFile is the bundle's credential.json.
+    old_credential_path = "/run/overalls-secrets/lilly/credential.json"
+    old_host.succeed("install -m 0600 " + old_credential_path + " " + retired_credential)
     deleted = operator(
         m1,
         dict(
