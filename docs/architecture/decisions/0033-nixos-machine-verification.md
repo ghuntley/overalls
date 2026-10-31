@@ -338,6 +338,20 @@ restored the fleet's evaluable executor-loss check after an integration merge
 dropped its formal parameter. This remains build evidence; recorded native
 journeys keep their revisions and scopes.
 
+*Fixture image medium (2026-10-31).* The fleet fixture's Lilly hosts used to read
+guest image artifacts from the runner's store over the framework's 9p share. On
+Namespace xl runners that delivered 2–3.5 MB/s, and in machine-test run
+41164441328 audi-fleet's template prewarm ended unconfirmed after 918.9 s, past
+the fixture's 900 s image I/O deadline. The
+[image store module](../../../nix/verification/tests/machines/fleet/image-store.nix)
+now builds, at VM start, a read-only erofs virtio-blk drive from each configured
+image's resolved store artifacts up to 8 GiB. Before Lilly starts, it bind-mounts
+each artifact over its own `/nix/store` path (contract
+`fleet-image-store-medium-only`). Lilly's configured paths, immutable-store
+verification, durable template copy and deadline are unchanged. Template copy
+times on this medium are fixture timings. They are not production clone
+evidence, and larger images (Windows) still use 9p.
+
 ## Open questions
 
 The current runner proved nested KVM and the required functional suites. Maintain

@@ -816,7 +816,7 @@ let
   # host-certificate readiness to reach checkpoint assertions.
   lilly = name: { config, nodes, lib, ... }:
     let host = hosts.${name}; in {
-    imports = [ ziggyFixture.lilly ]
+    imports = [ ziggyFixture.lilly ./image-store.nix ]
       ++ [ (import ./audi.nix { inherit pkgs ubuntu; role = "gateway"; hostId = host.host; }) ]
       ++ [ galileoFixture.lilly ]
       ++ lib.optional (otelAudiSsh || observabilityRecovery || suspension) (otelAudiSshHost name);
@@ -1194,14 +1194,14 @@ let
       # Relocation scenarios need a long write-during-copy window; bootstrap
       # scenarios exercise readiness and retain the ordinary 64 MiB/s limit.
       transferBytesPerSecond = lib.mkIf (relocation || cloning) ((if sshBootstrap then 64 else if cloning then 32 else 16) * 1024 * 1024);
-      # Nested test hosts read the 1.7 GB guest image over the 9p-shared store.
-      # In machine-test run 41111309494 on namespace xl runners, the template
-      # copy ran below about 5.7 MB/s: it had not finished when the 300 s
-      # production default expired (unconfirmed after 311-316 s on both hosts),
-      # so first launches failed. Locally it runs at about 28 MB/s (60 s), or
-      # 123 s with the fleet pinned to 8 CPUs. 900 s covers the measured CI
-      # rate with margin. It applies to these fixtures only; the production
-      # default stays 300 s.
+      # Nested test hosts once read the 1.7 GB guest image over the 9p-shared
+      # store: in machine-test run 41111309494 on namespace xl runners the
+      # template copy ran below about 5.7 MB/s and expired the 300 s production
+      # default, and in run 41164441328 it ended unconfirmed after 918.9 s
+      # even at 900 s. The source now comes from a local read-only virtio-blk
+      # drive (./image-store.nix); 900 s is retained until CI prewarm durations
+      # from that medium are recorded. It applies to these fixtures only; the
+      # production default stays 300 s.
       imageIoTimeoutSeconds = 900;
       hostId = host.host;
       controlPlane = "https://control.example.test:5443";
