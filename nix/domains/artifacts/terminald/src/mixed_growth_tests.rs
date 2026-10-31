@@ -118,7 +118,22 @@ fn verify_mixed(
         stalled(&stalled_session, watermark),
         "actual queue must reach pressure"
     );
-    let blocked_limit = if watermark >= unit { 2 * unit } else { unit };
+    // Growth reserves only when a read finds the ring already full. At a
+    // watermark of at least one unit, the read that first fills the ring can
+    // also lift the queue over the watermark and pause the pump before another
+    // read, so staying at one unit is as legal as growing to two. The pump grows
+    // and enqueues under the session lock that `stalled` takes, so this stalled
+    // limit is final; the inventory still requires exact reservation accounting.
+    let blocked_limit = snapshot(&daemon, blocked.id).limit;
+    let legal_blocked: &[usize] = if watermark >= unit {
+        &[unit, 2 * unit]
+    } else {
+        &[unit]
+    };
+    assert!(
+        legal_blocked.contains(&blocked_limit),
+        "stalled growth must stop before pressure; limit={blocked_limit}"
+    );
     expected.insert(blocked.id, blocked_limit);
     verify_inventory(&daemon, &expected, viewers);
     let barrier = Arc::new(Barrier::new(contenders + 2));
@@ -327,23 +342,31 @@ fn create_peer(daemon: &Arc<Daemon>, user: &str) -> Peer {
     Peer { id, socket: client }
 }
 
+/// Emits `payload` NUL bytes, then waits until the shell has drawn its next
+/// prompt. A prompt read after the completion marker would otherwise reach a
+/// full healthy ring after the caller's checkpoint, for example once a
+/// retirement frees quota, and grow it outside the expected inventory.
 fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
     assert!(payload <= Config::default().ring_max + 32769 && round <= 3);
     let marker = format!("GROWTH_COMPLETE_{}_ROUND_{round}_DONE", peer.id).into_bytes();
-    let escaped = marker.iter().fold(String::new(), |mut text, byte| {
-        let _ = write!(text, "\\{byte:03o}");
-        text
-    });
-    let command = format!("set +m; {head} -c {payload} /dev/zero; printf '{escaped}\\012'\n");
-    assert!(!command
+    let idle = format!("GROWTH_IDLE_{}_ROUND_{round}_PROMPT", peer.id).into_bytes();
+    // printf and PS1 both expand three-digit octal escapes, so neither marker
+    // appears literally in the echoed command line.
+    let command = format!(
+        "set +m; PS1='{}'; {head} -c {payload} /dev/zero; printf '{}\\012'\n",
+        octal(&idle),
+        octal(&marker)
+    );
+    assert!(![&marker, &idle].iter().any(|needle| command
         .as_bytes()
-        .windows(marker.len())
-        .any(|window| window == marker));
+        .windows(needle.len())
+        .any(|window| window == needle.as_slice())));
     peer.socket
         .write_all(command.as_bytes())
         .expect("finite native growth command");
     let deadline = Instant::now() + Duration::from_secs(20);
     let mut zeros = 0_usize;
+    let mut completed = false;
     let mut matched = 0_usize;
     let mut scratch = [0_u8; 8192];
     loop {
@@ -352,17 +375,22 @@ fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
             Ok(0) => panic!("live growth socket ended before marker"),
             Ok(count) => {
                 for byte in &scratch[..count] {
-                    if *byte == 0 {
+                    let needle = if completed { &idle } else { &marker };
+                    if !completed && *byte == 0 {
                         zeros += 1;
                     }
-                    matched = if *byte == marker[matched] {
+                    matched = if *byte == needle[matched] {
                         matched + 1
                     } else {
-                        usize::from(*byte == marker[0])
+                        usize::from(*byte == needle[0])
                     };
-                    if matched == marker.len() {
+                    if matched == needle.len() {
+                        if completed {
+                            return;
+                        }
                         assert_eq!(zeros, payload, "exact generated growth-byte count");
-                        return;
+                        completed = true;
+                        matched = 0;
                     }
                 }
             }
@@ -374,4 +402,11 @@ fn execute_growth(peer: &mut Peer, head: &str, payload: usize, round: usize) {
             Err(error) => panic!("native growth read failed: {:?}", error.kind()),
         }
     }
+}
+
+fn octal(bytes: &[u8]) -> String {
+    bytes.iter().fold(String::new(), |mut text, byte| {
+        let _ = write!(text, "\\{byte:03o}");
+        text
+    })
 }

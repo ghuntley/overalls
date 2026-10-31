@@ -118,3 +118,28 @@ contract mismatch: only a test module was added, all race workers join before
 assertions, snapshots release locks before asserting, and exact independent
 capacity arithmetic permits each legal scheduling result. Authenticated guest,
 RSS, sustained many-viewer throughput and hosted acceptance remain open.
+
+## Correction (2026-10-30): oracle scheduling assumptions
+
+Buck2 CI run 41143401371 at `b34d4c37a` failed the default family:
+`ring_total` was 60817408 against an expected 61865984. Production accounting
+was correct. The reservation equalled the sum of actual ring capacities, but
+the oracle above wrongly required the stalled session to reach 2 MiB. Growth
+reserves only when a read finds the ring already full. At a 1 MiB watermark,
+the read that first fills the ring can also lift the queue over the watermark,
+and the pump then pauses before another read. A local probe at the default
+1 MiB unit and watermark left 2 of 20 stalled sessions at 1 MiB, and 3 of 40 at
+a 64 KiB unit. Every probe matched `ring_total` to the actual capacity. Under
+the pump's session lock, the oracle now accepts a stalled limit of one or two
+units when the watermark is at least one unit, and exactly one unit below it.
+Exact reservation, capacity and backing assertions are unchanged.
+
+A full-suite rerun exposed a second oracle race in the smaller family:
+5242880 reserved against 4194304 expected after the filler retirement. The
+growth helper returned at the completion marker, before the shell's next
+prompt. When that prompt reached a full healthy ring after the retirement had
+freed quota, the ring grew outside the checkpoint. Each growth round now sets
+an octal-escaped prompt marker and waits until it is read. Probes saw no bytes
+after that prompt in 48 rounds. All 61 terminald tests passed with
+`--test-threads=1`, and the mixed property passed six further runs. These
+are local Linux PTY results; the remaining gaps above still apply.
