@@ -148,3 +148,16 @@ These ran on panterloons against a private PostgreSQL instance
 - Lilly-side coalescing of hint-triggered exchanges and specific
   classification of `unavailable` and `busy` (Lilly workstream).
 - Size the production connection budget for `hosts × running` per node.
+
+## Addendum 2026-10-31: report freshness regression
+
+Fleet run 41179645145 failed `clone-destination-loss` with
+`insufficient_capacity`. The FIFO queued Lilly's execution exchange, the only
+request carrying the capacity report, behind utility bursts on the same
+socket. `reported_at` is Lilly's sample time, so the wait counted against the
+5 s capacity window. Enrollment cadence ages rose from 1.1–2.5 s in the
+passing era to 2.2–4.3 s. ADR-0275's amendment of the same date adds a
+report lane (`priority_ops`): the session open and execution exchange start
+ahead of queued utilities, within the unchanged `running` bound. The
+per-socket pool bound, deadline and protocol are unchanged. Evidence and the
+rejected alternatives are in the ADR.

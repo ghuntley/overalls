@@ -289,5 +289,30 @@ defmodule MarshallComputeContractTest do
              Marshall.ControlSocketDriver.deliver(stale, reply)
 
     refute_received {:control_stub_started, 101, _}
+
+    # The report lane (Lilly's session open and execution exchange) starts
+    # ahead of earlier queued requests, in the same single running slot.
+    Application.put_env(:marshall, Marshall.Control.Concurrency,
+      lilly_running: 1,
+      queue_deadline_ms: 5_000
+    )
+
+    lane = Marshall.ControlSocketDriver.bound(%{test: self()})
+    {lane, []} = Marshall.ControlSocketDriver.request(lane, 200, "stub.wait")
+    {lane, []} = Marshall.ControlSocketDriver.request(lane, 201, "stub.wait")
+    {lane, []} = Marshall.ControlSocketDriver.request(lane, 202, "stub.priority")
+    assert_receive {:control_stub_started, 200, utility}
+    send(utility, :release)
+
+    reply =
+      receive do
+        {ref, {:ok, %{"n" => 200}}} = reply when is_reference(ref) -> reply
+      end
+
+    assert {lane, [{200, {:ok, _}}]} = Marshall.ControlSocketDriver.deliver(lane, reply)
+    assert_receive {:control_stub_started, 202, exchange}
+    refute_received {:control_stub_started, 201, _}
+    assert map_size(lane.tasks) == 1 and :queue.len(lane.queue) == 1
+    on_exit(fn -> Process.exit(exchange, :kill) end)
   end
 end

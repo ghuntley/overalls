@@ -32,8 +32,8 @@ The component's declared Elixir modules remain present, compilable, and owned by
 - **kind:** security
 - **status:** active
 
-### marshall.compute.I5 — Lilly control sockets run a bounded FIFO of requests
+### marshall.compute.I5 — Lilly control sockets run a bounded queue with a report lane
 - **scope:** `Marshall.Control.Socket` request dispatch with `Marshall.Control.Concurrency` (ADR-0275)
-- **must:** A Lilly-limited socket MUST run at most its configured `running` requests at once, MUST start accepted requests in arrival order, MUST keep running plus queued within the advertised `in_flight` (refusing only beyond it as `busy`), and MUST answer a request that waited past the queue deadline `temporarily_unavailable` without starting it.
+- **must:** A Lilly-limited socket MUST run at most its configured `running` requests at once, MUST start a queued report-lane request (Lilly's session open or execution exchange) before any other queued request and otherwise start accepted requests in arrival order, MUST keep running plus queued within the advertised `in_flight` (refusing only beyond it as `busy`), and MUST answer a request that waited past the queue deadline `temporarily_unavailable` without starting it.
 - **kind:** non-functional
 - **status:** active

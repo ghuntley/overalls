@@ -50,6 +50,16 @@ defmodule Marshall.Control.Services.Lilly do
   def limits,
     do: Map.put(@limits, :running, Marshall.Control.Concurrency.fetch!().lilly_running)
 
+  # @cc [owner:ghuntley,label:capacity;recovery] control-lilly-report-lane
+  # The session open and the execution exchange carry the host's capacity
+  # report, whose sample time is its freshness. They MUST start before every
+  # queued utility request on the socket, so a utility burst cannot age the
+  # report past the capacity window (run 41179645145, ADR-0275 amendment).
+  # Lilly keeps at most one of them in flight (one-control-request-in-flight),
+  # so the lane cannot starve the utilities; it never runs beyond `running`.
+  @impl true
+  def priority_ops, do: ["lilly.sessions", "lilly.exchange"]
+
   @impl true
   def handle_request("lilly." <> route, body, %{token: token}) do
     case ProvisionerRequests.handle(route, token, body) do

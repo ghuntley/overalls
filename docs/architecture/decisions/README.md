@@ -19,7 +19,10 @@ workspace and toolchain.
 socket to two running requests, queueing the rest in FIFO order with a deadline
 inside Lilly's own. It amends ADR-0142's per-request concurrency after
 hint-triggered bursts exhausted Marshall's database pool. Pool checkout
-timeouts and the longest wait are now in runtime metrics.
+timeouts and the longest wait are now in runtime metrics. Its 2026-10-31
+amendment adds a report lane: Lilly's execution exchange, which carries the
+capacity report, starts ahead of queued utility requests without an extra
+running slot, so a burst no longer ages the report past capacity freshness.
 
 [ADR-0268](0268-cedar-single-authorization-source.md) makes Cedar Marshall's single
 authorization source: one Marshall-owned authorizer with per-resource Cedar

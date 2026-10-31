@@ -448,6 +448,8 @@ answered `temporarily_unavailable` without running. The advertised
 services keep `running = in_flight`. The trigger was pool exhaustion from
 hint-triggered bursts of 14 host-locked exchanges in machine-test run
 41126173301.
+ADR-0275's 2026-10-31 amendment starts Lilly's session open and execution
+exchange ahead of queued utility requests, within the same `running` bound.
 
 ## Open questions
 

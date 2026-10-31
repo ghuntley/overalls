@@ -41,13 +41,21 @@ defmodule Marshall.Control.Service do
   welcome), the largest client-to-server frame (enforced at upgrade), the most
   accepted requests (`in_flight`, advertised) and the most of those running at
   once (`running`, server-side only; ADR-0275). Accepted requests beyond
-  `running` wait in FIFO order in the socket. `running` defaults to and never
-  exceeds `in_flight`. A service names only the limits it changes.
+  `running` wait in the socket: priority ops first, each lane in FIFO order.
+  `running` defaults to and never exceeds `in_flight`. A service names only the
+  limits it changes.
   """
   @callback limits() ::
               %{optional(:frame | :inbound | :in_flight | :running) => pos_integer()}
 
-  @optional_callbacks limits: 0
+  @doc """
+  Ops that start before every queued ordinary request (ADR-0275 report lane).
+  A service lists only ops its client keeps at most one of in flight, so the
+  lane cannot starve the others. Services without it have no priority ops.
+  """
+  @callback priority_ops() :: [String.t()]
+
+  @optional_callbacks limits: 0, priority_ops: 0
 
   @default_limits %{frame: 1_048_576, inbound: 1_048_576, in_flight: 8}
 
@@ -72,6 +80,14 @@ defmodule Marshall.Control.Service do
 
     limits = Map.merge(@default_limits, declared)
     Map.put(limits, :running, min(Map.get(limits, :running, limits.in_flight), limits.in_flight))
+  end
+
+  @doc "The priority ops of a service module; empty when it declares none."
+  @spec priority_ops(module()) :: MapSet.t(String.t())
+  def priority_ops(module) do
+    if Code.ensure_loaded?(module) and function_exported?(module, :priority_ops, 0),
+      do: MapSet.new(module.priority_ops()),
+      else: MapSet.new()
   end
 
   @doc "The service module for a declared service name."

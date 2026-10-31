@@ -3,7 +3,8 @@ defmodule Marshall.ControlStubService do
   A test-only control service with Lilly's in_flight and running limits.
 
   `stub.wait` reports `{:control_stub_started, n, pid}` to the test and blocks
-  until that pid receives `:release`. `stub.db` serializes on one advisory
+  until that pid receives `:release`. `stub.priority` behaves the same but is
+  the stub's priority op, standing in for Lilly's execution exchange. `stub.db` serializes on one advisory
   transaction lock through the dynamic repo named in the identity, the way
   Lilly exchanges serialize on their host row, and reports start and finish so
   the test can measure concurrency. Neither touches credentials or hints.
@@ -26,8 +27,13 @@ defmodule Marshall.ControlStubService do
   def limits, do: Map.take(Marshall.Control.Services.Lilly.limits(), [:in_flight, :running])
 
   @impl true
+  @spec priority_ops() :: [String.t()]
+  def priority_ops, do: ["stub.priority"]
+
+  @impl true
   @spec handle_request(String.t(), map(), identity()) :: {:ok, map()} | {:error, String.t()}
-  def handle_request("stub.wait", %{"n" => n}, %{test: test}) when is_integer(n) do
+  def handle_request(op, %{"n" => n}, %{test: test})
+      when op in ["stub.wait", "stub.priority"] and is_integer(n) do
     send(test, {:control_stub_started, n, self()})
 
     receive do

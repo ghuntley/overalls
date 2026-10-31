@@ -6,9 +6,10 @@ defmodule Marshall.Control.Socket do
   Requests run in supervised tasks, so a domain transaction always completes
   even if the socket dies; only its response can be lost, as with HTTPS.
   At most the service's `running` limit execute at once; further accepted
-  requests wait in FIFO order here and start as running ones finish
-  (ADR-0275). One that waited past the queue deadline is answered
-  `temporarily_unavailable` without running.
+  requests wait here and start as running ones finish (ADR-0275): the
+  service's priority ops first, then the rest, each lane in arrival order. One
+  that waited past the queue deadline is answered `temporarily_unavailable`
+  without running.
   Hints for the bound identity are pushed as they arrive, and a notifier
   recovery pushes a resync.
   """
@@ -31,10 +32,12 @@ defmodule Marshall.Control.Socket do
        module: module,
        principal: principal,
        limits: Marshall.Control.Service.limits(module),
+       priority_ops: Marshall.Control.Service.priority_ops(module),
        queue_deadline_ms: Marshall.Control.Concurrency.fetch!().queue_deadline_ms,
        identity: nil,
        tasks: %{},
        queue: :queue.new(),
+       priority: :queue.new(),
        last_seen: now(),
        ping: 0
      }}
@@ -122,12 +125,17 @@ defmodule Marshall.Control.Socket do
   defp message({:req, %{id: id, op: op, body: body}}, %{identity: identity} = state)
        when identity != nil do
     cond do
-      map_size(state.tasks) + :queue.len(state.queue) >= state.limits.in_flight ->
+      map_size(state.tasks) + :queue.len(state.queue) + :queue.len(state.priority) >=
+          state.limits.in_flight ->
         {:push, {:text, Envelope.encode({:res, %{id: id, result: {:error, "busy"}}})}, state}
 
       Marshall.Control.FaultGate.blocked?(op) ->
         result = {:error, "temporarily_unavailable"}
         {:push, {:text, Envelope.encode({:res, %{id: id, result: result}})}, state}
+
+      MapSet.member?(state.priority_ops, op) ->
+        priority = :queue.in({id, op, body, identity, now()}, state.priority)
+        dispatch(%{state | priority: priority}, [])
 
       true ->
         queue = :queue.in({id, op, body, identity, now()}, state.queue)
@@ -162,23 +170,23 @@ defmodule Marshall.Control.Socket do
   end
 
   # @cc [owner:ghuntley,label:capacity;protocol] control-bounded-fifo-dispatch
-  # Accepted requests MUST start in arrival order, with at most limits.running
-  # of them running at once; running plus queued MUST stay within the
-  # advertised in_flight, so the busy refusal fires exactly where it did
-  # before. Every accepted request MUST be answered exactly once: with its
+  # Accepted requests MUST start with every queued priority op (the service's
+  # priority_ops) before any other queued request, and in arrival order within
+  # each lane, with at most limits.running of them running at once; the
+  # priority lane MUST NOT add a running slot. Running plus queued (both
+  # lanes) MUST stay within the advertised in_flight, so the busy refusal fires
+  # exactly where it did before. Every accepted request MUST be answered exactly once: with its
   # result, `unavailable` if its task dies, or `temporarily_unavailable` when it
   # waited queue_deadline_ms or longer, in which case it MUST NOT start. Frames
   # and reply names are unchanged; only their timing differs (ADR-0275).
   @spec dispatch(map(), [WebSock.message()]) :: WebSock.handle_result()
   defp dispatch(state, responses) do
     if map_size(state.tasks) < state.limits.running do
-      case :queue.out(state.queue) do
-        {:empty, _queue} ->
+      case next(state) do
+        :empty ->
           push(state, responses)
 
-        {{:value, {id, op, body, identity, received}}, queue} ->
-          state = %{state | queue: queue}
-
+        {{id, op, body, identity, received}, state} ->
           if now() - received >= state.queue_deadline_ms do
             Marshall.Events.emit("control.request_expired", service: service_atom(state.service))
             result = {:error, "temporarily_unavailable"}
@@ -190,6 +198,23 @@ defmodule Marshall.Control.Socket do
       end
     else
       push(state, responses)
+    end
+  end
+
+  @typep queued :: {term(), String.t(), map(), term(), integer()}
+
+  # The oldest queued priority op, else the oldest queued ordinary request.
+  @spec next(map()) :: :empty | {queued(), map()}
+  defp next(state) do
+    case :queue.out(state.priority) do
+      {{:value, item}, priority} ->
+        {item, %{state | priority: priority}}
+
+      {:empty, _priority} ->
+        case :queue.out(state.queue) do
+          {{:value, item}, queue} -> {item, %{state | queue: queue}}
+          {:empty, _queue} -> :empty
+        end
     end
   end
 
