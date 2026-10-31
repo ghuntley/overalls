@@ -391,6 +391,10 @@ other contention. Evidence:
 (`template-reserve-within-one-observation`). Against a 2.5 s observation
 hold, the old 1 s wait fails, and a reservation arriving 0.1, 1.2 or 2.2 s
 into the read acquires the lock within the rest of the read plus 1 s.
+Since 2026-10-31 a capacity observation holds the pool lock only for its
+bind and a generation-token read
+([ADR-0274](0274-fenced-capacity-snapshots.md)), so mutation sections with
+1-2 s waits no longer queue behind its native reads.
 
 [`Image.load_cached/2`](../../../lilly/lib/lilly/host/image.ex) skips
 rehashing an unchanged configured image after a Lilly restart. It uses a

@@ -5,19 +5,23 @@ defmodule Lilly.Host.PoolSnapshot do
   the allocation and template audits, the dataset claim and the final
   verification of a preparation all derive from it instead of re-reading.
   A snapshot grants nothing by itself and is valid only while the exact lock
-  it was read under is still held.
+  it was read under is still held. A fenced snapshot (read_fenced/2) is read
+  without the lock for capacity reports only; it is valid only while the pool
+  generation token it was read under is unchanged (ADR-0274), and never
+  gates a mutation.
   """
   alias Lilly.Host.{Lock, Pool, ZFS}
   alias Lilly.Transfer.SnapshotOwnership
 
   @enforce_keys [:lock, :observation, :owners, :mounts]
-  defstruct @enforce_keys ++ [usage: :exact]
+  defstruct @enforce_keys ++ [usage: :exact, fence: nil]
 
   @typedoc "Exact observations may grant capacity credit; identity observations never do."
   @type usage :: :exact | :identity
 
   @type t :: %__MODULE__{
-          lock: Lilly.Host.Lease.t(),
+          lock: Lilly.Host.Lease.t() | nil,
+          fence: {Pool.t(), binary()} | nil,
           observation: map(),
           owners: %{String.t() => %{String.t() => String.t()}},
           mounts: [ZFS.mount()],
@@ -31,8 +35,9 @@ defmodule Lilly.Host.PoolSnapshot do
   # read/2 MUST run with a current host lock and read every native fact after
   # that lock was acquired: snapshot expectations, then the observation (two
   # whole-pool reads with identity checks), then owners, then mounts. A failed
-  # read MUST NOT yield a partial snapshot. Consumers MUST check held?/1 so a
-  # snapshot never outlives the lock acquisition it was read under (ADR-0152).
+  # read MUST NOT yield a partial snapshot. Consumers that authorize a mutation
+  # MUST check held?/1 so a snapshot never outlives the lock acquisition it was
+  # read under (ADR-0152); capacity classification may use current?/1 (ADR-0274).
   # A placement UUID makes the observation diagnostic: an incoherent read emits
   # only that UUID and catalogued stage/reason atoms, never native output.
   # `:identity` usage tolerates usage-only movement between the two reads
@@ -64,10 +69,51 @@ defmodule Lilly.Host.PoolSnapshot do
       else: {:error, :lock}
   end
 
+  # @cc [owner:ghuntley,label:capacity;concurrency] fenced-snapshot-reports-only
+  # read_fenced/2 reads the same native facts as read/3 with :exact usage but
+  # without a pool lock, under a generation token read under the lock
+  # (Storage.observe/4). Its snapshot MUST NOT satisfy held?/1, so no
+  # mutation, preparation or readiness path accepts it; current?/1 accepts it
+  # only while the pool's generation still equals that token.
+  @spec read_fenced(Pool.t(), binary()) :: {:ok, t()} | {:error, read_error()}
+  def read_fenced(pool, token) when is_binary(token) do
+    identity = Pool.zfs_identity(pool)
+
+    with {:observe, {:ok, observation}} <-
+           {:observe,
+            with(
+              {:ok, expected} <- SnapshotOwnership.expectations(pool),
+              do: observe(pool, expected, nil, :exact)
+            )},
+         {:owner_set, {:ok, owners}} <- {:owner_set, ZFS.owners(identity)},
+         {:mounts, {:ok, mounts}} <- {:mounts, ZFS.mounts()} do
+      {:ok,
+       %__MODULE__{
+         lock: nil,
+         fence: {pool, token},
+         observation: observation,
+         owners: owners,
+         mounts: mounts,
+         usage: :exact
+       }}
+    else
+      {:observe, {:error, reason}} -> {:error, {:observe, reason}}
+      {stage, _} -> {:error, stage}
+    end
+  end
+
   @doc "Whether the lock this snapshot was read under is still held by this process."
   @spec held?(term()) :: boolean()
+  def held?(%__MODULE__{lock: nil}), do: false
   def held?(%__MODULE__{lock: lock}), do: Lock.held?(lock)
   def held?(_), do: false
+
+  @doc "Whether the snapshot is still current: its lock is held, or its fence is unchanged."
+  @spec current?(term()) :: boolean()
+  def current?(%__MODULE__{fence: {pool, token}, lock: nil}),
+    do: Lilly.Host.Storage.generation(pool) == {:ok, token}
+
+  def current?(snapshot), do: held?(snapshot)
 
   @spec observe(Pool.t(), ZFS.snapshots(), OverallsProtocol.uuid() | nil, usage()) ::
           {:ok, map()} | {:error, atom()}

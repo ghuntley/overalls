@@ -822,9 +822,12 @@ defmodule Lilly.Host.ZFSDataset do
   @spec allocations(Pool.t(), PoolSnapshot.t()) ::
           {:ok, %{String.t() => non_neg_integer()}} | {:error, atom()}
   def allocations(pool, snapshot) do
-    case classify_allocations(pool, snapshot) do
-      {:ok, credits} -> {:ok, credits}
-      {:error, _check} -> {:error, :zfs_allocation_ownership_unconfirmed}
+    # Only a locked snapshot may back a mutation; a fenced one reports only.
+    with true <- PoolSnapshot.held?(snapshot),
+         {:ok, credits} <- classify_allocations(pool, snapshot) do
+      {:ok, credits}
+    else
+      _ -> {:error, :zfs_allocation_ownership_unconfirmed}
     end
   end
 
@@ -839,8 +842,9 @@ defmodule Lilly.Host.ZFSDataset do
           | :workloads
 
   # @cc [owner:ghuntley,label:capacity] allocation-classification-from-one-snapshot
-  # classify_allocations/2 MUST classify only a PoolSnapshot whose lock is still
-  # held. Its snapshot expectations are the ones the observation was accounted
+  # classify_allocations/2 MUST classify only a PoolSnapshot that is still
+  # current: its lock still held, or, for a fenced capacity snapshot, its pool
+  # generation unchanged. Its snapshot expectations are the ones the observation was accounted
   # against under that lock (ADR-0152); owners and mounts come from the same
   # read. Every ownership, template and disk-metadata refusal is retained; an
   # owned child with an invalid launch bundle is recognized without credit.
@@ -854,7 +858,7 @@ defmodule Lilly.Host.ZFSDataset do
     %PoolSnapshot{observation: observation, owners: owners, mounts: mounts} = snapshot
     snapshots = observation.snapshots
 
-    with {:pool_lock, true} <- {:pool_lock, PoolSnapshot.held?(snapshot)},
+    with {:pool_lock, true} <- {:pool_lock, PoolSnapshot.current?(snapshot)},
          {:active_claims, {:ok, entries}} <- {:active_claims, File.ls(active(pool))},
          {:active_claims, true} <-
            {:active_claims,

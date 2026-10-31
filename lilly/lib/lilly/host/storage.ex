@@ -11,7 +11,8 @@ defmodule Lilly.Host.Storage do
   # BEAM that runs no PoolQueue the native lock is the only contention point
   # and its retry window stays at most two seconds.
   # Observations MUST explicitly use a short wait and report contention as
-  # unavailable.
+  # unavailable; capacity observations hold the lock only for observe/4's
+  # prologue.
   @spec locked(Pool.t(), (-> term())) :: term()
   @spec locked(Pool.t(), (-> term()), 0..30_000) :: term()
   @spec locked(Pool.t(), (-> term()), 0..30_000, section()) :: term()
@@ -70,6 +71,89 @@ defmodule Lilly.Host.Storage do
     end
   end
 
+  # @cc [owner:ghuntley,label:capacity;concurrency] pool-generation-advances-per-mutation
+  # Every pool section except :snapshot MUST replace the pool's generation
+  # token (a fresh random value in the lock directory) after acquiring the
+  # native lock and before its callback runs. A failed write that still
+  # removed the previous token (for example ENOSPC after truncation on a full
+  # pool, where deletes must keep working) or found no readable token counts
+  # as advanced; only when the previous token is still readable unchanged
+  # MUST the callback not run, and the
+  # section is storage_busy. Sections of every BEAM that use this module
+  # therefore change the token, so a token read under the lock and read
+  # unchanged later proves that no section began in between.
+  @spec advance(Path.t()) :: :ok | {:error, File.posix()}
+  defp advance(directory) do
+    path = generation_path(directory)
+    previous = File.read(path)
+
+    case File.write(path, Base.encode16(:crypto.strong_rand_bytes(16))) do
+      :ok ->
+        :ok
+
+      {:error, reason} ->
+        case {previous, File.read(path)} do
+          {{:ok, old}, {:ok, old}} -> {:error, reason}
+          # No readable token before or now: no observer can match one.
+          _changed -> :ok
+        end
+    end
+  end
+
+  @spec generation_path(Path.t()) :: Path.t()
+  defp generation_path(directory), do: Path.join(directory, "generation")
+
+  @doc "The pool's current generation token, or :error when it is missing or unreadable."
+  @spec generation(Pool.t()) :: {:ok, binary()} | :error
+  def generation(pool) do
+    case File.read(generation_path(Path.join(pool.path, ".lilly-storage"))) do
+      {:ok, <<_::binary-size(32)>> = token} -> {:ok, token}
+      _ -> :error
+    end
+  end
+
+  # @cc [owner:ghuntley,label:capacity;concurrency] fenced-observation-never-straddles
+  # observe/4 MUST run `prologue` as a :snapshot section waiting at most
+  # wait_ms, read the generation token under that same lock (creating one if
+  # missing), release the lock, and only then run `read` with the token. The
+  # read holds no pool lock, so mutations never wait for it. The read's result
+  # (success or error) MUST be returned only if the token is unchanged after
+  # the read; otherwise observe/4 MUST return storage_busy, so an observation
+  # that straddles the start of any pool section is never reported as fresh.
+  @spec observe(
+          Pool.t(),
+          (-> :ok | {:error, prologue_error}),
+          (binary() -> {:ok, result} | {:error, read_error}),
+          0..30_000
+        ) :: {:ok, result} | {:error, prologue_error | read_error | :storage_busy}
+        when result: term(), prologue_error: atom(), read_error: atom()
+  def observe(pool, prologue, read, wait_ms)
+      when is_function(prologue, 0) and is_function(read, 1) and wait_ms in 0..30_000 do
+    fenced = locked(pool, fn -> with :ok <- prologue.(), do: fence(pool) end, wait_ms, :snapshot)
+
+    case fenced do
+      {:ok, token} ->
+        result = read.(token)
+        if generation(pool) == {:ok, token}, do: result, else: {:error, :storage_busy}
+
+      {:error, _} = error ->
+        error
+    end
+  end
+
+  # Under the lock: the current token, or a fresh one when none exists yet.
+  @spec fence(Pool.t()) :: {:ok, binary()} | {:error, :storage_busy}
+  defp fence(pool) do
+    with :error <- generation(pool),
+         :ok <- advance(Path.join(pool.path, ".lilly-storage")),
+         {:ok, token} <- generation(pool) do
+      {:ok, token}
+    else
+      {:ok, token} -> {:ok, token}
+      _ -> {:error, :storage_busy}
+    end
+  end
+
   # One turn, then the native pool lock, then `fun`; both always released.
   defp turn(pool, kind, wait_ms, combine, fun) do
     started = System.monotonic_time(:millisecond)
@@ -90,9 +174,14 @@ defmodule Lilly.Host.Storage do
               :counters.put(items, 1, 1)
 
               try do
-                {result, count} = fun.(turn)
-                :counters.put(items, 1, count)
-                {:ran, result}
+                # A section whose generation cannot advance never runs.
+                if kind == :snapshot or advance(directory) == :ok do
+                  {result, count} = fun.(turn)
+                  :counters.put(items, 1, count)
+                  {:ran, result}
+                else
+                  :busy
+                end
               after
                 Lock.release(port)
 

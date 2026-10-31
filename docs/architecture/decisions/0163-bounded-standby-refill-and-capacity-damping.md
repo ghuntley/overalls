@@ -129,6 +129,12 @@ shape (ADR-0159).
   ([host reports](../../../marshall/lib/marshall/compute/host_reports.ex),
   `pool-observation-time-bounds-freshness`). The grace and its start check are
   unchanged.
+- Fenced snapshots (2026-10-31): a capacity read now holds the pool lock only
+  for its bind and is fenced by a generation token
+  ([ADR-0274](0274-fenced-capacity-snapshots.md)). A read that straddles a
+  pool section is reported `busy`, so this grace bounds it, and two
+  consecutive `busy` reads trigger one locked read. The 200 ms snapshot wait
+  now applies to the bind only.
 
 ## Open questions
 

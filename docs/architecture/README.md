@@ -514,6 +514,9 @@ makes each pool-locked disk preparation read native state once, as one
 `PoolSnapshot`, and re-verify the pool once after its own mutation. Native
 traces halve the whole-pool listings per standby claim with every refusal kept;
 the production concurrency campaign remains outstanding.
+[ADR-0274](decisions/0274-fenced-capacity-snapshots.md) (accepted/partial)
+reads capacity snapshots outside the pool lock, fenced by a generation token
+that every pool section replaces, so mutations no longer wait for them.
 
 [ADR-0143](decisions/0143-faster-create-clone-delete.md) addresses measured
 create, clone and delete latency. Image materialization adds kernel copy offload

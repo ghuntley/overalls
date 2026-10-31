@@ -105,6 +105,14 @@ removes redundant reads, not verification.
 
 ## Implementation evidence
 
+Update (2026-10-31): capacity reports no longer read the snapshot under the
+lock. [ADR-0274](0274-fenced-capacity-snapshots.md) fences them with a pool
+generation token instead, and a fenced snapshot fails `held?/1`, so the
+invariant that no check consults native state read before the lock was
+acquired still holds for every check that authorizes a mutation. Preparations,
+readiness and claims are unchanged.
+
+
 The [2026-10-18 retained-bundle review](../reviews/2026-10-18-retained-bundle-capacity.md)
 records a capacity-audit correction: a child with exact claim, owner, GUID,
 mount, drive and ready-disk metadata may be recognized without allocation credit

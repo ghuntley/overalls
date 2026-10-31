@@ -1,5 +1,10 @@
 # Architecture decision records
 
+[ADR-0274](0274-fenced-capacity-snapshots.md) takes Lilly's capacity
+snapshots out of the pool lock: only the bind and a generation-token read stay
+locked, and a read that straddles any pool section is reported `busy`, never
+fresh. Preparations keep ADR-0152's locked snapshot.
+
 [ADR-0269](0269-buck2-build-system-with-nix-toolchains.md) makes Buck2 the
 only build entry point, with Nix supplying pinned toolchains and assembling
 NixOS. [ADR-0270](0270-graph-driven-machine-test-selection.md) selects each
@@ -1133,6 +1138,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0271](0271-buck2-host-self-deployment.md) | accepted | partial | Hosts self-deploy by building their Buck2 deployment target |
 | [ADR-0272](0272-nativelink-remote-cache-and-execution.md) | accepted | partial | NativeLink remote cache and execution for Buck2 |
 | [ADR-0273](0273-single-rust-workspace-and-toolchain.md) | accepted | partial | One Cargo workspace and one Rust toolchain |
+| [ADR-0274](0274-fenced-capacity-snapshots.md) | accepted | partial | Fenced capacity snapshots outside the pool lock |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

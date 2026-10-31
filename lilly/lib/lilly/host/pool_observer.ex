@@ -3,8 +3,9 @@ defmodule Lilly.Host.PoolObserver do
   Background pool observation, off the host report path (ADR-0140).
 
   One observer per configured pool reads its snapshot on its own single-flight
-  `OverallsProtocol.Cadence`, resting after each read in proportion to how
-  long it held the pool lock, and publishes the latest result, stamped with the
+  `OverallsProtocol.Cadence`, fenced by the pool generation rather than under
+  the pool lock (`Lilly.Host.Pool.snapshot/2`), resting after each read in
+  proportion to its duration, and publishes the latest result, stamped with the
   time the read began, to an `OverallsProtocol.View`. Capacity collection reads
   that view without waiting, so a slow pool read (the pool lock held for
   seconds) no longer delays every host report.
@@ -18,7 +19,9 @@ defmodule Lilly.Host.PoolObserver do
   # Two observation cadences: a healthy boot's observer starts well within it.
   @absent_grace_ms 2000
 
-  @type read :: (Pool.t() -> OverallsProtocol.pool())
+  @type read ::
+          (Pool.t() -> OverallsProtocol.pool())
+          | (Pool.t(), Pool.mode() -> OverallsProtocol.pool())
   @type observation :: %{observed_at: DateTime.t(), entry: OverallsProtocol.pool()}
   @type option ::
           {:view, View.view()}
@@ -131,12 +134,17 @@ defmodule Lilly.Host.PoolObserver do
              read: PoolObserver.read(),
              interval: pos_integer(),
              cadence: Cadence.t(),
-             task: {Task.t(), DateTime.t(), integer()} | nil
+             task: {Task.t(), DateTime.t(), integer()} | nil,
+             busy: non_neg_integer()
            }
 
-    # A slow read rests at least as long as it held the pool lock, up to this
-    # bound, so observation holds the lock at most half the time while the
-    # worst-case observation age stays within Marshall's 15 s pool busy grace.
+    # Consecutive busy fenced reads before one read under the pool lock.
+    @locked_after 2
+
+    # A slow read rests at least as long as it took, up to this bound, so a
+    # locked read holds the pool lock, and any read loads the host's ZFS
+    # utilities, at most half the time, while the worst-case observation age
+    # stays within Marshall's 15 s pool busy grace.
     @max_rest_ms 3000
 
     @spec start_link({Lilly.Host.Pool.t(), [PoolObserver.option()]}) :: GenServer.on_start()
@@ -152,10 +160,11 @@ defmodule Lilly.Host.PoolObserver do
        %{
          pool: pool,
          view: view,
-         read: Keyword.get(options, :read, &Lilly.Host.Pool.report/1),
+         read: Keyword.get(options, :read, &Lilly.Host.Pool.report/2),
          interval: Keyword.get(options, :interval_ms, 1000),
          cadence: Cadence.new(),
-         task: nil
+         task: nil,
+         busy: 0
        }}
     end
 
@@ -172,6 +181,12 @@ defmodule Lilly.Host.PoolObserver do
     # time, and fast reads still start once per interval. The worst-case age
     # of a published observation is d + rest + d of the next read: interval + d
     # for d <= interval / 2, 3d up to 3 s, and 2d + 3 s beyond.
+
+    # @cc [owner:ghuntley,label:capacity;concurrency] pool-observer-fenced-first
+    # Reads MUST use :fenced mode (no pool lock during the native read) except
+    # that after two consecutive busy results the next read MUST use :locked
+    # mode, so sustained mutation traffic cannot keep capacity withheld past
+    # Marshall's busy grace. Any non-busy result returns to :fenced reads.
     @impl true
     def handle_info(:tick, state), do: {:noreply, step(state, :tick)}
 
@@ -181,7 +196,8 @@ defmodule Lilly.Host.PoolObserver do
       {:ok, _version} =
         View.put(state.view, state.pool.id, %{observed_at: observed, entry: entry})
 
-      {:noreply, finish(state, started)}
+      busy = if Map.get(entry, :busy) == true, do: state.busy + 1, else: 0
+      {:noreply, finish(%{state | busy: busy}, started)}
     end
 
     def handle_info(
@@ -213,9 +229,12 @@ defmodule Lilly.Host.PoolObserver do
           started = System.monotonic_time(:millisecond)
           read = state.read
           pool = state.pool
+          mode = if state.busy >= @locked_after, do: :locked, else: :fenced
 
           task =
-            Task.Supervisor.async_nolink(PoolObserver.tasks(state.view), fn -> read.(pool) end)
+            Task.Supervisor.async_nolink(PoolObserver.tasks(state.view), fn ->
+              if is_function(read, 1), do: read.(pool), else: read.(pool, mode)
+            end)
 
           %{state | cadence: cadence, task: {task, observed, started}}
 

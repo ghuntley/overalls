@@ -167,6 +167,34 @@ defmodule Lilly.Host.PoolObserverTest do
            end) == [:absent, :present]
   end
 
+  # @cc [owner:ghuntley,label:verification;capacity] observer-locked-after-two-busy
+  # Reads MUST be fenced until two consecutive busy results, then one read
+  # MUST be locked, and a non-busy result MUST return to fenced reads.
+  test "two busy fenced reads are followed by one locked read" do
+    test = self()
+    {:ok, calls} = Agent.start_link(fn -> 0 end)
+
+    read = fn pool, mode ->
+      call = Agent.get_and_update(calls, &{&1 + 1, &1 + 1})
+      send(test, {:mode, call, mode})
+
+      if call in [1, 2],
+        do: %{id: pool.id, busy: true, storage: pool.storage},
+        else: @observed
+    end
+
+    view = :"pool_observer_test_#{System.unique_integer([:positive])}"
+    start_supervised!({PoolObserver, {[@pool], [view: view, read: read, interval_ms: 100]}})
+
+    modes =
+      for call <- 1..5 do
+        assert_receive {:mode, ^call, mode}, 2000
+        mode
+      end
+
+    assert modes == [:fenced, :fenced, :locked, :fenced, :fenced]
+  end
+
   @spec wait_for((-> {:ok, term()} | nil), non_neg_integer()) :: {:ok, term()}
   defp wait_for(probe, attempts \\ 40) do
     case probe.() do

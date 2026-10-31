@@ -175,9 +175,9 @@ defmodule Lilly.Host.Pool do
   # observation until it ages out; every other snapshot error MUST produce
   # unavailable=true. Neither carries totals or allocation credit. Configuration
   # MUST NOT stand in for measured capacity. Slowness is not evidence (ADR-0140).
-  @spec report(t()) :: OverallsProtocol.pool()
-  def report(pool) do
-    case snapshot(pool) do
+  @spec report(t(), mode()) :: OverallsProtocol.pool()
+  def report(pool, mode \\ :fenced) do
+    case snapshot(pool, mode) do
       {:ok, observation} ->
         availability_changed(pool, :available)
         observation
@@ -220,8 +220,9 @@ defmodule Lilly.Host.Pool do
 
   @doc "Serialized ZFS physical allocation evidence."
   # @cc [owner:ghuntley,label:capacity;recovery] snapshot-credit-serialized-with-disks
-  # snapshot/1 MUST serialize with disk mutations and verify current pool identity before
-  # reporting allocation credit. ZFS credits exclusive physical bytes only after matching
+  # snapshot/2 MUST be serializable with disk mutations (read under the pool lock, or
+  # fenced by a generation token unchanged across the whole read) and verify current pool
+  # identity under the lock before reporting allocation credit. ZFS credits exclusive physical bytes only after matching
   # durable ownership and ready disk shape.
   # Why a snapshot was withheld: the pool lock, binding, native observation or
   # one allocation-ownership check (see ZFSDataset.classify_allocations/2).
@@ -235,18 +236,57 @@ defmodule Lilly.Host.Pool do
           | :mounts
           | Lilly.Host.ZFSDataset.allocation_rejection()
 
-  @spec snapshot(t()) :: {:ok, OverallsProtocol.pool()} | {:error, snapshot_stage()}
+  @typedoc """
+  How a capacity snapshot is read: `:fenced` holds the pool lock only to bind
+  the pool and read its generation token, then reads outside the lock;
+  `:locked` reads the whole snapshot under the lock.
+  """
+  @type mode :: :fenced | :locked
+
+  # @cc [owner:ghuntley,label:capacity;concurrency] fenced-capacity-snapshot
+  # snapshot/2 in :fenced mode MUST hold the pool lock only to bind the pool
+  # and read its generation token (Storage.observe/4); the native reads and
+  # allocation classification run outside the lock. A snapshot whose read
+  # straddled the start of any pool section MUST be withheld as storage_busy,
+  # never reported, and none of its errors reported as unavailable. :locked
+  # mode keeps the whole snapshot under the lock.
+  @spec snapshot(t(), mode()) :: {:ok, OverallsProtocol.pool()} | {:error, snapshot_stage()}
   # A capacity observation waits briefly for the pool lock (ADR-0163): most
   # mutation sections are far shorter than the sampling interval, so a short
   # wait turns a withheld sample into a fresh one without serializing writers.
   @snapshot_wait_ms 200
-  def snapshot(pool) do
+  def snapshot(pool, mode \\ :fenced)
+
+  def snapshot(pool, :locked) do
     Lilly.Host.Storage.locked(pool, fn -> snapshot_locked(pool) end, @snapshot_wait_ms, :snapshot)
   end
 
+  def snapshot(%{backend: :zfs} = pool, :fenced) do
+    Lilly.Host.Storage.observe(
+      pool,
+      fn ->
+        case Lilly.Host.ZFSDataset.bind(pool) do
+          :ok -> :ok
+          _ -> {:error, :bind}
+        end
+      end,
+      fn token -> entry(pool, Lilly.Host.PoolSnapshot.read_fenced(pool, token)) end,
+      @snapshot_wait_ms
+    )
+  end
+
   defp snapshot_locked(%{backend: :zfs} = pool) do
-    with {:bind, :ok} <- {:bind, Lilly.Host.ZFSDataset.bind(pool)},
-         {:read, {:ok, snapshot}} <- {:read, Lilly.Host.PoolSnapshot.read(pool)},
+    with {:bind, :ok} <- {:bind, Lilly.Host.ZFSDataset.bind(pool)} do
+      entry(pool, Lilly.Host.PoolSnapshot.read(pool))
+    else
+      {stage, _} -> {:error, stage}
+    end
+  end
+
+  @spec entry(t(), {:ok, Lilly.Host.PoolSnapshot.t()} | {:error, term()}) ::
+          {:ok, OverallsProtocol.pool()} | {:error, snapshot_stage()}
+  defp entry(pool, read) do
+    with {:read, {:ok, snapshot}} <- {:read, read},
          {:allocations, {:ok, allocations}} <-
            {:allocations, Lilly.Host.ZFSDataset.classify_allocations(pool, snapshot)},
          checkpoint_children =
@@ -287,9 +327,6 @@ defmodule Lilly.Host.Pool do
 
       {:read, _} ->
         {:error, :observe}
-
-      {stage, _} ->
-        {:error, stage}
     end
   end
 
