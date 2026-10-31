@@ -177,6 +177,167 @@ defmodule Galileo.UpstreamTest do
       ttl: 5000
     }
 
+  # @cc [owner:ghuntley,label:verification;reliability] galileo-bodiless-request-framing
+  # Generated bodiless guest requests MUST reach a raw TLS origin with no
+  # transfer-encoding and no body bytes; only methods anticipating content
+  # carry an explicit zero content-length. The origin answers without draining
+  # and closes, as the GitHub machine fixture does.
+  property "bodiless guest requests are forwarded without chunked framing", profile: :ci do
+    method = draw("method", member_of(~w(GET HEAD DELETE OPTIONS POST PUT PATCH)))
+    guest = draw("guest", member_of([[], [{"content-length", "0"}], [{"Content-Length", " 0 "}]]))
+    assert Upstream.request_content(guest) == :none
+
+    {origin, listener} = raw_origin(self())
+
+    try do
+      result =
+        Upstream.stream(%{target: origin, headers: [], ttl: 5000},
+          method: method,
+          path: "/bodiless",
+          query: "",
+          body_state: :empty,
+          request_content: Upstream.request_content(guest),
+          pull: fn state -> {:ok, "", state} end,
+          headers: guest,
+          consume: fn _ -> :ok end,
+          renew: fn -> {:ok, %{ttl: 5000}} end,
+          transport_opts: [verify: :verify_peer, cacertfile: Path.join(@fixtures, "ca.pem")]
+        )
+
+      assert_receive {:raw_request, head, trailing}, 2000
+      [request_line | lines] = String.split(head, "\r\n")
+      assert request_line == method <> " /bodiless HTTP/1.1"
+
+      framing =
+        for line <- lines,
+            [name, value] = String.split(line, ":", parts: 2),
+            String.downcase(name) in ["content-length", "transfer-encoding"],
+            do: {String.downcase(name), String.trim(value)}
+
+      expected = if method in ~w(POST PUT PATCH), do: [{"content-length", "0"}], else: []
+      assert framing == expected
+      assert trailing == ""
+      assert result.outcome == :completed
+      assert result.status == 200
+      refute_receive {:raw_request, _, _}, 50
+    after
+      :ssl.close(listener)
+    end
+  end
+
+  property "guest framing with content keeps the streamed request body" do
+    framing =
+      draw(
+        "framing",
+        member_of([
+          [{"transfer-encoding", "chunked"}],
+          [{"content-length", "1"}],
+          [{"Content-Length", "4096"}],
+          [{"content-length", "0"}, {"transfer-encoding", "chunked"}]
+        ])
+      )
+
+    assert Upstream.request_content([{"accept", "*/*"} | framing]) == :stream
+  end
+
+  test "a source with content despite bodiless framing is streamed once", %{origin: origin} do
+    owner = self()
+
+    result =
+      Upstream.stream(%{target: origin, headers: [], ttl: 5000},
+        method: "POST",
+        path: "/upload",
+        query: "",
+        body_state: :unread,
+        request_content: :none,
+        pull: fn
+          :unread -> {:more, "unframed", :tail}
+          :tail -> {:ok, "!", :read}
+        end,
+        headers: [],
+        consume: fn event ->
+          send(owner, event)
+          :ok
+        end,
+        renew: fn -> {:ok, %{ttl: 5000}} end,
+        transport_opts: [verify: :verify_peer, cacertfile: Path.join(@fixtures, "ca.pem")]
+      )
+
+    assert result.outcome == :completed
+    assert result.body_state == :read
+    assert_receive :origin_attempt
+    refute_receive :origin_attempt
+    assert_receive {:data, "9"}
+  end
+
+  test "a failing source with bodiless framing never reaches the origin", %{origin: origin} do
+    result =
+      Upstream.stream(%{target: origin, headers: [], ttl: 5000},
+        method: "DELETE",
+        path: "/bodiless",
+        query: "",
+        body_state: :unread,
+        request_content: :none,
+        pull: fn _ -> {:error, :truncated} end,
+        headers: [],
+        consume: fn _ -> :ok end,
+        renew: fn -> {:ok, %{ttl: 5000}} end,
+        transport_opts: [verify: :verify_peer, cacertfile: Path.join(@fixtures, "ca.pem")]
+      )
+
+    assert result.outcome == :source_error
+    assert result.body_state == :unread
+    refute_receive :origin_attempt, 200
+  end
+
+  @spec raw_origin(pid()) :: {String.t(), :ssl.sslsocket()}
+  defp raw_origin(owner) do
+    {:ok, listener} =
+      :ssl.listen(0,
+        certfile: String.to_charlist(Path.join(@fixtures, "localhost.pem")),
+        keyfile: String.to_charlist(Path.join(@fixtures, "localhost.key")),
+        ip: {127, 0, 0, 1},
+        mode: :binary,
+        active: false,
+        reuseaddr: true
+      )
+
+    {:ok, {_, port}} = :ssl.sockname(listener)
+
+    spawn_link(fn ->
+      with {:ok, transport} <- :ssl.transport_accept(listener, 2000),
+           {:ok, socket} <- :ssl.handshake(transport, 2000) do
+        {head, rest} = raw_head(socket, "")
+        reply = "HTTP/1.1 200 OK\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+        :ok = :ssl.send(socket, reply)
+        send(owner, {:raw_request, head, rest <> raw_drain(socket, "")})
+        :ssl.close(socket)
+      end
+    end)
+
+    {"https://localhost:#{port}", listener}
+  end
+
+  @spec raw_head(:ssl.sslsocket(), binary()) :: {binary(), binary()}
+  defp raw_head(socket, buffer) do
+    case :binary.split(buffer, "\r\n\r\n") do
+      [head, rest] ->
+        {head, rest}
+
+      [_] ->
+        {:ok, bytes} = :ssl.recv(socket, 0, 2000)
+        raw_head(socket, buffer <> bytes)
+    end
+  end
+
+  @spec raw_drain(:ssl.sslsocket(), binary()) :: binary()
+  defp raw_drain(socket, buffer) do
+    case :ssl.recv(socket, 0, 200) do
+      {:ok, bytes} -> raw_drain(socket, buffer <> bytes)
+      {:error, _} -> buffer
+    end
+  end
+
   test "injected headers override guest duplicates and strip transport headers" do
     guest = [
       {"authorization", "Bearer guest-attempt"},

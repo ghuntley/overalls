@@ -297,6 +297,8 @@ class Server(ThreadingHTTPServer):
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
+    # The current request's framed body, read at most once per request.
+    body: bytes | None = None
 
     def log_message(self, format: str, *args: object) -> None:
         pass
@@ -323,6 +325,11 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.flush()
 
     def read_body(self) -> bytes:
+        if self.body is None:
+            self.body = self.read_framed_body()
+        return self.body
+
+    def read_framed_body(self) -> bytes:
         if self.headers.get("Transfer-Encoding", "").lower() != "chunked":
             length = int(self.headers.get("Content-Length", "0"))
             if length < 0 or length > MAX_BODY:
@@ -463,6 +470,11 @@ class Handler(BaseHTTPRequestHandler):
                 "credential": credential,
             }
         )
+        # Drain the framed request body before any reply, as an HTTP/1.1 origin
+        # must: closing with unread bytes resets the connection and can discard
+        # the response before the client reads it.
+        self.body = None
+        self.read_body()
         if host in {
             "github-cloud.githubusercontent.com",
             "github-cloud.s3.amazonaws.com",

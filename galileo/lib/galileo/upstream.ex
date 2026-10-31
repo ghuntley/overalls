@@ -28,6 +28,8 @@ defmodule Galileo.Upstream do
                  | {:error, term()})}
           | {:lease_expires_at, integer()}
           | {:transport_opts, keyword()}
+          | {:request_content, request_content()}
+  @type request_content :: :none | :stream
   @type lease :: {pid(), reference()}
 
   @hop_by_hop ~w(connection keep-alive proxy-connection proxy-authenticate proxy-authorization te trailer transfer-encoding upgrade)
@@ -46,6 +48,8 @@ defmodule Galileo.Upstream do
   # an interval with no response bytes MUST NOT close a still-authorized attempt.
   # Owner-bound sources MUST supply a nonblocking frontend cancellation callback;
   # missing callbacks MUST fail before connecting or reading the source body.
+  # Requests whose guest framing declares no content (`request_content: :none`)
+  # and whose source is empty MUST be forwarded without chunked framing.
   @spec stream(map(), [option()]) :: result()
   def stream(authorization, options) do
     method = Keyword.fetch!(options, :method)
@@ -75,6 +79,11 @@ defmodule Galileo.Upstream do
 
     renew = options |> Keyword.fetch!(:renew) |> Overalls.Diagnostics.Context.wrap()
     transport_opts = Keyword.get(options, :transport_opts, [])
+    request_content = Keyword.get(options, :request_content, :stream)
+
+    unless request_content in [:none, :stream],
+      do: raise(ArgumentError, "request content must be :none or :stream")
+
     uri = authorization |> origin() |> URI.parse()
 
     initial = %{status: nil, response_bytes: 0, outcome: :transport_error, body_state: body_state}
@@ -114,7 +123,8 @@ defmodule Galileo.Upstream do
               pull,
               body_updated,
               guest,
-              consume
+              consume,
+              request_content
             )
 
           {:error, _reason} ->
@@ -149,6 +159,24 @@ defmodule Galileo.Upstream do
     injected ++ kept
   end
 
+  # @cc [owner:ghuntley,label:reliability] galileo-request-content-framing
+  # An HTTP/1.1 guest request declares content only through its own framing: a
+  # transfer-encoding or a nonzero content-length (RFC 9112 section 6.3).
+  # Requests without content MUST NOT gain chunked framing upstream; an origin
+  # that answers without draining an unexpected terminating chunk can otherwise
+  # reset the connection before Galileo reads the response. Undeclared framing
+  # is a hint, not authority: the one source pull still decides.
+  @spec request_content([{binary(), binary()}]) :: request_content()
+  def request_content(headers) do
+    framing =
+      for {name, value} <- headers,
+          downcased = String.downcase(name),
+          downcased in ["content-length", "transfer-encoding"],
+          do: {downcased, String.trim(value)}
+
+    if Enum.all?(framing, &(&1 == {"content-length", "0"})), do: :none, else: :stream
+  end
+
   @spec origin(map()) :: binary()
   def origin(%{peer: %{endpoint: endpoint}}), do: endpoint
   def origin(%{target: target}), do: target
@@ -164,7 +192,8 @@ defmodule Galileo.Upstream do
          pull,
          body_updated,
          guest,
-         consume
+         consume,
+         request_content
        ) do
     attach_lease(lease, upstream)
 
@@ -172,10 +201,18 @@ defmodule Galileo.Upstream do
       if lease_open?(lease) do
         request_headers = headers(authorization, guest) ++ [{"connection", "close"}]
 
-        with {:ok, upstream, ref} <-
-               Mint.HTTP.request(upstream, method, request_path, request_headers, :stream),
-             {:ok, upstream, body_state} <-
-               upload(upstream, ref, body_state, pull, body_updated, lease) do
+        with {:ok, upstream, ref, body_state} <-
+               send_request(
+                 request_content,
+                 upstream,
+                 method,
+                 request_path,
+                 request_headers,
+                 body_state,
+                 pull,
+                 body_updated,
+                 lease
+               ) do
           receive_response(%{initial | body_state: body_state}, upstream, ref, consume, lease)
         else
           {:error, _reason, _upstream} ->
@@ -195,6 +232,52 @@ defmodule Galileo.Upstream do
       end
     after
       close(upstream)
+    end
+  end
+
+  defp send_request(:stream, upstream, method, path, headers, body_state, pull, updated, lease) do
+    with {:ok, upstream, ref} <- Mint.HTTP.request(upstream, method, path, headers, :stream),
+         {:ok, upstream, body_state} <- upload(upstream, ref, body_state, pull, updated, lease),
+         do: {:ok, upstream, ref, body_state}
+  end
+
+  # A source whose guest framing declares no content is pulled once before the
+  # request is written, so a source failure still leaves no request upstream.
+  # An empty complete source is sent without chunked framing: methods that
+  # anticipate content carry an explicit zero length, others no framing at
+  # all. A source that yields bytes anyway (an HTTP/2 or test frontend need not
+  # send framing headers) is streamed exactly as `:stream` would, starting with
+  # the chunk already pulled.
+  defp send_request(:none, upstream, method, path, headers, body_state, pull, updated, lease) do
+    case interruptible_pull(body_state, pull, lease) do
+      {:ok, "", body_state} ->
+        :ok = updated.(body_state)
+        body = if method in ~w(POST PUT PATCH), do: "", else: nil
+
+        if lease_open?(lease) do
+          case Mint.HTTP.request(upstream, method, path, headers, body) do
+            {:ok, upstream, ref} -> {:ok, upstream, ref, body_state}
+            {:error, upstream, reason} -> upload_error(reason, upstream, body_state, lease)
+          end
+        else
+          {:lease_closed, upstream, body_state}
+        end
+
+      {kind, _bytes, _state} = pulled when kind in [:ok, :more] ->
+        if lease_open?(lease) do
+          with {:ok, upstream, ref} <- Mint.HTTP.request(upstream, method, path, headers, :stream),
+               {:ok, upstream, body_state} <-
+                 forward_pulled(pulled, upstream, ref, body_state, pull, updated, lease),
+               do: {:ok, upstream, ref, body_state}
+        else
+          {:lease_closed, upstream, body_state}
+        end
+
+      {:error, reason} ->
+        {:source_error, reason, upstream, body_state}
+
+      :lease_closed ->
+        {:lease_closed, upstream, body_state}
     end
   end
 
@@ -253,7 +336,13 @@ defmodule Galileo.Upstream do
   end
 
   defp pull_upload(upstream, ref, body_state, pull, body_updated, lease) do
-    case interruptible_pull(body_state, pull, lease) do
+    body_state
+    |> interruptible_pull(pull, lease)
+    |> forward_pulled(upstream, ref, body_state, pull, body_updated, lease)
+  end
+
+  defp forward_pulled(pulled, upstream, ref, body_state, pull, body_updated, lease) do
+    case pulled do
       {:more, bytes, body_state} ->
         :ok = body_updated.(body_state)
         send_upload(upstream, ref, bytes, body_state, pull, body_updated, lease)

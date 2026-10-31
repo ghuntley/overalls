@@ -83,8 +83,9 @@ owner, wrong epoch, unattached VM, customer profile), Cloak-at-rest and
 write-only secret surfaces, plus renewal without credential or peer-token
 reissuance. Galileo tests cover strip-prefix alignment, header
 override semantics, bounded multi-chunk uploads, single-attempt failure and TLS
-rejection before body consumption, and monotonic cancellation of a stalled
-upstream after renewal refusal. Audi tests cover bounded upload and download
+rejection before body consumption, monotonic cancellation of a stalled
+upstream after renewal refusal, and generated bodiless guest requests reaching
+a raw TLS origin with no chunked framing or body bytes. Audi tests cover bounded upload and download
 forwarding without retaining complete bodies. The `galileo-service` NixOS test exercises the real
 packaged Galileo release, SOPS credential loading, verified synthetic
 control/origin TLS, header injection, strip-prefix handling and malformed-binding

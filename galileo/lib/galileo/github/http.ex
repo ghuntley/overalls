@@ -146,6 +146,11 @@ defmodule Galileo.GitHub.HTTP do
           query: if(route.query == "", do: "", else: "?" <> route.query),
           body_state: conn,
           pull: if(remaining == @redirect_limit, do: &pull/1, else: &empty_pull/1),
+          request_content:
+            if(remaining == @redirect_limit,
+              do: Galileo.Upstream.request_content(conn.req_headers),
+              else: :none
+            ),
           pull_in_owner: true,
           cancel_frontend:
             Map.get_lazy(config, :cancel_frontend, fn -> Galileo.HTTP.frontend_cancel(conn) end),

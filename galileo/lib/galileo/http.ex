@@ -126,6 +126,7 @@ defmodule Galileo.HTTP do
               query: query,
               body_state: conn,
               pull: &pull/1,
+              request_content: Galileo.Upstream.request_content(conn.req_headers),
               pull_in_owner: true,
               cancel_frontend:
                 Map.get_lazy(config, :cancel_frontend, fn -> frontend_cancel(conn) end),
