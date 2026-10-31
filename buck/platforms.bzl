@@ -26,6 +26,10 @@ def _overalls_execution_platform_impl(ctx: AnalysisContext) -> list[Provider]:
             # local_only actions never leave the machine.
             use_limited_hybrid = True,
             allow_limited_hybrid_fallbacks = True,
+            # A remote action that fails (a worker missing something the
+            # local machine has) is retried locally rather than failing the
+            # build (ADR-0276).
+            allow_hybrid_fallbacks_on_failure = True,
             allow_cache_uploads = ctx.attrs.remote_cache and ctx.attrs.upload,
             use_windows_path_separators = ctx.attrs.use_windows_path_separators,
         ),
@@ -60,9 +64,13 @@ def overalls_execution_platform(name: str, **kwargs):
                         read_root_config("buck2_re_client", "action_cache_address", ""))
     cells = read_root_config("nix", "cells_id", "")
 
+    # The Namespace worker image recorded for these cells (ADR-0276), as a
+    # digest-pinned reference; tools/buck2 sets it only when it matches.
+    image = read_root_config("overalls", "re_image", "")
+
     # Only Linux x86_64 has workers, and only an explicit opt-in executes
-    # remotely: hosts write remote_execution = false and use a read-only
-    # listener without an execution service.
+    # remotely: tools/buck2 sets it with a worker image for these cells, and
+    # the host updater's configuration sets it false (ADR-0276).
     remote_execution = (
         remote_cache and cells != "" and
         host_info().os.is_linux and host_info().arch.is_x86_64 and
@@ -74,7 +82,10 @@ def overalls_execution_platform(name: str, **kwargs):
         os_configuration = host_configuration.os,
         remote_cache = remote_cache,
         remote_execution = remote_execution,
-        remote_properties = {"overalls-cells": cells} if cells else {},
+        remote_properties = dict(
+            ({"overalls-cells": cells} if cells else {}),
+            **({"container-image": "docker://" + image} if image else {})
+        ),
         # Buck2 uploads only when both the platform and the action allow it;
         # one native key turns on both.
         upload = read_root_config("buck2", "default_allow_cache_upload", "false") == "true",

@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Contract namespace-re-worker-image: see tools/CONTRACTS.
+#
+#   tools/namespace-re-image [--push | --check]
+#
+# Builds the Namespace remote-execution worker image for this checkout's
+# buckCells (ADR-0276): every store path in the cells closure except
+# derivation files (only local_only Nix imports read those), plus /bin/sh,
+# /usr/bin/env and /tmp. Layers are deterministic tarballs grouped by size.
+# With --push it pushes the image to the workspace's nscr.io registry as
+# overalls-buck-re-worker:<cells_id>, optimises it for remote execution and
+# records `<cells_id> <image>@<digest>` in tools/namespace-re-image.lock, which
+# tools/buck2 reads to enable remote execution for matching cells only.
+# Needs nsc logged in (`nsc login`, or a Namespace runner's identity).
+set -euo pipefail
+root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$root"
+push=false check=false
+case "${1:-}" in
+  --push) push=true ;;
+  --check) check=true ;;
+  "") ;;
+  *) echo "usage: tools/namespace-re-image [--push | --check]" >&2; exit 2 ;;
+esac
+
+cells=$(nix build --no-link --print-out-paths .#buckCells.x86_64-linux)
+cells_id=$(sed -n 's/^  cells_id = \([0-9a-f]\{64\}\)$/\1/p' "$cells/toolchains.buckconfig")
+[[ -n "$cells_id" ]] || { echo "tools/namespace-re-image: no cells_id in $cells" >&2; exit 1; }
+lock=tools/namespace-re-image.lock
+if [[ "$check" == true ]]; then
+  # Whether the committed lock names an image for these cells.
+  if awk -v id="$cells_id" '$1 == id { found = 1 } END { exit !found }' "$lock" 2>/dev/null; then
+    echo "tools/namespace-re-image: $lock matches cells $cells_id"
+    exit 0
+  fi
+  echo "tools/namespace-re-image: $lock has no image for cells $cells_id" >&2
+  exit 1
+fi
+config() { sed -n "s/^  $1 = //p" "$cells/toolchains.buckconfig"; }
+bash_bin=$(config bash)
+coreutils_bin=$(config coreutils)
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/namespace-re-image.XXXXXX")
+trap 'rm -rf "$work"' EXIT
+tar_flags=(--sort=name --mtime=@1 --owner=0 --group=0 --numeric-owner --format=gnu)
+
+# Groups of about 200 MiB, largest paths first, so the layers stay pullable
+# in parallel and a cells change reuses most of them.
+nix path-info --size $(nix-store -qR "$cells" | grep -v '\.drv$') \
+  | sort -k2,2nr \
+  | awk -v limit=$((200 * 1024 * 1024)) -v dir="$work" '
+      { if (size + $2 > limit && size > 0) { group++; size = 0 }
+        size += $2; print substr($1, 2) > (dir "/group-" sprintf("%04d", group)) }'
+layers=()
+for list in "$work"/group-*; do
+  sort -o "$list" "$list"
+  tar -C / "${tar_flags[@]}" -cf "$list.tar" -T "$list"
+  layers+=(-f "$list.tar")
+done
+mkdir -p "$work/base/bin" "$work/base/usr/bin" "$work/base/tmp"
+chmod 1777 "$work/base/tmp"
+# Genrules and scripts that call PATH tools (mkdir, sed, grep) find the
+# cells' own copies, as they find the host's locally.
+for dir in "$coreutils_bin" "$(config findutils)" "$(config gnugrep)" "$(config gnused)"; do
+  for tool in "$dir"/*; do ln -sfn "$tool" "$work/base/bin/${tool##*/}"; done
+done
+ln -sfn "$bash_bin" "$work/base/bin/sh"
+ln -sfn "$bash_bin" "$work/base/bin/bash"
+ln -s "$coreutils_bin/env" "$work/base/usr/bin/env"
+tar -C "$work/base" "${tar_flags[@]}" -cf "$work/base.tar" bin usr tmp
+layers+=(-f "$work/base.tar")
+echo "tools/namespace-re-image: cells $cells_id, $(( ${#layers[@]} / 2 )) layers"
+
+if [[ "$push" != true ]]; then
+  exit 0
+fi
+registry=$(nsc workspace describe -o json 2>/dev/null | sed -n 's/.*"registry_url": *"\([^"]*\)".*/\1/p')
+[[ -n "$registry" ]] || registry=$(nsc workspace describe | sed -n 's/^Registry URL: //p')
+[[ -n "$registry" ]] || { echo "tools/namespace-re-image: no nscr.io registry; run nsc login" >&2; exit 1; }
+image="$registry/overalls-buck-re-worker"
+nsc docker login >/dev/null
+crane=(nix shell --inputs-from . nixpkgs#crane -c crane)
+"${crane[@]}" append --platform linux/amd64 --oci-empty-base "${layers[@]}" -t "$image:$cells_id-layers" >/dev/null
+"${crane[@]}" mutate --env PATH=/bin:/usr/bin --workdir / -t "$image:$cells_id" "$image:$cells_id-layers" >/dev/null
+digest=$("${crane[@]}" digest "$image:$cells_id")
+nsc base-image optimize --image_ref "$image@$digest"
+printf '%s %s@%s\n' "$cells_id" "$image" "$digest" > "$lock"
+echo "tools/namespace-re-image: $image@$digest"

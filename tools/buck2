@@ -32,6 +32,22 @@ remote_config() {
   if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off && -n "${NAMESPACE_RBE_TOKEN:-}" ]]; then
     export NAMESPACE_RBE_TOKEN
     local wanted='<file:tools/namespace.buckconfig>'
+    # The worker image for these cells, when tools/namespace-re-image has
+    # recorded one: its digest joins every action's properties, so every
+    # client on these cells shares action keys. Remote execution itself is a
+    # developer opt-in (OVERALLS_BUCK2_REMOTE_EXECUTION=on): Namespace's
+    # worker pool cannot be bounded inside the workspace's shared CPU cap.
+    local cells_id image
+    cells_id=$(sed -n 's/^  cells_id = \([0-9a-f]\{64\}\)$/\1/p' .buck-cells/toolchains.buckconfig 2>/dev/null || true)
+    image=$(awk -v id="$cells_id" '$1 == id && id != "" { print $2 }' tools/namespace-re-image.lock 2>/dev/null || true)
+    if [[ -n "$image" ]]; then
+      wanted+=$'\n[overalls]\n  re_image = '"$image"
+      if [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-off}" == on ]]; then
+        wanted+=$'\n  remote_execution = true'
+      fi
+    elif [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-off}" == on ]]; then
+      echo "tools/buck2: no Namespace worker image for these cells; building locally with the cache. Regenerate it with tools/namespace-re-image --push and commit tools/namespace-re-image.lock." >&2
+    fi
     if [[ "$(cat "$remote_include" 2>/dev/null || true)" != "$wanted" ]]; then
       remote_restart
       printf '%s\n' "$wanted" > "$remote_include"
@@ -128,4 +144,25 @@ if [[ ! -e .buck-cells || "$(cat "$state" 2>/dev/null)" != "$key" ]]; then
   printf '%s\n' "$key" > "$state"
 fi
 remote_config on
-exec "$root/.buck-cells/bin/buck2" "$@"
+if ! grep -qx '  remote_execution = true' "$remote_include" 2>/dev/null; then
+  exec "$root/.buck-cells/bin/buck2" "$@"
+fi
+# Opt-in remote execution (ADR-0276): Namespace starts 16-vCPU workers on
+# demand inside the workspace's shared CPU cap and does not scale them to
+# zero, so after the command name every running worker and how to destroy it.
+# Another developer's build may still be using one, so nothing is destroyed
+# automatically.
+status=0
+"$root/.buck-cells/bin/buck2" "$@" || status=$?
+if command -v nsc >/dev/null; then
+  workers=$(nsc list -o json 2>/dev/null | python3 -I -c '
+import json, sys
+for item in json.load(sys.stdin):
+    if item.get("labels", {}).get("bazel.purpose") == "worker":
+        print(item["cluster_id"])
+' 2>/dev/null || true)
+  for worker in $workers; do
+    echo "tools/buck2: Namespace RE worker $worker is still running and counts against the shared CPU cap; once no build uses it: nsc destroy $worker --force" >&2
+  done
+fi
+exit "$status"

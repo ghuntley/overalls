@@ -130,23 +130,25 @@ rule is deleted (ADR-0269).
 
 @cc [owner:ghuntley,label:build;security] buck2-remote-cache-optional
 The execution platform MUST query the remote cache only when a
-[buck2_re_client] address is configured (the untracked .buckconfig.local, or
-root's ~/.buckconfig.d file on a host, present only with its identity), so
-absent credentials mean plain local execution. Uploads MUST additionally
-require [buck2] default_allow_cache_upload = true; the server, not this flag,
-enforces that only the CI identity can write (ADR-0272). Every action
-MUST carry the platform property overalls-cells=<[nix] cells_id> whenever
-the cells define one, cached or executed, so cache-only hosts and executing
-clients compute the same action digests.
+[buck2_re_client] address or action_cache_address is configured (the
+Namespace include tools/buck2 writes only with a token, or the untracked
+.buckconfig.local), so absent credentials mean plain local execution. Uploads
+MUST additionally require [buck2] default_allow_cache_upload = true. Every
+action MUST carry the platform property overalls-cells=<[nix] cells_id>
+whenever the cells define one, and container-image=<the digest-pinned worker
+image> whenever [overalls] re_image names one, cached or executed, so cache-only
+hosts and executing clients on the same cells share action keys (ADR-0276).
 
 @cc [owner:ghuntley,label:build;security] buck2-remote-execution-optional
 The execution platform MUST enable remote execution only on Linux x86_64,
-with a [buck2_re_client] address, a [nix] cells_id and an explicit
+with a remote cache configured, a [nix] cells_id and an explicit
 [overalls] remote_execution = true; hosts' updater configuration sets it
-false. Remote execution MUST be remote-first with local fallback on
-infrastructure failure (limited hybrid with fallbacks), so an unreachable
-scheduler or an action no worker can run builds locally; local_only actions
-and test commands MUST never run remotely (ADR-0272).
+false. Remote execution MUST be remote-first with local fallback both on
+infrastructure failure (limited hybrid with fallbacks) and on a failed remote
+action (allow_hybrid_fallbacks_on_failure), so a worker missing something the
+machine has never fails a build that succeeds locally, while an action that
+also fails locally still fails it; local_only actions and test commands MUST
+never run remotely (ADR-0276).
 
 @cc [owner:ghuntley,label:verification] precommit-info-selection
 A precommit check's PrecommitInfo MUST list every repository path its default

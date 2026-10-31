@@ -50,3 +50,15 @@ generated include, the Nix store or a log. tools/namespace-token-scan MUST
 fail, naming only files, when the token prefix appears in the include,
 buck-out's Buck2 logs, the daemon state under ~/.buck or a given file
 (ADR-0276).
+
+@cc [owner:ghuntley,label:build] namespace-re-worker-image
+tools/namespace-re-image MUST build the Namespace worker image from exactly
+the pinned buckCells closure without derivation files, plus /bin/sh,
+/usr/bin/env and /tmp, push it digest-pinned to the workspace's nscr.io
+registry, optimise it, and record `<cells_id> <image>@<digest>` in
+tools/namespace-re-image.lock. tools/buck2 MUST set `[overalls] re_image`
+only when the lock's cells_id equals the checkout's, so actions carry
+`container-image` only for a worker image that holds their toolchains, and
+MUST set `remote_execution = true` only then and only under
+OVERALLS_BUCK2_REMOTE_EXECUTION=on: Namespace cannot bound its worker pool
+inside the workspace CPU cap, so CI and hosts stay cache-only (ADR-0276).

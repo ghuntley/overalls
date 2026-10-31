@@ -66,11 +66,21 @@ chose on 2026-10-31. Observed facts:
      non-hermetic Mila platform builds run locally;
    - non-hermetic CI jobs receive no token;
    - host deployment builds keep `remote_execution = false`.
-6. **Remote execution.** Remote execution runs on Namespace Linux workers
-   whose image carries the `buckCells` closure. The image is digest-pinned in
-   `nscr.io`, and its digest is a `container-image` platform property beside
-   `overalls-cells`. It is enabled per client with
-   `[overalls] remote_execution = true`.
+6. **Remote execution is a developer opt-in.** Remote execution runs on
+   Namespace Linux workers whose image carries the `buckCells` closure. The
+   image is digest-pinned in `nscr.io`, recorded per `cells_id` in the
+   committed `tools/namespace-re-image.lock`, and its digest is a
+   `container-image` platform property beside `overalls-cells` on every
+   action whenever the lock matches, so all clients share action keys.
+   Remote execution itself runs only under
+   `OVERALLS_BUCK2_REMOTE_EXECUTION=on`. CI and hosts are cache-only.
+
+   Revised on 2026-10-31, the same day the decision was taken. The
+   workspace's 64-vCPU Linux cap is shared by CI runners and the Namespace
+   cache, and Namespace documents no maximum worker count, idle timeout or
+   scale-to-zero for remote-execution workers. One opt-in build started a
+   16x32 worker, which kept running until it was destroyed by hand. That
+   queued CI runners behind it, so the user chose to stay inside the cap.
 7. **Fail open.** A Namespace outage, or a revoked or expired token, never
    blocks an update. The host updater retries a failed build once with
    `OVERALLS_BUCK2_REMOTE=off`.
@@ -119,6 +129,10 @@ coordinator approved the updater uploading on the same day.
 - **Token delivery reaches only root and `wheel`.** Contract
   `namespace-buck2-token-delivery`, and the `enrollment-configuration`
   evaluation test (`namespace-buck2-token-evaluation`).
+- **Remote execution stays opt-in, and remote failures fall back to local.**
+  - Contracts `namespace-re-worker-image`, `buck2-remote-cache-optional` and
+    `buck2-remote-execution-optional`.
+  - `local_only` actions never run remotely; the measured builds confirm it.
 - **The updater never executes remotely, and a cache failure never fails an
   update.**
   - Contracts `updater-remote-cache-read-only` (revised) and
@@ -134,8 +148,9 @@ coordinator approved the updater uploading on the same day.
 
 ## Implementation evidence
 
-Implementation is partial. The cache is implemented; remote execution
-(decision 6) is not.
+Implementation is partial. The cache is implemented. Remote execution
+(decision 6) is implemented and measured for Rust, as a developer opt-in; the
+Elixir rules (M6) are not on trunk yet.
 
 - **Client.** [tools/buck2](../../../tools/buck2),
   [tools/namespace.buckconfig](../../../tools/namespace.buckconfig) and the
@@ -166,14 +181,58 @@ Implementation is partial. The cache is implemented; remote execution
   `NAMESPACE_RBE_TOKEN` from the secret. The NativeLink `buck-re` action and
   its script are removed.
 
+- **Remote execution, opt-in.**
+  - [tools/namespace-re-image](../../../tools/namespace-re-image) builds the
+    image from the `buckCells` closure.
+    - It leaves out the cells' 2,334 `.drv` files. These are read only by
+      `local_only` Nix imports, and they are also why `dockerTools` failed:
+      `exportReferencesGraph` pulled in their invalid bootstrap outputs.
+    - It adds `/bin/sh` and `/usr/bin/env`.
+    - It writes 40 deterministic layers of about 200 MiB, pushes them with
+      the flake-pinned crane, runs `nsc base-image optimize` and writes the
+      lock.
+  - [buck/platforms.bzl](../../../buck/platforms.bzl) adds
+    `container-image` and `allow_hybrid_fallbacks_on_failure`.
+  - Namespace accepted the extra `overalls-cells` property.
+  - After an opt-in build, `tools/buck2` names every running
+    `bazel.purpose=worker` instance with its `nsc destroy` command. It
+    destroys nothing itself, because another build may be using a worker.
+- **Measured on Panterloons, 2026-10-31.**
+
+  | Build | Wall time | Commands |
+  | --- | --- | --- |
+  | `root//nix:terminald`, cold local, no cache (coordinator's measurement) | 24 s | — |
+  | `root//nix:terminald`, warm cache, fresh `buck-out` | 9 s | — |
+  | `root//nix:terminald`, cold remote | 242 s | 58: cached 0, remote 49, local 9 |
+  | `root//nix:terminald`, cache-only rebuild after the remote run | 9.7 s | 58: cached 49, remote 0, local 9 |
+  | `salopettes:deployment[drv]` | 381 s | 457: cached 50, remote 342, local 65 |
+
+  - About 3 minutes of the cold remote run was the first image pull, waiting
+    in `re_queued`.
+  - The cache-only rebuild shows that remote results serve cache-only
+    clients.
+  - In the `salopettes` build, every `nix_store_import` (11),
+    `nix_assemble_drv` and `lyra_cross` action ran locally.
+  - On a 96-thread development host, remote execution is slower than a
+    local build plus the cache. That is the second reason cache-only is the
+    default.
+- **Fallback without masking.**
+  - A genrule that calls `mkdir` from `PATH` failed on the worker and
+    succeeded locally.
+  - A planted `E0308` in terminald's `main.rs` ran remotely, then locally,
+    and the build failed.
+
 Remaining gaps:
 - No recorded deployment receipt for the token bundle on the hosts yet.
 - No recorded CI run showing cache hits on a rerun yet.
-- Remote execution (decision 6) is not yet implemented. It still needs:
-  - the worker image built from `buckCells` and pushed to `nscr.io`;
-  - the `container-image` property;
-  - a check that Namespace accepts `overalls-cells`;
-  - a measured remote build.
+- No Elixir compile has been measured remotely; the Mix rules arrive with
+  M6.
+- The recorded image predates the `/bin` tool links in
+  `tools/namespace-re-image`, so genrules that use `PATH` tools fall back to
+  local until the image is rebuilt. A rebuild costs a temporary 8x16
+  maintenance instance for `nsc base-image optimize`.
+- The cells change often, and a stale lock means no remote execution until
+  someone republishes the image.
 - No machine test exercises the Namespace path. It needs network access to a
   vendor service, which machine tests do not have.
 

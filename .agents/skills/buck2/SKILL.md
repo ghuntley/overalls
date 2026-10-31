@@ -295,10 +295,26 @@ are retired; their module stays dormant.
   create-token`, `overalls-secrets encrypt fleet-namespace --replace`,
   `nsc token revoke`).
 - **What runs remotely** (`toolchains//:execution_platform`, from
-  `buck/platforms.bzl`): only with a cache configured, `[nix] cells_id` and
-  `[overalls] remote_execution = true`, Linux x86_64. `local_only` actions
-  and test commands never go remote. Every action carries
-  `overalls-cells=<cells_id>` in its digest.
+  `buck/platforms.bzl`): Linux x86_64, with a cache configured, `[nix]
+  cells_id` and `[overalls] remote_execution = true`. Remote execution is a
+  developer opt-in, `OVERALLS_BUCK2_REMOTE_EXECUTION=on`. CI and hosts are
+  cache-only, because Namespace cannot bound its 16-vCPU workers inside the
+  workspace's shared CPU cap, and on a 96-thread host local execution plus the
+  cache is faster anyway. `tools/buck2` sets `[overalls] re_image` whenever
+  `tools/namespace-re-image.lock` names a worker image for the checkout's
+  `cells_id`, so every action carries `overalls-cells=<cells_id>` and
+  `container-image=docker://<image>@<digest>` in its digest. After an opt-in
+  build it prints `nsc destroy <id> --force` for each running worker; destroy
+  idle ones. `local_only` actions and test commands never go remote. A
+  remote action that fails is retried locally
+  (`allow_hybrid_fallbacks_on_failure`), so a real failure costs two runs and
+  still fails.
+- **Worker image.** `tools/namespace-re-image --push` (needs `nsc login`)
+  builds the image from the buckCells closure without `.drv` files, plus
+  `/bin` links to coreutils, findutils, grep and sed, pushes it to
+  `nscr.io`, runs `nsc base-image optimize`, and rewrites the lock. Commit the
+  lock with any change to the cells; until then those cells have no image.
+  Optimising starts a temporary 8x16 Namespace maintenance instance.
 - **Checking.** The build summary prints `Cache hits: N%` and
   `Commands: N (cached: C, remote: R, local: L)`. Force local with
   `OVERALLS_BUCK2_REMOTE=off` or `buck2 build --local-only`.
