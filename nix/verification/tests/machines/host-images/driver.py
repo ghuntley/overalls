@@ -12,6 +12,9 @@ from collections.abc import Sequence
 # host store, injected credentials or a test-console service. Fresh copies MUST
 # generate different SSH identities; reboot and each surviving mirror member
 # MUST retain the first copy's identity. Writes MUST stay in disposable overlays.
+# The base perimeter admits SSH only from the recorded installer source
+# (ADR-0234); the fixture images record 10.0.2.2, QEMU user networking's view
+# of this driver, exactly as installation would (exported-image-installer-source).
 work = pathlib.Path(tempfile.mkdtemp(prefix="overalls-images-"))
 bases = [pathlib.Path(images) / f"{name}.qcow2" for name in ["system0", "system1"]]
 

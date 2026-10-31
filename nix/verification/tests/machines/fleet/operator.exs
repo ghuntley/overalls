@@ -1,3 +1,62 @@
+# @cc [owner:ghuntley,label:verification;security] fleet-operator-closed-refusals
+# Fixture preconditions MUST fail with a reviewed reason atom from this closed
+# set. A refusal carries no identifiers, counts, payloads or exception terms.
+defmodule FleetOperatorRefusal do
+  @moduledoc "Closed-set fixture refusal; carries only a reviewed reason atom."
+  @reasons [
+    :historical_disabled,
+    :invalid_identifier,
+    :owner_not_synthetic,
+    :manifest_invalid,
+    :image_mismatch,
+    :image_not_admitted,
+    :git_identity_present,
+    :guest_agents_mismatch,
+    :image_missing,
+    :pool_host_mismatch,
+    :host_unschedulable,
+    :host_not_execution_ready,
+    :image_not_inventoried,
+    :capacity_stale,
+    :insufficient_memory,
+    :insufficient_disk,
+    :insufficient_vcpu,
+    :insufficient_capacity
+  ]
+  @type reason ::
+          :historical_disabled
+          | :invalid_identifier
+          | :owner_not_synthetic
+          | :manifest_invalid
+          | :image_mismatch
+          | :image_not_admitted
+          | :git_identity_present
+          | :guest_agents_mismatch
+          | :image_missing
+          | :pool_host_mismatch
+          | :host_unschedulable
+          | :host_not_execution_ready
+          | :image_not_inventoried
+          | :capacity_stale
+          | :insufficient_memory
+          | :insufficient_disk
+          | :insufficient_vcpu
+          | :insufficient_capacity
+  @type t :: %__MODULE__{reason: reason()}
+  defexception [:reason]
+
+  @impl true
+  @spec message(t()) :: String.t()
+  def message(%__MODULE__{reason: reason}), do: Atom.to_string(reason)
+
+  @spec require!(boolean(), reason()) :: :ok
+  def require!(true, reason) when reason in @reasons, do: :ok
+  def require!(false, reason) when reason in @reasons, do: refuse!(reason)
+
+  @spec refuse!(reason()) :: no_return()
+  def refuse!(reason) when reason in @reasons, do: raise(__MODULE__, reason: reason)
+end
+
 Code.require_file("/etc/fleet-account-lifecycle.exs")
 Code.require_file("/etc/fleet-github-historical.exs")
 
@@ -1726,13 +1785,20 @@ try do
   result = FleetOperator.run(request)
   IO.puts("FLEET_OK " <> JSON.encode!(result))
 rescue
+  error in FleetOperatorRefusal ->
+    # The reason is a reviewed atom from a closed set; nothing else leaves.
+    IO.puts(:stderr, "Fleet operator refused (#{FleetOperatorRefusal.message(error)})")
+    System.halt(1)
+
   error ->
     # Exception class and source locations are public; terms, arguments and
     # exception messages may contain private fixture data and stay suppressed.
+    # Fixture modules reached by tail calls (no FleetOperator frame remains)
+    # still name their own locations.
     locations =
       for {module, function, _arity_or_args, location} <- __STACKTRACE__,
-          module == FleetOperator,
-          do: "#{function}:#{Keyword.get(location, :line, 0)}"
+          module in [FleetOperator, GitHubHistoricalFleet, FleetAccountLifecycle],
+          do: "#{inspect(module)}.#{function}:#{Keyword.get(location, :line, 0)}"
 
     IO.puts(
       :stderr,

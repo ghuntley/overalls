@@ -10,6 +10,7 @@ let
   selectedGitHubFamily = if githubFamily == null then "nixos" else githubFamily;
   foreignGitHub = githubIntegration && builtins.elem selectedGitHubFamily [ "arch" "almalinux" ];
   foreignGuest = foreignEditor || foreignGitHub;
+  windowsGitHub = githubIntegration && selectedGitHubFamily == "windows";
   selectedForeignFamily = if foreignGitHub then selectedGitHubFamily else selectedEditorFamily;
   # @cc [owner:ghuntley,label:verification] editor-native-packaged-runtime-probe
   # Native Node diagnostics MUST execute the selected editor package's own
@@ -154,7 +155,15 @@ let
   # Editor, suspension and coding-client fixtures MUST retain the real 1 GiB host overhead and 64 MiB VMM
   # allowance when admitting the default 2 GiB guest. Only their native guest
   # cgroup budget may grow; measured headroom still decides actual admission.
-  fixtureGuestMemoryMiB = if editor || codingClis || suspension || foreignGitHub then 4096 else 3072;
+  # foreign-github-fixture-memory: the frozen Windows image declares a 2 GiB
+  # minimum that its pinned manifest cannot lower, so its slice holds two
+  # 2112 MiB reservations beside the 1 GiB overhead (5248 MiB) with headroom.
+  fixtureGuestMemoryMiB = if windowsGitHub then 6144
+    else if editor || codingClis || suspension || foreignGitHub then 4096 else 3072;
+  # The Lilly host VM keeps at least 2 GiB beyond the guest slice for the
+  # kernel, 512 MiB ARC and host services, so measured MemAvailable rather than
+  # the slice is never the tighter bound for a second admitted guest.
+  lillyHostMemoryMiB = if windowsGitHub then 8192 else 6144;
   storage = import ./storage.nix { inherit pkgs hostFixture; imageSize = "${toString storageGiB}G"; };
   identity = builtins.fromJSON (builtins.readFile "${storage}/identity.json");
   # @cc [owner:ghuntley,label:verification] host-replacement-runtime-fresh-storage
@@ -333,11 +342,13 @@ let
       vscodeWebBroker = if editor then packages.vscodeWebBroker else null;
     };
   # @cc [owner:ghuntley,label:verification;capacity] foreign-github-fixture-memory
-  # The foreign GitHub journey MUST admit two of its guests on one host (the
+  # Every GitHub journey MUST admit two of its guests on one host (the
   # owner's relocation lands beside the member's guest) after the real 1 GiB
-  # host overhead and 64 MiB VMM allowance. Its headless fixture image therefore
-  # declares a 1 GiB minimum; only browser-editor images need 2 GiB.
-  guest = if githubIntegration && selectedGitHubFamily == "windows" then packages.windowsGuestPublished else if foreignGuest then foreignEditorBuilder ({
+  # host overhead and 64 MiB VMM allowance. Headless foreign fixture images
+  # therefore declare a 1 GiB minimum; only browser-editor images need 2 GiB.
+  # The frozen Windows image keeps its pinned 2 GiB minimum, so its guest slice
+  # and host VM grow instead; admission still reads measured headroom.
+  guest = if windowsGitHub then packages.windowsGuestPublished else if foreignGuest then foreignEditorBuilder ({
     privateServiceRoots = guestPrivateRoots;
     files = editorFixtureFiles;
   } // lib.optionalAttrs (foreignGitHub && !editor) { minimumMemoryBytes = GiB; }) else if ubuntu || (githubIntegration && selectedGitHubFamily == "ubuntu") then ubuntuGuestBuilder {
@@ -1134,7 +1145,7 @@ let
       after = [ "fleet-credentials.service" ];
       requires = [ "fleet-credentials.service" ];
     };
-    virtualisation.memorySize = 6144;
+    virtualisation.memorySize = lillyHostMemoryMiB;
     # Six vCPUs per fleet host. In machine-test run 41111309494, cloning-fleet
     # had 35 lilly.control_unavailable cycles: seven 2-vCPU VMs (the three
     # Marshall nodes among them) plus two 8-vCPU hosts, 30 vCPUs, shared one
@@ -1491,8 +1502,12 @@ assert builtins.isInt guestManifest.minimum_disk_bytes
 # foreign-github-fixture-memory: two guest reservations plus the host overhead
 # MUST fit the native guest budget, so image growth fails at evaluation rather
 # than as a browser timeout behind a normalized provision_failed.
-assert !githubIntegration || selectedGitHubFamily == "windows" || (builtins.isInt guestManifest.minimum_memory_bytes
-  && GiB + 2 * (guestManifest.minimum_memory_bytes + 64 * 1024 * 1024) <= fixtureGuestMemoryMiB * 1024 * 1024);
+# The Windows variant reads the minimum from its pinned passthru manifest (no
+# import-from-derivation); run 41208554953 refused its 2 GiB guest inside a
+# 3072 MiB slice as a bare MatchError in the historical allocation.
+assert !githubIntegration || (builtins.isInt guestManifest.minimum_memory_bytes
+  && GiB + 2 * (guestManifest.minimum_memory_bytes + 64 * 1024 * 1024) <= fixtureGuestMemoryMiB * 1024 * 1024
+  && fixtureGuestMemoryMiB + 2048 <= lillyHostMemoryMiB);
 # @cc [owner:ghuntley,label:verification] resize-fixture-image-minima
 # The selected real image's numeric disk/memory minima MUST fit the fixed
 # initial resize/team-resource request before its scenario may run.

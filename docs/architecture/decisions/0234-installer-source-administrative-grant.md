@@ -84,8 +84,14 @@ The operator authorized this grant while reprovisioning Dungarees (2026-10-20).
 - Tests: [`host-planning.py`](../../../nix/verification/tests/evaluation/host-planning.py),
   [`runtime-firewall-test.py`](../../../nix/verification/tests/evaluation/runtime-firewall-test.py)
   and [`enrollment-configuration.nix`](../../../nix/verification/tests/evaluation/enrollment-configuration.nix).
-- Remaining gap: no NixOS machine test boots a base system with the recorded
-  file; physical evidence is recorded with the Dungarees reinstall.
+- The `host-images` NixOS machine test boots the exported base images without
+  instrumentation; its fixture images
+  ([`configurations.nix`](../../../nix/verification/tests/fixtures/hosts/configurations.nix),
+  `exported-image-installer-source`) carry the file `install-base-source`
+  would write for QEMU user networking (10.0.2.2). Before this, every run since
+  2026-10-17 timed out on SSH because the base perimeter dropped the driver.
+- Remaining gap: no recorded passing `host-images` execution with the
+  recorded file yet; physical evidence is recorded with the Dungarees reinstall.
 
 ## Open questions
 

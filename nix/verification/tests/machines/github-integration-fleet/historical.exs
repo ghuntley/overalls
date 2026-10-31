@@ -30,28 +30,50 @@ defmodule GitHubHistoricalFleet do
         "image_id" => image_id,
         "key" => key
       }) do
-    "1" = System.fetch_env!("FLEET_GITHUB_HISTORICAL_WINDOWS")
-    true = Enum.all?([owner, host_id, pool_id, key], &OverallsProtocol.uuid?/1)
+    require!(System.fetch_env!("FLEET_GITHUB_HISTORICAL_WINDOWS") == "1", :historical_disabled)
+
+    require!(
+      Enum.all?([owner, host_id, pool_id, key, image_id], &is_binary/1) and
+        Enum.all?([owner, host_id, pool_id, key], &OverallsProtocol.uuid?/1),
+      :invalid_identifier
+    )
+
     actor = Ash.get!(Marshall.Accounts.User, owner, authorize?: false)
-    true = String.ends_with?(to_string(actor.email), "@example.test")
-    false = actor.administrator
 
-    {:ok, frozen} =
-      System.fetch_env!("FLEET_GUEST")
-      |> Path.join("manifest.json")
-      |> File.read!()
-      |> JSON.decode!()
-      |> OverallsProtocol.ImageManifest.validate()
+    require!(
+      String.ends_with?(to_string(actor.email), "@example.test") and
+        actor.administrator == false,
+      :owner_not_synthetic
+    )
 
-    ^image_id = frozen.id
-    true = OverallsProtocol.NativeAdmission.admitted?(frozen)
-    false = Map.has_key?(frozen, :git_identity_version)
-    true = OverallsProtocol.ImageManifest.guest_agents(frozen) == :windows_v1
+    frozen =
+      case System.fetch_env!("FLEET_GUEST")
+           |> Path.join("manifest.json")
+           |> File.read!()
+           |> JSON.decode!()
+           |> OverallsProtocol.ImageManifest.validate() do
+        {:ok, frozen} -> frozen
+        _ -> refuse!(:manifest_invalid)
+      end
+
+    require!(frozen.id == image_id, :image_mismatch)
+    require!(OverallsProtocol.NativeAdmission.admitted?(frozen), :image_not_admitted)
+    require!(not Map.has_key?(frozen, :git_identity_version), :git_identity_present)
+
+    require!(
+      OverallsProtocol.ImageManifest.guest_agents(frozen) == :windows_v1,
+      :guest_agents_mismatch
+    )
 
     {:ok, result} =
       Ledger.transaction(fn ->
-        [image] = Ledger.read!(Image, id: image_id)
-        true = image.manifest["guest_agents"] == "windows-v1"
+        image =
+          case Ledger.read!(Image, id: image_id) do
+            [image] -> image
+            _ -> refuse!(:image_missing)
+          end
+
+        require!(image.manifest["guest_agents"] == "windows-v1", :guest_agents_mismatch)
 
         shape = %{
           architecture: :x86_64,
@@ -65,18 +87,27 @@ defmodule GitHubHistoricalFleet do
         slot = AddressAllocation.next_slot!(:oss)
         host = Ledger.lock!(Host, host_id)
         pool = Ledger.lock!(StoragePool, pool_id)
-        ^host_id = pool.host_id
-        true = host.enabled and host.maintenance_mode == :normal
-        true = host.inventory["execution_ready"] == true
-        true = image_id in host.inventory["images"]
-        true = HostLiveness.capacity_fresh?(host.reported_at, Ledger.now())
-        true = HostLiveness.capacity_fresh?(pool.reported_at, Ledger.now())
+        require!(pool.host_id == host_id, :pool_host_mismatch)
+        require!(host.enabled and host.maintenance_mode == :normal, :host_unschedulable)
+        require!(host.inventory["execution_ready"] == true, :host_not_execution_ready)
+        require!(image_id in List.wrap(host.inventory["images"]), :image_not_inventoried)
 
-        true =
-          Budget.fits?(
-            Budget.available(host, pool, Ledger.read!(Reservation, host_id: host_id)),
-            needed
-          )
+        require!(
+          HostLiveness.capacity_fresh?(host.reported_at, Ledger.now()) and
+            HostLiveness.capacity_fresh?(pool.reported_at, Ledger.now()),
+          :capacity_stale
+        )
+
+        available = Budget.available(host, pool, Ledger.read!(Reservation, host_id: host_id))
+        # Name the refused dimension only; byte and core counts stay private.
+        case Enum.find([:memory_bytes, :disk_bytes, :vcpu], fn dimension ->
+               Map.fetch!(needed, dimension) > Map.fetch!(available, dimension)
+             end) do
+          :memory_bytes -> refuse!(:insufficient_memory)
+          :disk_bytes -> refuse!(:insufficient_disk)
+          :vcpu -> refuse!(:insufficient_vcpu)
+          nil -> require!(Budget.fits?(available, needed), :insufficient_capacity)
+        end
 
         placement_id = Ash.UUID.generate()
 
@@ -130,4 +161,10 @@ defmodule GitHubHistoricalFleet do
 
     result
   end
+
+  @spec require!(boolean(), FleetOperatorRefusal.reason()) :: :ok
+  defp require!(condition, reason), do: FleetOperatorRefusal.require!(condition, reason)
+
+  @spec refuse!(FleetOperatorRefusal.reason()) :: no_return()
+  defp refuse!(reason), do: FleetOperatorRefusal.refuse!(reason)
 end
