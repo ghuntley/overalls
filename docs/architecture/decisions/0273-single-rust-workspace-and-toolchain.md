@@ -224,6 +224,26 @@ partial, in milestone M5.
   run by [`tools/precommit`](../../../tools/precommit), fails when a
   `RUST_ARTIFACTS` entry has no `rust_leaf_parity_test` over its import target.
   Remaining: Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
+- **Correction (2026-10-31): Lyra's cargo.** "Lyra … rebuilt under it" was
+  true of rustc only. Lyra's client, Windows and native builds and its tests
+  check took `cargo` (and, for the check, clippy and rustfmt) from nixpkgs,
+  1.99.0 on 2026-10-30, with `RUSTC` set to the toolchain's 1.97.1. Lyra has
+  paired nixpkgs cargo with its own rustc since the source drop (46da28263,
+  2026-10-17), and that became a breach of this decision when the single
+  toolchain landed (f0263cb74, 2026-10-30). All four derivations now take
+  `cargo`, clippy and rustfmt from the toolchain
+  ([`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix),
+  [`lyra-native.nix`](../../../nix/domains/artifacts/infrastructure/lyra-native.nix)).
+  The rebuilt outputs match the previous ones byte for byte: the Linux amd64
+  and arm64 clients, the four musl helpers, the Windows client, the seven
+  Windows agents and their manifest, and the 21 native and 3 probe files.
+  The two macOS clients differ only in `LC_UUID` (and, on arm64, the ad-hoc
+  signature hashes over it). A `nix build --rebuild` of the unchanged
+  derivation differs in the same 16 bytes, so the macOS clients were never
+  reproducible; that is an open finding, not an effect of cargo. The same
+  nixpkgs cargo still builds terminald's native and Windows builds and the
+  editor broker's Windows build, and Marshall's Cedar NIF uses nixpkgs
+  cargo and rustc. Those remain open breaches.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.

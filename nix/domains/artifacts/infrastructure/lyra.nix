@@ -31,7 +31,9 @@ let
     src = source;
     # git: tests/workspace_object_format.rs drives the production clone plan
     # against a real repository.
-    nativeBuildInputs = with pkgs; [ cargo rustc clippy rustfmt openssh openssl perl util-linux git ];
+    # cargo, rustc, clippy and rustfmt all come from the one toolchain
+    # (ADR-0273), never from nixpkgs.
+    nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ openssh openssl perl util-linux git ]);
     dontConfigure = true;
     buildPhase = ''
       cd lyra
@@ -116,7 +118,7 @@ let
     src = source;
     strictDeps = true;
     dontStrip = true;
-    nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig jq coreutils gnutar xz perl ];
+    nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig jq coreutils gnutar xz perl ]);
     dontConfigure = true;
     doCheck = false;
     buildPhase = ''
@@ -176,7 +178,7 @@ pkgs.stdenv.mkDerivation {
   src = source;
   strictDeps = true;
   dontStrip = true;
-  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig jq coreutils gnutar xz perl ];
+  nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig jq coreutils gnutar xz perl ]);
   dontConfigure = true;
   doCheck = false;
   buildPhase = ''

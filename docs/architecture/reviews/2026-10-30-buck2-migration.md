@@ -863,6 +863,36 @@ path. The Buck2 leaves name crates by their relative cell path
 embedded-path scan refuses an import that would carry one. The prelude's own
 `--remap-path-prefix` wins over a toolchain flag, so no extra remap is set.
 
+**Lyra's cargo (2026-10-31).** Lyra's four Nix derivations ran nixpkgs cargo
+1.99.0 against the toolchain's rustc 1.97.1, which breaches ADR-0273 (see its
+dated correction). They now take cargo, clippy and rustfmt from the toolchain.
+Rebuilt outputs are byte-identical to the previous ones, except the two macOS
+clients' `LC_UUID`.
+
+**Findings (open):**
+
+- *macOS clients are not reproducible.* `nix build --rebuild` of the same
+  Lyra derivation changes 16 bytes of `LC_UUID` in `darwin-amd64` and
+  `darwin-arm64` (plus the ad-hoc signature hashes over it on arm64); the
+  zig Mach-O link takes something per-run into the UUID. The Linux, Windows,
+  FreeBSD and illumos outputs rebuild identically.
+- *Vendored OpenSSL embeds build paths.* Every Lyra binary that links
+  `openssl-sys` with `vendored` carries three absolute paths from the build
+  sandbox: `ENGINESDIR` and `MODULESDIR` under Cargo's `OUT_DIR`
+  (`/build/target/<triple>/hardened/build/openssl-sys-<hash>/out/openssl-build/install/lib/{engines-3,ossl-modules}`)
+  and the `compiler:` string naming cargo-zigbuild's `zigcc` wrapper under
+  `/build/cargo-zigbuild-cache`. openssl-src passes `--prefix=$OUT_DIR/...`
+  and OpenSSL compiles the directories in as defines, so
+  `-ffile-prefix-map` cannot reach them (and would itself appear in the
+  `compiler:` string). They are not store paths, so closures are unaffected,
+  but the outputs depend on the builder's directory layout, and the two
+  directories are the shipped client's default provider and engine search
+  paths: a writable `/build` on a user's machine is a place a provider could be
+  loaded from if a configuration asked for one. Fixing it needs a patched
+  openssl-src (an install prefix independent of `OUT_DIR`); until then a
+  Buck2 build of Lyra matches Nix only when it runs under the same `/build`
+  layout.
+
 ## M9: Mila platforms
 
 This milestone implements the Mila part of ADR-0269. It makes no new
