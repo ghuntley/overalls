@@ -187,13 +187,18 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
         It MUST retain one request ID and retry only explicit pre-admission
         capacity or unavailable-host refusal within a bounded deadline;
         unexpected failures expose bounded state diagnostics and still fail.
+        Share mutations also retain one request ID and retry only a transient
+        Porsche-to-Marshall transport or availability failure within the same
+        deadline, so a replay is deduplicated by that ID.
         """
         # Capture rejected exec output inside the VM: an unknown key can receive
         # a private browser approval URL, which must never enter driver output.
         # Native restarts recheck measured headroom. Retry only a pre-admission
         # capacity/host refusal, with one retained public request ID and a deadline.
         restarting = command.startswith("start ")
-        if restarting and "--request-id" not in command:
+        # A share mutation replayed with its retained request ID is idempotent.
+        replayable = accepted and command.startswith(("share add ", "share remove "))
+        if (restarting or replayable) and "--request-id" not in command:
             command += " --request-id " + str(uuid.uuid4())
         if restarting:
             eventually(fresh_hosts)
@@ -220,7 +225,9 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
                 "'temporarily_unavailable','http_error','transport_error','invalid_response',"
                 "'message_too_large') else 'redacted'; "
                 "assert (r.returncode == 0 and v.get('status')=='succeeded') or "
-                "e in ('insufficient_capacity','host_unavailable') or capacity_clone, "
+                "e in ('insufficient_capacity','host_unavailable') or capacity_clone "
+                "or (" + repr(replayable) + " and e in ('transport_error','unavailable',"
+                "'temporarily_unavailable')), "
                 "'SSH command failed: '+reason; "
                 "print(json.dumps(v))"
                 if accepted
@@ -253,6 +260,17 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
             value = json.loads(output) if accepted else None
             if value and value.get("error") in ("insufficient_capacity", "host_unavailable"):
                 assert restarting, "Unexpected admission refusal"
+                return False
+            if (
+                value
+                and replayable
+                and value.get("error")
+                in (
+                    "transport_error",
+                    "unavailable",
+                    "temporarily_unavailable",
+                )
+            ):
                 return False
             assert not accepted or (
                 value is not None
