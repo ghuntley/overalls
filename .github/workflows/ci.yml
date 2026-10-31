@@ -124,6 +124,7 @@ jobs:
         env:
           MACHINE_ALL: ${{ inputs.machine_all }}
           MACHINE_LIMIT: "40"
+          PACKAGE_SHARD: "45"
         run: |
           set -euo pipefail
           # Known Inception failures (AGENTS.md) run only in the daily backstop.
@@ -142,22 +143,42 @@ jobs:
             deferred=true
             machine='[]'
           fi
-          # Every selected machine test, deferred or not, evaluates per push:
-          # `<suite>.assembly[drv]` runs the declared-only, restricted
-          # evaluation without booting a VM, so a missing input or module
-          # argument fails here rather than in the daily run. Affected
-          # flake package and check assemblies (label flake_output, BUCK.v2)
-          # evaluate the same way (`<target>[drv]`): an evaluation-time
+          # Every selected machine test and flake package is evaluated per
+          # push, exactly once: `[drv]` runs the declared-only, restricted
+          # evaluation without building, so a missing input or module argument
+          # fails here rather than in the daily run (an evaluation-time
           # assertion broke every check in publish-cache after a Lyra build
-          # change (cache run 41155406148).
-          evaluate=$(jq -c '[.machine_tests[].target | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]
-            + [.builds[] | select(.labels | index("flake_output")) | "\(.target)[drv]"]' affected.json)
-          # One runner evaluating all ~200 suites hit the 60-minute timeout
-          # (run 41102561512), so evaluations shard 20 per runner.
-          evaluate_shards=$(jq -c '[range(0; length; 20) as $i | {index: ($i / 20 + 1), targets: .[$i:$i + 20]}]' <<<"$evaluate")
+          # change, cache run 41155406148). A successful build implies the
+          # evaluation, so nothing that this run or publish-cache.yml builds
+          # anyway is evaluated twice:
+          # - machine tests in this run's matrix build their own assembly;
+          #   only deferred ones (and known Inception failures) evaluate here;
+          # - flake_output checks are built by publish-cache.yml, which runs
+          #   on every trunk push and pull request and selects every
+          #   flake_output check (no affected subset); its --keep-going build
+          #   now carries the guarantee that an evaluation-time assertion
+          #   (the Lyra break, cache run 41155406148) fails the push. Only
+          #   the flake_output packages evaluate here.
+          running=$(jq -c '[.[].target]' <<<"$machine")
+          machine_evaluate=$(jq -c --argjson running "$running" '[.machine_tests[].target
+            | select(. as $t | $running | index($t) | not)
+            | sub(":(?<n>[^:]+)$"; ":\(.n).assembly[drv]")]' affected.json)
+          package_evaluate=$(jq -c '[.builds[] | select((.labels | index("flake_output")) and (.labels | index("check") | not))
+            | "\(.target)[drv]"]' affected.json)
+          evaluate=$(jq -c -n --argjson m "$machine_evaluate" --argjson p "$package_evaluate" '$m + $p')
+          # Machine assemblies realise guest images at evaluation time: 20 per
+          # runner (one runner for ~200 hit the 60-minute timeout, run
+          # 41102561512, and 20-target shards took up to 32 minutes in run
+          # 41228962477). Package assemblies evaluate in seconds, so a shard
+          # takes PACKAGE_SHARD of them and pays the runner setup once.
+          evaluate_shards=$(jq -c -n --argjson m "$machine_evaluate" --argjson p "$package_evaluate" \
+            --argjson ms 20 --argjson ps "$PACKAGE_SHARD" '
+            ([range(0; $m | length; $ms) as $i | $m[$i:$i + $ms]]
+             + [range(0; $p | length; $ps) as $i | $p[$i:$i + $ps]])
+            | to_entries | map({index: (.key + 1), targets: .value})')
           tests=$(jq -c '[.tests[].target]' affected.json)
-          # flake_output assemblies are evaluated above; publish-cache.yml
-          # builds the checks. expected_failure targets are soundness probes
+          # flake_output assemblies are evaluated above or built by
+          # publish-cache.yml. expected_failure targets are soundness probes
           # that must not build.
           all_builds=$(jq -c '[.builds[] | select((.labels | index("flake_output")) or (.labels | index("expected_failure")) | not) | .target]' affected.json)
           # Whole host systems (deployment, base, install) and the kexec image

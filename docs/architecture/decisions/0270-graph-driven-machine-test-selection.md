@@ -213,9 +213,16 @@ Remaining gaps:
   that the generator reads. Removing it means each suite's `BUCK` `params`
   instantiating its suite in lib.assemble, which belongs with the per-module
   targets of M11.
-- `ci.yml` evaluates each affected `flake_output` assembly (`[drv]`, the
-  flake package and check targets in [BUCK.v2](../../../BUCK.v2)) but its
-  build job skips them, because `publish-cache.yml` builds the checks.
+- Each push evaluates or builds every selected assembly exactly once. A
+  successful build implies its evaluation. `ci.yml` therefore runs `[drv]`
+  only for the machine tests outside its matrix (deferred, or known
+  Inception failures) and for the `flake_output` packages. Machine tests in
+  the matrix build their own assembly, and `publish-cache.yml` builds every
+  `flake_output` check. Machine assemblies shard 20 per runner, because they
+  realise guest images while evaluating (up to 32 minutes per shard in run
+  41228962477). Package assemblies shard 45 per runner. For an
+  everything-selected push this is 13 evaluate shards instead of 20; for a
+  ten-suite push, 2 instead of 10.
 - The known-broken Inception machine tests (`inception`, `inception-checkout`,
   `inception-ssh-host-ca`) are labelled `known_inception_failure`: `ci.yml`
   skips them, and the daily run reports them without failing. `zfs-guest` and
