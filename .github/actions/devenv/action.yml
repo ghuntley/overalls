@@ -114,7 +114,10 @@ runs:
         # need it: virtiofsd holds a descriptor per inode when it cannot
         # open file handles, and copying a system closure exceeds the
         # container's default limit (the build VM panics with ENFILE).
-        sudo sh -c 'ulimit -n 1048576 && nohup /nix/var/nix/profiles/default/bin/nix-daemon > /tmp/nix-daemon.log 2>&1 &'
+        # Detach with setsid, not a background job: sh starts `cmd &` with
+        # SIGINT and SIGQUIT ignored (POSIX), every builder inherited that,
+        # and bmake's interrupt self-tests then failed the FreeBSD kernel.
+        sudo sh -c 'ulimit -n 1048576 && exec setsid -f /nix/var/nix/profiles/default/bin/nix-daemon > /tmp/nix-daemon.log 2>&1 < /dev/null'
         for _ in $(seq 1 30); do
           [ -S /nix/var/nix/daemon-socket/socket ] && break
           sleep 1

@@ -119,8 +119,37 @@ pkgs.runCommand "overalls-freebsd-kernel-${if faultInjection then "fault" else "
     --replace-fail '/bin:/usr/bin:/sbin:/usr/sbin' '${lib.makeBinPath [ pkgs.coreutils pkgs.gnugrep ]}'
   substituteInPlace contrib/bmake/unit-tests/opt-keep-going-indirect.mk \
     --replace-fail 'env -i ' 'env -i PATH=${pkgs.coreutils}/bin '
+  # glibc 2.43+ defines C23 qualifier-preserving macros for these search
+  # functions under _GNU_SOURCE. FreeBSD 14.3 declares them as plain functions,
+  # and its host tools assign their results to char *. The cross-build headers
+  # emulate FreeBSD's headers on Linux, so remove the macros there (ISO C
+  # 7.1.4) rather than relaxing -Werror.
+  cat >> tools/build/cross-build/include/linux/string.h <<'HEADER'
+
+  #undef memchr
+  #undef strchr
+  #undef strpbrk
+  #undef strrchr
+  #undef strstr
+  HEADER
+  cat >> tools/build/cross-build/include/linux/stdlib.h <<'HEADER'
+
+  #undef bsearch
+  HEADER
+  # specspec.c alone among mtree's sources relied on glibc < 2.44 including
+  # <sys/stat.h> transitively. Include it before mtree.h like its siblings, so
+  # the cross-build st_mtimespec mapping renames the field and its uses alike.
+  substituteInPlace contrib/mtree/specspec.c \
+    --replace-fail '#include <err.h>' $'#include <sys/stat.h>\n\n#include <err.h>'
+  # bmake's bootstrap self-tests (cmd-interrupt, deptgt-interrupt) send SIGINT
+  # to bmake and expect its handler to run. A make that starts with SIGINT
+  # ignored keeps it ignored, and a builder inherits the daemon's ignored
+  # signals across exec: a daemon started as a non-interactive shell's
+  # background job ignores SIGINT and SIGQUIT (POSIX). Restore the default
+  # dispositions so the build does not depend on how the daemon was started.
   for stage in kernel-toolchain buildkernel; do
-    ${pkgs.python3}/bin/python3 tools/build/make.py -j16 \
+    ${pkgs.coreutils}/bin/env --default-signal=INT,QUIT \
+      ${pkgs.python3}/bin/python3 tools/build/make.py -j16 \
       TARGET=amd64 TARGET_ARCH=amd64 __MAKE_CONF=/dev/null SRCCONF=/dev/null \
       HOST_INCLUDE_ROOT=${pkgs.stdenv.cc.libc.dev}/include \
       WITHOUT_TOOLCHAIN=yes WITHOUT_CLANG=yes WITHOUT_LLD=yes WITHOUT_LLDB=yes \

@@ -20,6 +20,11 @@ Clang 19.1.7 (matching FreeBSD 14.3), LLD and host tools, executes the complete
 bmake bootstrap test suite, preserves the kernel's warnings-as-errors gate and
 fixes the version timestamp. Its host adaptations replace FHS paths and BSD
 `date` syntax with the pinned Nix tools; they do not suppress compiler warnings.
+For glibc 2.44 hosts, the cross-build headers drop glibc's C23
+qualifier-preserving search macros, matching FreeBSD 14.3's plain prototypes,
+and mtree's `specspec.c` includes `<sys/stat.h>` directly. The build restores
+default SIGINT/SIGQUIT dispositions before bootstrapping, so bmake's interrupt
+tests do not depend on signals the Nix daemon left ignored.
 
 The output contains `kernel`, ELF/symbol evidence, a six-field kernel provenance
 JSON and a build receipt under `share/overalls/native-kernel`. The aggregate patch
