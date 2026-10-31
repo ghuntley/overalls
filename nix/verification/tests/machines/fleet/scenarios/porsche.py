@@ -627,6 +627,9 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
                     else "redacted"
                 )
                 raise AssertionError("Published clone admission failed: " + label)
+            # A completed clone can no longer reach the armed restart failure:
+            # the fault never interposed on the source's relaunch.
+            assert phase != "complete", "Published clone completed without the armed restart fault"
             return (
                 sql(
                     "SELECT count(*) FROM compute_clone_requests WHERE "

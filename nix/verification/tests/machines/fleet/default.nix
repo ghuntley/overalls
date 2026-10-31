@@ -154,7 +154,7 @@ let
   # Editor, suspension and coding-client fixtures MUST retain the real 1 GiB host overhead and 64 MiB VMM
   # allowance when admitting the default 2 GiB guest. Only their native guest
   # cgroup budget may grow; measured headroom still decides actual admission.
-  fixtureGuestMemoryMiB = if editor || codingClis || suspension then 4096 else 3072;
+  fixtureGuestMemoryMiB = if editor || codingClis || suspension || foreignGitHub then 4096 else 3072;
   storage = import ./storage.nix { inherit pkgs hostFixture; imageSize = "${toString storageGiB}G"; };
   identity = builtins.fromJSON (builtins.readFile "${storage}/identity.json");
   # @cc [owner:ghuntley,label:verification] host-replacement-runtime-fresh-storage
@@ -332,10 +332,15 @@ let
       vscodeWeb = if editor then packages.vscodeWeb else null;
       vscodeWebBroker = if editor then packages.vscodeWebBroker else null;
     };
-  guest = if githubIntegration && selectedGitHubFamily == "windows" then packages.windowsGuestPublished else if foreignGuest then foreignEditorBuilder {
+  # @cc [owner:ghuntley,label:verification;capacity] foreign-github-fixture-memory
+  # The foreign GitHub journey MUST admit two of its guests on one host (the
+  # owner's relocation lands beside the member's guest) after the real 1 GiB
+  # host overhead and 64 MiB VMM allowance. Its headless fixture image therefore
+  # declares a 1 GiB minimum; only browser-editor images need 2 GiB.
+  guest = if githubIntegration && selectedGitHubFamily == "windows" then packages.windowsGuestPublished else if foreignGuest then foreignEditorBuilder ({
     privateServiceRoots = guestPrivateRoots;
     files = editorFixtureFiles;
-  } else if ubuntu || (githubIntegration && selectedGitHubFamily == "ubuntu") then ubuntuGuestBuilder {
+  } // lib.optionalAttrs (foreignGitHub && !editor) { minimumMemoryBytes = GiB; }) else if ubuntu || (githubIntegration && selectedGitHubFamily == "ubuntu") then ubuntuGuestBuilder {
     privateServiceRoots = guestPrivateRoots;
     files = editorFixtureFiles;
   }
@@ -1036,16 +1041,10 @@ let
       (pkgs.writeShellScriptBin "zfs" ''
         exec ${pkgs.python3}/bin/python3 ${cloneObservationRecorder}/zfs_observation_recorder.py ${config.boot.zfs.package}/bin/zfs "$@"
       '')
-    ]);
-    systemd.services.lilly.path = lib.mkBefore (lib.optionals runtimeReadiness [
-      # @cc [owner:ghuntley,label:verification;recovery] native-submission-barrier-scope
-      # Only the isolated readiness fixture may pause one explicitly armed unit
-      # around real submission. Ordinary calls retain the pinned executable and
-      # arguments; no launch, journal or authenticated outcome may be fabricated.
-      (pkgs.writeShellScriptBin "systemd-run" ''
-        exec ${pkgs.python3}/bin/python3 ${./submission-barrier.py} ${pkgs.systemd}/bin/systemd-run "$@"
-      '')
     ] ++ lib.optionals cloning [
+      # clone-restoration-fault-is-fixture-only: lilly-hostd, not the BEAM,
+      # submits VM units (vm_launch.rs) and resolves systemd-run from its own
+      # PATH at startup, so the armed refusal MUST interpose there.
       (pkgs.writeShellScriptBin "systemd-run" ''
         if [ -f /run/clone-restart-fault ]; then
           target="$(${pkgs.coreutils}/bin/cat /run/clone-restart-fault)"
@@ -1057,6 +1056,15 @@ let
           done
         fi
         exec ${pkgs.systemd}/bin/systemd-run "$@"
+      '')
+    ]);
+    systemd.services.lilly.path = lib.mkBefore (lib.optionals runtimeReadiness [
+      # @cc [owner:ghuntley,label:verification;recovery] native-submission-barrier-scope
+      # Only the isolated readiness fixture may pause one explicitly armed unit
+      # around real submission. Ordinary calls retain the pinned executable and
+      # arguments; no launch, journal or authenticated outcome may be fabricated.
+      (pkgs.writeShellScriptBin "systemd-run" ''
+        exec ${pkgs.python3}/bin/python3 ${./submission-barrier.py} ${pkgs.systemd}/bin/systemd-run "$@"
       '')
     ]);
     systemd.services.lilly-transfer-sshd = lib.mkIf (relocation || porsche || cloneDestinationLoss || cloneMarshallRestart || githubIntegration) {
@@ -1479,6 +1487,11 @@ assert builtins.isInt guestManifest.minimum_disk_bytes
   && (let free = storageGiB * GiB - raceUsed;
       in suspension || cloning || codingClis || cloneDestinationLoss || cloneMarshallRestart || guestTrust
         || free >= 3 * raceReservation);
+# foreign-github-fixture-memory: two guest reservations plus the host overhead
+# MUST fit the native guest budget, so image growth fails at evaluation rather
+# than as a browser timeout behind a normalized provision_failed.
+assert !githubIntegration || selectedGitHubFamily == "windows" || (builtins.isInt guestManifest.minimum_memory_bytes
+  && GiB + 2 * (guestManifest.minimum_memory_bytes + 64 * 1024 * 1024) <= fixtureGuestMemoryMiB * 1024 * 1024);
 # @cc [owner:ghuntley,label:verification] resize-fixture-image-minima
 # The selected real image's numeric disk/memory minima MUST fit the fixed
 # initial resize/team-resource request before its scenario may run.
