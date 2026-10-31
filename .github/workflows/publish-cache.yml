@@ -70,12 +70,18 @@ jobs:
           fetch-depth: 0
       # Each service keeps its fetched deps and compiled _build (including the
       # Dialyzer project PLT); Hex, Mix (core PLTs) and rebar3 caches are shared.
+      # _build/<env>/lib/<app>/priv is a symlink to the source priv/, so a
+      # Rustler NIF (Marshall's priv/native/marshall_cedar.so, gitignored)
+      # lives outside _build. Without caching it, a restored _build holds the
+      # compiled NIF module but a fresh checkout lacks the library, nothing
+      # recompiles, and the application cannot start (run 41176375306).
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           cache-paths: |
             ${{ matrix.project }}/deps
             ${{ matrix.project }}/_build
+            ${{ matrix.project }}/priv/native
             ~/.mix
             ~/.hex
             ~/.cache/rebar3
@@ -127,8 +133,13 @@ jobs:
         # `compile --warnings-as-errors` replays them. A strict compile that
         # fails is retried once with --force, which drops stale replays but
         # still fails on any warning the current source produces.
+        # A project with a Rustler crate (native/) whose library is missing
+        # from priv/native (a cache restored before priv/native was cached)
+        # has its own compiled app dropped, so the NIF module rebuilds it.
         run: >-
           devenv shell -- bash -euo pipefail -c 'mix deps.get
+          && { [ ! -d native ] || compgen -G "priv/native/*.so" > /dev/null
+          || rm -rf "_build/test/lib/$(basename "$PWD")"; }
           && { MIX_ENV=test mix compile --warnings-as-errors
           || MIX_ENV=test mix compile --force --warnings-as-errors; }
           && mix precommit'
