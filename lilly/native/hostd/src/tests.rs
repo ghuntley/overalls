@@ -225,7 +225,7 @@ fn lease_grants_follow_arrival_order(tc: TestCase) {
     let directory = tempfile::tempdir().expect("tempdir");
     let table = Arc::new(leases(directory.path()));
     let never = Arc::new(AtomicBool::new(false));
-    let (first, _) = table
+    let first = table
         .acquire(0, Mode::Exclusive, directory.path(), Duration::ZERO, &never)
         .expect("first lease");
     let log = Arc::new(Mutex::new(Vec::<(usize, &'static str, Mode)>::new()));
@@ -236,7 +236,7 @@ fn lease_grants_follow_arrival_order(tc: TestCase) {
         let never = Arc::clone(&never);
         let path = directory.path().to_path_buf();
         threads.push(std::thread::spawn(move || {
-            let (lease, _) = shared
+            let lease = shared
                 .acquire(
                     index as u64 + 1,
                     mode,
@@ -308,7 +308,7 @@ fn zero_wait_is_one_attempt_and_contention_is_distinct() {
     let directory = tempfile::tempdir().expect("tempdir");
     let table = leases(directory.path());
     let never = AtomicBool::new(false);
-    let (lease, _) = table
+    let lease = table
         .acquire(1, Mode::Exclusive, directory.path(), Duration::ZERO, &never)
         .unwrap();
     let started = Instant::now();
@@ -1226,4 +1226,67 @@ fn local_resume_requires_the_token_check() {
     assert_eq!(client.result(), (Status::Setup, vec![]));
     client.send(4, resume(b"1-ab-cd-ef"));
     assert_eq!(client.result(), (Status::Failed, vec![6]));
+}
+
+/// hostd-fork-fence: a utility spawned on another thread must never keep a
+/// released lease locked, so the next zero-wait acquire, inside hostd or
+/// from another process, always succeeds. Without the fence a forked child
+/// holds a copy of the released descriptor until it execs.
+#[test]
+fn concurrent_spawns_never_extend_a_released_lease() {
+    if crate::descriptor_resolution::unavailable("concurrent_spawns_never_extend_a_released_lease")
+    {
+        return;
+    }
+    let directory = tempfile::tempdir().expect("tempdir");
+    let table = leases(directory.path());
+    let never = AtomicBool::new(false);
+    let stop = Arc::new(AtomicBool::new(false));
+    let spawner = {
+        let stop = Arc::clone(&stop);
+        std::thread::spawn(move || {
+            let arguments: Vec<CString> = Vec::new();
+            while !stop.load(std::sync::atomic::Ordering::SeqCst) {
+                let _ = crate::exec::run(
+                    &crate::exec::Spec {
+                        executable: Path::new("/bin/sh"),
+                        arguments: &arguments,
+                        timeout: Duration::from_secs(5),
+                        output_limit: 65_536,
+                        lease: None,
+                        inherit: &[],
+                    },
+                    &Custody::ProcessGroup,
+                    &AtomicBool::new(false),
+                );
+            }
+        })
+    };
+    let mut refused = 0;
+    for session in 0..1000 {
+        match table.acquire(
+            session,
+            Mode::Exclusive,
+            directory.path(),
+            Duration::ZERO,
+            &never,
+        ) {
+            Ok(lease) => assert!(table.release(session, lease)),
+            Err(_) => refused += 1,
+        }
+        let outside = std::fs::File::open(directory.path().join("owner.lock")).unwrap();
+        if rustix::fs::flock(
+            &outside,
+            rustix::fs::FlockOperation::NonBlockingLockExclusive,
+        )
+        .is_err()
+        {
+            refused += 1;
+        }
+        // This test's own lock holder closes under the fence like a lease.
+        crate::exec::after_forks(|| drop(outside));
+    }
+    stop.store(true, std::sync::atomic::Ordering::SeqCst);
+    spawner.join().unwrap();
+    assert_eq!(refused, 0, "a released lease stayed locked");
 }

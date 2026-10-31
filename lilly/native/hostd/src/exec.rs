@@ -173,6 +173,22 @@ fn detached_reports() -> Sender<WaitStatus> {
     crate::lock(sender, "bridge exit reports").clone()
 }
 
+/// Held from fork until the child has exec'd, and while a lock descriptor is
+/// closed.
+static FORK_FENCE: Mutex<()> = Mutex::new(());
+
+/// @cc [owner:ghuntley,label:concurrency;recovery] hostd-fork-fence
+/// Every fork hostd performs MUST hold the fork fence until the child has
+/// exec'd (`Command::spawn` returns only then), and `after_forks` runs its
+/// closure only while no fork is in that window. Until exec a forked child
+/// holds close-on-exec copies of all of hostd's descriptors, so a lease
+/// descriptor closed outside the fence could leave its `flock` held by that
+/// child and refuse the next owner's zero-wait acquire.
+pub fn after_forks<R>(close: impl FnOnce() -> R) -> R {
+    let _fence = crate::lock(&FORK_FENCE, "fork fence");
+    close()
+}
+
 /// Make this process the subreaper for every descendant and start reaping.
 pub fn start_reaper() -> std::io::Result<()> {
     rustix::process::set_child_subreaper(Some(rustix::process::getpid()))?;
@@ -468,7 +484,10 @@ fn run_inner(
     let reaper = reaper();
     let spawned = {
         let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
-        match builder.spawn() {
+        let fence = crate::lock(&FORK_FENCE, "fork fence");
+        let spawned = builder.spawn();
+        drop(fence);
+        match spawned {
             Ok(child) => {
                 let pid = child.id().cast_signed();
                 waiting.insert(pid, sender);
@@ -664,7 +683,10 @@ pub fn spawn_detached(
     let reaper = reaper();
     let spawned = {
         let mut waiting = crate::lock(&reaper.waiting, "reaper registry");
-        match builder.spawn() {
+        let fence = crate::lock(&FORK_FENCE, "fork fence");
+        let spawned = builder.spawn();
+        drop(fence);
+        match spawned {
             Ok(child) => {
                 let pid = child.id().cast_signed();
                 let pidfd = Pid::from_raw(pid).and_then(|pid| {

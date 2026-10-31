@@ -177,7 +177,7 @@ impl Leases {
         directory: &Path,
         wait: Duration,
         cancelled: &AtomicBool,
-    ) -> Result<(u64, Arc<OwnedFd>), Refusal> {
+    ) -> Result<u64, Refusal> {
         let descriptor = self.open_lock(directory)?;
         let stat = fstat(&descriptor).map_err(|_| Refusal::Unavailable)?;
         let key: Key = (stat.st_dev, stat.st_ino);
@@ -215,20 +215,21 @@ impl Leases {
                             Mode::Exclusive => inode.exclusive = true,
                             Mode::Shared => inode.shared += 1,
                         }
-                        let descriptor = Arc::new(descriptor);
+                        // The table holds the only reference until a
+                        // command borrows it (lease-release-closes-descriptor).
                         state.held.insert(
                             id,
                             Lease {
                                 id,
                                 session,
                                 mode,
-                                descriptor: Arc::clone(&descriptor),
+                                descriptor: Arc::new(descriptor),
                                 key,
                                 directory: directory.to_path_buf(),
                             },
                         );
                         self.changed.notify_all();
-                        return Ok((id, descriptor));
+                        return Ok(id);
                     }
                     Err(Errno::AGAIN) => pause = pause.min(EXTERNAL_RETRY),
                     Err(_) => {
@@ -259,7 +260,8 @@ impl Leases {
         state.held.get(&lease).map(|held| held.session)
     }
 
-    /// The descriptor of a held lease, for inheritance by a utility.
+    /// The descriptor of a held lease, for inheritance by a utility. The
+    /// clone MUST be dropped before the lease is released.
     pub fn descriptor(&self, session: u64, lease: u64) -> Option<Arc<OwnedFd>> {
         let state = self.state.lock().ok()?;
         state
@@ -291,7 +293,10 @@ impl Leases {
     /// @cc [owner:ghuntley,label:recovery] lease-release-closes-descriptor
     /// release MUST drop hostd's descriptor (never `LOCK_UN`, which would
     /// also unlock copies inherited by still-running utilities) and wake every
-    /// waiter. Callers MUST first kill and reap the lease's commands.
+    /// waiter. Callers MUST first kill and reap the lease's commands and drop
+    /// every `descriptor` clone, so the table's reference is the last one and
+    /// is closed under the fork fence (hostd-fork-fence): once release returns
+    /// no forked, not yet exec'd child of hostd still holds the lock.
     pub fn release(&self, session: u64, lease: u64) -> bool {
         let Ok(mut state) = self.state.lock() else {
             return false;
@@ -309,7 +314,7 @@ impl Leases {
                 state.inodes.remove(&held.key);
             }
         }
-        drop(held);
+        crate::exec::after_forks(|| drop(held));
         self.changed.notify_all();
         true
     }

@@ -335,7 +335,7 @@ impl Session {
                     Duration::from_millis(u64::from(wait_ms)),
                     &self.closed,
                 ) {
-                    Ok((lease, _)) => {
+                    Ok(lease) => {
                         if self.closed.load(Ordering::SeqCst) {
                             self.daemon.leases.release(self.id, lease);
                         } else {
