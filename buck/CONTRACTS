@@ -173,13 +173,28 @@ workspace lints and root clippy.toml), and `<name>-rustfmt` MUST fail on any
 unformatted Rust source; both are `check`/`precommit` labelled, with
 per-target and per-file `[rustfmt/<path>]` sub-targets (ADR-0265, ADR-0273).
 
+@cc [owner:ghuntley,label:build;verification] lyra-cross-buck2
+lyra_cross MUST build Lyra's client, Windows agents and native agents with
+the shared lyra-build.sh over cargo-workspace.nix's source layout (Lyra's
+files, every member manifest, empty stubs for the other members), with
+crates only from the rust// cell's vendor tree and tools only from the
+realised lyra_build_inputs derivation, offline, inside bubblewrap with the
+Nix sandbox's /build root and environment, so its outputs can be compared
+with the Nix builds byte for byte. The /build root exists only because
+vendored OpenSSL embeds build paths; it is not a reason to depend on any
+other host path (ADR-0273).
+
 @cc [owner:ghuntley,label:build;verification] rust-leaf-parity
 rust_leaf_parity_test MUST fail when an imported Buck2 Rust leaf's
 executables differ from the Nix build it replaces in their set of names, ELF
 interpreter, RUNPATH or panic strategy (unwind or abort), need a library or carry a `.debug_*` section the Nix
 build does not, or embed (in an rpath or
 anywhere in their bytes) a store path outside the closure of the import's
-declared runtime references. It builds
+declared runtime references. With `compare = "bytes"` it MUST instead
+fail on any file present on one side only, a different executable bit, or
+any differing byte, masking only Mach-O LC_UUID and code-signature bytes
+(and their manifest hashes), which differ between two Nix builds of one
+derivation. It builds
 the Nix side, so it is labelled heavy and is deleted with that build at M11
 (ADR-0269).
 

@@ -1,7 +1,55 @@
+load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:lyra.bzl", "lyra_cross")
 load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:rust.bzl", "rust_leaf_parity_test")
 
 nix_owned()
 
 # Root Cargo workspace members' manifests (ADR-0273), which every Nix Rust
 # build reads through cargo-workspace.nix; machine-test assembly declares them.
 filegroup(name = "cargo_manifests", srcs = glob(["Cargo.toml", "vendor/fs2/**"]), visibility = ["PUBLIC"])
+
+# Lyra's cross builds (buck/lyra.bzl): the source is the root workspace with
+# Lyra's files and every other member's manifest, as in cargo-workspace.nix.
+_WORKSPACE = [
+    "//:workspace_files",
+    ":srcs",
+    "//elixir:cargo_manifests",
+    "//enrico:cargo_manifests",
+    "//lilly:cargo_manifests",
+    "//marshall:cargo_manifests",
+    "//mila:cargo_manifests",
+    "//nix:cargo_manifests",
+]
+
+# name, mode, flake attribute of the Nix build it replaces (deleted at M11).
+[(
+    lyra_cross(
+        name = name,
+        mode = mode,
+        srcs = _WORKSPACE,
+        build_script = "//nix:lyra-build.sh",
+    ),
+    nix_store_import(name = name + "-import", src = ":" + name, visibility = ["PUBLIC"]),
+    rust_leaf_parity_test(
+        name = name + "-parity",
+        buck = ":" + name + "-import",
+        nix_attr = "legacyPackages.x86_64-linux." + attr,
+        compare = "bytes",
+        labels = ["heavy"],
+    ),
+) for name, mode, attr in [
+    ("client", "client", "lyra"),
+    ("windows", "windows", "lyraWindows"),
+    ("native", "native", "lyra.native.out"),
+]]
+
+nix_store_import(name = "native-probes-import", src = ":native[probes]", visibility = ["PUBLIC"])
+
+rust_leaf_parity_test(
+    name = "native-probes-parity",
+    buck = ":native-probes-import",
+    nix_attr = "legacyPackages.x86_64-linux.lyra.native.probes",
+    compare = "bytes",
+    labels = ["heavy"],
+)

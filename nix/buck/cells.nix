@@ -88,6 +88,10 @@ let
     # never fetch them; //tools:buck2-no-nix-<os> realises one on demand.
     buck2_no_nix_windows = builtins.unsafeDiscardOutputDependency noNix.windows.drvPath;
     buck2_no_nix_linux = builtins.unsafeDiscardOutputDependency noNix.linux.drvPath;
+    # Lyra's cross builds (buck/lyra.bzl, M5): the derivation of their tools
+    # and SDKs only, realised by the action, so the cells never fetch them.
+    lyra_build_inputs = builtins.unsafeDiscardOutputDependency
+      (import ../domains/artifacts/infrastructure/lyra.nix { inherit pkgs; }).buckInputs.drvPath;
     bintools = "${pkgs.stdenv.cc.bintools.bintools}/bin";
     # The cc wrapper with an empty environment: it reads NIX_LDFLAGS and
     # friends, so a Buck2 daemon started in a dev shell would otherwise link

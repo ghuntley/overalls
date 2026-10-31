@@ -86,3 +86,19 @@ _GLIBC_REFS = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib"]]
     ]),
     ("observability-runtimes", "observabilityRuntimes", ["overalls-fleet-exporter", "overalls-logging-health"]),
 ]]
+
+# The workspace members this package owns, for Cargo-driven builds that copy
+# the root workspace (buck/lyra.bzl): manifests only.
+filegroup(
+    name = "cargo_manifests",
+    srcs = [
+        "domains/artifacts/terminald/Cargo.toml",
+        "domains/artifacts/vscode-web-broker/Cargo.toml",
+        "domains/system/observability-runtimes/Cargo.toml",
+        "domains/system/otel-guest/receiver/Cargo.toml",
+    ],
+    visibility = ["PUBLIC"],
+)
+
+# Lyra's build script, shared by lyra.nix and buck/lyra.bzl (lyra-shared-build).
+export_file(name = "lyra-build.sh", src = "domains/artifacts/infrastructure/lyra-build.sh", visibility = ["PUBLIC"])

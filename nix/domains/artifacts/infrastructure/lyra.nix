@@ -18,6 +18,30 @@ let
     url = "https://github.com/joseluisq/macosx-sdks/releases/download/11.3/MacOSX11.3.sdk.tar.xz";
     hash = (import ../pins.nix).macosSdk113;
   };
+  # Inputs of lyra-build.sh, which both these derivations and the Buck2
+  # `lyra_cross` rule run (contract lyra-shared-build).
+  buildVars = {
+    LYRA_RUST = "${toolchain}";
+    LYRA_VENDOR = "${vendor}";
+    LYRA_PYTHON = "${pkgs.python313}/bin/python3.13";
+    LYRA_MANIFEST = "${./lyra_manifest.py}";
+    LYRA_MACOS_SDK = "${sdk}";
+  };
+  exports = vars: lib.concatStrings (lib.mapAttrsToList (name: value: "export ${name}=${lib.escapeShellArg value}\n") vars);
+  buildEnv = exports buildVars;
+  native = import ./lyra-native.nix {
+    inherit pkgs source vendor toolchain nativeBinaries buildVars exports;
+    inherit (workspace) lockSha256;
+  };
+  # Every tool lyra-build.sh runs, for the Buck2 rule: the Nix builds get the
+  # same set from nativeBuildInputs and stdenv. The tools and both SDKs are
+  # this derivation's references, so realising it fetches them; Buck2's cells
+  # name only its .drv (buck/lyra.bzl).
+  buckInputs = pkgs.writeTextDir "env.sh" (exports (buildVars // native.buildVars // {
+    PATH = lib.makeBinPath ([ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig jq perl python313 stdenv.cc stdenv.cc.bintools ]) ++ pkgs.stdenv.initialPath);
+    LYRA_BWRAP = "${pkgs.bubblewrap}/bin/bwrap";
+    LYRA_SH = "${pkgs.bash}/bin/bash";
+  }));
   # @cc [owner:ghuntley,label:build;verification] lyra-native-tls-check-toolchain
   # The sandboxed Lyra check MUST supply the build tools required by its
   # vendored Linux OpenSSL backend and run tests without network downloads, and
@@ -123,47 +147,12 @@ let
     doCheck = false;
     buildPhase = ''
       runHook preBuild
-      cd lyra
-      export CARGO_HOME="$TMPDIR/cargo-home"
-      export RUSTC="${toolchain}/bin/rustc"
-      export CARGO_ZIGBUILD_CACHE_DIR="$TMPDIR/cargo-zigbuild-cache"
-      export XDG_CACHE_HOME="$TMPDIR/cache"
-      mkdir -p "$CARGO_HOME"
-      substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
-      export CARGO_TARGET_DIR="$TMPDIR/target"
-      # Panic locations would otherwise embed vendored-crate store paths in the
-      # executables, and the Windows disk image would keep them alive.
-      export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
-      for binary in ${lib.concatStringsSep " " windowsBinaries}; do
-        cargo zigbuild --profile hardened --locked --offline --target x86_64-pc-windows-gnu --bin "$binary"
-      done
+      ${buildEnv}
+      bash ${./lyra-build.sh} windows "$out"
       runHook postBuild
     '';
     installPhase = ''
       runHook preInstall
-      mkdir -p "$out/bin"
-      for binary in ${lib.concatStringsSep " " windowsBinaries}; do
-        cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/hardened/$binary.exe" "$out/bin/$binary.exe"
-        test "$(stat -c %s "$out/bin/$binary.exe")" -le 104857600
-      done
-      ${pkgs.python3}/bin/python3 - "$out" ${lib.concatStringsSep " " windowsBinaries} <<'PY'
-import hashlib
-import json
-import pathlib
-import sys
-
-root: pathlib.Path = pathlib.Path(sys.argv[1])
-names: list[str] = sys.argv[2:]
-artifacts: dict[str, dict[str, str | int]] = {
-    name: {
-        "path": "/bin/" + name + ".exe",
-        "sha256": hashlib.sha256((root / "bin" / (name + ".exe")).read_bytes()).hexdigest(),
-        "bytes": (root / "bin" / (name + ".exe")).stat().st_size,
-    }
-    for name in names
-}
-(root / "manifest.json").write_text(json.dumps({"version": "0.1.0", "artifacts": artifacts}, sort_keys=True))
-PY
       runHook postInstall
     '';
     meta = {
@@ -183,64 +172,12 @@ pkgs.stdenv.mkDerivation {
   doCheck = false;
   buildPhase = ''
     runHook preBuild
-    cd lyra
-    export CARGO_HOME="$TMPDIR/cargo-home"
-    export RUSTC="${toolchain}/bin/rustc"
-    export CARGO_ZIGBUILD_CACHE_DIR="$TMPDIR/cargo-zigbuild-cache"
-    export XDG_CACHE_HOME="$TMPDIR/cache"
-    mkdir -p "$CARGO_HOME"
-    substitute ${vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "${vendor}"
-    tar -xJf ${sdk} -C "$TMPDIR"
-    export SDKROOT="$TMPDIR/MacOSX11.3.sdk"
-    export CARGO_TARGET_DIR="$TMPDIR/target"
-    # Panic locations would otherwise embed vendored-crate store paths, and one
-    # such reference keeps the whole vendor link farm (every crate) in Lyra's
-    # runtime closure, as the cross builds already avoid.
-    export RUSTFLAGS="--remap-path-prefix=${vendor}=/vendor --remap-path-prefix=$PWD=/source"
-    for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu; do
-      cargo zigbuild --profile hardened --locked --offline --target "$target" --bin overalls
-    done
-    cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-linux-musl --bin overalls-ssh-authorize
-    cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-linux-musl --bin overalls-host-certificate
-    cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-linux-musl --bin overalls-trustd
-    cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-linux-musl --bin overalls-workspaced
+    ${buildEnv}
+    bash ${./lyra-build.sh} client "$out"
     runHook postBuild
   '';
   installPhase = ''
     runHook preInstall
-    mkdir -p "$out/bin"
-    cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/hardened/overalls" "$out/bin/linux-amd64"
-    cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/hardened/overalls-ssh-authorize" "$out/bin/overalls-ssh-authorize"
-    cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/hardened/overalls-host-certificate" "$out/bin/overalls-host-certificate"
-    cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/hardened/overalls-trustd" "$out/bin/overalls-trustd"
-    cp "$CARGO_TARGET_DIR/x86_64-unknown-linux-musl/hardened/overalls-workspaced" "$out/bin/overalls-workspaced"
-    cp "$CARGO_TARGET_DIR/aarch64-unknown-linux-musl/hardened/overalls" "$out/bin/linux-arm64"
-    cp "$CARGO_TARGET_DIR/x86_64-apple-darwin/hardened/overalls" "$out/bin/darwin-amd64"
-    cp "$CARGO_TARGET_DIR/aarch64-apple-darwin/hardened/overalls" "$out/bin/darwin-arm64"
-    # Windows workstations (x86_64; Windows on Arm runs it under emulation).
-    # Published without .exe; the installer saves it as overalls.exe.
-    cp "$CARGO_TARGET_DIR/x86_64-pc-windows-gnu/hardened/overalls.exe" "$out/bin/windows-amd64"
-    for binary in "$out"/bin/*; do
-      test "$(stat -c %s "$binary")" -le 104857600
-    done
-    ${pkgs.python3}/bin/python3 - "$out" <<'PY'
-import hashlib
-import json
-import pathlib
-import sys
-
-root: pathlib.Path = pathlib.Path(sys.argv[1])
-names: tuple[str, ...] = ("linux-amd64", "linux-arm64", "darwin-amd64", "darwin-arm64", "windows-amd64")
-artifacts: dict[str, dict[str, str | int]] = {
-    name: {
-        "path": "/bin/" + name,
-        "sha256": hashlib.sha256((root / "bin" / name).read_bytes()).hexdigest(),
-        "bytes": (root / "bin" / name).stat().st_size,
-    }
-    for name in names
-}
-(root / "manifest.json").write_text(json.dumps({"version": "0.1.0", "artifacts": artifacts}, sort_keys=True))
-PY
     runHook postInstall
   '';
   meta = {
@@ -252,8 +189,7 @@ PY
   passthru.windows = windows;
   passthru.toolchain = toolchain;
   passthru.nativeBinaries = nativeBinaries;
-  passthru.native = import ./lyra-native.nix {
-    inherit pkgs source vendor toolchain nativeBinaries;
-    inherit (workspace) lockSha256;
-  };
+  passthru.native = native;
+  passthru.buckInputs = buckInputs;
+  passthru.macosSdk = sdk;
 }

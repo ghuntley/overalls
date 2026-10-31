@@ -744,6 +744,33 @@ every invocation, queries every `rust_leaf_parity_test` and fails when a
 seven entries above; adding an entry without a test fails with the entry
 named.
 
+**Lyra (2026-10-31).** Lyra's client, Windows agents and native agents are
+Cargo builds with zig, cargo-zigbuild, the macOS 11.3 and illumos SDKs and
+vendored OpenSSL, not prelude Rust rules. Their build phases moved into one
+script, `lyra-build.sh`, that `lyra.nix` and `lyra-native.nix` run in the
+Nix sandbox and `lyra_cross` (`buck/lyra.bzl`) runs inside bubblewrap. The
+action copies the declared workspace (root manifests, every member's
+manifest, Lyra's files), adds cargo-workspace.nix's empty member stubs,
+realises the tools from `[nix] lyra_build_inputs` (the `.drv` of lyra.nix's
+`buckInputs`, so checkouts that never build Lyra never fetch its SDKs) and
+builds offline (`--unshare-net`) with crates from the rust// cell. The script
+now pins `SOURCE_DATE_EPOCH` and `TZ`, which the Nix sandbox had supplied
+implicitly: without them vendored OpenSSL records the build date and the PE
+linker a timestamp.
+
+| Leaf | Import | Evidence |
+|---|---|---|
+| Lyra client (9 executables, manifest) | `//lyra:client-import` | `//lyra:client-parity` (bytes): identical; macOS `LC_UUID` and signature masked |
+| Lyra Windows agents (7, manifest) | `//lyra:windows-import` | `//lyra:windows-parity` (bytes): identical |
+| Lyra native agents (20, manifest) | `//lyra:native-import` | `//lyra:native-parity` (bytes): identical |
+| Lyra native probes (2, manifest) | `//lyra:native-probes-import` | `//lyra:native-probes-parity` (bytes): identical |
+
+The refactored Nix derivations also match the outputs deployed before the
+refactor, under the same masking. `lyra.windows`, `lyra.native` and
+`lyra.native.probes` follow the swap through the client's passthru, so the
+Windows and native guest images, the executor bootstrap release and the
+transport probes all take the Buck2 builds in assembly.
+
 **Static musl leaves.** `rust_musl_binary` applies a transition that adds
 `toolchains//:musl`; the Rust toolchain's target triple and flags and the C
 toolchain's linker select on it, so the binary and its third-party crates

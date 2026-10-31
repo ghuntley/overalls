@@ -6,6 +6,12 @@ RUST_ARTIFACTS = {
     # `release`, as the Nix helpers are really built: the `hardened` (abort)
     # build failed real guest launches in machine run 41094831662.
     "lilly-host-helpers": "root//lilly:host-helpers-import",
+    # Lyra's client, Windows agents and native agents (buck/lyra.bzl), each
+    # byte-identical to its Nix build apart from the masked Mach-O UUID.
+    "lyra": "root//lyra:client-import",
+    "lyra-native": "root//lyra:native-import",
+    "lyra-native-probes": "root//lyra:native-probes-import",
+    "lyra-windows": "root//lyra:windows-import",
     "observability-runtimes": "root//nix:observability-runtimes-import",
     "otel-guest-receiver": "root//nix:otel-guest-receiver-import",
     "terminald": "root//nix:terminald-import",

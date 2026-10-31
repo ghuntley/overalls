@@ -113,7 +113,22 @@ let
   # answer file's DriverPaths; kept for diagnosing Setup's WinPE initialization.
   windowsGuestDrvload = mkWindowsGuest { winpeDriverLoad = "drvload"; };
   windowsBoot = import ./guest/windows/boot.nix { inherit pkgs vmm; };
-  lyra = import ./infrastructure/lyra.nix { inherit pkgs; };
+  # Lyra's three builds are Buck2 leaves (buck/lyra.bzl) when assembly passes
+  # them; the client keeps Nix's passthru and carries the swapped Windows and
+  # native builds, so `lyra.windows` and `lyra.native(.probes)` follow suit.
+  lyraNix = import ./infrastructure/lyra.nix { inherit pkgs; };
+  lyraNativeBuild =
+    if artifacts ? "lyra-native" then
+      (swapLeaf "lyra-native" lyraNix.native).overrideAttrs (previous: {
+        passthru = previous.passthru // { probes = swapLeaf "lyra-native-probes" lyraNix.native.probes; };
+      })
+    else lyraNix.native;
+  lyra = (swapLeaf "lyra" lyraNix).overrideAttrs (previous: {
+    passthru = previous.passthru // {
+      windows = swapLeaf "lyra-windows" lyraNix.windows;
+      native = lyraNativeBuild;
+    };
+  });
   lyraWindows = lyra.windows;
   githubBootstrapRelease = import ./infrastructure/executor-bootstrap.nix { inherit pkgs lyra; };
   nativeAgentPayload = import ./guest/native-agents.nix { inherit pkgs lyra terminald; };
@@ -163,7 +178,7 @@ let
   # environment.
   mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
   # Buck2 Rust leaves this set consumes as `artifacts.<name>` (buck/rust_artifacts.bzl).
-  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ];
+  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "lyra" "lyra-native" "lyra-native-probes" "lyra-windows" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
   # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2

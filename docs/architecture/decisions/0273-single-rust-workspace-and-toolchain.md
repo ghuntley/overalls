@@ -223,7 +223,18 @@ partial, in milestone M5.
   [`rust_parity_coverage.bxl`](../../../buck/bxl/rust_parity_coverage.bxl),
   run by [`tools/precommit`](../../../tools/precommit), fails when a
   `RUST_ARTIFACTS` entry has no `rust_leaf_parity_test` over its import target.
-  Remaining: Lyra (musl and cross targets), Marshall's Cedar NIF and Mila.
+  Lyra's client (Linux musl, macOS, Windows), Windows agents and FreeBSD
+  and illumos native agents are swapped too (`//lyra:client`, `:windows`,
+  `:native`, [`buck/lyra.bzl`](../../../buck/lyra.bzl)). Those builds are
+  Cargo-driven (zig, cargo-zigbuild, the macOS and illumos SDKs, vendored
+  OpenSSL), so the Nix derivations and the Buck2 rule run one script,
+  [`lyra-build.sh`](../../../nix/domains/artifacts/infrastructure/lyra-build.sh),
+  and the parity tests (`compare = "bytes"`) require byte-identical trees. The
+  only masked bytes are the macOS clients' `LC_UUID` and the code signature
+  over it, which differ between two Nix builds of one derivation too. The
+  Buck2 action runs inside bubblewrap with the Nix sandbox's `/build` root,
+  because vendored OpenSSL embeds absolute build paths (an open finding in the
+  migration review). Remaining: Marshall's Cedar NIF and Mila.
 - **Correction (2026-10-31): Lyra's cargo.** "Lyra … rebuilt under it" was
   true of rustc only. Lyra's client, Windows and native builds and its tests
   check took `cargo` (and, for the check, clippy and rustfmt) from nixpkgs,

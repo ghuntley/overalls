@@ -74,6 +74,8 @@ overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"]
     # Cargo-driven Mila Windows FFI cross-build and the no-Nix kits (M9).
     "rust_bin", "rust_vendor", "cargo_zigbuild", "cc_bin", "zig",
     "buck2_no_nix_windows", "buck2_no_nix_linux",
+    # Lyra's cross-build tools and SDKs, realised on demand (buck/lyra.bzl, M5).
+    "lyra_build_inputs",
 ]]
 
 # Mila's Xcode, Gradle and .NET targets (buck/mila.bzl) need SDKs from the

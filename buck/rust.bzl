@@ -285,6 +285,7 @@ def _rust_leaf_parity_test_impl(ctx: AnalysisContext) -> list[Provider]:
     command = cmd_args(
         ctx.attrs._python[RunInfo],
         ctx.attrs._script,
+        ["--bytes"] if ctx.attrs.compare == "bytes" else [],
         ctx.attrs._nix[RunInfo],
         ctx.attrs.readelf,
         ctx.attrs._nix_store[RunInfo],
@@ -308,6 +309,7 @@ _rust_leaf_parity_test = rule(
     impl = _rust_leaf_parity_test_impl,
     attrs = {
         "buck": attrs.dep(providers = [NixStorePathInfo]),
+        "compare": attrs.enum(["linkage", "bytes"], default = "linkage"),
         "labels": attrs.list(attrs.string(), default = []),
         "nix_attr": attrs.string(),
         "readelf": attrs.string(),
@@ -318,13 +320,15 @@ _rust_leaf_parity_test = rule(
     },
 )
 
-def rust_leaf_parity_test(name: str, buck: str, nix_attr: str, labels: list[str] = []):
+def rust_leaf_parity_test(name: str, buck: str, nix_attr: str, labels: list[str] = [], compare: str = "linkage"):
     """Fails when an imported Buck2 Rust leaf links differently from the flake
-    attribute `nix_attr` it replaces. Builds the Nix side, so callers label it
-    `heavy`."""
+    attribute `nix_attr` it replaces, or with `compare = "bytes"` (a leaf
+    built by the same script as its Nix build) when any output byte differs.
+    Builds the Nix side, so callers label it `heavy`."""
     _rust_leaf_parity_test(
         name = name,
         buck = buck,
+        compare = compare,
         nix_attr = nix_attr,
         readelf = _store_path("bintools") + "/readelf",
         labels = labels,

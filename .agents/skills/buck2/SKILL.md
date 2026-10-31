@@ -158,6 +158,12 @@ match Nix byte for byte. Compare them with `diff -r`.
   `//buck/bxl/rust_parity_coverage.bxl:main`, which fails when a
   `RUST_ARTIFACTS` import has no parity test. The flake (host self-deploy) keeps
   the Nix build until the M2 activation gate; deletions wait for M11.
+- **Cargo-driven leaves** (Lyra's cross builds, `buck/lyra.bzl`): when a
+  build needs Cargo itself (zig linkers, SDKs, `-sys` build scripts), put
+  the Nix build phase in a script both systems run, give Buck2 its tools
+  as a realised `.drv` in the cells, and compare with
+  `rust_leaf_parity_test(compare = "bytes")`. Pin `SOURCE_DATE_EPOCH` and
+  `TZ` in the script; mask only what differs between two Nix builds.
 - **Machine tests** receive `ASSEMBLY_ARTIFACTS` (`buck/artifacts.bzl`), the
   merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`; every key must be a name the
   package set consumes, or evaluation fails.
