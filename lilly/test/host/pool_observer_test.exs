@@ -122,6 +122,51 @@ defmodule Lilly.Host.PoolObserverTest do
     assert id == @pool.id and storage == @pool.storage
   end
 
+  test "an absent observer is announced only after the grace, and its return only after that" do
+    view = :pool_observer_test_grace_view
+
+    events = fn action ->
+      ExUnit.CaptureLog.capture_log(action)
+      |> String.split("\n")
+      |> Enum.flat_map(fn line ->
+        cond do
+          line =~ "Pool observer not running" -> [:absent]
+          line =~ "Pool observer running again" -> [:present]
+          true -> []
+        end
+      end)
+    end
+
+    # A brief absence, as in a healthy boot before the observer starts: silent.
+    assert events.(fn ->
+             PoolObserver.report(@pool, view, 300)
+             PoolObserver.report(@pool, view, 300)
+
+             start_supervised!(
+               Supervisor.child_spec({OverallsProtocol.View, name: view}, id: :grace_view)
+             )
+
+             PoolObserver.report(@pool, view, 300)
+             stop_supervised!(:grace_view)
+           end) == []
+
+    # Absent past the grace: announced once, then its return is announced once.
+    assert events.(fn ->
+             PoolObserver.report(@pool, view, 300)
+             Process.sleep(350)
+             PoolObserver.report(@pool, view, 300)
+             PoolObserver.report(@pool, view, 300)
+
+             start_supervised!(
+               Supervisor.child_spec({OverallsProtocol.View, name: view}, id: :grace_view)
+             )
+
+             PoolObserver.report(@pool, view, 300)
+             PoolObserver.report(@pool, view, 300)
+             stop_supervised!(:grace_view)
+           end) == [:absent, :present]
+  end
+
   @spec wait_for((-> {:ok, term()} | nil), non_neg_integer()) :: {:ok, term()}
   defp wait_for(probe, attempts \\ 40) do
     case probe.() do

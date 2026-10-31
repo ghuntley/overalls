@@ -14,6 +14,8 @@ defmodule Lilly.Host.PoolObserver do
   alias OverallsProtocol.View
 
   @view Lilly.Host.PoolObserver.View
+  # Two observation cadences: a healthy boot's observer starts well within it.
+  @absent_grace_ms 2000
 
   @type read :: (Pool.t() -> OverallsProtocol.pool())
   @type observation :: %{observed_at: DateTime.t(), entry: OverallsProtocol.pool()}
@@ -50,42 +52,63 @@ defmodule Lilly.Host.PoolObserver do
   def tasks(view), do: Module.concat(view, Tasks)
 
   # @cc [owner:ghuntley,label:capacity;concurrency] pool-observer-report-never-waits
-  # report/2 MUST NOT read the pool or wait for an observer. With an observer
+  # report/3 MUST NOT read the pool or wait for an observer. With an observer
   # view running it MUST return the latest published entry for the pool with
   # observed entries stamped observed_at, or a busy entry (no counters or credit)
   # when no observation has been published yet. When no observer view runs it
-  # MUST report the pool busy, never read it inline, and emit
-  # lilly.pool_observer_absent once per transition (lilly.pool_observer_present
-  # on return), so a missing observer is visible and ages capacity out.
-  @spec report(Pool.t(), View.view()) :: OverallsProtocol.pool()
-  def report(pool, view \\ @view) do
+  # MUST report the pool busy and never read it inline.
+
+  # @cc [owner:ghuntley,label:observability] pool-observer-absence-after-grace
+  # An absent observer view MUST be announced by lilly.pool_observer_absent
+  # once it has been continuously absent for longer than the grace (two
+  # observation cadences by default), and lilly.pool_observer_present MUST
+  # follow only an announced absence. A shorter absence, such as the first
+  # samples of a healthy boot before the observer starts, MUST emit neither.
+  @spec report(Pool.t(), View.view(), non_neg_integer()) :: OverallsProtocol.pool()
+  def report(pool, view \\ @view, grace_ms \\ @absent_grace_ms) do
+    now = System.monotonic_time(:millisecond)
+
     if Process.whereis(view) do
-      presence(view, :present)
+      presence(view, :present, now, grace_ms)
 
       case View.fetch(view, pool.id) do
         {:ok, {_version, %{observed_at: observed, entry: entry}}} -> stamp(entry, observed)
         :error -> %{id: pool.id, busy: true, storage: pool.storage}
       end
     else
-      presence(view, :absent)
+      presence(view, :absent, now, grace_ms)
       %{id: pool.id, busy: true, storage: pool.storage}
     end
   end
 
-  @spec presence(View.view(), :present | :absent) :: :ok
-  defp presence(view, state) do
+  # Presence per view: :present, {:absent, since_ms} (not yet announced) or
+  # :announced. persistent_term is written only on these transitions.
+  @spec presence(View.view(), :present | :absent, integer(), non_neg_integer()) :: :ok
+  defp presence(view, observed, now, grace_ms) do
     key = {__MODULE__, :presence, view}
 
-    cond do
-      :persistent_term.get(key, :present) == state ->
+    case {:persistent_term.get(key, :present), observed} do
+      {:present, :present} ->
         :ok
 
-      state == :absent ->
-        :persistent_term.put(key, state)
+      {:present, :absent} ->
+        :persistent_term.put(key, {:absent, now})
+
+      {{:absent, since}, :absent} when now - since > grace_ms ->
+        :persistent_term.put(key, :announced)
         Lilly.Events.emit("lilly.pool_observer_absent", [])
 
-      true ->
-        :persistent_term.put(key, state)
+      {{:absent, _since}, :absent} ->
+        :ok
+
+      {{:absent, _since}, :present} ->
+        :persistent_term.put(key, :present)
+
+      {:announced, :absent} ->
+        :ok
+
+      {:announced, :present} ->
+        :persistent_term.put(key, :present)
         Lilly.Events.emit("lilly.pool_observer_present", [])
     end
   end

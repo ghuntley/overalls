@@ -49,9 +49,12 @@ and its relation to
    `lilly.pool_observation_failed` (pool UUID only) and keeps the previous
    observation, which then ages out under the grace. If the observer view is
    not running, collection reports every pool `busy`. It never reads inline,
-   and it emits `lilly.pool_observer_absent` once per transition
-   (`lilly.pool_observer_present` on return). Capacity then ages out visibly
-   rather than reverting quietly to the old report path.
+   and it emits `lilly.pool_observer_absent` once the view has been absent
+   for longer than two observation cadences (2 s), then
+   `lilly.pool_observer_present` on return. A shorter absence, such as the
+   first samples of every boot before the observer starts, emits neither, so
+   the warning is not routine noise. Capacity then ages out visibly rather
+   than reverting quietly to the old report path.
 
 ## Affected decisions
 
