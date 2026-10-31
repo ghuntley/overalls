@@ -43,6 +43,12 @@ def make_repo(tmp: Path) -> Path:
         shutil.copy2(source, target, follow_symlinks=False)
     os.symlink(os.path.realpath(ROOT / ".buck-cells"), repo / ".buck-cells")
     run(repo, "git", "init", "-q", "-b", "base")
+    # The base commit holds the whole tree as loose objects, which starts a
+    # detached `git gc --auto`. It removed .git/objects/NN while a nested
+    # Buck2 crawled the root, and the query failed with read_dir ENOENT
+    # (ci run 41228962477). Nothing here needs packing.
+    run(repo, "git", "config", "gc.auto", "0")
+    run(repo, "git", "config", "maintenance.auto", "false")
     run(repo, "git", "add", "-A")
     run(
         repo,
