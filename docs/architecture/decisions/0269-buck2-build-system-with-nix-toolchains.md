@@ -179,7 +179,9 @@ the approved migration plan.
     The fixture alone assembles without Buck2 artifacts, so its drvPath is
     the flake's: the plain Ubuntu runners in `mila-builds.yml` substitute it
     from Cachix, where `publish-cache.yml` puts it, and have no Namespace
-    cache to supply Buck2 leaves.
+    cache to supply Buck2 leaves. `mila-builds.yml`'s Linux, Android and tailnet journey
+    jobs build `//mila:journey-fixture` with `tools/buck2`, gate on that
+    target rather than the flake, and start the fixture from its store path.
   - `nix-compact-core`, `-native`, `-native-host`, `-configuration` and
     `fleet-builds-configuration` are `//:check-*` assemblies. On 2026-10-31
     their `[drv]` evaluated under restrict-eval with the same drvPaths as the
@@ -314,8 +316,7 @@ Remaining gaps, by milestone of the migration plan:
     the module-configuration test consume `githubTools` and `marvin`
     through Nix until assembly takes Buck2 artifacts (M3).
   - The `marvin`, `python-static`, `conflict-markers`, `package-input-lock`
-    and `overalls-install-ps1` checks stay in the flake until M11, and
-    `mila-builds.yml` still runs `nix build .#mila-journey-fixture`.
+    and `overalls-install-ps1` checks stay in the flake until M11.
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
 - removal of the flake package, check and configuration outputs (M11);

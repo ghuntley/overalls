@@ -384,12 +384,12 @@ jobs:
               raise SystemExit(f"unexpected GTK journey smoke report: {steps!r}")
           PY
       # The hermetic Marshall+Porsche journey fixture runs on this runner.
-      # Every fixture step is gated on the flake exposing `apps.<system>.mila-journey-fixture`,
-      # so the job stays green (journey skipped) until the fixture lands.
+      # Every fixture step is gated on `//mila:journey-fixture` existing,
+      # so the job stays green (journey skipped) without the fixture.
       - name: Detect hermetic journey fixture
         id: journey
         run: |
-          if grep -rqs 'mila-journey-fixture' flake.nix nix; then
+          if grep -qs 'name = "journey-fixture"' mila/BUCK; then
             echo "declared=true" >> "$GITHUB_OUTPUT"
           else
             echo "declared=false" >> "$GITHUB_OUTPUT"
@@ -399,7 +399,7 @@ jobs:
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
       # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      # pushed by publish-cache's `//:check-mila-journey-fixture`.
       - name: Configure Cachix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
@@ -425,12 +425,11 @@ jobs:
         timeout-minutes: 40
         run: |
           set -euo pipefail
-          system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-          if ! nix eval --raw ".#packages.${system}.mila-journey-fixture.drvPath" >/dev/null 2>&1; then
-            echo "flake has no packages.${system}.mila-journey-fixture; journey skipped"
-            exit 0
-          fi
-          nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
+          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
+          # publish-cache.yml pushes, so it substitutes from Cachix.
+          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
+          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
+          tools/buck2 kill
           echo "built=true" >> "$GITHUB_OUTPUT"
       - name: Start hermetic journey fixture
         if: steps.fixture.outputs.built == 'true'
@@ -517,11 +516,11 @@ jobs:
           fi
       # The hermetic Marshall+Porsche journey fixture (ADR-0264) is substituted from
       # Cachix and built before the APK, then boots beside the emulator on this runner.
-      # Every fixture step is gated on the flake exposing `packages.<system>.mila-journey-fixture`.
+      # Every fixture step is gated on `//mila:journey-fixture` existing.
       - name: Detect hermetic journey fixture
         id: journey
         run: |
-          if grep -qs 'mila-journey-fixture' flake.nix; then
+          if grep -qs 'name = "journey-fixture"' mila/BUCK; then
             echo "declared=true" >> "$GITHUB_OUTPUT"
           else
             echo "declared=false" >> "$GITHUB_OUTPUT"
@@ -531,7 +530,7 @@ jobs:
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
       # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      # pushed by publish-cache's `//:check-mila-journey-fixture`.
       - name: Configure Cachix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
@@ -548,18 +547,17 @@ jobs:
         timeout-minutes: 40
         run: |
           set -euo pipefail
-          system="$(nix eval --impure --raw --expr builtins.currentSystem)"
-          if ! nix eval --raw ".#packages.${system}.mila-journey-fixture.drvPath" >/dev/null 2>&1; then
-            echo "flake has no packages.${system}.mila-journey-fixture; journey skipped"
-            exit 0
-          fi
           if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
             echo "/dev/kvm unavailable; the fixture never falls back to TCG, journey skipped"
             exit 0
           fi
           # The VM closure and the Android SDK do not both fit the runner's default free space.
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
-          nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
+          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
+          # publish-cache.yml pushes, so it substitutes from Cachix.
+          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
+          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
+          tools/buck2 kill
           echo "built=true" >> "$GITHUB_OUTPUT"
       - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
         continue-on-error: true
@@ -692,7 +690,7 @@ jobs:
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
       # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `checks.x86_64-linux.mila-journey-fixture`.
+      # pushed by publish-cache's `//:check-mila-journey-fixture`.
       - name: Configure Cachix for the journey fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
@@ -704,7 +702,13 @@ jobs:
       - name: Build hermetic journey fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         timeout-minutes: 40
-        run: nix build -L --out-link "$RUNNER_TEMP/mila-journey-fixture" ".#mila-journey-fixture"
+        run: |
+          set -euo pipefail
+          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
+          # publish-cache.yml pushes, so it substitutes from Cachix.
+          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
+          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
+          tools/buck2 kill
       - name: Enable KVM for the journey fixture
         if: env.MILA_TAILSCALE_AUTHKEY != ''
         run: |
