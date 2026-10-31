@@ -894,7 +894,10 @@ embedded-path scan refuses an import that would carry one. The prelude's own
 1.99.0 against the toolchain's rustc 1.97.1, which breaches ADR-0273 (see its
 dated correction). They now take cargo, clippy and rustfmt from the toolchain.
 Rebuilt outputs are byte-identical to the previous ones, except the two macOS
-clients' `LC_UUID`.
+clients' `LC_UUID`. terminald's native and Windows builds and the editor
+broker's Windows build had the same split and are fixed the same way, with
+byte-identical outputs. Marshall's Cedar NIF (nixpkgs cargo and rustc) is
+the last breach.
 
 **Findings (open):**
 

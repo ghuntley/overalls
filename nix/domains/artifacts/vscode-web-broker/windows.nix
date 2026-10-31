@@ -19,7 +19,7 @@ pkgs.stdenv.mkDerivation {
   dontConfigure = true;
   dontStrip = true;
   doCheck = false;
-  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils rustfmt ];
+  nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig coreutils ]);
   buildPhase = ''
     runHook preBuild
     cd ${lib.escapeShellArg "nix/domains/artifacts/vscode-web-broker"}

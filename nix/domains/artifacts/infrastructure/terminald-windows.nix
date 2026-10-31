@@ -22,7 +22,7 @@ pkgs.stdenv.mkDerivation {
   dontStrip = true;
   dontConfigure = true;
   doCheck = false;
-  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils ];
+  nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig coreutils ]);
   buildPhase = ''
     runHook preBuild
     cd ${lib.escapeShellArg "nix/domains/artifacts/terminald"}

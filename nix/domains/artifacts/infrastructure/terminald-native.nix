@@ -27,7 +27,7 @@ pkgs.stdenv.mkDerivation {
   strictDeps = true;
   dontStrip = true;
   allowedReferences = [ ];
-  nativeBuildInputs = with pkgs; [ cargo cargo-zigbuild zig coreutils python313 ];
+  nativeBuildInputs = [ toolchain ] ++ (with pkgs; [ cargo-zigbuild zig coreutils python313 ]);
   dontConfigure = true;
   doCheck = false;
   buildPhase = ''

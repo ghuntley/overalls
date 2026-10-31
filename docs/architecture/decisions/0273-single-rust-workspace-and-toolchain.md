@@ -251,10 +251,13 @@ partial, in milestone M5.
   The two macOS clients differ only in `LC_UUID` (and, on arm64, the ad-hoc
   signature hashes over it). A `nix build --rebuild` of the unchanged
   derivation differs in the same 16 bytes, so the macOS clients were never
-  reproducible; that is an open finding, not an effect of cargo. The same
-  nixpkgs cargo still builds terminald's native and Windows builds and the
-  editor broker's Windows build, and Marshall's Cedar NIF uses nixpkgs
-  cargo and rustc. Those remain open breaches.
+  reproducible; that is an open finding, not an effect of cargo. terminald's
+  native and Windows builds and the editor broker's Windows build had the
+  same split (and the broker's nixpkgs rustfmt); they also take cargo,
+  clippy and rustfmt from the toolchain now, and their rebuilt outputs (3, 2
+  and 2 files) are byte-identical to the previous ones. Marshall's Cedar NIF
+  still uses nixpkgs cargo and rustc, an open breach that lands after the
+  M6 Mix change.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.
