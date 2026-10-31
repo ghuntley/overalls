@@ -22,43 +22,63 @@ defmodule Susan.TokenBucketPropertyTest do
     assert {:ok, _} = TokenBucket.take(bucket, limit, 60_000)
   end
 
+  # A shrunk counterexample to the earlier oracle, which measured the refill
+  # window from time zero rather than from the first request: the first take
+  # at -391 ms starts a full bucket there, and the 780 ms that follow refill
+  # two tokens at 9231 per hour.
+  test "a first request before time zero refills from the first request" do
+    assert admissions_within_bound(1, 9231, [-391, 390, 390]) == 3
+  end
+
   @tag :hegel
   test "admissions never exceed burst plus refill and refusals name a sufficient wait" do
     Hegel.check(
       fn ->
         burst = draw("burst", integer(1, 50))
         rate = draw("rate", integer(1, 10_000))
-        limit = %{burst: burst, per_hour: rate}
         steps = draw("steps", list_of(integer(-5_000, 120_000), max_length: 80))
-
-        {_, now, admitted} =
-          Enum.reduce(steps, {nil, 0, 0}, fn delta, {bucket, now, admitted} ->
-            now = now + delta
-
-            case TokenBucket.take(bucket, limit, now) do
-              {:ok, next} ->
-                assert next.level >= 0 and next.level <= burst * 1000
-                {next, now, admitted + 1}
-
-              {:error, retry, _first, next} ->
-                assert retry > 0
-                assert next.level < 1000
-                # Waiting the advertised Retry-After always admits one request.
-                assert {:ok, _} = TokenBucket.take(next, limit, max(now, next.at) + retry * 1000)
-                {next, now, admitted}
-            end
-          end)
-
-        span =
-          max(
-            Enum.reduce(steps, {0, 0}, fn d, {t, hi} -> {t + d, max(hi, t + d)} end) |> elem(1),
-            now
-          )
-
-        assert admitted <= burst + div(span * rate, @hour) + 1
+        admissions_within_bound(burst, rate, steps)
       end,
       test_cases: 300
     )
+  end
+
+  # Takes one request at each running sum of steps and checks the contract
+  # susan-token-bucket-bounds: every refusal names a sufficient wait, and over
+  # the interval from the first request to the latest time reached the bucket
+  # admits at most burst + floor(span * rate / hour). A clock that goes
+  # backwards adds nothing, so the span ends at the latest time, not the last.
+  @spec admissions_within_bound(pos_integer(), pos_integer(), [integer()]) :: non_neg_integer()
+  defp admissions_within_bound(burst, rate, steps) do
+    limit = %{burst: burst, per_hour: rate}
+    times = steps |> Enum.scan(&(&1 + &2))
+
+    {_, admitted} =
+      Enum.reduce(times, {nil, 0}, fn now, {bucket, admitted} ->
+        case TokenBucket.take(bucket, limit, now) do
+          {:ok, next} ->
+            assert next.level >= 0 and next.level <= burst * 1000
+            {next, admitted + 1}
+
+          {:error, retry, _first, next} ->
+            assert retry > 0
+            assert next.level < 1000
+            # Waiting the advertised Retry-After always admits one request.
+            assert {:ok, _} = TokenBucket.take(next, limit, max(now, next.at) + retry * 1000)
+            {next, admitted}
+        end
+      end)
+
+    case times do
+      [] ->
+        assert admitted == 0
+
+      [first | _] ->
+        span = Enum.max(times) - first
+        assert admitted <= burst + div(span * rate, @hour)
+    end
+
+    admitted
   end
 
   @tag :hegel
