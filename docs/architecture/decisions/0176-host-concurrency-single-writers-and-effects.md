@@ -376,6 +376,22 @@ busy after about 1 s, and the first create built the template inline for
 about 8.5 min, past the 600 s test wait (artifact-agent-publish,
 account-lifecycle).
 
+The retry treated the symptom. The template reservation and creation sections
+waited only 1 s for the pool lock, while a pool observation holds it for
+2-5 s on CI runners. In run 41164441328 (account-lifecycle-ubuntu) the
+second image's prewarm on one host lost four reservations and one creation
+to observation holds, used five retries over 2 min 20 s, and was ready only
+on the sixth attempt. Both template sections now wait up to 30 s in the
+pool's FIFO turn queue, as a create's preparation and readiness sections
+already do (contract `template-sections-outwait-observation`). They run only
+in the template steward, so the wait delays no caller, and the turn is
+granted when the current holder releases the lock. The retry remains for
+other contention. Evidence:
+[pool_observer_lock_test.exs](../../../lilly/test/host/pool_observer_lock_test.exs)
+(`template-reserve-within-one-observation`). Against a 2.5 s observation
+hold, the old 1 s wait fails, and a reservation arriving 0.1, 1.2 or 2.2 s
+into the read acquires the lock within the rest of the read plus 1 s.
+
 [`Image.load_cached/2`](../../../lilly/lib/lilly/host/image.ex) skips
 rehashing an unchanged configured image after a Lilly restart. It uses a
 private digest cache keyed by path, manifest ID and native nanosecond file

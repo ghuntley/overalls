@@ -78,3 +78,22 @@ and its relation to
 - Native evidence: a fleet machine-test run on CI showing report ages below
   5 s with snapshot holds above 1 s. Until that run, the update is BEAM-test
   evidence only.
+
+## Update (2026-10-31): lock share
+
+Finding 3 was wrong for slow reads. The one-second tick began the next read
+at most 1 s after the previous read finished, so 2.5-3.5 s CI reads held the
+pool lock about 80% of the time. In run 41164441328 template reservations,
+which waited only 1 s, lost to them four times on one host. The observer now
+rests after each read for max(interval - d, min(d, 3 s)), so reads of up to
+3 s hold the lock at most half the time. The worst-case observation age is
+3d up to 3 s and 2d + 3 s beyond, within the 15 s busy grace while reads stay
+under 6 s. Template sections now wait in the FIFO turn queue for up to 30 s.
+Both changes are recorded as updates to ADR-0140 and ADR-0176.
+
+Remaining gap: other pool sections still wait 1-2 s. In the same run's
+account-lifecycle subtest, 58 transfer and clone sections went
+`storage_busy` after 1 s (36) or 2 s (19) behind observation holds of up to
+3.7 s. Halving the observer's lock share lowers that rate but cannot remove
+it while a single read holds the lock longer than those waits. Shorter
+observation holds, or waits that cover one hold, remain open.

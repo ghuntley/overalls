@@ -598,6 +598,23 @@ and with no observer the pool is reported busy. Native fleet evidence is
 pending.
 Review: [2026-10-30 pool observer](../reviews/2026-10-30-pool-observer.md).
 
+**Update (2026-10-31, observer lock share):** with a fixed one-second tick, a
+2.5-3.5 s read left the pool lock free for only about 0.5 s between reads, so
+mutations that wait 1 s for the lock kept losing (run 41164441328,
+account-lifecycle-ubuntu: `lilly.pool_section` snapshot holds of 1.7-4.7 s
+and four template reservations `busy` after 1001 ms). The observer now rests
+after each read for max(interval - d, min(d, 3 s)), where d is the read's
+duration (contract `pool-observer-proportional-rest`). Reads of up to 3 s
+hold the lock at most half the time, and fast reads still start once a
+second. The worst-case age of a published observation becomes interval + d
+for d <= 0.5 s, 3d up to 3 s (7.5 s at the CI median) and 2d + 3 s beyond,
+which stays inside the 15 s busy grace until reads take 6 s. Host report
+freshness is unchanged, because collection never waits for a read. Evidence:
+[pool_observer_lock_test.exs](../../../lilly/test/host/pool_observer_lock_test.exs)
+(`observer-lock-duty-at-most-half` and a Hegel property for the rest bound).
+Template sections wait in the turn queue instead
+([ADR-0176](0176-host-concurrency-single-writers-and-effects.md)).
+
 ## Open questions
 
 - The backstop lengths for each tier are settled per phase from measurements.

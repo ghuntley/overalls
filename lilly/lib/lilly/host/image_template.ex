@@ -166,6 +166,18 @@ defmodule Lilly.Host.ImageTemplate do
     end
   end
 
+  # @cc [owner:ghuntley,label:concurrency;capacity] template-sections-outwait-observation
+  # Template reservation and creation run only in the template steward, off
+  # every caller's path. Their pool-lock sections MUST wait in the pool's FIFO
+  # turn queue at least as long as a pool observation can hold the lock (2-5 s
+  # on CI runners), so a build is granted the lock when the current holder
+  # releases it instead of failing storage_busy while an observation runs.
+  @section_wait_ms 30_000
+
+  @doc false
+  @spec section_wait_ms() :: 30_000
+  def section_wait_ms, do: @section_wait_ms
+
   defp reserve(pool, image) do
     Storage.locked(
       pool,
@@ -200,7 +212,7 @@ defmodule Lilly.Host.ImageTemplate do
           end
         end
       end,
-      1000,
+      @section_wait_ms,
       :template_reserve
     )
   end
@@ -380,7 +392,7 @@ defmodule Lilly.Host.ImageTemplate do
           end
         end
       end,
-      1000,
+      @section_wait_ms,
       :template_create
     )
   end
