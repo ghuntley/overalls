@@ -212,7 +212,11 @@ jobs:
     needs: affected
     if: needs.affected.outputs.host_builds != '[]'
     name: build ${{ matrix.host.name }}
-    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    # A host deployment realises ~145 GiB (guest images, the Windows Server
+    # image): more than the ~125 GB Namespace allows a cache volume (ENOSPC in
+    # runs 41169053536 and 41194732683). The hosts-only 16x64 profile has a
+    # 288 GB root disk, and its store stays there instead of on the volume.
+    runs-on: namespace-profile-cached-amd64-hosts;container.privileged=true
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -228,11 +232,14 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+          nix-on-cache-volume: "false"
       - name: Build ${{ matrix.host.name }}
         env:
           TARGETS: ${{ toJSON(matrix.host.targets) }}
         run: |
           set -euo pipefail
+          df -h /nix
+          trap 'df -h /nix' EXIT
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}"
 

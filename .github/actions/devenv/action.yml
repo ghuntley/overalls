@@ -21,6 +21,14 @@ inputs:
     description: Whether to install the devenv CLI.
     required: false
     default: "true"
+  nix-on-cache-volume:
+    description: >-
+      Whether /nix and ~/.cache/nix live on the Namespace cache volume, which
+      Namespace caps at about 125 GB. "false" leaves them on the runner's root
+      disk for jobs whose closure exceeds that (ci.yml hosts on the 288 GB
+      cached-amd64-hosts profile).
+    required: false
+    default: "true"
 
 runs:
   using: composite
@@ -51,7 +59,7 @@ runs:
     - name: Mount caches from cache volume
       uses: namespacelabs/nscloud-cache-action@1124a6f3ce44e5cf84cc22111530961f4d2a15f9 # v1
       with:
-        cache: nix
+        cache: ${{ inputs.nix-on-cache-volume == 'true' && 'nix' || '' }}
         path: |
           ~/.npm
           ~/.cache/devenv
@@ -74,7 +82,8 @@ runs:
     # single-user: install multi-user here and start the daemon directly.
     # The installer takes ownership of a /nix restored from the cache volume.
     #
-    # The store MUST stay within the cache volume (116 GB). Evaluation
+    # The store MUST stay within the cache volume (116 GB), or the root disk
+    # when nix-on-cache-volume is "false". Evaluation
     # realises multi-gigabyte guest and storage images through
     # import-from-derivation, so min-free/max-free let the daemon collect
     # unrooted paths (images of finished evaluations, outputs already pushed)

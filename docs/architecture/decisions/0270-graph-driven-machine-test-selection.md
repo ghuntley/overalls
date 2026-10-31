@@ -154,6 +154,15 @@ PR runs the affected machine-test set, and the approved migration plan.
   run 41059576724 fanned out about 200 jobs for an otel-fleet test fix. This
   is a capacity limit on decision 4, not a change of it; the deferred suites
   run daily, and dispatch with `machine_all` runs them at once.
+  Whole host systems build one target per runner in the `hosts` job. A host
+  deployment realises about 145 GiB (guest images and the Windows Server
+  image), more than Namespace allows a cache volume (about 125 GB; runs
+  41169053536 and 41194732683 failed with ENOSPC). The `hosts` job therefore
+  runs on the hosts-only `cached-amd64-hosts` Namespace profile (16x64, with a
+  288 GB root disk) and keeps its Nix store on that disk
+  (`nix-on-cache-volume: "false"` in
+  [the devenv action](../../../.github/actions/devenv/action.yml)), still
+  realising and publishing the complete closure.
 - **Executed:** `tools/buck2 test` of `sysctl` and `nix-ld` booted their VMs
   and passed; through `nix_assemble`, `sysctl` produced the same store path as
   the flake check, so the declared-only tree evaluates the same test.
