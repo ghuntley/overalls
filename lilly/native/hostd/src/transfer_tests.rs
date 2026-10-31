@@ -259,6 +259,35 @@ fn ssh_pull_runs_unprivileged_with_fixed_options() {
     }
 }
 
+/// Run `ssh -G` on `arguments` and return what it printed.
+///
+/// The test binary shares one process with hostd's single reaper, which reaps
+/// every exited child (hostd-single-reaper). A child spawned outside its
+/// registry, such as by `Command::output`, can be reaped by it first, and the
+/// standard library's wait then fails with `ECHILD`. So `ssh -G` runs as a
+/// registered command; stderr shares the pipe, and its lines cannot supply
+/// the asserted keys because each must resolve to exactly one value.
+fn resolve_with_openssh(ssh_path: &std::path::Path, arguments: &[String]) -> String {
+    let arguments: Vec<CString> = std::iter::once("-G")
+        .chain(arguments.iter().map(String::as_str))
+        .map(|argument| CString::new(argument).unwrap())
+        .collect();
+    let (status, output) = crate::exec::run(
+        &crate::exec::Spec {
+            executable: ssh_path,
+            arguments: &arguments,
+            timeout: std::time::Duration::from_secs(30),
+            output_limit: 1 << 20,
+            lease: None,
+            inherit: &[],
+        },
+        &crate::exec::Custody::ProcessGroup,
+        &std::sync::atomic::AtomicBool::new(false),
+    );
+    assert_eq!(status, Status::Succeeded, "ssh -G");
+    String::from_utf8(output).unwrap()
+}
+
 /// @cc [owner:ghuntley,label:verification;security] hostd-ssh-effective-configuration
 /// Real OpenSSH (`ssh -G`) MUST resolve the derived producer to IPv4 only,
 /// user `lilly-transfer`, no agent, strict pinned host keys, identities only,
@@ -312,13 +341,7 @@ fn real_openssh_resolves_the_fixed_restrictions() {
     let count: usize = helper[5].parse().unwrap();
     let producer = &helper[6..6 + count];
     assert!(producer[0].ends_with("/ssh"));
-    let output = std::process::Command::new(ssh_path)
-        .arg("-G")
-        .args(&producer[1..])
-        .output()
-        .expect("ssh -G");
-    assert!(output.status.success());
-    let text = String::from_utf8(output.stdout).unwrap();
+    let text = resolve_with_openssh(ssh_path, &producer[1..]);
     let mut configuration: std::collections::HashMap<&str, Vec<&str>> =
         std::collections::HashMap::new();
     for (key, value) in text.lines().filter_map(|line| line.split_once(' ')) {

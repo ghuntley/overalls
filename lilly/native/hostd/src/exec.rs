@@ -71,6 +71,9 @@ fn reaper() -> &'static Reaper {
 /// child's status goes to the command that spawned it; orphaned descendants
 /// adopted by the subreaper are reaped and dropped. A failed spawn's child,
 /// which the standard library reaps itself, is therefore never taken from it.
+/// Any other child of the process, unit tests included, MUST be spawned
+/// through this registry: one spawned elsewhere (e.g. `Command::output`) can
+/// be reaped here first, and its own wait then fails with `ECHILD`.
 fn reap_forever() {
     let reaper = reaper();
     loop {
