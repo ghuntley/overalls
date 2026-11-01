@@ -1,4 +1,4 @@
-load("@root//buck:mila.bzl", "mila_platform", "mila_windows_ffi")
+load("@root//buck:mila.bzl", "mila_platform", "mila_windows_dll_check", "mila_windows_ffi")
 load("@root//buck:nix.bzl", "nix_owned", "nix_store_run")
 
 nix_owned()
@@ -52,18 +52,41 @@ _LOCALIZATION = glob(["localization/**"], exclude = _BUILD_OUTPUTS)
 _APPLE = glob(["native/apple/**", "native/mila-build"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
 _ANDROID = glob(["native/android/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
 _WINDOWS = glob(["windows-dotnet/**", "windows-dotnet-smoke/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + [
-    "//protocol:srcs",
+    "//protocol:test_fixtures",
 ]
 
 _FFI_MANIFEST = ["--manifest-path", "mila/rust/mila-ffi/Cargo.toml"]
 
 # --- Windows FFI. ---
 
-# The shipped mila_native.dll is MSVC, built on the Windows runner
-# (:windows-ffi-msvc). These Linux targets cross-build the same crate for
-# x86_64-pc-windows-gnu as a hermetic compile and Clippy check of its
-# cfg(windows) code (ADR-0265); the gnu DLL is not shipped.
+# The shipped mila_native.dll is the x86_64-pc-windows-gnu DLL, cross-built
+# hermetically and deterministically on Linux (ADR-0269 M9). mila-builds.yml
+# publishes it from Linux, and the Windows job imports it
+# (:windows-ffi-published) instead of building one. Clippy covers the
+# cfg(windows) code (ADR-0265).
 mila_windows_ffi(name = "windows-ffi-gnu", srcs = _FFI_SRCS, labels = ["check"])
+
+# A second, independent build (its own output and Cargo target directories,
+# never from a cache) that must be byte-identical to :windows-ffi-gnu.
+mila_windows_ffi(name = "windows-ffi-gnu-rebuild", srcs = _FFI_SRCS, independent = True)
+
+mila_windows_dll_check(
+    name = "windows-ffi-gnu-reproducible",
+    mode = "reproducible",
+    builds = [":windows-ffi-gnu", ":windows-ffi-gnu-rebuild"],
+    labels = ["check"],
+)
+
+# The DLL's mila_* exports equal the C header's functions, every .NET import
+# is exported, it imports only system DLLs and it holds no timestamp or path.
+mila_windows_dll_check(
+    name = "windows-ffi-gnu-abi",
+    mode = "abi",
+    builds = [":windows-ffi-gnu"],
+    header = "rust/mila-ffi/include/mila_ffi.h",
+    csharp = glob(["windows-dotnet/**/*.cs"], exclude = _BUILD_OUTPUTS),
+    labels = ["check"],
+)
 
 mila_windows_ffi(name = "windows-ffi-gnu-clippy", mode = "clippy", srcs = _FFI_SRCS, labels = ["check"])
 
@@ -177,7 +200,23 @@ mila_platform(
 
 # --- Windows (.NET 10 SDK, cargo and Python from PATH; tools/buck2 --no-nix). ---
 
-# The MSVC DLL, built with cargo in mila/rust/target as before.
+# The published gnu DLL, imported on Windows: mila-builds.yml downloads the
+# Linux job's artifact (mila_ffi.dll and SHA256SUMS) into
+# mila/build/windows-ffi-gnu and passes its digest as
+# `-c mila.windows_ffi_sha256=<hex>`, which the copy enforces.
+_PUBLISHED_DLL_SHA256 = read_config("mila", "windows_ffi_sha256", "")
+
+mila_platform(
+    name = "windows-ffi-published",
+    os = "windows",
+    steps = [],
+    outputs = {"mila_ffi.dll": "mila/build/windows-ffi-gnu/mila_ffi.dll"},
+    sums = {"mila_ffi.dll": "mila/build/windows-ffi-gnu/SHA256SUMS"},
+    sha256 = {"mila_ffi.dll": _PUBLISHED_DLL_SHA256} if _PUBLISHED_DLL_SHA256 else {},
+)
+
+# A local MSVC DLL for Windows development without the published artifact
+# (`-c mila.windows_ffi=msvc`); CI and releases never use it.
 mila_platform(
     name = "windows-ffi-msvc",
     os = "windows",
@@ -197,7 +236,10 @@ mila_platform(
 )
 
 # The WinUI client, restored in NuGet locked mode (packages.lock.json) and
-# built with the imported DLL staged as mila_native.dll.
+# built with the imported DLL staged as mila_native.dll: the published gnu DLL
+# unless `-c mila.windows_ffi=msvc`.
+_WINDOWS_FFI = read_config("mila", "windows_ffi", "published")
+
 mila_platform(
     name = "windows-dotnet",
     os = "windows",
@@ -205,7 +247,7 @@ mila_platform(
         {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet"},
         {"argv": ["dotnet", "build", "--configuration", "Release", "--no-restore", "-p:MilaNativeDll=$MILA_FFI_DIR/mila_ffi.dll"], "cwd": "mila/windows-dotnet"},
     ],
-    path_env = {"MILA_FFI_DIR": ":windows-ffi-msvc"},
+    path_env = {"MILA_FFI_DIR": ":windows-ffi-" + _WINDOWS_FFI},
     outputs = {"win-x64": "mila/windows-dotnet/bin/Release/net10.0-windows10.0.19041.0/win-x64"},
     require = ["dotnet", "python"],
     srcs = _WINDOWS,

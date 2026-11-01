@@ -38,6 +38,8 @@ class Output:
     # A SHA256SUMS file (relative to the project root or absolute) that MUST
     # list the copied file's digest, for an output another job produced.
     sums: str | None
+    # The SHA-256 the copied file MUST have (the producing job's digest).
+    sha256: str | None
 
 
 @dataclass(frozen=True)
@@ -86,11 +88,14 @@ def parse(document: object) -> Spec:
         if not isinstance(raw, dict):
             raise SystemExit("mila_platform: each output must be an object")
         source, name, sums = raw.get("source"), raw.get("name"), raw.get("sums")
+        sha256 = raw.get("sha256")
         if not isinstance(source, str) or not isinstance(name, str):
             raise SystemExit("mila_platform: an output needs a source and a name")
         if not (sums is None or isinstance(sums, str)):
             raise SystemExit("mila_platform: sums must be a path or null")
-        outputs.append(Output(source=source, name=name, sums=sums))
+        if not (sha256 is None or isinstance(sha256, str)):
+            raise SystemExit("mila_platform: sha256 must be a digest or null")
+        outputs.append(Output(source=source, name=name, sums=sums, sha256=sha256))
     return Spec(
         steps=steps,
         env=_mapping(document.get("env", {}), "env"),
@@ -161,6 +166,10 @@ def run(spec: Spec, root: Path, out: Path, stamp: Path | None) -> None:
             digest = hashlib.sha256(target.read_bytes()).hexdigest()
             if output.sums is not None:
                 _verify(root / output.sums, Path(output.source).name, digest)
+            if output.sha256 is not None and output.sha256 != digest:
+                raise SystemExit(
+                    f"mila_platform: {output.source} is {digest}, expected {output.sha256}"
+                )
             sums.append(f"{digest}  {output.name}\n")
     if sums:
         (out / "SHA256SUMS").write_text("".join(sums), encoding="utf-8")

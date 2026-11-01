@@ -985,6 +985,21 @@ bit-reproducible and the .NET interop has only been verified against MSVC,
 so it stays a compile and Clippy check. Switching the shipped DLL to gnu
 would need its own decision.
 
+**Windows FFI, reproducible (2026-11-01).** The user decided that the gnu DLL
+is the shipped Windows FFI artifact. The DLL was not reproducible because
+zig's lld stamped the build time into the COFF header; with
+`SOURCE_DATE_EPOCH=0` lld writes zero (`zig cc` refuses
+`-Wl,--no-insert-timestamp`), and the Cargo target directory is now remapped
+too. `//mila:windows-ffi-gnu-reproducible` compares it with an independent,
+uncached rebuild in other directories, and `//mila:windows-ffi-gnu-abi`
+checks its exports against the C header and the .NET imports, its import
+table (system and API-set DLLs only, so no MinGW runtime is needed), its
+timestamps and its bytes for build paths. `mila-builds.yml`'s Linux
+`windows-ffi` job publishes the DLL and its SHA-256, and `windows-native`
+imports and verifies it instead of building an MSVC DLL, then runs the
+production .NET interop smoke test against it. ADR-0269's M9 evidence lists
+the hashes and the CI run.
+
 **Darwin cells.** `buckCells.aarch64-darwin` evaluates once devenv's patched
 nixpkgs source (an import-from-derivation) is substituted from
 devenv.cachix.org; only three small derivations are built. Hermetic toolchains

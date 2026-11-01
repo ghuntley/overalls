@@ -211,12 +211,19 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   - Apple (macOS): `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`,
     `{macos,ios}-{dev,release}` (wrapping `mila/native/mila-build`).
   - Android (Linux or macOS): `android-debug`, `android-release`, `android-ffi-clippy`.
-  - Windows: `windows-ffi-msvc`, `windows-ffi-msvc-clippy`, `windows-dotnet`,
-    `windows-smoke`.
-  - Hermetic, on Linux: `windows-ffi-gnu` and `windows-ffi-gnu-clippy`
-    cross-build the FFI crate for `x86_64-pc-windows-gnu` with cargo-zigbuild
-    and the `rust//` cell's vendored crates. They are a compile and Clippy
-    check only; the shipped DLL stays MSVC.
+  - Windows: `windows-ffi-published`, `windows-dotnet`, `windows-smoke`, and
+    the local fallback `windows-ffi-msvc`, `windows-ffi-msvc-clippy`.
+  - Hermetic, on Linux: `windows-ffi-gnu` cross-builds the shipped FFI DLL
+    for `x86_64-pc-windows-gnu` with cargo-zigbuild and the `rust//` cell's
+    vendored crates, deterministically (`SOURCE_DATE_EPOCH=0`, remapped
+    paths). `windows-ffi-gnu-reproducible` compares it with the independent
+    `windows-ffi-gnu-rebuild`; `windows-ffi-gnu-abi` checks its exports
+    against `include/mila_ffi.h` and the .NET imports;
+    `windows-ffi-gnu-clippy` lints it. mila-builds.yml publishes the DLL.
+  - Windows imports that DLL: `windows-ffi-published` copies
+    `mila/build/windows-ffi-gnu/mila_ffi.dll` (the downloaded artifact) and
+    checks it against its `SHA256SUMS` and `-c mila.windows_ffi_sha256=<hex>`.
+    `-c mila.windows_ffi=msvc` builds the local MSVC fallback instead.
 - **The daemon's environment is the SDK.** Buck2 local actions inherit the
   environment of the daemon, not of the command. Install the SDKs first. Run
   `tools/buck2 kill` after changing `PATH` or a variable a build reads (the

@@ -39,9 +39,13 @@ existing typed Mila transport and must not be added as untyped FFI payloads.
 The development host is Linux, so the Windows SDK and .NET SDK are not
 available here. The project files are checked for contract and XML syntax;
 `dotnet restore` and a Windows build must run in the Windows CI job described by
-ADR-0235. That job runs the Buck2 targets `//mila:windows-ffi-msvc`,
-`//mila:windows-dotnet` and `//mila:windows-smoke` through
-`tools/buck2 --no-nix` (ADR-0269; see the buck2 skill).
+ADR-0235. That job builds no DLL: it downloads the reproducible
+`x86_64-pc-windows-gnu` `mila_ffi.dll` that the Linux `windows-ffi` job
+publishes from `//mila:windows-ffi-gnu` into `mila/build/windows-ffi-gnu`,
+then runs `//mila:windows-ffi-published`, `//mila:windows-dotnet` and
+`//mila:windows-smoke` through `tools/buck2 --no-nix` with
+`-c mila.windows_ffi_sha256=<digest>` (ADR-0269; see the buck2 skill).
+Without the artifact, `-c mila.windows_ffi=msvc` builds a local MSVC DLL.
 
 NuGet restores in locked mode from `packages.lock.json` here and in
 `../windows-dotnet-smoke`. After changing a `PackageReference`, refresh the lock

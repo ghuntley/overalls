@@ -417,7 +417,9 @@ the approved migration plan.
   verified against the pin registry, and enables only `non_hermetic`
   targets; [no-nix.nix](../../../nix/buck/no-nix.nix) fails when those pins
   stop matching the buckCells buck2. A hermetic `//mila:windows-ffi-gnu`
-  cross-build and Clippy check run on Linux; the shipped DLL stays MSVC.
+  cross-build and Clippy check run on Linux. Since 2026-11-01 (the user's
+  decision) that gnu DLL, not an MSVC build, is the shipped Windows FFI
+  artifact: see the reproducible Windows FFI DLL evidence below.
   `mila-builds.yml` builds Apple, Android and Windows through these
   targets, and `mila-release.yml` builds its source bundles and Linux tarball
   through `//:package-tool-mila-*`, the Android APK through
@@ -531,8 +533,35 @@ Remaining gaps, by milestone of the migration plan:
   builds run without a tag); its legacy Flutter Windows job is unchanged;
   the
   Robolectric `android-all` jar Gradle downloads at test time is outside the
-  verification metadata; the gnu Windows DLL is a check, not a reproducible
-  artifact;
+  verification metadata. (The gap "the gnu Windows DLL is a check, not a reproducible
+  artifact" is closed; see the next item);
+- the reproducible Windows FFI DLL (implemented, 2026-11-01): the user
+  decided that the gnu DLL, cross-built on Linux, is the published Windows
+  FFI artifact. [mila.bzl](../../../buck/mila.bzl) `mila_windows_ffi` builds
+  it with the single toolchain's rustc (ADR-0273), cargo-zigbuild and zig in
+  a clean environment with `SOURCE_DATE_EPOCH=0`, which zig's lld writes as a
+  zero PE `TimeDateStamp` (`zig cc` refuses `-Wl,--no-insert-timestamp`),
+  and remaps the vendor, checkout and Cargo target paths.
+  [mila/BUCK](../../../mila/BUCK) adds `:windows-ffi-gnu-rebuild`, an
+  independent local, uncached build in other output and target directories;
+  `:windows-ffi-gnu-reproducible` fails unless both DLLs are byte-identical,
+  and `:windows-ffi-gnu-abi` ([mila_windows_dll.py](../../../buck/mila_windows_dll.py))
+  parses the PE file and fails unless its `mila_*` exports equal the
+  hand-written `include/mila_ffi.h` (cbindgen cannot produce it, see the
+  review), every .NET `EntryPoint` is exported, it imports only system and
+  API-set DLLs (no libgcc or winpthread), its COFF, export and debug
+  timestamps are zero and it holds no build path.
+  [mila-builds.yml](../../../.github/workflows/mila-builds.yml)'s Linux
+  `windows-ffi` job runs those checks and publishes the DLL with its SHA-256;
+  `windows-native` no longer installs Rust or builds a DLL. It verifies the
+  download against that digest, and `//mila:windows-ffi-published` enforces
+  it again (`-c mila.windows_ffi_sha256`) before `:windows-dotnet` stages it
+  as `mila_native.dll` and `:windows-smoke` runs the production .NET interop
+  against it. `:windows-ffi-msvc` stays only as a local fallback
+  (`-c mila.windows_ffi=msvc`). Evidence: two local builds produced
+  `04ef3b4227e7a578c4cac7036b5c8ffc6e2583bd2557847b22855cfa8c2453eb`; the
+  CI run is recorded in the migration review. Release signing of the DLL
+  and of the .NET client remains with `mila-release.yml`;
 - the `publish-cache.yml` gates job, which reaches Buck2 through
   `prek run --all-files` and still repeats the ADR and contract steps that the
   `ci.yml` precommit job now runs;

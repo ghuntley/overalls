@@ -256,8 +256,21 @@ NuGet packages.lock.json in locked mode for Windows (ADR-0269 M9).
 mila_windows_ffi MUST build mila_ffi.dll for x86_64-pc-windows-gnu on Linux
 from the single Nix Rust toolchain, cargo-zigbuild, zig and the rust// cell's
 vendored root-lock crates, offline and with a clean environment, and MUST keep
-checkout and store paths out of the binary; its clippy mode MUST deny warnings
-for that target (ADR-0265, ADR-0273, ADR-0269 M9).
+checkout, store and Cargo target paths out of the binary. It MUST build with
+SOURCE_DATE_EPOCH=0 so the linker writes no PE timestamp. An `independent`
+build MUST run locally without reading or writing a cache. Its clippy mode
+MUST deny warnings for that target (ADR-0265, ADR-0273, ADR-0269 M9).
+
+@cc [owner:ghuntley,label:build;security;verification] mila-windows-ffi-published
+The Windows FFI DLL that Mila ships is //mila:windows-ffi-gnu, published by
+mila-builds.yml's Linux windows-ffi job; the Windows job MUST import it
+through //mila:windows-ffi-published, which refuses a copy whose digest
+differs from its SHA256SUMS or from `mila.windows_ffi_sha256`, and MUST NOT
+build a DLL itself. mila_windows_dll_check MUST fail when the DLL differs by
+one byte from the independent rebuild (reproducible), or when (abi) its
+mila_* exports differ from include/mila_ffi.h's functions, a .NET EntryPoint
+is not exported, it imports a non-system DLL, a COFF, export or debug
+directory timestamp is not zero, or it contains a build path (ADR-0269 M9).
 
 @cc [owner:ghuntley,label:verification] find-a-test-from-graph
 The tests README "Find a test" table MUST be rendered by docs.bxl from the

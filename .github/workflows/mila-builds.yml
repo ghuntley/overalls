@@ -6,7 +6,8 @@ name: "mila builds"
 # Android build on macOS with tools/buck2 over buckCells.aarch64-darwin, and
 # Windows, which has no Nix, runs `tools/buck2 --no-nix` with the pinned buck2
 # and prelude. The Android emulator and journey fixture need KVM, so they run
-# the macOS-built APKs on Linux.
+# the macOS-built APKs on Linux. Windows builds no DLL: it imports the
+# reproducible gnu FFI DLL that the Linux windows-ffi job publishes.
 on:
   pull_request:
     paths:
@@ -35,6 +36,8 @@ on:
       - "buck/nix.bzl"
       - "buck/checks.bzl"
       - "buck/mila_platform.py"
+      - "buck/mila_windows_dll.py"
+      - "buck/BUCK"
   push:
     branches: [trunk]
     paths:
@@ -63,6 +66,8 @@ on:
       - "buck/nix.bzl"
       - "buck/checks.bzl"
       - "buck/mila_platform.py"
+      - "buck/mila_windows_dll.py"
+      - "buck/BUCK"
   workflow_dispatch:
 
 concurrency:
@@ -216,11 +221,60 @@ jobs:
           fi
           curl -sS --max-time 10 -X POST "http://$address:8445/finished/$NODE/${OUTCOME:-skipped}" || true
 
+  # The published Windows FFI DLL (ADR-0269 M9): cross-built for
+  # x86_64-pc-windows-gnu on Linux by the hermetic //mila:windows-ffi-gnu,
+  # rebuilt independently and compared byte for byte, and checked against the
+  # C header and the .NET imports. windows-native imports this artifact and
+  # verifies it against the `sha256` output instead of building a DLL.
+  windows-ffi:
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 60
+    outputs:
+      sha256: ${{ steps.publish.outputs.sha256 }}
+    # Namespace remote cache (ADR-0276) for this hermetic job; the
+    # independent rebuild never reads or writes a cache.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Build, rebuild and check the Windows FFI DLL
+        run: |
+          tools/buck2 test //mila:windows-ffi-gnu-reproducible //mila:windows-ffi-gnu-abi //mila:windows-ffi-gnu-clippy
+          for target in windows-ffi-gnu-reproducible windows-ffi-gnu-abi; do
+            cat "$(tools/buck2 build "//mila:$target" --show-full-simple-output)"
+          done
+      - name: Stage the DLL
+        id: publish
+        run: |
+          dir=$(tools/buck2 build //mila:windows-ffi-gnu --show-full-simple-output)
+          mkdir -p out
+          cp -L "$dir/mila_ffi.dll" "$dir/SHA256SUMS" out/
+          (cd out && sha256sum -c SHA256SUMS)
+          sha256=$(sha256sum out/mila_ffi.dll | cut -d' ' -f1)
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+          echo "mila_ffi.dll sha256 $sha256" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: mila-windows-ffi
+          path: out/
+          if-no-files-found: error
+          retention-days: 30
+
   windows-native:
+    needs: windows-ffi
     runs-on: windows-2025
     timeout-minutes: 110
     env:
       MILA_TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
+      # Every Buck2 call passes the same -c, so the daemon keeps one config.
+      MILA_FFI_SHA256: ${{ needs.windows-ffi.outputs.sha256 }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Verify native client is independent of Flutter
@@ -237,11 +291,18 @@ jobs:
             $matches | ForEach-Object { $_.ToString() }
             throw 'Windows native client must remain independent of Flutter'
           }
-      - name: Install the pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+      # The published DLL from the Linux job, checked against its digest.
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          toolchain: 1.97.1
-          components: clippy
+          name: mila-windows-ffi
+          path: mila/build/windows-ffi-gnu
+      - name: Verify the published DLL
+        shell: bash
+        run: |
+          test -n "$MILA_FFI_SHA256"
+          cd mila/build/windows-ffi-gnu
+          sha256sum -c SHA256SUMS
+          echo "$MILA_FFI_SHA256  mila_ffi.dll" | sha256sum -c
       # No Nix here: `tools/buck2 --no-nix` downloads the pinned buck2 and
       # prelude (hashes from the pin registry) and builds only non_hermetic
       # targets. The daemon starts here and keeps this step's PATH.
@@ -252,21 +313,16 @@ jobs:
           dotnet_version=$(cd mila/windows-dotnet && dotnet --version)
           case "$dotnet_version" in 10.*) ;; *) echo "Mila requires the latest .NET 10 SDK, found $dotnet_version" >&2; exit 1 ;; esac
           tools/buck2 --no-nix --version
-      - name: Build Rust Windows FFI
-        shell: bash
-        run: tools/buck2 --no-nix build //mila:windows-ffi-msvc
-      - name: Clippy the Rust FFI
-        shell: bash
-        run: tools/buck2 --no-nix build //mila:windows-ffi-msvc-clippy
       # NuGet restores in locked mode (packages.lock.json); the build stages
-      # the MSVC DLL as mila/windows-dotnet/bin/Release/<tfm>/win-x64/mila_native.dll.
+      # the published DLL (//mila:windows-ffi-published, which enforces the
+      # digest) as mila/windows-dotnet/bin/Release/<tfm>/win-x64/mila_native.dll.
       - name: Build native WinUI client (.NET 10)
         shell: bash
-        run: tools/buck2 --no-nix build //mila:windows-dotnet
+        run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-dotnet
 
       - name: Invoke staged Rust DLL through production .NET interop
         shell: bash
-        run: tools/buck2 --no-nix build //mila:windows-smoke
+        run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-smoke
 
       # Journey mode drives the staged Rust session against the hermetic
       # Marshall+Porsche fixture through its descriptor (version 1: deployment
@@ -830,7 +886,7 @@ jobs:
   native-gate:
     name: Native platform gate
     if: ${{ always() }}
-    needs: [apple-native, android-native, android-emulator, linux-native, windows-native]
+    needs: [apple-native, android-native, android-emulator, linux-native, windows-ffi, windows-native]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -854,10 +910,11 @@ jobs:
           ANDROID: ${{ needs.android-native.result }}
           ANDROID_EMULATOR: ${{ needs.android-emulator.result }}
           LINUX: ${{ needs.linux-native.result }}
+          WINDOWS_FFI: ${{ needs.windows-ffi.result }}
           WINDOWS: ${{ needs.windows-native.result }}
         run: |
           set -eu
-          for result in "$APPLE" "$ANDROID" "$ANDROID_EMULATOR" "$LINUX" "$WINDOWS"; do
+          for result in "$APPLE" "$ANDROID" "$ANDROID_EMULATOR" "$LINUX" "$WINDOWS_FFI" "$WINDOWS"; do
             test "$result" = success || {
               echo "Native platform gate failed: $result" >&2
               exit 1

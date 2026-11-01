@@ -12,8 +12,11 @@
 # them.
 #
 # `mila_windows_ffi` is hermetic: it cross-builds the FFI crate for
-# x86_64-pc-windows-gnu on Linux (a compile and Clippy check; the shipped DLL
-# stays MSVC, built on Windows by a non_hermetic target).
+# x86_64-pc-windows-gnu on Linux. Its DLL is the published Windows FFI
+# artifact: built deterministically (SOURCE_DATE_EPOCH=0, so lld writes no PE
+# timestamp; build paths remapped), rebuilt independently and compared byte
+# for byte, and checked against the C header and the .NET imports by
+# `mila_windows_dll_check`. The Windows job imports it rather than building.
 #
 # Contract mila-non-hermetic-targets: see buck/CONTRACTS.
 
@@ -87,6 +90,8 @@ def mila_platform(
         os: str | list[str],
         steps: list[dict[str, typing.Any]],
         outputs: dict[str, str] = {},
+        sums: dict[str, str] = {},
+        sha256: dict[str, str] = {},
         env: dict[str, str] = {},
         path_env: dict[str, str] = {},
         require: list[str] = [],
@@ -101,7 +106,9 @@ def mila_platform(
     with `env` and with `path_env` (variable -> target whose output path is
     passed, absolute). `outputs` maps an output name to the repository path
     the steps produce; the target's output directory holds copies of them and
-    their SHA256SUMS. `require` names programs that must be on the daemon's
+    their SHA256SUMS. An output another job produced names, in `sums`, the
+    SHA256SUMS file that MUST list its digest, and, in `sha256`, a digest it
+    MUST have (which also enters the action key). `require` names programs that must be on the daemon's
     PATH. `srcs` are the declared inputs (changes rerun the build). A `check`
     writes a stamp that `buck2 test` reads.
     """
@@ -115,7 +122,7 @@ def mila_platform(
         name = name,
         spec = json.encode({
             "env": env,
-            "outputs": [{"name": n, "source": s, "sums": None} for n, s in outputs.items()],
+            "outputs": [{"name": n, "source": s, "sums": sums.get(n), "sha256": sha256.get(n)} for n, s in outputs.items()],
             "require": require,
             "steps": steps,
         }),
@@ -142,7 +149,7 @@ def _mila_windows_ffi_impl(ctx: AnalysisContext) -> list[Provider]:
         # Vendored root-lock crates only. Keep store and checkout paths out of
         # panic locations (see lyra.nix) through the target's config rustflags:
         # RUSTFLAGS would replace the flags cargo-zigbuild adds (its dlltool).
-        "printf '[source.crates-io]\\nreplace-with = \"vendored-sources\"\\n[source.vendored-sources]\\ndirectory = \"%s\"\\n[target.x86_64-pc-windows-gnu]\\nrustflags = [\"--remap-path-prefix=%s=/vendor\", \"--remap-path-prefix=%s=/source\"]\\n' \"$vendor\" \"$vendor\" \"$root\" > \"$CARGO_HOME/config.toml\"",
+        "printf '[source.crates-io]\\nreplace-with = \"vendored-sources\"\\n[source.vendored-sources]\\ndirectory = \"%s\"\\n[target.x86_64-pc-windows-gnu]\\nrustflags = [\"--remap-path-prefix=%s=/vendor\", \"--remap-path-prefix=%s=/source\", \"--remap-path-prefix=%s=/target\"]\\n' \"$vendor\" \"$vendor\" \"$root\" \"$CARGO_TARGET_DIR\" > \"$CARGO_HOME/config.toml\"",
         "if [ \"$mode\" = clippy ]; then",
         # ADR-0265: the cfg(windows) code only compiles for the Windows target.
         "  cargo-zigbuild clippy --locked --offline -p mila-ffi --all-targets --target x86_64-pc-windows-gnu -- -D warnings",
@@ -167,7 +174,9 @@ def _mila_windows_ffi_impl(ctx: AnalysisContext) -> list[Provider]:
             tool(ctx.attrs._bash),
             "-c",
             # A clean environment, keeping only Buck2's per-action scratch dir.
-            "exec \"$1/env\" -i PATH=\"$2\" BUCK_SCRATCH_PATH=\"$BUCK_SCRATCH_PATH\" \"$3\" \"${@:4}\"",
+            # zig's lld honours SOURCE_DATE_EPOCH for the PE TimeDateStamp
+            # (zig cc refuses -Wl,--no-insert-timestamp), so 0 means none.
+            "exec \"$1/env\" -i PATH=\"$2\" BUCK_SCRATCH_PATH=\"$BUCK_SCRATCH_PATH\" SOURCE_DATE_EPOCH=0 TZ=UTC LC_ALL=C \"$3\" \"${@:4}\"",
             "mila_windows_ffi",
             tool(ctx.attrs._coreutils),
             path,
@@ -180,6 +189,10 @@ def _mila_windows_ffi_impl(ctx: AnalysisContext) -> list[Provider]:
         ),
         category = "mila_windows_ffi",
         identifier = ctx.attrs.mode,
+        # An independent rebuild never comes from, or goes to, a cache, so the
+        # reproducibility check compares two real executions.
+        local_only = ctx.attrs.independent,
+        allow_cache_upload = not ctx.attrs.independent,
     )
     return check_providers(ctx, output) if clippy else [DefaultInfo(default_output = output)]
 
@@ -187,6 +200,7 @@ def _mila_windows_ffi_impl(ctx: AnalysisContext) -> list[Provider]:
 mila_windows_ffi = rule(
     impl = _mila_windows_ffi_impl,
     attrs = {
+        "independent": attrs.bool(default = False),
         "labels": attrs.list(attrs.string(), default = []),
         # "build" outputs mila_ffi.dll and SHA256SUMS; "clippy" is a check.
         "mode": attrs.enum(["build", "clippy"], default = "build"),
@@ -198,5 +212,46 @@ mila_windows_ffi = rule(
         "_rust": tool_attr("rust_bin"),
         "_vendor": tool_attr("rust_vendor"),
         "_zig": tool_attr("zig"),
+    },
+)
+
+def _mila_windows_dll_check_impl(ctx: AnalysisContext) -> list[Provider]:
+    stamp = ctx.actions.declare_output("stamp")
+    builds = [dep[DefaultInfo].default_outputs[0] for dep in ctx.attrs.builds]
+    if ctx.attrs.mode == "reproducible":
+        if len(builds) != 2:
+            fail("mila_windows_dll_check(reproducible) compares exactly two builds")
+        args = builds
+    else:
+        if len(builds) != 1:
+            fail("mila_windows_dll_check(abi) checks exactly one build")
+        args = [cmd_args(builds[0], format = "{}/mila_ffi.dll"), ctx.attrs.header] + ctx.attrs.csharp
+    ctx.actions.run(
+        cmd_args(
+            tool(ctx.attrs._python),
+            "-I",
+            ctx.attrs._driver,
+            ctx.attrs.mode,
+            stamp.as_output(),
+            args,
+        ),
+        category = "mila_windows_dll_check",
+        identifier = ctx.attrs.mode,
+    )
+    return check_providers(ctx, stamp)
+
+# Contract mila-windows-ffi-published: see buck/CONTRACTS.
+mila_windows_dll_check = rule(
+    impl = _mila_windows_dll_check_impl,
+    attrs = {
+        # reproducible: two mila_windows_ffi builds; abi: one.
+        "builds": attrs.list(attrs.dep()),
+        "csharp": attrs.list(attrs.source(), default = []),
+        "header": attrs.option(attrs.source(), default = None),
+        "labels": attrs.list(attrs.string(), default = []),
+        "mode": attrs.enum(["reproducible", "abi"]),
+        "_coreutils": tool_attr("coreutils"),
+        "_driver": attrs.default_only(attrs.source(default = "root//buck:mila_windows_dll.py")),
+        "_python": tool_attr("python"),
     },
 )
