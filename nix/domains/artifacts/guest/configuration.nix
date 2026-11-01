@@ -1,7 +1,7 @@
 { config, lib, options, pkgs, modulesPath, ... }@arguments:
 let
   codingClis = arguments.codingClis or (import ./coding-clis.nix { inherit pkgs; });
-  githubTools = import ./github { inherit pkgs; };
+  githubTools = arguments.githubTools or (import ./github { inherit pkgs; });
 in
 {
   imports = [

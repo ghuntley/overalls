@@ -612,10 +612,15 @@ Remaining gaps, by milestone of the migration plan:
     HEGEL_SEED, because hegel_ex sets no per-property database key. A
     per-property key would also enable the engine's `.hegel/examples` replay
     database; that is an upstream hegel_ex follow-up.
-- M7 leftovers:
-  - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
-    the module-configuration test consume `githubTools` and `marvin`
-    through Nix until assembly takes Buck2 artifacts (M3).
+- M7 leftovers: none for gh, git-lfs and Marvin. Assembly takes
+  `//nix/domains/artifacts/guest/github:release-import` and `//marvin:import`
+  as the `github-tools` and `marvin` artifacts (`PACKAGE_ARTIFACTS` in
+  [artifacts.bzl](../../../buck/artifacts.bzl)). Guest images, the Marshall
+  and Ziggy modules and the machine tests read them through the package set
+  ([github/default.nix](../../../nix/domains/artifacts/guest/github/default.nix),
+  contract github-tools-from-buck2; Marvin through `swapLeaf`). The Nix
+  builds remain only for `mila-journey-fixture`, which assembles without
+  artifacts, and for evaluation checks that import a guest module directly.
 - M9 leftovers: `mila-release.yml`'s signed Buck2 builds, Android signing
   and signing-leak checks have not run: the repository has no `mila-release`
   environment or signing secrets yet, and its publish job creates a public

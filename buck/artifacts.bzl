@@ -15,7 +15,16 @@ def _merge(*dicts) -> dict[str, str]:
             merged[name] = target
     return merged
 
-ASSEMBLY_ARTIFACTS = _merge(RUST_ARTIFACTS, MIX_ARTIFACTS)
+# Buck2 packages that are neither Rust leaves nor Mix releases: the managed
+# GitHub tools release (gh and git-lfs for every guest platform) and Marvin's
+# browser-extension release. Contract github-tools-from-buck2: see
+# nix/domains/artifacts/guest/github/default.nix.
+PACKAGE_ARTIFACTS = {
+    "github-tools": "root//nix/domains/artifacts/guest/github:release-import",
+    "marvin": "root//marvin:import",
+}
+
+ASSEMBLY_ARTIFACTS = _merge(RUST_ARTIFACTS, MIX_ARTIFACTS, PACKAGE_ARTIFACTS)
 
 # Machine tests also get the test-only fixtures; hosts never do.
 MACHINE_TEST_ARTIFACTS = _merge(ASSEMBLY_ARTIFACTS, TEST_ARTIFACTS)

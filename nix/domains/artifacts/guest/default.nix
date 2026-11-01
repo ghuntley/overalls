@@ -1,5 +1,6 @@
 { pkgs, terminald, lyraLinux, vscodeWeb ? null, vscodeWebBroker ? null,
   codingClis ? import ./coding-clis.nix { inherit pkgs; },
+  githubTools ? import ./github { inherit pkgs; },
   extraModules ? [ ], imageName ? "lilly-nixos-x86_64",
   minimumMemoryBytes ? (if vscodeWeb == null then 536870912 else 2147483648),
   minimumDiskBytes ? null,
@@ -10,7 +11,7 @@ let
   guest = import (pkgs.path + "/nixos/lib/eval-config.nix") {
     system = "x86_64-linux";
     inherit pkgs;
-    specialArgs = { inherit codingClis; };
+    specialArgs = { inherit codingClis githubTools; };
     modules = [ ./configuration.nix ({ config, ... }: {
       # Profiles such as Inception deliberately disable administrative SSH
       # while still enabling the boot-bound trust receiver below.

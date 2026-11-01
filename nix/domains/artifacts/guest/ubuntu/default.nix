@@ -1,5 +1,6 @@
 { pkgs, terminald, lyraLinux, vscodeWeb ? null, vscodeWebBroker ? null,
-  codingClis ? import ../coding-clis.nix { inherit pkgs; } }:
+  codingClis ? import ../coding-clis.nix { inherit pkgs; },
+  githubTools ? import ../github { inherit pkgs; } }:
 { imageName ? "lilly-ubuntu-26.04-x86_64"
 , packages ? [ ]
 , packageLock ? ./packages.lock.json
@@ -10,7 +11,6 @@
 }:
 let
   inherit (pkgs) lib;
-  githubTools = import ../github { inherit pkgs; };
   nixCache = import ../../../../platform/nix-cache.nix;
   nixConfig = pkgs.writeText "overalls-ubuntu-nix.conf" ''
     experimental-features = nix-command flakes

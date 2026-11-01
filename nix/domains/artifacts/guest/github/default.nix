@@ -1,4 +1,7 @@
-{ pkgs }:
+# `release` is the Buck2 build of the same release
+# (//nix/domains/artifacts/guest/github:release, imported by assembly as the
+# `github-tools` artifact). Without it every binary is built here.
+{ pkgs, release ? null }:
 let
   inherit (pkgs) lib;
   platforms = {
@@ -70,10 +73,20 @@ let
     '';
     meta.license = lib.licenses.mit;
   };
-  gh = lib.mapAttrs mkGh platforms;
-  lfs = lib.mapAttrs mkLfs platforms;
+  # @cc [owner:ghuntley,label:build] github-tools-from-buck2
+  # With a Buck2 release, gh, git-lfs and the release directory MUST all come
+  # from it: each per-platform package installs that release's binary, so a
+  # guest image and Marshall's manifest name the same bytes, and nothing here
+  # compiles Go. go-binary-nix-parity keeps both builds byte-identical.
+  fromRelease = tool: platform: goos:
+    let file = tool + lib.optionalString (goos == "windows") ".exe"; in
+    pkgs.runCommand "overalls-managed-${tool}-${platform}" { meta.license = lib.licenses.mit; } ''
+      install -D -m 0755 ${release}/${platform}/${file} "$out/bin/${file}"
+    '';
+  gh = if release == null then lib.mapAttrs mkGh platforms else lib.mapAttrs (fromRelease "gh") platforms;
+  lfs = if release == null then lib.mapAttrs mkLfs platforms else lib.mapAttrs (fromRelease "git-lfs") platforms;
   packages = platform: [ gh.${platform} lfs.${platform} ];
-  release = pkgs.runCommand "overalls-github-tools-release-v1" {
+  nixRelease = pkgs.runCommand "overalls-github-tools-release-v1" {
     nativeBuildInputs = [ pkgs.jq ];
     passthru = { inherit gh lfs; configuration = ./github.gitconfig; };
   } ''
@@ -103,6 +116,7 @@ let
     jq -Sc --arg generation "$generation" '. + {generation:$generation}' manifest.json > "$out/manifest.json"
   '';
 in {
-  inherit gh lfs packages release;
+  inherit gh lfs packages;
+  release = if release == null then nixRelease else release;
   configuration = ./github.gitconfig;
 }

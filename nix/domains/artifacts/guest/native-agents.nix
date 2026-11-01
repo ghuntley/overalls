@@ -1,8 +1,7 @@
-{ pkgs, lyra, terminald }:
+{ pkgs, lyra, terminald, githubTools ? import ./github { inherit pkgs; } }:
 let
   bootstrap = import ./native-bootstrap.nix { inherit pkgs lyra; };
   nativeGit = import ./native-git.nix { inherit pkgs; };
-  githubTools = import ./github { inherit pkgs; };
   # @cc [owner:ghuntley,label:security] native-agent-set-complete
   # Every binary listed here MUST be cross-built for the selected native OS;
   # the image builder MUST never copy the Linux Lyra closure into a native

@@ -254,7 +254,7 @@ let
   nixosGuest = import ../../../../domains/artifacts/guest {
     inherit pkgs;
     inherit (packages) terminald;
-    codingClis = packages.codingClis;
+    inherit (packages) codingClis githubTools;
     vscodeWeb = if editor || suspension then packages.vscodeWeb else null;
     vscodeWebBroker = if editor || suspension then packages.vscodeWebBroker else null;
     lyraLinux = if agent && !(agentCli || guestCliRecovery || executorLoss) then agentSeed else packages.lyraLinux;
@@ -323,7 +323,7 @@ let
   ubuntuGuestBuilder = import ../../../../domains/artifacts/guest/ubuntu {
     inherit pkgs;
     inherit (packages) terminald;
-    codingClis = packages.codingClis;
+    inherit (packages) codingClis githubTools;
     vscodeWeb = if editor || suspension then packages.vscodeWeb else null;
     vscodeWebBroker = if editor || suspension then packages.vscodeWebBroker else null;
     lyraLinux = if agent && !guestCliRecovery then agentSeed else packages.lyraLinux;
@@ -336,7 +336,7 @@ let
     (if selectedForeignFamily == "arch" then ../../../../domains/artifacts/guest/arch else ../../../../domains/artifacts/guest/alma)
     {
       inherit pkgs;
-      inherit (packages) terminald lyraLinux;
+      inherit (packages) terminald lyraLinux githubTools;
       mkUbuntuGuest = ubuntuGuestBuilder;
       vscodeWeb = if editor then packages.vscodeWeb else null;
       vscodeWebBroker = if editor then packages.vscodeWebBroker else null;

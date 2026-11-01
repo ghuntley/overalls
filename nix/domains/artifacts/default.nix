@@ -80,14 +80,14 @@ let
     systemImageTypes = [ "google_apis" ];
     abiVersions = [ "x86_64" ];
   }).androidsdk;
-  githubTools = import ./guest/github { inherit pkgs; };
+  githubTools = import ./guest/github { inherit pkgs; release = artifacts.github-tools or null; };
   # Patched static Firecracker/jailer pair (ADR-0169); the only VMM Lilly runs.
   inherit (import ./infrastructure/firecracker.nix { inherit pkgs; }) vmm;
   # UEFI firmware Firecracker loads as its PVH "kernel" for Windows guests.
   windowsFirmware = import ./guest/windows/firmware.nix { inherit pkgs; };
   # DEBUG build with firmware tracing on the serial console, for boot diagnosis.
   windowsFirmwareDebug = import ./guest/windows/firmware.nix { inherit pkgs; debug = true; };
-  mkWindowsGuest = import ./guest/windows { inherit pkgs; firmware = windowsFirmware; };
+  mkWindowsGuest = import ./guest/windows { inherit pkgs githubTools; firmware = windowsFirmware; };
   # Agentless image (ADR-0170) carrying the vsock transport probe (ADR-0171 gate 1).
   windowsGuest = mkWindowsGuest { agents = lyraWindows; };
   # The windows-v1 image: the same installation with the readiness and trust
@@ -124,7 +124,7 @@ let
   });
   lyraWindows = lyra.windows;
   githubBootstrapRelease = import ./infrastructure/executor-bootstrap.nix { inherit pkgs lyra; };
-  nativeAgentPayload = import ./guest/native-agents.nix { inherit pkgs lyra terminald; };
+  nativeAgentPayload = import ./guest/native-agents.nix { inherit pkgs lyra terminald githubTools; };
   # Native guest daemons use each OS's reviewed vsock ABI and are shipped
   # separately from the workstation CLI for native image assembly.
   lyraNative = pkgs.runCommand "overalls-native-agents" {} ''
@@ -161,7 +161,7 @@ let
   };
 
   nestingProbeGuest = import ./guest {
-    inherit pkgs terminald lyraLinux codingClis;
+    inherit pkgs terminald lyraLinux codingClis githubTools;
     privateServiceRoots = [ ];
     imageName = "inception-inner-nesting-probe-x86_64";
     minimumMemoryBytes = 536870912;
@@ -181,14 +181,17 @@ let
   rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "lyra" "lyra-native" "lyra-native-probes" "lyra-windows" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ]
     # Test-only fixtures (buck/rust_artifacts.bzl TEST_ARTIFACTS).
     ++ [ "otel-request-fixture" "otel-request-recorder-cut" ];
+  # Other Buck2 packages (buck/artifacts.bzl PACKAGE_ARTIFACTS).
+  packageArtifactNames = [ "github-tools" "marvin" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
   # release (`<app>`), its encrypted variant (`encrypted-<app>`), a fixture
   # release (`fixture-<app>-<variant>`, read through releaseFixture), or a
-  # Buck2 Rust leaf in `rustArtifactNames`. A misspelt key would otherwise be
-  # ignored and the Nix build used silently (ADR-0269).
+  # Buck2 Rust leaf in `rustArtifactNames` or package in
+  # `packageArtifactNames`. A misspelt key would otherwise be ignored and the
+  # Nix build used silently (ADR-0269).
   unknownArtifacts = builtins.filter
-    (name: !(builtins.elem name (mixApplications ++ map (name: "encrypted-${name}") mixApplications ++ rustArtifactNames)
+    (name: !(builtins.elem name (mixApplications ++ map (name: "encrypted-${name}") mixApplications ++ rustArtifactNames ++ packageArtifactNames)
       || lib.any (application: lib.hasPrefix "fixture-${application}-" name) mixApplications))
     (builtins.attrNames artifacts);
 
@@ -440,7 +443,9 @@ rec {
   inherit terminald terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;
-  marvin = import ./marvin { inherit pkgs; };
+  # Marvin's Buck2 build (//marvin:marvin, the `marvin` artifact) when assembly
+  # supplies it; npm-lock-node-modules keeps both builds on package-lock.json.
+  marvin = swapLeaf "marvin" (import ./marvin { inherit pkgs; });
   mila = import ./mila { inherit pkgs; };
   vscodeWeb = import ./vscode-web { inherit pkgs; };
   updateVscodeExtensions = import ./vscode-web/updater.nix { inherit pkgs vscodeWeb; };
@@ -458,24 +463,24 @@ rec {
   mkSusanImage = revision: import ./susan-image.nix { inherit pkgs revision; release = mixReleases.susan; };
   susanImage = import ./susan-image.nix { inherit pkgs; release = mixReleases.susan; };
   guest = import ./guest {
-    inherit pkgs privateServiceRoots terminald lyraLinux vscodeWeb vscodeWebBroker codingClis;
+    inherit pkgs privateServiceRoots terminald lyraLinux vscodeWeb vscodeWebBroker codingClis githubTools;
     minimumMemoryBytes = 2147483648;
   };
   mkAndroidGuest = import ./guest/android {
-    inherit pkgs terminald lyraLinux codingClis androidSdk;
+    inherit pkgs terminald lyraLinux codingClis githubTools androidSdk;
   };
   androidGuest = mkAndroidGuest { inherit privateServiceRoots; };
-  mkUbuntuGuest = import ./guest/ubuntu { inherit pkgs terminald lyraLinux vscodeWeb vscodeWebBroker codingClis; };
+  mkUbuntuGuest = import ./guest/ubuntu { inherit pkgs terminald lyraLinux vscodeWeb vscodeWebBroker codingClis githubTools; };
   ubuntuGuest = mkUbuntuGuest { inherit privateServiceRoots; minimumMemoryBytes = 2147483648; };
   # Foreign Linux variants share the reviewed kernel/initrd boot contract while
   # their builders assemble roots from separately pinned distribution inputs.
   # The builders install the generic Linux guest runtime and keep image
   # identities separate in the fleet catalog by distribution and source pin.
-  mkArchGuest = import ./guest/arch { inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker; };
+  mkArchGuest = import ./guest/arch { inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker githubTools; };
   archGuest = mkArchGuest { inherit privateServiceRoots; minimumMemoryBytes = 2147483648; };
   mkArchLinuxGuest = mkArchGuest;
   archLinuxGuest = archGuest;
-  mkAlmaLinuxGuest = import ./guest/alma { inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker; };
+  mkAlmaLinuxGuest = import ./guest/alma { inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker githubTools; };
   almaLinuxGuest = mkAlmaLinuxGuest { inherit privateServiceRoots; minimumMemoryBytes = 2147483648; };
   # Short aliases follow the catalog's display name and preserve discoverability
   # for callers that use the conventional Alma naming.
@@ -585,7 +590,7 @@ rec {
     privateServiceRoots = if privateServiceRoots == []
       then [ "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt" ]
       else privateServiceRoots;
-    inherit terminald lyraLinux codingClis;
+    inherit terminald lyraLinux codingClis githubTools;
     gitIdentityVersion = 1;
     imageName = "inception-nixos-x86_64";
     minimumMemoryBytes = 34359738368;
@@ -595,7 +600,7 @@ rec {
     }) ];
   };
   inceptionProbeGuest = import ./guest {
-    inherit pkgs terminald lyraLinux codingClis;
+    inherit pkgs terminald lyraLinux codingClis githubTools;
     privateServiceRoots = [ ];
     imageName = "inception-nesting-probe-x86_64";
     minimumMemoryBytes = 2147483648;

@@ -1,4 +1,4 @@
-{ pkgs, firmware }:
+{ pkgs, firmware, githubTools ? import ../github { inherit pkgs; } }:
 { imageName ? "lilly-windows-server-2025-x86_64"
 , iso ? builtins.fromJSON (builtins.readFile ./iso.json)
 , windowsIso ? pkgs.fetchurl { inherit (iso) url sha256 name; }
@@ -53,7 +53,6 @@ assert editorBundle == null || (editorBundle.editorProtocol == 1 &&
   builtins.match "[0-9a-f]{64}" editorBundle.releaseId != null);
 assert editorBroker == null || (editorBroker.targetPlatform == "win32-x64" && !editorBroker.editorCapability);
 let
-  githubTools = import ../github { inherit pkgs; };
   inherit (pkgs) lib;
   editorDescriptor = if editorBundle == null then null else {
     protocol = editorBundle.editorProtocol;

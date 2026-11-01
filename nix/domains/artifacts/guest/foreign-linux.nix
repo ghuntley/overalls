@@ -1,5 +1,5 @@
 { pkgs, mkUbuntuGuest, terminald, lyraLinux, distribution, defaultImageName, source, sourceFormat,
-  vscodeWeb ? null, vscodeWebBroker ? null }:
+  vscodeWeb ? null, vscodeWebBroker ? null, githubTools ? import ./github { inherit pkgs; } }:
 { imageName ? defaultImageName
 , privateServiceRoots ? [ ]
 , files ? { }
@@ -8,7 +8,6 @@
 }:
 let
   inherit (pkgs) lib;
-  githubTools = import ./github { inherit pkgs; };
   # @cc [owner:ghuntley,label:build;security] foreign-linux-fixture-files
   # Custom files MUST use canonical absolute /opt destinations and ordinary
   # read-only or owner-writable file modes. Assembly MUST refuse existing

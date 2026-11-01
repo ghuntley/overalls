@@ -1,7 +1,8 @@
 # Managed gh and git-lfs (M7, ADR-0269): Buck2 builds of the same patched
 # releases as default.nix, from the Nix-vendored modules in buckCells' go/.
-# default.nix stays the Nix definition consumed by guest images and the
-# Marshall/Ziggy modules until assembly takes Buck2 artifacts (M3).
+# Assembly takes :release-import as the `github-tools` artifact
+# (buck/artifacts.bzl); default.nix builds them only for an assembly without it.
+load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:go.bzl", "go_binary", "go_test")
 load("@root//buck:github.bzl", "github_tools_release")
 load("@root//buck:nix.bzl", "nix_owned")
@@ -61,5 +62,13 @@ github_tools_release(
     name = "release",
     configuration = "github.gitconfig",
     platforms = {platform: (":gh-" + platform, ":git-lfs-" + platform) for platform in PLATFORMS},
+    visibility = ["PUBLIC"],
+)
+
+# Static binaries and a manifest: the release embeds no store path.
+nix_store_import(
+    name = "release-import",
+    src = ":release",
+    allowed_references = [],
     visibility = ["PUBLIC"],
 )

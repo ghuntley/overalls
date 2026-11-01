@@ -22,7 +22,7 @@ let
   };
   constructor = distribution: editor: broker: import (../../../domains/artifacts/guest + "/${distribution}") {
     inherit pkgs;
-    inherit (packages) mkUbuntuGuest terminald lyraLinux;
+    inherit (packages) mkUbuntuGuest terminald lyraLinux githubTools;
     vscodeWeb = editor;
     vscodeWebBroker = broker;
   };

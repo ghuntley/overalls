@@ -94,7 +94,7 @@ nixos_machine_test(
     labels = [],
     params = {
         "bootProfile": "true",
-        "guest": "import ../../domains/artifacts/guest { pkgs = buildPkgs; inherit (packages) terminald lyraLinux; privateServiceRoots = [ ./fixtures/ubuntu/ca.crt ]; }",
+        "guest": "import ../../domains/artifacts/guest { pkgs = buildPkgs; inherit (packages) terminald lyraLinux githubTools; privateServiceRoots = [ ./fixtures/ubuntu/ca.crt ]; }",
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",

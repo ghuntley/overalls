@@ -1,6 +1,7 @@
-{ pkgs, mkUbuntuGuest, terminald, lyraLinux, vscodeWeb ? null, vscodeWebBroker ? null }:
+{ pkgs, mkUbuntuGuest, terminald, lyraLinux, vscodeWeb ? null, vscodeWebBroker ? null,
+  githubTools ? import ../github { inherit pkgs; } }:
 import ../foreign-linux.nix {
-  inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker;
+  inherit pkgs mkUbuntuGuest terminald lyraLinux vscodeWeb vscodeWebBroker githubTools;
   distribution = "arch";
   defaultImageName = "lilly-archlinux-x86_64";
   source = pkgs.fetchurl {

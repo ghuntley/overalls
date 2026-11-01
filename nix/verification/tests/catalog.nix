@@ -512,7 +512,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
     bootProfile = true;
     guest = import ../../domains/artifacts/guest {
       pkgs = buildPkgs;
-      inherit (packages) terminald lyraLinux;
+      inherit (packages) terminald lyraLinux githubTools;
       privateServiceRoots = [ ./fixtures/ubuntu/ca.crt ];
     };
   });
