@@ -49,6 +49,35 @@ defmodule Marshall.CedarEntities do
     )
   end
 
+  @spec thread(String.t(), String.t(), map(), map()) :: Entity.t()
+  def thread(id, owner_id, grants \\ %{}, attributes \\ %{}) do
+    Entity.new(
+      "Thread",
+      id,
+      Map.merge(
+        %{
+          "owner" => user(owner_id),
+          "owner_active" => true,
+          "sharing" => true,
+          "viewers" => users(grants, :viewer),
+          "operators" => users(grants, :operator),
+          "managers" => users(grants, :manager),
+          "team_admins" => users(grants, :team_admins),
+          "team_members" => users(grants, :team_members)
+        },
+        attributes
+      )
+    )
+  end
+
+  @spec terminal_session(String.t(), String.t(), [String.t()]) :: Entity.t()
+  def terminal_session(id, owner_id, viewer_ids \\ []) do
+    Entity.new("TerminalSession", id, %{
+      "owner" => user(owner_id),
+      "viewers" => Enum.map(viewer_ids, &user/1)
+    })
+  end
+
   defp user(id), do: {"User", id}
   defp users(grants, role), do: grants |> Map.get(role, []) |> Enum.map(&user/1)
 end
