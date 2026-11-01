@@ -111,15 +111,46 @@ with subtest("destination host loss mid-receive retains commitments until rejoin
         "fleet-relocation-guest clone-write " + origin["placement_id"], timeout=180
     )
 
-    admission: object = operator(
-        m1,
-        dict(action="clone", owner_id=users["owner_id"], vm_id=origin_vm, key=str(uuid.uuid4())),
-    )
-    assert isinstance(admission, dict)
-    clone_id = str(admission["id"])
-    copy_id = str(admission["destination_vm_id"])
-    assert str(uuid.UUID(clone_id)) == clone_id
-    assert str(uuid.UUID(copy_id)) == copy_id
+    # Activation admits against measured CPU/RAM headroom (restart-full-shape-
+    # recheck), which counts the running source's own load. A burst such as the
+    # marker sync can refuse one activation with insufficient_capacity, a durable
+    # failure; a fresh request is retried exactly as provisioning above is.
+    clone_admitted: dict[str, str] = {}
+
+    def clone_activated() -> bool:
+        admission: object = operator(
+            m1,
+            dict(
+                action="clone", owner_id=users["owner_id"], vm_id=origin_vm, key=str(uuid.uuid4())
+            ),
+        )
+        assert isinstance(admission, dict)
+        request_id = str(admission["id"])
+        destination_id = str(admission["destination_vm_id"])
+        assert str(uuid.UUID(request_id)) == request_id
+        assert str(uuid.UUID(destination_id)) == destination_id
+
+        def activation_settled() -> bool:
+            return sql(
+                "SELECT phase <> 'queued' OR finished_at IS NOT NULL "
+                f"FROM compute_clone_requests WHERE id='{request_id}'"
+            ) in ("t", "true")
+
+        eventually(activation_settled, timeout=300)
+        failure = sql(
+            "SELECT coalesce(failure, '') || ':' || (finished_at IS NOT NULL)::text "
+            f"FROM compute_clone_requests WHERE id='{request_id}'"
+        )
+        if failure == "insufficient_capacity:true":
+            time.sleep(5)
+            return False
+        assert failure.endswith(":false"), f"clone activation failed: {failure.split(':')[0]}"
+        clone_admitted.update(clone_id=request_id, copy_id=destination_id)
+        return True
+
+    eventually(clone_activated, timeout=600)
+    clone_id = clone_admitted["clone_id"]
+    copy_id = clone_admitted["copy_id"]
 
     # Only the physical receive of a running admitted copy arms the crash.
     def receive_begun() -> bool:
