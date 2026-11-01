@@ -152,7 +152,7 @@ defmodule Lilly.VM.ActorWatchTest do
 
     # Like the real helper it exits when Lilly closes its stdin (EOF).
     File.write!(script, """
-    #!/usr/bin/env bash
+    #!#{System.find_executable("bash") || raise("missing fixture utility")}
     wait_parent() {
       if read -r -t 0.01 _; then
         return 1

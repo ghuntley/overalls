@@ -7,22 +7,36 @@ defmodule Lilly.Transfer.StreamTest do
   alias Lilly.Transfer.Stream
   @moduletag :tmp_dir
 
-  # TEST-NET-1 (RFC 5737): connections never complete, so an SSH producer
-  # stays connecting until the stream deadline or its owner's death.
-  @unreachable "192.0.2.1"
+  # A loopback listener that never accepts: the TCP handshake completes in
+  # its backlog but no SSH banner ever arrives, so an SSH producer stalls
+  # until the stream deadline or its owner's death. Loopback works in a
+  # network-less build sandbox, where an unroutable address fails at once.
+  @unreachable "127.0.0.1"
 
   setup %{tmp_dir: dir} do
     File.chmod!(dir, 0o700)
     expected = Path.join(dir, "expected")
     File.write!(expected, "lilly-probe-v3 challenge\n")
-    %{dir: dir, ownership: Path.join(dir, "transfer"), expected: expected}
+    {:ok, silent} = :gen_tcp.listen(0, [:binary, ip: {127, 0, 0, 1}, active: false])
+    {:ok, port} = :inet.port(silent)
+    {:ok, closed} = :gen_tcp.listen(0, ip: {127, 0, 0, 1})
+    {:ok, refused} = :inet.port(closed)
+    :ok = :gen_tcp.close(closed)
+
+    %{
+      dir: dir,
+      ownership: Path.join(dir, "transfer"),
+      expected: expected,
+      port: port,
+      refused: refused
+    }
   end
 
-  defp ssh(c, address) do
+  defp ssh(c, address, port \\ nil) do
     {:ssh,
      %{
        address: address,
-       port: 2223,
+       port: port || c.port,
        source_host: "33333333-4444-4555-8666-777777777777",
        relocation: "22222222-3333-4444-8555-666666666666",
        identity: Path.join(c.dir, "id_ed25519"),
@@ -71,11 +85,11 @@ defmodule Lilly.Transfer.StreamTest do
   end
 
   test "a failed side is a closed observation and progress starts at zero", c do
-    # Nothing listens on the loopback port, and no key exists: ssh fails.
+    # Nothing listens on this loopback port, and no key exists: ssh fails.
     owner = self()
 
     assert {:error, reason} =
-             Stream.run(c.ownership, ssh(c, "127.0.0.1"), compare(c), 10_000, 0, owner)
+             Stream.run(c.ownership, ssh(c, "127.0.0.1", c.refused), compare(c), 10_000, 0, owner)
 
     # Depending on which side observes the refused SSH connection first, the
     # pipeline reports the producer, children, or consumer failure.  All three
