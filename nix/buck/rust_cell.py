@@ -350,6 +350,11 @@ def generate(metadata: Path, root_manifest: Path, platforms_file: Path, out: Pat
                 for t in package["targets"]
                 if "test" in t["kind"]
             ],
+            "examples": [
+                {"name": t["name"], "root": _relative(t["src_path"], root / member_paths[pid])}
+                for t in package["targets"]
+                if "example" in t["kind"]
+            ],
             "build_script": next(
                 (
                     _relative(t["src_path"], root / member_paths[pid])

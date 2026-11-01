@@ -184,7 +184,9 @@ let
   # environment.
   mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
   # Buck2 Rust leaves this set consumes as `artifacts.<name>` (buck/rust_artifacts.bzl).
-  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "lyra" "lyra-native" "lyra-native-probes" "lyra-windows" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ];
+  rustArtifactNames = [ "enrico-git-owner" "lilly-host-helpers" "lyra" "lyra-native" "lyra-native-probes" "lyra-windows" "observability-runtimes" "otel-guest-receiver" "terminald" "trace-spool" "vscode-web-broker" ]
+    # Test-only fixtures (buck/rust_artifacts.bzl TEST_ARTIFACTS).
+    ++ [ "otel-request-fixture" "otel-request-recorder-cut" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
   # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2
@@ -431,16 +433,14 @@ let
   # lib.getExe finds mainProgram) and passthru (terminald's `native`), and
   # expose it as passthru.nixBuild, so a fixture that patches or rebuilds the
   # source overrides the Nix build rather than silently overriding the
-  # import's copy step (ADR-0269, ADR-0273). It MUST also keep the Nix build's
-  # allowedReferences, so a reference constraint (the Windows agents embed no
-  # store path) binds the artifact that ships, not only the recipe.
+  # import's copy step (ADR-0269, ADR-0273). A reference constraint (the
+  # Windows agents embed no store path) MUST bind the artifact that ships: the
+  # import carries it (nix_store_import allowed_references), not this recipe.
   swapLeaf = name: nixBuild:
     if artifacts ? ${name} then
       artifacts.${name}.overrideAttrs (previous: {
         meta = nixBuild.meta or { };
         passthru = (previous.passthru or { }) // (nixBuild.passthru or { }) // { inherit nixBuild; };
-      } // lib.optionalAttrs (nixBuild.drvAttrs ? allowedReferences) {
-        inherit (nixBuild.drvAttrs) allowedReferences;
       })
     else nixBuild;
 
@@ -449,18 +449,51 @@ let
   # first-party builds from this set, never build their own copy. Patched
   # third-party nixpkgs packages (Fluent Bit) stay on the system's nixpkgs so
   # a host keeps the version its configuration was reviewed against.
-  otelReceiver = swapLeaf "otel-guest-receiver" (pkgs.callPackage ../system/otel-guest/receiver.nix {
+  otelReceiverNix = pkgs.callPackage ../system/otel-guest/receiver.nix {
     inherit (cargoWorkspace) rustPlatform;
     clippy = cargoWorkspace.rustTools;
     rustfmt = cargoWorkspace.rustTools;
-  });
+  };
+  otelReceiver = swapLeaf "otel-guest-receiver" otelReceiverNix;
+  # The otel-request-recorder suite's fixtures (nix/BUCK): the receiver's
+  # request_fixture example, and the recorder with the commit-reply cut
+  # inserted at its apply/reply boundary.
+  otelRequestFixture = swapLeaf "otel-request-fixture" (otelReceiverNix.overrideAttrs (previous: {
+    pname = "overalls-request-recorder-native-fixture";
+    postBuild = (previous.postBuild or "") + ''
+      cargo build --offline --release -p overalls-otel-guest-receiver --example request_fixture
+    '';
+    postInstall = ''
+      mkdir -p "$out/bin"
+      install -m 0755 target/*/release/examples/request_fixture "$out/bin/request_fixture" 2>/dev/null \
+        || install -m 0755 target/release/examples/request_fixture "$out/bin/request_fixture"
+      find "$out/bin" -mindepth 1 ! -name request_fixture -delete
+    '';
+  }));
+  otelRequestRecorderCut = swapLeaf "otel-request-recorder-cut" (otelReceiverNix.overrideAttrs (previous: {
+    pname = "overalls-request-recorder-commit-reply-fixture";
+    nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ cargoWorkspace.rustTools ];
+    postPatch = (previous.postPatch or "") + ''
+      substituteInPlace nix/domains/system/otel-guest/receiver/src/request_recorder.rs --replace-fail \
+        'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),' \
+        ${lib.escapeShellArg (builtins.readFile ../../verification/tests/machines/otel-request-recorder/commit-reply-cut.rs)}
+    '';
+    # The inserted fault expression is not rustfmt-formatted and lengthens
+    # run past too_many_lines, so this variant replaces the inherited gate with
+    # clippy alone and allows only that length lint for the patched function.
+    postCheck = ''
+      pushd "$buildAndTestSubdir"
+      cargo clippy --offline --all-targets -- -D warnings -A clippy::too_many_lines
+      popd
+    '';
+  }));
   enricoGitOwner = swapLeaf "enrico-git-owner" (import ./applications/enrico-git-owner.nix { inherit pkgs; });
   observabilityRuntimes = swapLeaf "observability-runtimes" (import ../system/observability-runtimes.nix { inherit pkgs; });
   traceSpool = swapLeaf "trace-spool" (import ./infrastructure/trace-spool.nix { inherit pkgs; });
 in
 assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
-  inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool hostLock;
+  inherit otelReceiver otelRequestFixture otelRequestRecorderCut enricoGitOwner observabilityRuntimes traceSpool hostLock;
   inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource hostTools hostSystemTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldWindows;
   inherit codingClis githubTools;

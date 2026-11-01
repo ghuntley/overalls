@@ -248,9 +248,18 @@ partial, in milestone M5.
   Nix builds, and the cells
   give the tests only the host system tools (`host_system_tools`), while
   `host_tools` remains for the Lilly release; `lib.dependencyPins.cargo` builds every Nix Rust leaf;
-  the otel-request-recorder fixtures patch and rebuild the receiver through
-  its Nix build; and fleet scenario selection evaluates test scripts without
-  artifacts. The Nix leaves cannot be deleted until those consumers stop
+  the otel-request-recorder fixtures patched and rebuilt the receiver through
+  its Nix build until gap 18 step (iii), when they became Buck2 targets
+  ([nix/BUCK](../../../nix/BUCK)): the receiver's `request_fixture` example
+  (examples are `<pkg>-example-<name>` targets under the crate's clippy
+  gate), with its call timeout a run-time option, and a test-only
+  `overalls_rust_crate_variant` that inserts the commit-reply cut through
+  `buck/replace_boundary.sh`, which fails if the boundary moves. Machine tests
+  receive them as `TEST_ARTIFACTS`; hosts never do. Since the same step a
+  reference constraint travels on the import (`nix_store_import`
+  `allowed_references`, `[]` for Lyra's Windows agents, asserted by
+  windows-guest-unit) rather than being copied from the Nix build; and fleet
+  scenario selection evaluates test scripts without artifacts. The Nix leaves cannot be deleted until those consumers stop
   using them. terminald and the editor broker
   followed: `rust_musl_binary` ([buck/rust.bzl](../../../buck/rust.bzl))
   transitions a binary to `toolchains//:musl`, under which the same toolchain

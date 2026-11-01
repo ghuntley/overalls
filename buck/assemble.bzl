@@ -7,7 +7,7 @@ load(":nix.bzl", "OwnedSrcsInfo")
 RuntimeRefsInfo = provider(fields = {"refs": list[str]})
 
 # A Buck2 artifact imported into the Nix store.
-NixStorePathInfo = provider(fields = {"store_path": Artifact, "runtime_refs": list[str], "self_reference": str | None})
+NixStorePathInfo = provider(fields = {"store_path": Artifact, "runtime_refs": list[str], "self_reference": str | None, "allowed_references": list[str] | None})
 
 def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
     src = ctx.attrs.src[DefaultInfo].default_outputs[0]
@@ -24,11 +24,15 @@ def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
         allow_cache_upload = False,
     )
     refs = ctx.attrs.runtime_refs + (ctx.attrs.src[RuntimeRefsInfo].refs if RuntimeRefsInfo in ctx.attrs.src else [])
-    return [DefaultInfo(default_output = out), NixStorePathInfo(store_path = out, runtime_refs = refs, self_reference = ctx.attrs.self_reference)]
+    return [DefaultInfo(default_output = out), NixStorePathInfo(store_path = out, runtime_refs = refs, self_reference = ctx.attrs.self_reference, allowed_references = ctx.attrs.allowed_references)]
 
 nix_store_import = rule(
     impl = _nix_store_import_impl,
     attrs = {
+        # The store paths the imported copy may reference, enforced by Nix
+        # (nix/assemble/import-artifact.nix); `[]` for an artifact that must
+        # embed none. None leaves it unconstrained.
+        "allowed_references": attrs.option(attrs.list(attrs.string()), default = None),
         "runtime_refs": attrs.list(attrs.string(), default = []),
         # Placeholder store path the artifact embeds for itself; assembly
         # rewrites it to the imported path (see nix/assemble/import-artifact.nix).
@@ -52,6 +56,8 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
     artifacts = ctx.actions.write_json("artifacts.json", {
         name: {"path": dep[NixStorePathInfo].store_path, "runtimeRefs": dep[NixStorePathInfo].runtime_refs} | (
             {"selfReference": dep[NixStorePathInfo].self_reference} if dep[NixStorePathInfo].self_reference else {}
+        ) | (
+            {"allowedReferences": dep[NixStorePathInfo].allowed_references} if dep[NixStorePathInfo].allowed_references != None else {}
         )
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)

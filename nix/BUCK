@@ -2,7 +2,7 @@ load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:mix.bzl", "mix_sources")
-load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test", "rust_musl_binary")
+load("@root//buck:rust.bzl", "overalls_rust_crate", "overalls_rust_crate_variant", "rust_leaf_parity_test", "rust_musl_binary")
 
 nix_owned()
 
@@ -139,6 +139,59 @@ _GLIBC_REFS = [read_root_config("nix", lib) for lib in ["glibc_lib", "gcc_lib"]]
     ]),
     ("observability-runtimes", "observabilityRuntimes", ["overalls-fleet-exporter", "overalls-logging-health"]),
 ]]
+
+# The otel-request-recorder machine test's fixtures (test-only artifacts,
+# buck/rust_artifacts.bzl TEST_ARTIFACTS). The request fixture is the
+# receiver's example; the commit-reply-loss variant raises its call timeout
+# at run time (REQUEST_FIXTURE_CALL_TIMEOUT_SECS).
+genrule(
+    name = "otel-request-fixture",
+    out = "otel-request-fixture",
+    cmd = "mkdir -p $OUT/bin && cp $(location :overalls-otel-guest-receiver-example-request_fixture) $OUT/bin/request_fixture",
+)
+
+nix_store_import(
+    name = "otel-request-fixture-import",
+    src = ":otel-request-fixture",
+    runtime_refs = _GLIBC_REFS,
+    visibility = ["PUBLIC"],
+)
+
+# The recorder with commit-reply-cut.rs inserted at the production
+# apply/reply boundary. The patch fails when that boundary is gone or
+# repeated, as the Nix build's --replace-fail did.
+genrule(
+    name = "otel-request-recorder-cut-source",
+    srcs = ["domains/system/otel-guest/receiver/src/request_recorder.rs"],
+    out = "request_recorder.rs",
+    cmd = " ".join([
+        "$(exe toolchains//:bash) $(location //buck:replace_boundary.sh)",
+        "$SRCS",
+        "'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),'",
+        "$(location //nix/verification/tests/machines/otel-request-recorder:srcs)/commit-reply-cut.rs",
+        "$OUT",
+    ]),
+)
+
+overalls_rust_crate_variant(
+    "nix/domains/system/otel-guest/receiver",
+    name = "otel-request-recorder-cut",
+    replace = {"src/request_recorder.rs": ":otel-request-recorder-cut-source"},
+    bins = ["slo_recorder"],
+)
+
+genrule(
+    name = "otel-request-recorder-cut",
+    out = "otel-request-recorder-cut",
+    cmd = "mkdir -p $OUT/bin && cp $(location :otel-request-recorder-cut-slo_recorder) $OUT/bin/slo_recorder",
+)
+
+nix_store_import(
+    name = "otel-request-recorder-cut-import",
+    src = ":otel-request-recorder-cut",
+    runtime_refs = _GLIBC_REFS,
+    visibility = ["PUBLIC"],
+)
 
 # The workspace members this package owns, for Cargo-driven builds that copy
 # the root workspace (buck/lyra.bzl): manifests only.

@@ -166,8 +166,12 @@ match Nix byte for byte. Compare them with `diff -r`.
   `lib_test = False` (its harness cannot link outside the BEAM; Marshall's
   Cedar crate is the example). It reads the member from
   `rust//:workspace.bzl` and defines `<pkg>-lib`, one target per binary,
-  `<pkg>-unittest`, `<pkg>-test-<name>`, and the `<pkg>-clippy` and
-  `<pkg>-rustfmt` precommit checks (`[rustfmt/<path>]` checks one file).
+  `<pkg>-unittest`, `<pkg>-test-<name>`, `<pkg>-example-<name>`, and the
+  `<pkg>-clippy` and `<pkg>-rustfmt` precommit checks (`[rustfmt/<path>]`
+  checks one file). A test-only fault-injection build uses
+  `overalls_rust_crate_variant(path, name, replace = {"src/x.rs": ":gen"},
+  bins = [...])`, with the patch made by `//buck:replace_boundary.sh`
+  (fails if the boundary moves); nix/BUCK's commit-reply cut is the example.
   Native libraries are `[nix] <name>_lib` directories in `cells.nix`.
   Adding a crate, dependency or Rust file name rebuilds the cell.
 - **Replacing a Nix leaf.** Bundle the binaries in the layout the Nix
@@ -176,8 +180,10 @@ match Nix byte for byte. Compare them with `diff -r`.
   (`buck/rust_artifacts.bzl`) and to `rustArtifactNames` in
   `nix/domains/artifacts/default.nix`, and make the consumer read
   `swapLeaf "<name>" <Nix build>` (keeps `meta`, exposes
-  `passthru.nixBuild`). Anything that patches or rebuilds the source must
-  override `.nixBuild`, never the import. Add a `rust_leaf_parity_test`
+  `passthru.nixBuild`). A reference constraint goes on the import
+  (`allowed_references = []` for Lyra's Windows agents). A fixture that
+  patches or rebuilds the source is its own Buck2 target in
+  `TEST_ARTIFACTS`, never an override of the leaf. Add a `rust_leaf_parity_test`
   (label `heavy`) against a flake attribute with exactly the same
   executables; `tools/precommit` runs
   `//buck/bxl/rust_parity_coverage.bxl:main`, which fails when a
@@ -189,9 +195,10 @@ match Nix byte for byte. Compare them with `diff -r`.
   as a realised `.drv` in the cells, and compare with
   `rust_leaf_parity_test(compare = "bytes")`. Pin `SOURCE_DATE_EPOCH` and
   `TZ` in the script; mask only what differs between two Nix builds.
-- **Machine tests** receive `ASSEMBLY_ARTIFACTS` (`buck/artifacts.bzl`), the
-  merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`; every key must be a name the
-  package set consumes, or evaluation fails.
+- **Machine tests** receive `MACHINE_TEST_ARTIFACTS` (`buck/artifacts.bzl`):
+  `ASSEMBLY_ARTIFACTS` (the merge of `RUST_ARTIFACTS` and `MIX_ARTIFACTS`,
+  which hosts also get) plus the test-only `TEST_ARTIFACTS`; every key must
+  be a name the package set consumes, or evaluation fails.
 
 **Mila platforms** (`buck/mila.bzl`, `mila/BUCK`, ADR-0269 M9). Xcode,
 Gradle and .NET need SDKs that Nix does not supply, so these are

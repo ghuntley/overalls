@@ -192,7 +192,10 @@ binaries MUST use the Cargo profile their Nix build selects, and every binary
 Cargo would test MUST have a `<bin>-bin-unittest` target (ADR-0273); only
 `lib_test = False` (a Rustler NIF, whose harness cannot link outside the
 BEAM) drops the library's test target. Every target MUST see Cargo's
-CARGO_PKG_*, per-target CARGO_CRATE_NAME and CARGO_PRIMARY_PACKAGE.
+CARGO_PKG_*, per-target CARGO_CRATE_NAME and CARGO_PRIMARY_PACKAGE. Every
+example MUST be a `<pkg>-example-<name>` binary covered by the crate's clippy
+check. overalls_rust_crate_variant MUST build only from the same table, with
+each replaced source required to exist and supplied whole by its target.
 
 @cc [owner:ghuntley,label:build] rust-musl-binary
 rust_musl_binary MUST build its `actual` binary under `toolchains//:musl`, so

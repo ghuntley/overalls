@@ -18,40 +18,19 @@ let
       ${../../../../../elixir/request_accounting/lib/overalls/request_accounting}/producer/*.ex
   '';
   recorder = packages.otelReceiver;
-  # The fixtures patch and rebuild the source, so they derive from the Nix
-  # build even when the recorder itself is the Buck2 leaf.
-  recorderSource = recorder.nixBuild or recorder;
-  fixture = recorderSource.overrideAttrs (previous: {
-    pname = "overalls-request-recorder-native-fixture";
-    postPatch = (previous.postPatch or "") + pkgs.lib.optionalString commitReplyLoss ''
-      substituteInPlace nix/domains/system/otel-guest/receiver/examples/request_fixture.rs --replace-fail \
-        'Duration::from_secs(3)' 'Duration::from_secs(8)'
-    '';
-    postBuild = (previous.postBuild or "") + ''
-      cargo build --offline --release -p overalls-otel-guest-receiver --example request_fixture
-    '';
-    postInstall = (previous.postInstall or "") + ''
-      install -m 0755 target/*/release/examples/request_fixture "$out/bin/request_fixture" 2>/dev/null \
-        || install -m 0755 target/release/examples/request_fixture "$out/bin/request_fixture"
-    '';
-  });
-  cutRecorder = recorderSource.overrideAttrs (previous: {
-    pname = "overalls-request-recorder-commit-reply-fixture";
-    nativeBuildInputs = (previous.nativeBuildInputs or []) ++ [ packages.cargoWorkspace.rustTools ];
-    postPatch = (previous.postPatch or "") + ''
-      substituteInPlace nix/domains/system/otel-guest/receiver/src/request_recorder.rs --replace-fail \
-        'Ok(envelope) => runtime.apply(producer, envelope.command, now_ns()?),' \
-        ${pkgs.lib.escapeShellArg (builtins.readFile ./commit-reply-cut.rs)}
-    '';
-    # The inserted fault expression is not rustfmt-formatted and lengthens
-    # run past too_many_lines, so this variant replaces the inherited gate with
-    # clippy alone and allows only that length lint for the patched function.
-    postCheck = ''
-      pushd "$buildAndTestSubdir"
-      cargo clippy --offline --all-targets -- -D warnings -A clippy::too_many_lines
-      popd
-    '';
-  });
+  # Buck2-built fixtures (nix/BUCK): the receiver's request_fixture example and
+  # the recorder with commit-reply-cut.rs inserted at its apply/reply boundary.
+  # The commit-reply-loss variant gives `call` 8 s to outlast the stopped
+  # recorder, through the fixture's run-time option.
+  fixture = if commitReplyLoss
+    then pkgs.runCommand "overalls-request-recorder-native-fixture-slow-call" {
+      nativeBuildInputs = [ pkgs.makeWrapper ];
+    } ''
+      makeWrapper ${packages.otelRequestFixture}/bin/request_fixture "$out/bin/request_fixture" \
+        --set REQUEST_FIXTURE_CALL_TIMEOUT_SECS 8
+    ''
+    else packages.otelRequestFixture;
+  cutRecorder = packages.otelRequestRecorderCut;
 # @cc [owner:ghuntley,label:verification] recorder-cut-history-insertion-required
 # The fault variant MUST refuse evaluation if its insertion boundary disappears;
 # it MUST NOT silently run only the original histories.

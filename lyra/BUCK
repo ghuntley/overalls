@@ -31,7 +31,9 @@ _WORKSPACE = [
         srcs = _WORKSPACE,
         build_script = "//nix:lyra-build.sh",
     ),
-    nix_store_import(name = name + "-import", src = ":" + name, visibility = ["PUBLIC"]),
+    # The Windows agents embed no store path; the import enforces it as the
+    # Nix build's allowedReferences did.
+    nix_store_import(name = name + "-import", src = ":" + name, allowed_references = [] if mode == "windows" else None, visibility = ["PUBLIC"]),
     rust_leaf_parity_test(
         name = name + "-parity",
         buck = ":" + name + "-import",

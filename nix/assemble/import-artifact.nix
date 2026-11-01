@@ -10,7 +10,10 @@
 # (Mix releases embed their own $out in bin/<app> and erts start scripts).
 # It is rewritten to this derivation's $out; it has the same length as a real
 # store path, so the rewrite is safe in any file.
-{ name, path, runtimeRefs ? [ ], selfReference ? null }:
+# allowedReferences, when the artifact declares it, constrains the copy as it
+# constrained the Nix build it replaces (the Windows agents embed no store
+# path), so the constraint binds the artifact that ships.
+{ name, path, runtimeRefs ? [ ], selfReference ? null, allowedReferences ? null }:
 let
   # JSON strings carry no store context; storePath restores it, so each
   # reference becomes a derivation input that Nix scans the copy for.
@@ -20,10 +23,12 @@ let
 in
 # With a self-reference, the import takes the placeholder's name so $out has
 # the same length and the rewrite cannot shift offsets.
-pkgs.runCommand (if selfReference != null then builtins.substring 44 (-1) selfReference else name) {
+pkgs.runCommand (if selfReference != null then builtins.substring 44 (-1) selfReference else name) ({
   runtimeRefs = refs;
   passthru = { inherit imported; runtimeRefs = refs; };
-} (''
+} // pkgs.lib.optionalAttrs (allowedReferences != null) {
+  allowedReferences = map (ref: builtins.storePath (storeRoot ref)) allowedReferences;
+}) (''
   cp -a ${imported} "$out"
   chmod -R u+w "$out"
 '' + pkgs.lib.optionalString (selfReference != null) ''

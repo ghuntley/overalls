@@ -74,7 +74,8 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
     Called from the BUCK file of the path's top-level directory. Defines
     `<package>-lib` (rust_library), `<package>-unittest` (the library's tests),
     one rust_binary per `[[bin]]` with its `<bin>-bin-unittest` (the binary's
-    own tests) and `<package>-test-<name>` per integration test. `profile` is the Cargo profile the Nix build selects for binaries:
+    own tests), `<package>-test-<name>` per integration test and
+    `<package>-example-<name>` per example. `profile` is the Cargo profile the Nix build selects for binaries and examples:
     `release` or `hardened`. `native_libs` names `[nix]` library directories
     (cells.nix) searched for the crate's `#[link]` libraries; the cc wrapper
     records them as the binaries' rpath. `test_env` is added to every test's
@@ -162,6 +163,19 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             run_env = _TEST_ENV | test_env,
             **_for_crate(test_attrs, test["name"].replace("-", "_"))
         ), crate, ["normal", "dev"], lib_label))
+    # `examples/`, as `cargo build --example` builds them (normal and dev
+    # dependencies), so `clippy --all-targets` parity covers them and test
+    # fixtures built from them need no Cargo build.
+    for example in crate["examples"]:
+        targets.append(name + "-example-" + example["name"])
+        native.rust_binary(**_with_platform_deps(dict(
+            name = name + "-example-" + example["name"],
+            crate = example["name"].replace("-", "_"),
+            crate_root = sub + "/" + example["root"],
+            rustc_flags = lints + profile_flags,
+            visibility = visibility,
+            **_for_crate(common, example["name"].replace("-", "_"))
+        ), crate, ["normal", "dev"], lib_label))
 
     rust_srcs = [f for f in srcs if f.endswith(".rs")]
     rust_clippy_check(
@@ -178,6 +192,53 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
         rust = _rust_root(),
         labels = ["check", "precommit"],
     )
+
+def overalls_rust_crate_variant(path: str, name: str, replace: dict[str, str], bins: list[str], profile: str = "release"):
+    """A test-only build of workspace member `path` with sources replaced.
+
+    `replace` maps a source path relative to the crate (`src/x.rs`) to a
+    target whose output stands in for it, such as a genrule that patches the
+    original. Defines `<name>-lib` from the replaced sources and one
+    `<name>-<bin>` per name in `bins`, linked against it, with the crate's
+    own dependencies, environment and lints. It adds no clippy or rustfmt
+    check: a fault-injection variant need not meet the production gates.
+    """
+    crate = CRATES.get(path)
+    if crate == None:
+        fail("{} is not a member of the root Cargo workspace".format(path))
+    package = native.package_name()
+    sub = path[len(package) + 1:]
+    replaced = [sub + "/" + f for f in replace]
+    srcs = glob([sub + "/**/*"], exclude = [sub + "/target/**", sub + "/.hegel/**"] + replaced)
+    if len(replaced) != len(glob(replaced)):
+        fail("{}: every replaced source must exist in {}".format(name, path))
+    lints = LINT_FLAGS if crate["workspace_lints"] else []
+    common = dict(
+        srcs = srcs,
+        mapped_srcs = {target: sub + "/" + f for f, target in replace.items()},
+        edition = crate["edition"],
+        features = crate["features"],
+        env = _crate_env(crate, sub),
+    )
+    lib = crate["lib"]
+    native.rust_library(**_with_platform_deps(dict(
+        name = name + "-lib",
+        crate = lib["crate"],
+        crate_root = sub + "/" + lib["root"],
+        rustc_flags = lints + _RELEASE_FLAGS,
+        **_for_crate(common, lib["crate"])
+    ), crate, ["normal"]))
+    known = {b["name"]: b for b in crate["bins"]}
+    for bin in bins:
+        if bin not in known:
+            fail("{}: {} has no binary {}".format(name, path, bin))
+        native.rust_binary(**_with_platform_deps(dict(
+            name = name + "-" + bin,
+            crate = bin.replace("-", "_"),
+            crate_root = sub + "/" + known[bin]["root"],
+            rustc_flags = lints + {"hardened": _HARDENED_FLAGS, "release": _RELEASE_FLAGS}[profile],
+            **_for_crate(common, bin.replace("-", "_"))
+        ), crate, ["normal"], [":" + name + "-lib"]))
 
 def _store_path(name: str) -> str:
     path = read_root_config("nix", name)

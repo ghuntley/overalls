@@ -63,6 +63,20 @@ fn serve(recorder: &Path, control: &Path) -> Result<(), ()> {
     }
 }
 
+/// The `call` reply timeout: 3 s, or `REQUEST_FIXTURE_CALL_TIMEOUT_SECS`
+/// (1-60), which the commit-reply-loss variant raises to outlast a recorder
+/// stopped at the commit/reply boundary.
+fn call_timeout() -> Result<Duration, ()> {
+    match std::env::var("REQUEST_FIXTURE_CALL_TIMEOUT_SECS") {
+        Err(std::env::VarError::NotPresent) => Ok(Duration::from_secs(3)),
+        Ok(value) => match value.parse::<u64>() {
+            Ok(seconds @ 1..=60) => Ok(Duration::from_secs(seconds)),
+            _ => Err(()),
+        },
+        Err(std::env::VarError::NotUnicode(_)) => Err(()),
+    }
+}
+
 fn run() -> Result<(), ()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     match args.as_slice() {
@@ -78,7 +92,7 @@ fn run() -> Result<(), ()> {
                 // the fixture process makes the authenticated recorder connection.
                 let mut stream = UnixStream::connect(path).map_err(|_| ())?;
                 stream
-                    .set_read_timeout(Some(Duration::from_secs(3)))
+                    .set_read_timeout(Some(call_timeout()?))
                     .map_err(|_| ())?;
                 let bytes = serde_json::to_vec(&Envelope {
                     version: 1,

@@ -247,11 +247,12 @@ assert lib.hasInfix "  overalls-workspaced-windows\n" (builtins.readFile ../../.
 assert image.passthru.disk.drvAttrs.allowedReferences == [ ];
 assert packages.lyraWindows.drvAttrs.allowedReferences == [ ];
 assert packages.terminaldWindows.drvAttrs.allowedReferences == [ ];
-# Lyra's Windows agents are built by lyra-build.sh (Nix and Buck2 run the same
-# script): the build runs it in windows mode, and the script remaps the
-# vendored crates and the source out of panic locations, so no store path is
-# embedded (allowedReferences above enforces it).
-assert lib.hasInfix "lyra-build.sh windows" (plain (packages.lyraWindows.nixBuild or packages.lyraWindows).buildPhase);
+# Lyra's Windows agents are built by lyra-build.sh: Buck2's lyra_cross rule
+# (buck/lyra.bzl, //lyra:windows) runs it in windows mode, and the script remaps the vendored
+# crates and the source out of panic locations, so no store path is embedded
+# (allowedReferences above enforces it).
+assert lib.hasInfix "attrs.enum([\"client\", \"windows\", \"native\"])" (builtins.readFile ../../../../buck/lyra.bzl);
+assert lib.hasInfix "/build/lyra-build.sh \\\"$mode\\\"" (builtins.readFile ../../../../buck/lyra.bzl);
 assert lib.hasInfix "--remap-path-prefix=$LYRA_VENDOR=/vendor --remap-path-prefix=$PWD=/source" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra-build.sh);
 assert lib.hasInfix "STORE_HASH.sub" installDriver;
 # Gate 5: the agent executor task, and private names through the local resolver only.

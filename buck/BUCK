@@ -18,6 +18,9 @@ export_file(name = "rust_parity.py", visibility = ["PUBLIC"])
 # Workspace stubs for Cargo-driven builds of one member (buck/lyra.bzl).
 export_file(name = "cargo_workspace_stubs.py", visibility = ["PUBLIC"])
 
+# Test-only fault-injection source patches (nix/BUCK).
+export_file(name = "replace_boundary.sh", visibility = ["PUBLIC"])
+
 # The non_hermetic Mila platform build driver (buck/mila.bzl).
 export_file(name = "mila_platform.py", visibility = ["PUBLIC"])
 

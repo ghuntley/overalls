@@ -4,7 +4,7 @@
 # Contract assembly-artifact-names: see nix/domains/artifacts/default.nix.
 
 load(":mix_artifacts.bzl", "MIX_ARTIFACTS")
-load(":rust_artifacts.bzl", "RUST_ARTIFACTS")
+load(":rust_artifacts.bzl", "RUST_ARTIFACTS", "TEST_ARTIFACTS")
 
 def _merge(*dicts) -> dict[str, str]:
     merged = {}
@@ -16,3 +16,6 @@ def _merge(*dicts) -> dict[str, str]:
     return merged
 
 ASSEMBLY_ARTIFACTS = _merge(RUST_ARTIFACTS, MIX_ARTIFACTS)
+
+# Machine tests also get the test-only fixtures; hosts never do.
+MACHINE_TEST_ARTIFACTS = _merge(ASSEMBLY_ARTIFACTS, TEST_ARTIFACTS)
