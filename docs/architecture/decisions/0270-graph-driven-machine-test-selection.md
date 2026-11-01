@@ -170,16 +170,19 @@ PR runs the affected machine-test set, and the approved migration plan.
   precommit failure is not mapped; its range runs again only when a later
   push touches it.
   Whole host systems build one target per runner in the `hosts` job. A host
-  deployment realises about 145 GiB (guest images and the Windows Server
-  image), more than Namespace allows a cache volume (about 125 GB; runs
-  41169053536 and 41194732683 failed with ENOSPC). A `hosts` job building a
-  `:deployment` therefore runs on the hosts-only `cached-amd64-hosts`
-  Namespace profile (16x64, with a 288 GB root disk; it takes half the
-  workspace's 128 GB Linux memory, so base, install and kexec stay on xl) and
-  keeps its Nix store on that disk
-  (`nix-on-cache-volume: "false"` in
+  deployment realises about 130 GiB: substitutes of 107.6 GiB (the Windows
+  Server image alone is 64 GiB raw) plus locally built guest images. That is
+  more than the xl cache volume (about 116 GB free; Namespace caps volumes
+  near 125 GB), and runs 41169053536 and 41194732683 failed with ENOSPC.
+  Verifying substitutes instead of downloading them does not help: a new
+  toplevel takes `overalls-images.json`, and so every image, in its input
+  closure. The images are mostly zeros (27.2 GiB as zstd NARs), so a
+  `:deployment` job keeps its store on a loop-mounted btrfs with forced zstd
+  compression on the xl root disk (`nix-on-cache-volume: "false"` in
   [the devenv action](../../../.github/actions/devenv/action.yml)), still
-  realising and publishing the complete closure.
+  realising and publishing the complete closure. A 16x64 profile with a
+  288 GB disk was tried first and dropped: it needs half the workspace's
+  128 GB Linux memory and waited for capacity.
 - **Executed:** `tools/buck2 test` of `sysctl` and `nix-ld` booted their VMs
   and passed; through `nix_assemble`, `sysctl` produced the same store path as
   the flake check, so the declared-only tree evaluates the same test.

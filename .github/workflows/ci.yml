@@ -247,13 +247,13 @@ jobs:
     needs: affected
     if: needs.affected.outputs.host_builds != '[]'
     name: build ${{ matrix.host.name }}
-    # A host deployment realises ~145 GiB (guest images, the Windows Server
-    # image): more than the ~125 GB Namespace allows a cache volume (ENOSPC in
-    # runs 41169053536 and 41194732683). The hosts-only 16x64 profile has a
-    # 288 GB root disk, and its store stays there instead of on the volume.
-    # It takes half the workspace's Linux memory, so only deployments use it;
-    # base, install and kexec fit the xl cache volume.
-    runs-on: ${{ endsWith(matrix.host.name, ':deployment') && 'namespace-profile-cached-amd64-hosts;container.privileged=true' || 'namespace-profile-cached-amd64-xl;container.privileged=true' }}
+    # A host deployment realises ~130 GiB (guest images; the Windows Server
+    # image alone is 64 GiB raw): more than the ~116 GB cache volume (ENOSPC
+    # in runs 41169053536 and 41194732683), and its new toplevel needs every
+    # image as an input. The images are mostly zeros (27 GiB as zstd NARs),
+    # so a deployment keeps its store on a zstd-compressed btrfs on the root
+    # disk instead of the volume. Base, install and kexec fit the volume.
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 180
     strategy:
       fail-fast: false
@@ -265,6 +265,21 @@ jobs:
       NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      # Before Nix is installed: the store goes on a loop-mounted btrfs with
+      # forced zstd compression, sized to the root disk less room for
+      # uncompressed build directories in /tmp. A failure stops the job.
+      - name: Compressed Nix store
+        if: endsWith(matrix.host.name, ':deployment')
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq btrfs-progs > /dev/null
+          avail=$(df --output=avail -B1 / | tail -1)
+          size=$(( avail - 32 * 1024 * 1024 * 1024 ))
+          sudo truncate -s "$size" /var/lib/nix-store.btrfs
+          sudo mkfs.btrfs -q /var/lib/nix-store.btrfs
+          sudo mkdir -p /nix
+          sudo mount -o loop,compress-force=zstd:1,noatime /var/lib/nix-store.btrfs /nix
+          df -h / /nix
       - uses: ./.github/actions/devenv
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
@@ -275,8 +290,8 @@ jobs:
           TARGETS: ${{ toJSON(matrix.host.targets) }}
         run: |
           set -euo pipefail
-          df -h /nix
-          trap 'df -h /nix' EXIT
+          df -h / /nix
+          trap 'df -h / /nix' EXIT
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}"
 

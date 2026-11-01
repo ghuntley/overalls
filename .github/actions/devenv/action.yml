@@ -24,9 +24,9 @@ inputs:
   nix-on-cache-volume:
     description: >-
       Whether /nix and ~/.cache/nix live on the Namespace cache volume, which
-      Namespace caps at about 125 GB. "false" leaves them on the runner's root
-      disk for jobs whose closure exceeds that (ci.yml hosts on the 288 GB
-      cached-amd64-hosts profile).
+      Namespace caps at about 125 GB. "false" leaves them wherever the job
+      mounted /nix (ci.yml's host deployments: a compressed btrfs on the root
+      disk).
     required: false
     default: "true"
 
