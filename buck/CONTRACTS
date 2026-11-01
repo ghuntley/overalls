@@ -181,8 +181,9 @@ CONTRACTS files and the checker have no per-file sub-target, and deleting a
 CONTRACTS file selects the whole check (ADR-0269).
 
 @cc [owner:ghuntley,label:verification] precommit-selects-affected-checks
-precommit.bxl MUST select only `precommit`-labelled targets, so bootstrap
-flake checks and machine tests never run in precommit. For the changed and
+precommit.bxl MUST select only `precommit`-labelled targets without an
+`--exclude-labels` label, so bootstrap flake checks and machine tests never
+run in precommit. For the changed and
 deleted paths it MUST build every check whose result they can change (by
 PrecommitInfo, or by owner rdeps and package for checks without it), MUST
 select every check for a build-graph or toolchain change or --scope all, MUST

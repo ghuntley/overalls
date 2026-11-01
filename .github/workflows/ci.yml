@@ -532,7 +532,9 @@ jobs:
   precommit:
     needs: affected
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    timeout-minutes: 60
+    # A cold Marshall check (compile, PLT, Dialyzer) alone takes about 35
+    # minutes; Mix actions run locally (ADR-0272).
+    timeout-minutes: 90
     # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
     # token is set; forks and pull requests get no secret and build locally.
     env:
@@ -549,13 +551,17 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
+      # The Mix suites (`expensive`) build in the mix job, sharded across
+      # its runners. Selected here too, a docs change reran Marshall's whole
+      # suite cold on this one runner until the job timed out (run
+      # 41287426347).
       - name: Precommit
         env:
           RANGE: ${{ needs.affected.outputs.range }}
         run: |
           set -euo pipefail
           read -ra range <<<"$RANGE"
-          tools/precommit "${range[@]}"
+          tools/precommit --exclude-label expensive "${range[@]}"
       - name: Check Buck2 state for the Namespace token
         if: always()
         run: tools/namespace-token-scan

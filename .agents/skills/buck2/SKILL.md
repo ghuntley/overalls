@@ -396,7 +396,9 @@ which have been removed from the repository.
 command, the single prek hook and CI call it.
 
 - **Scopes:** the named files or the staged changes (default), `--base REV`
-  (merge-base to working tree), `--all`. `--plan` prints the selection as JSON;
+  (merge-base to working tree), `--all`. `--exclude-label LABEL` drops checks
+  carrying it (CI's precommit job drops `expensive`: the `mix` job runs the
+  suites). `--plan` prints the selection as JSON;
   `--fix` first copies each changed file's `fix` sub-target output over it
   (the only mode that rewrites files).
 - **How it selects** (`buck/bxl/precommit.bxl`): the universe is every target

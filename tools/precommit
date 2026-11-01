@@ -5,7 +5,8 @@
 # and runs buck/bxl/precommit.bxl, which builds every affected check in one
 # Buck2 build. The devenv `precommit` command, the prek hook and CI call it.
 #
-#   tools/precommit [--staged | --base REV | --all] [--fix] [--plan] [FILE...]
+#   tools/precommit [--staged | --base REV | --all] [--fix] [--plan]
+#                   [--exclude-label LABEL]... [FILE...]
 #
 #   FILE...     check these files (the prek hook passes the staged files);
 #               staged deletions are added
@@ -17,6 +18,9 @@
 #               (ruff today, mix format once Mix rules expose them); the only
 #               mode that changes files
 #   --plan      print the selected checks as JSON and build nothing
+#   --exclude-label LABEL
+#               skip checks carrying LABEL (CI passes `expensive`: its `mix`
+#               job builds the Mix suites on their own runners)
 #
 # When Buck2 cannot start (no cells, no daemon) or OVERALLS_PRECOMMIT_DIRECT=1,
 # the hook-parity scripts run directly instead; see direct_checks.
@@ -25,12 +29,12 @@ root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
 
 usage() {
-  sed -n '8,20p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
+  sed -n '8,24p' "${BASH_SOURCE[0]}" | sed 's/^# \{0,1\}//' >&2
   exit 2
 }
 
 scope=staged base="" fix=false plan=false
-declare -a files=()
+declare -a files=() excluded=()
 while (($#)); do
   case $1 in
     --staged) scope=staged ;;
@@ -42,6 +46,11 @@ while (($#)); do
       ;;
     --fix) fix=true ;;
     --plan) plan=true ;;
+    --exclude-label)
+      (($# >= 2)) || usage
+      excluded+=("$2")
+      shift
+      ;;
     --help | -h) usage ;;
     --) shift; files+=("$@"); break ;;
     -*) echo "tools/precommit: unknown option $1" >&2; usage ;;
@@ -127,6 +136,7 @@ bxl() {
   local -a args=(--scope "$([[ $scope == all ]] && echo all || echo changed)")
   ((${#changed[@]})) && args+=(--files "${changed[@]}")
   ((${#deleted[@]})) && args+=(--deleted "${deleted[@]}")
+  ((${#excluded[@]})) && args+=(--exclude-labels "${excluded[@]}")
   "$root/tools/buck2" bxl --console simple //buck/bxl/precommit.bxl:main -- "${args[@]}" "$@"
 }
 

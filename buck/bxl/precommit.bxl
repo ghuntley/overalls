@@ -6,7 +6,8 @@
 #   tools/buck2 bxl //buck/bxl/precommit.bxl:main -- --files ... --deleted ...
 #
 # Selection, an aspect over the `precommit` label:
-#   1. The universe is every target labelled `precommit`.
+#   1. The universe is every target labelled `precommit`, less any carrying
+#      an `--exclude-labels` label.
 #   2. A check with PrecommitInfo (buck/checks.bzl) is selected when a changed
 #      path is in its `inputs` or a deleted path matches its `deletions`. If
 #      every changed input has a `per_file` entry, only those sub-targets and
@@ -41,8 +42,10 @@ def _under(path: str, package: str) -> bool:
     return package == "" or path.startswith(package + "/")
 
 # Returns (labels to build, report rows).
-def _plan(ctx: bxl.Context, files: list[str], deleted: list[str], everything: bool, limit: int, fix: bool) -> (list, list):
+def _plan(ctx: bxl.Context, files: list[str], deleted: list[str], everything: bool, limit: int, fix: bool, excluded: list[str]) -> (list, list):
     universe = ctx.uquery().attrfilter("labels", "precommit", "root//...")
+    for label in excluded:
+        universe = universe - ctx.uquery().attrfilter("labels", label, universe)
     configured = ctx.configured_targets(universe)
     analyses = ctx.analysis([t.label for t in configured])
     by_label = {}
@@ -116,7 +119,7 @@ def _plan(ctx: bxl.Context, files: list[str], deleted: list[str], everything: bo
 def _main(ctx: bxl.Context) -> None:
     args = ctx.cli_args
     fix = args.mode == "fix"
-    builds, rows = _plan(ctx, args.files, args.deleted, args.scope == "all", args.per_file_limit, fix)
+    builds, rows = _plan(ctx, args.files, args.deleted, args.scope == "all", args.per_file_limit, fix, args.exclude_labels)
     if args.mode == "plan":
         ctx.output.print_json({"checks": rows})
         return
@@ -156,6 +159,7 @@ main = bxl_main(
         "scope": cli_args.enum(["changed", "all"], default = "changed", doc = "`all` builds every precommit check's default output."),
         "deleted": cli_args.list(cli_args.string(), default = [], doc = "Repository paths deleted relative to the base."),
         "files": cli_args.list(cli_args.string(), default = [], doc = "Changed repository paths that exist."),
+        "exclude-labels": cli_args.list(cli_args.string(), default = [], doc = "Skip checks carrying any of these labels."),
         "mode": cli_args.enum(["check", "fix", "plan"], default = "check", doc = "check builds the checks; fix builds the fix sub-targets of the changed files and prints their paths; plan prints the selection as JSON."),
         "per-file-limit": cli_args.int(64, doc = "Above this many changed inputs a check runs whole."),
     },

@@ -192,7 +192,12 @@ the approved migration plan.
   them in one `ctx.build`. [tools/precommit](../../../tools/precommit) computes
   the files from git and is the devenv `precommit` command and the single prek
   hook ([devenv.nix](../../../devenv.nix)), and the `precommit` job in
-  [ci.yml](../../../.github/workflows/ci.yml) runs it over the selected range.
+  [ci.yml](../../../.github/workflows/ci.yml) runs it over the selected range
+  with `--exclude-label expensive`, because the `mix` job builds the Mix
+  suites sharded on its own runners. Without it, a docs-only push selected
+  `//marshall:test` (its repository shard reads the docs) and ran the whole
+  suite cold on the precommit runner past the 60-minute bound (run
+  41287426347).
   - `PrecommitInfo`, `repo_check` and `contract_check` are in
     [checks.bzl](../../../buck/checks.bzl). The root [BUCK.v2](../../../BUCK.v2) adds
     `//:adrs`, `//:contracts` (with `[contracts/<path>]`), `//:contracts-tests`,
