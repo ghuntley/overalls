@@ -62,7 +62,8 @@ harness uses for real guest execution.
    to the fixture. `deployment.host` therefore
    stays `localhost`, which the TLS SAN, trust management host and Porsche
    certificate principal all name. Every tailnet step is skipped when the
-   `MILA_TAILSCALE_AUTHKEY` secret is absent.
+   `MILA_TAILSCALE_OAUTH_CLIENT_ID` secret is absent, as it is for pull
+   requests from forks.
 7. The approver also exposes `POST /fixture/<action>` under the same bearer
    and TLS (`descriptor.approver.fixture_url`). It runs only the closed
    stand-in actions `observe`, `thread-create`, `thread-ready`,
@@ -97,25 +98,20 @@ user on 2026-10-30.
 
 ### Tailnet configuration
 
-Create these in the Tailscale admin console:
+In place since 2026-11-01 (configured by the user in the Tailscale admin
+console):
 
-- Tag owner and access policy (tailnet policy file):
-
-  ```json
-  {
-    "tagOwners": { "tag:mila-ci": ["autogroup:admin"] },
-    "grants": [
-      { "src": ["tag:mila-ci"], "dst": ["tag:mila-ci"],
-        "ip": ["tcp:8443", "tcp:2222", "tcp:8444", "tcp:8445"] }
-    ]
-  }
-  ```
-
-  Merge these into the existing policy. No other source or destination
-  needs access to `tag:mila-ci`.
-- An auth key that is **reusable**, **ephemeral** and **pre-approved**, with
-  tag `tag:mila-ci` and the longest expiry policy allows. Rotate it before
-  it expires. Store it as the repository secret `MILA_TAILSCALE_AUTHKEY`.
+- The tailnet policy file has `tagOwners` for `tag:mila-ci` and a grant from
+  `tag:mila-ci` to `tag:mila-ci` only. The fixture needs tcp 8443, 2222, 8444
+  and 8445 between those nodes. The owner's devices (`tag:owner`) reach the
+  CI nodes through the existing owner grant and Tailscale SSH rule. Policy
+  tests assert that `tag:mila-ci` reaches no other tag.
+- The jobs join through an OAuth client with the `auth_keys` scope and tag
+  `tag:mila-ci`. It does not expire. `tailscale/github-action` mints an
+  ephemeral, tagged key per job from it. Its ID and secret are the repository
+  secrets `MILA_TAILSCALE_OAUTH_CLIENT_ID` and `MILA_TAILSCALE_OAUTH_SECRET`.
+  The OAuth client replaced the earlier `MILA_TAILSCALE_AUTHKEY` auth key,
+  which had been created without the tag, so no grant applied to its nodes.
 - MagicDNS is not required. Peers are found by their tailnet host names,
   `mila-{fixture,apple,windows}-<run id>-<attempt>`.
 

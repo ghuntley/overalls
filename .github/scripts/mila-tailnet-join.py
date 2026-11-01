@@ -201,7 +201,7 @@ def main() -> None:
             if not status.error and status.backend == "Running" and TAG not in status.self_tags:
                 diagnose(fixture, status, None, None)
                 raise SystemExit(
-                    f"this node is not tagged {TAG}: create the auth key with that tag, "
+                    f"this node is not tagged {TAG}: give the MILA_TAILSCALE_OAUTH_CLIENT_ID OAuth client that tag, "
                     f"or the grant cannot apply; {POLICY_HINT}"
                 )
             match = [peer for peer in status.peers if peer.name == fixture and peer.ipv4]

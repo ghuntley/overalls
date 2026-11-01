@@ -167,7 +167,7 @@ def check_policy() -> None:
     tags = me.get("Tags") if isinstance(me, dict) else None
     if not isinstance(tags, list) or TAG not in tags:
         raise SystemExit(
-            f"this fixture node is not tagged {TAG}: create the auth key with that tag; "
+            f"this fixture node is not tagged {TAG}: give the MILA_TAILSCALE_OAUTH_CLIENT_ID OAuth client that tag; "
             + POLICY_HINT
         )
     netmap = tailscale_json(["debug", "netmap"])

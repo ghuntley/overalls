@@ -128,7 +128,7 @@ jobs:
     runs-on: namespace-profile-cached-arm64
     timeout-minutes: 120
     env:
-      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
+      MILA_TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       # tools/buck2 builds buckCells.aarch64-darwin: buck2, the prelude and a
@@ -175,22 +175,23 @@ jobs:
       # The Namespace macOS image has no /usr/local/bin, where the Tailscale
       # action copies its binaries.
       - name: Create the Tailscale install directory
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         run: sudo mkdir -p /usr/local/bin
       - name: Join the Mila CI tailnet
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
-          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ env.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.MILA_TAILSCALE_OAUTH_SECRET }}
           tags: tag:mila-ci
           hostname: mila-apple-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Forward the tailnet fixture to localhost
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         timeout-minutes: 65
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Apple journey against the tunnelled fixture
         id: apple-journey
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         working-directory: mila/native/apple
         timeout-minutes: 20
         env:
@@ -199,7 +200,7 @@ jobs:
         run: swift test --filter MilaJourneyTests
       # An explicit result lets the fixture job stop once every journey ended.
       - name: Report the journey result to the tailnet fixture
-        if: always() && env.MILA_TAILSCALE_AUTHKEY != ''
+        if: always() && env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         shell: bash
         env:
           OUTCOME: ${{ steps.apple-journey.outcome }}
@@ -215,7 +216,7 @@ jobs:
     runs-on: windows-2025
     timeout-minutes: 110
     env:
-      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
+      MILA_TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Verify native client is independent of Flutter
@@ -269,20 +270,21 @@ jobs:
       # fixture tunnel step lands and writes MILA_JOURNEY_DESCRIPTOR, so the job
       # stays green without a backend; once enabled a missing descriptor fails.
       - name: Join the Mila CI tailnet
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
-          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ env.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.MILA_TAILSCALE_OAUTH_SECRET }}
           tags: tag:mila-ci
           hostname: mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Forward the tailnet fixture to localhost
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         timeout-minutes: 65
         shell: bash
         run: .github/scripts/mila-tailnet-fixture.sh "$RUNNER_TEMP/mila-journey-descriptor.json"
       - name: Windows journey against the tunnelled fixture
         id: windows-journey
-        if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' || env.MILA_TAILSCALE_AUTHKEY != '' }}
+        if: ${{ vars.MILA_WINDOWS_JOURNEY == 'enabled' || env.MILA_TAILSCALE_OAUTH_CLIENT_ID != '' }}
         shell: pwsh
         env:
           MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
@@ -293,7 +295,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw "Windows fixture journey failed" }
       # An explicit result lets the fixture job stop once every journey ended.
       - name: Report the journey result to the tailnet fixture
-        if: always() && env.MILA_TAILSCALE_AUTHKEY != ''
+        if: always() && env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         shell: bash
         env:
           OUTCOME: ${{ steps.windows-journey.outcome }}
@@ -736,26 +738,26 @@ jobs:
   # Tunnelled fixture host (ADR-0264). Boots the hermetic backend bound to
   # this runner's tailnet address and serves only the descriptor beside it
   # until the Apple and Windows journey nodes have joined and left (or a
-  # deadline passes). Skipped cleanly without MILA_TAILSCALE_AUTHKEY.
+  # deadline passes). Skipped cleanly without MILA_TAILSCALE_OAUTH_CLIENT_ID.
   journey-fixture-tailnet:
     runs-on: ubuntu-24.04
     timeout-minutes: 130
     env:
-      MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}
+      MILA_TAILSCALE_OAUTH_CLIENT_ID: ${{ secrets.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
       PEERS: mila-apple-${{ github.run_id }}-${{ github.run_attempt }} mila-windows-${{ github.run_id }}-${{ github.run_attempt }}
     steps:
       - name: Skip without the tailnet secret
-        if: env.MILA_TAILSCALE_AUTHKEY == ''
-        run: echo "MILA_TAILSCALE_AUTHKEY is not configured; tunnelled fixture skipped"
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID == ''
+        run: echo "MILA_TAILSCALE_OAUTH_CLIENT_ID is not configured; tunnelled fixture skipped"
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
       - name: Install Nix for the journey fixture
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
       # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
       # pushed by publish-cache's `//:check-mila-journey-fixture`.
       - name: Configure Cachix for the journey fixture
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: overalls
@@ -763,7 +765,7 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           useDaemon: false
       - name: Build hermetic journey fixture
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         timeout-minutes: 40
         run: |
           set -euo pipefail
@@ -773,7 +775,7 @@ jobs:
           ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
           tools/buck2 kill
       - name: Enable KVM for the journey fixture
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -781,14 +783,15 @@ jobs:
           sudo udevadm trigger --name-match=kvm
           test -r /dev/kvm -a -w /dev/kvm
       - name: Join the Mila CI tailnet
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0
         with:
-          authkey: ${{ env.MILA_TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ env.MILA_TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.MILA_TAILSCALE_OAUTH_SECRET }}
           tags: tag:mila-ci
           hostname: mila-fixture-${{ github.run_id }}-${{ github.run_attempt }}
       - name: Serve the fixture on the tailnet until the journeys finish
-        if: env.MILA_TAILSCALE_AUTHKEY != ''
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         timeout-minutes: 80
         run: |
           set -euo pipefail
@@ -814,7 +817,7 @@ jobs:
           python3 -I .github/scripts/mila-tailnet-peers.py --bind "$address" \
             --directory "$dir/public" --deadline 3000 "${peers[@]}"
       - name: Show journey fixture logs
-        if: failure() && env.MILA_TAILSCALE_AUTHKEY != ''
+        if: failure() && env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         run: |
           dir="$RUNNER_TEMP/mila-journey"
           tail -n 200 "$dir/fixture.log" || true
