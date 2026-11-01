@@ -217,6 +217,26 @@ Remaining gaps:
   and Linux journeys therefore accept an admitted resume or
   `desired_state = running` as a deliberate choice; the refusal itself
   remains to be reproduced and fixed in Marshall.
+- The Apple and Windows journeys share one tunnelled fixture, so neither
+  owns the seed machine's state. Apple's stop/start test observes the seed
+  machine running. In mila-builds run 41354267251 the Windows journey then
+  sent `terminal new` to that machine and got `transport_error`, not
+  `terminal_unavailable`. A running machine passes Marshall's readiness
+  checks, so Marshall sends `creation_query` over the host stream. The
+  terminal stand-in, like Lilly when it cannot reach a guest, does not
+  answer for another machine. Marshall's relay waits 5 s, and Porsche's 5 s
+  control bound expires first. The reproduction against a local fixture,
+  with no terminal steps: `terminal new` on the unobserved seed machine is
+  refused `terminal_unavailable`. After an `observe` of that machine it fails
+  with `transport_error` after 5.1 s. A newly created, unobserved machine is
+  still refused `terminal_unavailable`. The Windows journey therefore runs
+  the guestless refusal on a machine it creates and never observes, as the
+  machine test does (`mila-idle`). Moving the step earlier would not help:
+  Apple observed the seed machine before the Windows journey started.
+  Open product gap: for a running machine whose guest does not answer,
+  Marshall's terminal controls (each up to 5 s) are not bounded inside
+  Porsche's 5 s request, so `terminal new` reports `transport_error` and no
+  closed reason. No Marshall or Porsche test covers this path yet.
 - The tunnel has carried both journeys: in mila-builds run 41305124503 the
   Apple and Windows journey jobs reported success to the tunnelled fixture,
   and the Windows journey passed every step.

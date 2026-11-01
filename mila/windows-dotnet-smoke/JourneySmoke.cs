@@ -262,27 +262,9 @@ internal static class JourneySmoke
             if (descriptor.TerminalMachineId is { } terminalMachine)
                 await JourneyPages.GuestTerminalAsync(session, terminalMachine, cancellationToken);
 
-            // Real Porsche refuses unnamed attach: `terminal new` names the session first.
-            // The hermetic fixture runs no guest, so Marshall refuses it with the
-            // closed `terminal_unavailable` reason, which the journey accepts.
-            MilaNativeTerminalOpen opened = RustNative.TrySessionTerminalNew(handle, machine.Id, RequestId());
-            if (!opened.Succeeded)
-            {
-                string? refusal = RustNative.TrySessionLastRefusal(handle);
-                Program.Require(refusal == "terminal_unavailable", $"journey terminal new ({opened.Status}/{refusal ?? "none"})");
-                Step("terminal new refused: terminal_unavailable (no guest)");
-            }
-            else
-            {
-                MilaTerminalStream terminal = new(MilaRustTerminalTransport.Instance, () => session.Handle);
-                Program.Require(terminal.Attach(machine.Id, machine.CanWrite, 80, 24) && terminal.TerminalId is not null,
-                    "journey named terminal attach");
-                MilaTerminalPoll poll = MilaTerminalPoll.Idle;
-                for (int i = 0; i < 10 && poll is MilaTerminalPoll.Idle; i++) poll = terminal.Poll();
-                Program.Require(poll is MilaTerminalPoll.Output or MilaTerminalPoll.Idle or MilaTerminalPoll.Ended, $"journey terminal poll ({poll})");
-                terminal.Kill();
-                Step($"named terminal attach ({poll})");
-            }
+            // The guestless refusal runs on a machine this run creates and never
+            // observes, not on the shared seed machine (ADR-0264 item 9).
+            await JourneyPages.GuestlessTerminalAsync(handle, hook, cancellationToken);
 
             await SshKeysAsync(descriptor, handler, target, session, key, cancellationToken);
 

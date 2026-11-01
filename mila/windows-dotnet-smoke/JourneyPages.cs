@@ -440,6 +440,32 @@ internal static class JourneyPages
         Step("guest terminal end (server session closed)");
     }
 
+    /// <summary>
+    /// `terminal new` on a machine with no guest must get Marshall's closed
+    /// `terminal_unavailable` refusal. It uses a machine this run creates and
+    /// never observes, as the NixOS mila-journey test does (`mila-idle`).
+    /// </summary>
+    /// <remarks>
+    /// Not the seed machine: the Apple and Windows journeys share the tunnelled
+    /// fixture, and Apple's stop/start test observes the seed machine running.
+    /// A running machine passes Marshall's readiness checks, so Marshall sends
+    /// `creation_query` to the terminal stand-in. The stand-in answers only its
+    /// own machine, as Lilly does when it cannot reach a guest. Marshall's relay
+    /// waits 5 s and Porsche's 5 s control bound expires first, so the client
+    /// gets `transport_error` (mila-builds run 41354267251; ADR-0264 gaps).
+    /// </remarks>
+    internal static async Task GuestlessTerminalAsync(ulong handle, MilaFixtureHook hook, CancellationToken cancellationToken)
+    {
+        string name = "mila-journey-" + Guid.NewGuid().ToString("N")[..12] + "-idle";
+        Guid machine = await CreateAsync(handle, name, 1, 512, 2, cancellationToken);
+        MilaNativeTerminalOpen opened = RustNative.TrySessionTerminalNew(handle, machine, RequestId());
+        string? refusal = opened.Succeeded ? null : RustNative.TrySessionLastRefusal(handle);
+        Program.Require(!opened.Succeeded && refusal == "terminal_unavailable",
+            $"journey terminal new ({opened.Status}/{refusal ?? "none"})");
+        Step("terminal new refused: terminal_unavailable (no guest)");
+        await RemoveAsync(handle, hook, machine, cancellationToken);
+    }
+
     /// <summary>Attaches, retrying only the closed readiness refusals until 180 s.</summary>
     private static async Task<MilaTerminalStream> AttachAsync(
         MilaSessionConnection session, ulong handle, Guid machine, ushort columns, ushort rows, CancellationToken cancellationToken)

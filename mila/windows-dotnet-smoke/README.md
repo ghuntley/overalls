@@ -56,9 +56,10 @@ with a CNG device key (deleted afterwards when the journey created it), lets the
 approver hook approve the browser link (`POST {approval_url, fingerprint}` with
 the Bearer token), then lists machines, adds and removes a viewer share on the
 seed machine (matched by `machine_id` and name, signed in as `account_email`),
-lists notification devices, opens a named terminal with `terminal new` and
-attaches to it (the fixture runs no guest, so the closed `terminal_unavailable`
-refusal is accepted there), simulates a
+lists notification devices, requests `terminal new` on a machine it creates
+and never observes (no guest runs there, so it requires the closed
+`terminal_unavailable` refusal; the seed machine is not used because the Apple
+journey on the same fixture observes it running), simulates a
 transport loss and reconnects, and completes a share deferred before sign-in.
 The bearer token is never printed. The `windows-native` job runs it only when
 the repository variable `MILA_WINDOWS_JOURNEY` is `enabled` and the fixture
