@@ -27,7 +27,7 @@ let
         environment.etc."overalls-update-candidates.json".enable = lib.mkForce false;
         environment.etc."overalls-update-generation".text = "updated";
         services.overallsAutoUpdate.verbose = lib.mkForce true;
-        services.marshall.package = lib.mkForce (packages.marshall.overrideAttrs (previous: {
+        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-success" (previous: {
           postInstall = (previous.postInstall or "") + ''
             migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)
             cat > "$migrations/20990101000000_update_success.exs" <<'ELIXIR'
@@ -49,7 +49,7 @@ let
       broken.configuration = {
         environment.etc."overalls-update-candidates.json".enable = lib.mkForce false;
         # Exercise an actual failing migration from an otherwise runnable release.
-        services.marshall.package = lib.mkForce (packages.marshall.overrideAttrs (previous: {
+        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-failure" (previous: {
           postInstall = (previous.postInstall or "") + ''
             migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)
             cat > "$migrations/20990101000001_update_failure.exs" <<'ELIXIR'

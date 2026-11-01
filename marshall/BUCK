@@ -44,6 +44,8 @@ mix_sources(
     visibility = ["PUBLIC"],
 )
 
+mix_sources(name = "clone_fixture_srcs", owned = ["//nix:clone_fixture"])
+
 overalls_mix_project(
     name = "marshall",
     project = "marshall",
@@ -61,6 +63,48 @@ overalls_mix_project(
     source_overlays = [read_root_config("mix", "cedar_source", "")],
     release_reset_modes = True,
     release_pre_configure = mix_esbuild_config(),
+    # Fixture releases (contract mix-release-variants), formerly overrideAttrs
+    # of the Nix release in machines/fleet and machines/credential-rotation.
+    release_variants = {
+        # Contract clone-report-guard-fixture.
+        "observed_clone": {
+            "srcs": [":clone_fixture_srcs"],
+            "pre_build": [
+                "cp ../nix/verification/tests/machines/clone-cancellation/report_rejection.ex lib/marshall/clone_report_rejection_fixture.ex",
+                "{} ../nix/verification/tests/support/instrument_clone_reports.py lib/marshall/compute/host_reports.ex lib/marshall/compute/provisioner_control.ex".format(read_root_config("mix", "test_tools") + "/python3"),
+            ],
+        },
+        # The credential-rotation update candidate: a slow, successful
+        # migration that runs exactly once.
+        "update_success": {"post_install": [
+            'migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)',
+            """cat > "$migrations/20990101000000_update_success.exs" <<'ELIXIR'""",
+            "defmodule Marshall.Repo.Migrations.UpdateSuccess do",
+            "  use Ecto.Migration",
+            "  def up do",
+            '    execute "SELECT pg_sleep(20)"',
+            "    create table(:updater_fixture) do",
+            "      add :marker, :text, null: false",
+            "    end",
+            "    execute \"INSERT INTO updater_fixture (marker) VALUES ('once')\"",
+            "  end",
+            "  def down, do: drop(table(:updater_fixture))",
+            "end",
+            "ELIXIR",
+        ]},
+        # The credential-rotation broken candidate: a failing migration in an
+        # otherwise runnable release.
+        "update_failure": {"post_install": [
+            'migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)',
+            """cat > "$migrations/20990101000001_update_failure.exs" <<'ELIXIR'""",
+            "defmodule Marshall.Repo.Migrations.UpdateFailure do",
+            "  use Ecto.Migration",
+            '  def up, do: raise("isolated migration failure")',
+            "  def down, do: :ok",
+            "end",
+            "ELIXIR",
+        ]},
+    },
     release_env = {"CARGO_BUILD_JOBS": "4", "CARGO_NET_OFFLINE": "true"},
     test_env = {"CARGO_BUILD_JOBS": "4", "CARGO_NET_OFFLINE": "true"},
     # IngressTransportTest's Lilly connector fixture starts a private

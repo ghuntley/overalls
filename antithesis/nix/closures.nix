@@ -27,7 +27,8 @@ let
         system = pkgs.stdenv.hostPlatform.system;
         release = if release == null then null else toString release;
         releaseDerivation = if release == null then null else release.drvPath;
-        source = if release == null then null else toString release.src;
+        # A Buck2-built release (an import) has no Nix source; null there.
+        source = if release == null || !(release ? src) then null else toString release.src;
         roots = map toString roots;
       });
       links = lib.concatStringsSep "\n" (lib.mapAttrsToList

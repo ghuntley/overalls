@@ -189,12 +189,27 @@ let
     ++ [ "otel-request-fixture" "otel-request-recorder-cut" ];
   # @cc [owner:ghuntley,label:build] assembly-artifact-names
   # Every artifact key MUST name a leaf this set consumes: a Mix application
-  # release (`<app>`), its encrypted variant (`encrypted-<app>`), or a Buck2
-  # Rust leaf in `rustArtifactNames`. A misspelt key would otherwise be ignored
-  # and the Nix build used silently (ADR-0269).
+  # release (`<app>`), its encrypted variant (`encrypted-<app>`), a fixture
+  # release (`fixture-<app>-<variant>`, read through releaseFixture), or a
+  # Buck2 Rust leaf in `rustArtifactNames`. A misspelt key would otherwise be
+  # ignored and the Nix build used silently (ADR-0269).
   unknownArtifacts = builtins.filter
-    (name: !(builtins.elem name (mixApplications ++ map (name: "encrypted-${name}") mixApplications ++ rustArtifactNames)))
+    (name: !(builtins.elem name (mixApplications ++ map (name: "encrypted-${name}") mixApplications ++ rustArtifactNames)
+      || lib.any (application: lib.hasPrefix "fixture-${application}-" name) mixApplications))
     (builtins.attrNames artifacts);
+
+  # @cc [owner:ghuntley,label:build;verification] release-fixtures-from-buck2
+  # A fixture release (a patched update candidate or an instrumented build)
+  # MUST come from its Buck2 `release_variants` artifact whenever the
+  # application's release is a Buck2 artifact: an override of the import would
+  # be ignored (imported-artifacts-reject-build-hooks). Only an assembly
+  # without Buck2 releases builds the fixture by overriding the Nix release.
+  releaseFixture = application: variant: nixOverride:
+    let key = "fixture-${application}-${variant}"; in
+    if artifacts ? ${key} then artifacts.${key}
+    else if artifacts ? ${application} then
+      throw "${key}: assembly has a Buck2 ${application} release but no ${key} artifact (buck/mix_artifacts.bzl MIX_FIXTURE_ARTIFACTS, MIX_FIXTURE_SUITES)"
+    else mixReleases.${application}.overrideAttrs nixOverride;
   dependencies = lib.genAttrs mixApplications (application:
     beam.fetchMixDeps {
       pname = "overalls-${application}-deps";
@@ -515,7 +530,7 @@ rec {
   inherit (pkgs) buck2;
   userRecipients = secretPackages.recipients;
   secrets = secretPackages.command;
-  inherit mixReleases dependencyPins;
+  inherit mixReleases dependencyPins mixApplications releaseFixture;
   inherit (mixReleases) marshall lilly audi brady porsche ziggy galileo enrico peach susan;
   # Susan's OCI image (ADR-0224); flake.nix passes the source revision.
   mkSusanImage = revision: import ./susan-image.nix { inherit pkgs revision; release = mixReleases.susan; };

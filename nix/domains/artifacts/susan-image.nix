@@ -2,7 +2,9 @@
 # placement are deliberately open; TLS terminates at the fronting proxy.
 { pkgs, release, revision ? "source" }:
 let
-  version = release.version;
+  # From the name, which both the Nix release and a Buck2 import carry
+  # (overalls-susan-<version>); an import has no `version` attribute.
+  version = (builtins.parseDrvName release.name).version;
   # Fixed so identical inputs produce an identical image manifest.
   created = "2026-10-18T00:00:00Z";
 in

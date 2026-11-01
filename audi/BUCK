@@ -24,6 +24,24 @@ overalls_mix_project(
     release_srcs = [":release_srcs"],
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:sdk"],
+    # Fleet fixture releases (contract mix-release-variants), formerly
+    # overrideAttrs of the Nix release in machines/fleet/default.nix.
+    release_variants = {
+        # The patch changes only a @moduledoc, which `mix release` strips, so
+        # the marker keeps this candidate a distinct release (and store path).
+        "updated": {
+            "pre_build": [
+                """substituteInPlace lib/audi/health.ex --replace-fail 'Point-in-time role readiness for private deployment health checks.' 'Updated role readiness for private deployment health checks.'""",
+            ],
+            "post_install": ["printf 'updated\\n' > \"$out/overalls-fixture-variant\""],
+        },
+        # A controlled regression: listeners keep running, but the private
+        # health response fails, so the updater must not call it healthy.
+        "unhealthy": {"pre_build": [
+            """substituteInPlace lib/audi/health.ex --replace-fail 'Point-in-time role readiness for private deployment health checks.' 'Updated role readiness for private deployment health checks.'""",
+            """substituteInPlace lib/audi/health.ex --replace-fail 'System.monotonic_time(:millisecond) - started < 5000' 'System.monotonic_time(:millisecond) - started < 0'""",
+        ]},
+    },
     # Known Inception failures (AGENTS.md: "Inception is known broken and out
     # of scope ... Report them as known Inception failures"): the reviewed
     # list for the `known_failures` shard (contract mix-test-known-failures).

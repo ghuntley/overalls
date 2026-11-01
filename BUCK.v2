@@ -4,6 +4,7 @@
 load("//buck:nix.bzl", "nix_owned")
 load("//nix/buck:assembly_attrs.bzl", "ASSEMBLY_CHECKS", "ASSEMBLY_PACKAGES")
 load("//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
+load("//buck:mix_artifacts.bzl", "MIX_ANTITHESIS_ARTIFACTS")
 load("//buck:assemble.bzl", "nix_assemble")
 load("//buck:nix.bzl", "nix_store_run", "owned_set")
 load("//buck:mix.bzl", "mix_sources")
@@ -91,7 +92,11 @@ _PACKAGE_VISIBILITY = {
 [nix_assemble(
     name = "package-" + attr,
     attr = "outputPackages.\"{}\"".format(attr),
-    artifacts = {} if attr in _NIX_LEAF_OUTPUTS + _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS,
+    # The Antithesis contexts' package sets take the harness, guest and
+    # integrated-host releases (lib.assemble routes them).
+    artifacts = {} if attr in _NIX_LEAF_OUTPUTS + _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS | (
+        MIX_ANTITHESIS_ARTIFACTS if attr.startswith("antithesis-") else {}
+    ),
     labels = ["flake_output"],
     visibility = _PACKAGE_VISIBILITY.get(attr, []),
 ) for attr in ASSEMBLY_PACKAGES]

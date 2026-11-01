@@ -1,6 +1,7 @@
 # NixOS machine tests and script tests as Buck2 test targets (ADR-0270).
 
 load(":artifacts.bzl", "MACHINE_TEST_ARTIFACTS")
+load(":mix_artifacts.bzl", "MIX_FIXTURE_ARTIFACTS", "MIX_FIXTURE_SUITES")
 load(":assemble.bzl", "nix_assemble")
 load(":nix.bzl", "owned_set")
 
@@ -76,8 +77,9 @@ def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str
         attr = "checks.\"{}\"".format(check),
         srcs = [":" + name + ".inputs"],
         # Every Buck2-built leaf replaces its Nix build in the test, as it
-        # will on hosts (ADR-0269), plus the test-only fixtures.
-        artifacts = MACHINE_TEST_ARTIFACTS,
+        # will on hosts (ADR-0269), plus the test-only fixtures; suites that
+        # run fixture releases also receive those (their release_variants).
+        artifacts = MACHINE_TEST_ARTIFACTS | (MIX_FIXTURE_ARTIFACTS if kwargs.get("suite") in MIX_FIXTURE_SUITES else {}),
         labels = ["machine_test_assembly"],
     )
     _nixos_machine_test(

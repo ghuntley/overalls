@@ -7,7 +7,22 @@ load(":nix.bzl", "OwnedSrcsInfo")
 RuntimeRefsInfo = provider(fields = {"refs": list[str]})
 
 # A Buck2 artifact imported into the Nix store.
-NixStorePathInfo = provider(fields = {"store_path": Artifact, "runtime_refs": list[str], "self_reference": str | None, "allowed_references": list[str] | None})
+# package_references maps a placeholder store path the artifact embeds to the
+# package-set attribute assembly rewrites it to (contract
+# mix-release-package-references in nix/assemble/import-artifact.nix).
+NixStorePathInfo = provider(fields = {
+    "store_path": Artifact,
+    "runtime_refs": list[str],
+    "self_reference": str | None,
+    "allowed_references": list[str] | None,
+    "package_references": dict[str, str],
+})
+
+# One root per configured target: the encrypted and Antithesis variants of a
+# release share its label but not its configuration.
+def _import_root_name(ctx: AnalysisContext) -> str:
+    name = str(ctx.label)
+    return "".join([c if c.isalnum() or c in "-_." else "_" for c in name.elems()])
 
 def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
     src = ctx.attrs.src[DefaultInfo].default_outputs[0]
@@ -15,16 +30,28 @@ def _nix_store_import_impl(ctx: AnalysisContext) -> list[Provider]:
     script = ctx.actions.write("import.sh", [
         "set -euo pipefail",
         # Outputs can be symlinks into content-hashed directories; import the tree.
-        "\"$1\" --add-fixed --recursive sha256 \"$(realpath \"$2\")\" > \"$3\"",
+        "path=$(\"$1\" --add-fixed --recursive sha256 \"$(realpath \"$2\")\")",
+        # Contract nix-store-import-gc-rooted: see buck/CONTRACTS. The same
+        # root directory and checkout hash as nix_assemble.sh's roots.
+        "roots=${OVERALLS_GCROOT_DIR:-${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/overalls-buck2/gcroots}",
+        "mkdir -p \"$roots\"",
+        "\"$1\" --realise --add-root \"$roots/$(pwd | sha256sum | cut -c1-12)-import-$4\" \"$path\" > /dev/null",
+        "printf '%s\\n' \"$path\" > \"$3\"",
     ])
     ctx.actions.run(
-        cmd_args(ctx.attrs._bash[RunInfo], script, ctx.attrs._nix_store[RunInfo], src, out.as_output()),
+        cmd_args(ctx.attrs._bash[RunInfo], script, ctx.attrs._nix_store[RunInfo], src, out.as_output(), _import_root_name(ctx)),
         category = "nix_store_import",
         local_only = True,
         allow_cache_upload = False,
     )
     refs = ctx.attrs.runtime_refs + (ctx.attrs.src[RuntimeRefsInfo].refs if RuntimeRefsInfo in ctx.attrs.src else [])
-    return [DefaultInfo(default_output = out), NixStorePathInfo(store_path = out, runtime_refs = refs, self_reference = ctx.attrs.self_reference, allowed_references = ctx.attrs.allowed_references)]
+    return [DefaultInfo(default_output = out), NixStorePathInfo(
+        store_path = out,
+        runtime_refs = refs,
+        self_reference = ctx.attrs.self_reference,
+        allowed_references = ctx.attrs.allowed_references,
+        package_references = ctx.attrs.package_references,
+    )]
 
 nix_store_import = rule(
     impl = _nix_store_import_impl,
@@ -33,6 +60,7 @@ nix_store_import = rule(
         # (nix/assemble/import-artifact.nix); `[]` for an artifact that must
         # embed none. None leaves it unconstrained.
         "allowed_references": attrs.option(attrs.list(attrs.string()), default = None),
+        "package_references": attrs.dict(attrs.string(), attrs.string(), default = {}),
         "runtime_refs": attrs.list(attrs.string(), default = []),
         # Placeholder store path the artifact embeds for itself; assembly
         # rewrites it to the imported path (see nix/assemble/import-artifact.nix).
@@ -58,6 +86,8 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
             {"selfReference": dep[NixStorePathInfo].self_reference} if dep[NixStorePathInfo].self_reference else {}
         ) | (
             {"allowedReferences": dep[NixStorePathInfo].allowed_references} if dep[NixStorePathInfo].allowed_references != None else {}
+        ) | (
+            {"packageReferences": dep[NixStorePathInfo].package_references} if dep[NixStorePathInfo].package_references else {}
         )
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)

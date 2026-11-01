@@ -126,7 +126,7 @@ def _mix_release_impl(ctx: AnalysisContext) -> list[Provider]:
         "out_hash=" + shell_quote(ctx.attrs.out_hash),
         "random_seed=" + shell_quote(ctx.attrs.random_seed or ctx.attrs.out_hash[:10]),
         "out_name=" + shell_quote(name),
-        "declared_refs=" + shell_quote(" ".join(ctx.attrs.runtime_refs)),
+        "declared_refs=" + shell_quote(" ".join(ctx.attrs.runtime_refs + ctx.attrs.placeholder_refs)),
     ] + _env_lines(ctx.attrs.env) + _var_lines({
         "name": name,
         "pname": "overalls-" + ctx.attrs.application,
@@ -137,6 +137,7 @@ def _mix_release_impl(ctx: AnalysisContext) -> list[Provider]:
         "preBuild": "\n".join(ctx.attrs.pre_build),
         "postBuild": "\n".join(ctx.attrs.post_build),
         "postInstall": "\n".join(['cp /arg/2 "$out/overalls-release.json"'] + ctx.attrs.post_install),
+        "postRelease": "\n".join(ctx.attrs.post_release),
     }) + [
         "mixCompileFlags=(--warnings-as-errors)",
         "mix_release",
@@ -155,6 +156,10 @@ def _mix_release_impl(ctx: AnalysisContext) -> list[Provider]:
         category = "mix_release",
         identifier = ctx.attrs.application,
         local_only = True,
+        # Contract mix-release-cache-upload: a release holds no secret (no
+        # Erlang cookie, token or host-local state), so one runner's build
+        # serves every assembly through the action cache (ADR-0276).
+        allow_cache_upload = True,
     )
     return [
         DefaultInfo(default_output = out, sub_targets = {"runtime_refs": [DefaultInfo(default_output = refs)]}),
@@ -178,10 +183,16 @@ mix_release = rule(
         "random_seed": attrs.string(default = ""),
         "post_build": attrs.list(attrs.string(), default = []),
         "post_install": attrs.list(attrs.string(), default = []),
+        # Shell lines run after the stdenv phases (fixup included).
+        "post_release": attrs.list(attrs.string(), default = []),
         "pre_build": attrs.list(attrs.string(), default = []),
         "pre_configure": attrs.list(attrs.string(), default = []),
         "project": attrs.string(),
         "runtime_refs": attrs.list(attrs.string(), default = []),
+        # Placeholder store paths the release may name and assembly rewrites
+        # (nix_store_import `package_references`); allowed by the
+        # undeclared-reference check but never recorded as runtime refs.
+        "placeholder_refs": attrs.list(attrs.string(), default = []),
         "srcs": attrs.list(attrs.dep(providers = [MixSourcesInfo])),
         "state": attrs.string(),
     } | _TOOLS,
@@ -563,10 +574,102 @@ mix_release_probe = rule(
 )
 
 # ---------------------------------------------------------------------------
+# A release import in another variant configuration (contract
+# mix-variant-imports). The crash-dump and Antithesis variants are
+# configurations of the one `<app>_import`, not separate targets, so assembly
+# names each through a transition that adds the variant's constraints.
+
+def _configured(platform: PlatformInfo, values: list[ConstraintValueInfo], suffix: str) -> PlatformInfo:
+    constraints = dict(platform.configuration.constraints)
+    for value in values:
+        constraints[value.setting.label] = value
+    return PlatformInfo(
+        # Idempotent: Buck2 checks that a second application is a no-op.
+        label = platform.label if platform.label.endswith(suffix) else platform.label + suffix,
+        configuration = ConfigurationInfo(constraints = constraints, values = platform.configuration.values),
+    )
+
+def _encrypted_impl(platform: PlatformInfo, refs: struct) -> PlatformInfo:
+    return _configured(platform, [refs.encrypted[ConstraintValueInfo]], "-encrypted")
+
+def _harness_impl(platform: PlatformInfo, refs: struct) -> PlatformInfo:
+    return _configured(platform, [refs.antithesis[ConstraintValueInfo]], "-antithesis-harness")
+
+def _guest_impl(platform: PlatformInfo, refs: struct) -> PlatformInfo:
+    return _configured(platform, [refs.antithesis[ConstraintValueInfo]], "-antithesis-guest")
+
+def _integrated_impl(platform: PlatformInfo, refs: struct) -> PlatformInfo:
+    return _configured(platform, [refs.antithesis[ConstraintValueInfo]], "-antithesis-integrated-host")
+
+_guest = transition(impl = _guest_impl, refs = {"antithesis": "root//buck:antithesis_guest"})
+_harness = transition(impl = _harness_impl, refs = {"antithesis": "root//buck:antithesis_harness"})
+_integrated = transition(impl = _integrated_impl, refs = {"antithesis": "root//buck:antithesis_integrated_host"})
+_encrypted = transition(impl = _encrypted_impl, refs = {"encrypted": "root//buck:encrypted_crash_dumps"})
+
+def _variant_import_impl(ctx: AnalysisContext) -> list[Provider]:
+    actual = ctx.attrs.actual
+    return [actual[DefaultInfo], actual[NixStorePathInfo]]
+
+mix_import_antithesis_guest = rule(impl = _variant_import_impl, attrs = {"actual": attrs.transition_dep(cfg = _guest, providers = [NixStorePathInfo])})
+mix_import_antithesis_harness = rule(impl = _variant_import_impl, attrs = {"actual": attrs.transition_dep(cfg = _harness, providers = [NixStorePathInfo])})
+mix_import_antithesis_integrated_host = rule(impl = _variant_import_impl, attrs = {"actual": attrs.transition_dep(cfg = _integrated, providers = [NixStorePathInfo])})
+mix_import_encrypted = rule(impl = _variant_import_impl, attrs = {"actual": attrs.transition_dep(cfg = _encrypted, providers = [NixStorePathInfo])})
+
+_VARIANT_IMPORTS = {
+    "antithesis_guest": mix_import_antithesis_guest,
+    "antithesis_harness": mix_import_antithesis_harness,
+    "antithesis_integrated_host": mix_import_antithesis_integrated_host,
+    "encrypted": mix_import_encrypted,
+}
+
+def _release_differs_impl(ctx: AnalysisContext) -> list[Provider]:
+    command = cmd_args(
+        ctx.attrs._bash[RunInfo],
+        "-c",
+        # diff exits 0 when the trees are equal: the fixture patch was lost.
+        'if diff -rq "$1" "$2" > /dev/null; then echo "$3: identical to the base release; its patch had no effect" >&2; exit 1; fi; echo "$3 differs from the base release"',
+        "release_differs",
+        ctx.attrs.variant[DefaultInfo].default_outputs[0],
+        ctx.attrs.base[DefaultInfo].default_outputs[0],
+        ctx.attrs.name,
+    )
+    return [
+        DefaultInfo(),
+        ExternalRunnerTestInfo(
+            type = "custom",
+            command = [command],
+            labels = ctx.attrs.labels,
+            default_executor = CommandExecutorConfig(local_enabled = True, remote_enabled = False),
+            run_from_project_root = True,
+            use_project_relative_paths = True,
+        ),
+    ]
+
+# Contract mix-release-variants-differ: a fixture release that equals its
+# base release proves its patch was silently dropped.
+mix_release_differs_test = rule(
+    impl = _release_differs_impl,
+    attrs = {
+        "base": attrs.dep(),
+        "labels": attrs.list(attrs.string(), default = []),
+        "variant": attrs.dep(),
+        "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
+    },
+)
+
+# ---------------------------------------------------------------------------
 # Per-project macro. Configuration is read here, at load time, so every store
 # path enters the target hash (contract nix-toolchain-paths-in-action-keys).
 
 _ZERO_HASH = "00000000000000000000000000000000"
+
+# Lilly's release names its host tools (overalls-release.json and the
+# `host-tools` link) by this placeholder. Assembly rewrites it to the package
+# set's `hostTools`, which carries the Buck2 helpers once they are an
+# artifact; the name matches that derivation's so the path length is equal
+# (contract mix-release-package-references in nix/assemble/import-artifact.nix).
+_HOST_TOOLS_REF = "/nix/store/11111111111111111111111111111111-lilly-host-tools"
+_PACKAGE_REFERENCES = {"lilly": {_HOST_TOOLS_REF: "hostTools"}}
 
 def mix_available() -> bool:
     """Whether the cells carry the [mix] section.
@@ -612,7 +715,7 @@ def _metadata(application: str, encrypted: bool, antithesis: str | None) -> str:
         data["antithesis_integrated_host"] = antithesis == "integrated_host" and application == "lilly"
     if application == "lilly":
         vmm = _mix_config("vmm")
-        data["host_tools"] = _mix_config("host_tools")
+        data["host_tools"] = _HOST_TOOLS_REF
         data["firecracker"] = vmm + "/bin/firecracker"
         data["jailer"] = vmm + "/bin/jailer"
         data["unshare"] = _mix_config("util_linux_bin") + "/bin/unshare"
@@ -710,6 +813,8 @@ def overalls_mix_project(
         release_pre_configure: list[str] = [],
         post_build: list[str] = [],
         post_install: list[str] = [],
+        # Release lines run after fixup (mix_host_tools_link).
+        post_release: list[str] = [],
         test_env: dict[str, str] = {},
         test_support: list[str] = _TEST_SUPPORT,
         release_variants: dict[str, dict] = {},
@@ -861,7 +966,9 @@ def overalls_mix_project(
             pre_build = patch.get("pre_build", []),
             post_build = post_build,
             post_install = post_install + patch.get("post_install", []),
+            post_release = post_release,
             runtime_refs = _mix_config("runtime_refs").split(),
+            placeholder_refs = _PACKAGE_REFERENCES.get(name, {}).keys(),
             labels = ["mix", "release"] + (["fixture"] if variant else []),
             visibility = ["PUBLIC"],
         )
@@ -872,6 +979,21 @@ def overalls_mix_project(
             name = prefix + name + "_import" + ("_" + variant if variant else ""),
             src = ":" + prefix + "release" + ("_" + variant if variant else ""),
             self_reference = "/nix/store/{}-overalls-{}-0.1.0".format(_ZERO_HASH, name),
+            package_references = _PACKAGE_REFERENCES.get(name, {}),
+            visibility = ["PUBLIC"],
+        )
+        if variant:
+            mix_release_differs_test(
+                name = prefix + "release_" + variant + "_differs",
+                variant = ":" + prefix + "release_" + variant,
+                base = ":" + prefix + "release",
+                labels = ["mix", "release", "fixture"],
+            )
+    # The base import in each variant configuration (MIX_ARTIFACTS).
+    for configuration, wrapper in _VARIANT_IMPORTS.items():
+        wrapper(
+            name = prefix + name + "_import_" + configuration,
+            actual = ":" + prefix + name + "_import",
             visibility = ["PUBLIC"],
         )
     mix_release_probe(
@@ -894,7 +1016,9 @@ def mix_tree(dirs: list[str] = [], files: list[str] = [], exclude: list[str] = [
     return native.glob(include, exclude = exclude + ["**/BUCK"])
 
 def mix_host_tools_link() -> list[str]:
-    """postInstall line that links Lilly's host tools into its release."""
+    """post_release line that links Lilly's host tools into its release.
+    The link names a placeholder until assembly rewrites it, so it is made
+    after fixup's dangling-symlink check."""
     if not mix_available():
         return []
-    return ['ln -s {} "$out/host-tools"'.format(_mix_config("host_tools"))]
+    return ['ln -s {} "$out/host-tools"'.format(_HOST_TOOLS_REF)]

@@ -29,6 +29,8 @@ chmod -R u+w "$tree"
 # Replace each import's store-path file with the store path it names.
 "$jq" -c 'to_entries[]' "$artifacts" | while read -r entry; do
   name=$("$jq" -r .key <<<"$entry"); file=$("$jq" -r .value.path <<<"$entry")
+  # Contract nix-store-import-gc-rooted: see buck/CONTRACTS.
+  [[ -e $(cat "$file") ]] || { echo "nix_assemble: artifact $name names $(cat "$file"), which is no longer in the Nix store (collected after import); rebuild its import, e.g. after tools/buck2 clean" >&2; exit 1; }
   "$jq" -c --arg name "$name" --arg path "$(cat "$file")" '{($name): (.value | .path = $path)}' <<<"$entry"
 done | "$jq" -s 'add // {}' > "$tree/.buck-artifacts.json"
 # The target's parameters (fleet_host(params = ...)); lib.assemble validates

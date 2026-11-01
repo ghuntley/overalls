@@ -80,13 +80,31 @@ mix_sources(
     visibility = ["PUBLIC"],
 )
 
+mix_sources(name = "clone_fixture_srcs", owned = ["//nix:clone_fixture"])
+
 overalls_mix_project(
     name = "lilly",
     project = "lilly",
     release_srcs = [":release_srcs"],
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:lilly"],
-    post_install = mix_host_tools_link(),
+    post_release = mix_host_tools_link(),
+    # Fleet fixture releases (contract mix-release-variants), formerly
+    # overrideAttrs of the Nix release in machines/fleet/default.nix.
+    release_variants = {
+        # The update fixture tells the candidate by its start-event message.
+        "updated": {"pre_build": [
+            """substituteInPlace lib/lilly/events.ex --replace-fail 'message: "Lilly started"' 'message: "Lilly updated"'""",
+        ]},
+        # Contract clone-exact-guid-context-fixture.
+        "observed_clone": {
+            "srcs": [":clone_fixture_srcs"],
+            "pre_build": [
+                "cp ../nix/verification/tests/machines/clone-cancellation/observation.ex lib/lilly/clone_observation_fixture.ex",
+                "{} ../nix/verification/tests/support/instrument_clone_observation.py lib/lilly/host/zfs.ex".format(read_root_config("mix", "test_tools") + "/python3"),
+            ],
+        },
+    },
     # The suite runs the native host helpers and Firecracker as devenv
     # provides them: the imported Buck2 helpers, host system tools and the VMM
     # on PATH. The helpers run from the store, which Lilly trusts as root-owned.

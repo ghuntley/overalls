@@ -13,6 +13,13 @@ nix_store_import MUST run locally and never upload its output, because the
 output names a path in the local Nix store; it MUST forward the artifact's
 declared runtime references so assembly can record them (ADR-0269).
 
+@cc [owner:ghuntley,label:build;recovery] nix-store-import-gc-rooted
+nix_store_import MUST register the path it imports as an indirect GC root per
+checkout and configured target (beside nix_assemble's roots), because Buck2
+keeps the recorded store path after the store collects it; and nix_assemble
+MUST refuse an artifact whose recorded path is no longer valid, naming it,
+rather than let Nix report a path no substituter can build.
+
 @cc [owner:ghuntley,label:build;verification] rust-artifacts-have-parity
 Every RUST_ARTIFACTS entry (buck/rust_artifacts.bzl) MUST have a
 rust_leaf_parity_test whose `buck` attribute is its import target, so a Buck2
@@ -357,6 +364,9 @@ mix_release MUST list in RuntimeRefsInfo every store path the release may
 reference at runtime: the [mix] runtime_refs closure from the cells. The rule
 MUST fail on any store reference outside that list, because assembly records
 only declared references and the rest would be missing from the closure.
+Placeholder paths that assembly rewrites (`placeholder_refs`, contract
+mix-release-package-references) are allowed but never recorded as runtime
+refs; assembly adds the real paths when it rewrites them.
 
 @cc [owner:ghuntley,label:build] mix-compile-shared-build
 mix_compile MUST produce the project's `_build/<env>` and compiled dependency
@@ -446,3 +456,22 @@ Fixture releases MUST be overalls_mix_project release_variants, labelled
 `fixture`. They may add sources, a preBuild source patch or postInstall
 additions to the ordinary release recipe, and nothing else, so a fixture
 differs from production only by its declared patch.
+
+@cc [owner:ghuntley,label:build;verification] mix-release-variants-differ
+Every release_variants entry MUST have a `<variant>_differs` test that fails
+when the variant's release tree equals the base release, so a patch that no
+longer applies, or one dropped on the way, cannot pass as the fixture.
+
+@cc [owner:ghuntley,label:build] mix-variant-imports
+The encrypted-crash-dump and Antithesis releases MUST be the one
+`<app>_import` built through a transition that adds the variant's
+constraints (`<app>_import_<variant>`), never a separate recipe. Assembly
+names them in buck/mix_artifacts.bzl: `encrypted-<app>` in every assembly,
+`antithesis-<variant>-<app>` only for the Antithesis context outputs, and
+`fixture-<app>-<variant>` only for MIX_FIXTURE_SUITES.
+
+@cc [owner:ghuntley,label:build;security] mix-release-cache-upload
+mix_release MAY upload its output to the shared action cache (ADR-0276)
+only while a release carries no secret: no Erlang cookie, no credential or
+token, and nothing read from host-local state outside its declared inputs.
+A change that puts any of those into a release MUST turn the upload off.

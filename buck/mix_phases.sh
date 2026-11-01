@@ -34,6 +34,9 @@ mix_release() {
   installPhase=mixReleaseInstallHook
   runHook postHook
   genericBuild
+  # After fixup, so stdenv's noBrokenSymlinks check does not see links to
+  # placeholders that assembly rewrites (contract mix-release-package-references).
+  eval "${postRelease-}"
 
   # Any ELF that names the placeholder would break when assembly rewrites it.
   local file

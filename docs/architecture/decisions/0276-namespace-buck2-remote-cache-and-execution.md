@@ -97,6 +97,25 @@ chose on 2026-10-31. Observed facts:
      non-hermetic Mila platform builds run locally;
    - non-hermetic CI jobs receive no token;
    - host deployment builds keep `remote_execution = false`.
+
+   Exception, recorded on 2026-11-01: `mix_release` stays `local_only` but
+   sets `allow_cache_upload = True`, so one runner's release build serves
+   every later assembly. This was checked before enabling it. All 39 release
+   imports (10 applications as plain, `encrypted_crash_dumps` and Antithesis
+   harness builds, Lilly's guest and integrated-host builds, and the seven
+   fleet fixtures) were built on dungarees and scanned:
+   - none carries an Erlang cookie;
+   - the token-pattern hits are all false positives (Marshall's redaction
+     regexes, and PEM header strings inside `ssh_file`, `pubkey_pem` and the
+     JOSE beams);
+   - the action's inputs are its declared sources, the pinned Hex
+     dependencies and pinned Nix toolchains. It reads no host credential
+     or configuration file. This was established by inspection, not by a
+     sandbox.
+   Lilly's releases contain one symlink (the host-tools link). The action
+   cache refuses outputs with symlinks, so those releases still rebuild per
+   runner. The `mix-release-cache-upload` contract in `buck/CONTRACTS`
+   requires turning the upload off if a release ever gains a secret.
 6. **Remote execution is the default where it is supported.** Remote
    execution runs on Namespace Linux workers whose image carries the
    `buckCells` closure. The image is digest-pinned in `nscr.io`, recorded per

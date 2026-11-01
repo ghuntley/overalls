@@ -1,5 +1,5 @@
 load("@root//buck:checks.bzl", "script_check")
-load("@root//buck:nix.bzl", "nix_owned")
+load("@root//buck:nix.bzl", "nix_owned", "owned_set")
 load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:mix.bzl", "mix_sources")
 load("@root//nix/verification/tests/machines:modules.bzl", "SYSTEM_MODULE_GROUPS")
@@ -207,3 +207,20 @@ filegroup(
 export_file(name = "lyra-build.sh", src = "domains/artifacts/infrastructure/lyra-build.sh", visibility = ["PUBLIC"])
 
 export_file(name = "release_probe.exs", src = "verification/tests/release/probe.exs", visibility = ["PUBLIC"])
+
+# The clone-cancellation fixture releases (//lilly and //marshall
+# release_variants) copy the suite's instrumentation sources and run these
+# instrumenters over the application source before compiling.
+filegroup(
+    name = "clone_fixture_tools",
+    srcs = [
+        "verification/tests/support/instrument_clone_observation.py",
+        "verification/tests/support/instrument_clone_reports.py",
+    ],
+)
+
+owned_set(
+    name = "clone_fixture",
+    deps = [":clone_fixture_tools", "//nix/verification/tests/machines/clone-cancellation:srcs"],
+    visibility = ["PUBLIC"],
+)

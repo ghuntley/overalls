@@ -18,9 +18,51 @@ let
   # once and shared by every consumer of the package set.
   imported = lib.mapAttrs (name: artifact: importArtifact ({ inherit name; } // artifact)) artifacts;
 
+  # @cc [owner:ghuntley,label:build] antithesis-release-artifacts
+  # The Antithesis package sets MUST take their Mix releases from the
+  # `antithesis-<variant>-<app>` artifacts (buck/mix_artifacts.bzl
+  # MIX_ANTITHESIS_ARTIFACTS), never the production `<app>` release, whose
+  # build lacks the harness. The guest and integrated-host flags change only
+  # Lilly's build, so the other applications there take the harness release.
+  # Every other package set never sees these keys, and an unknown
+  # `antithesis-*` key is an evaluation error.
+  mixApplications = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
+  antithesisVariants = [ "harness" "guest" "integrated-host" ];
+  isAntithesisKey = lib.hasPrefix "antithesis-";
+  unknownAntithesis = lib.filter (name: isAntithesisKey name
+    && !(lib.any (v: lib.any (app: name == "antithesis-${v}-${app}") mixApplications) antithesisVariants))
+    (lib.attrNames imported);
+  isProductionRelease = name: lib.elem name mixApplications
+    || lib.any (app: lib.hasPrefix "fixture-${app}-" name) mixApplications;
+  plainImported = lib.filterAttrs (name: _: !(isAntithesisKey name)) imported;
+  antithesisVariant = variant:
+    if variant.antithesisIntegratedHost or false then "integrated-host"
+    else if variant.antithesisGuest or false then "guest"
+    else if variant.antithesisSdk or false then "harness"
+    else null;
+  variantArtifacts = variant:
+    let name = antithesisVariant variant; in
+    if name == null then plainImported
+    else lib.filterAttrs (key: _: !(isProductionRelease key)) plainImported
+      // lib.listToAttrs (lib.concatMap (app:
+        let
+          keys = [ "antithesis-${name}-${app}" ] ++ lib.optional (app != "lilly") "antithesis-harness-${app}";
+          found = lib.filter (key: imported ? ${key}) keys;
+        in lib.optional (found != [ ]) (lib.nameValuePair app imported.${lib.head found}))
+        mixApplications);
+
   # One package set. Variants differ only by explicit parameters.
-  packageSet = variant: import ../domains/artifacts/default.nix
-    ({ inherit pkgs; artifacts = imported; } // variant);
+  # Imports that name package-set attributes (contract
+  # mix-release-package-references) are resolved against the set they join.
+  packageSet = variant:
+    let
+      set = import ../domains/artifacts/default.nix ({
+        inherit pkgs;
+        artifacts = lib.mapAttrs (_: drv: if drv.passthru.needsPackageSet or false then drv.passthru.inPackageSet set else drv)
+          (variantArtifacts variant);
+      } // variant);
+    in
+    set;
 
   # Memoised so the default variant is evaluated once for every consumer.
   packages = packageSet { };
@@ -123,6 +165,8 @@ let
     "lib.assemble: a check is defined in both catalog.nix and outputs.nix";
     catalog // outputs.checks;
 in
+assert lib.assertMsg (unknownAntithesis == [ ])
+  "lib.assemble: unknown Antithesis artifacts ${builtins.toJSON unknownAntithesis}";
 assert lib.assertMsg (builtins.isAttrs params && unknownParams == [ ])
   "lib.assemble: unknown params ${builtins.toJSON unknownParams}; known: ${builtins.toJSON (lib.attrNames paramSchema)}";
 {

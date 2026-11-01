@@ -309,6 +309,44 @@ the approved migration plan.
     `ExCk` (type checker) chunk of 12 dependency beams, which the release
     strips, so they affect only the cache keys of checks and tests. `phx.digest` stamps `cache_manifest.json` with the
     build time; Nix keeps it, and Buck2 pins it to `SOURCE_DATE_EPOCH`.
+  - Assembly switched to the Buck2 releases on 2026-11-01. `MIX_ARTIFACTS`
+    in [mix_artifacts.bzl](../../../buck/mix_artifacts.bzl) gives every
+    `nix_assemble` each `<app>_import`, plus `encrypted-<app>` through a
+    transition.
+    - The Antithesis package targets take `antithesis-<variant>-<app>`
+      (contract `antithesis-release-artifacts` in
+      [default.nix](../../../nix/assemble/default.nix)).
+    - The fleet and credential-rotation suites take the seven
+      `release_variants` fixtures as `fixture-<app>-<variant>` (contract
+      `release-fixtures-from-buck2`); `mix_release_differs_test` proves
+      each differs from its base release.
+    - `overrideAttrs` that sets a build hook on an import is an evaluation
+      error (contract `imported-artifacts-reject-build-hooks`).
+    - Lilly's release names its host tools by a placeholder that each package
+      set rewrites to its own `hostTools`, so a release runs the host's
+      Buck2-built helpers (contract `mix-release-package-references`).
+  - Parity on dungarees after that switch, against
+    `(lib.assemble {}).packages.<app>` (the Nix release), measured before
+    `marshall/dep_patches` landed:
+    - audi, brady, enrico, galileo, peach, porsche, susan and ziggy are
+      identical once the self placeholder is normalised;
+    - Lilly differs only in `overalls-release.json`, whose `host_tools` is
+      the placeholder;
+    - Marshall differs only in the four beams and `cache_manifest.json`
+      above.
+    - The references each release action records equal the Nix release's
+      for all ten applications.
+    - Every `release_probe` passes, and no release carries an Erlang cookie
+      (ADR-0276 decision 5).
+    - The rewritten Lilly releases, plain and encrypted, link and record the
+      package set's `hostTools`, whose helpers are the Buck2 bundle.
+    - The leftover-placeholder checks in `importArtifact` used `! grep`, which
+      errexit ignores, so they could never fail; they now exit explicitly.
+    - A store GC on dungarees collected release imports that Buck2 still
+      recorded, and every fleet assembly then failed. Each import is now an
+      indirect GC root per checkout and configured target, and assembly
+      refuses a collected artifact by name (contract
+      `nix-store-import-gc-rooted` in [CONTRACTS](../../../buck/CONTRACTS)).
   - `buck2 test` passes for protocol (cold 15m25s, mostly its 900 s
     property suite; warm 0.2 s from the action cache), peach, susan,
     porsche, request_accounting and diagnostics. Suites read sibling fixtures
@@ -510,12 +548,13 @@ Remaining gaps, by milestone of the migration plan:
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
   NIF, Mila) (M5);
 - M6 leftovers:
-  - Assembly still uses `beam.mixRelease`
+  - Buck2 assemblies take each application's `<app>_import`, but
+    `beam.mixRelease`
     ([source.nix](../../../nix/domains/artifacts/applications/source.nix))
-    until the coordinator switches each application to its
-    `<app>_import`; both stay until every consumer moves.
-  - The six fleet fixtures built with `overrideAttrs` need
-    `release_variants`.
+    still builds the releases for an artifact-less `lib.assemble {}` and the
+    pin-refresh scripts. It goes once both build the Buck2 targets.
+    (`nix/buck/mix.nix` keeps its own `beam.mixRelease` for the shell-state
+    capture.)
   - Marshall's dev `assets.setup` alias still calls `esbuild.install`;
     Buck2 builds use the cells esbuild. Changing `mix.exs` would change the
     Nix release before the switch.
