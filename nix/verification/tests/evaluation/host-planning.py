@@ -1197,7 +1197,9 @@ class HostPlanning(unittest.TestCase):
     def test_failed_buck2_reports_a_bounded_redacted_tail(self) -> None:
         secret = "nsc_" + "s" * 40
         noise = "\n".join(f"line {n}" for n in range(500))
-        script = f"import sys; sys.stderr.write({noise!r} + '\\nAction failed {secret}\\n'); sys.exit(1)"
+        script = (
+            f"import sys; sys.stderr.write({noise!r} + '\\nAction failed {secret}\\n'); sys.exit(1)"
+        )
         with (
             patch.dict(os.environ, {"NAMESPACE_RBE_TOKEN": secret}),
             self.assertRaises(cli.Failure) as raised,

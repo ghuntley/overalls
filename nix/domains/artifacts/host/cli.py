@@ -110,15 +110,13 @@ DIAGNOSTIC_LINES = 40
 DIAGNOSTIC_BYTES = 8192
 
 
+# @cc [owner:ghuntley,label:security] host-cli-bounded-diagnostics
+# Only commands that opt in report stderr, and only its last
+# DIAGNOSTIC_LINES lines within DIAGNOSTIC_BYTES. Every value in `secrets`
+# MUST be replaced before the text leaves the process, and the command's
+# environment and arguments are never reported.
 def diagnostic_tail(stderr: bytes, secrets: list[str]) -> str:
-    """The bounded end of a tool's stderr, with every known secret removed.
-
-    @cc [owner:ghuntley,label:security] host-cli-bounded-diagnostics
-    Only commands that opt in report stderr, and only its last
-    DIAGNOSTIC_LINES lines within DIAGNOSTIC_BYTES. Every value in `secrets`
-    MUST be replaced before the text leaves the process, and the command's
-    environment and arguments are never reported.
-    """
+    """The bounded end of a tool's stderr, with every known secret removed."""
     text = stderr[-DIAGNOSTIC_BYTES:].decode(errors="replace")
     for secret in secrets:
         if secret:
