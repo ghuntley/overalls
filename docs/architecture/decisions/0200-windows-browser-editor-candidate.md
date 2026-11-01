@@ -189,7 +189,7 @@ The cross-platform review records the completed native build and exact imported
 bundle identity. These are package/source boundaries, not browser execution.
 
 The [portable worker model](../../../nix/domains/artifacts/vscode-web-broker/src/windows_model.rs),
-[Win32 launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs),
+[Win32 launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs),
 [listener](../../../nix/domains/artifacts/vscode-web-broker/src/windows_main.rs)
 and [pipe implementation](../../../nix/domains/artifacts/vscode-web-broker/src/windows_pipe.rs)
 implement the candidate custody path. The

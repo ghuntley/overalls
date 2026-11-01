@@ -53,7 +53,7 @@ it remains outside production selection.
 
 | Severity | Finding and evidence | Consequence and resolution |
 | --- | --- | --- |
-| High | The old [launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs) creates jobs without kill-on-close and expects retained jobs to reopen after handle loss. The native lifetime experiment contradicts that assumption. | Broker death can leave a live personal process without the named custody object required for safe reuse or cleanup. Keep handles in an independent custodian and test broker/custodian failures separately. |
+| High | The old [launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs) creates jobs without kill-on-close and expects retained jobs to reopen after handle loss. The native lifetime experiment contradicts that assumption. | Broker death can leave a live personal process without the named custody object required for safe reuse or cleanup. Keep handles in an independent custodian and test broker/custodian failures separately. |
 | High | The old [broker](../../../nix/domains/artifacts/vscode-web-broker/src/windows_main.rs) owns launch, receipt and process work in the same failure boundary as network admission. | A handle keeper alone would leave launch/receipt ownership gaps. Move the complete transaction, readiness and worker-pipe opening into the custodian; create suspended processes atomically in their job. |
 | High | A second privileged task and local pipe add an admission boundary. SYSTEM-only ACLs and a supplied PID do not independently bind the exact live executable. | Both pipe peers verify kernel PID, process creation identity, SYSTEM token and pinned executable. The custodian independently validates MMDS/release/account identity; no job handle is transferred. Scoped native endpoint/same-process handshake/forged-time tests pass; complete independent-task peer refusal evidence remains pending. |
 | High | Root exit, descendants and failed job accounting cannot release a runtime entry by inference. | Keep at most 64 reserved/live/quarantined slots, per-account single-flight and complete receipts. Drain exact owned descendants to zero before replacement/retirement; quarantine failed accounting. Native fault execution is required. |
@@ -66,7 +66,7 @@ refusal, adopting an ambiguous process or deleting personal files.
 
 The mutable source checkpoint now implements the
 [custodian-owned transaction](../../../nix/domains/artifacts/vscode-web-broker/src/windows_main.rs),
-[atomic launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs),
+[atomic launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs),
 [mutual local peer checks](../../../nix/domains/artifacts/vscode-web-broker/src/windows_ipc.rs)
 and [two-task installer](../../../nix/domains/artifacts/guest/windows/install-editor.ps1).
 The launch is suspended and atomically assigned with

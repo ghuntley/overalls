@@ -156,7 +156,7 @@ The [portable model](../../../nix/domains/artifacts/vscode-web-broker/src/window
 defines `CustodianGeneration`, `LogonSession`, process observation and
 classification, `prior_receipt_admission`, `straggler_plan` and the bounded
 `drain_prior_session` state machine, with property and unit tests for each
-invariant above. The [Win32 implementation](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs)
+invariant above. The [Win32 implementation](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs)
 records the S4U token's logon session before launch, scopes job and pipe names
 by generation, and implements the job-name probe, Toolhelp process observation
 and re-verifying straggler termination. One added SYSTEM-only native test covers

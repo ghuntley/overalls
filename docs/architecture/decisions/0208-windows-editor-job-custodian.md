@@ -255,7 +255,7 @@ inherited v7/v4 candidate boundary. The existing
 retain exact-target asset discovery. ADR-0200 preserves their historical
 implementation and verification record; none establishes the new custodian.
 
-The [Win32 launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs)
+The [Win32 launcher](../../../nix/domains/artifacts/vscode-web-broker/src/windows/worker.rs)
 now creates suspended workers with an atomic job-list attribute, no inherited
 handles and a retained kill-on-close job. The
 [custodian entry](../../../nix/domains/artifacts/vscode-web-broker/src/windows_main.rs)

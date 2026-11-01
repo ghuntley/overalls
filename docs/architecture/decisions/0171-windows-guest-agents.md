@@ -407,7 +407,7 @@ binds a worker to the validated boot, descriptor, placement, epoch, roster UID,
 GuestAccount UUID, local SAM SID and origin. It derives names from that identity,
 rejects foreign or incomplete process/pipe custody, refuses ambiguous Windows
 paths, and preserves owned workers across broker restart. The Win32 launcher in
-[`windows.rs`](../../../nix/domains/artifacts/vscode-web-broker/src/windows.rs)
+[`windows/`](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs)
 uses S4U account tokens, profile-backed paths, SYSTEM-owned jobs and exact
 process/PID-time/SID/executable/pipe checks; `windows_main.rs` obtains MMDS
 identity, runs the reviewed authorizer, serializes one account startup and
