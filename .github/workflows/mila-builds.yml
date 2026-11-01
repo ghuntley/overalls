@@ -619,11 +619,31 @@ jobs:
       - name: Clippy the Android FFI
         timeout-minutes: 30
         run: tools/buck2 build -c overalls.non_hermetic=true //mila:android-ffi-clippy
+      # Gradle resolves into the Gradle User Home that setup-gradle restores and
+      # saves, so the ~200 MB Robolectric SDK jar is downloaded only on a cache
+      # miss. Maven repositories rate-limit runners (429 in run 41287426560), so
+      # a build that failed only to download is retried with backoff: the jars
+      # already fetched stay in the Gradle cache, and the pinned sha256 values
+      # in gradle/verification-metadata.xml still decide what is accepted.
       - name: Assemble native Compose APKs
         timeout-minutes: 45
         run: |
           set -euo pipefail
-          tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug --show-full-output | tee "$RUNNER_TEMP/android-debug.txt"
+          for delay in 60 180 0; do
+            status=0
+            tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug --show-full-output \
+              > "$RUNNER_TEMP/android-debug.txt" 2> "$RUNNER_TEMP/android-debug.err" || status=$?
+            cat "$RUNNER_TEMP/android-debug.err" >&2
+            if [ "$status" -eq 0 ]; then
+              break
+            fi
+            if [ "$delay" -eq 0 ] || ! grep -qE 'Received status code (429|5[0-9][0-9])|Could not (GET|HEAD) .https://' "$RUNNER_TEMP/android-debug.err"; then
+              exit 1
+            fi
+            echo "::warning::Gradle download failed (rate limit or server error); retrying in ${delay}s"
+            sleep "$delay"
+          done
+          cat "$RUNNER_TEMP/android-debug.txt"
           out=$(awk 'END { print $2 }' "$RUNNER_TEMP/android-debug.txt")
           mkdir -p "$RUNNER_TEMP/mila-android-apks"
           cp -L "$out"/* "$RUNNER_TEMP/mila-android-apks/"
