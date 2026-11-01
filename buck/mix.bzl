@@ -523,6 +523,14 @@ mix_release_probe = rule(
 
 _ZERO_HASH = "00000000000000000000000000000000"
 
+def mix_available() -> bool:
+    """Whether the cells carry the [mix] section.
+
+    Host-tool-only cells (Windows `--no-nix`, aarch64-darwin) omit it; there
+    a package that declares a Mix project still loads, without its Mix
+    targets, so non-Mix targets in it (or depending on it) keep working."""
+    return bool(read_root_config("mix", "state_plain"))
+
 def _mix_config(key: str) -> str:
     value = read_root_config("mix", key)
     if not value:
@@ -595,6 +603,8 @@ def _release_env(application: str, encrypted: bool, antithesis: str | None, extr
 
 def mix_cargo_vendor() -> list[str]:
     """preConfigure lines that point Cargo at the root workspace's vendored crates."""
+    if not mix_available():
+        return []
     vendor = _mix_config("cedar_vendor")
     return [
         'export CARGO_HOME="$TMPDIR/cargo-home"',
@@ -609,6 +619,8 @@ def mix_cargo_vendor() -> list[str]:
 
 def mix_esbuild_config() -> list[str]:
     """preConfigure lines that select the one Nix esbuild for asset builds."""
+    if not mix_available():
+        return []
     return [
         "cat >> config/prod.exs <<'CONFIG'",
         'config :esbuild, path: "{}", version: "{}"'.format(_mix_config("esbuild"), _mix_config("esbuild_version")),
@@ -662,7 +674,10 @@ def overalls_mix_project(
 
     `release_srcs` and `test_srcs` are mix_sources targets: the first mirrors
     the Nix release source allowlist, the second adds tests and checks.
+    Without the cells' [mix] section it defines nothing (mix_available).
     """
+    if not mix_available():
+        return
     # Suites run openssl, ssh-keygen and python3, which devenv takes from PATH.
     if test_path == None:
         test_path = [_mix_config("test_tools")]
@@ -812,4 +827,6 @@ def mix_tree(dirs: list[str] = [], files: list[str] = [], exclude: list[str] = [
 
 def mix_host_tools_link() -> list[str]:
     """postInstall line that links Lilly's host tools into its release."""
+    if not mix_available():
+        return []
     return ['ln -s {} "$out/host-tools"'.format(_mix_config("host_tools"))]
