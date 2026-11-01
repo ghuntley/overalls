@@ -1,6 +1,7 @@
 defmodule Lilly.VM.Config do
   @moduledoc "Trusted local driver configuration. It is never decoded from remote command fields."
   import Bitwise
+  alias Lilly.Host.RootOwner
   alias Lilly.Network.Config, as: NetworkConfig
   alias Lilly.VM.Executable
 
@@ -176,9 +177,12 @@ defmodule Lilly.VM.Config do
         %File.Stat{type: :regular} ->
           {:ok, path}
 
-        %File.Stat{type: :symlink, uid: 0} when remaining > 0 ->
-          with {:ok, target} <- File.read_link(path) do
+        %File.Stat{type: :symlink} when remaining > 0 ->
+          with true <- RootOwner.root?(stat),
+               {:ok, target} <- File.read_link(path) do
             resolve_executable(Path.expand(target, Path.dirname(path)), remaining - 1)
+          else
+            _ -> :error
           end
 
         _ ->
@@ -193,7 +197,8 @@ defmodule Lilly.VM.Config do
 
   defp trusted_executable?(path) when is_binary(path) do
     with true <- Path.type(path) == :absolute and Path.expand(path) == path,
-         {:ok, %File.Stat{type: :regular, uid: 0, mode: mode}} <- File.lstat(path),
+         {:ok, %File.Stat{type: :regular, mode: mode} = stat} <- File.lstat(path),
+         true <- RootOwner.root?(stat),
          true <- band(mode, 0o111) != 0 and band(mode, 0o022) == 0,
          true <- trusted_parent?(Path.dirname(path)),
          do: true,
@@ -206,12 +211,13 @@ defmodule Lilly.VM.Config do
 
   defp trusted_parent?(path, remaining) do
     case File.lstat(path) do
-      {:ok, %File.Stat{type: :directory, uid: 0, mode: mode}} ->
-        (band(mode, 0o022) == 0 or band(mode, 0o1000) != 0) and
+      {:ok, %File.Stat{type: :directory, mode: mode} = stat} ->
+        RootOwner.root?(stat) and (band(mode, 0o022) == 0 or band(mode, 0o1000) != 0) and
           trusted_parent?(Path.dirname(path), remaining)
 
-      {:ok, %File.Stat{type: :symlink, uid: 0}} when remaining > 0 ->
-        with {:ok, target} <- File.read_link(path) do
+      {:ok, %File.Stat{type: :symlink} = stat} when remaining > 0 ->
+        with true <- RootOwner.root?(stat),
+             {:ok, target} <- File.read_link(path) do
           trusted_parent?(Path.dirname(path), remaining - 1) and
             trusted_parent?(Path.expand(target, Path.dirname(path)), remaining - 1)
         else

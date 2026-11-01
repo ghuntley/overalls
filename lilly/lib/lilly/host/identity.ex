@@ -2,7 +2,8 @@ defmodule Lilly.Host.Identity do
   @moduledoc "Application-specific host identity; raw systemd machine IDs never leave this boundary."
   @spec read() :: {:ok, String.t()} | {:error, :machine_identity_unavailable}
   def read do
-    with {:ok, %File.Stat{type: :regular, uid: 0, size: size}} <- File.lstat("/etc/machine-id"),
+    with {:ok, %File.Stat{type: :regular, size: size} = stat} <- File.lstat("/etc/machine-id"),
+         true <- Lilly.Host.RootOwner.root?(stat),
          true <- size in [32, 33],
          {:ok, bytes} <- File.read("/etc/machine-id"),
          {:ok, id} <- derive(bytes),

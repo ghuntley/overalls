@@ -15,6 +15,14 @@ config :logger, :default_handler,
   config: [type: :standard_error],
   formatter: {Overalls.Diagnostics.Formatter, catalog: Lilly.Events, service: :lilly}
 
+# Test builds only: inside a user namespace whose uid map has no uid 0
+# (the Buck2 bubblewrap test sandbox), root-owned system files appear owned by
+# the overflow uid. Read at compile time (Lilly.Host.RootOwner), never by a
+# release.
+if config_env() == :test do
+  config :lilly, Lilly.Host.RootOwner, unmapped_root: true
+end
+
 if config_env() in [:dev, :test] do
   config :covenant,
     contracts_dir: "contracts",
