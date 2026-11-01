@@ -177,7 +177,8 @@ M10 (2026-10-30) implements decision 3.
   pass. In host-enrollment, the enrolled host's published update builds
   through the Buck2 target.
   - Offline fixtures read their preloaded sources through lookup-path
-    entries (`nix.settings.extra-nix-path`), because restrict-eval refuses
+    entries (`nix.nixPath` and `nix.settings.nix-path`, the whole lookup path
+    since 6dce77882), because restrict-eval refuses
     `path:` and `file:` inputs and `builtins.storePath` names a path without
     admitting reads. Production inputs are `github:` and are covered by
     `allowed-uris`.
@@ -202,10 +203,25 @@ M10 (2026-10-30) implements decision 3.
   - The 93 Buck2-only sources are the imports' declared runtime references.
   - Moving the flake's packages and checks into lib.assemble left the
     dungarees toplevel drvPath unchanged.
-- **Activation (2026-10-31).** Dungarees and Panterloons report
+- **Activation (2026-10-31, 2026-11-01).** Dungarees and Panterloons report
   `"builder": "buck2"` in `status.json`, with `e58f8b6df` activated through
-  their deployment targets. Salopettes was offline in the tailnet and could
-  not be checked.
+  their deployment targets. Salopettes was offline in the tailnet on
+  2026-10-31. On 2026-11-01 at 00:17Z all three hosts, Salopettes included,
+  reported `"builder": "buck2"` over ssh. Salopettes' sshd listens on port 22
+  by design: it is the Susan-only relay (contract `salopettes-susan-only`).
+- **Base systems.** The `<host>-base` systems
+  ([nix/assemble/default.nix](../../../nix/assemble/default.nix)) are the
+  unenrolled install systems. Their updater waits for the enrollment receipt
+  and then runs the same runtime, which records `builder = "buck2"` for every
+  build it activates
+  ([runtime.py](../../../nix/domains/system/auto-update/runtime.py)). The
+  auto-update machine test asserts that status
+  ([driver.py](../../../nix/verification/tests/machines/auto-update/driver.py)).
+  The host-enrollment machine test boots a base image, enrolls it, and has the
+  updater build `//fleet/hosts/fixture-enrollment:deployment` through Buck2.
+  It passed in full on 2026-11-01 (6dce77882). The flake no longer exports
+  `nixosConfigurations` (0ee821c63), so no updater can build a flake
+  attribute.
 
 - **Operator CLI (M11).** [cli.py](../../../nix/domains/artifacts/host/cli.py)
   builds every published output with the candidate checkout's `tools/buck2`
@@ -216,8 +232,11 @@ M10 (2026-10-30) implements decision 3.
   dungarees at one revision, `:system[drv]` is the toplevel inside
   `:deployment[drv]` and `:enrollment[drv]`, and `:binding[drv]` equals the
   flake's `overallsHostBinding` derivation. The host-enrollment fixture no
-  longer defines `nixosConfigurations`; its `[drv]` evaluates, and its
-  machine run is pending. Unit tests in
+  longer defines `nixosConfigurations`. Its machine run passed in full on
+  2026-11-01, after the fixture put its lookup path in `nix.conf` too
+  (6dce77882): enrollment builds run in a systemd unit, which has no
+  `NIX_PATH`. A failed Buck2 build now reports a bounded, redacted stderr
+  tail (contract `host-cli-bounded-diagnostics`). Unit tests in
   [host-planning.py](../../../nix/verification/tests/evaluation/host-planning.py)
   cover the target names and output parsing.
 
@@ -234,8 +253,6 @@ Remaining:
   do not exercise Buck2-built leaves on the update path. Machine-test
   assemblies and the `[drv]` evaluation of the real host targets do cover
   them.
-- The activation gate stays open until Salopettes and the `-base` fixtures
-  report the Buck2 updater active.
 
 ## Open questions
 
