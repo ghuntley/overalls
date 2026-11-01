@@ -13,7 +13,7 @@
 # allowedReferences, when the artifact declares it, constrains the copy as it
 # constrained the Nix build it replaces (the Windows agents embed no store
 # path), so the constraint binds the artifact that ships.
-#
+
 # @cc [owner:ghuntley,label:build;verification] imported-artifacts-reject-build-hooks
 # An import is a copy, so build hooks set on it (preBuild, postInstall, a
 # *Phase, patches or src through overrideAttrs) would be ignored and the
@@ -21,7 +21,7 @@
 # evaluation error; a fixture that changes a Buck2 leaf uses a Buck2
 # `release_variants` entry instead. Overrides of meta, passthru or reference
 # constraints (swapLeaf) stay allowed, and their results stay sealed.
-#
+
 # @cc [owner:ghuntley,label:build;deployment] mix-release-package-references
 # packageReferences maps a placeholder store path the artifact embeds (in file
 # contents or symlink targets) to a package-set attribute, such as Lilly's
