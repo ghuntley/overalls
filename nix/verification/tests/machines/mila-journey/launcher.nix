@@ -1,4 +1,4 @@
-# `nix run .#mila-journey-fixture` (ADR-0264): boot the hermetic Mila journey
+# `tools/buck2 run //mila:journey-fixture` (ADR-0264): boot the hermetic Mila journey
 # backend as a KVM QEMU VM with the same fixture module the machine test uses,
 # forward its unprivileged ports to the host's loopback (or a chosen address)
 # and publish the v1 descriptor for platform journey tests.

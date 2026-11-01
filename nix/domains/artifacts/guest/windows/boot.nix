@@ -12,7 +12,7 @@ pkgs.writeShellApplication {
   text = ''
     usage() {
       echo "usage: overalls-windows-boot IMAGE_DIR WORK_DIR [MEM_MIB] [VCPUS]" >&2
-      echo "  IMAGE_DIR holds firmware, disk.raw and manifest.json (nix build .#windows-guest)" >&2
+      echo "  IMAGE_DIR holds firmware, disk.raw and manifest.json (tools/buck2 build //:package-guest-windows)" >&2
       echo "  WORK_DIR receives the writable disk copy, the Firecracker config and API socket" >&2
       echo "  Serial console (Windows EMS/SAC) is this terminal; needs root for the tap device" >&2
       exit 64
