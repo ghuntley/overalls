@@ -126,4 +126,5 @@ Remaining gaps:
 
 Amends [ADR-0224](0224-susan-push-relay.md) (egress and third parties).
 Serves [ADR-0235](0235-mila-desktop-clients.md). Placement:
-[ADR-0231](0231-hetzner-cloud-hosts-and-susan-placement.md).
+[ADR-0231](0231-hetzner-cloud-hosts-and-susan-placement.md). WNS delivery evidence for the
+Mila parity gate: [ADR-0278](0278-mila-push-notification-parity-scope.md).

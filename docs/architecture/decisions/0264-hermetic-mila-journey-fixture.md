@@ -230,4 +230,5 @@ under implementation evidence.
 [ADR-0228](0228-strict-host-certificates-in-mila.md),
 [ADR-0222](0222-porsche-client-commands.md),
 [ADR-0220](0220-mila-client-over-porsche-ssh.md),
-[ADR-0235](0235-mila-desktop-clients.md).
+[ADR-0235](0235-mila-desktop-clients.md),
+[ADR-0278](0278-mila-push-notification-parity-scope.md) (push row scope: delivery is Susan's evidence).

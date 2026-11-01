@@ -1,5 +1,11 @@
 # Architecture decision records
 
+[ADR-0278](0278-mila-push-notification-parity-scope.md) scopes the Mila
+parity matrix push row: clients prove permission or enablement plus device
+register, list, preferences and remove against the hermetic fixture, Susan's
+fake-provider tests prove APNs, FCM and WNS delivery, and live provider
+delivery is outside the gate.
+
 [ADR-0274](0274-fenced-capacity-snapshots.md) takes Lilly's capacity
 snapshots out of the pool lock: only the bind and a generation-token read stay
 locked, and a read that straddles any pool section is reported `busy`, never
@@ -1159,6 +1165,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0275](0275-bounded-control-request-execution.md) | accepted | partial | Bounded control request execution per Lilly socket |
 | [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md) | accepted | partial | Namespace remote cache and execution for Buck2 |
 | [ADR-0277](0277-mila-native-builds-on-buck2.md) | accepted | partial | Mila native builds on Buck2 with Nix toolchains |
+| [ADR-0278](0278-mila-push-notification-parity-scope.md) | accepted | partial | Mila push-notification parity scope |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.
