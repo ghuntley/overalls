@@ -1,6 +1,7 @@
 # Owned source groups that NixOS assembly reads besides a suite's own files
 # (ADR-0270). Each entry is a leaf filegroup so nix_assemble can copy it.
-# Coarse until modules have their own targets (M11).
+# Modules are separate: machine_tests.py adds //nix:system_modules or a
+# //nix:module-* group per suite (M11).
 
 # The flake, root manifests, modules, fleet inventory and secrets.
 NIX_INPUTS = [
@@ -11,7 +12,8 @@ NIX_INPUTS = [
     "//fleet/hosts/dungarees:srcs",
     "//fleet/hosts/panterloons:srcs",
     "//fleet/hosts/salopettes:srcs",
-    "//nix:srcs",
+    # Every nix/ file except the NixOS modules; machine_tests.py adds those.
+    "//nix:base",
     "//nix/platform:srcs",
     "//nix/domains/artifacts/guest/github:srcs",
     # support/zfs-node.nix installs these suites' probes for every ZFS node.

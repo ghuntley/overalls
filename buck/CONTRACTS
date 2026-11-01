@@ -271,3 +271,12 @@ A BUCK.v2 `_TOOL_OUTPUTS` package assembles without ASSEMBLY_ARTIFACTS, so its
 closure MUST contain no Buck2-swapped leaf; otherwise it ships a Nix-built copy
 that bypasses the leaf parity tests. tool_outputs_leaf_free fails when one does
 (ADR-0269).
+
+@cc [owner:ghuntley,label:build;verification] machine-test-module-inputs
+A machine test MUST declare //nix:system_modules when its catalog parameters
+pass `service`, featureFleet, host fixtures or a non-plain `modules.*`, or
+when its suite or a suite it references names a module path; a test that
+reaches only plain modules MUST declare their //nix:module-* groups. Flake
+output, check and host assemblies MUST keep the full //nix:srcs. Restrict-eval
+over the declared copy turns a missed module into an evaluation error
+(ADR-0270).

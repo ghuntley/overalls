@@ -49,15 +49,21 @@ NOT_MACHINE_CHECKS = frozenset({"windows-editor-acceptance-harness"})
 # Inception subtest is not a reason to skip zfs-guest: it stays required.
 KNOWN_INCEPTION_FAILURES = frozenset({"inception", "inception-checkout", "inception-ssh-host-ca"})
 
-# Modules that are plain paths and do not close over the application packages.
-PLAIN_MODULES = frozenset(
-    {
-        "modules.platform.sysctl",
-        "modules.security.access",
-        "modules.network.fleet-firewall",
-        "modules.fleetBuilds",
-    }
-)
+# Modules that are plain paths and do not close over the application packages,
+# each with the //nix group holding it and the files it imports (nix/BUCK).
+PLAIN_MODULES: Mapping[str, str] = {
+    "modules.platform.sysctl": "//nix:module-sysctl",
+    "modules.security.access": "//nix:module-access",
+    "modules.network.fleet-firewall": "//nix:module-fleet-firewall",
+    "modules.fleetBuilds": "//nix:module-fleet-builds",
+}
+# Contract machine-test-module-inputs: see buck/CONTRACTS. NIX_INPUTS holds
+# //nix:base, which omits the NixOS modules; an entry that can reach them
+# also declares //nix:system_modules (M11).
+SYSTEM_MODULES = "//nix:system_modules"
+# A suite file that names a module path or the request-source support module
+# (which imports otel-fleet) reads the modules directly.
+SYSTEM_REF = re.compile(r"domains/system|support/request-source\.nix")
 # Owned groups a suite reads beyond NIX_INPUTS and PACKAGE_INPUTS.
 # The offline Buck2 repository that support/update-fixture.nix copies (ADR-0271).
 UPDATE_FIXTURE_INPUTS = (
@@ -94,6 +100,8 @@ class Entry:
     packages: bool
     nested_kvm: bool
     known_failure: bool
+    # The //nix module groups its parameters reach (SYSTEM_MODULES for all).
+    modules: tuple[str, ...]
 
 
 @dataclass
@@ -208,6 +216,19 @@ def uses_packages(expr: str) -> bool:
     return any(ref not in PLAIN_MODULES for ref in MODULE_REF.findall(expr))
 
 
+def module_groups(expr: str, fleet: bool) -> tuple[str, ...]:
+    """The module groups a catalog entry's parameters reach.
+
+    `service` and featureFleet pass modules.default, and host fixtures are
+    built from the module catalog; any other module reference except a plain
+    one closes over the catalog's modules too.
+    """
+    refs = set(MODULE_REF.findall(expr))
+    if fleet or re.search(r"\b(service|fixtures)\b", expr) or refs - set(PLAIN_MODULES):
+        return (SYSTEM_MODULES,)
+    return tuple(sorted(PLAIN_MODULES[r] for r in refs))
+
+
 def parse_catalog(text: str, root: Path) -> list[Entry]:
     fleets = {
         name: expr
@@ -230,7 +251,10 @@ def parse_catalog(text: str, root: Path) -> list[Entry]:
         elif match := MACHINE_IMPORT.search(expr):
             suite, module = match.group(1), (match.group(2) or "/default.nix").lstrip("/")
         elif name in KVM_EVALUATION_CHECKS:
-            entries.append(Entry(name, EVALUATION, {}, uses_packages(expr), False, False))
+            # Evaluation-suite files are not scanned: they always get every module.
+            entries.append(
+                Entry(name, EVALUATION, {}, uses_packages(expr), False, False, (SYSTEM_MODULES,))
+            )
             continue
         else:
             continue
@@ -246,6 +270,7 @@ def parse_catalog(text: str, root: Path) -> list[Entry]:
                 packages=fleet or uses_packages(expr),
                 nested_kvm=bool(NESTED_KVM.search(source)),
                 known_failure=name in KNOWN_INCEPTION_FAILURES,
+                modules=module_groups(expr, fleet),
             )
         )
     names = [e.name for e in entries]
@@ -269,6 +294,14 @@ def sibling_refs(root: Path, suite: str, suites: Iterable[str]) -> set[str]:
             if parts and parts[0] != suite and parts[0] in known:
                 refs.add(parts[0])
     return refs
+
+
+def reads_system(root: Path, suite: str) -> bool:
+    """Whether a suite's own Nix files name NixOS module paths directly."""
+    return any(
+        SYSTEM_REF.search(path.read_text())
+        for path in sorted((root / MACHINES / suite).rglob("*.nix"))
+    )
 
 
 def closure(start: set[str], graph: Mapping[str, set[str]]) -> set[str]:
@@ -319,10 +352,12 @@ def render_target(entry: Entry, inputs: str, scenarios: Sequence[str]) -> str:
     return "\n".join(lines)
 
 
-def _inputs(entry: Entry, own: Sequence[str], siblings: Iterable[str]) -> str:
+def _inputs(entry: Entry, own: Sequence[str], siblings: Iterable[str], system: bool = False) -> str:
     groups = "NIX_INPUTS" + (" + PACKAGE_INPUTS" if entry.packages else "")
+    modules = [SYSTEM_MODULES] if system or SYSTEM_MODULES in entry.modules else list(entry.modules)
     extra = (
         list(own)
+        + modules
         + [f"//{MACHINES}/{s}:srcs" for s in sorted(siblings)]
         + list(SUITE_INPUTS.get(entry.suite, ()))
     )
@@ -348,6 +383,8 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
             body.append(load)
         body.append("\nnix_owned()\n")
         siblings = closure(graph[suite], graph) - {suite}
+        # The suite or a suite it references names module paths itself.
+        system = any(reads_system(root, s) for s in siblings | {suite})
         if suite == "fleet" and by_suite[suite]:
             body.append(
                 "\n# Each variant declares the shared files and only its own scenarios.\n"
@@ -362,9 +399,9 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
                     f"    srcs = _COMMON + {_string_list(variant, '    ')},\n)\n\n"
                 )
                 own = [f":{entry.name}.files"]
-                body.append(render_target(entry, _inputs(entry, own, siblings), variant))
+                body.append(render_target(entry, _inputs(entry, own, siblings, system), variant))
             else:
-                body.append(render_target(entry, _inputs(entry, [":srcs"], siblings), []))
+                body.append(render_target(entry, _inputs(entry, [":srcs"], siblings, system), []))
         files[MACHINES / suite / "BUCK"] = "".join(body)
     aggregate = [HEADER, 'load("@root//buck:nix.bzl", "nix_owned", "owned_set")\n']
     if evaluation:

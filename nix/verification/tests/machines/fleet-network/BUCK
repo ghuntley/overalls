@@ -14,5 +14,6 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + [
         ":srcs",
+        "//nix:system_modules",
     ],
 )

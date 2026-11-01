@@ -29,6 +29,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":vscode-web-nixos-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -88,6 +89,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":vscode-web-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -147,6 +149,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":vscode-web-arch-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -206,6 +209,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":vscode-web-almalinux-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -264,6 +268,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":coding-clis-nixos-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -324,6 +329,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":coding-clis-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -384,6 +390,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":github-integration-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -444,6 +451,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":github-integration-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -504,6 +512,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":github-integration-arch-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -564,6 +573,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":github-integration-almalinux-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -624,6 +634,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":github-integration-windows-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -682,6 +693,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":audi-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -742,6 +754,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":ssh-bootstrap-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -803,6 +816,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":ssh-bootstrap-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -863,6 +877,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":ssh-roster-matrix-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -924,6 +939,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":ssh-roster-matrix-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -985,6 +1001,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":user-ssh-journey-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1047,6 +1064,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":user-ssh-journey-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1106,6 +1124,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":audi-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1167,6 +1186,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":audi-ubuntu-relocation-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1228,6 +1248,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":audi-relocation-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1289,6 +1310,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":galileo-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1349,6 +1371,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":agent-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1410,6 +1433,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":otel-guest-native.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1471,6 +1495,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":otel-galileo-native.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1530,6 +1555,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":otel-audi-ssh-native.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1590,6 +1616,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":otel-porsche-native.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1651,6 +1678,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":agent-cli-journey.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1711,6 +1739,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":executor-loss.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1770,6 +1799,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":guest-cli-recovery.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1830,6 +1860,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":guest-cli-recovery-ubuntu.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1891,6 +1922,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":artifact-agent-publish.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -1954,6 +1986,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":thread-tool.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2016,6 +2049,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":agent-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2077,6 +2111,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2149,6 +2184,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":porsche-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2222,6 +2258,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":porsche-threads.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2283,6 +2320,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":porsche-lifecycle-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2345,6 +2383,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":porsche-lifecycle-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2404,6 +2443,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":fleet-guest-trust.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2465,6 +2505,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":private-web.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2527,6 +2568,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":integration-renewals.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2588,6 +2630,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":team-resources.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2646,6 +2689,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":maintenance-evacuation.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2704,6 +2748,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":host-replacement.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2762,6 +2807,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":clone-cancellation.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2821,6 +2867,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":clone-destination-loss.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2882,6 +2929,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":clone-marshall-restart.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -2941,6 +2989,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":resize-browser.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3001,6 +3050,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":account-lifecycle.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3064,6 +3114,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":account-lifecycle-ubuntu.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3126,6 +3177,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":default-oss-creation.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3187,6 +3239,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":repository-launch.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3248,6 +3301,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":repository-launch-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3307,6 +3361,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":cloning-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3366,6 +3421,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":brady-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3427,6 +3483,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":lilly-runtime-readiness.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3491,6 +3548,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":lilly-observability-recovery.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3561,6 +3619,7 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3633,6 +3692,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":terminal-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3695,6 +3755,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":terminal-ubuntu-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3759,6 +3820,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":porsche-terminal-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3825,6 +3887,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":mila-journey-terminal.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3889,6 +3952,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":customer-isolation-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -3953,6 +4017,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":relocation-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -4015,6 +4080,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":memory-suspension-fleet.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",
@@ -4074,6 +4140,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":sharing-surfaces.files",
+        "//nix:system_modules",
         "//nix/verification/tests/machines/account-lifecycle:srcs",
         "//nix/verification/tests/machines/agent-cli-journey:srcs",
         "//nix/verification/tests/machines/artifact-agent-publish:srcs",

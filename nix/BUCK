@@ -5,6 +5,50 @@ load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test", "ru
 
 nix_owned()
 
+# Machine-test inputs narrower than :srcs (ADR-0270, M11). :base is every file
+# here except the NixOS modules under domains/system; it keeps the files the
+# package set reads there. Suites that import modules add :system_modules,
+# or one module-* group when they import only that plain module, so a module
+# change selects only the suites that evaluate it. Assembly copies just the
+# declared files under restrict-eval, so a missing module is an evaluation
+# error, never a silent omission. Flake outputs and hosts keep :srcs.
+# Contract machine-test-module-inputs: see buck/CONTRACTS.
+_PACKAGE_SET_SYSTEM_FILES = [
+    "domains/system/nix-cache.nix",
+    "domains/system/observability-runtimes.nix",
+    "domains/system/observability-runtimes/**",
+    "domains/system/otel-guest/receiver.nix",
+    "domains/system/otel-guest/receiver/**",
+    "domains/system/ssh-host-certificate.nix",
+]
+_ALL = ["**", "**/.*", "**/.*/**"]
+_EXCLUDE = ["BUCK", "BUCK.v2"]
+_SYSTEM = glob(["domains/system/**", "domains/system/**/.*", "domains/system/**/.*/**"], exclude = _PACKAGE_SET_SYSTEM_FILES)
+
+filegroup(
+    name = "base",
+    # The generated test index is documentation; no evaluation reads it.
+    srcs = glob(_ALL, exclude = _EXCLUDE + _SYSTEM + [
+        "verification/tests/README.md",
+        "verification/tests/find_a_test.bzl",
+    ]),
+    visibility = ["PUBLIC"],
+)
+
+filegroup(name = "system_modules", srcs = _SYSTEM, visibility = ["PUBLIC"])
+
+# Plain modules (buck/machine_tests.py PLAIN_MODULES) with the files they import.
+[filegroup(
+    name = "module-" + name,
+    srcs = ["domains/system/" + f for f in files],
+    visibility = ["PUBLIC"],
+) for name, files in {
+    "access": ["access.nix", "host-identity.nix"],
+    "fleet-builds": ["fleet-builds.nix", "types.nix"],
+    "fleet-firewall": ["fleet-firewall.nix", "runtime-firewall.nix", "runtime-firewall.py", "types.nix"],
+    "sysctl": ["sysctl.nix"],
+}.items()]
+
 # Contract overalls-install-ps1-check: see nix/verification/tests/overalls-install-ps1.nix.
 script_check(
     name = "overalls-install-ps1",

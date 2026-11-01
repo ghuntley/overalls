@@ -208,10 +208,24 @@ PR runs the affected machine-test set, and the approved migration plan.
 
 Remaining gaps:
 
-- Declared inputs are coarse (`NIX_INPUTS` covers all of `nix/`) until modules
-  have targets (M11). Most suites have not yet been built through their
-  declared-only tree; a suite that reads an undeclared file fails its first
-  run, which the daily backstop surfaces.
+- Module inputs are narrowed only by catalog parameters (M11). `NIX_INPUTS`
+  names `//nix:base`, every `nix/` file except the NixOS modules under
+  `domains/system` (it keeps the few files the package set reads there).
+  [machine_tests.py](../../../buck/machine_tests.py) adds
+  `//nix:system_modules` to a suite whose parameters pass `service`,
+  featureFleet, host fixtures or a non-plain `modules.*`, or whose files name
+  a module path, and one `//nix:module-*` group to a suite that reaches only
+  a plain module (contract `machine-test-module-inputs`). 51 of 206 machine
+  tests narrow, 49 of them to no module at all; the 155 others still take
+  every module, because `modules.default` is one catalog. `tools/affected`
+  on a one-line change to `sysctl.nix` selected 206 machine tests before and
+  156 after; on `tailscale.nix`, 155 after. The 191 builds (flake outputs and
+  hosts, which keep `//nix:srcs`) are unchanged. All 51 narrowed assemblies
+  evaluated (`[drv]`) over their declared-only trees, and the `sysctl` and
+  `access` machine tests passed through them. Splitting that catalog per
+  service is the remaining step. Most suites have not yet been
+  built through their declared-only tree; a suite that reads an undeclared
+  file fails its first run, which the daily backstop surfaces.
 - `catalog.nix` stays: it defines the checks that lib.assemble exposes and
   that the generator reads. Removing it means each suite's `BUCK` `params`
   instantiating its suite in lib.assemble, which belongs with the per-module
