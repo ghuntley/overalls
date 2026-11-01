@@ -240,11 +240,13 @@ the approved migration plan.
       clears the environment), with `HEGEL_DATABASE=disabled`. That profile
       suppresses the wall-clock TooSlow health check, which failed Lilly's
       fresh-boot properties under load.
-    - The gate (empty `[mix] test_salt`) runs Hegel derandomized
-      (`HEGEL_DERANDOMIZE=true`) and ExUnit with `--seed 0`.
-    - `-c mix.test_salt=<salt>` changes every shard's action key. It derives
-      one seed (32-bit FNV-1a of the salt) for both `--seed` and
-      `HEGEL_SEED`, so the run explores new draws and can be replayed.
+    - One seed drives both `--seed` and `HEGEL_SEED`: the 32-bit FNV-1a
+      hash of the salt and the shard's input digest (SHA-256 over every file
+      of its source tree and its test arguments). A cache hit replays exactly
+      the draws of the run that recorded it, and every changed input explores
+      new draws.
+    - `-c mix.test_salt=<salt>` changes every shard's action key, so the run
+      explores new draws and can be replayed.
       `HEGEL_SEED` reaches BEAM properties from hegel-erlang `44b4c8e`;
       before it, the NIF cleared the seed.
     - Each shard log starts with its salt and seeds, and a failing shard
@@ -516,12 +518,10 @@ Remaining gaps, by milestone of the migration plan:
     gap too; neither build fixes them yet.
   - The known Inception failures run in the `[known_failures]` shards of
     `//audi:test` and `//marshall:test`, as above, not excluded.
-  - Derandomized Hegel draws come from one engine key (`unnamed-test`),
-    because hegel_ex sets no per-property database key. Every property
-    without a `seed:` therefore starts from the same seed in the gate. A
+  - Within one shard every property without a `seed:` starts from the same
+    HEGEL_SEED, because hegel_ex sets no per-property database key. A
     per-property key would also enable the engine's `.hegel/examples` replay
-    database; that is an upstream hegel_ex follow-up. The nightly salted run
-    gives every suite new draws.
+    database; that is an upstream hegel_ex follow-up.
 - M7 leftovers:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`

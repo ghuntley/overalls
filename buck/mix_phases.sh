@@ -230,37 +230,39 @@ _mix_known_failures() {
 }
 
 # Contracts mix-test-seeds-explicit: see buck/CONTRACTS. Sets _mix_seed and
-# the Hegel environment from $test_salt. The sandbox clears the environment,
-# so CI=true selects Hegel's `ci` profile explicitly: derandomized, no
-# database, and no wall-clock TooSlow health check, which would make a
-# verdict depend on machine load. The empty salt (the gate) keeps the
-# derandomized draws and ExUnit's declaration order; a salt derives one seed
-# (32-bit FNV-1a) for both ExUnit and HEGEL_SEED, which overrides
-# derandomization. The engine reads its environment once per VM.
+# the Hegel environment from the shard's inputs. The sandbox clears the
+# environment, so CI=true selects Hegel's `ci` profile explicitly: no
+# database and no wall-clock TooSlow health check, which would make a verdict
+# depend on machine load. The seed is the 32-bit FNV-1a hash of the shard's
+# input digest (every source file under /build-src and the test arguments)
+# and `[mix] test_salt`, and drives both ExUnit and HEGEL_SEED: a cached
+# verdict is exactly what a rerun of the same inputs reaches, every changed
+# input explores new draws, and a salt reruns everything with new ones. The
+# engine reads its environment once per VM.
 _mix_test_seeds() {
   export CI=true HEGEL_DATABASE=disabled
-  if [[ -z ${test_salt-} ]]; then
-    _mix_seed=0
-    export HEGEL_DERANDOMIZE=true
-    unset HEGEL_SEED
-  else
-    if [[ ! $test_salt =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
-      echo "mix_test: test_salt must be 1-64 characters of [A-Za-z0-9._-]" >&2
-      exit 1
-    fi
-    local hash=2166136261 i char
-    for ((i = 0; i < ${#test_salt}; i++)); do
-      printf -v char '%d' "'${test_salt:i:1}"
-      hash=$(((hash ^ char) * 16777619 & 0xffffffff))
-    done
-    # ExUnit treats seed 0 as "do not shuffle"; keep salted runs shuffled.
-    _mix_seed=$((hash == 0 ? 1 : hash))
-    export HEGEL_SEED=$_mix_seed
-    unset HEGEL_DERANDOMIZE
+  unset HEGEL_DERANDOMIZE
+  if [[ -n ${test_salt-} && ! $test_salt =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+    echo "mix_test: test_salt must be 1-64 characters of [A-Za-z0-9._-]" >&2
+    exit 1
   fi
-  local hegel=derandomized
-  if [[ -n ${HEGEL_SEED-} ]]; then hegel="HEGEL_SEED=$HEGEL_SEED"; fi
-  _mix_seed_line="mix_test: test_salt='${test_salt-}' exunit --seed $_mix_seed, hegel ci profile, $hegel, HEGEL_DATABASE=disabled"
+  local digest
+  digest=$(
+    {
+      (cd /build-src/source && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -r sha256sum)
+      printf 'arg %s\n' "$@"
+    } | sha256sum
+  )
+  digest=${digest%% *}
+  local input="${test_salt-}:$digest" hash=2166136261 i char
+  for ((i = 0; i < ${#input}; i++)); do
+    printf -v char '%d' "'${input:i:1}"
+    hash=$(((hash ^ char) * 16777619 & 0xffffffff))
+  done
+  # ExUnit treats seed 0 as "do not shuffle"; keep every run shuffled.
+  _mix_seed=$((hash == 0 ? 1 : hash))
+  export HEGEL_SEED=$_mix_seed
+  _mix_seed_line="mix_test: test_salt='${test_salt-}' inputs=$digest exunit --seed $_mix_seed, hegel ci profile HEGEL_SEED=$_mix_seed, HEGEL_DATABASE=disabled"
 }
 
 # Contracts mix-test-cacheable-result: see buck/CONTRACTS.
@@ -272,7 +274,7 @@ mix_test() {
   if [[ -d test ]]; then patchShebangs test > /dev/null; fi
   mkdir -p /io/1
   local seed
-  _mix_test_seeds
+  _mix_test_seeds "$@"
   seed=$_mix_seed
   local status=0
   printf '%s\n' "$_mix_seed_line" > /io/1/test.log
@@ -298,7 +300,7 @@ mix_test() {
     echo "mix_test: the suite exited with status $status" >&2
     echo "$_mix_seed_line" >&2
     echo "mix_test: reproduce with -c mix.test_salt='${test_salt-}', or outside Buck2 with" \
-      "CI=true HEGEL_DATABASE=disabled ${HEGEL_SEED:+HEGEL_SEED=$HEGEL_SEED }${HEGEL_DERANDOMIZE:+HEGEL_DERANDOMIZE=$HEGEL_DERANDOMIZE }mix test --seed $seed" >&2
+      "CI=true HEGEL_DATABASE=disabled HEGEL_SEED=$HEGEL_SEED mix test --seed $seed <the shard's files>" >&2
     exit 1
   fi
 }

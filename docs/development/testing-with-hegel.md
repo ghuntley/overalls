@@ -255,10 +255,12 @@ contract `mix-test-seeds-explicit` in [buck/CONTRACTS](../../buck/CONTRACTS)):
 
 | Run | `[mix] test_salt` | Hegel | ExUnit |
 |---|---|---|---|
-| Gate (`tools/precommit`, ci.yml, `tools/buck2 build`) | empty | `CI=true` (`ci` profile), `HEGEL_DERANDOMIZE=true`, `HEGEL_DATABASE=disabled` | `--seed 0` |
+| Gate (`tools/precommit`, ci.yml, `tools/buck2 build`) | empty | `CI=true` (`ci` profile), `HEGEL_SEED=<n>`, `HEGEL_DATABASE=disabled` | `--seed <n>` |
 | Nightly ([mix-nightly-seeds.yml](../../.github/workflows/mix-nightly-seeds.yml)) | `nightly-<UTC date>` | `CI=true`, `HEGEL_SEED=<n>`, `HEGEL_DATABASE=disabled` | `--seed <n>` |
 
-`<n>` is the 32-bit FNV-1a hash of the salt. The `ci` profile suppresses the
+`<n>` is the 32-bit FNV-1a hash of `<salt>:<inputs>`, where `<inputs>` is the
+SHA-256 digest of the shard's source tree and test arguments. A cache hit
+therefore replays exactly, and every changed shard draws anew. The `ci` profile suppresses the
 wall-clock TooSlow health check, so a verdict does not depend on machine load;
 plain `mix test` outside CI still runs it. Each shard log starts with its
 salt and seeds. A failing shard prints a reproduction command:

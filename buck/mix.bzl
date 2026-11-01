@@ -363,8 +363,8 @@ def _mix_test_impl(ctx: AnalysisContext) -> list[Provider]:
         result = ctx.actions.declare_output("shards", name, dir = True)
         script = _restored_script(ctx, "test-{}.sh".format(name), [
             "postgres_bin=" + shell_quote(ctx.attrs.postgres),
-            # mix_phases.sh derives the ExUnit and Hegel seeds from the salt;
-            # empty runs derandomized (contract mix-test-seeds-explicit).
+            # mix_phases.sh derives the ExUnit and Hegel seeds from the salt
+            # and the shard's input digest (contract mix-test-seeds-explicit).
             "test_salt=" + shell_quote(ctx.attrs.seed_salt),
             "test_timeout=" + shell_quote("{}m".format(ctx.attrs.timeout_minutes)),
         ] + (["known_failures=" + shell_quote("\n".join([e for f in sorted(ctx.attrs.known_failures) for e in ctx.attrs.known_failures[f]]))] if name == "known_failures" else []) +

@@ -393,11 +393,12 @@ A cached shard verdict MUST be the verdict a fresh run of the same action
 would reach, so every seed MUST come from the action's inputs. The
 `[mix] test_salt` configuration MUST enter every shard's action key, and every
 run MUST select Hegel's `ci` profile (CI=true: no wall-clock TooSlow check)
-with HEGEL_DATABASE=disabled. With the empty salt (the gate) mix_test MUST run
-Hegel derandomized (HEGEL_DERANDOMIZE=true, no HEGEL_SEED) and ExUnit with
-`--seed 0`. With a salt it MUST validate it and derive one seed from it
-for both `--seed` and HEGEL_SEED, so `-c mix.test_salt=<value>` reruns every
-suite with fresh, replayable draws. The shard log MUST start with the salt
+with HEGEL_DATABASE=disabled. It MUST derive one seed for both `--seed` and
+HEGEL_SEED from the shard's input digest (every file of its source tree and
+its test arguments) and the salt, which it MUST validate. A cache hit then
+replays exactly the draws of the run that recorded it, every changed input
+explores new draws, and `-c mix.test_salt=<value>` reruns every suite with
+fresh, replayable ones. The shard log MUST start with the salt
 and seeds, and a failing shard MUST print them with a reproduction command
 (ADR-0269).
 
