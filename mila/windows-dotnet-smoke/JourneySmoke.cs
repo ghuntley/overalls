@@ -181,7 +181,8 @@ internal sealed class MilaJourneyApprover(MilaJourneyDescriptor descriptor, Http
 /// Journey mode runs only with `--descriptor PATH` against the tunnelled
 /// fixture: CA-pinned trust enrollment, Rust session sign-in with browser
 /// approval through the approver hook, machine listing, share add/remove read
-/// back, notification device listing, web show/set, machine lifecycle with
+/// back, notification device register/list/preferences/remove (WNS and
+/// Susan stand-ins, real poke key), web show/set, machine lifecycle with
 /// resize read-back, threads, SSH key listing and second-device revoke,
 /// the guestless terminal refusal, the guest-backed terminal (when the
 /// descriptor names one), transport-loss reconnect and authenticated share
@@ -250,10 +251,7 @@ internal static class JourneySmoke
 
             await JourneyPages.SharingAsync(handle, machine.Id, descriptor.SharePrincipal, cancellationToken);
 
-            MilaNativeSessionBytesResult devices = RustNative.TrySessionDevices(handle);
-            Program.Require(devices.Succeeded, "journey device listing");
-            _ = MilaWindowsNotificationDevicesController.DecodeListing(devices.Data!);
-            Step("notification device listing");
+            await JourneyPages.NotificationsAsync(session, host, cancellationToken);
 
             // Web, lifecycle and threads assert their effects through session
             // reads; the fixture hooks stand in for the provisioner and agent.

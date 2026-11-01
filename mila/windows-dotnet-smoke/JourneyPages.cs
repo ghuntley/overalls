@@ -1,4 +1,6 @@
 using System.Net.Http.Headers;
+using System.Runtime.Versioning;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using Mila.Windows.Interop;
@@ -214,6 +216,95 @@ internal static class JourneyPages
         await AwaitAsync("share remove", () => ShareShow(handle, seed).All(grant =>
             !string.Equals(grant.Email, principal, StringComparison.OrdinalIgnoreCase)) ? "revoked" : null, cancellationToken);
         Step("share remove (read back)");
+    }
+
+    /// <summary>The fixture has no WNS: a made-up channel that passes the managed and Rust shape rules (stand-in).</summary>
+    private sealed class StandInWnsChannel : IMilaWnsChannelSource
+    {
+        public Task<MilaWnsChannel?> CreateChannelAsync(CancellationToken cancellationToken) => Task.FromResult<MilaWnsChannel?>(
+            new("https://wns2-par02p.notify.windows.com/w/?token=" + Convert.ToHexString(RandomNumberGenerator.GetBytes(16)),
+                DateTimeOffset.UtcNow.AddDays(1)));
+    }
+
+    /// <summary>The fixture has no Susan: a key-issuance reply in Susan's shape (stand-in), as the Android and headless journeys use.</summary>
+    [SupportedOSPlatform("windows")]
+    private sealed class StandInSusan : IMilaSusanKeyClient
+    {
+        public Task<MilaSusanKeyReply> IssueAsync(byte[] body, CancellationToken cancellationToken)
+        {
+            string reply = JsonSerializer.Serialize(new Dictionary<string, string>
+            {
+                ["push_key"] = MilaWindowsPokeKeyStore.Base64Url(RandomNumberGenerator.GetBytes(48)),
+                ["key_id"] = "mila-windows-journey",
+                ["expires_at"] = "2099-01-01T00:00:00Z",
+            });
+            return Task.FromResult(new MilaSusanKeyReply(System.Net.HttpStatusCode.Created, Encoding.UTF8.GetBytes(reply)));
+        }
+    }
+
+    /// <summary>
+    /// Notification device register, list, preferences and remove against the
+    /// fixture's Marshall and Porsche. Registration runs the real client workflow
+    /// with the real DPAPI-sealed X25519 poke key; only WNS and Susan are stand-ins.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    internal static async Task NotificationsAsync(MilaSessionConnection session, string host, CancellationToken cancellationToken)
+    {
+        ulong handle = session.Handle ?? throw new InvalidOperationException("journey session lost");
+        string pokeDirectory = Path.Combine(Path.GetTempPath(), "mila-journey-poke-" + Guid.NewGuid().ToString("N"), "poke-keys");
+        try
+        {
+            MilaWindowsPokeKeyStore pokeKeys = new(pokeDirectory);
+            Program.Require(pokeKeys.PublicKey(host) is { Length: 43 }, "journey poke key custody");
+            MilaWindowsNotificationController notifications = new();
+            notifications.SetSession(true);
+            MilaWindowsPushRegistration registration = new(new StandInWnsChannel(), pokeKeys, new StandInSusan(), notifications);
+            MilaPushRegistrationOutcome outcome = await registration.RegisterAsync(handle, host, () => session.Handle, "Mila journey", cancellationToken);
+            Program.Require(outcome == MilaPushRegistrationOutcome.Registered && registration.DeviceId is not null,
+                $"journey device register ({outcome}/{RustNative.TrySessionLastRefusal(handle) ?? "none"})");
+            string device = registration.DeviceId!;
+            Step("notifications: device registered (WNS and Susan stand-ins)");
+
+            MilaWindowsNotificationDevicesController devices = new(
+                _ =>
+                {
+                    MilaNativeSessionBytesResult listing = RustNative.TrySessionDevices(handle);
+                    Program.Require(listing.Succeeded, $"journey device ls ({listing.Status})");
+                    return Task.FromResult(MilaWindowsNotificationDevicesController.DecodeListing(listing.Data!));
+                },
+                (id, _) =>
+                {
+                    MilaNativeSessionActionResult removed = RustNative.TrySessionDeviceRemove(handle, id);
+                    Program.Require(removed.Succeeded, $"journey device rm ({removed.Status}/{RustNative.TrySessionLastRefusal(handle) ?? "none"})");
+                    return Task.CompletedTask;
+                },
+                (id, enabled, _) =>
+                {
+                    MilaNativeSessionActionResult set = RustNative.TrySessionDevicePreferences(handle, id, enabled);
+                    Program.Require(set.Succeeded, $"journey device prefs ({set.Status}/{RustNative.TrySessionLastRefusal(handle) ?? "none"})");
+                    return Task.CompletedTask;
+                });
+            MilaWindowsNotificationDevice Listed() => devices.Devices.SingleOrDefault(row => row.Id == device)
+                ?? throw new InvalidOperationException($"journey device {device} not listed ({devices.Status})");
+            await devices.LoadAsync(true, cancellationToken);
+            Program.Require(Listed() is { Platform: "windows", Enabled: true }, "journey device listed as an enabled windows device");
+            Step("notifications: device listed");
+            await devices.SetEnabledAsync(Listed(), false, cancellationToken);
+            Program.Require(!Listed().Enabled, "journey device disabled (read back)");
+            await devices.SetEnabledAsync(Listed(), true, cancellationToken);
+            Program.Require(Listed().Enabled, "journey device enabled (read back)");
+            Step("notifications: preferences off/on read back");
+            Program.Require(!RustNative.TrySessionDevicePreferences(handle, "bad device", true).Succeeded, "journey refuses a malformed device id");
+            await devices.RemoveAsync(Listed(), cancellationToken);
+            Program.Require(devices.Status == MilaWindowsNotificationDevicesStatus.Loaded && devices.Devices.All(row => row.Id != device),
+                "journey device removed (read back)");
+            Step("notifications: device removed");
+        }
+        finally
+        {
+            string? root = Path.GetDirectoryName(pokeDirectory);
+            if (root is not null && Directory.Exists(root)) Directory.Delete(root, recursive: true);
+        }
     }
 
     private static MilaWebEndpoint WebShow(ulong handle, Guid machine)

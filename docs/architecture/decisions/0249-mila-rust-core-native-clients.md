@@ -150,8 +150,12 @@ binding is wrong and never silently replaced.
 [`PokeKeySmoke.cs`](../../../mila/windows-dotnet-smoke/PokeKeySmoke.cs) checks
 the RFC 7748 vector, persistence, per-deployment separation, tamper and
 cross-deployment refusal and the ACL; the DPAPI and ACL checks run only on
-Windows CI. WNS delivery, notification device registration in the journey and
-a recorded passing journey run remain open.
+Windows CI. The journey registers a notification device through the real
+client workflow and that poke key, lists it as an enabled `windows` device,
+turns it off and on again with each change read back, refuses a malformed id
+and removes it, as the Android journey does. WNS and Susan are stand-ins there:
+the channel URI is made up and the push key is a random Susan-shaped reply.
+Real WNS delivery and a recorded passing journey run remain open.
 
 The Linux GTK client keeps its decisions in GTK-independent library modules:
 the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),
