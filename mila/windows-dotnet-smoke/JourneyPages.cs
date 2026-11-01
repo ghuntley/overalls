@@ -423,8 +423,13 @@ internal static class JourneyPages
         await UntilAsync(first, "40 132", TimeSpan.FromSeconds(30), "guest terminal resize", cancellationToken);
         Step("guest terminal resize 132x40");
 
+        // Detach this viewport only, then attach a fresh one to the same named
+        // session (as the Linux journey does): the earlier output must come back
+        // from the server's replay.
         first.Kill();
-        MilaTerminalStream second = await AttachAsync(session, handle, machine, 132, 40, cancellationToken);
+        MilaTerminalStream second = new(MilaRustTerminalTransport.Instance, () => session.Handle);
+        Program.Require(second.AttachSession(machine, terminalId, true, 132, 40),
+            $"journey guest terminal reattach ({RustNative.TrySessionLastRefusal(handle) ?? "none"})");
         Program.Require(second.TerminalId == terminalId, "journey guest terminal rejoins the named session");
         await UntilAsync(second, marker + "-42", TimeSpan.FromSeconds(60), "guest terminal replay", cancellationToken);
         Step("guest terminal detach and reattach with replay");

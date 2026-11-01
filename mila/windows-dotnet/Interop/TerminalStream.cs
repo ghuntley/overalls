@@ -98,15 +98,26 @@ internal sealed class MilaTerminalStream
     /// <summary>The named server terminal session currently attached or being rejoined.</summary>
     internal string? TerminalId => _terminalId;
 
-    /// <summary>Attaches a fresh stream to the caller's terminal session on one machine; any previous PTY is killed first.</summary>
-    internal bool Attach(Guid machineId, bool readWrite, ushort columns, ushort rows)
+    /// <summary>Attaches a fresh stream to a new server terminal session on one machine; any previous PTY is killed first.</summary>
+    internal bool Attach(Guid machineId, bool readWrite, ushort columns, ushort rows) =>
+        AttachNamed(machineId, null, readWrite, columns, rows);
+
+    /// <summary>
+    /// Attaches a fresh stream to the named server terminal session (a detached
+    /// viewport rejoining it, as the Linux client does); the server replays its
+    /// earlier output. A refused attach clears the name, so a retry opens a new one.
+    /// </summary>
+    internal bool AttachSession(Guid machineId, string terminalId, bool readWrite, ushort columns, ushort rows) =>
+        !string.IsNullOrEmpty(terminalId) && AttachNamed(machineId, terminalId, readWrite, columns, rows);
+
+    private bool AttachNamed(Guid machineId, string? terminalId, bool readWrite, ushort columns, ushort rows)
     {
         KillNative();
         Session.Kill(_generation);
         if (machineId == Guid.Empty) return false;
-        // A fresh attach always asks `terminal new`, which rejoins the caller's
-        // personal session; only reconnects reuse the remembered session id.
-        _terminalId = null;
+        // `terminal new` derives its session from the request id, so each call
+        // without a name opens a new server session; rejoining needs the name.
+        _terminalId = terminalId;
         _machine = machineId;
         _attempts = 0;
         _readWrite = readWrite;

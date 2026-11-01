@@ -306,6 +306,28 @@ internal static class LifecycleSmoke
         Program.Require(stream.Attach(Machine, true, 80, 24), "reattach");
         session = null;
         Program.Require(!stream.End() && transport.Ended.Count == 2, "end without a session handle cannot reach the server");
+        TerminalRejoin();
+    }
+
+    /// <summary>A detached viewport rejoins its named session without `terminal new`; a refused rejoin forgets the name.</summary>
+    private static void TerminalRejoin()
+    {
+        FakeTerminal transport = new();
+        MilaTerminalStream first = new(transport, () => 7);
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 21));
+        Program.Require(first.Attach(Machine, true, 80, 24) && transport.OpenCount == 1, "first attach opens a session");
+        string named = first.TerminalId!;
+        first.Kill();
+        MilaTerminalStream second = new(transport, () => 7);
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 22));
+        Program.Require(second.AttachSession(Machine, named, true, 132, 40) && second.TerminalId == named &&
+            transport.OpenCount == 1 && transport.AttachedTerminals[^1] == named, "rejoin attaches the named session without terminal new");
+        Program.Require(!new MilaTerminalStream(transport, () => 7).AttachSession(Machine, "", true, 80, 24) && transport.OpenCount == 1,
+            "rejoin requires a session name");
+        MilaTerminalStream refused = new(transport, () => 7);
+        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        Program.Require(!refused.AttachSession(Machine, named, true, 80, 24) && refused.TerminalId is null && transport.OpenCount == 1,
+            "a refused rejoin forgets the gone session");
     }
 
     private static void TerminalReconnect()
