@@ -304,8 +304,20 @@ jobs:
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       # Before Nix is installed: the store goes on a loop-mounted btrfs with
-      # forced zstd compression, sized to the root disk less room for
-      # uncompressed build directories in /tmp. A failure stops the job.
+      # forced zstd compression, sized to the root disk less a small reserve.
+      # A failure stops the job. Measured for dispatch 41274553637 (xl
+      # profile: a 95 GB root overlay with 62 GB free):
+      # - The 2.30 Nix this job installs builds in /nix/var/nix/builds, so
+      #   build directories already land on the compressed store. The old
+      #   32 GiB reserve for /tmp stayed empty; the root disk's use grew only
+      #   by the loop file. buck-out of a host build holds small store-path
+      #   files. 6 GiB covers both and the runner's own logs.
+      # - A Lilly host's toplevel substitutes up to 125.5 GiB unpacked
+      #   (32.7 GiB of NARs), the 64 GiB Windows Server image included,
+      #   plus 10.2 GiB for evaluation and its own image builds. The 116 GiB
+      #   fetch set of dungarees' system occupies 36 GiB on zstd:1 btrfs
+      #   (the Windows image alone 19 GiB), so these builds need about
+      #   45-50 GiB, which the previous 30 GiB store could not hold.
       - name: Compressed Nix store
         if: env.NIX_ON_CACHE_VOLUME == 'false'
         run: |
@@ -314,7 +326,7 @@ jobs:
           sudo apt-get update -qq
           sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq btrfs-progs > /dev/null
           avail=$(df --output=avail -B1 / | tail -1)
-          size=$(( avail - 32 * 1024 * 1024 * 1024 ))
+          size=$(( avail - 6 * 1024 * 1024 * 1024 ))
           sudo truncate -s "$size" /var/lib/nix-store.btrfs
           sudo mkfs.btrfs -q /var/lib/nix-store.btrfs
           sudo mkdir -p /nix
