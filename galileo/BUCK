@@ -24,4 +24,7 @@ overalls_mix_project(
     release_srcs = [":release_srcs"],
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:sdk"],
+    # One shard ran 20+ min on an 8-vCPU CI runner (ci 41316059648) and
+    # past mix_test's 45 min bound on loaded developer hosts.
+    test_shards = 4,
 )
