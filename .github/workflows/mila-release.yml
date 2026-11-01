@@ -144,7 +144,10 @@ jobs:
           if-no-files-found: error
 
   apple:
-    runs-on: namespace-profile-cached-arm64
+    # Own profile with no cache volume: pull-request jobs on cached-arm64
+    # share that profile's tool and Actions caches, which a signing job
+    # must never read.
+    runs-on: namespace-profile-release-arm64
     environment: mila-release
     timeout-minutes: 150
     # No Namespace remote cache: signed builds and their Buck2 state never
