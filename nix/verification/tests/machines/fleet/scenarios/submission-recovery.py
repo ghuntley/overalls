@@ -53,6 +53,29 @@ def submission_daemon_recovery(tc: TestCase, host_index: int, reopens: int) -> N
                     for value in machine.succeed(f"cat {barrier}/worker").strip().split(":")
                 )
                 assert worker_pid > 0 and worker_start > 0
+                # lilly-hostd, not the BEAM, runs the submission (vm_launch.rs).
+                # ADR-0176 decision 3: each hostd command runs in its own run-<n>
+                # child of hostd's delegated cgroup (never hostd's daemon leaf),
+                # so the paused worker is not suspended with lilly.service; hostd
+                # kills and reaps it when the BEAM session closes
+                # (session-close-custody) or at its own 10 s launch timeout.
+                # Not asserted here: that the worker is reaped before a restarted
+                # Lilly's next submission is granted the lease
+                # (lease-release-after-commands-reaped). The fenced generation is
+                # never resubmitted, so the first later submission follows the
+                # explicit wait below; observing the grant needs barrier plumbing
+                # that records lease acquisition. The worker's inherited flock
+                # keeps the lease held in the kernel while it lives regardless.
+                worker_stat = (
+                    machine.succeed(f"cat /proc/{worker_pid}/stat").rsplit(") ", 1)[1].split()
+                )
+                assert int(worker_stat[19]) == worker_start
+                worker_cgroup = machine.succeed(f"cat /proc/{worker_pid}/cgroup").strip()
+                assert worker_cgroup.startswith("0::/"), worker_cgroup
+                service, _, command_cgroup = worker_cgroup.removeprefix("0::").rpartition("/")
+                assert service.endswith("/lilly-hostd.service"), worker_cgroup
+                assert command_cgroup.startswith("run-"), worker_cgroup
+                assert command_cgroup.removeprefix("run-").isdigit(), worker_cgroup
                 daemon_stat = (
                     machine.succeed(f"cat /proc/{old_pid}/stat").rsplit(") ", 1)[1].split()
                 )
@@ -86,10 +109,6 @@ def submission_daemon_recovery(tc: TestCase, host_index: int, reopens: int) -> N
                     launched = process_snapshot(victim)
                     assert launched
                 machine.succeed(f"rm {barrier}/armed")
-                worker_stat = (
-                    machine.succeed(f"cat /proc/{worker_pid}/stat").rsplit(") ", 1)[1].split()
-                )
-                assert worker_stat[0] == "T" and int(worker_stat[19]) == worker_start
                 machine.succeed("systemctl kill --kill-whom=all --signal=KILL lilly.service")
                 machine.wait_until_succeeds(f"test ! -e /proc/{old_pid}", timeout=30)
                 machine.wait_until_succeeds(f"test ! -e /proc/{worker_pid}", timeout=30)

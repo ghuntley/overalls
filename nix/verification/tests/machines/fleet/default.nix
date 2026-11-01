@@ -1080,12 +1080,13 @@ let
         fi
         exec ${pkgs.systemd}/bin/systemd-run "$@"
       '')
-    ]);
-    systemd.services.lilly.path = lib.mkBefore (lib.optionals runtimeReadiness [
+    ] ++ lib.optionals runtimeReadiness [
       # @cc [owner:ghuntley,label:verification;recovery] native-submission-barrier-scope
       # Only the isolated readiness fixture may pause one explicitly armed unit
       # around real submission. Ordinary calls retain the pinned executable and
       # arguments; no launch, journal or authenticated outcome may be fabricated.
+      # lilly-hostd, not the BEAM, submits VM units (vm_launch.rs) through the
+      # systemd-run on its own PATH, so the barrier MUST interpose there.
       (pkgs.writeShellScriptBin "systemd-run" ''
         exec ${pkgs.python3}/bin/python3 ${./submission-barrier.py} ${pkgs.systemd}/bin/systemd-run "$@"
       '')

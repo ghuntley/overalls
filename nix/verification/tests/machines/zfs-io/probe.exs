@@ -4,7 +4,7 @@
 # control report. Utility faults follow native identity binding and MUST NOT
 # invent successful counters. Reload faults MUST actually export/import the pool.
 defmodule Overalls.ZFSIOFixture do
-  alias Lilly.Host.{Collector, Pool, ZFS, ZFSIO}
+  alias Lilly.Host.{Collector, Pool, PoolObserver, ZFS, ZFSIO}
 
   @type observation :: %{capacity: map(), io: map()}
 
@@ -39,7 +39,13 @@ defmodule Overalls.ZFSIOFixture do
       "/run/zfs-io-fault/bin/zpool" = System.find_executable("zpool")
     end
 
-    {:ok, report, _previous} = Collector.sample(pools, "/sys/fs/cgroup", nil, 1)
+    # Collection takes pool entries from the background pool observer and never
+    # reads a pool inline (contract pool-reads-do-not-delay-sample), so this
+    # one-shot BEAM runs its own observer and samples once it has published a
+    # measured entry for every pool.
+    view = :zfs_io_fixture_pool_observer
+    {:ok, _} = PoolObserver.start_link({pools, [view: view, interval_ms: 1000]})
+    report = observed(pools, view, System.monotonic_time(:millisecond) + 30_000)
     encoded = OverallsProtocol.encode_report(report)
     {:ok, decoded} = OverallsProtocol.report(encoded)
     ^encoded = OverallsProtocol.encode_report(decoded)
@@ -58,6 +64,24 @@ defmodule Overalls.ZFSIOFixture do
         io: Map.fetch!(io, capacity.id)
       }
     end)
+  end
+
+  @spec observed([Pool.t()], atom(), integer()) :: OverallsProtocol.report()
+  defp observed(pools, view, until) do
+    {:ok, report, _previous} =
+      Collector.sample(pools, "/sys/fs/cgroup", nil, 1, [], %{}, %{}, view)
+
+    cond do
+      not Enum.any?(report.pools, &Map.get(&1, :busy, false)) ->
+        report
+
+      System.monotonic_time(:millisecond) >= until ->
+        raise "pool observer published no measured entry before the fixture deadline"
+
+      true ->
+        Process.sleep(200)
+        observed(pools, view, until)
+    end
   end
 end
 

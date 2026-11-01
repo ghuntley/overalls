@@ -135,7 +135,10 @@ with a quarantined template after its client, source and host-loss checks passed
 its historical cause remains unknown. The later complete corrected Ubuntu suite
 passed, including the final cleanup guard and a limited post-import cache action
 that preserves ADR-0130's strict identities. Its exact-reuse branch passed;
-device-only fenced replacement remains unexecuted. Focused current NixOS also
+device-only fenced replacement remains unexecuted. (Correction 2026-11-01:
+ADR-0182 accepts device-only drift, so that branch now asserts reuse of the
+unchanged incarnation, and fenced replacement is driven by an mtime change on a
+sealed file; both passed on 2026-11-01, see ADR-0130's correction.) Focused current NixOS also
 passed exact reuse and original VM 102 cleanup through the current packaged
 prefix; its omitted remainder retains only the earlier full-run scope. The
 corrected/refrozen packaged handbook browser check passed at its captured source;

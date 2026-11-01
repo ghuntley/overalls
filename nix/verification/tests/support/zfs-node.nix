@@ -48,6 +48,10 @@
     '')
   ];
   environment.etc."zfs-fault".source = pkgs.writeShellScript "zfs-fault" ''
+    # lilly-hostd runs every utility with only PATH and LC_ALL, so the paused
+    # operation travels through a file the driver writes, as the observation
+    # fault mode does.
+    ZFS_PAUSE_OPERATION="''${ZFS_PAUSE_OPERATION:-$(cat /run/zfs-pause-operation 2>/dev/null || true)}"
     if [ "$1" = destroy ] && [ "''${ZFS_PAUSE_OPERATION:-}" = unmount ]; then
       ${config.boot.zfs.package}/bin/zfs unmount "$2" || exit 1
       touch /run/zfs-operation-committed
@@ -62,9 +66,12 @@
     exit "$result"
   '';
   environment.etc."copy-fault".source = pkgs.writeShellScript "copy-fault" ''
+    ZFS_PAUSE_OPERATION="''${ZFS_PAUSE_OPERATION:-$(cat /run/zfs-pause-operation 2>/dev/null || true)}"
     ${packages.lilly}/host-tools/bin/lilly-image-copy "$@"
     result=$?
-    if [ "$result" = 0 ] && [ "''${ZFS_PAUSE_OPERATION:-}" = cp ]; then
+    # Only the copy pauses; `identity` reads (Image.identities) share this
+    # executable and precede it.
+    if [ "$result" = 0 ] && [ "$1" != identity ] && [ "''${ZFS_PAUSE_OPERATION:-}" = cp ]; then
       touch /run/zfs-operation-committed
       exec sleep 300
     fi

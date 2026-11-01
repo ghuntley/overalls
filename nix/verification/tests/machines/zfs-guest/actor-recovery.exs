@@ -457,7 +457,10 @@ defmodule ZFSGuestActorRecovery do
 
   @spec process_snapshot(Spec.t()) :: binary()
   defp process_snapshot(spec) do
-    {snapshot, 0} = System.cmd("zfs-guest-processes", [spec.id])
+    # This BEAM runs as `lilly` without capabilities and cannot read the jailed
+    # VMM's executable link; it compares PIDs and start times, and the root
+    # driver checks executable identity (vm-processes.py snapshot/survival).
+    {snapshot, 0} = System.cmd("zfs-guest-processes", ["--survival", spec.id])
     true = byte_size(snapshot) > 2
     snapshot
   end

@@ -374,6 +374,31 @@ three times and then reports the latest coherent tree instead of withholding
 records the last real measurement time and lets a `busy` entry extend that
 measurement's freshness for at most 15 s, never past host authority.
 
+### Machine-fixture faults that never armed (2026-11-01)
+
+Two zfs-lifecycle checks asserted refusals whose faults never reached Lilly.
+The usage-drift preparation check expected `storage_busy`, but the probe never
+put the observation-fault wrapper on its private hostd's PATH, and ADR-0163
+decision 4 makes a preparation under moving usage succeed anyway. The check is
+now `moving-prepare`: the fault is armed only just before `Disk.prepare`, which
+must succeed and agree with a later quiet preparation. The parent-sync-failure
+deletion check planted a `sync` stub on PATH, but lilly-hostd performs `sync`
+natively, so the stub never ran and `reject-delete` succeeded; that case has
+not been exercised since 840c79834.
+
+The interrupted-mutation checks failed the same way: lilly-hostd runs each
+utility with only PATH and LC_ALL, so `ZFS_PAUSE_OPERATION` never reached the
+fault wrappers and no operation paused. The driver now names the paused
+operation in a root-owned file. The copy wrapper pauses only on a copy, not on
+the `identity` reads that share its executable. Evidence: zfs-lifecycle passed
+every subtest on dungarees with local builders only (test script 1864.74 s),
+except the explicitly skipped parent-sync case.
+
+Open gap: the parent-sync-failure deletion path has no machine evidence, and
+the driver skips it explicitly. Proposed follow-up, not decided: a fault seam
+for hostd's native sync compiled only into test builds, in the pattern of
+Lilly's test-only root-owner seam (778e73821).
+
 ## Open questions
 
 Validate ZFS accounting consistency and metadata headroom under concurrent guest

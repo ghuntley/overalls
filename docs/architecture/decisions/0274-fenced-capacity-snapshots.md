@@ -108,6 +108,16 @@ observation; amend the ADRs as needed).
 - Native state changed without any pool section, such as root-disk copies
   under a placement lock, moves usage. The two-tree read still detects that
   and reports `usage_moving`, as it did under the lock.
+- A withheld pool keeps ADR-0163's report shape: its identity, `busy: true`
+  and its configured storage, with no `total_bytes`, `free_bytes` or
+  allocations (contract `failed-pool-observation-has-no-credit`). The
+  Collector never fills the byte fields for a fenced or locked read that was
+  withheld, and every consumer, Marshall and machine-test drivers alike, must
+  accept that shape rather than expect measured fields on every sample.
+- This record covers capacity reports only. A preparation's own snapshot is
+  still read under the lock (ADR-0152), and usage drift between its two exact
+  reads is resampled as ADR-0163 decision 4 requires, so a preparation under
+  moving usage succeeds rather than returning `storage_busy`.
 
 ## Invariants and verification
 
@@ -149,7 +159,15 @@ observation; amend the ADRs as needed).
 - BEAM tests listed above. They use the real `PoolQueue`, hostd leases and
   lock directory, but no ZFS.
 
-Remaining gaps: no native ZFS or fleet evidence yet. The fenced read path
+- Machine tests, 2026-11-01, on dungarees with local builders only: the
+  zfs-io and zfs-guest probes are one-shot BEAMs that called
+  `Collector.sample/4` without a pool observer. Since collection reads pool
+  entries only from `PoolObserver` (contract `pool-reads-do-not-delay-sample`),
+  every sample was the withheld `busy` shape, at c904e5c33's parent as well
+  as after it, while direct fenced and locked `Pool.snapshot/2` reads in the
+  same BEAM measured both pools. The probes now run their own observer.
+
+Remaining gaps: no fleet evidence yet. The fenced read path
 (`read_fenced/2` against real `zfs list` output) runs only in machine tests,
 and the account-lifecycle suites have not been rerun.
 

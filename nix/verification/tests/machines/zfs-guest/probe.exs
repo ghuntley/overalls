@@ -3,7 +3,7 @@
 # confinement, and keep all terminal bytes out of diagnostics. Its worker exit MUST NOT
 # terminate the independently supervised VMM.
 defmodule ZFSGuestFixture do
-  alias Lilly.Host.{Collector, Image, Pool, ZFS}
+  alias Lilly.Host.{Collector, Image, Pool, PoolObserver, ZFS}
   alias Lilly.Terminal.Vsock
   alias Lilly.VM.{Boot, Config, Driver, Jail, Observation, Readiness, Spec, Unit}
 
@@ -145,6 +145,10 @@ defmodule ZFSGuestFixture do
       "template-post-import" ->
         Code.require_file("/etc/zfs-template-post-import.exs")
         :ok = ZFSGuestTemplatePostImport.run(pool, image, config, spec)
+
+      "template-drift-replacement" ->
+        Code.require_file("/etc/zfs-template-post-import.exs")
+        :ok = ZFSGuestTemplatePostImport.replace_drifted(pool, image, config, spec)
 
       "backup-flush-on" ->
         console(config, spec, "systemctl start lilly-flush.service")
@@ -432,7 +436,9 @@ defmodule ZFSGuestFixture do
                  Boot.expectation(boot),
                  180_000
                ) do
-            {:ok, _receipt} -> :ok
+            {:ok, _receipt} ->
+              :ok
+
             error ->
               # Preserve bounded guest-side evidence when the emulator does not
               # publish readiness.  This is intentionally limited to service
@@ -454,7 +460,14 @@ defmodule ZFSGuestFixture do
                   # Firecracker's bounded serial stream contains only kernel and
                   # systemd boot diagnostics by contract. Keep the tail small so
                   # a failed test cannot turn this into an unbounded log sink.
-                  IO.puts("android-boot-log-tail:\n" <> binary_part(bytes, max(byte_size(bytes) - 4096, 0), min(byte_size(bytes), 4096)))
+                  IO.puts(
+                    "android-boot-log-tail:\n" <>
+                      binary_part(
+                        bytes,
+                        max(byte_size(bytes) - 4096, 0),
+                        min(byte_size(bytes), 4096)
+                      )
+                  )
 
                 {:error, _reason} ->
                   :ok
@@ -636,7 +649,11 @@ defmodule ZFSGuestFixture do
         # A busy pool entry (lock held or usage moving, ADR-0031) is transient
         # identity-only evidence. Allocation assertions MUST read a settled
         # observation, retried within a bounded deadline, never a busy entry.
-        snapshot = settled_snapshot(pool, image, deadline(60_000))
+        # Collection reads pool entries only from the background pool observer
+        # (contract pool-reads-do-not-delay-sample); this one-shot BEAM runs its own.
+        view = :zfs_guest_fixture_pool_observer
+        {:ok, _} = PoolObserver.start_link({[pool], [view: view, interval_ms: 1000]})
+        snapshot = settled_snapshot(pool, image, view, deadline(60_000))
 
         IO.puts(
           JSON.encode!(%{snapshot | storage: OverallsProtocol.Storage.encode(snapshot.storage)})
@@ -646,9 +663,11 @@ defmodule ZFSGuestFixture do
     :ok
   end
 
-  @spec settled_snapshot(Pool.t(), Image.t(), integer()) :: map()
-  defp settled_snapshot(pool, image, until) do
-    {:ok, report, _} = Collector.sample([pool], "/sys/fs/cgroup/lilly.slice", nil, 1, [image])
+  @spec settled_snapshot(Pool.t(), Image.t(), atom(), integer()) :: map()
+  defp settled_snapshot(pool, image, view, until) do
+    {:ok, report, _} =
+      Collector.sample([pool], "/sys/fs/cgroup/lilly.slice", nil, 1, [image], %{}, %{}, view)
+
     [snapshot] = report.pools
 
     cond do
@@ -660,7 +679,7 @@ defmodule ZFSGuestFixture do
 
       true ->
         Process.sleep(500)
-        settled_snapshot(pool, image, until)
+        settled_snapshot(pool, image, view, until)
     end
   end
 
@@ -748,7 +767,9 @@ defmodule ZFSGuestFixture do
       )
 
     case result do
-      :pass -> :pass
+      :pass ->
+        :pass
+
       _ ->
         Process.sleep(1_000)
         wait_android_ready(config, spec, attempts - 1)

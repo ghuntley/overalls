@@ -97,6 +97,27 @@ with subtest("post-import template identity retains strict fenced recovery"):
     assert storage.succeed(f"zfs-guest-processes {vm}") == before_cache
     storage.succeed("zfs-guest observe 4", "zfs-guest read 4")
 
+with subtest("drifted sealed template is quarantined and replaced under fence"):
+    # Import only changes st_dev, which ADR-0182 accepts. An mtime change on a
+    # sealed file is still refused, so it drives fenced quarantine, retirement
+    # and replacement. Only the file's timestamp and the restored readonly
+    # seal change; the journal and owner.lock stay untouched.
+    templates = storage.succeed(
+        "for d in /pool/templates/*/; do cmp -s $d/manifest.json /etc/zfs-guest-manifest.json"
+        ' && basename "$d"; done'
+    ).split()
+    assert len(templates) == 1, templates
+    dataset = f"tank/lilly/template-{templates[0]}"
+    storage.succeed(
+        f"zfs set readonly=off {dataset}",
+        f"touch -m -d @1 /pool/templates/{templates[0]}/kernel",
+        f"zfs set readonly=on {dataset}",
+    )
+    before_cache = storage.succeed(f"zfs-guest-processes {vm}")
+    storage.succeed("zfs-guest template-drift-replacement 1 102", timeout=900)
+    assert storage.succeed(f"zfs-guest-processes {vm}") == before_cache
+    storage.succeed("zfs-guest observe 4", "zfs-guest read 4")
+
 with subtest("deleting an older guest preserves the later guest's process and disk"):
     neighbor = "dddddddd-dddd-4ddd-8ddd-000000000102"
     storage.succeed("zfs-guest start 1 102", "zfs-guest write 1 102")

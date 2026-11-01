@@ -24,6 +24,26 @@ defmodule ZFSLifecycleFixture do
         result
     end
   end
+
+  # The observation fault reads its mode from a file because the lazily spawned
+  # lilly-hostd clears every variable but PATH. The mode exists only while the
+  # observed action runs, so no earlier or later recursive list meets it.
+  @spec observed((-> result)) :: result when result: term()
+  def observed(action) do
+    case System.get_env("ZFS_OBSERVATION_FAULT") do
+      nil ->
+        action.()
+
+      mode ->
+        File.write!("/run/zfs-observation-fault-mode", mode)
+
+        try do
+          action.()
+        after
+          File.rm("/run/zfs-observation-fault-mode")
+        end
+    end
+  end
 end
 
 # The Nix release launcher prepends coreutils to PATH. Install the fault boundary
@@ -34,8 +54,14 @@ if System.get_env("ZFS_FAULT") == "1" do
   "/run/zfs-fault/bin/zfs" = System.find_executable("zfs")
 end
 
-if System.get_env("ZFS_CLEANUP_SYNC_FAULT") == "1" do
-  System.put_env("PATH", "/run/cleanup-fault/bin:" <> System.fetch_env!("PATH"))
+# Lilly runs zfs through the private lilly-hostd this BEAM spawns lazily, which
+# inherits PATH but not ZFS_OBSERVATION_FAULT, so the wrapper goes on PATH before
+# the first utility runs and reads its mode from a file (as in the native-zfs
+# probe). The mode is written only just before the observed action: a recursive
+# list earlier would meet no mode, fail, and expose a misplaced fault.
+if System.get_env("ZFS_OBSERVATION_FAULT") do
+  System.put_env("PATH", "/run/zfs-changing/bin:" <> System.fetch_env!("PATH"))
+  "/run/zfs-changing/bin/zfs" = System.find_executable("zfs")
 end
 
 action = System.fetch_env!("ZFS_ACTION")
@@ -193,10 +219,13 @@ case action do
     :ok =
       ZFSLifecycleFixture.prepare(pool, image, spec, System.monotonic_time(:millisecond) + 60_000)
 
-  "busy-prepare" ->
+  # Usage drift between the two exact reads is resampled and the latest coherent
+  # tree is the observation (ADR-0163 decision 4, contract
+  # zfs-bounded-resampling-no-credit), so a preparation under moving usage
+  # succeeds in one attempt.
+  "moving-prepare" ->
     {:ok, image} = Image.load(image_path)
-    File.write!("/run/zfs-observation-fault-mode", System.fetch_env!("ZFS_OBSERVATION_FAULT"))
-    {:error, :storage_busy} = Disk.prepare(pool, image, spec)
+    :ok = ZFSLifecycleFixture.observed(fn -> Disk.prepare(pool, image, spec) end)
 
   "warm-template" ->
     {:ok, image} = Image.load(image_path)
@@ -207,11 +236,11 @@ case action do
     {:error, _} = Disk.prepare(pool, image, spec)
 
   "delete" ->
-    :ok = Disk.delete(pool, spec)
+    :ok = ZFSLifecycleFixture.observed(fn -> Disk.delete(pool, spec) end)
     {:error, :enoent} = File.lstat(Lilly.Host.ZFSDataset.directory(pool, spec))
 
   "reject-delete" ->
-    {:error, _} = Disk.delete(pool, spec)
+    {:error, _} = ZFSLifecycleFixture.observed(fn -> Disk.delete(pool, spec) end)
 
   "reject-ready" ->
     {:error, _} = Disk.ready(pool, spec)

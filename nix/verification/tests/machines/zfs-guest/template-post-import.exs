@@ -36,15 +36,17 @@ defmodule ZFSGuestTemplatePostImport do
         }
   @type classification :: :exact | :device_only
 
-  # @cc [owner:ghuntley,label:verification;security;recovery] post-import-template-fenced-replacement
+  # @cc [owner:ghuntley,label:verification;security;recovery] post-import-template-device-drift-reuse
   # Only an exact imported ready identity, or consistent st_dev-only drift on
   # all four otherwise exact native vectors, may enter this fixture action.
-  # Every other mismatch or failed predicate MUST abort. Device drift MUST first
-  # cause the ordinary reader to quarantine the unchanged incarnation without
-  # entering its callback, then ONE ordinary ensure MUST retire it and fully
-  # verify a distinct incarnation. The old journal and owner.lock MUST NOT be
-  # edited, replaced or deleted by fixture code. VM launch authority MUST remain
-  # absent throughout cache effects; ordinary Driver.start is a later action.
+  # Every other mismatch or failed predicate MUST abort. Linux ZFS reassigns
+  # st_dev on every mount, so device-only drift MUST NOT quarantine
+  # (ADR-0182, contract sealed-identity-survives-remount): the ordinary reader
+  # MUST enter its callback with the unchanged incarnation and revision, whose
+  # vectors differ from the record only in st_dev. The old journal and
+  # owner.lock MUST NOT be edited, replaced or deleted by fixture code. VM
+  # launch authority MUST remain absent throughout cache effects; ordinary
+  # Driver.start is a later action.
   @spec run(Pool.t(), Image.t(), Config.t(), Spec.t()) :: :ok
   def run(pool, image, config, spec) do
     true = spec.id == "dddddddd-dddd-4ddd-8ddd-000000000102"
@@ -84,40 +86,67 @@ defmodule ZFSGuestTemplatePostImport do
         true = load(pool, old.payload.incarnation) == old
 
       :device_only ->
-        :ok = before_deadline(deadline)
-
-        {:error, :template_quarantined} =
-          ImageTemplate.with_image(pool, image, fn _ ->
-            raise "post-import drift entered forbidden template callback"
-          end)
-
-        :ok = assert_transition(pool, old, :quarantined, 1)
-        true = lock_identity(lease_directory) == lock_identity
-        :ok = unused_placement(config, pool, spec)
-        :ok = before_deadline(deadline)
-
-        :ok = ImageTemplate.ensure(pool, image)
-        :ok = assert_transition(pool, old, :deleted, 3)
-        :ok = absent_template(pool, old)
-        fresh = current_ready(pool, image)
-        true = fresh.revision == 4
-        true = fresh.id != old.id
-
-        true =
-          Enum.all?(~w(incarnation nonce guid)a, fn key ->
-            Map.fetch!(fresh.payload, key) != Map.fetch!(old.payload, key)
-          end)
-
-        true =
-          Map.take(fresh.payload, ~w(host_id pool_id image_id bytes)a) ==
-            Map.take(old.payload, ~w(host_id pool_id image_id bytes)a)
-
-        :ok = verify_public_reader(pool, image, fresh, lock_identity, deadline)
-        true = load(pool, fresh.payload.incarnation) == fresh
-        :ok = assert_transition(pool, old, :deleted, 3)
-        :ok = absent_template(pool, old)
+        :ok = verify_public_reader(pool, image, old, lock_identity, deadline)
+        true = load(pool, old.payload.incarnation) == old
+        {:ok, _} = Image.sealed(directory(pool, old), old.payload.identities)
     end
 
+    true = lock_identity(lease_directory) == lock_identity
+    :ok = unused_placement(config, pool, spec)
+    :ok = before_deadline(deadline)
+    :ok
+  end
+
+  # @cc [owner:ghuntley,label:verification;security;recovery] drifted-template-fenced-replacement
+  # The driver, as root, changed only one sealed file's mtime and restored the
+  # readonly seal, a change ADR-0182 still refuses. The ordinary reader MUST
+  # quarantine the unchanged incarnation without entering its callback, then
+  # ONE ordinary ensure MUST retire it and fully verify a distinct incarnation
+  # with the same host, pool, image and bytes. The old journal and owner.lock
+  # MUST NOT be edited, replaced or deleted by fixture code, and VM launch
+  # authority MUST remain absent throughout.
+  @spec replace_drifted(Pool.t(), Image.t(), Config.t(), Spec.t()) :: :ok
+  def replace_drifted(pool, image, config, spec) do
+    true = spec.id == "dddddddd-dddd-4ddd-8ddd-000000000102"
+    deadline = System.monotonic_time(:millisecond) + @action_budget_ms
+    :ok = unused_placement(config, pool, spec)
+    lease_directory = lease_directory(pool, image)
+    lock_identity = lock_identity(lease_directory)
+    old = current_ready(pool, image)
+    :ok = native(pool, old)
+    {:error, :invalid_local_image} = Image.sealed(directory(pool, old), old.payload.identities)
+    :ok = before_deadline(deadline)
+
+    {:error, :template_quarantined} =
+      ImageTemplate.with_image(pool, image, fn _ ->
+        raise "drifted template entered forbidden template callback"
+      end)
+
+    :ok = assert_transition(pool, old, :quarantined, 1)
+    true = lock_identity(lease_directory) == lock_identity
+    :ok = unused_placement(config, pool, spec)
+    :ok = before_deadline(deadline)
+
+    :ok = ImageTemplate.ensure(pool, image)
+    :ok = assert_transition(pool, old, :deleted, 3)
+    :ok = absent_template(pool, old)
+    fresh = current_ready(pool, image)
+    true = fresh.revision == 4
+    true = fresh.id != old.id
+
+    true =
+      Enum.all?(~w(incarnation nonce guid)a, fn key ->
+        Map.fetch!(fresh.payload, key) != Map.fetch!(old.payload, key)
+      end)
+
+    true =
+      Map.take(fresh.payload, ~w(host_id pool_id image_id bytes)a) ==
+        Map.take(old.payload, ~w(host_id pool_id image_id bytes)a)
+
+    :ok = verify_public_reader(pool, image, fresh, lock_identity, deadline)
+    true = load(pool, fresh.payload.incarnation) == fresh
+    :ok = assert_transition(pool, old, :deleted, 3)
+    :ok = absent_template(pool, old)
     true = lock_identity(lease_directory) == lock_identity
     :ok = unused_placement(config, pool, spec)
     :ok = before_deadline(deadline)
@@ -265,7 +294,8 @@ defmodule ZFSGuestTemplatePostImport do
         true = verified.id == image.id and verified.verified
         true = bytes(verified) == record.payload.bytes
         {:ok, observed} = Image.identities(verified)
-        true = observed == record.payload.identities
+        # Exact, or st_dev-only drift that ADR-0182 accepts; nothing else.
+        _ = classify(record.payload.identities, observed)
         {:ok, _} = Image.sealed(sealed.path, observed)
         :ok = native(pool, record)
         true = load(pool, record.payload.incarnation) == record

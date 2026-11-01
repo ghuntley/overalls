@@ -226,6 +226,28 @@ cleanup in 1,246.95 seconds of driver execution. It executes only the current
 scope. No passing later run establishes the
 unknown failure-instant cause of the original failures.
 
+**Correction (2026-11-01).** The strict `st_dev` refusal above no longer
+holds. [ADR-0182](0182-unprivileged-lilly-beam.md) (840c79834) found that
+Linux ZFS reassigns a dataset's device number on every mount, so any remounted
+or imported template was quarantined; `Image.sealed/2` now compares every
+identity field except the device number (contract
+`sealed-identity-survives-remount`) while the caller still pins dataset GUID
+and mountpoint. The rationale above for recording and checking file identities
+stands. The post-import cache action was not updated at the time and failed
+once it was first reached (2026-11-01, after the zfs-guest pool-observer fixture
+fix): device-only drift entered the reader callback. It now expects
+device-only drift to reuse the unchanged incarnation (contract
+`post-import-template-device-drift-reuse`), and a separate step drives fenced
+quarantine, retirement and replacement from an mtime change on one sealed file,
+which ADR-0182 still refuses (contract `drifted-template-fenced-replacement`).
+Evidence (2026-11-01, dungarees, local builders only, at ee67cc20b plus this
+change): both zfs-guest subtests passed, device-only reuse in 179.93 s and
+drifted-template quarantine and replacement in 304.35 s, as did every later
+subtest through resize. The run was stopped later, in the clone journey; a
+control run at 59b2d87e7 with the drift subtest disabled failed that journey
+too (`import_disk_adoption_unconfirmed`), so that failure is independent of
+this change and is tracked with the clone-cancellation failure.
+
 ## Open questions
 
 The disposable ZFS test used sparse copy across independent datasets, despite
