@@ -33,6 +33,9 @@ jobs:
     timeout-minutes: 90
     permissions:
       contents: write
+      # tools/namespace-re-image exchanges the job's OIDC token for the
+      # baseimage:optimize grant the workspace identity lacks.
+      id-token: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -49,7 +52,8 @@ jobs:
           else
             echo "stale=true" >> "$GITHUB_OUTPUT"
           fi
-      # nsc on a Namespace runner is authenticated as the workspace.
+      # nsc on a Namespace runner is authenticated as the workspace; the
+      # optimise step exchanges the job's OIDC token (see the script).
       - name: Build, push and optimise the image
         if: steps.check.outputs.stale == 'true'
         run: tools/namespace-re-image --push
