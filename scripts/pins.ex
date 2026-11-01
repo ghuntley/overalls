@@ -24,10 +24,6 @@ defmodule Overalls.Pins do
     "nix/verification/tests/evaluation/windows-guest.nix" => :sealed_output,
     # The illumos SDK package table is a domain lock (name, version, digest).
     "nix/domains/artifacts/guest/native-kernels/illumos/sdk.nix" => :domain_lock,
-    # The Windows editor release id hashes this recipe's text, so moving its
-    # literals would invalidate the sealed native editor bundle; move them with
-    # the next editor source bump.
-    "nix/domains/artifacts/vscode-web/windows-source.nix" => :sealed_recipe,
     # Expected digest of the stock image's Python, asserted inside the guest;
     # it identifies an installed binary rather than pinning a fetch.
     "nix/domains/artifacts/guest/omnios/candidate.nix" => :identity_digest

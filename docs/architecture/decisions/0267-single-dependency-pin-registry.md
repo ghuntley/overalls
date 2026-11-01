@@ -64,7 +64,6 @@ check and prek hook) enforces this:
   list of reviewed exemptions. Each exemption records its reason:
   - sealed Overalls outputs and their evaluation assertions;
   - the illumos SDK package table, which is a domain lock;
-  - the Windows editor recipe, whose text is bound into the editor release id;
   - an installed-binary identity digest.
 - It refuses registry keys that no file reads.
 - It refuses reads of keys the registry does not contain.
@@ -101,9 +100,13 @@ plan (track T1).
   Evaluation-time drvPaths for the toolchain, smtprelay, underclass, vscode,
   Windows runtime, gh, kernels and coding CLIs were compared against trunk and
   are identical.
-- The Windows editor recipe keeps three inline Node and Python archive hashes
-  until the next editor source bump, because its release id binds the recipe
-  text.
+- The Windows editor recipe was first exempt, because its release id binds
+  the recipe text. On 2026-11-01 its Node archive, headers, `node.lib` and
+  embedded Python hashes moved to the registry and the exemption was removed.
+  The release id the 2026-10-18 native bundle was built for had already moved
+  with later recipe and runtime changes, so no committed bundle depended on it.
+  The fetch drvPaths are unchanged; only the product overlay that carries the
+  release id changed.
 - Refresh automation does not yet cover the moved fetch keys. They are updated
   by editing the registry, which is the same manual process as before but now
   in one file.
@@ -161,6 +164,10 @@ plan (track T1).
   [flake.nix](../../../flake.nix) and as a prek hook in [devenv.nix](../../../devenv.nix). Its regression and
   repository tests are in [pins_test.exs](../../../marshall/test/architecture/pins_test.exs). `package-input-lock` in
   `flake.nix` covers `nix-compact`.
+- [windows-source.nix](../../../nix/domains/artifacts/vscode-web/windows-source.nix) reads the
+  `nodeWindowsX64`, `nodeHeaders`, `nodeWindowsX64Library` and
+  `pythonEmbedWindowsX64` keys; [pins.ex](../../../scripts/pins.ex) no longer exempts it. Its
+  source-kit input drvPaths match trunk except the release-id product overlay.
 - [The CI devenv action](../../../.github/actions/devenv/action.yml) and [the OSS scanner image](../../../.oss-scanner/Dockerfile)
   pin the Nix installer checksum and the base image digest.
 
@@ -172,7 +179,6 @@ Remaining gaps:
   extensions) with their updaters.
 - Pinning `mix local.hex` and `mix local.rebar` in the upgrade workflows, and
   `cargo-ndk` in the Mila workflows.
-- Moving the Windows editor recipe literals at its next source bump.
 
 ## Open questions
 

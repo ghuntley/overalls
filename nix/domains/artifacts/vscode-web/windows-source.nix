@@ -13,19 +13,19 @@ let
   patches = [ ./patches/0001-overalls-browser-editor.patch ./patches/0002-overalls-editor-policy.patch ./patches/0003-overalls-startup-defaults.patch ./patches/0004-overalls-personal-bundled-updates.patch ];
   nodeArchive = pkgs.fetchurl {
     url = "https://nodejs.org/dist/v${inputs.nodeVersion}/node-v${inputs.nodeVersion}-win-x64.zip";
-    hash = "sha256-FY92hbRN5R9sDfHRU1JsvNPhvHOajfxgdyHO913p5UE=";
+    hash = (import ../pins.nix).nodeWindowsX64;
   };
   nodeHeaders = pkgs.fetchurl {
     url = "https://nodejs.org/dist/v${inputs.nodeVersion}/node-v${inputs.nodeVersion}-headers.tar.gz";
-    hash = "sha256-V8a+4uMLu+5b1R1sw0PrmS4XS1aiodDqt6dRB3HCDqI=";
+    hash = (import ../pins.nix).nodeHeaders;
   };
   nodeLibrary = pkgs.fetchurl {
     url = "https://nodejs.org/dist/v${inputs.nodeVersion}/win-x64/node.lib";
-    hash = "sha256-oKhKoDkXtXjShgELdSGDfp/xE2/7LkpAbBQxbDP9Bvc=";
+    hash = (import ../pins.nix).nodeWindowsX64Library;
   };
   python = pkgs.fetchurl {
     url = "https://www.python.org/ftp/python/3.13.7/python-3.13.7-embed-amd64.zip";
-    hash = "sha256-9syiFqNZvoR5fKu1QUnOXgYq+xbMdWfrf8UcrLLYa2U=";
+    hash = (import ../pins.nix).pythonEmbedWindowsX64;
   };
   electronTypes = pkgs.fetchurl {
     url = "https://github.com/electron/electron/releases/download/v${inputs.electronTypesVersion}/electron.d.ts";
