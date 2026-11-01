@@ -24,4 +24,7 @@ overalls_mix_project(
     release_srcs = [":release_srcs"],
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:sdk"],
+    # One shard passed mix_test's 45 min bound on loaded developer hosts
+    # (load 30-60), as galileo's did.
+    test_shards = 4,
 )
