@@ -294,8 +294,7 @@ pub(crate) fn now_ms() -> u64 {
         tv_sec: 0,
         tv_nsec: 0,
     };
-    // SAFETY: clock_gettime(2) writes one timespec to `time`, a live local.
-    unsafe { libc::clock_gettime(libc::CLOCK_REALTIME, &raw mut time) };
+    crate::sys::unix::clock_gettime(libc::CLOCK_REALTIME, &mut time);
     time.tv_sec.cast_unsigned() * 1000 + (time.tv_nsec / 1_000_000).cast_unsigned()
 }
 

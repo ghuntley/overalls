@@ -300,20 +300,13 @@ fn create_peer(daemon: &Arc<Daemon>, user: &str) -> Peer {
         .set_read_timeout(Some(Duration::from_millis(200)))
         .expect("growth read deadline");
     let send_bytes: libc::c_int = 1024;
-    #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
-    let send_length = size_of_val(&send_bytes) as libc::socklen_t;
     assert_eq!(
-        // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
-        // `send_bytes`, a live local.
-        unsafe {
-            libc::setsockopt(
-                server.as_raw_fd(),
-                libc::SOL_SOCKET,
-                libc::SO_SNDBUF,
-                (&raw const send_bytes).cast::<libc::c_void>(),
-                send_length,
-            )
-        },
+        crate::sys::unix::setsockopt(
+            server.as_raw_fd(),
+            libc::SOL_SOCKET,
+            libc::SO_SNDBUF,
+            &send_bytes,
+        ),
         0
     );
     let request = AttachRequest {

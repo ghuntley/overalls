@@ -18,6 +18,11 @@ mod observer;
 mod pty;
 mod ring;
 mod session;
+#[allow(
+    unsafe_code,
+    reason = "the FFI shims: every unsafe block lives here, behind safe wrappers (ADR-0265)"
+)]
+mod sys;
 #[cfg_attr(windows, path = "vsock_windows.rs")]
 #[cfg_attr(
     any(target_os = "freebsd", target_os = "illumos"),

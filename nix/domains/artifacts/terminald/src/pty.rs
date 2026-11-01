@@ -1,7 +1,9 @@
 //! PTY session processes with full passwd-identity execution.
+use crate::sys::pty::{self as sys_pty, Passwd};
+use crate::sys::unix as sys;
 use std::ffi::CString;
 use std::io;
-use std::os::unix::io::{FromRawFd, IntoRawFd, OwnedFd, RawFd};
+use std::os::unix::io::{AsRawFd, IntoRawFd, RawFd};
 
 pub(crate) struct UserInfo {
     pub name: String,
@@ -41,15 +43,17 @@ pub(crate) enum Read {
 }
 
 /// Wait up to `millis` for master output.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "shares the platform-neutral signature of the Windows ConPTY master"
+)]
 pub(crate) fn wait_readable(master: &Master, millis: i32) -> Ready {
     let mut ready = libc::pollfd {
         fd: *master,
         events: libc::POLLIN,
         revents: 0,
     };
-    // SAFETY: poll(2) reads and updates exactly one pollfd (nfds = 1) at
-    // `ready`, a live local.
-    let polled = unsafe { libc::poll(&raw mut ready, 1, millis) };
+    let polled = sys::poll_one(&mut ready, millis);
     if polled == 0 {
         return Ready::Timeout;
     }
@@ -63,10 +67,12 @@ pub(crate) fn wait_readable(master: &Master, millis: i32) -> Ready {
 }
 
 /// One master read.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "shares the platform-neutral signature of the Windows ConPTY master"
+)]
 pub(crate) fn read(master: &Master, buf: &mut [u8]) -> Read {
-    // SAFETY: `buf` is a live exclusive slice, so read(2) may store up to
-    // `buf.len()` bytes at its start.
-    let read = unsafe { libc::read(*master, buf.as_mut_ptr().cast::<libc::c_void>(), buf.len()) };
+    let read = sys::read(*master, buf);
     if read == 0 {
         return Read::Eof;
     }
@@ -82,11 +88,13 @@ pub(crate) fn read(master: &Master, buf: &mut [u8]) -> Read {
 }
 
 /// Write all input bytes to the master, retrying interrupted writes.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "shares the platform-neutral signature of the Windows ConPTY master"
+)]
 pub(crate) fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
     while !data.is_empty() {
-        // SAFETY: `data` is a live slice, so write(2) may read `data.len()` bytes.
-        let written =
-            unsafe { libc::write(*master, data.as_ptr().cast::<libc::c_void>(), data.len()) };
+        let written = sys::write(*master, data);
         if written > 0 {
             data = &data[written.cast_unsigned()..];
             continue;
@@ -105,32 +113,32 @@ pub(crate) fn write_input(master: &Master, mut data: &[u8]) -> io::Result<()> {
     reason = "shares the platform-neutral signature of the Windows ConPTY master"
 )]
 pub(crate) fn kill(_master: &Master, pid: i32) {
-    // SAFETY: kill(2) takes integers only and touches no memory; the leader
-    // stays unreaped until retirement, so `pid` cannot have been reused.
-    unsafe { libc::kill(-pid, libc::SIGKILL) };
-    // SAFETY: as above, `pid` is this session's still-unreaped leader.
-    unsafe { libc::kill(pid, libc::SIGKILL) };
+    // The leader stays unreaped until retirement, so `pid` cannot have been
+    // reused.
+    sys::kill(-pid, libc::SIGKILL);
+    sys::kill(pid, libc::SIGKILL);
 }
 
 /// Retirement: hang up the group, kill and reap the leader, close the master.
 /// The PID stays reserved until this reap, so earlier signals cannot hit reuse.
+#[expect(
+    clippy::trivially_copy_pass_by_ref,
+    reason = "shares the platform-neutral signature of the Windows ConPTY master"
+)]
 pub(crate) fn retire(master: &Master, pid: i32) {
-    // SAFETY: kill(2) takes integers only and touches no memory; the leader
-    // stays unreaped until the waitpid below, so `pid` cannot have been reused.
-    unsafe { libc::kill(-pid, libc::SIGHUP) };
-    // SAFETY: as above, `pid` is this session's still-unreaped leader.
-    unsafe { libc::kill(pid, libc::SIGKILL) };
+    // The leader stays unreaped until the waitpid below, so `pid` cannot have
+    // been reused.
+    sys::kill(-pid, libc::SIGHUP);
+    sys::kill(pid, libc::SIGKILL);
     let mut status = 0;
     loop {
-        // SAFETY: waitpid(2) writes one int to `status`, a live local.
-        let waited = unsafe { libc::waitpid(pid, &raw mut status, 0) };
+        let waited = sys::waitpid(pid, Some(&mut status), 0);
         if waited >= 0 || io::Error::last_os_error().raw_os_error() != Some(libc::EINTR) {
             break;
         }
     }
-    // SAFETY: close(2) touches no memory; retirement runs once per session,
-    // so the master is closed exactly once.
-    unsafe { libc::close(*master) };
+    // Retirement runs once per session, so the master is closed exactly once.
+    sys::close(*master);
 }
 
 /// @cc [owner:ghuntley,label:security;capacity] terminal-user-inventory-bounded
@@ -169,52 +177,9 @@ pub(crate) fn users() -> io::Result<Vec<String>> {
     Ok(users)
 }
 
-struct Passwd {
-    name: Vec<u8>,
-    uid: u32,
-    gid: u32,
-    shell: Vec<u8>,
-    home: Vec<u8>,
-}
-
 fn lookup_passwd(name: &str) -> Option<Passwd> {
     let cname = CString::new(name).ok()?;
-    let mut buffer = vec![0u8; 4096];
-    // SAFETY: passwd is plain C data; all-zero (null pointers) is valid.
-    let mut entry: libc::passwd = unsafe { std::mem::zeroed() };
-    let mut result: *mut libc::passwd = std::ptr::null_mut();
-    // SAFETY: `cname` is NUL-terminated; `entry`, `result` and the
-    // `buffer.len()`-byte `buffer` are live locals getpwnam_r may write.
-    let status = unsafe {
-        libc::getpwnam_r(
-            cname.as_ptr(),
-            &raw mut entry,
-            buffer.as_mut_ptr().cast::<libc::c_char>(),
-            buffer.len(),
-            &raw mut result,
-        )
-    };
-    if status != 0 || result.is_null() {
-        return None;
-    }
-    let copy = |pointer: *const libc::c_char| -> Vec<u8> {
-        if pointer.is_null() {
-            Vec::new()
-        } else {
-            // SAFETY: a successful getpwnam_r points each non-null field at a
-            // NUL-terminated string inside `buffer`, which is still alive.
-            unsafe { std::ffi::CStr::from_ptr(pointer) }
-                .to_bytes()
-                .to_vec()
-        }
-    };
-    Some(Passwd {
-        name: copy(entry.pw_name),
-        uid: entry.pw_uid,
-        gid: entry.pw_gid,
-        shell: copy(entry.pw_shell),
-        home: copy(entry.pw_dir),
-    })
+    sys_pty::lookup_passwd(&cname)
 }
 
 fn supplementary_groups(name: &str, primary: u32) -> Vec<u32> {
@@ -274,18 +239,7 @@ pub(crate) fn resolve(name: &str) -> Option<UserInfo> {
 
 #[cfg(test)]
 pub(crate) fn current_user_name() -> String {
-    // SAFETY: getuid has no preconditions.
-    let uid = unsafe { libc::getuid() };
-    // SAFETY: getpwuid takes an integer; the test harness reads the result
-    // before any other passwd call can reuse its static storage.
-    let entry = unsafe { libc::getpwuid(uid) };
-    assert!(!entry.is_null(), "current uid must have a passwd entry");
-    // SAFETY: `entry` is non-null and points at getpwuid's live passwd record.
-    let name = unsafe { (*entry).pw_name };
-    // SAFETY: pw_name is a NUL-terminated string in that same live record.
-    unsafe { std::ffi::CStr::from_ptr(name) }
-        .to_string_lossy()
-        .into_owned()
+    sys_pty::current_user_name()
 }
 
 /// @cc [owner:ghuntley,label:security] session-credentials-and-environment
@@ -294,24 +248,14 @@ pub(crate) fn current_user_name() -> String {
 /// directory with TERM from the client, COLORTERM=truecolor and a UTF-8 locale.
 /// Every PTY setup call MUST be checked and descriptors other than stdio MUST
 /// close on exec. EOF alone confirms exec; interrupted status reads MUST retry.
-#[expect(
-    clippy::too_many_lines,
-    reason = "fork and the async-signal-safe child sequence must stay in one frame"
-)]
 pub(crate) fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Result<Spawned> {
-    // SAFETY: posix_openpt takes flags only and touches no memory.
-    let master = unsafe { libc::posix_openpt(libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC) };
-    if master < 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: `master` is a freshly opened descriptor that nothing else owns.
-    let owned_master = unsafe { OwnedFd::from_raw_fd(master) };
-    // SAFETY: grantpt and unlockpt take the open master descriptor only.
-    if unsafe { libc::grantpt(master) } != 0 || unsafe { libc::unlockpt(master) } != 0 {
+    let owned_master = sys_pty::open_master(libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC)?;
+    let master = owned_master.as_raw_fd();
+    if sys_pty::grantpt(master) != 0 || sys_pty::unlockpt(master) != 0 {
         let error = io::Error::last_os_error();
         return Err(error);
     }
-    let slave = slave_name(master)?;
+    let slave = sys_pty::slave_name(master)?;
     #[cfg(not(target_os = "illumos"))]
     set_winsize(&master, cols, rows)?;
     let argv0 = login_name(&user.shell);
@@ -333,126 +277,49 @@ pub(crate) fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Re
                 .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "environment"))
         })
         .collect::<Result<_, _>>()?;
-    let argv: Vec<*const libc::c_char> = arguments
-        .iter()
-        .map(|a| a.as_ptr())
-        .chain(std::iter::once(std::ptr::null()))
-        .collect();
-    let envp: Vec<*const libc::c_char> = env_c
-        .iter()
-        .map(|e| e.as_ptr())
-        .chain(std::iter::once(std::ptr::null()))
-        .collect();
+    let argv = sys_pty::CStringArray::new(&arguments);
+    let envp = sys_pty::CStringArray::new(&env_c);
     let groups = user.groups.clone();
     #[cfg(target_os = "linux")]
-    let group_count = groups.len();
+    let child_groups = sys_pty::Groups::new(&groups);
     #[cfg(any(target_os = "freebsd", target_os = "illumos"))]
-    let group_count: libc::c_int = groups.len().try_into().map_err(|_| {
-        io::Error::new(io::ErrorKind::InvalidInput, "too many supplementary groups")
-    })?;
+    let child_groups = sys_pty::Groups::new(&groups)?;
     let descriptor_bound = child_descriptor_bound()?;
     let gid = user.gid;
     let uid = user.uid;
     let mut status_pipe = [0; 2];
-    // SAFETY: pipe2(2) writes two descriptors into `status_pipe`, a live
-    // two-element array.
-    if unsafe { libc::pipe2(status_pipe.as_mut_ptr(), libc::O_CLOEXEC) } != 0 {
+    if sys_pty::pipe2(&mut status_pipe, libc::O_CLOEXEC) != 0 {
         let error = io::Error::last_os_error();
         return Err(error);
     }
-    // SAFETY: every value the child uses (identity, argv, envp, slave name,
-    // descriptor bound) was built before fork; the child below makes only
-    // async-signal-safe calls until execve or _exit.
-    let pid = unsafe { libc::fork() };
+    let pid = sys_pty::fork_session(&sys_pty::Child {
+        status_read: status_pipe[0],
+        status_write: status_pipe[1],
+        descriptor_bound,
+        slave: &slave,
+        master,
+        cols,
+        rows,
+        groups: child_groups,
+        gid,
+        uid,
+        home: &home,
+        shell: &user.shell,
+        argv: &argv,
+        envp: &envp,
+    });
     if pid < 0 {
         let error = io::Error::last_os_error();
-        // SAFETY: close(2) touches no memory; no child exists to share the pipe.
-        unsafe { libc::close(status_pipe[0]) };
-        // SAFETY: close(2) touches no memory; no child exists to share the pipe.
-        unsafe { libc::close(status_pipe[1]) };
+        // No child exists to share the pipe.
+        sys::close(status_pipe[0]);
+        sys::close(status_pipe[1]);
         return Err(error);
     }
-    if pid == 0 {
-        #[expect(
-            clippy::multiple_unsafe_ops_per_block,
-            reason = "the post-fork child is one async-signal-safe sequence ending in \
-                      execve or _exit, with one shared invariant"
-        )]
-        // SAFETY: this is the post-fork child of a multithreaded parent. Every
-        // call is async-signal-safe and allocates nothing: the argv, envp,
-        // group and path pointers were built before fork and stay valid in
-        // this copy of the address space; `empty` is a live local sigset;
-        // every failure reports errno through the CLOEXEC status pipe and
-        // ends the child with _exit, so control never returns to the parent's
-        // Rust code.
-        unsafe {
-            libc::close(status_pipe[0]);
-            // The child may not inherit another session's transport or future daemon
-            // descriptors, even if a library opened one without O_CLOEXEC.
-            if protect_child_descriptors(descriptor_bound) != 0 || libc::setsid() < 0 {
-                child_failed(status_pipe[1]);
-            }
-            let slave_fd = libc::open(slave.as_ptr(), libc::O_RDWR);
-            if slave_fd < 0 {
-                child_failed(status_pipe[1]);
-            }
-            if !prepare_slave(slave_fd, cols, rows)
-                || !controlling_terminal(slave_fd)
-                || libc::dup2(slave_fd, 0) < 0
-                || libc::dup2(slave_fd, 1) < 0
-                || libc::dup2(slave_fd, 2) < 0
-            {
-                child_failed(status_pipe[1]);
-            }
-            if slave_fd > 2 {
-                libc::close(slave_fd);
-            }
-            libc::close(master);
-            let empty: libc::sigset_t = std::mem::zeroed();
-            let mask_error =
-                libc::pthread_sigmask(libc::SIG_SETMASK, &raw const empty, std::ptr::null_mut());
-            if mask_error != 0 {
-                child_failed_with(status_pipe[1], mask_error);
-            }
-            for signal in 1..=31 {
-                if signal != libc::SIGKILL
-                    && signal != libc::SIGSTOP
-                    && libc::signal(signal, libc::SIG_DFL) == libc::SIG_ERR
-                {
-                    child_failed(status_pipe[1]);
-                }
-            }
-            if libc::geteuid() == 0 {
-                if libc::setgroups(group_count, groups.as_ptr()) != 0
-                    || libc::setgid(gid) != 0
-                    || libc::setuid(uid) != 0
-                {
-                    child_failed(status_pipe[1]);
-                }
-            } else if libc::getuid() != uid || libc::getgid() != gid {
-                child_failed_with(status_pipe[1], libc::EPERM);
-            }
-            if libc::chdir(home.as_ptr()) != 0 {
-                child_failed(status_pipe[1]);
-            }
-            libc::execve(user.shell.as_ptr(), argv.as_ptr(), envp.as_ptr());
-            child_failed(status_pipe[1]);
-        }
-    }
-    // SAFETY: close(2) touches no memory; the parent closes its copy of the
-    // write end once so EOF can confirm exec.
-    unsafe { libc::close(status_pipe[1]) };
+    // The parent closes its copy of the write end once so EOF can confirm exec.
+    sys::close(status_pipe[1]);
     let mut child_errno: libc::c_int = 0;
     let read = loop {
-        // SAFETY: read(2) stores at most size_of::<c_int>() bytes into
-        // `child_errno`, a live c_int.
-        let result = unsafe {
-            libc::read(
-                status_pipe[0],
-                (&raw mut child_errno).cast::<libc::c_void>(),
-                size_of::<libc::c_int>(),
-            )
-        };
+        let result = sys::read_c_int(status_pipe[0], &mut child_errno);
         if result < 0 && io::Error::last_os_error().raw_os_error() == Some(libc::EINTR) {
             continue;
         }
@@ -465,14 +332,13 @@ pub(crate) fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Re
     } else {
         io::Error::new(io::ErrorKind::InvalidData, "incomplete child status")
     };
-    // SAFETY: close(2) touches no memory; the read end is closed once here.
-    unsafe { libc::close(status_pipe[0]) };
+    // The read end is closed once here.
+    sys::close(status_pipe[0]);
     if read != 0 {
-        // SAFETY: kill(2) touches no memory; `pid` is our unreaped child.
-        unsafe { libc::kill(pid, libc::SIGKILL) };
+        // `pid` is our unreaped child.
+        sys::kill(pid, libc::SIGKILL);
         loop {
-            // SAFETY: waitpid(2) with a null status pointer writes nothing.
-            let waited = unsafe { libc::waitpid(pid, std::ptr::null_mut(), 0) };
+            let waited = sys::waitpid(pid, None, 0);
             if waited >= 0 || io::Error::last_os_error().raw_os_error() != Some(libc::EINTR) {
                 break;
             }
@@ -483,62 +349,6 @@ pub(crate) fn spawn(user: &UserInfo, term: &str, cols: u16, rows: u16) -> io::Re
         master: owned_master.into_raw_fd(),
         pid,
     })
-}
-
-/// The illumos STREAMS slave is acquired by opening it after setsid without
-/// `O_NOCTTY`; TIOCSCTTY is unsupported. Every native child MUST verify that the
-/// slave belongs to its own session before applying credentials or executing.
-unsafe fn controlling_terminal(fd: RawFd) -> bool {
-    #[cfg(not(target_os = "illumos"))]
-    {
-        let steal: libc::c_ulong = 0;
-        // SAFETY: TIOCSCTTY takes an integer argument and touches no caller
-        // memory; an invalid descriptor only makes the ioctl fail.
-        if unsafe { libc::ioctl(fd, libc::TIOCSCTTY, steal) } < 0 {
-            return false;
-        }
-    }
-    // SAFETY: tcgetsid only inspects the descriptor and reports failure as -1.
-    let session = unsafe { libc::tcgetsid(fd) };
-    // SAFETY: getpid has no preconditions and is async-signal-safe.
-    session == unsafe { libc::getpid() }
-}
-
-#[cfg(not(target_os = "illumos"))]
-fn slave_name(master: RawFd) -> io::Result<CString> {
-    let mut buffer = [0_u8; 128];
-    // SAFETY: ptsname_r writes at most `buffer.len()` bytes into `buffer`, a
-    // live local array.
-    let status = unsafe { libc::ptsname_r(master, buffer.as_mut_ptr().cast(), buffer.len()) };
-    if status > 0 {
-        return Err(io::Error::from_raw_os_error(status));
-    }
-    if status != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: a successful ptsname_r leaves a NUL-terminated name in `buffer`.
-    Ok(unsafe { std::ffi::CStr::from_ptr(buffer.as_ptr().cast()) }.to_owned())
-}
-
-/// @cc [owner:ghuntley,label:security] illumos-terminal-slave-name
-/// The pinned illumos libc lacks `ptsname_r`. Its ptsname buffer MUST be copied
-/// while holding the daemon's shared ptsname mutex before fork; no other daemon
-/// call site may use ptsname without that same lock.
-#[cfg(target_os = "illumos")]
-fn slave_name(master: RawFd) -> io::Result<CString> {
-    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    let _guard = LOCK
-        .lock()
-        .map_err(|_| io::Error::other("slave name lock unavailable"))?;
-    // SAFETY: ptsname takes the open master only; `_guard` serializes every
-    // daemon use of its static result buffer.
-    let pointer = unsafe { libc::ptsname(master) };
-    if pointer.is_null() {
-        return Err(io::Error::last_os_error());
-    }
-    // SAFETY: a non-null ptsname result is a NUL-terminated string in a
-    // static buffer that no other caller can overwrite while `_guard` lives.
-    Ok(unsafe { std::ffi::CStr::from_ptr(pointer) }.to_owned())
 }
 
 #[cfg(not(target_os = "illumos"))]
@@ -557,148 +367,15 @@ fn child_descriptor_bound() -> io::Result<i32> {
 /// libc closefrom/fdwalk MUST NOT run in a multithreaded post-fork child.
 #[cfg(target_os = "illumos")]
 fn child_descriptor_bound() -> io::Result<i32> {
-    // SAFETY: rlimit is plain integer data; all-zero is valid.
-    let mut limit: libc::rlimit = unsafe { std::mem::zeroed() };
-    // SAFETY: getrlimit(2) writes one rlimit to `limit`, a live local.
-    if unsafe { libc::getrlimit(libc::RLIMIT_NOFILE, &raw mut limit) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    if limit.rlim_max > 1_048_576 {
+    let limit = sys_pty::descriptor_hard_limit()?;
+    if limit > 1_048_576 {
         return Err(io::Error::new(
             io::ErrorKind::Unsupported,
             "unbounded descriptor limit",
         ));
     }
-    i32::try_from(limit.rlim_max)
+    i32::try_from(limit)
         .map_err(|_| io::Error::new(io::ErrorKind::Unsupported, "invalid descriptor limit"))
-}
-
-#[cfg(target_os = "linux")]
-#[expect(
-    clippy::cast_possible_truncation,
-    reason = "close_range returns only 0 or -1"
-)]
-unsafe fn protect_child_descriptors(_bound: i32) -> libc::c_int {
-    // SAFETY: close_range with CLOSE_RANGE_CLOEXEC only sets descriptor flags
-    // in this process and reads no caller memory.
-    unsafe {
-        libc::syscall(
-            libc::SYS_close_range,
-            3u32,
-            u32::MAX,
-            libc::CLOSE_RANGE_CLOEXEC,
-        ) as libc::c_int
-    }
-}
-
-#[cfg(target_os = "freebsd")]
-unsafe fn protect_child_descriptors(_bound: i32) -> libc::c_int {
-    // SAFETY: close_range with CLOSE_RANGE_CLOEXEC only sets descriptor flags
-    // in this process and reads no caller memory.
-    unsafe { libc::close_range(3, u32::MAX, libc::CLOSE_RANGE_CLOEXEC.cast_signed()) }
-}
-
-#[cfg(target_os = "illumos")]
-unsafe fn protect_child_descriptors(bound: i32) -> libc::c_int {
-    for fd in 3..bound {
-        // SAFETY: F_GETFD reads only descriptor flags; a closed descriptor
-        // reports EBADF.
-        let flags = unsafe { libc::fcntl(fd, libc::F_GETFD) };
-        if flags < 0 {
-            // SAFETY: this runs in the same thread that just failed fcntl, so
-            // the thread-local errno is that call's result.
-            if unsafe { child_errno() } == libc::EBADF {
-                continue;
-            }
-            return -1;
-        }
-        // SAFETY: F_SETFD only updates descriptor flags of a descriptor that
-        // F_GETFD has just shown to be open.
-        if unsafe { libc::fcntl(fd, libc::F_SETFD, flags | libc::FD_CLOEXEC) } != 0 {
-            return -1;
-        }
-    }
-    0
-}
-
-#[cfg(not(target_os = "illumos"))]
-unsafe fn prepare_slave(_fd: RawFd, _cols: u16, _rows: u16) -> bool {
-    true
-}
-
-/// @cc [owner:ghuntley,label:security] illumos-terminal-streams-setup
-/// The illumos slave MUST have ptem, ldterm and ttcompat pushed once, with the
-/// requested window size set after those modules exist. Every ioctl failure
-/// MUST refuse the session before credentials change or exec occurs.
-#[cfg(target_os = "illumos")]
-unsafe fn prepare_slave(fd: RawFd, cols: u16, rows: u16) -> bool {
-    for module in [c"ptem", c"ldterm", c"ttcompat"] {
-        // SAFETY: I_FIND reads the NUL-terminated module name from a static
-        // C string literal that outlives the call.
-        match unsafe { libc::ioctl(fd, libc::I_FIND, module.as_ptr()) } {
-            1 => {}
-            // SAFETY: I_PUSH reads the same static NUL-terminated module name.
-            0 if unsafe { libc::ioctl(fd, libc::I_PUSH, module.as_ptr()) } == 0 => {}
-            _ => return false,
-        }
-    }
-    let size = libc::winsize {
-        ws_row: rows,
-        ws_col: cols,
-        ws_xpixel: 0,
-        ws_ypixel: 0,
-    };
-    // SAFETY: TIOCSWINSZ reads one winsize from `size`, a live local.
-    unsafe { libc::ioctl(fd, libc::TIOCSWINSZ, &size) == 0 }
-}
-
-#[cfg(target_os = "linux")]
-unsafe fn child_errno() -> libc::c_int {
-    // SAFETY: __errno_location has no preconditions.
-    let slot = unsafe { libc::__errno_location() };
-    // SAFETY: `slot` is this thread's errno, valid for reads for the life of
-    // the thread.
-    unsafe { *slot }
-}
-#[cfg(target_os = "freebsd")]
-unsafe fn child_errno() -> libc::c_int {
-    // SAFETY: __error has no preconditions.
-    let slot = unsafe { libc::__error() };
-    // SAFETY: `slot` is this thread's errno, valid for reads for the life of
-    // the thread.
-    unsafe { *slot }
-}
-#[cfg(target_os = "illumos")]
-unsafe fn child_errno() -> libc::c_int {
-    // SAFETY: ___errno has no preconditions.
-    let slot = unsafe { libc::___errno() };
-    // SAFETY: `slot` is this thread's errno, valid for reads for the life of
-    // the thread.
-    unsafe { *slot }
-}
-
-unsafe fn child_failed(fd: RawFd) -> ! {
-    // SAFETY: the caller is the post-fork child, whose thread-local errno
-    // holds the failed call's result.
-    let errno = unsafe { child_errno() };
-    // SAFETY: the caller is the post-fork child, so exiting with _exit is the
-    // intended end of this process.
-    unsafe { child_failed_with(fd, errno) }
-}
-
-unsafe fn child_failed_with(fd: RawFd, errno: libc::c_int) -> ! {
-    // SAFETY: write reads exactly size_of::<c_int>() bytes from `errno`, a live
-    // local of that size; write is async-signal-safe after fork.
-    unsafe {
-        libc::write(
-            fd,
-            (&raw const errno).cast::<libc::c_void>(),
-            size_of::<libc::c_int>(),
-        )
-    };
-    // SAFETY: _exit ends only the post-fork child without running parent
-    // destructors or atexit handlers, as the caller's contract requires.
-    unsafe { libc::_exit(127) }
 }
 
 fn login_name(shell: &CString) -> CString {
@@ -725,8 +402,7 @@ pub(crate) fn set_winsize(master: &Master, cols: u16, rows: u16) -> io::Result<(
         ws_xpixel: 0,
         ws_ypixel: 0,
     };
-    // SAFETY: TIOCSWINSZ reads one winsize from `size`, a live local.
-    if unsafe { libc::ioctl(master, libc::TIOCSWINSZ, &size) } < 0 {
+    if sys::set_winsize(master, &size) < 0 {
         return Err(io::Error::last_os_error());
     }
     Ok(())
@@ -765,22 +441,21 @@ mod tests {
     fn spawn_runs_login_shell_with_environment() {
         let user = resolve(&current_user_name()).expect("current user");
         let spawned = spawn(&user, "xterm-test", 97, 31).expect("spawn pty session");
-        // SAFETY: winsize is plain integer data; all-zero is valid.
-        let mut size: libc::winsize = unsafe { std::mem::zeroed() };
-        assert_eq!(
-            // SAFETY: TIOCGWINSZ writes one winsize to `size`, a live local.
-            unsafe { libc::ioctl(spawned.master, libc::TIOCGWINSZ, &mut size) },
-            0
-        );
+        let mut size = libc::winsize {
+            ws_row: 0,
+            ws_col: 0,
+            ws_xpixel: 0,
+            ws_ypixel: 0,
+        };
+        assert_eq!(sys::get_winsize(spawned.master, &mut size), 0);
         assert_eq!((size.ws_row, size.ws_col), (31, 97));
         let script = "printf 'MARK1=%s %s %s\\n' \"$TERM\" \"$COLORTERM\" \"$HOME\"; exit 0\n";
         write_all(spawned.master, script.as_bytes());
         let output = read_until_closed(spawned.master);
         let mut status = 0;
-        // SAFETY: waitpid(2) writes one int to `status`, a live local.
-        unsafe { libc::waitpid(spawned.pid, &raw mut status, 0) };
-        // SAFETY: close(2) touches no memory; the test owns the master.
-        unsafe { libc::close(spawned.master) };
+        sys::waitpid(spawned.pid, Some(&mut status), 0);
+        // The test owns the master.
+        sys::close(spawned.master);
         if libc::WIFEXITED(status) && libc::WEXITSTATUS(status) == 127 {
             eprintln!(
                 "skipping: user shell {} is not executable in this environment",
@@ -805,16 +480,10 @@ mod tests {
     fn login_shell_does_not_inherit_unmarked_daemon_descriptors() {
         use std::os::fd::AsRawFd;
         let private = std::fs::File::open("/dev/null").unwrap();
-        // SAFETY: F_DUPFD takes integer arguments only and touches no memory.
-        let inherited = unsafe { libc::fcntl(private.as_raw_fd(), libc::F_DUPFD, 200) };
+        let guard = sys::duplicate_inheritable(private.as_raw_fd(), 200).unwrap();
+        let inherited = guard.as_raw_fd();
         assert!(inherited >= 200);
-        // SAFETY: `inherited` is a fresh duplicate that nothing else owns.
-        let guard = unsafe { OwnedFd::from_raw_fd(inherited) };
-        assert_eq!(
-            // SAFETY: F_GETFD reads descriptor flags only.
-            unsafe { libc::fcntl(inherited, libc::F_GETFD) } & libc::FD_CLOEXEC,
-            0
-        );
+        assert_eq!(sys::descriptor_flags(inherited) & libc::FD_CLOEXEC, 0);
         let user = resolve(&current_user_name()).unwrap();
         let spawned = spawn(&user, "xterm-256color", 80, 24).unwrap();
         let script = format!(
@@ -822,10 +491,9 @@ mod tests {
         );
         write_all(spawned.master, script.as_bytes());
         let output = read_until_closed(spawned.master);
-        // SAFETY: waitpid(2) with a null status pointer writes nothing.
-        unsafe { libc::waitpid(spawned.pid, std::ptr::null_mut(), 0) };
-        // SAFETY: close(2) touches no memory; the test owns the master.
-        unsafe { libc::close(spawned.master) };
+        sys::waitpid(spawned.pid, None, 0);
+        // The test owns the master.
+        sys::close(spawned.master);
         drop(guard);
         assert!(output
             .windows(b"DESCRIPTOR_CLOSED".len())
@@ -838,8 +506,7 @@ mod tests {
         reason = "the skip notice explains why the test passed without its environment"
     )]
     fn non_root_cannot_spawn_as_another_identity() {
-        // SAFETY: geteuid has no preconditions.
-        if unsafe { libc::geteuid() } == 0 {
+        if sys::geteuid() == 0 {
             eprintln!("skipping: test requires a non-root runner");
             return;
         }
@@ -869,9 +536,7 @@ mod tests {
 
     fn write_all(fd: RawFd, mut data: &[u8]) {
         while !data.is_empty() {
-            // SAFETY: `data` is a live slice, so write(2) may read `data.len()` bytes.
-            let written =
-                unsafe { libc::write(fd, data.as_ptr().cast::<libc::c_void>(), data.len()) };
+            let written = sys::write(fd, data);
             if written <= 0 {
                 return;
             }
@@ -890,17 +555,8 @@ mod tests {
                 events: libc::POLLIN,
                 revents: 0,
             };
-            // SAFETY: poll(2) reads and updates one pollfd at `poller`, a live local.
-            unsafe { libc::poll(&raw mut poller, 1, 250) };
-            // SAFETY: read(2) stores at most `scratch.len()` bytes into
-            // `scratch`, a live local array.
-            let read = unsafe {
-                libc::read(
-                    fd,
-                    scratch.as_mut_ptr().cast::<libc::c_void>(),
-                    scratch.len(),
-                )
-            };
+            sys::poll_one(&mut poller, 250);
+            let read = sys::read(fd, &mut scratch);
             if read > 0 {
                 opened = true;
                 out.extend_from_slice(&scratch[..read.cast_unsigned()]);

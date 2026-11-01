@@ -1,4 +1,5 @@
 //! Harness-only, host-authenticated and read-only physical terminal snapshot.
+use crate::sys::unix as sys;
 use crate::{frame, session, vsock};
 use std::io;
 use std::io::Read;
@@ -25,9 +26,8 @@ pub(crate) fn read_ledger() -> Option<Vec<[u8; 16]>> {
         Err(error) if error.kind() == io::ErrorKind::NotFound => return Some(Vec::new()),
         Err(_) => return None,
     };
-    // SAFETY: flock(2) takes only the descriptor of `file`, which stays open
-    // for the call, and touches no memory.
-    if unsafe { libc::flock(file.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) } != 0 {
+    // `file` stays open for the call.
+    if sys::flock(file.as_raw_fd(), libc::LOCK_SH | libc::LOCK_NB) != 0 {
         return None;
     }
     let mut bytes = Vec::new();
@@ -78,15 +78,15 @@ pub(crate) fn start(daemon: Arc<session::Daemon>) -> io::Result<()> {
             match vsock::accept(listener) {
                 Ok((fd, cid, _)) => {
                     if cid != vsock::CID_HOST {
-                        // SAFETY: close(2) touches no memory; this loop owns
-                        // the freshly accepted `fd` and never uses it again.
-                        unsafe { libc::close(fd) };
+                        // This loop owns the freshly accepted `fd` and never
+                        // uses it again.
+                        sys::close(fd);
                         continue;
                     }
                     if !session::reserve(&active, 1, 8) {
-                        // SAFETY: close(2) touches no memory; this loop owns
-                        // the freshly accepted `fd` and never uses it again.
-                        unsafe { libc::close(fd) };
+                        // This loop owns the freshly accepted `fd` and never
+                        // uses it again.
+                        sys::close(fd);
                         continue;
                     }
                     let daemon = daemon.clone();
@@ -99,10 +99,9 @@ pub(crate) fn start(daemon: Arc<session::Daemon>) -> io::Result<()> {
                         .is_err()
                     {
                         active.fetch_sub(1, Ordering::SeqCst);
-                        // Failed admission owns and closes the still-local accepted fd.
-                        // SAFETY: close(2) touches no memory; the spawn failed, so
-                        // no handler thread received `fd`.
-                        unsafe { libc::close(fd) };
+                        // Failed admission owns and closes the still-local accepted fd:
+                        // the spawn failed, so no handler thread received `fd`.
+                        sys::close(fd);
                     }
                 }
                 Err(_) => std::thread::sleep(std::time::Duration::from_millis(50)),
@@ -120,33 +119,8 @@ fn handle(daemon: Arc<session::Daemon>, fd: RawFd) {
         tv_sec: 3,
         tv_usec: 0,
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "a timeval is 16 bytes, far below socklen_t::MAX"
-    )]
-    let length = size_of_val(&timeout) as libc::socklen_t;
-    // SAFETY: SO_RCVTIMEO reads one timeval of `length` bytes from `timeout`,
-    // a live local of exactly that type and size.
-    unsafe {
-        libc::setsockopt(
-            fd,
-            libc::SOL_SOCKET,
-            libc::SO_RCVTIMEO,
-            (&raw const timeout).cast::<libc::c_void>(),
-            length,
-        );
-    }
-    // SAFETY: SO_SNDTIMEO reads one timeval of `length` bytes from `timeout`,
-    // a live local of exactly that type and size.
-    unsafe {
-        libc::setsockopt(
-            fd,
-            libc::SOL_SOCKET,
-            libc::SO_SNDTIMEO,
-            (&raw const timeout).cast::<libc::c_void>(),
-            length,
-        );
-    }
+    sys::setsockopt(fd, libc::SOL_SOCKET, libc::SO_RCVTIMEO, &timeout);
+    sys::setsockopt(fd, libc::SOL_SOCKET, libc::SO_SNDTIMEO, &timeout);
     let mut buffer = Vec::new();
     let authorized = match session::read_frame(fd, &mut buffer) {
         Some(Ok(first)) if first.op == frame::OP_HELLO => session::decode_hello(&first.payload)
@@ -171,9 +145,8 @@ fn handle(daemon: Arc<session::Daemon>, fd: RawFd) {
             }
         }
     }
-    // SAFETY: close(2) touches no memory; this handler owns `fd` and this is
-    // its final use.
-    unsafe { libc::close(fd) };
+    // This handler owns `fd` and this is its final use.
+    sys::close(fd);
 }
 
 #[cfg(test)]

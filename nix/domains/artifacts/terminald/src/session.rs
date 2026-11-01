@@ -1102,11 +1102,9 @@ fn ensure_account(helper: &std::path::Path, user: &str) -> std::io::Result<()> {
             Ok(Some(_)) => return Err(std::io::Error::other("account unavailable")),
             Ok(None) if Instant::now() < deadline => std::thread::sleep(Duration::from_millis(20)),
             _ => {
-                // SAFETY: kill(2) touches no memory; the helper is unreaped,
-                // so its process group ID cannot have been reused.
-                unsafe {
-                    libc::kill(-child.id().cast_signed(), libc::SIGKILL);
-                }
+                // The helper is unreaped, so its process group ID cannot have
+                // been reused.
+                crate::sys::unix::kill(-child.id().cast_signed(), libc::SIGKILL);
                 let _ = child.wait();
                 return Err(std::io::Error::other("account unavailable"));
             }
@@ -1129,10 +1127,11 @@ fn proc_start_ticks(pid: i32) -> u64 {
 
 #[cfg(feature = "antithesis-observer")]
 fn monotonic_ms() -> u64 {
-    // SAFETY: timespec is plain integer data; all-zero is valid.
-    let mut time: libc::timespec = unsafe { std::mem::zeroed() };
-    // SAFETY: clock_gettime(2) writes one timespec to `time`, a live local.
-    if unsafe { libc::clock_gettime(libc::CLOCK_MONOTONIC, &raw mut time) } != 0 {
+    let mut time = libc::timespec {
+        tv_sec: 0,
+        tv_nsec: 0,
+    };
+    if crate::sys::unix::clock_gettime(libc::CLOCK_MONOTONIC, &mut time) != 0 {
         return 0;
     }
     u64::try_from(time.tv_sec)
@@ -1650,30 +1649,15 @@ mod tests {
 
     #[test]
     fn explicit_kill_retires_while_an_independent_owner_holds_a_quiet_slave() {
-        use std::os::fd::{FromRawFd, OwnedFd};
         use std::time::{Duration, Instant};
         let daemon = Daemon::new(Config::default(), [3u8; 32], "p".into(), "1".into());
         let (id, _) = daemon
             .create(&pty::current_user_name(), "xterm-256color", 80, 24)
             .unwrap();
         let session = daemon.live_session(id).unwrap();
-        let mut name: [libc::c_char; 128] = [0; 128];
-        assert_eq!(
-            // SAFETY: ptsname_r writes at most `name.len()` bytes into `name`,
-            // a live local array.
-            unsafe { libc::ptsname_r(session.master, name.as_mut_ptr(), name.len()) },
-            0
-        );
-        // SAFETY: `name` holds the NUL-terminated slave path ptsname_r wrote.
-        let slave = unsafe {
-            libc::open(
-                name.as_ptr(),
-                libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC,
-            )
-        };
-        assert!(slave >= 0);
-        // SAFETY: `slave` is a freshly opened descriptor that nothing else owns.
-        let slave = unsafe { OwnedFd::from_raw_fd(slave) };
+        let name = crate::sys::pty::slave_name(session.master).unwrap();
+        let slave =
+            crate::sys::unix::open(&name, libc::O_RDWR | libc::O_NOCTTY | libc::O_CLOEXEC).unwrap();
         std::thread::sleep(Duration::from_millis(200));
         daemon.kill(id).unwrap();
         let deadline = Instant::now() + Duration::from_secs(2);
@@ -1713,20 +1697,13 @@ mod tests {
             .set_read_timeout(Some(Duration::from_secs(5)))
             .unwrap();
         let send_bytes: libc::c_int = 1024;
-        #[expect(clippy::cast_possible_truncation, reason = "a c_int is 4 bytes")]
-        let send_length = size_of_val(&send_bytes) as libc::socklen_t;
         assert_eq!(
-            // SAFETY: SO_SNDBUF reads one c_int of `send_length` bytes from
-            // `send_bytes`, a live local.
-            unsafe {
-                libc::setsockopt(
-                    server.as_raw_fd(),
-                    libc::SOL_SOCKET,
-                    libc::SO_SNDBUF,
-                    (&raw const send_bytes).cast::<libc::c_void>(),
-                    send_length,
-                )
-            },
+            crate::sys::unix::setsockopt(
+                server.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_SNDBUF,
+                &send_bytes,
+            ),
             0
         );
         let request = AttachRequest {
@@ -1777,8 +1754,7 @@ mod tests {
                 children
                     .split_whitespace()
                     .filter_map(|id| id.parse::<libc::pid_t>().ok())
-                    // SAFETY: getpgid takes an integer and touches no memory.
-                    .any(|pid| unsafe { libc::getpgid(pid) } == session.pid)
+                    .any(|pid| crate::sys::unix::getpgid(pid) == session.pid)
             })
         } else {
             true
@@ -1908,20 +1884,15 @@ mod tests {
         let port = crate::vsock::bound_port(listener).expect("discover bound port");
         let acceptor = daemon.clone();
         let server = std::thread::spawn(move || crate::handle_connections(&acceptor, listener));
-        // SAFETY: socket(2) takes integer arguments only and touches no memory.
-        let client = unsafe {
-            libc::socket(
-                crate::vsock::AF_VSOCK,
-                libc::SOCK_STREAM | libc::SOCK_CLOEXEC,
-                0,
-            )
-        };
+        let client = crate::sys::unix::socket(
+            crate::vsock::AF_VSOCK,
+            libc::SOCK_STREAM | libc::SOCK_CLOEXEC,
+            0,
+        );
         assert!(client >= 0);
         let address = crate::vsock::address(crate::vsock::CID_LOCAL, port);
         assert_eq!(
-            // SAFETY: connect(2) reads 16 bytes from `address`, a live
-            // sixteen-byte repr(C) sockaddr_vm.
-            unsafe { libc::connect(client, (&raw const address).cast::<libc::sockaddr>(), 16) },
+            crate::sys::unix::connect(client, &address),
             0,
             "vsock loopback connect"
         );
@@ -1953,20 +1924,12 @@ mod tests {
             let mut reader = Reader::new(&reply.payload);
             (reader.u64().unwrap(), reader.bytes(16).unwrap().to_vec())
         };
-        // SAFETY: socket(2) takes integer arguments only and touches no memory.
-        let data = unsafe {
-            libc::socket(
-                crate::vsock::AF_VSOCK,
-                libc::SOCK_STREAM | libc::SOCK_CLOEXEC,
-                0,
-            )
-        };
-        assert_eq!(
-            // SAFETY: connect(2) reads 16 bytes from `address`, a live
-            // sixteen-byte repr(C) sockaddr_vm.
-            unsafe { libc::connect(data, (&raw const address).cast::<libc::sockaddr>(), 16) },
-            0
+        let data = crate::sys::unix::socket(
+            crate::vsock::AF_VSOCK,
+            libc::SOCK_STREAM | libc::SOCK_CLOEXEC,
+            0,
         );
+        assert_eq!(crate::sys::unix::connect(data, &address), 0);
         let mut attach = Vec::new();
         frame::put_u64(&mut attach, session_id);
         attach.extend_from_slice(&session_token);
@@ -1996,18 +1959,9 @@ mod tests {
                 events: libc::POLLIN,
                 revents: 0,
             };
-            // SAFETY: poll(2) reads and updates one pollfd at `poller`, a live local.
-            unsafe { libc::poll(&raw mut poller, 1, 250) };
+            crate::sys::unix::poll_one(&mut poller, 250);
             let mut scratch = [0u8; 4096];
-            // SAFETY: read(2) stores at most `scratch.len()` bytes into
-            // `scratch`, a live local array.
-            let read = unsafe {
-                libc::read(
-                    data,
-                    scratch.as_mut_ptr().cast::<libc::c_void>(),
-                    scratch.len(),
-                )
-            };
+            let read = crate::sys::unix::read(data, &mut scratch);
             if read > 0 {
                 tail.extend_from_slice(&scratch[..read.cast_unsigned()]);
                 assert_eq!(tail[0], frame::MAGIC);
@@ -2023,12 +1977,10 @@ mod tests {
             );
         }
         daemon.kill(session_id).ok();
-        // SAFETY: close(2) touches no memory; the test owns `data`.
-        unsafe { libc::close(data) };
-        // SAFETY: close(2) touches no memory; the test owns `client`.
-        unsafe { libc::close(client) };
-        // SAFETY: close(2) touches no memory; the test owns `listener`.
-        unsafe { libc::close(listener) };
+        // The test owns `data`, `client` and `listener`.
+        crate::sys::unix::close(data);
+        crate::sys::unix::close(client);
+        crate::sys::unix::close(listener);
         server.join().ok();
     }
 }
