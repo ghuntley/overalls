@@ -1,4 +1,5 @@
 //! Boot-bound native filesystem flush daemon (vsock port 1026).
+#![deny(unsafe_code)]
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
 fn run() -> std::io::Result<()> {

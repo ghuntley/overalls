@@ -1,4 +1,5 @@
 #![cfg(target_os = "linux")]
+#![deny(unsafe_code)]
 
 use hegel::{generators as gs, TestCase};
 use serde_json::{json, Value};

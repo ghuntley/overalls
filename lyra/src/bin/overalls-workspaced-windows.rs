@@ -8,6 +8,7 @@
 //! are the shared `workspace_receiver` code; only the transport, the boot
 //! binding (MMDS instead of the kernel command line) and the paths differ.
 //! Readiness never depends on it. Runs as a SYSTEM task; exits 64 elsewhere.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod daemon {

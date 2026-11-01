@@ -1,4 +1,5 @@
 //! Readiness daemon for native FreeBSD and illumos guests.
+#![deny(unsafe_code)]
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
 fn main() -> ! {

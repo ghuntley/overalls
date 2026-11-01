@@ -1,4 +1,5 @@
 //! Isolated machine-test probe; never part of the native service or agent set.
+#![deny(unsafe_code)]
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
 mod native {

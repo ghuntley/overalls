@@ -3,6 +3,7 @@
 //!
 //! The fake records every argv and answers with scripted Porsche and guest
 //! outcomes. It exercises the real CLI binary, not Porsche, Audi or a guest.
+#![deny(unsafe_code)]
 
 use hegel::{generators as gs, TestCase};
 use lyra::workspace_source::{self, WorkspaceSource};

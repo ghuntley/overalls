@@ -1,4 +1,5 @@
 //! Shared certificate and trust primitives for the client and guest/gateway helpers.
+#![deny(unsafe_code)]
 pub mod agent;
 pub mod durable;
 pub mod guest;

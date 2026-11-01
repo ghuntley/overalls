@@ -2,6 +2,7 @@
 //!
 //! The executor deliberately reuses Lyra's fenced control loop. Only the
 //! filesystem paths and closed diagnostics differ from the Windows wrapper.
+#![deny(unsafe_code)]
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
 mod daemon {

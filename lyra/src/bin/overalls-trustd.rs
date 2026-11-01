@@ -1,4 +1,5 @@
 //! Immutable, boot-bound public CA installer for Firecracker guests.
+#![deny(unsafe_code)]
 use lyra::sys::socket;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};

@@ -1,4 +1,5 @@
 //! Real subprocess bounds and malformed advertised-ref refusal.
+#![deny(unsafe_code)]
 use lyra::workspace_checkout::{self, Checkout};
 use lyra::workspace_receiver::{GitRunner, SystemGit};
 use lyra::workspace_source::{self, WorkspaceSource};

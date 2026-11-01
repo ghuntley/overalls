@@ -8,6 +8,7 @@
 //! it is running so the new identity is served. It then renews within the
 //! shared renewal window once an hour. Runs as a SYSTEM task; exits 64 on
 //! other operating systems.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod agent {

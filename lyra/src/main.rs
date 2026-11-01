@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 mod agent_cli;
 mod config;
 mod guest_host;

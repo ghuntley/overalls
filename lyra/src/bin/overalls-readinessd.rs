@@ -8,6 +8,7 @@
 //! `ssh-ready` marker, `sshd` is RUNNING, and `C:` accepts a durable write. It has
 //! no execution, transfer or cleanup authority and ingests nothing from the
 //! peer. Runs as a SYSTEM task; exits 64 on other operating systems.
+#![deny(unsafe_code)]
 
 #[cfg(any(windows, test))]
 use lyra::guest::ssh_bootstrap::ready as ssh_bootstrap_ready;

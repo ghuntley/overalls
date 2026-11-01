@@ -1,5 +1,6 @@
 #![cfg(target_os = "linux")]
 //! Shared-grammar agreement and receiver state-machine properties (ADR-0128).
+#![deny(unsafe_code)]
 
 use hegel::{generators as gs, TestCase};
 use lyra::workspace_checkout::{self, Checkout, CheckoutRevision, ObjectFormat};

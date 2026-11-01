@@ -1,5 +1,6 @@
 #![cfg(target_os = "linux")]
 //! Real local Git object-format resolution and checkout, without provider I/O.
+#![deny(unsafe_code)]
 use lyra::workspace_checkout::{self, CheckoutRevision, ObjectFormat};
 use lyra::workspace_receiver::{git_plan, GitRunner, SystemGit};
 use lyra::workspace_source::{self, WorkspaceSource};

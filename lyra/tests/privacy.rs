@@ -1,3 +1,4 @@
+#![deny(unsafe_code)]
 use std::fs;
 use std::net::{TcpListener, TcpStream};
 use std::process::{Child, Command, Stdio};

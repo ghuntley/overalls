@@ -1,4 +1,5 @@
 //! Static native guest networking before any Overalls service starts.
+#![deny(unsafe_code)]
 
 #[cfg(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris"))]
 fn main() -> std::process::ExitCode {

@@ -1,4 +1,5 @@
 //! One certificate installation path for ephemeral guest and persistent gateway keys.
+#![deny(unsafe_code)]
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use fs2::FileExt;
 use lyra::{

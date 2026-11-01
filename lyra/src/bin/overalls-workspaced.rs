@@ -3,6 +3,7 @@
 //! Lilly delivers a single JSON line on vsock port 1031 after guest trust is
 //! installed. This process persists the source once, replies immediately and
 //! runs plain `git` in a background thread. Readiness never depends on it.
+#![deny(unsafe_code)]
 use lyra::sys::socket;
 use lyra::workspace_receiver::{
     self as receiver, Binding, Paths, Receiver, Retry, SystemGit, PORT,

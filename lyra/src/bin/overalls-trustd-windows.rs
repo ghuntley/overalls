@@ -10,6 +10,7 @@
 //! `C:\overalls\trust\current`), and only then answers with the `installed`
 //! receipt. A refused or failed installation answers nothing. Runs as a SYSTEM
 //! task; exits 64 on other operating systems.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod daemon {

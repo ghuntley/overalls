@@ -12,6 +12,7 @@
 //!
 //! On any other operating system the binary exits 64 so the shared crate's
 //! Linux checks still build every bin.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod probe {

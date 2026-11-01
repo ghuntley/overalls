@@ -14,6 +14,7 @@
 //! sshd's file log and reports each accepted public-key login to the authority,
 //! as the Linux PAM hook does. Logs are closed event names; no key, name or
 //! token is written. Runs as a SYSTEM task; exits 64 on other operating systems.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod sync {

@@ -9,6 +9,7 @@
 //! binary and a new executor ships with a rebuilt image. Diagnostics are
 //! closed lines in `C:\overalls\logs\agentd.log`; command text, tool output and
 //! response bodies never enter them. Exits 64 on other operating systems.
+#![deny(unsafe_code)]
 
 #[cfg(windows)]
 mod daemon {

@@ -1,4 +1,5 @@
 //! Guest account reconciler and sshd key callback over Audi's private TLS route.
+#![deny(unsafe_code)]
 
 use lyra::guest::ssh_platform::{Invocation, Platform};
 use serde::{Deserialize, Serialize};
