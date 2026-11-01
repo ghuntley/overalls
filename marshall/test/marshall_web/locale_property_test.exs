@@ -82,7 +82,11 @@ defmodule MarshallWeb.LocalePropertyTest do
           assert {:ok, expected_tag} =
                    Localize.validate_locale(Locale.formatting_locale(selected.expected))
 
-          assert actual.localize == expected_tag
+          # Localize caches validated tags VM-wide under a case-folded key,
+          # and Accept-Language negotiation validates lowercased ranges, so
+          # `requested_locale_id` records whichever caller first resolved the
+          # locale ("pt-br" or "pt-BR"). Compare the resolved identity.
+          assert resolved_identity(actual.localize) == resolved_identity(expected_tag)
           assert actual.direction == if(selected.expected in ~w(ar ur arz), do: :rtl, else: :ltr)
         end
       end
@@ -93,6 +97,9 @@ defmodule MarshallWeb.LocalePropertyTest do
       end
     end
   end
+
+  @spec resolved_identity(Localize.LanguageTag.t()) :: Localize.LanguageTag.t()
+  defp resolved_identity(%Localize.LanguageTag{} = tag), do: %{tag | requested_locale_id: nil}
 
   @spec quality(pos_integer()) :: String.t()
   defp quality(value), do: "0." <> String.pad_leading(Integer.to_string(value), 3, "0")
