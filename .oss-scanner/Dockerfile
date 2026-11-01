@@ -46,11 +46,15 @@ RUN groupadd --system nixbld \
 WORKDIR /src
 COPY . /src
 
-# Build the primary control-plane release. The repository's Nix checks cover
-# the other non-inception releases; inception guest workloads remain excluded.
-RUN nix build --no-link --print-build-logs \
-      .#marshall \
-    && nix path-info .#marshall
+# Build the primary control-plane release through Buck2, the only build entry
+# point (ADR-0269): tools/buck2 links the flake's pinned buckCells and the
+# release is the same assembly production hosts run. The repository's checks
+# cover the other non-inception releases; inception guest workloads remain
+# excluded. The daemon is stopped so no process outlives the layer.
+RUN tools/buck2 build --show-full-output //:package-service-marshall > /tmp/marshall.txt \
+    && nix path-info "$(cat "$(awk 'END { print $2 }' /tmp/marshall.txt)")" \
+    && tools/buck2 kill \
+    && rm /tmp/marshall.txt
 
 # Leave a small, deterministic assertion that the image contains the source,
 # history and compiled release closures needed by an offline auditor.
