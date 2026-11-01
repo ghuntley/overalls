@@ -105,22 +105,67 @@ class InstallReceipt(TypedDict):
     storage: StorageFacts
 
 
+# A failed Buck2 build reports this much of its stderr, at most.
+DIAGNOSTIC_LINES = 40
+DIAGNOSTIC_BYTES = 8192
+
+
+def diagnostic_tail(stderr: bytes, secrets: list[str]) -> str:
+    """The bounded end of a tool's stderr, with every known secret removed.
+
+    @cc [owner:ghuntley,label:security] host-cli-bounded-diagnostics
+    Only commands that opt in report stderr, and only its last
+    DIAGNOSTIC_LINES lines within DIAGNOSTIC_BYTES. Every value in `secrets`
+    MUST be replaced before the text leaves the process, and the command's
+    environment and arguments are never reported.
+    """
+    text = stderr[-DIAGNOSTIC_BYTES:].decode(errors="replace")
+    for secret in secrets:
+        if secret:
+            text = text.replace(secret, "[redacted]")
+    return "\n".join(text.splitlines()[-DIAGNOSTIC_LINES:])
+
+
+def buck2_secrets(env: Mapping[str, str]) -> list[str]:
+    """The Namespace bearer token wherever tools/buck2 would find it."""
+    found = [env.get("NAMESPACE_RBE_TOKEN", "")]
+    with contextlib.suppress(OSError):
+        found.append(Path("/run/overalls-secrets/fleet-namespace/token").read_text().strip())
+    personal = Path(env.get("HOME", "/nonexistent"), ".config/overalls/namespace-rbe-token.json")
+    with contextlib.suppress(OSError, ValueError):
+        document: object = json.loads(personal.read_text())
+        if isinstance(document, dict):
+            token = document.get("bearer_token")
+            if isinstance(token, str):
+                found.append(token)
+    return [secret for secret in found if secret]
+
+
 def run(
     args: list[str | Path],
     data: bytes | None = None,
     env: dict[str, str] | None = None,
     cwd: Path | None = None,
+    diagnostics: bool = False,
 ) -> bytes:
     try:
         return subprocess.check_output(
             [str(a) for a in args],
             input=data,
-            stderr=subprocess.DEVNULL,
+            stderr=subprocess.PIPE if diagnostics else subprocess.DEVNULL,
             env=env,
             timeout=7200,
             cwd=cwd,
         )
-    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+    except subprocess.CalledProcessError as error:
+        name = Path(str(args[0])).name
+        if diagnostics and isinstance(error.stderr, bytes):
+            secrets = buck2_secrets(env or dict(os.environ))
+            raise Failure(
+                "Command failed: " + name + "\n" + diagnostic_tail(error.stderr, secrets)
+            ) from None
+        raise Failure("Command failed: " + name) from None
+    except subprocess.TimeoutExpired:
         raise Failure("Command failed: " + Path(str(args[0])).name) from None
 
 
@@ -330,7 +375,8 @@ def buck2_build(root: Path, target: str) -> str:
     """Builds a published checkout's target with its own tools/buck2 (ADR-0269).
 
     The revision is the checkout's commit, which assembly records in place of
-    the flake's self.rev; the target's output file names the store path."""
+    the flake's self.rev; the target's output file names the store path. A
+    failed build reports the bounded end of Buck2's stderr."""
     revision = run(["git", "-C", root, "rev-parse", "HEAD"]).decode().strip()
     listing = run(
         [
@@ -342,6 +388,7 @@ def buck2_build(root: Path, target: str) -> str:
             target,
         ],
         cwd=root,
+        diagnostics=True,
     ).decode()
     lines = listing.strip().splitlines()
     fields = lines[-1].split(" ", 1) if lines else []

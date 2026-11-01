@@ -20,7 +20,12 @@ let
     discovery.routes = [ { dev = "eth0"; dst = "default"; } ];
   };
   common = pkgs.writeText "fixture-common.nix" ''
-    { lib, modulesPath, ... }: {
+    { lib, modulesPath, ... }: let
+      fixturePath = [
+        "overalls-fixture-nixpkgs=${nixpkgs}" "overalls-fixture-project=${source}"
+        "overalls-fixture-disko=${diskoSource}" "overalls-fixture-nix-compact=${nixCompactSource}"
+      ];
+    in {
       imports = [ (modulesPath + "/testing/test-instrumentation.nix") ];
       users.users.root.hashedPasswordFile = lib.mkForce null;
       overalls.access.users = lib.mkForce {
@@ -31,11 +36,15 @@ let
       nix.settings.experimental-features = [ "nix-command" "flakes" ];
       # The published lib.assemble reads these preloaded sources. nix_assemble
       # evaluates under restrict-eval, which refuses this offline fixture's
-      # path and file inputs but admits lookup-path entries.
-      nix.settings.extra-nix-path = lib.concatStringsSep " " [
-        "overalls-fixture-nixpkgs=${nixpkgs}" "overalls-fixture-project=${source}"
-        "overalls-fixture-disko=${diskoSource}" "overalls-fixture-nix-compact=${nixCompactSource}"
-      ];
+      # path and file inputs but admits lookup-path entries. They are the
+      # whole lookup path: restrict-eval resolves every entry up front, and
+      # the default `nixpkgs=flake:nixpkgs` would download the global flake
+      # registry, which this offline VM cannot reach. Enrollment and update
+      # builds run in systemd units, which have no NIX_PATH and read nix.conf;
+      # login shells read NIX_PATH, which overrides nix.conf. Both carry the
+      # same list.
+      nix.nixPath = lib.mkForce fixturePath;
+      nix.settings.nix-path = lib.mkForce fixturePath;
       disko.devices.disk.system0.device = lib.mkForce "/dev/vda";
       disko.devices.disk.system1.device = lib.mkForce "/dev/vdb";
     }

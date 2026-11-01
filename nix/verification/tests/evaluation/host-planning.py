@@ -3,6 +3,7 @@
 import copy
 import importlib.util
 import json
+import os
 import sys
 import tempfile
 import unittest
@@ -1192,6 +1193,24 @@ class HostPlanning(unittest.TestCase):
 
             with patch.object(cli, "run", side_effect=other), self.assertRaises(cli.Failure):
                 cli.buck2_build(root, target)
+
+    def test_failed_buck2_reports_a_bounded_redacted_tail(self) -> None:
+        secret = "nsc_" + "s" * 40
+        noise = "\n".join(f"line {n}" for n in range(500))
+        script = f"import sys; sys.stderr.write({noise!r} + '\\nAction failed {secret}\\n'); sys.exit(1)"
+        with (
+            patch.dict(os.environ, {"NAMESPACE_RBE_TOKEN": secret}),
+            self.assertRaises(cli.Failure) as raised,
+        ):
+            cli.run([sys.executable, "-c", script], diagnostics=True)
+        message = str(raised.exception)
+        self.assertIn("Action failed [redacted]", message)
+        self.assertNotIn(secret, message)
+        self.assertNotIn("line 0\n", message)
+        self.assertLessEqual(len(message.splitlines()), cli.DIAGNOSTIC_LINES + 1)
+        with self.assertRaises(cli.Failure) as quiet:
+            cli.run([sys.executable, "-c", script])
+        self.assertEqual(str(quiet.exception), "Command failed: " + Path(sys.executable).name)
 
     def test_encryption_uses_shared_key_in_existing_git_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
