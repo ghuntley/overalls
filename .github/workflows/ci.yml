@@ -69,6 +69,10 @@ jobs:
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
+          # A full fetch moves origin/<branch> to the branch's current tip, and
+          # without a ref the action checks that out: a job that starts after a
+          # later push would test a different commit from the rest of the run.
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - uses: ./.github/actions/devenv
         with:
@@ -536,6 +540,10 @@ jobs:
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:
+          # A full fetch moves origin/<branch> to the branch's current tip, and
+          # without a ref the action checks that out: a job that starts after a
+          # later push would test a different commit from the rest of the run.
+          ref: ${{ github.sha }}
           fetch-depth: 0
       - uses: ./.github/actions/devenv
         with:
