@@ -2,7 +2,7 @@
 # Evaluates lib.assemble over a copied tree of declared sources only, under
 # restrict-eval, so an undeclared Nix input is an evaluation error (ADR-0269).
 set -euo pipefail
-nix=$1 jq=$2 manifest=$3 names=$4 artifacts=$5 attr=$6 revision=$7 gcroot=$8 out=$9 mode=${10:-build}
+nix=$1 jq=$2 manifest=$3 names=$4 artifacts=$5 params=$6 attr=$7 revision=$8 gcroot=$9 out=${10} mode=${11:-build}
 # GC roots stay outside the repository so file watchers never follow them.
 roots=${OVERALLS_GCROOT_DIR:-${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/overalls-buck2/gcroots}
 mkdir -p "$roots"
@@ -31,10 +31,15 @@ chmod -R u+w "$tree"
   name=$("$jq" -r .key <<<"$entry"); file=$("$jq" -r .value.path <<<"$entry")
   "$jq" -c --arg name "$name" --arg path "$(cat "$file")" '{($name): (.value | .path = $path)}' <<<"$entry"
 done | "$jq" -s 'add // {}' > "$tree/.buck-artifacts.json"
+# The target's parameters (fleet_host(params = ...)); lib.assemble validates
+# each key and type (contract assembly-params-validated).
+"$jq" -e 'type == "object"' "$params" > /dev/null || { echo "nix_assemble: params is not a JSON object" >&2; exit 1; }
+cp "$params" "$tree/.buck-params.json"
 [[ -f "$tree/flake.nix" && -f "$tree/flake.lock" ]] || { echo "nix_assemble: flake.nix/flake.lock not declared" >&2; exit 1; }
 expr="let flake = builtins.getFlake \"path:$tree\"; a = flake.lib.assemble {
       revision = \"$revision\";
       artifacts = builtins.fromJSON (builtins.readFile (flake.outPath + \"/.buck-artifacts.json\"));
+      params = builtins.fromJSON (builtins.readFile (flake.outPath + \"/.buck-params.json\"));
     }; in a.$attr"
 # getFlake takes a path and flake.lock pins every input, so assembly needs
 # no flake registry. Restrict-eval resolves each lookup-path entry up front,

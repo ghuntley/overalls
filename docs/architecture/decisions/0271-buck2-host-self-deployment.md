@@ -242,9 +242,19 @@ M10 (2026-10-30) implements decision 3.
 
 Remaining:
 
-- The per-host parameters stay fleet-wide `lib.assemble` defaults, because
-  no host sets crash-dump encryption, antithesis flags or private service
-  roots individually today. `nix_assemble` has no `params` channel yet.
+- Per-host parameters have a channel: `fleet_host(params = {...})` in a
+  host's `BUCK` passes them to every system target of that host through
+  `nix_assemble`'s `params` ([buck/fleet.bzl](../../../buck/fleet.bzl),
+  [buck/assemble.bzl](../../../buck/assemble.bzl)), and lib.assemble
+  validates each key, type and repository-relative path (contract
+  `assembly-params-validated` in
+  [nix/assemble/default.nix](../../../nix/assemble/default.nix);
+  [assembly_params.py](../../../buck/tests/assembly_params.py) is
+  `//buck:assembly_params`). The only parameter is `privateServiceRoots`. No
+  host sets it, so every host still takes the fleet-wide defaults. Crash-dump
+  encryption arrives as `encrypted-<app>` artifacts rather than as a
+  parameter, and antithesis flags apply to the antithesis contexts, not to
+  hosts.
 - Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater unless CI has
   uploaded them for the same cells and revision; that needs CI's cache
   secrets (ADR-0272). The offline update fixture holds no

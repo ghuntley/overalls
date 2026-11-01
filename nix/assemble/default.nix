@@ -33,8 +33,29 @@ let
     nixCompact = nix-compact;
   };
   fleetBuilds = modules.fleetBuilds;
+  # @cc [owner:ghuntley,label:build] assembly-params-validated
+  # Per-target parameters arrive as JSON through nix_assemble's `params`
+  # (a host's fleet_host(params = ...)). Every key MUST be one paramSchema
+  # names and every value MUST have its type; repository files are
+  # repository-relative paths resolved inside the declared tree. An unknown
+  # or mistyped parameter is an evaluation error, never ignored, and absent
+  # parameters keep the fleet-wide defaults (ADR-0271).
+  repositoryFile = key: path:
+    if builtins.isString path && path != "" && !(lib.hasPrefix "/" path)
+      && !(lib.elem ".." (lib.splitString "/" path))
+    then ../.. + "/${path}"
+    else throw "lib.assemble: params.${key} entries must be repository-relative paths, got ${builtins.toJSON path}";
+  paramSchema = {
+    # CA certificates guests and hosts trust for private services.
+    privateServiceRoots = value:
+      if builtins.isList value && value != [ ] then map (repositoryFile "privateServiceRoots") value
+      else throw "lib.assemble: params.privateServiceRoots must be a non-empty list of repository-relative paths";
+  };
+  unknownParams = lib.subtractLists (lib.attrNames paramSchema) (lib.attrNames params);
+  hostParams = lib.mapAttrs (key: paramSchema.${key}) params;
+
   hostPackages = packageSet {
-    privateServiceRoots = params.privateServiceRoots or [ ../../secrets/private-services-root.pem ../../secrets/brady-root.pem ];
+    privateServiceRoots = hostParams.privateServiceRoots or [ ../../secrets/private-services-root.pem ../../secrets/brady-root.pem ];
   };
 
   inventory = import ../platform/hosts/inventory.nix { inherit lib; };
@@ -102,8 +123,12 @@ let
     "lib.assemble: a check is defined in both catalog.nix and outputs.nix";
     catalog // outputs.checks;
 in
+assert lib.assertMsg (builtins.isAttrs params && unknownParams == [ ])
+  "lib.assemble: unknown params ${builtins.toJSON unknownParams}; known: ${builtins.toJSON (lib.attrNames paramSchema)}";
 {
   inherit packages hostPackages imported kexec checks modules antithesis systems;
+  # The validated parameters, resolved (buck/tests/assembly_params.py).
+  params = hostParams;
   # Flake package outputs by their flake names (`//:package-<name>`).
   outputPackages = outputs.packages;
 }

@@ -36,6 +36,15 @@ script_test(
     labels = ["nix_eval"],
 )
 
+# lib.assemble's params channel resolves known parameters and refuses
+# unknown keys, wrong types and paths outside the repository.
+script_test(
+    name = "assembly_params",
+    script = "tests/assembly_params.py",
+    deps = ["//:flake", "//nix:srcs"],
+    labels = ["nix_eval"],
+)
+
 # BUCK.v2's _TOOL_OUTPUTS read no assembly artifact (every ASSEMBLY_ARTIFACTS
 # key), so assembling them without artifacts is sound (tools/buck2 run //:host).
 script_test(

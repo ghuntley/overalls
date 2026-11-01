@@ -370,6 +370,11 @@ the approved migration plan.
   (`host-params-match-artifacts`) refuses a host that enables encrypted dumps
   for an application whose plain release is a Buck2 artifact when no
   encrypted artifact exists.
+- Per-target parameters reach lib.assemble through `nix_assemble`'s `params`
+  (a host's `fleet_host(params = ...)`). lib.assemble refuses unknown keys,
+  wrong types and paths outside the repository (contract
+  `assembly-params-validated`; `//buck:assembly_params`), and absent keys keep
+  the fleet-wide defaults ([ADR-0271](0271-buck2-host-self-deployment.md)).
 - Imported artifacts keep their own store-path references:
   `selfReference` is rewritten from the build placeholder to the import's
   `$out`, with lengths checked.
@@ -517,9 +522,6 @@ Remaining gaps, by milestone of the migration plan:
     per-property key would also enable the engine's `.hegel/examples` replay
     database; that is an upstream hegel_ex follow-up. The nightly salted run
     gives every suite new draws.
-- the remaining M3 item: `nix_assemble` has no per-host `params` channel, so
-  hosts take lib.assemble's fleet-wide defaults
-  ([ADR-0271](0271-buck2-host-self-deployment.md));
 - M7 leftovers:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`

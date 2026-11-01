@@ -55,6 +55,7 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
         )
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)
+    params = ctx.actions.write_json("params.json", ctx.attrs.params)
     def run(output: OutputArtifact, mode: str, category: str):
         ctx.actions.run(
             cmd_args(
@@ -65,6 +66,7 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
                 manifest,
                 names,
                 artifacts,
+                params,
                 ctx.attrs.attr,
                 ctx.attrs.revision,
                 _gcroot_name(ctx),
@@ -97,6 +99,9 @@ _nix_assemble = rule(
         "artifacts": attrs.dict(attrs.string(), attrs.dep(providers = [NixStorePathInfo]), default = {}),
         "attr": attrs.string(),
         "labels": attrs.list(attrs.string(), default = []),
+        # lib.assemble's per-target parameters (contract
+        # assembly-params-validated): JSON scalars and string lists only.
+        "params": attrs.dict(attrs.string(), attrs.one_of(attrs.bool(), attrs.string(), attrs.list(attrs.string())), default = {}),
         "revision": attrs.string(),
         "srcs": attrs.list(attrs.dep(providers = [OwnedSrcsInfo]), default = ["root//:flake_srcs"]),
         "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
@@ -107,7 +112,7 @@ _nix_assemble = rule(
 )
 
 def nix_assemble(name: str, attr: str, **kwargs):
-    """Build `lib.assemble { revision; artifacts; }.<attr>`.
+    """Build `lib.assemble { revision; artifacts; params; }.<attr>`.
 
     The revision is read from `-c overalls.revision=<sha>` at load time, so it
     is part of the action key; it defaults to "unknown" for local builds.
