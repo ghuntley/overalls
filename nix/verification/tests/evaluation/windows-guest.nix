@@ -251,7 +251,7 @@ assert packages.terminaldWindows.drvAttrs.allowedReferences == [ ];
 # script): the build runs it in windows mode, and the script remaps the
 # vendored crates and the source out of panic locations, so no store path is
 # embedded (allowedReferences above enforces it).
-assert lib.hasInfix "lyra-build.sh windows" (plain packages.lyraWindows.buildPhase);
+assert lib.hasInfix "lyra-build.sh windows" (plain (packages.lyraWindows.nixBuild or packages.lyraWindows).buildPhase);
 assert lib.hasInfix "--remap-path-prefix=$LYRA_VENDOR=/vendor --remap-path-prefix=$PWD=/source" (builtins.readFile ../../../domains/artifacts/infrastructure/lyra-build.sh);
 assert lib.hasInfix "STORE_HASH.sub" installDriver;
 # Gate 5: the agent executor task, and private names through the local resolver only.

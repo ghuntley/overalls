@@ -354,12 +354,16 @@ let
   # lib.getExe finds mainProgram) and passthru (terminald's `native`), and
   # expose it as passthru.nixBuild, so a fixture that patches or rebuilds the
   # source overrides the Nix build rather than silently overriding the
-  # import's copy step (ADR-0269, ADR-0273).
+  # import's copy step (ADR-0269, ADR-0273). It MUST also keep the Nix build's
+  # allowedReferences, so a reference constraint (the Windows agents embed no
+  # store path) binds the artifact that ships, not only the recipe.
   swapLeaf = name: nixBuild:
     if artifacts ? ${name} then
       artifacts.${name}.overrideAttrs (previous: {
         meta = nixBuild.meta or { };
         passthru = (previous.passthru or { }) // (nixBuild.passthru or { }) // { inherit nixBuild; };
+      } // lib.optionalAttrs (nixBuild.drvAttrs ? allowedReferences) {
+        inherit (nixBuild.drvAttrs) allowedReferences;
       })
     else nixBuild;
 
