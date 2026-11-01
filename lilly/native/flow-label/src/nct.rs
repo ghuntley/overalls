@@ -159,7 +159,9 @@ extern "C" fn collect(
     // SAFETY: data is the &mut Lookup register_get registered; nfct_query
     // calls back synchronously while that Lookup is live and unaliased.
     let lookup = unsafe { &mut *data.cast::<Lookup>() };
-    lookup.count += 1;
+    // Saturating: a callback storm can never wrap back to an accepted count of
+    // one, and overflow never panics inside this extern "C" callback.
+    lookup.count = lookup.count.saturating_add(1);
     if lookup.count != 1 {
         return CB_FAILURE;
     }

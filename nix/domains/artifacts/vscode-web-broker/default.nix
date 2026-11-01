@@ -8,9 +8,9 @@ workspace.buildStaticMusl {
   pname = "overalls-vscode-web-broker";
   crate = "nix/domains/artifacts/vscode-web-broker";
   binaries = [ "overalls-vscode-web-broker" ];
-  # Declared `hardened`; built `release` (unwind) since T2 (a89cde0de), as
-  # hosts run it now: an open regression in ADR-0273, restored with Buck2.
-  buildType = "release";
+  # The workspace `hardened` profile (strip, fat LTO, one codegen unit, abort
+  # on panic), as its Buck2 build (ADR-0273). Changing it changes both.
+  buildType = "hardened";
   check = true;
   meta = {
     description = "Account-bound Overalls guest broker for source-built VS Code";

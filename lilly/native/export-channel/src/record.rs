@@ -34,21 +34,26 @@ pub fn build(key: &str, command: &str) -> Option<Request> {
     })
 }
 
-pub fn encode(request: &Request) -> [u8; WIRE_BYTES] {
-    debug_assert_eq!(request.key.len(), 68);
-    let mut wire = [0_u8; WIRE_BYTES];
-    wire[0..4].copy_from_slice(MAGIC);
-    wire[4..6].copy_from_slice(&68_u16.to_be_bytes());
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "a command longer than COMMAND_BYTES (8320) panics on the slice copy below, so every encoded length fits u16"
-    )]
-    let command_size = request.command.len() as u16;
-    wire[6..8].copy_from_slice(&command_size.to_be_bytes());
-    wire[8..8 + 68].copy_from_slice(request.key.as_bytes());
+/// @cc [owner:ghuntley,label:protocol;recovery] export-record-encode-total
+/// `encode` MUST return a frame exactly for the requests `build` accepts and
+/// None for every other request, so a malformed request is a typed refusal and
+/// never a panic (the helpers ship `panic = "abort"`); every frame it returns
+/// decodes back to the same request.
+pub fn encode(request: &Request) -> Option<[u8; WIRE_BYTES]> {
+    let request = build(&request.key, &request.command)?;
+    let (key, command) = (request.key.as_bytes(), request.command.as_bytes());
+    // build bounds the command below COMMAND_BYTES (8320), so it fits u16.
+    let command_size = u16::try_from(command.len()).ok()?;
     let start = 8 + KEY_BYTES;
-    wire[start..start + request.command.len()].copy_from_slice(request.command.as_bytes());
-    wire
+    let mut wire = [0_u8; WIRE_BYTES];
+    wire.get_mut(0..4)?.copy_from_slice(MAGIC);
+    wire.get_mut(4..6)?.copy_from_slice(&68_u16.to_be_bytes());
+    wire.get_mut(6..8)?
+        .copy_from_slice(&command_size.to_be_bytes());
+    wire.get_mut(8..8 + key.len())?.copy_from_slice(key);
+    wire.get_mut(start..start + command.len())?
+        .copy_from_slice(command);
+    Some(wire)
 }
 
 pub fn decode(wire: &[u8]) -> Option<Request> {

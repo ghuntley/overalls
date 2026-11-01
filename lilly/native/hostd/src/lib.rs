@@ -220,6 +220,18 @@ const VM_FLAGS: [&[u8]; 5] = [
 // Test builds unwind; there a poisoned lock still panics with its label, as the
 // call sites' own `expect`s did before.
 
+/// @cc [owner:ghuntley,label:recovery] hostd-diagnostics-never-fail
+/// A diagnostic line MUST NOT panic or fail the request that writes it: a
+/// closed or broken stderr (for example while journald restarts) drops the
+/// line. `eprintln!` panics there, which aborts all of a `hardened` hostd.
+pub(crate) fn diagnostic(line: std::fmt::Arguments<'_>) {
+    use std::io::Write as _;
+    let mut stderr = std::io::stderr().lock();
+    let _ = stderr
+        .write_fmt(line)
+        .and_then(|()| stderr.write_all(b"\n"));
+}
+
 /// Lock a mutex shared between hostd threads, panicking with `label` if it is
 /// poisoned.
 #[track_caller]

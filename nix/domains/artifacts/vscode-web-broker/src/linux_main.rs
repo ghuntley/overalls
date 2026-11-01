@@ -9,7 +9,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{Read, Write};
 use std::mem::{self, MaybeUninit};
-use std::net::{Shutdown, TcpListener, TcpStream};
+use std::net::{Ipv4Addr, Shutdown, TcpListener, TcpStream};
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::os::unix::net::UnixStream;
@@ -120,22 +120,32 @@ fn emit(event: Event, reason: Option<Refusal>) {
         Event::LingerExpired => "editor.linger_expired",
         Event::Failed => "editor.broker_failed",
     };
-    if let Some(reason) = reason {
-        eprintln!(
-            "{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\",\"reason\":\"{}\"}}",
-            reason.name()
-        );
-    } else {
-        eprintln!("{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\"}}");
-    }
+    journal(event, reason.map(Refusal::name));
 }
 
 fn emit_closed(ending: Ending) {
-    let event = "editor.closed";
-    eprintln!(
-        "{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\",\"reason\":\"{}\"}}",
-        ending.name()
-    );
+    journal("editor.closed", Some(ending.name()));
+}
+
+/// @cc [owner:ghuntley,label:recovery;observability] editor-broker-diagnostics-never-fail
+/// A diagnostic write that fails, such as stderr reaching a restarted journal
+/// with EPIPE, MUST be dropped. It MUST NOT panic, end a relay or end the
+/// broker, which runs with `panic = "abort"`.
+fn journal(event: &str, reason: Option<&str>) {
+    write_event(&mut std::io::stderr().lock(), event, reason);
+}
+
+fn write_event(sink: &mut impl Write, event: &str, reason: Option<&str>) {
+    let _ = match reason {
+        Some(reason) => writeln!(
+            sink,
+            "{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\",\"reason\":\"{reason}\"}}"
+        ),
+        None => writeln!(
+            sink,
+            "{{\"service\":\"overalls-vscode-web-broker\",\"event\":\"{event}\"}}"
+        ),
+    };
 }
 
 fn read_configuration(path: &Path) -> Result<Configuration, Refusal> {
@@ -830,6 +840,10 @@ fn record(ending: &Mutex<Option<Ending>>, outcome: Ending) -> Ending {
     slot.unwrap_or(outcome)
 }
 
+/// @cc [owner:ghuntley,label:recovery;capacity] editor-relay-thread-refusal
+/// Failure to create the response relay thread MUST close both sides of this
+/// connection and refuse it as `transport`. It MUST NOT panic: under
+/// `panic = "abort"` that would end every other relay of the broker.
 fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusal> {
     let mut client_writer = client.try_clone().map_err(|_| Refusal::Transport)?;
     let mut worker_reader = worker.try_clone().map_err(|_| Refusal::Transport)?;
@@ -838,7 +852,7 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusa
     thread::scope(|scope| {
         let ending = &ending;
         let (client_writer, worker_reader) = (&mut client_writer, &mut worker_reader);
-        scope.spawn(move || {
+        let response = thread::Builder::new().spawn_scoped(scope, move || {
             let outcome = match pump(worker_reader, client_writer) {
                 Pumped::End(0) => Ending::Silent,
                 Pumped::End(_) => Ending::Worker,
@@ -862,6 +876,11 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusa
             }
             let _ = client_writer.shutdown(Shutdown::Both);
         });
+        if response.is_err() {
+            let _ = client.shutdown(Shutdown::Both);
+            let _ = worker.shutdown(Shutdown::Both);
+            return Err(Refusal::Transport);
+        }
         let outcome = match pump(&mut client, &mut worker) {
             Pumped::End(_) => Ending::Client,
             Pumped::Read => Ending::GatewayRead,
@@ -879,15 +898,16 @@ fn relay(mut client: TcpStream, mut worker: UnixStream) -> Result<Ending, Refusa
         let _ = gateway_done.send(());
         let _ = client.shutdown(Shutdown::Both);
         let _ = worker.shutdown(Shutdown::Both);
-    });
+        Ok(())
+    })?;
     Ok(ending
         .into_inner()
         .unwrap_or_else(std::sync::PoisonError::into_inner)
         .unwrap_or(Ending::Client))
 }
 
-fn connection(mut client: TcpStream, runtime: &Arc<Runtime>) -> Result<(), Refusal> {
-    let _guard = ConnectionGuard(runtime.clone());
+fn connection(mut client: TcpStream, slot: &ConnectionGuard) -> Result<(), Refusal> {
+    let runtime = &slot.0;
     client
         .set_read_timeout(Some(STARTUP))
         .map_err(|_| Refusal::Transport)?;
@@ -980,8 +1000,14 @@ fn serve(configuration: Configuration) -> Result<(), Refusal> {
     emit(Event::Started, None);
     notify_ready();
     for accepted in listener.incoming() {
-        let client = accepted.map_err(|_| Refusal::Transport)?;
-        if client.peer_addr().map_err(|_| Refusal::Transport)?.ip() != runtime.boot.gateway {
+        // Accept failures are per connection (ECONNABORTED) or transient
+        // exhaustion (EMFILE, ENOBUFS); neither may end the broker.
+        let Ok(client) = accepted else {
+            emit(Event::Refused, Some(Refusal::Transport));
+            thread::sleep(ACCEPT_BACKOFF);
+            continue;
+        };
+        if !from_gateway(&client, runtime.boot.gateway) {
             emit(Event::Refused, Some(Refusal::Transport));
             continue;
         }
@@ -990,14 +1016,33 @@ fn serve(configuration: Configuration) -> Result<(), Refusal> {
             emit(Event::Refused, Some(Refusal::Capacity));
             continue;
         }
-        let runtime = runtime.clone();
-        thread::spawn(move || {
-            if let Err(reason) = connection(client, &runtime) {
+        // The slot travels with the thread; a failed spawn drops it with the
+        // closure, returning the slot and closing the client.
+        let slot = ConnectionGuard(runtime.clone());
+        let spawned = thread::Builder::new().spawn(move || {
+            if let Err(reason) = connection(client, &slot) {
                 emit(Event::Refused, Some(reason));
             }
         });
+        if spawned.is_err() {
+            emit(Event::Refused, Some(Refusal::Capacity));
+        }
     }
     Err(Refusal::Transport)
+}
+
+/// Pause after a failed accept so descriptor exhaustion cannot spin the loop.
+const ACCEPT_BACKOFF: Duration = Duration::from_millis(50);
+
+/// @cc [owner:ghuntley,label:security;recovery] editor-broker-accept-survives-peers
+/// A connection whose peer address cannot be read, such as one reset before
+/// admission, or that is not the gateway MUST be refused alone. Accept errors
+/// and connection-thread exhaustion MUST refuse that connection and keep the
+/// broker listening; no single peer may end the broker.
+fn from_gateway(client: &TcpStream, gateway: Ipv4Addr) -> bool {
+    client
+        .peer_addr()
+        .is_ok_and(|address| address.ip() == gateway)
 }
 
 fn execute() -> Result<(), Refusal> {
@@ -1335,5 +1380,74 @@ mod tests {
             },
         );
         assert_eq!(ending, Ending::WorkerClosed);
+    }
+
+    /// A sink whose every write fails as stderr does once journald restarts.
+    struct BrokenPipe;
+
+    impl Write for BrokenPipe {
+        fn write(&mut self, _bytes: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        }
+
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        }
+    }
+
+    #[test]
+    fn diagnostics_keep_their_lines_and_drop_failed_writes() {
+        let mut lines = Vec::new();
+        write_event(&mut lines, "editor.refused", Some(Refusal::Capacity.name()));
+        write_event(&mut lines, "editor.ready", None);
+        assert_eq!(
+            String::from_utf8(lines).unwrap(),
+            "{\"service\":\"overalls-vscode-web-broker\",\"event\":\"editor.refused\",\"reason\":\"capacity\"}\n\
+             {\"service\":\"overalls-vscode-web-broker\",\"event\":\"editor.ready\"}\n"
+        );
+        // eprintln! panicked here, which under panic = "abort" ended every relay.
+        write_event(
+            &mut BrokenPipe,
+            "editor.closed",
+            Some(Ending::Client.name()),
+        );
+        write_event(&mut BrokenPipe, "editor.ready", None);
+    }
+
+    #[test]
+    fn reset_or_foreign_peers_are_refused_alone() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let address = listener.local_addr().unwrap();
+        let loopback = Ipv4Addr::LOCALHOST;
+
+        let healthy = TcpStream::connect(address).unwrap();
+        let (accepted, _) = listener.accept().unwrap();
+        assert!(from_gateway(&accepted, loopback));
+        assert!(!from_gateway(&accepted, Ipv4Addr::new(10, 10, 0, 1)));
+        drop((healthy, accepted));
+
+        // A peer that resets before admission leaves a socket whose peer
+        // address no longer reads; the broker used to exit on that error.
+        let reset = TcpStream::connect(address).unwrap();
+        let linger = libc::linger {
+            l_onoff: 1,
+            l_linger: 0,
+        };
+        // SAFETY: SO_LINGER reads one linger of the passed size from a live local.
+        let status = unsafe {
+            libc::setsockopt(
+                reset.as_raw_fd(),
+                libc::SOL_SOCKET,
+                libc::SO_LINGER,
+                (&raw const linger).cast(),
+                libc::socklen_t::try_from(size_of::<libc::linger>()).unwrap(),
+            )
+        };
+        assert_eq!(status, 0);
+        drop(reset);
+        thread::sleep(Duration::from_millis(50));
+        let (orphan, _) = listener.accept().unwrap();
+        assert!(orphan.peer_addr().is_err());
+        assert!(!from_gateway(&orphan, loopback));
     }
 }

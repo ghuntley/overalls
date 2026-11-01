@@ -1,5 +1,5 @@
 use crate::native;
-use crate::{finished, half_close_due, Direction, Request};
+use crate::{finished, half_close_due, Direction, Overrun, Request};
 use crate::{EXIT_IO, EXIT_OK, EXIT_SETUP, GO, READY};
 use rustix::event::{PollFd, PollFlags};
 use rustix::fs::OFlags;
@@ -104,13 +104,26 @@ fn socket(descriptor: &OwnedFd) -> bool {
 /// Move `room` or `pending` bytes; None is an error that ends the bridge.
 #[expect(
     clippy::option_option,
-    reason = "the three splice outcomes (count, retry, fatal) are matched exhaustively at each call"
+    reason = "the three splice outcomes (count, retry, fatal) are matched exhaustively in `applied`"
 )]
 pub(crate) fn moved(result: rustix::io::Result<usize>) -> Option<Option<usize>> {
     match result {
         Ok(count) => Some(Some(count)),
         Err(Errno::AGAIN | Errno::INTR) => Some(None),
         Err(_) => None,
+    }
+}
+
+/// Apply one splice outcome to a direction's accounting: a retry changes
+/// nothing; false (an errno or an `Overrun` count) ends the bridge.
+fn applied(
+    result: rustix::io::Result<usize>,
+    record: impl FnOnce(usize) -> Result<(), Overrun>,
+) -> bool {
+    match moved(result) {
+        None => false,
+        Some(Some(count)) => record(count).is_ok(),
+        Some(None) => true,
     }
 }
 
@@ -163,59 +176,27 @@ fn bridge(
         }
         drop(fds);
         if outbound.wants_read() {
-            match moved(splice(
-                client,
-                None,
-                outbound_writer,
-                None,
-                outbound.room(),
-                flags,
-            )) {
-                None => return EXIT_IO,
-                Some(Some(count)) => outbound.read(count),
-                Some(None) => {}
+            let result = splice(client, None, outbound_writer, None, outbound.room(), flags);
+            if !applied(result, |count| outbound.read(count)) {
+                return EXIT_IO;
             }
         }
         if outbound.wants_write() {
-            match moved(splice(
-                outbound_reader,
-                None,
-                guest,
-                None,
-                outbound.pending,
-                flags,
-            )) {
-                None => return EXIT_IO,
-                Some(Some(count)) => outbound.wrote(count),
-                Some(None) => {}
+            let result = splice(outbound_reader, None, guest, None, outbound.pending, flags);
+            if !applied(result, |count| outbound.wrote(count)) {
+                return EXIT_IO;
             }
         }
         if inbound.wants_read() {
-            match moved(splice(
-                guest,
-                None,
-                inbound_writer,
-                None,
-                inbound.room(),
-                flags,
-            )) {
-                None => return EXIT_IO,
-                Some(Some(count)) => inbound.read(count),
-                Some(None) => {}
+            let result = splice(guest, None, inbound_writer, None, inbound.room(), flags);
+            if !applied(result, |count| inbound.read(count)) {
+                return EXIT_IO;
             }
         }
         if inbound.wants_write() {
-            match moved(splice(
-                inbound_reader,
-                None,
-                client,
-                None,
-                inbound.pending,
-                flags,
-            )) {
-                None => return EXIT_IO,
-                Some(Some(count)) => inbound.wrote(count),
-                Some(None) => {}
+            let result = splice(inbound_reader, None, client, None, inbound.pending, flags);
+            if !applied(result, |count| inbound.wrote(count)) {
+                return EXIT_IO;
             }
         }
     }

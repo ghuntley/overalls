@@ -474,3 +474,63 @@ fn snapshot_bound_dominates_image_bound(tc: TestCase) {
     assert_eq!(snapshot, 536_870_912_000);
     assert_eq!(image, 137_438_953_472);
 }
+
+/// A stdout stand-in that accepts `budget` bytes, then fails like a closed
+/// pipe (EPIPE), optionally failing the flush as well.
+struct ClosingWriter {
+    written: Vec<u8>,
+    budget: usize,
+    flush_fails: bool,
+}
+
+impl std::io::Write for ClosingWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let room = self.budget.saturating_sub(self.written.len());
+        if room == 0 && !bytes.is_empty() {
+            return Err(std::io::ErrorKind::BrokenPipe.into());
+        }
+        let count = bytes.len().min(room);
+        self.written.extend_from_slice(&bytes[..count]);
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if self.flush_fails {
+            Err(std::io::ErrorKind::BrokenPipe.into())
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// @cc [owner:ghuntley,label:verification] hegel-image-copy-result-write
+/// Writing the result line MUST succeed with exactly the line and a newline
+/// when stdout accepts it, and MUST return `Error::Output` (never panic) when
+/// stdout closes part-way or the flush fails.
+#[hegel::test(test_cases = 100)]
+fn result_write_failure_is_typed_output_error(tc: TestCase) {
+    let line = tc.draw(gs::sampled_from(&[
+        "reflink",
+        "offload",
+        "copy",
+        "[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]",
+    ]));
+    let budget = tc.draw(gs::integers::<usize>().max_value(line.len() + 4));
+    let flush_fails = tc.draw(gs::booleans());
+    let mut out = ClosingWriter {
+        written: Vec::new(),
+        budget,
+        flush_fails,
+    };
+    let fits = budget > line.len();
+    match write_result(&mut out, line) {
+        Ok(()) => {
+            assert!(fits && !flush_fails);
+            assert_eq!(out.written, format!("{line}\n").into_bytes());
+        }
+        Err(error) => {
+            assert_eq!(error, Error::Output);
+            assert!(!fits || flush_fails);
+        }
+    }
+}

@@ -97,10 +97,15 @@ fn serve_worker(
     let Ok(duplicate) = received.try_clone() else {
         return EXIT_FAILED;
     };
+    // parse_serve admits only a nonempty worker argv; refuse rather than
+    // index if a caller ever builds a ServeRequest without it.
+    let [program, arguments @ ..] = request.worker.as_slice() else {
+        return EXIT_FAILED;
+    };
     let forwarded = std::fs::File::from(duplicate);
-    let mut builder = Process::new(&request.worker[0]);
+    let mut builder = Process::new(program);
     builder
-        .args(&request.worker[1..])
+        .args(arguments)
         .stdin(Stdio::null())
         .stdout(Stdio::from(forwarded))
         .stderr(Stdio::inherit())

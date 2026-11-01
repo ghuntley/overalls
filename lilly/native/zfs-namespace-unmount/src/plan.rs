@@ -69,30 +69,35 @@ pub fn valid_path(value: &str) -> bool {
         && !value.ends_with("/.")
 }
 
-/// In-place octal escape decode ("\040" → ' '). False on malformed escapes.
+/// @cc [owner:ghuntley,label:security;recovery] mount-field-octal-bounded
+/// In-place `\ooo` escape decode ("\040" becomes a space). A truncated escape,
+/// a non-octal digit or a value above 0o377 (one byte) MUST be refused with
+/// false, never wrapped or panicked on: mountinfo is untrusted input and a
+/// refused field fails the sweep closed as an inspection error.
 pub(crate) fn decode_mount_field(field: &mut Vec<u8>) -> bool {
     let mut output = Vec::with_capacity(field.len());
-    let mut index = 0;
-    while index < field.len() {
-        match field[index] {
-            b'\\'
-                if index + 3 < field.len()
-                    && field[index + 1..=index + 3]
-                        .iter()
-                        .all(|byte| byte.is_ascii_digit() && *byte <= b'7') =>
-            {
-                let value = (field[index + 1] - b'0') * 64
-                    + (field[index + 2] - b'0') * 8
-                    + (field[index + 3] - b'0');
-                output.push(value);
-                index += 4;
-            }
-            b'\\' => return false,
-            byte => {
-                output.push(byte);
-                index += 1;
-            }
+    let mut rest = field.as_slice();
+    while let Some((&byte, tail)) = rest.split_first() {
+        if byte != b'\\' {
+            output.push(byte);
+            rest = tail;
+            continue;
         }
+        let [high, middle, low, after @ ..] = tail else {
+            return false;
+        };
+        let mut value = 0_u16;
+        for digit in [high, middle, low] {
+            if !(b'0'..=b'7').contains(digit) {
+                return false;
+            }
+            value = value * 8 + u16::from(digit - b'0');
+        }
+        let Ok(value) = u8::try_from(value) else {
+            return false;
+        };
+        output.push(value);
+        rest = after;
     }
     *field = output;
     true

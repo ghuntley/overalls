@@ -8,9 +8,9 @@ in
   pname = "lilly-terminald";
   crate = "nix/domains/artifacts/terminald";
   binaries = [ "lilly-terminald" ];
-  # Declared `hardened`; built `release` (unwind) since T2 (a89cde0de), as
-  # hosts run it now: an open regression in ADR-0273, restored with Buck2.
-  buildType = "release";
+  # The workspace `hardened` profile (strip, fat LTO, one codegen unit, abort
+  # on panic), as its Buck2 build (ADR-0273). Changing it changes both.
+  buildType = "hardened";
   features = pkgs.lib.optionals antithesisObserver [ "antithesis-observer" ];
   meta = {
     description = "Overalls guest terminal multiplexer over AF_VSOCK";

@@ -123,9 +123,14 @@ pub fn handle_connections(daemon: &Arc<Daemon>, listener: vsock::Listener) {
                     continue;
                 }
                 let bound = daemon.clone();
-                std::thread::Builder::new()
+                // Thread exhaustion refuses this connection alone; the failed
+                // closure no longer owns the descriptor, so close it here.
+                if std::thread::Builder::new()
                     .spawn(move || handle_connection(&bound, fd))
-                    .ok();
+                    .is_err()
+                {
+                    conn::close(fd);
+                }
             }
             Err(_) => std::thread::sleep(std::time::Duration::from_millis(50)),
         }

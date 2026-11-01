@@ -8,12 +8,9 @@ workspace.rustPlatform.buildRustPackage {
   src = workspace.source { name = "lilly-export-channel-source"; crates = [ "lilly/native/export-channel" ]; };
   inherit (workspace) cargoLock;
   buildAndTestSubdir = "lilly/native/export-channel";
-  # Declared profile: the workspace `hardened` (LTO, abort on panic). Open T2
-  # regression (ADR-0273): `cargoBuildType` never took effect, so since
-  # a89cde0de this leaf has shipped `release` (unwind). It stays `release`,
-  # what hosts run, until `hardened` is restored with Buck2 after the panic
-  # paths abort would expose are found.
-  buildType = "release";
+  # The workspace `hardened` profile (strip, fat LTO, one codegen unit, abort
+  # on panic), as its Buck2 build (ADR-0273). Changing it changes both.
+  buildType = "hardened";
   strictDeps = true;
   doCheck = true;
   nativeBuildInputs = [ workspace.rustTools ];

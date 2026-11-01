@@ -200,3 +200,51 @@ fn root_side_uid_is_refused() {
     assert!(parse_cli(&words("0")).is_none());
     assert!(parse_cli(&words("977")).is_some());
 }
+
+/// The independent debit specification, in wide arithmetic clamped to i64.
+fn debit_oracle(credit: i64, count: usize, rate: u64) -> i64 {
+    if rate == 0 {
+        return credit;
+    }
+    let spent = i128::try_from(count).expect("usize fits i128") * 1000;
+    i64::try_from((i128::from(credit) - spent).max(i128::from(i64::MIN))).expect("clamped")
+}
+
+/// @cc [owner:ghuntley,label:verification] hegel-transfer-throttle-total
+/// Over every credit, elapsed time, rate and splice count (not only the
+/// reachable, CLI-bounded ones) `refill` and `debit` MUST match their
+/// wide-arithmetic oracles and never overflow or panic.
+#[hegel::test(test_cases = 300)]
+fn throttle_arithmetic_is_total(tc: TestCase) {
+    let credit = tc.draw(gs::one_of(vec![
+        gs::integers::<i64>()
+            .min_value(-CREDIT_CAP_MS)
+            .max_value(CREDIT_CAP_MS)
+            .boxed(),
+        gs::integers::<i64>().boxed(),
+    ]));
+    let elapsed = tc.draw(gs::integers::<i64>());
+    let rate = tc.draw(gs::one_of(vec![
+        gs::integers::<u64>().boxed(),
+        gs::sampled_from(&[0, 1, u64::MAX, u64::MAX / 1000, 1 << 63]).boxed(),
+    ]));
+    let count = tc.draw(gs::one_of(vec![
+        gs::integers::<usize>().boxed(),
+        gs::sampled_from(&[0, 1, usize::MAX, usize::MAX / 1000]).boxed(),
+    ]));
+    assert_eq!(
+        refill(credit, elapsed, rate),
+        refill_oracle(credit, elapsed, rate)
+    );
+    assert_eq!(
+        debit(credit, count, rate),
+        debit_oracle(credit, count, rate)
+    );
+}
+
+/// An empty side argv is a refused spawn, never an index panic.
+#[test]
+fn empty_side_argv_is_refused() {
+    use std::process::Stdio;
+    assert!(spawn(&[], None, Stdio::null(), Stdio::null(), Stdio::null()).is_err());
+}

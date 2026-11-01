@@ -3,8 +3,7 @@
 # Contract assembly-artifact-names: see nix/domains/artifacts/default.nix.
 RUST_ARTIFACTS = {
     "enrico-git-owner": "root//enrico:git-owner-import",
-    # `release`, as the Nix helpers are really built: the `hardened` (abort)
-    # build failed real guest launches in machine run 41094831662.
+    # `hardened` (abort on panic), as the Nix helpers are built (ADR-0273).
     "lilly-host-helpers": "root//lilly:host-helpers-import",
     # Lyra's client, Windows agents and native agents (buck/lyra.bzl), each
     # byte-identical to its Nix build apart from the masked Mach-O UUID.

@@ -92,31 +92,47 @@ partial, in milestone M5.
   panics. A `hardened` profile (`inherits = "release"`, strip, LTO, one codegen
   unit, `panic = "abort"`) carries the settings that the Lilly helpers, Lyra,
   terminald and the editor broker each declared before. Their Nix builds select
-  it with `cargoBuildType = "hardened"` or `--profile hardened`.
-  **Open regression from T2 (a89cde0de).** `cargoBuildType` has no effect:
+  it with `buildType = "hardened"` or `--profile hardened`.
+  **T2 regression (a89cde0de), fixed.** `cargoBuildType` had no effect:
   nixpkgs' `buildRustPackage` sets it from its own `buildType` argument
-  (default `release`). Since a89cde0de the 13 Lilly helpers and terminald's
-  and the editor broker's Linux musl builds are therefore `release` builds
-  that unwind on panic, keep their symbol tables and use neither LTO nor one
-  codegen unit (`cargoBuildHook flags: ... --profile release` in their
-  logs). Before T2 each crate's own `[profile.release]` made them abort, strip
-  and use LTO. Lyra, terminald's FreeBSD, illumos and Windows builds and the
-  broker's Windows build pass `--profile hardened` and are unaffected. The
-  deployed helpers are the unwind builds, so the Buck2 helpers match them
-  (`release`) until a later change restores `hardened` in Nix
-  (`buildType = "hardened"`) and Buck2 together, after the panic paths that
-  abort would expose are found. The leaves now declare that profile with the
-  effective `buildType = "release"`, and `cargoWorkspace.rustPlatform`'s
-  `buildRustPackage` refuses `cargoBuildType`, so a declared profile can no
-  longer be dropped silently.
-  For hostd, the panic-path audit is done: its
-  request decoder is total by construction with a typed decode error, its
-  per-connection and per-request threads no longer panic when none can be
-  created, and property and real-binary tests pass under both `release` and
-  `hardened` ([review](../reviews/2026-10-30-buck2-migration.md#m5-rust-on-buck2),
+  (default `release`). From a89cde0de the 13 Lilly helpers and terminald's
+  and the editor broker's Linux musl builds were therefore `release` builds
+  that unwound on panic, kept their symbol tables and used neither LTO nor
+  one codegen unit. Before T2 each crate's own `[profile.release]` made them
+  abort, strip and use LTO. Lyra, terminald's FreeBSD, illumos and Windows
+  builds and the broker's Windows build pass `--profile hardened` and were
+  unaffected. The exported `buildRustPackage` now refuses `cargoBuildType`,
+  so a declared profile can no longer be dropped silently, and all fifteen
+  leaves build `hardened` again in Nix (`buildType = "hardened"`) and Buck2
+  (`profile = "hardened"` in [lilly/BUCK](../../../lilly/BUCK) and
+  [nix/BUCK](../../../nix/BUCK)) together.
+  Restoring abort followed a panic-path audit of every leaf, because abort
+  turns a panic in any thread into the end of the process and skips
+  destructors. hostd's audit came first: its request decoder is total by
+  construction with a typed decode error, its per-connection and
+  per-request threads no longer panic when none can be created, and
+  property and real-binary tests pass under both profiles
+  ([review](../reviews/2026-10-30-buck2-migration.md#m5-rust-on-buck2),
   [`decode_tests.rs`](../../../lilly/native/hostd/src/decode_tests.rs),
   [`malformed_frames.rs`](../../../lilly/native/hostd/tests/malformed_frames.rs)).
-  The helpers still build `release`; the other twelve were not audited.
+  The other helpers had no thread joins, `catch_unwind`, panic hooks or
+  destructor-only cleanup of outside state (their descriptors, locks and
+  libzfs or conntrack handles are released by the kernel, and child
+  processes carry a KILL parent-death signal). Their panics reachable from
+  input or the kernel became typed errors: image-copy's result line on a
+  closed stdout (exit 5), zfs-namespace-unmount's `\ooo` mountinfo escapes
+  above 0o377 (now an inspection error, so the sweep is unconfirmed),
+  ingress-bridge's splice counts, transfer-stream's throttle arithmetic,
+  empty argv and deadline, export-channel's oversized encode and worker
+  argv, resume-token's `unreachable!` and flow-label's callback counter.
+  terminald had no reachable panic; a failed connection-thread spawn now
+  closes the descriptor. The Linux broker's `eprintln!` (which panics on a
+  closed stderr), its relay and connection thread spawns and its
+  accept/`peer_addr` exits now refuse one connection instead. Each fix has a
+  property or unit test and an adjacent contract. Nothing interprets exit
+  101: Lilly maps unknown helper statuses to failures, hostd reports both
+  as failure classes, and the daemons' units restart on failure. The
+  broker's Windows build keeps the same patterns unaudited.
 - **Nix.** [`cargo-workspace.nix`](../../../nix/domains/artifacts/infrastructure/cargo-workspace.nix)
   vendors the root lock once with `importCargoLock` (through
   [`locked-cargo-vendor.nix`](../../../nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix)).
@@ -171,8 +187,8 @@ partial, in milestone M5.
   the guest telemetry receiver, observability-runtimes, the trace spool,
   terminald's checks and Mila's Rust and Linux builds use `rustPlatform`;
   terminald's musl build and the editor broker use `buildStaticMusl`
-  with the profile the leaf declares through `buildType` (`release` for both,
-  as before; see the open T2 regression above). The exported
+  with the profile the leaf declares through `buildType` (`hardened` for
+  both; see the T2 regression above). The exported
   `buildRustPackage` refuses `cargoBuildType`, which nixpkgs ignores, so a
   declared profile always takes effect. `pkgsStatic`'s
   `makeRustPlatform` over this toolchain was rejected: its build scripts
@@ -208,7 +224,8 @@ partial, in milestone M5.
   not the unwind build Nix actually produces; real guest launches failed in
   machine run 41094831662, and fbb29d9fe held the swap back. An A/B cleared
   them (the failures were runner oversubscription; see the review), and the
-  helpers now build `release`, with the panic strategy in the parity test.
+  helpers then built `release` like the Nix builds, with the panic strategy
+  in the parity test. Since the T2 fix both sides build `hardened`.
   Since M2 (7ccb4f72a) a host's `:deployment` target carries the same
   `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too; the flake's
   Nix builds remain the fallback until M11. terminald and the editor broker

@@ -163,17 +163,22 @@ pub fn run(request: &Request) -> u8 {
     )
 }
 
-fn spawn(
+pub(crate) fn spawn(
     args: &[OsString],
     uid: Option<u32>,
     stdin: Stdio,
     stdout: Stdio,
     stderr: Stdio,
 ) -> Result<std::process::Child, ()> {
+    // parse_cli admits only nonempty absolute side argv; an empty one is a
+    // refused spawn, never an index panic.
+    let [program, arguments @ ..] = args else {
+        return Err(());
+    };
     // hostd already gave this process a cleared environment (PATH, LC_ALL).
-    let mut builder = Process::new(args[0].clone());
+    let mut builder = Process::new(program);
     builder
-        .args(&args[1..])
+        .args(arguments)
         .stdin(stdin)
         .stdout(stdout)
         .stderr(stderr);
@@ -242,13 +247,20 @@ fn transfer(
     )
 }
 
+/// @cc [owner:ghuntley,label:capacity;recovery] transfer-throttle-arithmetic-total
 /// Throttle credit after `elapsed_ms` of monotonic time at `rate` bytes per
-/// second; a zero rate is unthrottled and leaves the credit untouched.
+/// second; a zero rate is unthrottled and leaves the credit untouched. `refill`
+/// and `debit` MUST be total over every i64/u64/usize input and equal the
+/// exact wide-arithmetic result clamped to i64 (refill also capped at
+/// `CREDIT_CAP_MS`), so no rate, clock jump or splice count can wrap the credit
+/// or abort the hardened helper.
 pub(crate) fn refill(credit: i64, elapsed_ms: i64, rate: u64) -> i64 {
     if rate != 0 && elapsed_ms > 0 {
-        // Clamp elapsed before multiplication to bound arithmetic after suspension.
-        let refill = elapsed_ms.min(1000) * i64::try_from(rate).unwrap_or(CREDIT_CAP_MS);
-        credit.saturating_add(refill).min(CREDIT_CAP_MS)
+        // Clamp elapsed before multiplication to bound arithmetic after
+        // suspension; 1000 * u64::MAX cannot overflow i128.
+        let grown = i128::from(credit) + i128::from(elapsed_ms.min(1000)) * i128::from(rate);
+        // Capped at CREDIT_CAP_MS and no smaller than `credit`, so it fits i64.
+        i64::try_from(grown.min(i128::from(CREDIT_CAP_MS))).unwrap_or(CREDIT_CAP_MS)
     } else {
         credit
     }
@@ -268,7 +280,10 @@ pub(crate) fn window(credit: i64, rate: u64) -> usize {
 /// Throttle credit after `count` bytes were spliced.
 pub(crate) fn debit(credit: i64, count: usize, rate: u64) -> i64 {
     if rate != 0 {
-        credit - i64::try_from(count).unwrap_or(0) * 1000
+        let spent = i128::try_from(count)
+            .unwrap_or(i128::MAX)
+            .saturating_mul(1000);
+        i64::try_from(i128::from(credit).saturating_sub(spent)).unwrap_or(i64::MIN)
     } else {
         credit
     }
@@ -292,9 +307,12 @@ fn sweep(
     progress: Option<BorrowedFd<'_>>,
 ) -> u8 {
     let mut last = Instant::now();
-    let deadline = last + Duration::from_millis(request.timeout_ms);
+    // parse_cli bounds the timeout to a day; an unrepresentable deadline is
+    // treated as already expired (fail closed), never an Instant overflow panic.
+    let Some(deadline) = last.checked_add(Duration::from_millis(request.timeout_ms)) else {
+        return finish(producer, Some(consumer), 2);
+    };
     let mut credit: i64 = CREDIT_CAP_MS;
-    let mut eof = false;
     let mut copied_total: u64 = 0;
     let mut reported_at = last;
     let mut diagnostics = 0_usize;
@@ -312,14 +330,10 @@ fn sweep(
         last = now;
         credit = refill(credit, elapsed, request.rate);
         let mut delay = 1;
-        if !eof {
+        // The sink is dropped exactly at producer end of stream.
+        if let Some(live_sink) = sink.as_ref() {
             let available = window(credit, request.rate);
             if available > 0 {
-                #[expect(
-                    clippy::expect_used,
-                    reason = "sink is Some until eof is set, and this splice runs only while !eof"
-                )]
-                let live_sink = sink.as_ref().expect("live sink");
                 match splice(
                     &data_reader,
                     None,
@@ -328,10 +342,7 @@ fn sweep(
                     available,
                     SpliceFlags::NONBLOCK | SpliceFlags::MOVE,
                 ) {
-                    Ok(0) => {
-                        drop(sink.take());
-                        eof = true;
-                    }
+                    Ok(0) => drop(sink.take()),
                     Ok(count) => {
                         delay = 0;
                         copied_total = match copied_total.checked_add(count as u64) {

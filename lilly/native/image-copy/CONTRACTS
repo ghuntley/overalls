@@ -9,8 +9,9 @@ The helper MUST use Hegel property tests for byte preservation, independent
 destination writes, input refusal, fallback classification and kernel copy
 offload (refusal only before progress, no fallback after partial transfer),
 sparse extent copies, nanosecond identity, changed-source refusal, the source
-lease, the snapshot source policy and size bound, an injective result wire word
-and the snapshot-over-image size lattice. Tests MUST run without root; real
+lease, the snapshot source policy and size bound, an injective result wire word,
+the typed (non-panicking) result-line write failure and the snapshot-over-image
+size lattice. Tests MUST run without root; real
 filesystem and crash claims require disposable NixOS tests.
 
 @cc [owner:ghuntley,label:recovery] image-helper-dual-copy-ownership

@@ -21,8 +21,9 @@ impl Direction {
         self.pending > 0
     }
 
+    /// Free window space; zero (never an underflow) if `pending` exceeds it.
     pub fn room(&self) -> usize {
-        WINDOW - self.pending
+        WINDOW.saturating_sub(self.pending)
     }
 
     /// Every byte the source sent was delivered.
@@ -30,19 +31,32 @@ impl Direction {
         self.eof && self.pending == 0
     }
 
-    /// Record a source read of `count` bytes; zero is end of stream.
-    pub fn read(&mut self, count: usize) {
+    /// @cc [owner:ghuntley,label:recovery] bridge-direction-refuses-overrun
+    /// Record a source read of `count` bytes; zero is end of stream. A read count beyond `room()` or a write count beyond `pending` MUST be
+    /// refused with `Overrun` and leave the direction unchanged, so a kernel
+    /// count that broke the splice contract ends the bridge with `EXIT_IO`
+    /// instead of wrapping the accounting or aborting the hardened helper.
+    pub fn read(&mut self, count: usize) -> Result<(), Overrun> {
         if count == 0 {
             self.eof = true;
-        } else {
+        } else if count <= self.room() {
             self.pending += count;
+        } else {
+            return Err(Overrun);
         }
+        Ok(())
     }
 
-    pub fn wrote(&mut self, count: usize) {
-        self.pending -= count;
+    /// Record a sink write of `count` pending bytes.
+    pub fn wrote(&mut self, count: usize) -> Result<(), Overrun> {
+        self.pending = self.pending.checked_sub(count).ok_or(Overrun)?;
+        Ok(())
     }
 }
+
+/// A splice reported more bytes than the direction asked it to move.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Overrun;
 
 /// @cc [owner:ghuntley,label:recovery] bridge-ends-with-lilly
 /// The bridge MUST finish once the client's side (Lilly's socket, or Audi's

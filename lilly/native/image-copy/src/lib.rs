@@ -72,6 +72,8 @@ pub enum Error {
     Changed,
     Sync,
     Lease,
+    /// The result line could not be written to stdout.
+    Output,
 }
 
 /// @cc [owner:ghuntley,label:security] native-artifact-nanosecond-identity
@@ -124,6 +126,17 @@ fn parse_bounded(value: &str, max: u64) -> Result<u64, Error> {
 /// exhaustion, malformed requests and unknown errors MUST fail.
 pub fn unsupported(error: Errno) -> bool {
     matches!(error, Errno::XDEV | Errno::NOTTY | Errno::OPNOTSUPP)
+}
+
+/// @cc [owner:ghuntley,label:recovery] image-copy-result-write-typed
+/// The single result line MUST be written and flushed through `write_result`;
+/// a failed or closed stdout is `Error::Output` (exit 5, like every other
+/// post-validation failure), never a panic, so the hardened (`panic = "abort"`)
+/// helper reports it as a typed refusal rather than SIGABRT.
+pub fn write_result(out: &mut impl std::io::Write, line: &str) -> Result<(), Error> {
+    writeln!(out, "{line}")
+        .and_then(|()| out.flush())
+        .map_err(|_| Error::Output)
 }
 
 fn offload_unsupported(error: Errno) -> bool {

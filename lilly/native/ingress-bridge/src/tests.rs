@@ -76,7 +76,9 @@ fn direction_accounts_for_every_byte(tc: TestCase) {
     for _ in 0..steps {
         if tc.draw(gs::booleans()) && direction.wants_read() {
             let count = tc.draw(gs::integers::<usize>().max_value(direction.room()));
-            direction.read(count);
+            direction
+                .read(count)
+                .expect("a count within room is accepted");
             if count == 0 {
                 eof = true;
             } else {
@@ -88,7 +90,9 @@ fn direction_accounts_for_every_byte(tc: TestCase) {
                     .min_value(1)
                     .max_value(direction.pending),
             );
-            direction.wrote(count);
+            direction
+                .wrote(count)
+                .expect("a count within pending is accepted");
             written += count;
         }
         assert_eq!(direction.pending, read - written);
@@ -120,5 +124,30 @@ fn moved_classifies_results_against_the_errno_lattice(tc: TestCase) {
             expected,
             "errno {raw}"
         );
+    }
+}
+
+/// @cc [owner:ghuntley,label:verification] bridge-direction-overrun
+/// From any reachable state, a read count beyond `room()` or a write count
+/// beyond `pending` MUST be refused with `Overrun` and leave the direction
+/// unchanged; it never wraps the accounting or panics.
+#[hegel::test(test_cases = 200)]
+fn direction_refuses_counts_beyond_the_window(tc: TestCase) {
+    let mut direction = Direction::default();
+    let filled = tc.draw(gs::integers::<usize>().max_value(WINDOW));
+    direction
+        .read(filled)
+        .expect("a count within room is accepted");
+    let before = direction;
+    let excess = tc.draw(gs::integers::<usize>().min_value(1));
+    let too_much_read = direction.room().saturating_add(excess);
+    if too_much_read > direction.room() {
+        assert_eq!(direction.read(too_much_read), Err(Overrun));
+        assert_eq!(direction, before);
+    }
+    let too_much_written = direction.pending.saturating_add(excess);
+    if too_much_written > direction.pending {
+        assert_eq!(direction.wrote(too_much_written), Err(Overrun));
+        assert_eq!(direction, before);
     }
 }

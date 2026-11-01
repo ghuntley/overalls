@@ -119,7 +119,8 @@ fn character_class_matches_enumerated_alphabet(tc: TestCase) {
 #[hegel::test(test_cases = 100)]
 fn octal_decoding_matches_independent_model(tc: TestCase) {
     let words = [
-        "abc", r"\040", r"\011tab", "plain", r"\1short", r"\99x", "end\\",
+        "abc", r"\040", r"\011tab", "plain", r"\1short", r"\99x", "end\\", r"\377", r"\400",
+        r"\777", r"\134",
     ];
     let mut field: Vec<u8> = tc
         .draw(gs::vecs(gs::sampled_from(&words)).min_size(0).max_size(6))
@@ -139,11 +140,15 @@ fn octal_decoding_matches_independent_model(tc: TestCase) {
                 valid = false;
                 break;
             }
-            expected.push(
-                (source[index + 1] - b'0') * 64
-                    + (source[index + 2] - b'0') * 8
-                    + (source[index + 3] - b'0'),
-            );
+            // Wide arithmetic: \400..\777 exceed one byte and are refused.
+            let value = u16::from(source[index + 1] - b'0') * 64
+                + u16::from(source[index + 2] - b'0') * 8
+                + u16::from(source[index + 3] - b'0');
+            let Ok(value) = u8::try_from(value) else {
+                valid = false;
+                break;
+            };
+            expected.push(value);
             index += 4;
         } else {
             expected.push(source[index]);
@@ -392,5 +397,19 @@ fn observation_cap_counts_absent_and_duplicate_entries(tc: TestCase) {
             let expected = if count == 0 { Vec::new() } else { vec![key] };
             assert_eq!(plan(&observations), SweepPlan::Plan(expected));
         }
+    }
+}
+
+/// A mountinfo escape above one byte (`\400`..`\777`) is malformed inventory:
+/// the line is an inspection error, never a wrapped byte or a panic.
+#[test]
+fn over_range_octal_escape_is_an_inspection_error() {
+    for escape in [r"\400", r"\777"] {
+        let line = shaped_line("/", &format!("/srv/{escape}x"), "zfs", "tank/a", 0);
+        assert_eq!(
+            classify_line(line.as_bytes(), b"tank/a", b"/srv/a"),
+            MountState::InspectError,
+            "escape {escape}"
+        );
     }
 }

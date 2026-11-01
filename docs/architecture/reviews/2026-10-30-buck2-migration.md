@@ -868,6 +868,20 @@ which shows that the binary test checks the abort case. Remaining for
 `hardened`: the other twelve helpers, and the start-up-only spawns in
 `exec.rs` (reaper and bridge-exit reporter), were not audited here.
 
+Closed (`hardened` restored, 2026-11-01). The remaining audit covered the
+other twelve helpers, terminald and the Linux editor broker, and hostd's
+lazy threads and diagnostics. Panics reachable from input, the kernel or
+resource exhaustion became typed errors or refusals; ADR-0273's Profiles
+evidence lists them. In hostd, the reaper and bridge-exit reporter threads
+are now created with `thread::Builder` when `start_reaper` runs, before
+anything is served, and a failure is `EXIT_REAPER` rather than a later
+abort. Request-path diagnostics no longer use `eprintln!`, which panics
+on a closed stderr. The 13 helpers, terminald and the broker now build
+`hardened` in Nix and Buck2 together. Remaining gaps: the Windows broker
+keeps the same `eprintln!` and spawn patterns (it has always built
+`hardened`), and the hostd diagnostic and thread-spawn refusals have no
+fault-injection test.
+
 **Mila C header.** The three copies of the C ABI had drifted: the Rust
 crate's header declared 32 of the 52 `mila_*` exports, Apple's 37 and the
 Windows scaffold's 26, and the Windows copy spelled the watch enumerators

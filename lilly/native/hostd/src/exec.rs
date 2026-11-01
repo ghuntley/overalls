@@ -52,10 +52,17 @@ struct Reaper {
     spawned: Condvar,
 }
 
+/// Whether the reaper and the detached-bridge reporter threads exist.
+static REAPER_STARTED: AtomicBool = AtomicBool::new(false);
+static REPORTER_STARTED: AtomicBool = AtomicBool::new(false);
+
 fn reaper() -> &'static Reaper {
     static REAPER: OnceLock<Reaper> = OnceLock::new();
     REAPER.get_or_init(|| {
-        std::thread::spawn(reap_forever);
+        // start_reaper, before hostd serves anything, refuses to start when
+        // this thread could not be created; a panic here would abort hostd.
+        let reaping = std::thread::Builder::new().spawn(reap_forever);
+        REAPER_STARTED.store(reaping.is_ok(), Ordering::Release);
         Reaper {
             waiting: Mutex::new(HashMap::new()),
             children: Mutex::new(0),
@@ -159,15 +166,16 @@ fn detached_reports() -> Sender<WaitStatus> {
     static REPORTS: OnceLock<Mutex<Sender<WaitStatus>>> = OnceLock::new();
     let sender = REPORTS.get_or_init(|| {
         let (sender, receiver) = channel::<WaitStatus>();
-        std::thread::spawn(move || {
+        let reporter = std::thread::Builder::new().spawn(move || {
             for status in receiver {
                 let (outcome, signal) =
                     BridgeExit::of(status.exit_status(), status.terminating_signal()).fields();
-                eprintln!(
+                crate::diagnostic(format_args!(
                     "{{\"service\":\"lilly-hostd\",\"event\":\"ingress.bridge_exited\",\"outcome\":\"{outcome}\",\"signal\":\"{signal}\"}}"
-                );
+                ));
             }
         });
+        REPORTER_STARTED.store(reporter.is_ok(), Ordering::Release);
         Mutex::new(sender)
     });
     crate::lock(sender, "bridge exit reports").clone()
@@ -189,11 +197,20 @@ pub fn after_forks<R>(close: impl FnOnce() -> R) -> R {
     close()
 }
 
-/// Make this process the subreaper for every descendant and start reaping.
+/// @cc [owner:ghuntley,label:recovery] hostd-reaper-threads-at-start
+/// `start_reaper` makes this process the subreaper of every descendant. It
+/// MUST create the reaper and detached-bridge reporter threads and fail with
+/// an error, never a panic, when either cannot be created, so hostd exits
+/// `EXIT_REAPER` before serving instead of aborting later.
 pub fn start_reaper() -> std::io::Result<()> {
     rustix::process::set_child_subreaper(Some(rustix::process::getpid()))?;
     let _ = reaper();
-    Ok(())
+    let _ = detached_reports();
+    if REAPER_STARTED.load(Ordering::Acquire) && REPORTER_STARTED.load(Ordering::Acquire) {
+        Ok(())
+    } else {
+        Err(std::io::Error::other("reaper threads could not be created"))
+    }
 }
 
 static NEXT_CGROUP: AtomicU64 = AtomicU64::new(1);

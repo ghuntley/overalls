@@ -32,7 +32,10 @@ fn record_roundtrip_is_exact(tc: TestCase) {
         })
         .collect();
     let request = build(&key, &command).expect("constructed record");
-    assert_eq!(decode(&encode(&request)), Some(request));
+    assert_eq!(
+        decode(&encode(&request).expect("built record encodes")),
+        Some(request)
+    );
 }
 
 /// @cc [owner:ghuntley,label:verification] hegel-export-record-scrutiny
@@ -43,7 +46,7 @@ fn record_refusal_matrix_follows_the_oracle(tc: TestCase) {
     let key = good_key(&tc);
     let command = "zfs send --props".to_string();
     let request = build(&key, &command).expect("formed record");
-    let mut wire = encode(&request);
+    let mut wire = encode(&request).expect("formed record encodes");
     let slot = tc.draw(gs::sampled_from(&[
         "magic",
         "key_size",
@@ -155,7 +158,7 @@ fn decode_is_total_and_canonical(tc: TestCase) {
         _ => {
             let command = tc.draw(gs::sampled_from(&["zfs send --props", "x", "a b c"]));
             let request = build(&good_key(&tc), command).expect("formed record");
-            encode(&request).to_vec()
+            encode(&request).expect("formed record encodes").to_vec()
         }
     };
     let edits = tc.draw(gs::integers::<usize>().min_value(0).max_value(8));
@@ -183,7 +186,10 @@ fn decode_is_total_and_canonical(tc: TestCase) {
     let decoded = decode(&wire);
     if let Some(record) = decoded {
         assert_eq!(wire.len(), WIRE_BYTES);
-        assert_eq!(encode(&record)[..], wire[..]);
+        assert_eq!(
+            encode(&record).expect("decoded record encodes")[..],
+            wire[..]
+        );
     } else {
         assert!(
             wire.len() != WIRE_BYTES || wire[..4] != MAGIC[..] || {
@@ -202,5 +208,32 @@ fn decode_is_total_and_canonical(tc: TestCase) {
                     || wire[8 + KEY_BYTES + command_size..].iter().any(|b| *b != 0)
             }
         );
+    }
+}
+
+/// @cc [owner:ghuntley,label:verification] hegel-export-encode-total
+/// Arbitrary requests, including keys of any length and oversized,
+/// non-printable or empty commands, MUST encode exactly when `build` accepts
+/// them and never panic (a panic aborts the hardened helper); every encoded
+/// frame decodes back to the same request.
+#[hegel::test(test_cases = 200)]
+fn encode_is_total_and_agrees_with_build(tc: TestCase) {
+    let key = if tc.draw(gs::booleans()) {
+        good_key(&tc)
+    } else {
+        tc.draw(gs::text().max_size(80))
+    };
+    let filler = tc.draw(gs::sampled_from(&['x', ' ', '~', '\u{7f}', '\u{e9}']));
+    let length = tc.draw(gs::integers::<usize>().max_value(COMMAND_BYTES + 64));
+    let mut command: String = std::iter::repeat_n(filler, length).collect();
+    command.push_str(&tc.draw(gs::text().max_size(8)));
+    let request = Request { key, command };
+    let expected = build(&request.key, &request.command);
+    match encode(&request) {
+        Some(wire) => {
+            assert_eq!(expected.as_ref(), Some(&request));
+            assert_eq!(decode(&wire), Some(request));
+        }
+        None => assert_eq!(expected, None),
     }
 }

@@ -43,10 +43,12 @@ pub fn bridge(request: &BridgeRequest) -> u8 {
     if creds.uid.as_raw() != metadata.uid() {
         return EXIT_FAILED;
     }
-    let wire = encode(&Request {
+    let Some(wire) = encode(&Request {
         key: request.key.clone(),
         command: request.command.clone(),
-    });
+    }) else {
+        return EXIT_FAILED;
+    };
     let mut space = [std::mem::MaybeUninit::uninit(); rustix::cmsg_space!(ScmRights(1))];
     let mut ancillary = SendAncillaryBuffer::new(&mut space);
     let stdout_fd = std::io::stdout();

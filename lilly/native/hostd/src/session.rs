@@ -697,10 +697,10 @@ impl Session {
             );
         }
         let Some(arguments) = self.confined(id, utility, arguments) else {
-            eprintln!(
+            crate::diagnostic(format_args!(
                 "lilly-hostd: refused utility {} outside its argument grammar",
                 utility.index()
-            );
+            ));
             drop(descriptor);
             {
                 let mut book = crate::lock(&self.book, "session book");
@@ -753,10 +753,10 @@ impl Session {
         }
         if status == Status::Setup {
             // Only the utility index: arguments and paths are never logged.
-            eprintln!(
+            crate::diagnostic(format_args!(
                 "lilly-hostd: utility {} refused or unavailable",
                 utility.index()
-            );
+            ));
         }
         drop(descriptor);
         {
@@ -817,7 +817,9 @@ impl Session {
         ) {
             Ok(plan) => plan,
             Err(reason) => {
-                eprintln!("lilly-hostd: refused a transfer stream outside its grammar");
+                crate::diagnostic(format_args!(
+                    "lilly-hostd: refused a transfer stream outside its grammar"
+                ));
                 return self.refuse(id, reason);
             }
         };
@@ -966,10 +968,10 @@ impl Session {
             return self.refuse(id, Refusal::UnknownLease);
         };
         let Some(arguments) = self.confined(id, utility, arguments) else {
-            eprintln!(
+            crate::diagnostic(format_args!(
                 "lilly-hostd: refused durable utility {} outside its argument grammar",
                 utility.index()
-            );
+            ));
             return self.refuse(id, Refusal::Malformed);
         };
         {

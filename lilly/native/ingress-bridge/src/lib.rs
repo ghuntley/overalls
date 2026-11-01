@@ -30,7 +30,7 @@ mod native;
 mod run;
 
 pub use cli::{parse_cli, Request};
-pub use direction::{finished, half_close_due, Direction};
+pub use direction::{finished, half_close_due, Direction, Overrun};
 pub use run::{handshake, run};
 
 #[cfg(test)]

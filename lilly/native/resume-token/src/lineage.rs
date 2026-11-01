@@ -111,7 +111,9 @@ pub fn matches(pairs: &[Pair], name: &str, to: u64) -> bool {
             (1..=5, _) => return false,
             (6..=8, Pair::Bool(_)) => {}
             (6..=8, _) => return false,
-            _ => unreachable!(),
+            // `index` is a position in the nine-entry KEYS, so this arm is
+            // never taken; refusing keeps the token check total without a panic.
+            _ => return false,
         }
     }
     seen & 31 == 31 && actual_to == to && actual_from == 0
