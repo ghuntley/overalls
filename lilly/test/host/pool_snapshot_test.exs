@@ -213,7 +213,15 @@ defmodule Lilly.Host.PoolSnapshotTest do
           {:ok, observation} ->
             parents = Map.take(tree, [@parent])
 
-            for {name, guid, seal, kind} <- probes do
+            # Drawn probes rarely hit an accepted template's exact name, GUID
+            # and seal together; seed 3204049527 drew none in 400 cases. Each
+            # observed child is therefore also probed with no GUID expectation
+            # and either seal, so every accepted template exercises acceptance.
+            observed =
+              for name <- Enum.sort(Map.keys(observation.children)),
+                  do: {name, nil, :either, :template}
+
+            for {name, guid, seal, kind} <- probes ++ observed do
               targeted =
                 ZFS.artifact_rows(identity, parents, subtree(tree, name), name, guid, seal, kind)
 
