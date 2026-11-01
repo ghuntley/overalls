@@ -30,6 +30,12 @@ defmodule FleetCodingCLIsGuest do
 
   @type mode :: :prepare | :terminal | :gc | :customer | :tls_refusal | :token_count
   @native_timeout_seconds 180
+  # The first launch of each client in a fresh guest pages in its binary. The
+  # 338 MB Bun-compiled Claude Code binary took 8.9 s cold in an idle local
+  # one-vCPU guest and exceeded the former 30 s bound on a loaded CI runner,
+  # with an agent maintenance claim running in the same guest. Version and
+  # help probes therefore get a startup bound sized for contended first runs.
+  @startup_timeout_seconds 120
   @private_directory "$HOME/.local/state/overalls-coding-cli-fixture"
 
   # @cc [owner:ghuntley,label:verification;security] coding-clis-native-guest-account
@@ -133,23 +139,34 @@ defmodule FleetCodingCLIsGuest do
 
   @spec versions_and_help(Terminal.t()) :: :ok
   defp versions_and_help(socket) do
+    # Version output is captured in a shell variable before matching, so a
+    # timeout reports the client's own status (124/137) rather than the
+    # matcher's 1. Root runs these probes in gc mode without a private directory.
     command(
       socket,
       :codex_version,
-      "test \"$(timeout --foreground -k 5 30 codex --version)\" = 'codex-cli 0.149.0'",
-      45_000
+      "version=$(#{startup("codex --version")}) && test \"$version\" = 'codex-cli 0.149.0'",
+      startup_deadline()
     )
 
     command(
       socket,
       :claude_version,
-      "timeout --foreground -k 5 30 claude --version | grep -Eq '^2\\.1\\.238 \\(Claude Code\\)$'",
-      45_000
+      "version=$(#{startup("claude --version")}) && " <>
+        "printf '%s\\n' \"$version\" | grep -Eq '^2\\.1\\.238 \\(Claude Code\\)$'",
+      startup_deadline()
     )
 
-    command(socket, :codex_help, "timeout --foreground -k 5 30 codex --help >/dev/null", 45_000)
-    command(socket, :claude_help, "timeout --foreground -k 5 30 claude --help >/dev/null", 45_000)
+    command(socket, :codex_help, "#{startup("codex --help")} >/dev/null", startup_deadline())
+    command(socket, :claude_help, "#{startup("claude --help")} >/dev/null", startup_deadline())
   end
+
+  @spec startup(String.t()) :: String.t()
+  defp startup(client_command),
+    do: "timeout --foreground -k 5 #{@startup_timeout_seconds} #{client_command}"
+
+  @spec startup_deadline() :: pos_integer()
+  defp startup_deadline, do: (@startup_timeout_seconds + 15) * 1000
 
   @spec inference(Terminal.t()) :: :ok
   defp inference(socket) do
