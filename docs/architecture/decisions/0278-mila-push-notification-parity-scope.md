@@ -3,7 +3,7 @@
 - ID: ADR-0278
 - Date: 2026-11-01
 - Status: accepted
-- Implementation: partial
+- Implementation: implemented
 - Components: Mila, Susan, verification
 - Supersedes: none
 - Superseded by: none
@@ -155,7 +155,7 @@ Client evidence:
   drives `mila-journey` `device-register`/`device-ls`/`device-prefs`/`device-rm`
   and asserts each effect in PostgreSQL. It registers as the `android`
   platform; it is core evidence, not a platform client.
-- **Apple: open.** [`MilaNotificationsTests`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaNotificationsTests.swift)
+- **Apple: implemented.** In mila-builds run 41354267251, apple-native passed. [`MilaNotificationsTests`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaNotificationsTests.swift)
   covers the token encoding, registration through the Rust boundary, refusal
   of invalid tokens and signed-out sessions. [`MilaJourneyTests`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaJourneyTests.swift)
   `testNotificationDeviceRegisterListPreferencesAndRemoveAgainstFixture`
@@ -164,11 +164,12 @@ Client evidence:
   fixture, reading each back. `MilaNotificationsTests`
   `testRegistrationIsRefusedWithoutUserNotificationsAuthorization` denies the
   injected authorization source and shows that neither Susan nor the core's
-  register call is reached. Neither has compiled or passed in the
-  apple-native job yet, so the cell stays open. The job's journey step
-  previously filtered on `MilaJourneyTests`, which matches no test case name,
+  register call is reached. That run passed the journey test, and the
+  `//mila:apple-swift-test` step, which runs the unit tests. The job's
+  journey step previously filtered on `MilaJourneyTests`, which matches no test case name,
   so the Apple fixture journey had not run; the filter now names the classes.
-- **Linux: open (journey steps added; awaiting a passing linux-native run).**
+- **Linux: implemented.** In mila-builds run 41354267251, linux-native passed, and
+  both journeys reported every notification step ok.
   [`notifications.rs`](../../../mila/native/linux/src/notifications.rs)
   tests the explicit local desktop enablement, that registration-related
   calls are refused with `LocallyDisabled` before it
@@ -183,8 +184,7 @@ Client evidence:
   `notification_device_*`, and the `gtk-journey` window's Settings controls
   in [`gtk_journey.rs`](../../../mila/native/linux/src/gtk_journey.rs)
   `gtk_notification_device_*`) list it, disable and enable it, and remove
-  it, reading each effect back through `device ls`. No linux-native run has
-  recorded these steps passing yet.
+  it, reading each effect back through `device ls`.
 - **Windows: implemented.** In mila-builds run 41305124503, windows-native passed in full.
   [`JourneySmoke.cs`](../../../mila/windows-dotnet-smoke/JourneySmoke.cs)
   registers, lists, disables and enables, and removes a device against the
@@ -193,8 +193,6 @@ Client evidence:
 
 ## Open questions
 
-- The Apple and Linux journey steps await passing apple-native and
-  linux-native runs. Until then those cells stay open.
 - Susan's `susan-fixed-provider-egress` contract (`susan/CONTRACTS`) still
   names only the APNs, Google OAuth and FCM origins. ADR-0236 added
   Entra ID and per-device WNS channel hosts, so the contract text should be
