@@ -135,25 +135,30 @@ internal static class JourneyPages
         await ObserveAsync(hook, machine, cancellationToken);
         Step("lifecycle create");
 
-        foreach ((string action, string desired) in new[] { ("stop", "stopped"), ("start", "running"), ("pause", "paused") })
+        foreach ((string action, string desired) in new[] { ("stop", "stopped"), ("start", "running") })
         {
             await SubmitAsync(handle, "lifecycle " + action, request => RustNative.TrySessionMachineAction(handle, machine, action, request).Status,
                 cancellationToken);
             await AwaitAsync("lifecycle " + action, () => Named(handle, name)?.DesiredState == desired ? desired : null, cancellationToken);
             string observed = await ObserveAsync(hook, machine, cancellationToken);
-            Program.Require(action is "pause" || observed == desired, $"journey lifecycle {action} observed {observed}");
+            Program.Require(observed == desired, $"journey lifecycle {action} observed {observed}");
             Step($"lifecycle {action} ({desired})");
         }
 
-        // Resume is a wake request, as in the Linux journey's check_resumed: it
-        // passes when Marshall admits the request, or when the paused machine is
-        // requested running again. The desired state alone need not change.
+        // Pause and resume follow the Linux journey exactly: the provisioner
+        // stand-in does not observe the pause, so resume is the plain lifecycle
+        // request (not a checkpoint wake). It passes when Marshall admits the
+        // request, or when the paused machine is requested running again
+        // (check_resumed).
+        await SubmitAsync(handle, "lifecycle pause", request => RustNative.TrySessionMachineAction(handle, machine, "pause", request).Status,
+            cancellationToken);
+        await AwaitAsync("lifecycle pause", () => Named(handle, name)?.DesiredState == "paused" ? "paused" : null, cancellationToken);
+        Step("lifecycle pause (paused)");
         string wake = await SubmitAsync(handle, "lifecycle resume",
             request => RustNative.TrySessionMachineAction(handle, machine, "resume", request).Status, cancellationToken);
         string resumed = await AwaitAsync("lifecycle resume", () =>
             RequestAdmitted(handle, wake) ? "wake_requested"
             : Named(handle, name)?.DesiredState == "running" ? "running" : null, cancellationToken);
-        await ObserveAsync(hook, machine, cancellationToken);
         Step($"lifecycle resume ({resumed})");
 
         await SubmitAsync(handle, "lifecycle delete", request => RustNative.TrySessionMachineAction(handle, machine, "rm", request).Status,

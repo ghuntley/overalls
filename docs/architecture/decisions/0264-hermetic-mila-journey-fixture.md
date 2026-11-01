@@ -207,6 +207,15 @@ Remaining gaps:
   epoch and sends no `fenced` close.
 - Pause records intent, but the synthetic host stores no checkpoint, so resume
   is asserted only as an admitted wake.
+- Open gap under `ssh-wake-receipt-physical-readiness`
+  (`marshall/lib/marshall/ssh/commands.ex`): in mila-builds run 41302149617
+  the Windows journey observed the pause through the fixture, so Marshall
+  turned the resume into a checkpoint wake, and `request show` for that
+  wake-backed resume receipt was refused with `InvalidRequest` instead of
+  reporting the wake's phase. No Marshall test reproduces it yet. The Windows
+  and Linux journeys therefore accept an admitted resume or
+  `desired_state = running` as a deliberate choice; the refusal itself
+  remains to be reproduced and fixed in Marshall.
 - The tunnel for macOS and Windows has not run until the secret and policy
   above exist.
 
