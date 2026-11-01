@@ -273,8 +273,12 @@ partial, in milestone M5.
   same split (and the broker's nixpkgs rustfmt); they also take cargo,
   clippy and rustfmt from the toolchain now, and their rebuilt outputs (3, 2
   and 2 files) are byte-identical to the previous ones. Marshall's Cedar NIF
-  still uses nixpkgs cargo and rustc, an open breach that lands after the
-  M6 Mix change.
+  (both the Nix release and the Buck2 Mix build state in
+  [`mix.nix`](../../../nix/buck/mix.nix)) and its lint gate
+  ([`marshall-cedar-lints.nix`](../../../nix/domains/artifacts/applications/marshall-cedar-lints.nix))
+  now take rustc, cargo, clippy and rustfmt from the toolchain too; the NIF
+  was built by nixpkgs rustc 1.99.0 and is now built by 1.97.1, with the same
+  `NEEDED` entries and the same release closure.
 - **Lint gate.** The root `[workspace.lints]` is `scripts/rust/lints.toml`
   verbatim. Every member opts in with `[lints] workspace = true`, and one root
   [`clippy.toml`](../../../clippy.toml) replaces the per-crate copies.
@@ -298,8 +302,8 @@ partial, in milestone M5.
 
 Remaining for this decision:
 
-- Marshall's Cedar NIF, its lints and libhegel on nixpkgs Rust 1.99
-  (decision 2, M6), and the Buck2 builds of terminald, the broker, Lyra, the
+- libhegel (the test-only hegel_ex NIF, built from its own lock) on nixpkgs
+  Rust (decision 2), and the Buck2 builds of terminald, the broker, Lyra, the
   Cedar NIF and Mila (decision 3), in M5;
 - per-consumer Nix source filters, until M5 deletes the `buildRustPackage`
   leaves.

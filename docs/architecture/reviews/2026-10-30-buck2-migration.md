@@ -910,8 +910,11 @@ dated correction). They now take cargo, clippy and rustfmt from the toolchain.
 Rebuilt outputs are byte-identical to the previous ones, except the two macOS
 clients' `LC_UUID`. terminald's native and Windows builds and the editor
 broker's Windows build had the same split and are fixed the same way, with
-byte-identical outputs. Marshall's Cedar NIF (nixpkgs cargo and rustc) is
-the last breach.
+byte-identical outputs. Marshall's Cedar NIF, in both the Nix release and
+the Buck2 Mix build state, and its lint gate now take the toolchain's rustc,
+cargo, clippy and rustfmt as well (rustc 1.99.0 to 1.97.1; same `NEEDED`
+entries and release closure). libhegel, a third-party test-only NIF, remains
+on nixpkgs Rust.
 
 **Findings (open):**
 

@@ -28,7 +28,7 @@ let
     # Non-null so the fixed-output deps hook is installed; actions name their own.
     mixFodDeps = pkgs.emptyDirectory;
     # Marshall's Rustler NIF needs these; other applications ignore them.
-    nativeBuildInputs = [ pkgs.cargo pkgs.rustc pkgs.pkg-config ];
+    nativeBuildInputs = [ artifacts.cargoWorkspace.rustTools pkgs.pkg-config ];
     configurePhase = ":";
     installPhase = ":";
     dontFixup = true;

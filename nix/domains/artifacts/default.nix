@@ -357,7 +357,7 @@ let
       sourceRoot = "source/${application}";
       mixFodDeps = dependencies.${application};
       compileFlags = [ "--warnings-as-errors" ];
-      nativeBuildInputs = lib.optionals isMarshall [ pkgs.cargo pkgs.rustc pkgs.pkg-config ];
+      nativeBuildInputs = lib.optionals isMarshall [ cargoWorkspace.rustTools pkgs.pkg-config ];
       env = {
         ERL_CRASH_DUMP_PUBLIC_KEY = if encryptedCrashDumps then "${./build-crash-dump-public.pem}" else "";
         ERL_FLAGS = "+S 4:4";
