@@ -25,6 +25,19 @@ internal static class PokeKeySmoke
         Program.Require(MilaX25519.Agree(privateKey, publicKey, otherPublic).AsSpan()
                 .SequenceEqual(MilaX25519.Agree(otherPrivate, otherPublic, publicKey)),
             "generated X25519 pairs agree");
+        // A generated public key is published in RFC 7748 order: the RFC's Bob,
+        // given it as raw bytes, derives the same secret.
+        Program.Require(MilaX25519.Agree(privateKey, publicKey, bobPublic).AsSpan()
+                .SequenceEqual(MilaX25519.Agree(bobPrivate, bobPublic, publicKey)),
+            "generated X25519 public key is in RFC 7748 byte order");
+        byte[] aliceMasked = (byte[])alicePublic.Clone();
+        aliceMasked[31] |= 0x80;
+        Program.Require(MilaX25519.Agree(bobPrivate, bobPublic, aliceMasked).AsSpan().SequenceEqual(shared),
+            "peer u-coordinate top bit is masked");
+        bool lowOrderRefused = false;
+        try { _ = MilaX25519.Agree(alicePrivate, alicePublic, new byte[32]); }
+        catch (System.Security.Cryptography.CryptographicException) { lowOrderRefused = true; }
+        Program.Require(lowOrderRefused, "all-zero peer public key refused");
 
         string root = Path.Combine(Path.GetTempPath(), "mila-poke-" + Guid.NewGuid().ToString("N"));
         string directory = Path.Combine(root, "poke-keys");

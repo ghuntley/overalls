@@ -154,25 +154,37 @@ internal sealed class MilaWindowsPokeKeyStore : IMilaPokeKeySource
 }
 
 /// <summary>
-/// X25519 through CNG's curve25519. .NET's ECParameters carry big-endian
-/// integers, so keys are reversed to and from RFC 7748's little-endian encoding.
+/// X25519 through CNG's curve25519. CNG's curve25519 key blobs, and so .NET's
+/// ECParameters on Windows, carry the RFC 7748 little-endian encodings as they
+/// are, and .NET already returns the raw secret in RFC 7748 order. CNG does not
+/// clamp an imported private scalar and refuses an unclamped one, so the scalar
+/// is clamped as RFC 7748 section 5 specifies (X25519 clamps it anyway). A peer
+/// u-coordinate has its top bit masked and is reduced modulo p, as RFC 7748
+/// requires, and an all-zero (low-order) secret is refused. This follows
+/// .NET 11's X25519DiffieHellmanCng.
 /// </summary>
 [SupportedOSPlatform("windows")]
 internal static class MilaX25519
 {
     private static ECCurve Curve => ECCurve.CreateFromFriendlyName("curve25519");
 
+    // p = 2^255 - 19, little-endian.
+    private static ReadOnlySpan<byte> FieldPrime =>
+    [
+        0xed, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x7f,
+    ];
+
     internal static (byte[] Private, byte[] Public) Generate()
     {
         using ECDiffieHellman key = ECDiffieHellman.Create(Curve);
         ECParameters parameters = key.ExportParameters(includePrivateParameters: true);
-        try
+        if (parameters.D is not { Length: 32 } d || parameters.Q.X is not { Length: 32 } x)
         {
-            if (parameters.D is not { Length: 32 } d || parameters.Q.X is not { Length: 32 } x)
-                throw new CryptographicException("curve25519 key shape");
-            return (Reversed(d), Reversed(x));
+            if (parameters.D is { } secret) Array.Clear(secret);
+            throw new CryptographicException("curve25519 key shape");
         }
-        finally { if (parameters.D is { } secret) Array.Clear(secret); }
+        return (d, x);
     }
 
     /// <summary>The raw X25519 shared secret (RFC 7748 encoding) for this key pair and a peer public key.</summary>
@@ -180,27 +192,49 @@ internal static class MilaX25519
     {
         if (privateKey.Length != 32 || publicKey.Length != 32 || peerPublic.Length != 32)
             throw new CryptographicException("curve25519 key length");
-        byte[] d = Reversed(privateKey);
+        byte[] d = privateKey.ToArray();
         try
         {
+            d[0] &= 0b1111_1000;
+            d[31] &= 0b0111_1111;
+            d[31] |= 0b0100_0000;
             using ECDiffieHellman key = ECDiffieHellman.Create(new ECParameters
             {
-                Curve = Curve, D = d, Q = new ECPoint { X = Reversed(publicKey), Y = new byte[32] },
+                Curve = Curve, D = d, Q = new ECPoint { X = publicKey.ToArray(), Y = new byte[32] },
             });
             using ECDiffieHellman peer = ECDiffieHellman.Create(new ECParameters
             {
-                Curve = Curve, Q = new ECPoint { X = Reversed(peerPublic), Y = new byte[32] },
+                Curve = Curve, Q = new ECPoint { X = Reduced(peerPublic), Y = new byte[32] },
             });
-            return Reversed(key.DeriveRawSecretAgreement(peer.PublicKey));
+            byte[] shared = key.DeriveRawSecretAgreement(peer.PublicKey);
+            if (shared.Length != 32 || !shared.AsSpan().ContainsAnyExcept((byte)0))
+                throw new CryptographicException("X25519 low-order peer");
+            return shared;
         }
         finally { Array.Clear(d); }
     }
 
-    private static byte[] Reversed(ReadOnlySpan<byte> value)
+    /// <summary>Masks the top bit and reduces a u-coordinate in [p, 2^255) by p.</summary>
+    internal static byte[] Reduced(ReadOnlySpan<byte> u)
     {
-        byte[] copy = value.ToArray();
-        Array.Reverse(copy);
-        return copy;
+        byte[] value = u.ToArray();
+        value[31] &= 0b0111_1111;
+        int comparison = 0;
+        for (int i = 31; i >= 0 && comparison == 0; i--)
+            comparison = value[i].CompareTo(FieldPrime[i]);
+        if (comparison >= 0)
+        {
+            int borrow = 0;
+            for (int i = 0; i < 32; i++)
+            {
+                int difference = value[i] - FieldPrime[i] - borrow;
+                value[i] = (byte)difference;
+                borrow = difference < 0 ? 1 : 0;
+            }
+        }
+        if (!value.AsSpan().ContainsAnyExcept((byte)0))
+            throw new CryptographicException("X25519 low-order peer");
+        return value;
     }
 }
 
