@@ -403,6 +403,11 @@ let
         cat >> config/prod.exs <<'CONFIG'
         config :esbuild, path: "${lib.getExe pkgs.esbuild}", version: "${pkgs.esbuild.version}"
         CONFIG
+        # Contract mix-dep-patches (buck/CONTRACTS): the same dependency
+        # patches as Buck2's mix_dep_patches, so both releases stay equal.
+        for dep_patch in dep_patches/*.patch; do
+          patch -d "$MIX_DEPS_PATH/$(basename "$dep_patch" .patch)" -p1 --forward --batch < "$dep_patch"
+        done
       '';
 
       postBuild = lib.optionalString isMarshall ''

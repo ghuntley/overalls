@@ -10,7 +10,8 @@
 #   2. A check with PrecommitInfo (buck/checks.bzl) is selected when a changed
 #      path is in its `inputs` or a deleted path matches its `deletions`. If
 #      every changed input has a `per_file` entry, only those sub-targets and
-#      `shared` are built; otherwise its default output.
+#      `shared` are built; otherwise its default output. A matching deletion
+#      builds `shared`, or the default output when a check has no `shared`.
 #   3. A check without PrecommitInfo is selected when it is an rdep of an
 #      owner of a changed file, or for a deleted file below its package, and
 #      its default output is built.
@@ -80,7 +81,8 @@ def _plan(ctx: bxl.Context, files: list[str], deleted: list[str], everything: bo
         gone = [d for d in deleted if path_matches(d, info.deletions)]
         if not changed and not gone:
             continue
-        per_file = info.per_file and len(changed) <= limit and all([f in info.per_file for f in changed])
+        # A deletion builds `shared`; a check without one runs whole instead.
+        per_file = info.per_file and len(changed) <= limit and all([f in info.per_file for f in changed]) and (not gone or info.shared)
         if per_file:
             subs = {}
             for f in changed:

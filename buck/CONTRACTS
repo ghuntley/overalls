@@ -328,12 +328,22 @@ mix_release MUST run the phases and setup hooks of nixpkgs' mixRelease for
 its OTP variant: unpack, deps.compile, `compile --warnings-as-errors`,
 release, the cookie drop, the bin wrap, the ERTS path rewrite and stdenv's
 fixup. Its tree MUST equal the Nix release's byte for byte once the output
-path is normalised, except where the Nix build is itself not reproducible:
-four Marshall beams whose atom, literal and fun tables vary between builds,
-and Marshall's cache_manifest.json, where phx.digest stamps the build time.
-This rule pins those manifest mtimes to SOURCE_DATE_EPOCH. Mix and Rustler
+path is normalised, except Marshall's cache_manifest.json, where the Nix
+build's phx.digest stamps the build time and this rule pins those manifest
+mtimes to SOURCE_DATE_EPOCH. Two clean builds of one release MUST be
+byte-identical (dependency patches: mix-dep-patches). Mix and Rustler
 setup MUST otherwise follow the same hooks and environment as mixRelease,
 including the builder's TERM, which decides sys.config's map order.
+
+@cc [owner:ghuntley,label:build;deployment] mix-dep-patches
+A project's `dep_patches/<dep>.patch` files MUST be applied with `patch -p1`
+to the fetched `<dep>` before any dependency compiles, in every Mix action
+that compiles and in the Nix release. A patch that neither applies nor is
+already applied MUST fail the action. Marshall's patches make
+generated code independent of atom creation order and the wall clock:
+Phoenix LiveView's engine sorts the change-tracking keys it iterates out of
+maps whose order follows atom indices, and tz stamps `compiled_at` from
+SOURCE_DATE_EPOCH. Dependency patches change no runtime behaviour.
 
 @cc [owner:ghuntley,label:build;deployment] mix-release-self-reference
 A release MUST name itself only by the placeholder
@@ -358,6 +368,15 @@ MUST NOT recompile the project or its dependencies.
 mix_check MUST expose each check as its own subtarget ([format], [logging],
 [gettext], [dialyzer]) that fails the build when the Mix task fails.
 [dialyzer] MUST consume the PLT built once by the [plt] action.
+
+@cc [owner:ghuntley,label:verification] mix-check-precommit
+mix_check MUST publish PrecommitInfo over every declared source file unless
+an owned package directory is among its sources. A changed test module
+(under test/, outside test/support/) MUST select [format] alone, and the
+project's top-level prose (*.md, CONTRACTS) no check; any other changed
+source and any deletion in a top-level directory its sources come from MUST
+select the whole check
+(precommit-selects-affected-checks).
 
 @cc [owner:ghuntley,label:verification] mix-test-cacheable-result
 mix_test MUST run each shard of the suite as a build action whose

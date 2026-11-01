@@ -1,4 +1,4 @@
-load("@root//buck:mix.bzl", "MIX_TEST_SUPPORT", "mix_cargo_vendor", "mix_esbuild_config", "mix_sources", "mix_tree", "overalls_mix_project")
+load("@root//buck:mix.bzl", "MIX_TEST_SUPPORT", "mix_cargo_vendor", "mix_dep_patches", "mix_esbuild_config", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:rust.bzl", "overalls_rust_crate")
 
@@ -32,7 +32,7 @@ GENERATED = [
 # The release source allowlist (contract release-source-allowlist).
 mix_sources(
     name = "release_srcs",
-    srcs = mix_tree(dirs = ["lib", "config", "assets", "priv"], files = ["mix.exs", "mix.lock"], exclude = GENERATED),
+    srcs = mix_tree(dirs = ["lib", "config", "assets", "priv", "dep_patches"], files = ["mix.exs", "mix.lock"], exclude = GENERATED),
     deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs", "//elixir:request_accounting_release_srcs", "//vendor:ash_scim"],
     visibility = ["PUBLIC"],
 )
@@ -52,7 +52,10 @@ overalls_mix_project(
     antithesis_srcs = ["//antithesis:marshall"],
     postgres = True,
     checks = {"gettext": "gettext.extract --check-up-to-date"},
-    pre_configure = mix_cargo_vendor(),
+    # Phoenix LiveView and tz derive generated code from atom-index map order
+    # and the wall clock; the patches make both deterministic (contract
+    # mix-dep-patches).
+    pre_configure = mix_cargo_vendor() + mix_dep_patches(),
     # The root Cargo workspace overlay (manifest, lock, member stubs, the Cedar
     # crate); the Nix release source is copied without modes (ADR-0273).
     source_overlays = [read_root_config("mix", "cedar_source", "")],

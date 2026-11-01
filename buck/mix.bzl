@@ -9,6 +9,7 @@
 # release reproduce beam.mixRelease byte for byte.
 
 load(":assemble.bzl", "NixStorePathInfo", "RuntimeRefsInfo", "nix_store_import")
+load(":checks.bzl", "PrecommitInfo")
 load(":nix.bzl", "OwnedSrcsInfo")
 
 # Repository-relative path -> source artifact (a file, or a whole owned
@@ -242,10 +243,45 @@ def _mix_check_impl(ctx: AnalysisContext) -> list[Provider]:
         outputs = cmd_args(compiled.state, result.as_output(), plt if check == "dialyzer" and plt else "-")
         _run_sandboxed(ctx, "mix_check", script, tree, outputs, identifier = check)
         sub_targets[check] = [DefaultInfo(default_output = result)]
-    return [DefaultInfo(
+    files = _source_files(ctx.attrs.srcs)
+    providers = [DefaultInfo(
         default_outputs = [v[0].default_outputs[0] for k, v in sub_targets.items() if k != "plt"],
         sub_targets = sub_targets,
     )]
+    # An owned package directory is not addressable by file, so such a check
+    # keeps the rdeps fallback (buck/bxl/precommit.bxl).
+    if all([artifact.is_source for artifact in files.values()]):
+        providers.append(_mix_check_precommit(compiled.project, files, ctx.attrs.checks.keys()))
+    return providers
+
+_FORMATTED = (".ex", ".exs", ".heex")
+
+# Contract mix-check-precommit: see buck/CONTRACTS.
+def _mix_check_precommit(project: str, files: dict[str, Artifact], checks: list[str]) -> PrecommitInfo:
+    """Which checks read a changed file.
+
+    Test modules are read only by [format]; the project's top-level prose is
+    read by no check. Every other path (lib, config, test/support, mix.exs,
+    priv, other packages' sources) has no entry, so a change to it builds the
+    whole check, as does any deletion in a package it reads."""
+    per_file = {}
+    for path in files:
+        if not path.startswith(project + "/"):
+            continue
+        relative = path[len(project) + 1:]
+        if relative.startswith("test/") and not relative.startswith("test/support/"):
+            per_file[path] = ["format"] if "format" in checks and relative.endswith(_FORMATTED) else []
+        elif "/" not in relative and (relative.endswith(".md") or relative == "CONTRACTS"):
+            per_file[path] = []
+    return PrecommitInfo(
+        # A deleted file may be a source the check read; the packages its
+        # sources come from bound which deletions can matter.
+        deletions = sorted({path.split("/", 1)[0] + "/*": True for path in files}.keys()),
+        fix = {},
+        inputs = {path: True for path in files},
+        per_file = per_file,
+        shared = [],
+    )
 
 # Contract mix-check-subtargets: see buck/CONTRACTS.
 mix_check = rule(
@@ -624,6 +660,24 @@ def mix_cargo_vendor() -> list[str]:
         'export RUSTFLAGS="--remap-path-prefix={}=/vendor"'.format(vendor),
         'mkdir -p "$CARGO_HOME"',
         'substitute {}/.cargo/config.toml "$CARGO_HOME/config.toml" --subst-var-by vendor "{}"'.format(vendor, vendor),
+    ]
+
+def mix_dep_patches(directory: str = "dep_patches") -> list[str]:
+    """preConfigure lines that apply `<directory>/<dep>.patch` to each fetched dependency.
+
+    Checks and tests reuse the compiled dependency tree, which already carries
+    the patches and a marker for each, so a marked patch is not applied
+    again; one that does not apply fails the action (contract
+    mix-dep-patches)."""
+    return [
+        "# Contract mix-dep-patches: see buck/CONTRACTS.",
+        'for dep_patch in {}/*.patch; do'.format(directory),
+        '  dep_dir="$MIX_DEPS_PATH/$(basename "$dep_patch" .patch)"',
+        '  if [[ ! -e $dep_dir/.overalls-dep-patch ]]; then',
+        '    patch -d "$dep_dir" -p1 --forward --batch < "$dep_patch"',
+        '    touch "$dep_dir/.overalls-dep-patch"',
+        "  fi",
+        "done",
     ]
 
 def mix_esbuild_config() -> list[str]:

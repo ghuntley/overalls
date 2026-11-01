@@ -294,8 +294,20 @@ the approved migration plan.
       Tz.PeriodsProvider: atom, literal and fun tables) and
       `cache_manifest.json`. `sys.config` matched once the release action
       sets the builder's `TERM`, which decides its map order.
-  - Two clean Marshall builds in separate isolation directories differ only
-    in those four beams. `phx.digest` stamps `cache_manifest.json` with the
+  - Two clean Marshall builds in separate isolation directories differed
+    only in those four beams. Their causes were in two dependencies, which
+    [marshall/dep_patches](../../../marshall/dep_patches) fixes before
+    compilation (contract `mix-dep-patches`; the Nix release applies the
+    same patches, but has not been rebuilt to compare): Phoenix
+    LiveView's engine emitted change tracking in the order of maps keyed by
+    atoms, which follows atom creation order and so the parallel compiler's
+    schedule, and tz stamped `compiled_at` with the wall clock. On
+    2026-11-01 two clean `//marshall:release` builds (`--no-remote-cache`,
+    isolation directories `det1` and `det2`) were byte-identical: 8772
+    files, one aggregate `sha256sum` 16f5ccd109f953bb. Their
+    `//marshall:compile` trees still differ in the `Dbgi` (debug info) or
+    `ExCk` (type checker) chunk of 12 dependency beams, which the release
+    strips, so they affect only the cache keys of checks and tests. `phx.digest` stamps `cache_manifest.json` with the
     build time; Nix keeps it, and Buck2 pins it to `SOURCE_DATE_EPOCH`.
   - `buck2 test` passes for protocol (cold 15m25s, mostly its 900 s
     property suite; warm 0.2 s from the action cache), peach, susan,
@@ -509,8 +521,12 @@ Remaining gaps, by milestone of the migration plan:
     Nix release before the switch.
   - Mix actions need unprivileged user namespaces, so they run locally only
     until remote workers provide them (ADR-0272).
-  - Mix checks have no per-file `PrecommitInfo` yet; precommit runs each
-    check whole.
+  - `mix_check`'s `PrecommitInfo` is per file kind, not per file
+    ([mix.bzl](../../../buck/mix.bzl), contract mix-check-precommit): a
+    changed test module builds `[format]` alone and top-level prose nothing,
+    but any other change runs the whole check, because every check reads the
+    compiled project. `mix_test` has no provider, so a change in a project
+    runs its shards, and `mix format` has no `[fix/<path>]` sub-targets.
   - Lilly's suite passes in the sandbox and is a precommit check, but two
     host reads stay outside the action key: `test_host_cgroup` binds
     `/sys/fs/cgroup` read-only for the collector, and `test_host_identity`
@@ -518,8 +534,8 @@ Remaining gaps, by milestone of the migration plan:
     store, so the uid-0 ownership checks see the overflow uid that test
     builds alone accept (`Lilly.Host.RootOwner`, contract
     root-owner-exact-in-production).
-  - Marshall's four nondeterministic beams are a Nix-side reproducibility
-    gap too; neither build fixes them yet.
+  - Marshall's compile tree (not its release) keeps 12 dependency beams
+    whose `Dbgi` or `ExCk` chunk follows the parallel compiler's schedule.
   - The known Inception failures run in the `[known_failures]` shards of
     `//audi:test` and `//marshall:test`, as above, not excluded.
   - Within one shard every property without a `seed:` starts from the same

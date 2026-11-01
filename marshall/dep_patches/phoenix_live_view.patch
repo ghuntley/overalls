@@ -1,0 +1,29 @@
+--- a/lib/phoenix_live_view/engine.ex
++++ b/lib/phoenix_live_view/engine.ex
+@@ -523,7 +523,7 @@
+ 
+       entry =
+         quote do
+-          {unquote(key_expr), %{unquote_splicing(Map.to_list(variables))}, unquote(dynamic)}
++          {unquote(key_expr), %{unquote_splicing(Enum.sort(Map.to_list(variables)))}, unquote(dynamic)}
+         end
+ 
+       gen = {:<-, gen_meta, [gen_pattern, gen_var]}
+@@ -701,7 +701,7 @@
+ 
+   defp changed_assigns(assigns) do
+     checks =
+-      for {{changed_var, key}, _} <- assigns,
++      for {{changed_var, key}, _} <- Enum.sort(assigns),
+           not nested_and_parent_is_checked?(changed_var, key, assigns) do
+         changed = Macro.var(changed_var, __MODULE__)
+ 
+@@ -858,7 +858,7 @@
+   end
+ 
+   defp to_component_keys(:all), do: :all
+-  defp to_component_keys(map), do: Map.keys(map)
++  defp to_component_keys(map), do: map |> Map.keys() |> Enum.sort()
+ 
+   defp vars_changed_vars(keys) do
+     # when we calculate the changed map for components, we need to

@@ -9,7 +9,8 @@ let
   # deps and generated assets MUST remain excluded. Marshall's release source
   # additionally carries the root Cargo workspace overlay from ../default.nix:
   # the root manifest, lock and clippy.toml, member manifests with empty target
-  # stubs, the patched fs2 source and the Cedar crate's own sources only.
+  # stubs, the patched fs2 source and the Cedar crate's own sources only, and
+  # its dep_patches directory (contract mix-dep-patches in buck/CONTRACTS).
 
   # @cc [owner:ghuntley,label:build] harness-source-isolation
   # The fallback SDK source MUST enter only explicitly selected harness
@@ -43,6 +44,8 @@ let
   ] ++ lib.optionals (application == "marshall") [
     ../../../../marshall/assets
     ../../../../marshall/priv
+    # Dependency patches applied before compilation (contract mix-dep-patches).
+    ../../../../marshall/dep_patches
     # Marshall's own Cedar NIF crate, compiled by Rustler at build time,
     # enters with the root Cargo workspace overlay in ../default.nix.
     # Marshall's SCIM integration is vendored in-tree and referenced by path

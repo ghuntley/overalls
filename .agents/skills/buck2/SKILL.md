@@ -411,10 +411,12 @@ command, the single prek hook and CI call it.
   `OVERALLS_PRECOMMIT_DIRECT=1`, the hook scripts run directly with the pinned
   tools devenv passes in `OVERALLS_PRECOMMIT_*`. The ADR, contract,
   package-input-lock and toolchain checks are then reported as skipped.
-- **Mix projects.** Each project's `:check` and `:test` shards (see Elixir
-  targets) are precommit checks without `PrecommitInfo` yet, so a change in a
-  project runs its whole check and its shards (cache hits when unchanged).
-  There are no `[fix/<path>]` sub-targets for `mix format` yet. CI runs the
+- **Mix projects.** Each project's `:check` carries `PrecommitInfo`
+  (contract mix-check-precommit): a changed test module selects `[format]`
+  alone, top-level prose (`*.md`, `CONTRACTS`) selects nothing, and any other
+  source change or a deletion runs the whole check. The `:test` shards have
+  no provider yet, so a change in a project runs them (cache hits when
+  unchanged). There are no `[fix/<path>]` sub-targets for `mix format` yet. CI runs the
   suites in ci.yml's `mix` job. publish-cache.yml's `mix precommit` matrix
   runs only Lilly's leg on push; a workflow_dispatch runs it whole once, to
   compare per-app test counts with `mix` before the matrix is deleted.
@@ -434,10 +436,10 @@ command, the single prek hook and CI call it.
    of `per_file`, so changing it runs the whole check. Without the provider,
    put the check in the package that owns its sources: precommit then runs its
    default output when those sources change.
-5. Mix rules: `mix_check` and `mix_test` carry `precommit`; a `PrecommitInfo`
-   with `shared = ["format", "logging", "gettext", "dialyzer"]` (or the
-   default output) and `fix = {path: "fix/" + path}` from `mix format` gives
-   `precommit --fix` Elixir formatting.
+5. Mix rules: `mix_check` and `mix_test` carry `precommit`. `mix_check`'s
+   `PrecommitInfo` maps test modules to `[format]`; a check with an empty
+   `shared` runs whole on a matching deletion. A `fix = {path: "fix/" + path}`
+   from `mix format` would give `precommit --fix` Elixir formatting.
 
 ## Host deployment targets
 

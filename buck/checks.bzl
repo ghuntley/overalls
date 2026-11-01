@@ -50,7 +50,8 @@ def check_providers(ctx: AnalysisContext, stamp: Artifact, sub_targets: dict = {
 #   fix:       path -> sub-target whose single output is the fixed file;
 #              `tools/precommit --fix` copies it over the source.
 #   deletions: patterns (see path_matches) of deleted paths that select the
-#              check: per-file checks then build `shared`, others the default.
+#              check: per-file checks then build `shared` (the default output
+#              when `shared` is empty), others the default.
 PrecommitInfo = provider(fields = {
     "deletions": list[str],
     "fix": dict[str, str],
