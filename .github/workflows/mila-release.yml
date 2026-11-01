@@ -44,15 +44,17 @@ jobs:
           install-devenv: "false"
       - name: Build the source bundle
         run: |
-          nix build -L .#tool-mila-source-bundle --out-link bundle
+          tools/buck2 build //:package-tool-mila-source-bundle --show-full-output | tee bundle.txt
+          bundle=$(cat "$(awk 'END { print $2 }' bundle.txt)")
           mkdir -p out
-          cp -L bundle/* out/
+          cp -L "$bundle"/* out/
           (cd out && sha256sum -c SHA256SUMS)
       - name: Build the native Windows source bundle
         run: |
-          nix build -L .#tool-mila-windows-source-bundle --out-link windows-bundle
+          tools/buck2 build //:package-tool-mila-windows-source-bundle --show-full-output | tee windows-bundle.txt
+          bundle=$(cat "$(awk 'END { print $2 }' windows-bundle.txt)")
           mkdir -p out-windows
-          cp -L windows-bundle/* out-windows/
+          cp -L "$bundle"/* out-windows/
           (cd out-windows && sha256sum -c SHA256SUMS)
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -76,9 +78,10 @@ jobs:
           install-devenv: "false"
       - name: Linux release tarball
         run: |
-          nix build -L .#tool-mila-linux-release --out-link release
+          tools/buck2 build //:package-tool-mila-linux-release --show-full-output | tee release.txt
+          release=$(cat "$(awk 'END { print $2 }' release.txt)")
           mkdir -p out
-          cp -L release/*.tar.gz release/SHA256SUMS out/
+          cp -L "$release"/*.tar.gz "$release"/SHA256SUMS out/
           (cd out && sha256sum -c SHA256SUMS)
           archive=$(find out -maxdepth 1 -type f -name '*.tar.gz' -print -quit)
           tar -tzf "$archive" > release-files.txt
@@ -101,6 +104,9 @@ jobs:
     runs-on: ubuntu-24.04
     environment: mila-release
     timeout-minutes: 90
+    # No Namespace remote cache: the release builds stay on this runner.
+    env:
+      OVERALLS_BUCK2_REMOTE: "off"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
@@ -116,14 +122,18 @@ jobs:
           toolchain: 1.97.1
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - name: Install cargo-ndk
-        run: cargo install cargo-ndk --locked
+        run: cargo install cargo-ndk --locked --version 4.1.2
       - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
         with:
           gradle-version: '9.3.1'
+      # A Buck2 target (ADR-0269 M9) over the SDKs above; this job has no Nix,
+      # so `tools/buck2 --no-nix` uses the pinned buck2 and prelude. Gradle
+      # verifies every dependency against gradle/verification-metadata.xml.
+      # The APK is unsigned, and no Buck2 log is uploaded.
       - name: Assemble native Android release APK
-        working-directory: mila/native/android
         run: |
-          gradle --no-daemon --stacktrace assembleRelease
+          tools/buck2 --no-nix build //mila:android-release
+          cd mila/native/android
           sha256sum app/build/outputs/apk/release/app-release-unsigned.apk > app/build/outputs/apk/release/SHA256SUMS
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
@@ -137,6 +147,10 @@ jobs:
     runs-on: macos-15
     environment: mila-release
     timeout-minutes: 150
+    # No Namespace remote cache: signed builds and their Buck2 state never
+    # leave this runner (see the signing check below).
+    env:
+      OVERALLS_BUCK2_REMOTE: "off"
     strategy:
       fail-fast: false
       matrix:
@@ -167,7 +181,7 @@ jobs:
           toolchain: 1.97.1
           targets: aarch64-apple-ios
       - name: Compile typed Apple FFI seam
-        run: cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml --target-dir mila/rust/target -p mila-ffi --release
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-ffi
       - name: Verify Apple native package is Flutter-free
         working-directory: mila/native/apple
         env:
@@ -180,6 +194,20 @@ jobs:
           fi
           swift build -c release
           swift test -c release
+      # Signing canaries for the Buck2 log check below: mask the values the
+      # check looks for, so they never reach the job log either.
+      - name: Mask the signing canaries
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          MILA_APPLE_IDENTITY: ${{ vars[matrix.identity_var] }}
+        run: |
+          set -euo pipefail
+          for value in "$CERTIFICATE_PASSWORD" "$NOTARY_KEY_ID" "$NOTARY_ISSUER" "$MILA_APPLE_IDENTITY"; do
+            [ -n "$value" ] && echo "::add-mask::$value"
+          done
+          true
       - name: Import signing identity, profiles and notary credentials
         env:
           CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
@@ -198,6 +226,9 @@ jobs:
           mkdir -p "$secrets"
           keychain="$secrets/mila.keychain-db"
           password=$(openssl rand -hex 24)
+          echo "::add-mask::$password"
+          # The Buck2 log check reads it; removed with the signing material.
+          printf '%s' "$password" > "$secrets/keychain-password"
           security create-keychain -p "$password" "$keychain"
           security set-keychain-settings -lut 3600 "$keychain"
           security unlock-keychain -p "$password" "$keychain"
@@ -239,7 +270,95 @@ jobs:
           # mila-build refuses a missing input and verifies each signature it
           # makes; it writes the artifact and its SHA256SUMS.
           export MILA_VERSION="${GITHUB_REF_NAME#mila-v}"
-          ./mila/native/mila-build ${{ matrix.platform }} release
+          # The non_hermetic target reads MILA_VERSION, the MILA_APPLE_* names
+          # and MILA_KEYCHAIN from the daemon's environment, so restart the
+          # daemon here. No secret is in this environment: the import step
+          # above holds those, and its only $GITHUB_ENV writes are the paths
+          # and profile name MILA_KEYCHAIN, MILA_NOTARY_PROFILE and
+          # MILA_IOS_EXPORT_OPTIONS. The check below verifies that against
+          # this copy of the environment the daemon inherits. The target is
+          # local_only and never uploaded to a cache, and no Buck2 log is
+          # uploaded.
+          (umask 077 && env > "$RUNNER_TEMP/mila-signing/release-env")
+          tools/buck2 kill
+          tools/buck2 build -c overalls.non_hermetic=true "//mila:${{ matrix.platform }}-release"
+      # The Buck2 logs are collected without any secret in the environment,
+      # then searched for the signing values; nothing here is uploaded. Both
+      # steps run when the build fails, before the signing material goes.
+      - name: Collect the Buck2 logs for the signing check
+        if: always()
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/buck2-signing-check"
+          mkdir -p "$logs"
+          tools/buck2 log show > "$logs/show.txt" || true
+          tools/buck2 log what-ran > "$logs/what-ran.txt" || true
+          # Every invocation's event log, decoded by buck2 itself.
+          for f in buck-out/*/log/*.pb.zst; do
+            [ -f "$f" ] && { tools/buck2 log show "$f" >> "$logs/events.txt" || true; }
+          done
+          true
+      # The job sets OVERALLS_BUCK2_REMOTE=off, so nothing reaches a remote
+      # cache and the local places below are all Buck2 wrote.
+      # Fails when a signing value reached the daemon's environment, a Buck2
+      # event log, buck-out, the daemon's own files (~/.buck: buckd stderr
+      # and state) or a buck2 temporary directory. The identity, a variable
+      # rather than a secret, is searched in the action commands and
+      # environments (what-ran) only: codesign's output in the event logs and
+      # the signed artifacts in buck-out legitimately name it. build.sh never
+      # reads MILA_IOS_EXPORT_OPTIONS and the target copies only
+      # mila/build/<platform>-release, so no file anywhere searched may equal
+      # the decoded ExportOptions.plist.
+      - name: Check Buck2 logs and buck-out hold no signing values
+        if: always()
+        env:
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          NOTARY_ISSUER: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          MILA_APPLE_IDENTITY: ${{ vars[matrix.identity_var] }}
+        run: |
+          set -euo pipefail
+          logs="$RUNNER_TEMP/buck2-signing-check"
+          signing="$RUNNER_TEMP/mila-signing"
+          mkdir -p "$logs"
+          [ -f "$signing/release-env" ] && cp "$signing/release-env" "$logs/release-env"
+          places=("$logs" buck-out)
+          [ -d "$HOME/.buck" ] && places+=("$HOME/.buck")
+          for tmp in "${TMPDIR:-/tmp}"/buck2* /tmp/buck2*; do
+            [ -e "$tmp" ] && places+=("$tmp")
+          done
+          # An import that failed early leaves no keychain password: skip it.
+          keychain_password=""
+          [ -f "$signing/keychain-password" ] && keychain_password=$(cat "$signing/keychain-password")
+          leaked=0
+          for value in "$keychain_password" "$CERTIFICATE_PASSWORD" "$NOTARY_KEY_ID" "$NOTARY_ISSUER"; do
+            [ -n "$value" ] || continue
+            if grep -rqaF -e "$value" "${places[@]}" 2>/dev/null; then leaked=1; fi
+          done
+          if [ -n "$MILA_APPLE_IDENTITY" ] && [ -f "$logs/what-ran.txt" ] &&
+             grep -qaF -e "$MILA_APPLE_IDENTITY" "$logs/what-ran.txt"; then leaked=1; fi
+          if [ -s "$signing/ExportOptions.plist" ]; then
+            digest=$(shasum -a 256 < "$signing/ExportOptions.plist" | cut -d' ' -f1)
+            size=$(wc -c < "$signing/ExportOptions.plist" | tr -d ' ')
+            while IFS= read -r -d '' f; do
+              [ "$(wc -c < "$f" | tr -d ' ')" = "$size" ] || continue
+              [ "$(shasum -a 256 < "$f" | cut -d' ' -f1)" = "$digest" ] && leaked=1
+            done < <(find "${places[@]}" -type f -print0 2>/dev/null)
+          fi
+          # The daemon's environment holds only the expected paths and names.
+          if [ -f "$logs/release-env" ]; then
+            for name in MILA_KEYCHAIN MILA_IOS_EXPORT_OPTIONS; do
+              value=$(sed -n "s/^$name=//p" "$logs/release-env")
+              case "$value" in ""|"$RUNNER_TEMP"/mila-signing/*) ;; *) leaked=1 ;; esac
+            done
+            value=$(sed -n 's/^MILA_NOTARY_PROFILE=//p' "$logs/release-env")
+            case "$value" in ""|mila-notary) ;; *) leaked=1 ;; esac
+          fi
+          rm -rf "$logs"
+          if [ "$leaked" = 1 ]; then
+            echo 'a signing value reached the Buck2 daemon environment, a Buck2 log or buck-out' >&2
+            exit 1
+          fi
       - name: Remove signing material
         if: always()
         run: |

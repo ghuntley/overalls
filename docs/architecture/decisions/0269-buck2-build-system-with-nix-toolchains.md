@@ -298,7 +298,11 @@ the approved migration plan.
   stop matching the buckCells buck2. A hermetic `//mila:windows-ffi-gnu`
   cross-build and Clippy check run on Linux; the shipped DLL stays MSVC.
   `mila-builds.yml` builds Apple, Android and Windows through these
-  targets; the `mila-release.yml` change is held for a test release. Local evidence: the Android targets build and pass
+  targets, and `mila-release.yml` builds its source bundles and Linux tarball
+  through `//:package-tool-mila-*`, the Android APK through `--no-nix`
+  `//mila:android-release`, and the Apple FFI and signed apps through
+  `//mila:apple-ffi` and `//mila:<platform>-release`, with a check that no
+  signing value reaches a Buck2 log, buck-out or the daemon's files. Local evidence: the Android targets build and pass
   their unit tests, the Windows gnu targets build, and `--no-nix` loads and
   tests a non_hermetic target on Linux. CI run 41114668466 built every
   Apple, Android and Windows target; the review records the runs and the
@@ -327,9 +331,10 @@ Remaining gaps, by milestone of the migration plan:
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
 - removal of the flake package, check and configuration outputs (M11);
-- M9 leftovers: `mila-release.yml` still builds through Nix and the
-  platform tools directly (its Buck2 change and Apple signing-leak check are
-  held for a test release), and its legacy Flutter Windows job is unchanged;
+- M9 leftovers: `mila-release.yml`'s Buck2 build and Apple signing-leak
+  check have not run: the repository has no `mila-release` environment or
+  signing secrets yet, and its publish job creates a public release, so no
+  test release was made; its legacy Flutter Windows job is unchanged;
   the
   Robolectric `android-all` jar Gradle downloads at test time is outside the
   verification metadata; the gnu Windows DLL is a check, not a reproducible
