@@ -32,10 +32,11 @@ jobs:
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 90
     permissions:
-      contents: write
-      # tools/namespace-re-image exchanges the job's OIDC token for the
-      # baseimage:optimize grant the workspace identity lacks.
-      id-token: write
+      contents: read
+    outputs:
+      stale: ${{ steps.check.outputs.stale }}
+      lock: ${{ steps.push.outputs.lock }}
+      tenant: ${{ steps.push.outputs.tenant }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -52,18 +53,94 @@ jobs:
           else
             echo "stale=true" >> "$GITHUB_OUTPUT"
           fi
-      # nsc on a Namespace runner is authenticated as the workspace; the
-      # optimise step exchanges the job's OIDC token (see the script).
-      - name: Build, push and optimise the image
+      # The runner's workspace identity pushes; the optimise job below holds
+      # the baseimage:optimize grant it lacks.
+      - name: Build and push the image
+        id: push
         if: steps.check.outputs.stale == 'true'
-        run: tools/namespace-re-image --push
+        env:
+          NAMESPACE_RE_IMAGE_OPTIMIZE: skip
+        run: |
+          set -euo pipefail
+          tools/namespace-re-image --push
+          echo "lock=$(cat tools/namespace-re-image.lock)" >> "$GITHUB_OUTPUT"
+          tenant=$(nsc workspace describe -o json | jq -r .tenant_id)
+          [[ -n "$tenant" && "$tenant" != null ]]
+          echo "tenant=$tenant" >> "$GITHUB_OUTPUT"
+
+  # On Namespace runners nsc always acts as the instance's workspace
+  # identity, which lacks baseimage:optimize (and Namespace refuses that
+  # permission in revocable tokens). A GitHub-hosted runner has no Namespace
+  # identity, so the token exchanged through the workspace trust
+  # relationship (issuer token.actions.githubusercontent.com, GitHub's
+  # immutable subject repo:ghuntley@127353/overalls@1118826815:ref:refs/heads/trunk,
+  # audience namespace, grant baseimage:optimize only) is its only
+  # credential. The OIDC token is never printed.
+  optimize:
+    needs: publish
+    if: needs.publish.outputs.stale == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      NSC_VERSION: 0.0.588
+      NSC_SHA256: ba46d10dcb31caff49eda5597c6208e8917c490a0602480d6de127688f287a10
+    steps:
+      - name: Install nsc
+        run: |
+          set -euo pipefail
+          archive="nsc_${NSC_VERSION}_linux_amd64.tar.gz"
+          curl -fsSLo "$RUNNER_TEMP/$archive" \
+            "https://github.com/namespacelabs/foundation/releases/download/v${NSC_VERSION}/$archive"
+          echo "$NSC_SHA256  $RUNNER_TEMP/$archive" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/nsc"
+          tar -xzf "$RUNNER_TEMP/$archive" -C "$RUNNER_TEMP/nsc" nsc
+          echo "$RUNNER_TEMP/nsc" >> "$GITHUB_PATH"
+      - name: Exchange the OIDC token and optimise
+        env:
+          LOCK: ${{ needs.publish.outputs.lock }}
+          TENANT: ${{ needs.publish.outputs.tenant }}
+        run: |
+          set -euo pipefail
+          image_ref=${LOCK#* }
+          [[ "$image_ref" == nscr.io/*@sha256:* ]] || { echo "unexpected lock line" >&2; exit 1; }
+          oidc=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=namespace" | jq -r .value)
+          [[ -n "$oidc" && "$oidc" != null ]] || { echo "no GitHub OIDC token" >&2; exit 1; }
+          if ! nsc auth exchange-oidc-token --tenant_id "$TENANT" --token "$oidc" --duration 1h >/dev/null; then
+            # Name the claims the trust relationship matches on (never the token).
+            payload=$(cut -d. -f2 <<<"$oidc" | tr '_-' '/+')
+            while (( ${#payload} % 4 )); do payload+="="; done
+            base64 -d <<<"$payload" 2>/dev/null | jq -c '{iss, sub, aud}' >&2 || true
+            exit 1
+          fi
+          unset oidc
+          nsc base-image optimize --image_ref "$image_ref"
+
+  commit:
+    needs: [publish, optimize]
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
       - name: Commit the lock
-        if: steps.check.outputs.stale == 'true'
+        env:
+          LOCK: ${{ needs.publish.outputs.lock }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          cp tools/namespace-re-image.lock "$RUNNER_TEMP/lock"
+          printf '%s\n' "$LOCK" > "$RUNNER_TEMP/lock"
           for attempt in 1 2 3 4 5; do
             git fetch origin trunk
             git reset --hard origin/trunk

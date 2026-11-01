@@ -91,41 +91,14 @@ crane=(nix shell --inputs-from . nixpkgs#crane -c crane)
 "${crane[@]}" append --platform linux/amd64 --oci-empty-base "${layers[@]}" -t "$image:$cells_id-layers" >/dev/null
 "${crane[@]}" mutate --env PATH=/bin:/usr/bin --workdir / -t "$image:$cells_id" "$image:$cells_id-layers" >/dev/null
 digest=$("${crane[@]}" digest "$image:$cells_id")
-# The runner's workspace identity may push but lacks baseimage:optimize, and
-# Namespace refuses that permission in revocable tokens. On GitHub Actions,
-# exchange the job's OIDC token through the workspace trust relationship
-# (issuer token.actions.githubusercontent.com, subject
-# repo:ghuntley/overalls:ref:refs/heads/trunk, grant baseimage:optimize only)
-# just before optimising. The OIDC token is never printed.
-if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
-  oidc=$(curl -fsS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-    "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=namespace" | jq -r .value)
-  [[ -n "$oidc" && "$oidc" != null ]] || { echo "tools/namespace-re-image: no GitHub OIDC token" >&2; exit 1; }
-  tenant=$(nsc workspace describe -o json 2>/dev/null | sed -n 's/.*"tenant_id": *"\([^"]*\)".*/\1/p')
-  [[ -n "$tenant" ]] || { echo "tools/namespace-re-image: no Namespace tenant id" >&2; exit 1; }
-  # A Namespace runner points NSC_TOKEN_FILE/NSC_TOKEN_SPEC* at the
-  # workspace identity, which overrides any stored token. Exchange into a
-  # private HOME with those unset so the optimise runs as the exchanged
-  # (baseimage:optimize) identity.
-  nsc_home="$work/nsc-home"
-  mkdir -m 700 "$nsc_home"
-  nsc_oidc() { env -u NSC_TOKEN_FILE -u NSC_TOKEN_SPEC -u NSC_TOKEN_SPEC_FILE HOME="$nsc_home" nsc "$@"; }
-  if ! nsc_oidc auth exchange-oidc-token --tenant_id "$tenant" --token "$oidc" --duration 1h >/dev/null; then
-    # Name the claims the trust relationship matches on (never the token).
-    payload=$(cut -d. -f2 <<<"$oidc" | tr '_-' '/+')
-    while (( ${#payload} % 4 )); do payload+="="; done
-    base64 -d <<<"$payload" 2>/dev/null | jq -c '{iss, sub, aud}' >&2 || true
-    exit 1
-  fi
-  unset oidc
-  # Non-secret state for diagnosing the exchanged identity: variable names,
-  # stored file names and the workspace check-login reports.
-  echo "tools/namespace-re-image: NSC variables: $(compgen -e | grep '^NSC_' | tr '\n' ' ')" >&2
-  echo "tools/namespace-re-image: XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-unset}" >&2
-  find "$nsc_home" "${XDG_CONFIG_HOME:-$nsc_home/.config}/ns" -maxdepth 3 -printf '%P %s\n' 2>/dev/null >&2 || true
-  nsc_oidc auth check-login 2>&1 | grep -v -i -E 'token|bearer|ey[A-Za-z0-9_-]{20}' >&2 || true
-  nsc_oidc base-image optimize --image_ref "$image@$digest"
-else
+# A Namespace runner's workspace identity may push but lacks
+# baseimage:optimize, Namespace refuses that permission in revocable tokens,
+# and on its own runners nsc always acts as the instance identity. CI
+# therefore sets NAMESPACE_RE_IMAGE_OPTIMIZE=skip and optimises in a
+# separate GitHub-hosted job that exchanges the job's OIDC token
+# (.github/workflows/namespace-re-image.yml). Run locally, the logged-in
+# user optimises here.
+if [[ "${NAMESPACE_RE_IMAGE_OPTIMIZE:-}" != skip ]]; then
   nsc base-image optimize --image_ref "$image@$digest"
 fi
 printf '%s %s@%s\n' "$cells_id" "$image" "$digest" > "$lock"
