@@ -18,6 +18,13 @@ nixos-machine-tests.yml MUST run every nixos_machine_test target daily, and
 on dispatch the space-separated check names given in `checks`, each through
 `tools/buck2 test` in its own job (ADR-0270).
 
+@cc [owner:ghuntley,label:verification] mix-nightly-fresh-seeds
+mix-nightly-seeds.yml MUST run daily and on dispatch, building every Mix suite
+that ci.yml's mix job can select with one `-c mix.test_salt` per run:
+`nightly-<UTC date>` by default, or the dispatched salt for a replay. It MUST
+print the salt, so a failure can be reproduced (contract
+mix-test-seeds-explicit, ADR-0269).
+
 @cc [owner:ghuntley,label:security;build] ci-namespace-cache
 ci.yml's affected, build, hosts, test, evaluate, machine and precommit jobs,
 nixos-machine-tests.yml's jobs and oss-scanner.yml's image job MUST receive the Namespace token only as the

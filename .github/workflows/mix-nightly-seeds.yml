@@ -1,0 +1,105 @@
+name: "mix nightly seeds"
+
+# Fresh ExUnit and Hegel seeds for every Mix suite once a day (ADR-0269 seed
+# policy). The trunk gate runs Hegel derandomized with ExUnit `--seed 0`, so a
+# cached verdict depends only on its inputs. This run passes the salt
+# `nightly-<UTC date>`, which enters every shard's action key, so every suite
+# reruns with one seed derived from the salt for both ExUnit and HEGEL_SEED
+# (contract mix-test-seeds-explicit). A failing shard prints its salt, seed and
+# reproduction command; dispatch with the same salt to rerun it.
+#
+# Contract mix-nightly-fresh-seeds: see .github/CONTRACTS.
+on:
+  schedule:
+    # Daily at 03:00 UTC, away from the 14:00 machine-test run.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+    inputs:
+      salt:
+        description: Salt to run with ([A-Za-z0-9._-], default nightly-<UTC date>), for reproducing a failure.
+        required: false
+        default: ""
+
+concurrency:
+  group: mix-nightly-seeds-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  discover:
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 60
+    outputs:
+      salt: ${{ steps.select.outputs.salt }}
+      mix: ${{ steps.select.outputs.mix }}
+    # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
+    # token is set.
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: List Mix suites
+        run: tools/affected --all --output all.json
+      - name: Choose the salt and suites
+        id: select
+        env:
+          SALT: ${{ inputs.salt }}
+        run: |
+          set -euo pipefail
+          salt=${SALT:-nightly-$(date -u +%F)}
+          if [[ ! $salt =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+            echo "salt must be 1-64 characters of [A-Za-z0-9._-]" >&2
+            exit 1
+          fi
+          # Same split as ci.yml's mix job: Marshall's shards, then every other
+          # suite. `publish_cache_gate` suites (Lilly's, ADR-0269 M8 gap) stay
+          # with publish-cache.yml until they pass in the sandbox.
+          mix=$(jq -c '[.tests[] | select((.labels | index("expensive")) and (.labels | index("publish_cache_gate") | not)) | .target]
+            | [{name: "marshall", targets: map(select(startswith("root//marshall:")))},
+               {name: "suites", targets: map(select(startswith("root//marshall:") | not))}]
+            | map(select(.targets | length > 0))' all.json)
+          {
+            echo "salt=$salt"
+            echo "mix=$mix"
+          } >> "$GITHUB_OUTPUT"
+          echo "test_salt=$salt" | tee -a "$GITHUB_STEP_SUMMARY"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
+
+  mix:
+    needs: discover
+    if: needs.discover.outputs.mix != '[]'
+    name: mix ${{ matrix.suite.name }} (${{ needs.discover.outputs.salt }})
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.discover.outputs.mix) }}
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Test ${{ matrix.suite.name }} with a fresh salt
+        env:
+          SALT: ${{ needs.discover.outputs.salt }}
+          TARGETS: ${{ toJSON(matrix.suite.targets) }}
+        run: |
+          set -euo pipefail
+          echo "test_salt=$SALT"
+          mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
+          tools/buck2 build --keep-going --console simple -c mix.test_salt="$SALT" "${targets[@]}"
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan

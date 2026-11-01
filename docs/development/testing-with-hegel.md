@@ -248,6 +248,23 @@ the engine's `.hegel/examples` replay database wherever `HEGEL_DATABASE` is not
 `disabled`. That changes which examples run, so it is an open follow-up rather
 than part of this pin.
 
+Under Buck2, `mix_test` sets the seeds from the action's inputs, so a cached
+verdict is the one a fresh run would reach
+([ADR-0269](../architecture/decisions/0269-buck2-build-system-with-nix-toolchains.md),
+contract `mix-test-seeds-explicit` in [buck/CONTRACTS](../../buck/CONTRACTS)):
+
+| Run | `[mix] test_salt` | Hegel | ExUnit |
+|---|---|---|---|
+| Gate (`tools/precommit`, ci.yml, `tools/buck2 build`) | empty | `CI=true` (`ci` profile), `HEGEL_DERANDOMIZE=true`, `HEGEL_DATABASE=disabled` | `--seed 0` |
+| Nightly ([mix-nightly-seeds.yml](../../.github/workflows/mix-nightly-seeds.yml)) | `nightly-<UTC date>` | `CI=true`, `HEGEL_SEED=<n>`, `HEGEL_DATABASE=disabled` | `--seed <n>` |
+
+`<n>` is the 32-bit FNV-1a hash of the salt. The `ci` profile suppresses the
+wall-clock TooSlow health check, so a verdict does not depend on machine load;
+plain `mix test` outside CI still runs it. Each shard log starts with its
+salt and seeds. A failing shard prints a reproduction command:
+`tools/buck2 build <target> -c mix.test_salt=<salt>`, or the `mix test` line
+with the same environment.
+
 The `b0dec2a` installer publishes the NIF through a sibling temporary file and
 atomic rename. The previous in-place copy truncated a loaded library inode,
 which could crash a concurrent test VM even when copying identical bytes.

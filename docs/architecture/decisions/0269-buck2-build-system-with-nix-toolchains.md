@@ -233,11 +233,25 @@ the approved migration plan.
     - any other failure fails the shard;
     - known.txt marks each entry failing or now passing, and ci.yml's `mix`
       job prints it under "known Inception failures".
-  - Seeds (contract `mix-test-seeds-explicit`). A cached verdict keeps the
-    ExUnit and Hegel draws of the run that recorded it, and the shard log
-    keeps ExUnit's seed. `-c mix.test_salt=<value>` changes every shard's
-    action key and reruns it with fresh draws. Deriving the seeds from the
-    input digest remains open.
+  - Seeds (contract `mix-test-seeds-explicit`, `_mix_test_seeds` in
+    [mix_phases.sh](../../../buck/mix_phases.sh)). Every seed comes from the
+    action's inputs, so a cached verdict is the one a fresh run would reach.
+    - Every shard selects Hegel's `ci` profile (`CI=true`; the sandbox
+      clears the environment), with `HEGEL_DATABASE=disabled`. That profile
+      suppresses the wall-clock TooSlow health check, which failed Lilly's
+      fresh-boot properties under load.
+    - The gate (empty `[mix] test_salt`) runs Hegel derandomized
+      (`HEGEL_DERANDOMIZE=true`) and ExUnit with `--seed 0`.
+    - `-c mix.test_salt=<salt>` changes every shard's action key. It derives
+      one seed (32-bit FNV-1a of the salt) for both `--seed` and
+      `HEGEL_SEED`, so the run explores new draws and can be replayed.
+      `HEGEL_SEED` reaches BEAM properties from hegel-erlang `44b4c8e`;
+      before it, the NIF cleared the seed.
+    - Each shard log starts with its salt and seeds, and a failing shard
+      prints a reproduction command.
+    - [mix-nightly-seeds.yml](../../../.github/workflows/mix-nightly-seeds.yml)
+      reruns every `mix_test` target daily with the salt `nightly-<UTC date>`
+      (contract `mix-nightly-fresh-seeds`).
   - `//buck:mix_test_failure_uncached` now runs its fixture in two shards.
   - ci.yml's `mix` job builds the affected suites on at most two runners:
     Marshall, and the rest. It also runs on same-repository pull requests,
@@ -495,11 +509,12 @@ Remaining gaps, by milestone of the migration plan:
     gap too; neither build fixes them yet.
   - The known Inception failures run in the `[known_failures]` shards of
     `//audi:test` and `//marshall:test`, as above, not excluded.
-  - Hegel and ExUnit still draw fresh seeds per run, so a cached verdict
-    freezes one draw per input tree, and a cached failure cannot be replayed
-    from its seed. `-c mix.test_salt=<value>` reruns every suite with new
-    seeds. Deriving the seeds from the input digest, and a scheduled
-    fresh-seed run, remain open.
+  - Derandomized Hegel draws come from one engine key (`unnamed-test`),
+    because hegel_ex sets no per-property database key. Every property
+    without a `seed:` therefore starts from the same seed in the gate. A
+    per-property key would also enable the engine's `.hegel/examples` replay
+    database; that is an upstream hegel_ex follow-up. The nightly salted run
+    gives every suite new draws.
 - the remaining M3 item: `nix_assemble` has no per-host `params` channel, so
   hosts take lib.assemble's fleet-wide defaults
   ([ADR-0271](0271-buck2-host-self-deployment.md));

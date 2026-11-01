@@ -229,6 +229,40 @@ _mix_known_failures() {
   [[ $status == 0 ]] || { ((failures > 0)) && ((unknown == 0)); }
 }
 
+# Contracts mix-test-seeds-explicit: see buck/CONTRACTS. Sets _mix_seed and
+# the Hegel environment from $test_salt. The sandbox clears the environment,
+# so CI=true selects Hegel's `ci` profile explicitly: derandomized, no
+# database, and no wall-clock TooSlow health check, which would make a
+# verdict depend on machine load. The empty salt (the gate) keeps the
+# derandomized draws and ExUnit's declaration order; a salt derives one seed
+# (32-bit FNV-1a) for both ExUnit and HEGEL_SEED, which overrides
+# derandomization. The engine reads its environment once per VM.
+_mix_test_seeds() {
+  export CI=true HEGEL_DATABASE=disabled
+  if [[ -z ${test_salt-} ]]; then
+    _mix_seed=0
+    export HEGEL_DERANDOMIZE=true
+    unset HEGEL_SEED
+  else
+    if [[ ! $test_salt =~ ^[A-Za-z0-9._-]{1,64}$ ]]; then
+      echo "mix_test: test_salt must be 1-64 characters of [A-Za-z0-9._-]" >&2
+      exit 1
+    fi
+    local hash=2166136261 i char
+    for ((i = 0; i < ${#test_salt}; i++)); do
+      printf -v char '%d' "'${test_salt:i:1}"
+      hash=$(((hash ^ char) * 16777619 & 0xffffffff))
+    done
+    # ExUnit treats seed 0 as "do not shuffle"; keep salted runs shuffled.
+    _mix_seed=$((hash == 0 ? 1 : hash))
+    export HEGEL_SEED=$_mix_seed
+    unset HEGEL_DERANDOMIZE
+  fi
+  local hegel=derandomized
+  if [[ -n ${HEGEL_SEED-} ]]; then hegel="HEGEL_SEED=$HEGEL_SEED"; fi
+  _mix_seed_line="mix_test: test_salt='${test_salt-}' exunit --seed $_mix_seed, hegel ci profile, $hegel, HEGEL_DATABASE=disabled"
+}
+
 # Contracts mix-test-cacheable-result: see buck/CONTRACTS.
 mix_test() {
   _mix_restore
@@ -237,11 +271,15 @@ mix_test() {
   # controlled git) get store interpreters, as in a Nix check.
   if [[ -d test ]]; then patchShebangs test > /dev/null; fi
   mkdir -p /io/1
+  local seed
+  _mix_test_seeds
+  seed=$_mix_seed
   local status=0
+  printf '%s\n' "$_mix_seed_line" > /io/1/test.log
   # A hard bound per shard (contract mix-test-sharded): a hung test or
   # cleanup fails the shard in test_timeout instead of holding it for hours.
   timeout --signal=TERM --kill-after=30s "${test_timeout:-45m}" \
-    mix do deps.loadpaths --no-deps-check + test "$@" > /io/1/test.log 2>&1 || status=$?
+    mix do deps.loadpaths --no-deps-check + test --seed "$seed" "$@" >> /io/1/test.log 2>&1 || status=$?
   if [[ $status == 124 || $status == 137 ]]; then
     echo "mix_test: the shard exceeded its ${test_timeout:-45m} bound" >> /io/1/test.log
   fi
@@ -258,6 +296,9 @@ mix_test() {
     grep -E '^ +[0-9]+\) (test|property|doctest|describe) ' /io/1/test.log >&2 || true
     tail -n 200 /io/1/test.log >&2
     echo "mix_test: the suite exited with status $status" >&2
+    echo "$_mix_seed_line" >&2
+    echo "mix_test: reproduce with -c mix.test_salt='${test_salt-}', or outside Buck2 with" \
+      "CI=true HEGEL_DATABASE=disabled ${HEGEL_SEED:+HEGEL_SEED=$HEGEL_SEED }${HEGEL_DERANDOMIZE:+HEGEL_DERANDOMIZE=$HEGEL_DERANDOMIZE }mix test --seed $seed" >&2
     exit 1
   fi
 }

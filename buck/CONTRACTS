@@ -371,11 +371,17 @@ included) and MUST write known.txt marking each entry `failing` or
 job MUST print that file under a "known Inception failures" heading.
 
 @cc [owner:ghuntley,label:verification] mix-test-seeds-explicit
-A cached shard verdict freezes the ExUnit and Hegel draws of the run that
-produced it; mix_test MUST NOT hide that. The shard log MUST keep ExUnit's
-seed line, and the `[mix] test_salt` configuration MUST enter every shard's
-action key, so `-c mix.test_salt=<value>` reruns every suite with fresh
-seeds (ADR-0269).
+A cached shard verdict MUST be the verdict a fresh run of the same action
+would reach, so every seed MUST come from the action's inputs. The
+`[mix] test_salt` configuration MUST enter every shard's action key, and every
+run MUST select Hegel's `ci` profile (CI=true: no wall-clock TooSlow check)
+with HEGEL_DATABASE=disabled. With the empty salt (the gate) mix_test MUST run
+Hegel derandomized (HEGEL_DERANDOMIZE=true, no HEGEL_SEED) and ExUnit with
+`--seed 0`. With a salt it MUST validate it and derive one seed from it
+for both `--seed` and HEGEL_SEED, so `-c mix.test_salt=<value>` reruns every
+suite with fresh, replayable draws. The shard log MUST start with the salt
+and seeds, and a failing shard MUST print them with a reproduction command
+(ADR-0269).
 
 @cc [owner:ghuntley,label:verification;security] mix-test-hermetic-postgres
 A mix_test that needs a database MUST start its own PostgreSQL on a unix
