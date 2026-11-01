@@ -37,7 +37,7 @@ remotable actions remotely by default, as tools/buck2 does everywhere.
 @cc [owner:ghuntley,label:security;release] mila-release-publish-tag-only
 mila-release.yml MUST create a GitHub release, or upload to any store, only in
 a run for a pushed `refs/tags/mila-v*` tag (`github.event_name == 'push'`): the
-publish job and its tag-only needs (source-bundle, linux, windows) carry that
+publish job and its tag-only needs (source-bundle, linux) carry that
 explicit `if:`. A run on any other trigger (workflow_dispatch on any ref, a
 trunk push) MUST NOT publish and MUST NOT enter the `mila-release`
 environment or read a signing secret; its android and apple jobs build

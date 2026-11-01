@@ -9,8 +9,12 @@ name: "mila release"
 # signing secret. They build the unsigned APK and the ad-hoc
 # `mila-build <platform> unsigned` DMG and IPA as MAJOR.MINOR.PATCH 0.0.<run
 # number> and upload them as `unsigned-*` artifacts kept 7 days. source-bundle,
-# linux, windows and publish are tag-only, so an unsigned run never publishes
+# linux and publish are tag-only, so an unsigned run never publishes
 # (contracts mila-release-publish-tag-only, mila-release-signing-leak).
+# No Windows client artifact is released: the Flutter Windows job was retired
+# with the Flutter client, and the native follow-up is an unsigned win-x64 zip
+# from //mila:windows-dotnet once its DLL is a reproducible Buck2 artifact
+# (ADR-0235). The Windows source bundle is still published.
 # The Apple jobs hand mila-build its MILA_* inputs (mila/native/apple/build.sh);
 # mila-build refuses a missing input and verifies each signature it makes.
 # Signing material is written to job-temporary files and keychains that an
@@ -21,15 +25,13 @@ name: "mila release"
 # APPLE_IOS_PROFILE_RUNNER_BASE64, APPLE_IOS_PROFILE_NOTIFICATION_SERVICE_BASE64,
 # APPLE_IOS_EXPORT_OPTIONS_BASE64, APPLE_NOTARY_KEY_P8_BASE64, APPLE_NOTARY_KEY_ID,
 # APPLE_NOTARY_ISSUER_ID, ANDROID_UPLOAD_KEYSTORE_BASE64,
-# ANDROID_UPLOAD_STORE_PASSWORD, ANDROID_UPLOAD_KEY_PASSWORD,
-# WINDOWS_CERTIFICATE_PFX_BASE64, WINDOWS_CERTIFICATE_PASSWORD.
+# ANDROID_UPLOAD_STORE_PASSWORD, ANDROID_UPLOAD_KEY_PASSWORD.
 # Variables: MILA_APPLE_TEAM, MILA_APPLE_IDENTITY (Developer ID for macOS),
 # MILA_IOS_IDENTITY, MILA_MACOS_PROFILE_RUNNER,
 # MILA_MACOS_PROFILE_NOTIFICATION_SERVICE, MILA_IOS_PROFILE_RUNNER,
 # MILA_IOS_PROFILE_NOTIFICATION_SERVICE (profile names),
 # MILA_ANDROID_UPLOAD_KEY_ALIAS, MILA_FCM_PROJECT_ID, MILA_FCM_APPLICATION_ID,
-# MILA_FCM_API_KEY, MILA_FCM_SENDER_ID, MILA_WINDOWS_PUBLISHER,
-# MILA_WINDOWS_TIMESTAMP_URL (optional).
+# MILA_FCM_API_KEY, MILA_FCM_SENDER_ID.
 on:
   push:
     tags: ["mila-v*"]
@@ -526,111 +528,11 @@ jobs:
           retention-days: ${{ env.MILA_SIGNED != 'true' && '7' || '' }}
           if-no-files-found: error
 
-  windows:
-    needs: source-bundle
-    if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mila-v') }}
-    runs-on: windows-2025
-    environment: mila-release
-    timeout-minutes: 120
-    env:
-      # Flutter remains a Windows-only compatibility build input while the
-      # signed release jobs use native clients.
-      FLUTTER_VERSION: 3.47.0
-      FLUTTER_WINDOWS_SHA256: 9f96d393cdfad05bea0b4b42c603ffda027af11adadc8e4cf3ac87e49110c1ca
-    defaults:
-      run:
-        shell: pwsh
-    steps:
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: mila-source-bundle
-          path: ${{ runner.temp }}/bundle
-      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
-        with:
-          name: mila-windows-source-bundle
-          path: ${{ runner.temp }}/windows-bundle
-      - name: Verify native Windows source bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/windows-bundle"
-          sha256sum -c SHA256SUMS
-          tar -xzf mila-windows-source-bundle-*.tar.gz
-          root=$(find . -maxdepth 1 -type d -name 'mila-windows-source-bundle-*' -print -quit)
-          (cd "$root" && sha256sum --quiet -c SHA256SUMS)
-          if find "$root" -type f \( -iname '*flutter*' -o -iname '*.dart' \) -print -quit | grep -q .; then
-            echo 'native Windows source bundle contains Flutter/Dart input' >&2
-            exit 1
-          fi
-      - name: Unpack and verify the source bundle
-        shell: bash
-        run: |
-          set -euo pipefail
-          cd "$RUNNER_TEMP/bundle"
-          sha256sum -c SHA256SUMS
-          tar -xzf mila-source-bundle-*.tar.gz -C "$RUNNER_TEMP"
-          root=$(cd "$RUNNER_TEMP" && cd mila-source-bundle-* && pwd -W)
-          (cd "$root" && sha256sum --quiet -c SHA256SUMS)
-          echo "MILA_ROOT=$root" >> "$GITHUB_ENV"
-          echo "PUB_CACHE=$root/pub-cache" >> "$GITHUB_ENV"
-      - name: Install the pinned Flutter
-        run: |
-          $zip = Join-Path $env:RUNNER_TEMP "flutter.zip"
-          $url = "https://storage.googleapis.com/flutter_infra_release/releases/stable/windows/flutter_windows_$($env:FLUTTER_VERSION)-stable.zip"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          $hash = (Get-FileHash -Algorithm SHA256 $zip).Hash.ToLowerInvariant()
-          if ($hash -ne $env:FLUTTER_WINDOWS_SHA256) { throw "Flutter archive digest $hash does not match the pin" }
-          tar -xf $zip -C $env:RUNNER_TEMP
-          Remove-Item $zip
-          "$env:RUNNER_TEMP\flutter\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
-      - name: Resolve packages offline from the bundle
-        run: |
-          flutter config --no-analytics
-          foreach ($d in "packages/mila_core", "packages/mila_transport", "tool", "app") {
-            Push-Location (Join-Path $env:MILA_ROOT "mila/$d")
-            flutter pub get --offline --enforce-lockfile
-            if ($LASTEXITCODE -ne 0) { throw "pub get failed in $d" }
-            Pop-Location
-          }
-      - name: Import the code-signing certificate
-        env:
-          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE_PFX_BASE64 }}
-          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
-        run: |
-          $pfx = Join-Path $env:RUNNER_TEMP "mila-signing.pfx"
-          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:CERTIFICATE))
-          $password = ConvertTo-SecureString $env:CERTIFICATE_PASSWORD -AsPlainText -Force
-          $cert = Import-PfxCertificate -FilePath $pfx -CertStoreLocation Cert:\CurrentUser\My -Password $password
-          Remove-Item $pfx
-          "MILA_WINDOWS_CERT_SHA1=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-      - name: Windows release (signed MSIX)
-        working-directory: ${{ env.MILA_ROOT }}/mila/tool
-        env:
-          MILA_WINDOWS_PUBLISHER: ${{ vars.MILA_WINDOWS_PUBLISHER }}
-          MILA_WINDOWS_TIMESTAMP_URL: ${{ vars.MILA_WINDOWS_TIMESTAMP_URL }}
-        run: |
-          dart run bin/mila_build.dart windows release
-          if ($LASTEXITCODE -ne 0) { throw "mila-build windows release failed" }
-      - name: Remove the code-signing certificate
-        if: always()
-        run: |
-          Remove-Item (Join-Path $env:RUNNER_TEMP "mila-signing.pfx") -ErrorAction SilentlyContinue
-          if ($env:MILA_WINDOWS_CERT_SHA1) {
-            Remove-Item "Cert:\CurrentUser\My\$($env:MILA_WINDOWS_CERT_SHA1)" -DeleteKey -ErrorAction SilentlyContinue
-          }
-      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
-        with:
-          name: release-windows
-          path: |
-            ${{ env.MILA_ROOT }}/mila/build/windows-release/*.msix
-            ${{ env.MILA_ROOT }}/mila/build/windows-release/SHA256SUMS
-          if-no-files-found: error
-
   # Contract mila-release-publish-tag-only: see .github/CONTRACTS. Only a
   # pushed mila-v* tag publishes; every other run skips this job and its
   # tag-only needs.
   publish:
-    needs: [source-bundle, linux, android, apple, windows]
+    needs: [source-bundle, linux, android, apple]
     if: ${{ github.event_name == 'push' && startsWith(github.ref, 'refs/tags/mila-v') }}
     runs-on: ubuntu-24.04
     environment: mila-release

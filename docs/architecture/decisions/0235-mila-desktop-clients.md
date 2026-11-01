@@ -198,6 +198,15 @@ Remaining gaps:
   key, sign in and approve it, then revoke the software key. It needs the
   Marshall custody attribute from the open question below, so that the
   deployment can see which keys are software and confirm the replacement.
+- No Windows client is released. mila-release's Flutter `windows` job (signed
+  MSIX through the removed Dart planner) was retired because its tool no longer
+  exists. The planned follow-up is an unsigned win-x64 zip from
+  `//mila:windows-dotnet`, once the FFI DLL is a reproducible Buck2 artifact.
+  The Windows source bundle is still published.
+- Signed publishing is deferred: the user decided on 2026-11-01 that
+  mila-release stays unsigned for now, so no signing secrets or signed publish
+  run are set up. The Android apksigner and Apple signed code paths remain,
+  unexercised.
 - The release workflows have not run with real signing material: the
   `mila-release` environment and its Apple and Android signing secrets are
   not yet provisioned, so the signed paths, including the Android apksigner
