@@ -39,8 +39,12 @@ precommit check) refuses all of these:
 
 - **Fetch** (`fetchurl`, `fetchFromGitHub`):
   1. Add a registry key with `lib.fakeHash`.
-  2. Build, and copy the reported hash into the registry.
-  3. Read the key through `pins.nix`.
+  2. Read the key through `pins.nix`.
+  3. Claim the key in an entry of `nix/domains/artifacts/fetch-pins.nix`
+     (declaring files, keys, a consumer closure; add `flake.lock` to `locks`
+     when the fetcher's output depends on nixpkgs tools, as vendors do).
+  4. Run `elixir scripts/fetch_pins.exs --entry <name>` to record the hash.
+     It refuses a registry key that no entry claims.
 - **Cargo:** register the lock in `lib.dependencyPins.cargo` in
   `nix/domains/artifacts/default.nix`. `scripts/cargo_security_upgrades.exs`
   refuses unregistered locks.
@@ -114,7 +118,10 @@ To add a tool:
   devenv's revision and commits both locks. A bump can invalidate registry
   hashes: `scripts/dependency_pins.ex` `refresh!` (used by the Mix and Cargo
   security-upgrade scripts) builds `lib.dependencyPins.<ecosystem>.<name>.build`
-  until every hash converges.
+  until every hash converges, and `nix-upgrades.yml` runs
+  `scripts/fetch_pins.exs --changed flake.lock` for the fetch entries whose
+  fetchers depend on nixpkgs. After bumping a fetch's version, run
+  `elixir scripts/fetch_pins.exs --changed <declaring file>`.
 - The devenv shell imports the same toolchain files as the cells
   (`infrastructure/toolchain.nix`, `nix/rust-toolchain.nix`,
   `nix/buck/python.nix`) and runs `tools/buck2` as `buck2`; it never

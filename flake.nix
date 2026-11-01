@@ -64,8 +64,8 @@
       # output and check through it.
       lib.assemble = assemble;
       # Lock files, builds and fixed-output hash keys for the scheduled
-      # Mix and Cargo security upgrade scripts.
-      lib.dependencyPins = assembled.packages.dependencyPins;
+      # Mix and Cargo security upgrades and the fetch-pin refresh.
+      lib.dependencyPins = assembled.dependencyPins;
 
       # Buck2 prelude and Nix toolchain paths (ADR-0269); tools/buck2 links it.
       buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (assembled.packages) toolchain; artifacts = assembled.packages; };

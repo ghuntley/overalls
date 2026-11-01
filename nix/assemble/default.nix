@@ -173,6 +173,11 @@ assert lib.assertMsg (builtins.isAttrs params && unknownParams == [ ])
   inherit packages hostPackages imported kexec checks modules antithesis systems;
   # The validated parameters, resolved (buck/tests/assembly_params.py).
   params = hostParams;
+  # lib.dependencyPins: the package set's lock-file ecosystems plus the
+  # `fetch` registry, whose closures include machine tests (ADR-0267).
+  dependencyPins = packages.dependencyPins // {
+    fetch = import ../domains/artifacts/fetch-pins.nix { inherit pkgs nixpkgs packages checks; };
+  };
   # Flake package outputs by their flake names (`//:package-<name>`).
   outputPackages = outputs.packages;
 }

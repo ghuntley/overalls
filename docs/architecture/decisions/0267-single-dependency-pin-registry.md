@@ -107,9 +107,12 @@ plan (track T1).
   with later recipe and runtime changes, so no committed bundle depended on it.
   The fetch drvPaths are unchanged; only the product overlay that carries the
   release id changed.
-- Refresh automation does not yet cover the moved fetch keys. They are updated
-  by editing the registry, which is the same manual process as before but now
-  in one file.
+- Every registry key now has a refresh path: Mix and Cargo entries refresh on
+  lock changes, and `lib.dependencyPins.fetch` covers the moved fetch keys.
+  The scheduled nix upgrade refreshes the entries whose fetchers depend on the
+  pinned nixpkgs; a version bump in a declaring file is refreshed with
+  `elixir scripts/fetch_pins.exs --changed <file>`. A refreshed hash is checked
+  by fetching it again, not by human review of the fetched source.
 
 ## Invariants and verification
 
@@ -123,6 +126,9 @@ plan (track T1).
   only tracked lock is the root one; the same script and `pins` refuse others.
 - `flake.lock` and `devenv.lock` agree on the application nixpkgs and
   `nix-compact`. Checked by `package-input-lock`.
+- Every registry key is claimed by exactly one `mix`, `cargo` or `fetch` entry.
+  Checked by `scripts/fetch_pins.exs` before any refresh, which the scheduled
+  nix upgrade runs; its pure logic is covered by `dependency_pins_test.exs`.
 - **Failure case:** a new fetcher written with an attribute name the pattern
   does not match, such as an unusual `*Digest`, would escape the check. Review
   and the domain-lock exemption list remain the backstop.
@@ -176,13 +182,25 @@ plan (track T1).
   wrong digest were exercised in an isolated `MIX_HOME`. The Mila
   [builds](../../../.github/workflows/mila-builds.yml) and [release](../../../.github/workflows/mila-release.yml) workflows already install
   `cargo-ndk --locked --version 4.1.2`.
+- [fetch-pins.nix](../../../nix/domains/artifacts/fetch-pins.nix) is `lib.dependencyPins.fetch`, wired in
+  [the assembly](../../../nix/assemble/default.nix) so closures can name machine tests. Each entry
+  lists its declaring files, registry keys and a consumer closure.
+  [dependency_pins.ex](../../../scripts/dependency_pins.ex) and [fetch_pins.exs](../../../scripts/fetch_pins.exs) give each key its own
+  placeholder hash, find the placeholder fetches in the closure (or the
+  evaluation-time download), learn the real hashes over as many rounds as
+  dependent vendors need, and fetch again with them. The
+  [nix upgrades workflow](../../../.github/workflows/nix-upgrades.yml) runs it for the changed lock files and commits
+  the registry with them. A local run refreshed the Let's Encrypt roots,
+  smtprelay source and Go vendor (two rounds), the coding-CLI nixpkgs tarball
+  and the illumos Git runtime; every recovered hash equalled the registry.
+  Every entry's closure was checked to contain each key's fetch.
+  [dependency_pins_test.exs](../../../marshall/test/architecture/dependency_pins_test.exs) covers selection, coverage, hash
+  formats (property), placeholder matching and mismatch parsing.
 - [The CI devenv action](../../../.github/actions/devenv/action.yml) and [the OSS scanner image](../../../.oss-scanner/Dockerfile)
   pin the Nix installer checksum and the base image digest.
 
 Remaining gaps:
 
-- A `fetch` ecosystem in `lib.dependencyPins`, so scheduled refreshes cover the
-  moved keys.
 - Registering the guest domain locks (Ubuntu, Windows, native Git, vscode
   extensions) with their updaters.
 

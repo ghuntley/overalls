@@ -57,8 +57,11 @@ jobs:
 
           # Runs `devenv update`, pins flake.lock's buildNixpkgs to the same
           # devenv-nixpkgs revision (flake-package-inputs; enforced by the
-          # package-input-lock check) and commits both locks. Returns non-zero
-          # when neither lock file changed.
+          # package-input-lock check), refreshes the lib.dependencyPins.fetch
+          # hashes whose fetchers depend on the changed locks (ADR-0267) and
+          # commits all three files. Returns non-zero when neither lock file
+          # changed; fails when a refreshed fetch does not build.
+          fetch_summary="$RUNNER_TEMP/fetch-pins.md"
           update_and_commit() {
             devenv update
 
@@ -73,16 +76,24 @@ jobs:
             echo "Changes detected in the lock files:"
             git --no-pager diff -- devenv.lock flake.lock || true
 
+            changed=()
+            while IFS= read -r path; do
+              changed+=(--changed "$path")
+            done < <(git diff --name-only -- devenv.lock flake.lock)
+            devenv shell -- elixir scripts/fetch_pins.exs "${changed[@]}" --summary "$fetch_summary"
+
             summary=$(git diff -- devenv.lock | grep -E '^\+.*"(devenv|git-hooks|nixpkgs)".*github:' | sed 's/^+/- Updated: /' || true)
             [ -n "$summary" ] || summary="- Updated devenv dependencies"
 
-            git add devenv.lock flake.lock
+            git add devenv.lock flake.lock nix/domains/artifacts/dependency-hashes.json
             git commit -F - <<EOF
           chore(deps): update devenv dependencies
 
           Automated update of development environment dependencies:
           $summary
           - Pinned flake.lock buildNixpkgs to $pin
+
+          $(cat "$fetch_summary")
 
           🤖 Generated automatically by the automatic nix upgrades workflow
           EOF

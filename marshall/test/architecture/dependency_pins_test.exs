@@ -3,6 +3,8 @@ Code.require_file("../../../scripts/cargo_security_upgrades.ex", __DIR__)
 
 defmodule Overalls.DependencyPinsTest do
   use ExUnit.Case, async: true
+  import Hegel
+  import Hegel.Gen, only: [binary: 1, member_of: 1]
   alias Overalls.{CargoSecurityUpgrades, DependencyPins}
   alias Overalls.DependencyPins.{Finding, HashMismatch}
 
@@ -146,5 +148,104 @@ defmodule Overalls.DependencyPinsTest do
              {:error, ["lyra/Cargo.lock"]}
 
     assert CargoSecurityUpgrades.single_root_lock([]) == {:error, []}
+  end
+
+  @fetch %{
+    "toolchain" => %{
+      locks: ["nix/domains/artifacts/infrastructure/toolchain.nix"],
+      keys: ["otpSource"]
+    },
+    "smtprelay" => %{
+      locks: ["nix/domains/artifacts/smtprelay/default.nix", "flake.lock"],
+      keys: ["smtprelaySource", "smtprelayVendor"]
+    }
+  }
+
+  test "validates evaluated fetch entries" do
+    decoded = %{"smtprelay" => %{"locks" => ["flake.lock"], "keys" => ["smtprelayVendor"]}}
+
+    assert {:ok, %{"smtprelay" => %{locks: ["flake.lock"], keys: ["smtprelayVendor"]}}} =
+             DependencyPins.fetch_targets(decoded)
+
+    assert {:error, _} = DependencyPins.fetch_targets(%{"x" => %{"locks" => ["x"], "keys" => []}})
+
+    assert {:error, _} =
+             DependencyPins.fetch_targets(%{"x" => %{"locks" => ["x"], "keys" => [1]}})
+
+    assert {:error, _} = DependencyPins.fetch_targets([])
+  end
+
+  # @cc [owner:ghuntley,label:verification;build] fetch-pin-coverage-oracle
+  # A changed declaring file or lock MUST select every fetch entry naming it,
+  # and a registry key that no entry claims, or that two claim, MUST be
+  # reported rather than left without a refresh path.
+  test "selects fetch entries by changed file and checks registry coverage" do
+    assert DependencyPins.affected_fetches(@fetch, ["flake.lock"]) == ["smtprelay"]
+    assert DependencyPins.affected_fetches(@fetch, ["devenv.lock"]) == []
+
+    assert DependencyPins.coverage(["a", "b", "c"], ["a", "b", "b", "d"]) == %{
+             uncovered: ["c"],
+             duplicated: ["b"],
+             unknown: ["d"]
+           }
+
+    assert DependencyPins.coverage(["a"], ["a"]) == %{uncovered: [], duplicated: [], unknown: []}
+  end
+
+  test "a key is missing only when neither resolved nor matched to a fetch" do
+    keys = ["source", "vendor", "tarball"]
+    assert DependencyPins.missing_keys(keys, [], []) == keys
+    assert DependencyPins.missing_keys(keys, ["tarball"], ["source"]) == ["vendor"]
+    assert DependencyPins.missing_keys(keys, ["tarball"], ["source", "vendor"]) == []
+  end
+
+  property "registry hashes keep their format through decode and encode" do
+    bytes = draw("digest", binary(length: 32))
+    format = draw("format", member_of([:sri, :base16]))
+    value = DependencyPins.encode(bytes, format)
+
+    assert DependencyPins.digest(value) == {:ok, bytes}
+    assert DependencyPins.hash_format(value) == {:ok, format}
+  end
+
+  test "decodes the nix32 hashes evaluation-time downloads report" do
+    # `builtins.fetchTarball` with sha256 = "sha256-BBBB...B=" reports this.
+    sri = "sha256-BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB="
+
+    assert DependencyPins.digest("sha256:040484808h8h0i0i01212024240484808h8h0i0i012120242404") ==
+             DependencyPins.digest(sri)
+
+    assert DependencyPins.digest("sha256-short=") == :error
+    assert DependencyPins.hash_format("not-a-hash") == :error
+  end
+
+  test "maps placeholder hashes in derivation JSON and mismatch logs to their keys" do
+    placeholder = DependencyPins.fake_digest("smtprelayVendor")
+    other = DependencyPins.fake_digest("otpSource")
+    assert placeholder != other
+    sri = DependencyPins.encode(placeholder, :sri)
+
+    shown = %{
+      "version" => 4,
+      "derivations" => %{
+        "abc-vendor.drv" => %{"outputs" => %{"out" => %{"hash" => sri, "method" => "nar"}}},
+        "def-other.drv" => %{"outputs" => %{"out" => %{"path" => "/nix/store/x"}}}
+      }
+    }
+
+    assert DependencyPins.hashed_derivations(shown, %{placeholder => "smtprelayVendor"}) == %{
+             "/nix/store/abc-vendor.drv" => "smtprelayVendor"
+           }
+
+    log = """
+    error: hash mismatch in file downloaded from 'https://example.org/a.tar.gz':
+             specified: sha256:040484808h8h0i0i01212024240484808h8h0i0i012120242404
+             got:       sha256:0jxcq8jvi6a0w36qwv0l6swimi0dq4qczx15zxwj5slnq6sggyi5
+    """
+
+    assert DependencyPins.parse_download_mismatches(log) == [
+             {"sha256:040484808h8h0i0i01212024240484808h8h0i0i012120242404",
+              "sha256:0jxcq8jvi6a0w36qwv0l6swimi0dq4qczx15zxwj5slnq6sggyi5"}
+           ]
   end
 end
