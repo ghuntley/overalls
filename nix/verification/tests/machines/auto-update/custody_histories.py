@@ -871,6 +871,36 @@ def check_runtime_invariants(terminal: str) -> None:
         require(not staging.exists(), "stale staging must not survive: " + terminal)
 
 
+NAMESPACE_CACHE_ABSENT: dict[str, object] = {
+    "event": "update.namespace_cache",
+    "state": "token_missing",
+}
+
+
+def without_namespace_cache(events: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Check and drop the Namespace cache report (ADR-0276).
+
+    The fixture holds no Namespace token, so every build MUST report the cache
+    as `token_missing` at most once, directly after its build phase (a
+    checkout mismatch fails the build before the report); the custody model
+    itself is independent of the cache.
+    """
+    build: dict[str, object] = {"event": "update.phase", "phase": "build"}
+    kept: list[dict[str, object]] = []
+    for event in events:
+        if event.get("event") == "update.namespace_cache":
+            require(event == NAMESPACE_CACHE_ABSENT, f"namespace cache report {event}")
+            require(
+                bool(kept) and kept[-1] == build, f"namespace cache report outside build: {events}"
+            )
+            continue
+        kept.append(event)
+    builds = kept.count(build)
+    reports = len(events) - len(kept)
+    require(reports <= builds, f"{reports} namespace cache reports for {builds} builds: {events}")
+    return kept
+
+
 def tick(world: World, model: Model) -> tuple[int, list[dict[str, object]]]:
     """Fire one production main() against the world and compare with the model."""
     expected_rc, expected_events = model.expect_tick(world)
@@ -891,6 +921,7 @@ def tick(world: World, model: Model) -> tuple[int, list[dict[str, object]]]:
     events: list[dict[str, object]] = []
     for line in output.getvalue().splitlines():
         events.append(object_map(json.loads(line)))
+    events = without_namespace_cache(events)
     require(rc == expected_rc, f"exit {rc} != model {expected_rc}")
     require(events == expected_events, f"events {events} != model {expected_events}")
     model.check()
