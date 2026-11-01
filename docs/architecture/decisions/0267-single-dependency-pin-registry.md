@@ -150,6 +150,13 @@ plan (track T1).
   `cedarCargo` hash, the last separately hashed first-party Cargo vendor.
   `pins` refuses any other tracked lock (`cargo_locks/1` in
   [pins.ex](../../../scripts/pins.ex)).
+- The prebuilt Rust archives are gone. The single rust-overlay toolchain
+  ([ADR-0273](0273-single-rust-workspace-and-toolchain.md) decision 2) is
+  read from the `rust-overlay` entry in `flake.lock` by
+  [rust-toolchain.nix](../../../nix/rust-toolchain.nix), and f0263cb74
+  removed the `rustStd*`, `rustcArchive` and `clippyArchive` registry keys
+  with devenv's own rust-overlay input. The gap stayed listed below until
+  2026-11-01.
 - The check is [pins.ex](../../../scripts/pins.ex) and [check_pins.exs](../../../scripts/check_pins.exs). It runs as the `pins` check in
   [flake.nix](../../../flake.nix) and as a prek hook in [devenv.nix](../../../devenv.nix). Its regression and
   repository tests are in [pins_test.exs](../../../marshall/test/architecture/pins_test.exs). `package-input-lock` in
@@ -166,8 +173,6 @@ Remaining gaps:
 - Pinning `mix local.hex` and `mix local.rebar` in the upgrade workflows, and
   `cargo-ndk` in the Mila workflows.
 - Moving the Windows editor recipe literals at its next source bump.
-- Replacing the prebuilt Rust archives with a single rust-overlay toolchain
-  (Buck2 plan, M5).
 
 ## Open questions
 
