@@ -382,7 +382,9 @@ A mix_test that needs a database MUST start its own PostgreSQL on a unix
 socket under the sandbox's /build, with TCP disabled, and stop it before the
 action ends. It MUST NOT reach a developer or host database. The only host
 state a suite may read is the read-only /sys/fs/cgroup of a mix_test with
-`host_cgroup` (Lilly's collector), which is not part of the action key.
+`host_cgroup` (Lilly's collector) and the read-only /etc/machine-id of a
+mix_test with `host_identity` (Lilly's ownership checks, which also run
+without the writable /nix/store overlay); neither is part of the action key.
 
 @cc [owner:ghuntley,label:verification;deployment] mix-release-probe
 release_probe MUST run nix/verification/tests/release/probe.exs in the Buck2

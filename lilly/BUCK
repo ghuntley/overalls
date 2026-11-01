@@ -93,14 +93,21 @@ overalls_mix_project(
     test_env = {"OVERALLS_TEST_VMM_DIR": read_root_config("mix", "vmm") + "/bin"},
     # The collector samples cgroup limits from /sys/fs/cgroup.
     test_host_cgroup = True,
-    # About 30 tests fail in the unprivileged sandbox (ADR-0269 M6 gap); 16
-    # of them because Lilly's
-    # configuration requires /etc/machine-id and the VMM helpers to be owned
-    # by uid 0, and a user namespace that maps only the build user shows
-    # host-root files as 65534 (Lilly.Control.ConfigTest's three startup
-    # loads and every Lilly.Control.InvalidBootPropertyTest mutation). Until a
-    # reviewed fix, the suite is not a precommit check and publish-cache.yml's
-    # `mix precommit` matrix keeps gating it (`publish_cache_gate`).
+    # Lilly's configuration requires /etc/machine-id and the VMM helpers to
+    # be owned by uid 0; a user namespace that maps only the build user shows
+    # host-root files as the overflow uid, which test builds accept
+    # (Lilly.Host.RootOwner, contract root-owner-exact-in-production).
+    test_host_identity = True,
+    # InvalidBootPropertyTest runs about 1250 s; the rest of the suite about
+    # as long again.
+    test_shards = 4,
+    test_shard_weights = {
+        "lilly/test/lilly/control/invalid_boot_property_test.exs": 1250,
+    },
+    # About 14 other tests still fail in the unprivileged sandbox (ADR-0269
+    # M6 gap). Until they are fixed, the suite is not a precommit check and
+    # publish-cache.yml's `mix precommit` matrix keeps gating it
+    # (`publish_cache_gate`).
     test_precommit = False,
     test_labels = ["publish_cache_gate"],
 )

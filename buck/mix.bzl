@@ -381,7 +381,7 @@ def _mix_test_impl(ctx: AnalysisContext) -> list[Provider]:
             tree,
             cmd_args(compiled.state, result.as_output()),
             identifier = name,
-            env = {"MIX_SANDBOX_CA_BUNDLE": ctx.attrs.ca_bundle} | ({"MIX_SANDBOX_CGROUP": "1"} if ctx.attrs.host_cgroup else {}),
+            env = {"MIX_SANDBOX_CA_BUNDLE": ctx.attrs.ca_bundle} | ({"MIX_SANDBOX_CGROUP": "1"} if ctx.attrs.host_cgroup else {}) | ({"MIX_SANDBOX_HOST_IDENTITY": "1"} if ctx.attrs.host_identity else {}),
             weight = schedulers,
         )
         results.append((name, result))
@@ -454,6 +454,10 @@ mix_test = rule(
         "seed_salt": attrs.string(default = ""),
         # Bind the host's /sys/fs/cgroup read-only (not part of the key).
         "host_cgroup": attrs.bool(default = False),
+        # Bind the host's /etc/machine-id read-only and leave /nix/store the
+        # read-only host store (no writable overlay), so root-owned system
+        # files keep their host ownership (not part of the key).
+        "host_identity": attrs.bool(default = False),
         # Project-relative test file -> its known failures (`Module` or
         # `Module: test name`). Those files run in the `known_failures` shard,
         # where only the listed failures are tolerated and are reported in
@@ -646,6 +650,7 @@ def overalls_mix_project(
         test_shard_weights: dict[str, int] = {},
         test_known_failures: dict[str, list[str]] = {},
         test_host_cgroup: bool = False,
+        test_host_identity: bool = False,
         test_labels: list[str] = [],
         repository_tests: list[str] = [],
         repository_support: list[str] = [],
@@ -699,6 +704,7 @@ def overalls_mix_project(
         shard_weights = test_shard_weights,
         known_failures = test_known_failures,
         host_cgroup = test_host_cgroup,
+        host_identity = test_host_identity,
         repository_tests = repository_tests,
         repository_srcs = repository_support,
         seed_salt = read_root_config("mix", "test_salt", ""),

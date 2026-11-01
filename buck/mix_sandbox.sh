@@ -79,6 +79,16 @@ fi
 if [[ -n ${MIX_SANDBOX_CGROUP-} ]]; then
   etc+=(--ro-bind /sys/fs/cgroup /sys/fs/cgroup)
 fi
+# Suites that check root ownership of host system files (Lilly's
+# /etc/machine-id and VMM executable checks) read the host's machine ID and
+# see the read-only host store, whose root-owned paths then appear as the
+# overflow uid rather than as the build user's writable overlay (mix_test
+# `host_identity`; not part of the action key).
+store=(--overlay-src /nix/store --tmp-overlay /nix/store)
+if [[ -n ${MIX_SANDBOX_HOST_IDENTITY-} ]]; then
+  store=()
+  etc+=(--ro-bind /etc/machine-id /etc/machine-id)
+fi
 # Buck2 does not kill a local action's process tree when its daemon exits
 # (`buck2 kill`, a restart). Left running, a sandbox keeps writing to a
 # scratch path the next daemon reuses, so this script watches for its own
@@ -87,7 +97,7 @@ fi
 parent=$PPID
 env -i "$bwrap" --unshare-all --die-with-parent --hostname localhost --uid 1000 --gid 100 \
   --tmpfs / --dev /dev --proc /proc --tmpfs /tmp --tmpfs /dev/shm \
-  --ro-bind /nix /nix --overlay-src /nix/store --tmp-overlay /nix/store \
+  --ro-bind /nix /nix "${store[@]}" \
   --bind "$scratch/build" /build --ro-bind "$scratch/src" /build-src --bind "$scratch/io" /io \
   --ro-bind "$scratch/in" /in --ro-bind "$scratch/etc/passwd" /etc/passwd \
   --ro-bind "$scratch/etc/group" /etc/group --ro-bind "$scratch/etc/hosts" /etc/hosts \
