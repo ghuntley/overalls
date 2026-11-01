@@ -103,7 +103,13 @@ if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_T
   [[ -n "$oidc" && "$oidc" != null ]] || { echo "tools/namespace-re-image: no GitHub OIDC token" >&2; exit 1; }
   tenant=$(nsc workspace describe -o json 2>/dev/null | sed -n 's/.*"tenant_id": *"\([^"]*\)".*/\1/p')
   [[ -n "$tenant" ]] || { echo "tools/namespace-re-image: no Namespace tenant id" >&2; exit 1; }
-  nsc auth exchange-oidc-token --tenant_id "$tenant" --token "$oidc" --duration 1h >/dev/null
+  if ! nsc auth exchange-oidc-token --tenant_id "$tenant" --token "$oidc" --duration 1h >/dev/null; then
+    # Name the claims the trust relationship matches on (never the token).
+    payload=$(cut -d. -f2 <<<"$oidc" | tr '_-' '/+')
+    while (( ${#payload} % 4 )); do payload+="="; done
+    base64 -d <<<"$payload" 2>/dev/null | jq -c '{iss, sub, aud}' >&2 || true
+    exit 1
+  fi
   unset oidc
 fi
 nsc base-image optimize --image_ref "$image@$digest"
