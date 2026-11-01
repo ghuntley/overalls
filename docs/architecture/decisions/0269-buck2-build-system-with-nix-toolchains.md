@@ -179,7 +179,7 @@ the approved migration plan.
     The fixture alone assembles without Buck2 artifacts, so its drvPath is
     the flake's: the plain Ubuntu runners in `mila-builds.yml` substitute it
     from Cachix, where `publish-cache.yml` puts it, and have no Namespace
-    cache to supply Buck2 leaves. `mila-builds.yml`'s Linux, Android and tailnet journey
+    cache to supply Buck2 leaves. `mila-builds.yml`'s Linux, Android emulator and tailnet journey
     jobs build `//mila:journey-fixture` with `tools/buck2`, gate on that
     target rather than the flake, and start the fixture from its store path.
   - `nix-compact-core`, `-native`, `-native-host`, `-configuration` and
@@ -283,7 +283,8 @@ the approved migration plan.
   Xcode, Gradle and .NET are `non_hermetic` targets: they run the platform
   SDK from the daemon's environment, are `local_only` with
   `allow_cache_upload = False`, and are compatible only with
-  `-c overalls.non_hermetic=true` and their host OS, so `buck2 build //...`
+  `-c overalls.non_hermetic=true` and their host OS (the Android targets
+  with Linux or macOS, through a select over the OS constraints), so `buck2 build //...`
   and [affected.bxl](../../../buck/bxl/affected.bxl) skip them. Their
   third-party inputs are pinned by Gradle dependency verification metadata
   and NuGet `packages.lock.json` in locked mode; the Swift packages have no
@@ -299,10 +300,17 @@ the approved migration plan.
   cross-build and Clippy check run on Linux; the shipped DLL stays MSVC.
   `mila-builds.yml` builds Apple, Android and Windows through these
   targets, and `mila-release.yml` builds its source bundles and Linux tarball
-  through `//:package-tool-mila-*`, the Android APK through `--no-nix`
+  through `//:package-tool-mila-*`, the Android APK through
   `//mila:android-release`, and the Apple FFI and signed apps through
   `//mila:apple-ffi` and `//mila:<platform>-release`, with a check that no
-  signing value reaches a Buck2 log, buck-out or the daemon's files. Local evidence: the Android targets build and pass
+  signing value reaches a Buck2 log, buck-out or the daemon's files.
+  Since 2026-11-01 the Android targets build on Namespace macOS runners with
+  `tools/buck2` over `buckCells.aarch64-darwin`, as the Apple targets do:
+  `mila-builds.yml`'s `android-native` on `cached-arm64` and
+  `mila-release.yml`'s `android` on the uncached `release-arm64`. The
+  emulator instrumentation and the hermetic journey fixture need KVM, which
+  an Apple Silicon macOS VM lacks, so the Linux `android-emulator` job runs
+  the macOS-built APKs (an artifact checked against its `SHA256SUMS`). Local evidence: the Android targets build and pass
   their unit tests, the Windows gnu targets build, and `--no-nix` loads and
   tests a non_hermetic target on Linux. CI run 41114668466 built every
   Apple, Android and Windows target; the review records the runs and the

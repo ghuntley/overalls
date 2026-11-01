@@ -37,8 +37,8 @@ private class JourneyStore : MilaDeploymentStore {
  *
  * Every step uses the packaged Rust JNI session (`LinkedMilaFfiAdapter`) and the production
  * controllers; nothing is faked. The suite is skipped unless the CI step passes the fixture
- * descriptor as the `milaJourneyDescriptor` instrumentation argument (see the android-native job
- * in `.github/workflows/mila-builds.yml` and `scripts/run-instrumentation.sh`).
+ * descriptor as the `milaJourneyDescriptor` instrumentation argument (see the android-emulator
+ * job in `.github/workflows/mila-builds.yml` and `scripts/run-instrumentation.sh`).
  *
  * No provisioner or guest runs in the fixture: lifecycle steps prove admission by Porsche, the
  * terminal step proves the closed `terminal_unavailable` refusal, and steps that need the

@@ -126,14 +126,14 @@ mila_platform(
     srcs = _APPLE,
 ) for platform in ["macos", "ios"]]
 
-# --- Android (Linux; JDK, Gradle, the Android SDK/NDK and cargo-ndk from PATH). ---
+# --- Android (Linux or macOS; JDK, Gradle, the Android SDK/NDK and cargo-ndk from PATH). ---
 
 # Gradle resolves only artifacts listed in gradle/verification-metadata.xml.
 _GRADLE = ["gradle", "--no-daemon", "--stacktrace"]
 
 mila_platform(
     name = "android-debug",
-    os = "linux",
+    os = ["linux", "macos"],
     steps = [{"argv": _GRADLE + ["assembleDebug", "assembleDebugAndroidTest", "testDebugUnitTest"], "cwd": "mila/native/android"}],
     outputs = {
         "app-debug.apk": "mila/native/android/app/build/outputs/apk/debug/app-debug.apk",
@@ -145,7 +145,7 @@ mila_platform(
 
 mila_platform(
     name = "android-release",
-    os = "linux",
+    os = ["linux", "macos"],
     steps = [{"argv": _GRADLE + ["assembleRelease"], "cwd": "mila/native/android"}],
     outputs = {"app-release-unsigned.apk": "mila/native/android/app/build/outputs/apk/release/app-release-unsigned.apk"},
     require = ["gradle", "java", "cargo", "cargo-ndk"],
@@ -156,7 +156,7 @@ mila_platform(
 # cargo-ndk reads cargo metadata from its working directory.
 mila_platform(
     name = "android-ffi-clippy",
-    os = "linux",
+    os = ["linux", "macos"],
     steps = [{"argv": ["cargo", "ndk", "--platform", "26", "-t", "arm64-v8a", "clippy", "--locked", "-p", "mila-ffi", "--", "-D", "warnings"], "cwd": "mila/rust"}],
     require = ["cargo", "cargo-ndk"],
     srcs = _FFI_SRCS,

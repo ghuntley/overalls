@@ -203,13 +203,14 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   `gradle/verification-metadata.xml` and NuGet `packages.lock.json` restored
   in locked mode.
 - **When they build.** Only with `-c overalls.non_hermetic=true` and on their
-  own OS (`target_compatible_with` uses `toolchains//:non_hermetic_enabled`).
+  own OS (`target_compatible_with` uses `toolchains//:non_hermetic_enabled`;
+  `os` may list several hosts, as the Android targets do).
   `buck2 build //...`, `buck2 test //...`, verification and `tools/affected`
   skip them.
 - **Targets.**
   - Apple (macOS): `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`,
     `{macos,ios}-{dev,release}` (wrapping `mila/native/mila-build`).
-  - Android (Linux): `android-debug`, `android-release`, `android-ffi-clippy`.
+  - Android (Linux or macOS): `android-debug`, `android-release`, `android-ffi-clippy`.
   - Windows: `windows-ffi-msvc`, `windows-ffi-msvc-clippy`, `windows-dotnet`,
     `windows-smoke`.
   - Hermetic, on Linux: `windows-ffi-gnu` and `windows-ffi-gnu-clippy`
@@ -236,7 +237,7 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
     `tools/buck2-no-nix.json` and the three registry keys with every buck2
     bump.
   - The Linux kit runs this mode on a development host.
-- **Example (Android, on Linux):** install JDK 17, Gradle 9.3.1, the Android
+- **Example (Android, on Linux or macOS):** install JDK 17, Gradle 9.3.1, the Android
   SDK and NDK and cargo-ndk on `PATH`, then
   `tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug`.
 

@@ -100,8 +100,10 @@ jobs:
   android:
     # The release artifact is assembled by the native Jetpack Compose client.
     # Keep this job independent of Flutter so native release regressions cannot
-    # be hidden by the legacy runner.
-    runs-on: ubuntu-24.04
+    # be hidden by the legacy runner. Like apple, it runs on the profile with
+    # no cache volume: pull-request jobs on cached-arm64 can write that
+    # profile's tool and Actions caches, which a release job must never read.
+    runs-on: namespace-profile-release-arm64
     environment: mila-release
     timeout-minutes: 90
     # No Namespace remote cache: the release builds stay on this runner.
@@ -114,9 +116,13 @@ jobs:
           distribution: temurin
           java-version: '17'
       - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
+        with:
+          packages: platform-tools
       - name: Install Android SDK and Rust targets
         run: |
+          yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
       - uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
         with:
           toolchain: 1.97.1
@@ -126,15 +132,24 @@ jobs:
       - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
         with:
           gradle-version: '9.3.1'
-      # A Buck2 target (ADR-0269 M9) over the SDKs above; this job has no Nix,
-      # so `tools/buck2 --no-nix` uses the pinned buck2 and prelude. Gradle
-      # verifies every dependency against gradle/verification-metadata.xml.
-      # The APK is unsigned, and no Buck2 log is uploaded.
+      # tools/buck2 builds buckCells.aarch64-darwin, as in the apple job.
+      - name: Setup Nix
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          useDaemon: false
+      # A Buck2 target (ADR-0269 M9) over the SDKs above; the daemon starts
+      # here with this environment. Gradle verifies every dependency against
+      # gradle/verification-metadata.xml. The APK is unsigned, and no Buck2
+      # log is uploaded.
       - name: Assemble native Android release APK
         run: |
-          tools/buck2 --no-nix build //mila:android-release
+          tools/buck2 build -c overalls.non_hermetic=true //mila:android-release
           cd mila/native/android
-          sha256sum app/build/outputs/apk/release/app-release-unsigned.apk > app/build/outputs/apk/release/SHA256SUMS
+          shasum -a 256 app/build/outputs/apk/release/app-release-unsigned.apk > app/build/outputs/apk/release/SHA256SUMS
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: release-android

@@ -7,8 +7,9 @@
 # files instead (Gradle dependency verification metadata, NuGet
 # packages.lock.json in locked mode; the Swift packages have no dependencies).
 # They build only when `-c overalls.non_hermetic=true` is set, which
-# `tools/buck2 --no-nix` sets, and only on their host OS, so `buck2 build //...`
-# and the verification and selection jobs skip them.
+# `tools/buck2 --no-nix` sets, and only on their host OS (Android on Linux or
+# macOS), so `buck2 build //...` and the verification and selection jobs skip
+# them.
 #
 # `mila_windows_ffi` is hermetic: it cross-builds the FFI crate for
 # x86_64-pc-windows-gnu on Linux (a compile and Clippy check; the shipped DLL
@@ -83,7 +84,7 @@ _mila_platform = rule(
 
 def mila_platform(
         name: str,
-        os: str,
+        os: str | list[str],
         steps: list[dict[str, typing.Any]],
         outputs: dict[str, str] = {},
         env: dict[str, str] = {},
@@ -93,7 +94,8 @@ def mila_platform(
         check: bool = False,
         labels: list[str] = [],
         visibility: list[str] = ["PUBLIC"]):
-    """A non_hermetic platform build for `os` ("linux", "macos" or "windows").
+    """A non_hermetic platform build for `os` ("linux", "macos" or "windows",
+    or a list of them when the SDK runs on several hosts).
 
     `steps` are `{"argv": [...], "cwd": <repo path>}` commands, run in order
     with `env` and with `path_env` (variable -> target whose output path is
@@ -103,6 +105,12 @@ def mila_platform(
     PATH. `srcs` are the declared inputs (changes rerun the build). A `check`
     writes a stamp that `buck2 test` reads.
     """
+    oses = [os] if type(os) == type("") else os
+    if len(oses) == 1:
+        compatible = [_ENABLED, _OS[oses[0]]]
+    else:
+        # Any one of the hosts: prelude//os:none matches no build host.
+        compatible = [_ENABLED] + select(dict({_OS[o]: [] for o in oses}, DEFAULT = ["prelude//os:none"]))
     _mila_platform(
         name = name,
         spec = json.encode({
@@ -114,8 +122,8 @@ def mila_platform(
         path_env = path_env,
         srcs = srcs,
         check = check,
-        labels = [NON_HERMETIC, os] + labels + (["check"] if check else []),
-        target_compatible_with = [_ENABLED, _OS[os]],
+        labels = [NON_HERMETIC] + oses + labels + (["check"] if check else []),
+        target_compatible_with = compatible,
         visibility = visibility,
     )
 

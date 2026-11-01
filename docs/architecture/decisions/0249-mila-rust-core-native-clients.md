@@ -109,11 +109,13 @@ completes VIEW/share-provider targets only for an authenticated session. JVM
 tests cover these controllers; emulator instrumentation covers the packaged JNI
 exports and BiometricPrompt unavailable/enrolled states. The
 [`MilaJourneyTest`](../../../mila/native/android/app/src/androidTest/java/dev/overalls/mila/nativeui/MilaJourneyTest.kt)
-suite against the hermetic Marshall+Porsche fixture runs in the `android-native`
-CI job and requires the fixture's `observe` and thread hooks. All 11 steps and
+suite against the hermetic Marshall+Porsche fixture runs in the Linux
+`android-emulator` CI job, over the APKs the macOS `android-native` job builds,
+and requires the fixture's `observe` and thread hooks. All 11 steps and
 the packaged instrumentation suite (including the BiometricPrompt
 unavailable/enrolled device test) passed on the API 35 emulator in mila-builds
-run 41014925339 (commit 83715218a). FCM delivery is not hermetic and remains
+run 41014925339 (commit 83715218a), when one Linux `android-native` job both
+built and ran them. FCM delivery is not hermetic and remains
 outside it.
 Session JNI reads call the session ABI once into a bounded buffer
 (`jni-session-single-read`), and thread answers name the question reported by an

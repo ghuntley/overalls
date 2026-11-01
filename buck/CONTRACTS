@@ -245,7 +245,7 @@ its VMs (ADR-0270).
 
 @cc [owner:ghuntley,label:build;verification] mila-non-hermetic-targets
 mila_platform targets MUST carry the non_hermetic label and MUST be compatible
-only with `overalls.non_hermetic=true` on their own OS, so `buck2 build //...`,
+only with `overalls.non_hermetic=true` on the host OSes they name, so `buck2 build //...`,
 `buck2 test //...` and affected selection skip them. Their actions MUST run
 locally and never read or write a cache, because the SDKs they run come from
 the daemon's PATH, which no action key records. Third-party inputs MUST come

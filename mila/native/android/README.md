@@ -30,8 +30,8 @@ gradle --project-dir mila/native/android :app:assembleDebug
 CI builds the APKs through Buck2 (ADR-0269):
 `tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug` (and `:android-release`,
 `:android-ffi-clippy`) runs the same Gradle tasks with the SDK, JDK, Gradle and cargo-ndk on the
-Buck2 daemon's `PATH`; see the buck2 skill. The repository's Linux checks do not install a native
-Android SDK. If Gradle or the SDK is unavailable, inspect the Kotlin and Gradle metadata and run the
+Buck2 daemon's `PATH`; see the buck2 skill. The targets build on Linux or macOS; CI builds them
+on a Namespace macOS runner. The repository's Linux checks do not install a native Android SDK. If Gradle or the SDK is unavailable, inspect the Kotlin and Gradle metadata and run the
 contract syntax check from the repository root.
 
 Gradle verifies every downloaded artifact against the SHA-256 checksums in
@@ -45,7 +45,7 @@ Gradle, so this file does not cover it.
 ## Release evidence
 
 The `android` job in `.github/workflows/mila-release.yml` assembles this project
-with pinned JDK 17, Gradle 9.3.1, Android API 36/NDK 28.2.13676358, and locked
+on an uncached Namespace macOS runner with pinned JDK 17, Gradle 9.3.1, Android API 36/NDK 28.2.13676358, and locked
 Rust dependencies (`cargo-ndk ... build --locked`). It publishes
 `app-release-unsigned.apk` and a SHA-256 manifest as the native release
 candidate. Signing remains a distribution concern while the native parity
@@ -54,8 +54,11 @@ build evidence.
 
 ## Instrumentation and the hermetic journey
 
-`connectedDebugAndroidTest` runs on the API 35 emulator in the `android-native` CI job through
-[`scripts/run-instrumentation.sh`](scripts/run-instrumentation.sh). Besides packaged JNI smoke tests,
+The instrumentation suite runs on the API 35 emulator in the Linux `android-emulator` CI job
+through [`scripts/run-instrumentation.sh`](scripts/run-instrumentation.sh), which installs the
+`app-debug.apk` and `app-debug-androidTest.apk` that the macOS `android-native` job built
+(`MILA_ANDROID_APK_DIR`) and runs them with `am instrument`. The emulator and the journey fixture
+need KVM, which a macOS runner lacks. Besides packaged JNI smoke tests,
 `MilaAppLockDeviceTest` toggles the emulator's device credential with `locksettings` to exercise
 the real `BiometricManager`/`BiometricPrompt` unavailable and enrolled states; it always restores a
 credential-free device.

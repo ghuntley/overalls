@@ -2,9 +2,11 @@ name: "mila builds"
 
 # Mila's dev targets on every platform (ADR-0235). The platform builds are
 # Buck2 targets (ADR-0269 M9, see the buck2 skill): Android, Apple and Windows
-# build the non_hermetic //mila: targets with the runner's SDKs; macOS runs
-# tools/buck2 over buckCells.aarch64-darwin, and Windows, which has no Nix,
-# runs `tools/buck2 --no-nix` with the pinned buck2 and prelude.
+# build the non_hermetic //mila: targets with the runner's SDKs; Apple and
+# Android build on macOS with tools/buck2 over buckCells.aarch64-darwin, and
+# Windows, which has no Nix, runs `tools/buck2 --no-nix` with the pinned buck2
+# and prelude. The Android emulator and journey fixture need KVM, so they run
+# the macOS-built APKs on Linux.
 on:
   pull_request:
     paths:
@@ -493,15 +495,89 @@ jobs:
         working-directory: mila/native/linux
         run: cargo fmt --all -- --check
 
+  # The APKs build on macOS; android-emulator runs them on Linux, because an
+  # Apple Silicon macOS VM has neither KVM for the fixture VM nor nested
+  # virtualisation for an Android emulator.
   android-native:
-    runs-on: ubuntu-24.04
-    timeout-minutes: 150
+    runs-on: namespace-profile-cached-arm64
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5.7.0
         with:
           distribution: temurin
           java-version: '17'
+      - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
+        timeout-minutes: 10
+        with:
+          packages: platform-tools
+      - name: Install Android SDK platform
+        timeout-minutes: 15
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
+      - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
+        timeout-minutes: 5
+        with:
+          gradle-version: '9.3.1'
+      - name: Install Rust Android linker
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+        with:
+          toolchain: 1.97.1
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+          components: clippy
+      - name: Install cargo-ndk
+        timeout-minutes: 10
+        run: cargo install cargo-ndk --locked --version 4.1.2
+      # tools/buck2 builds buckCells.aarch64-darwin, as in apple-native.
+      - name: Setup Nix
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Setup Cachix
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
+        with:
+          name: overalls
+          extraPullNames: devenv
+          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          useDaemon: false
+      # Bounded so a cold cells build fails well inside the job timeout. The
+      # daemon starts here and keeps this step's PATH and environment (JDK,
+      # Gradle, ANDROID_HOME, ANDROID_NDK_HOME, cargo-ndk).
+      - name: Materialise the Buck2 cells
+        timeout-minutes: 20
+        run: tools/buck2 --version
+      # Buck2 targets (ADR-0269 M9) over the SDKs above: Clippy of the
+      # Android FFI library, then the debug and test APKs and unit tests.
+      # Gradle verifies every dependency against gradle/verification-metadata.xml.
+      - name: Clippy the Android FFI
+        timeout-minutes: 30
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:android-ffi-clippy
+      - name: Assemble native Compose APKs
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug --show-full-output | tee "$RUNNER_TEMP/android-debug.txt"
+          out=$(awk 'END { print $2 }' "$RUNNER_TEMP/android-debug.txt")
+          mkdir -p "$RUNNER_TEMP/mila-android-apks"
+          cp -L "$out"/* "$RUNNER_TEMP/mila-android-apks/"
+          cd "$RUNNER_TEMP/mila-android-apks"
+          shasum -a 256 -c SHA256SUMS
+          test -f app-debug.apk -a -f app-debug-androidTest.apk
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: mila-android-debug-apks
+          path: ${{ runner.temp }}/mila-android-apks/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Runs the APKs android-native built on an x86_64 API 35 emulator beside the
+  # hermetic journey fixture. Both need /dev/kvm, so this job stays on Linux.
+  android-emulator:
+    needs: android-native
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
       - name: Enable KVM for the Android emulator
         id: enable-kvm
         continue-on-error: true
@@ -515,7 +591,7 @@ jobs:
             echo 'KVM unavailable; emulator runner will use software acceleration'
           fi
       # The hermetic Marshall+Porsche journey fixture (ADR-0264) is substituted from
-      # Cachix and built before the APK, then boots beside the emulator on this runner.
+      # Cachix and built first, then boots beside the emulator on this runner.
       # Every fixture step is gated on `//mila:journey-fixture` existing.
       - name: Detect hermetic journey fixture
         id: journey
@@ -540,7 +616,7 @@ jobs:
           authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           useDaemon: false
       # Building first keeps substitution/build time apart from VM startup; the
-      # VM boots only after the APK is assembled, just before the emulator.
+      # VM boots just before the emulator.
       - name: Build hermetic journey fixture
         id: fixture
         if: steps.journey.outputs.declared == 'true'
@@ -581,33 +657,13 @@ jobs:
           sdkmanager "platform-tools" "emulator" "platforms;android-35" "system-images;android-35;google_apis;x86_64"
           echo "ANDROID_HOME=$ANDROID_HOME" >> "$GITHUB_ENV"
           echo "PATH=$PATH" >> "$GITHUB_ENV"
-      - name: Install Android SDK platform
-        timeout-minutes: 10
-        run: |
-          sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
-      - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
-        timeout-minutes: 5
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
-          gradle-version: '9.3.1'
-      - name: Install Rust Android linker
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
-        with:
-          toolchain: 1.97.1
-          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
-          components: clippy
-      - name: Install cargo-ndk
-        timeout-minutes: 10
-        run: cargo install cargo-ndk --locked --version 4.1.2
-      # Buck2 targets (ADR-0269 M9) over the SDKs above, through the Nix the
-      # journey fixture steps installed: Clippy of the Android FFI library,
-      # then the debug and test APKs and unit tests. Gradle verifies every
-      # dependency against gradle/verification-metadata.xml.
-      - name: Assemble native Compose APK
-        timeout-minutes: 30
-        run: |
-          tools/buck2 build -c overalls.non_hermetic=true //mila:android-ffi-clippy //mila:android-debug
-          test -f mila/native/android/app/build/outputs/apk/debug/app-debug.apk
+          name: mila-android-debug-apks
+          path: ${{ runner.temp }}/mila-android-apks
+      - name: Verify the downloaded APKs
+        working-directory: ${{ runner.temp }}/mila-android-apks
+        run: sha256sum -c SHA256SUMS
       - name: Start hermetic journey fixture
         if: steps.fixture.outputs.built == 'true'
         timeout-minutes: 25
@@ -648,6 +704,8 @@ jobs:
       - name: Invoke packaged Rust JNI on Android
         timeout-minutes: 45
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        env:
+          MILA_ANDROID_APK_DIR: ${{ runner.temp }}/mila-android-apks
         with:
           api-level: 35
           target: google_apis
@@ -760,7 +818,7 @@ jobs:
   native-gate:
     name: Native platform gate
     if: ${{ always() }}
-    needs: [apple-native, android-native, linux-native, windows-native]
+    needs: [apple-native, android-native, android-emulator, linux-native, windows-native]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -782,11 +840,12 @@ jobs:
         env:
           APPLE: ${{ needs.apple-native.result }}
           ANDROID: ${{ needs.android-native.result }}
+          ANDROID_EMULATOR: ${{ needs.android-emulator.result }}
           LINUX: ${{ needs.linux-native.result }}
           WINDOWS: ${{ needs.windows-native.result }}
         run: |
           set -eu
-          for result in "$APPLE" "$ANDROID" "$LINUX" "$WINDOWS"; do
+          for result in "$APPLE" "$ANDROID" "$ANDROID_EMULATOR" "$LINUX" "$WINDOWS"; do
             test "$result" = success || {
               echo "Native platform gate failed: $result" >&2
               exit 1

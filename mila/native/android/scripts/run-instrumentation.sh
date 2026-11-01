@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Runs inside reactivecircus/android-emulator-runner once the emulator has booted.
 #
+# MILA_ANDROID_APK_DIR names a directory holding app-debug.apk and app-debug-androidTest.apk from
+# `//mila:android-debug` (CI builds them on macOS and runs this on Linux). Each run reinstalls both
+# APKs with runtime permissions granted, as Gradle's connectedDebugAndroidTest does, and drives
+# AndroidJUnitRunner with `am instrument`.
+#
 # 1. The packaged instrumentation suite always runs. MilaJourneyTest is skipped there because no
 #    fixture descriptor is passed.
 # 2. When MILA_JOURNEY_DESCRIPTOR names a mila-journey-fixture descriptor (v1), the fixture's
@@ -25,9 +30,34 @@ dump_device_logs() {
   echo "::endgroup::"
 }
 
+apk_dir="${MILA_ANDROID_APK_DIR:?MILA_ANDROID_APK_DIR must name the //mila:android-debug output}"
+app_apk="$apk_dir/app-debug.apk"
+test_apk="$apk_dir/app-debug-androidTest.apk"
+test -s "$app_apk"
+test -s "$test_apk"
+app_package=dev.overalls.mila.nativeui
+runner="$app_package.test/androidx.test.runner.AndroidJUnitRunner"
+
+# `am instrument` exits 0 whatever the result, so the summary decides: AndroidJUnitRunner prints
+# "OK (N tests)" only when every test passed, and FAILURES!!! or INSTRUMENTATION_FAILED otherwise.
+# Extra arguments are `-e key value` instrumentation arguments.
+instrument() {
+  adb uninstall "$app_package.test" >/dev/null 2>&1 || true
+  adb uninstall "$app_package" >/dev/null 2>&1 || true
+  adb install -r -t -g "$app_apk" || return 1
+  adb install -r -t -g "$test_apk" || return 1
+  local output
+  output="$(adb shell am instrument -w "$@" "$runner" | tr -d '\r')" || return 1
+  printf '%s\n' "$output"
+  if grep -qE 'FAILURES!!!|INSTRUMENTATION_FAILED|INSTRUMENTATION_RESULT: shortMsg=|Process crashed' <<<"$output"; then
+    return 1
+  fi
+  grep -qE '^OK \([1-9][0-9]* tests?\)$' <<<"$output"
+}
+
 packaged=0
 adb logcat -c || true
-gradle --no-daemon connectedDebugAndroidTest || packaged=$?
+instrument || packaged=$?
 if [ "$packaged" -ne 0 ]; then dump_device_logs "packaged suite"; fi
 
 descriptor="${MILA_JOURNEY_DESCRIPTOR:-}"
@@ -82,9 +112,7 @@ encoded="$(base64 -w0 "$descriptor")"
 echo "::add-mask::$encoded"
 adb logcat -c || true
 journey=0
-gradle --no-daemon connectedDebugAndroidTest \
-  -Pandroid.testInstrumentationRunnerArguments.class=dev.overalls.mila.nativeui.MilaJourneyTest \
-  "-Pandroid.testInstrumentationRunnerArguments.milaJourneyDescriptor=$encoded" || journey=$?
+instrument -e class "$app_package.MilaJourneyTest" -e milaJourneyDescriptor "$encoded" || journey=$?
 if [ "$journey" -ne 0 ]; then
   dump_device_logs "journey"
   exit "$journey"
