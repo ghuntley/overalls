@@ -192,6 +192,45 @@ defmodule Overalls.DependencyPinsTest do
     assert DependencyPins.coverage(["a"], ["a"]) == %{uncovered: [], duplicated: [], unknown: []}
   end
 
+  # @cc [owner:ghuntley,label:verification;build] domain-lock-coverage-oracle
+  # A tracked guest domain lock that no entry names, and a registered lock,
+  # updater or procedure that does not exist, MUST each be reported.
+  test "reports unregistered domain locks and missing updaters" do
+    targets = %{
+      "vscode-extensions" => %{
+        locks: ["nix/domains/artifacts/vscode-web/extensions.lock.json"],
+        updater: "nix/domains/artifacts/vscode-web/update-extensions.py",
+        procedure: "nix/domains/artifacts/vscode-web/README.md"
+      },
+      "windows-iso" => %{
+        locks: ["nix/domains/artifacts/guest/windows/iso.json"],
+        updater: nil,
+        procedure: "docs/guests/gone.md"
+      }
+    }
+
+    tracked = [
+      "nix/domains/artifacts/vscode-web/extensions.lock.json",
+      "nix/domains/artifacts/guest/ubuntu/packages.lock.json",
+      "mila/windows-dotnet/packages.lock.json"
+    ]
+
+    assert DependencyPins.domain_problems(targets, tracked, &(&1 != "docs/guests/gone.md")) == [
+             "nix/domains/artifacts/guest/ubuntu/packages.lock.json is a domain lock no lib.dependencyPins.domain entry names",
+             "windows-iso: docs/guests/gone.md does not exist"
+           ]
+
+    assert {:ok, %{"windows-iso" => %{updater: nil}}} =
+             DependencyPins.domain_targets(%{
+               "windows-iso" => %{"locks" => ["a"], "updater" => nil, "procedure" => "b"}
+             })
+
+    assert {:error, _} =
+             DependencyPins.domain_targets(%{
+               "x" => %{"locks" => ["a"], "updater" => 1, "procedure" => "b"}
+             })
+  end
+
   test "a key is missing only when neither resolved nor matched to a fetch" do
     keys = ["source", "vendor", "tarball"]
     assert DependencyPins.missing_keys(keys, [], []) == keys

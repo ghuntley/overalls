@@ -130,12 +130,16 @@ To add a tool:
 ## Guest lock files
 
 Guest images pin their distribution inputs in domain locks next to the
-image: `guest/ubuntu/packages.lock.json` (refreshed by
-`guest/ubuntu/update-lock.py`) and `vscode-web/extensions.lock.json`
-(`tool-update-vscode-extensions`). Fetched files read their hashes from
-those locks or the registry, never from inline literals. Read the guest's
-README before refreshing one, and rebuild the image's `//:package-guest-*`
-target and the machine tests that boot it.
+image. `lib.dependencyPins.domain` (`nix/domains/artifacts/domain-pins.nix`)
+lists every one with its updater (or `null` when it is updated by hand), the
+document that describes the update and the build that must pass afterwards:
+the Ubuntu package, base and fixture locks, the Windows ISO, winget and
+Visual Studio layout pins, the native Git package tables and
+`vscode-web/extensions.lock.json`. `scripts/fetch_pins.exs` refuses a tracked
+`*.lock.json` under `nix/` that no entry names. Fetched files read their
+hashes from those locks or the registry, never from inline literals. Read the
+entry's procedure before refreshing one, and rebuild its build and the
+machine tests that boot it.
 
 ## Verification
 

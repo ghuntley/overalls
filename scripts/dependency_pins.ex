@@ -150,6 +150,81 @@ defmodule Overalls.DependencyPins do
     }
   end
 
+  @typedoc "One `lib.dependencyPins.domain` entry: guest domain locks and how they are regenerated."
+  @type domain_target :: %{locks: [Path.t()], updater: Path.t() | nil, procedure: Path.t()}
+
+  @doc "Validates the JSON evaluated from `lib.dependencyPins.domain`."
+  @spec domain_targets(term()) :: {:ok, %{String.t() => domain_target()}} | {:error, String.t()}
+  def domain_targets(decoded) when is_map(decoded) do
+    Enum.reduce_while(decoded, {:ok, %{}}, fn
+      {name, %{"locks" => [_ | _] = locks, "updater" => updater, "procedure" => procedure}},
+      {:ok, acc}
+      when is_binary(name) and (is_binary(updater) or is_nil(updater)) and is_binary(procedure) ->
+        if Enum.all?(locks, &is_binary/1),
+          do:
+            {:cont,
+             {:ok, Map.put(acc, name, %{locks: locks, updater: updater, procedure: procedure})}},
+          else: {:halt, {:error, "#{name}: locks must be paths"}}
+
+      {name, _}, _ ->
+        {:halt, {:error, "#{inspect(name)}: expected locks, updater (or null) and procedure"}}
+    end)
+  end
+
+  def domain_targets(_),
+    do: {:error, "lib.dependencyPins.domain must evaluate to an attribute set"}
+
+  @doc """
+  Problems with the domain registry: tracked `*.lock.json` files under `nix/`
+  that no entry names, and registered locks, updaters or procedures for which
+  `exists?` is false.
+  """
+  @spec domain_problems(%{String.t() => domain_target()}, [Path.t()], (Path.t() -> boolean())) ::
+          [String.t()]
+  def domain_problems(targets, tracked, exists?) do
+    registered = targets |> Map.values() |> Enum.flat_map(& &1.locks) |> MapSet.new()
+
+    unregistered =
+      for path <- Enum.sort(tracked),
+          String.starts_with?(path, "nix/"),
+          String.ends_with?(path, ".lock.json"),
+          not MapSet.member?(registered, path),
+          do: "#{path} is a domain lock no lib.dependencyPins.domain entry names"
+
+    missing =
+      for {name, target} <- Enum.sort(targets),
+          path <- target.locks ++ [target.updater, target.procedure],
+          is_binary(path),
+          not exists?.(path),
+          do: "#{name}: #{path} does not exist"
+
+    unregistered ++ missing
+  end
+
+  @domain_apply ~S"""
+  pins: builtins.mapAttrs (_: pin: { inherit (pin) locks updater procedure; }) pins
+  """
+
+  @doc "Evaluates `lib.dependencyPins.domain` from the flake at `root`."
+  @spec domain_targets!(Path.t()) :: %{String.t() => domain_target()}
+  def domain_targets!(root) do
+    {json, _} =
+      run!(
+        root,
+        "nix",
+        ["eval", "--json", ".#lib.dependencyPins.domain", "--apply", @domain_apply],
+        echo: false,
+        stderr: false
+      )
+
+    with {:ok, decoded} <- JSON.decode(json),
+         {:ok, targets} <- domain_targets(decoded) do
+      targets
+    else
+      {:error, reason} -> fail("cannot read lib.dependencyPins.domain: #{inspect(reason)}")
+    end
+  end
+
   @doc "Keys that are neither already resolved nor matched to a fetch derivation."
   @spec missing_keys([String.t()], [String.t()], [String.t()]) :: [String.t()]
   def missing_keys(keys, resolved, matched), do: (keys -- resolved) -- matched

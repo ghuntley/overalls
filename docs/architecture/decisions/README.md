@@ -1148,7 +1148,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0264](0264-hermetic-mila-journey-fixture.md) | accepted | partial | Hermetic Mila journey fixture |
 | [ADR-0265](0265-rust-code-quality.md) | accepted | implemented | Rust code quality: module layout, lint policy and Hegel properties |
 | [ADR-0266](0266-anonymous-restored-guest-memory.md) | accepted | partial | Restored guest memory is anonymous |
-| [ADR-0267](0267-single-dependency-pin-registry.md) | accepted | partial | Single dependency pin registry |
+| [ADR-0267](0267-single-dependency-pin-registry.md) | accepted | implemented | Single dependency pin registry |
 | [ADR-0268](0268-cedar-single-authorization-source.md) | accepted | partial | Cedar is Marshall's single authorization source |
 | [ADR-0269](0269-buck2-build-system-with-nix-toolchains.md) | accepted | partial | Buck2 is the build system; Nix supplies toolchains, pins and NixOS assembly |
 | [ADR-0270](0270-graph-driven-machine-test-selection.md) | accepted | partial | Select pull-request builds and NixOS machine tests from the Buck2 graph |

@@ -174,9 +174,11 @@ assert lib.assertMsg (builtins.isAttrs params && unknownParams == [ ])
   # The validated parameters, resolved (buck/tests/assembly_params.py).
   params = hostParams;
   # lib.dependencyPins: the package set's lock-file ecosystems plus the
-  # `fetch` registry, whose closures include machine tests (ADR-0267).
+  # `fetch` and guest `domain` registries, whose closures and builds include
+  # machine tests (ADR-0267).
   dependencyPins = packages.dependencyPins // {
     fetch = import ../domains/artifacts/fetch-pins.nix { inherit pkgs nixpkgs packages checks; };
+    domain = import ../domains/artifacts/domain-pins.nix { inherit pkgs packages checks; };
   };
   # Flake package outputs by their flake names (`//:package-<name>`).
   outputPackages = outputs.packages;

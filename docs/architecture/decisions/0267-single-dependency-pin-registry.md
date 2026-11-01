@@ -3,7 +3,7 @@
 - ID: ADR-0267
 - Date: 2026-10-30
 - Status: accepted
-- Implementation: partial
+- Implementation: implemented
 - Components: build, Nix artifacts, verification, CI
 - Supersedes: none
 - Superseded by: none
@@ -129,6 +129,9 @@ plan (track T1).
 - Every registry key is claimed by exactly one `mix`, `cargo` or `fetch` entry.
   Checked by `scripts/fetch_pins.exs` before any refresh, which the scheduled
   nix upgrade runs; its pure logic is covered by `dependency_pins_test.exs`.
+- Every tracked `*.lock.json` under `nix/` belongs to a
+  `lib.dependencyPins.domain` entry, and each entry's lock, updater and
+  procedure exist. Checked by the same script.
 - **Failure case:** a new fetcher written with an attribute name the pattern
   does not match, such as an unusual `*Digest`, would escape the check. Review
   and the domain-lock exemption list remain the backstop.
@@ -196,13 +199,18 @@ plan (track T1).
   Every entry's closure was checked to contain each key's fetch.
   [dependency_pins_test.exs](../../../marshall/test/architecture/dependency_pins_test.exs) covers selection, coverage, hash
   formats (property), placeholder matching and mismatch parsing.
+- [domain-pins.nix](../../../nix/domains/artifacts/domain-pins.nix) is `lib.dependencyPins.domain`: the Ubuntu
+  package, base and test-fixture locks, the Windows ISO, winget and Visual
+  Studio layout pins, the native Git package tables and the vscode extension
+  lock, each with its updater (or none, for the Ubuntu base, Windows ISO and
+  native Git tables), the document that describes the update and the build
+  that must pass afterwards. Updaters need network access, and the Visual
+  Studio layout needs Windows, so no scheduled job runs them.
 - [The CI devenv action](../../../.github/actions/devenv/action.yml) and [the OSS scanner image](../../../.oss-scanner/Dockerfile)
   pin the Nix installer checksum and the base image digest.
 
-Remaining gaps:
-
-- Registering the guest domain locks (Ubuntu, Windows, native Git, vscode
-  extensions) with their updaters.
+No gaps remain. The scheduled refresh has been exercised locally, not yet by a
+scheduled CI run.
 
 ## Open questions
 

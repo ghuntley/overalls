@@ -4,7 +4,9 @@
 #                                      [--all] [--summary PATH]
 # Run from the repository root inside `devenv shell`. It first refuses a
 # registry key in nix/domains/artifacts/dependency-hashes.json that no mix,
-# cargo or fetch entry claims, or that two entries claim. It then refreshes
+# cargo or fetch entry claims, or that two entries claim, and a tracked
+# `*.lock.json` under nix/ that no lib.dependencyPins.domain entry names (or a
+# registered lock, updater or procedure that does not exist). It then refreshes
 # every entry named by --entry, every entry whose `locks` include a --changed
 # path (the scheduled nix upgrade passes the lock files it changed), or every
 # entry with --all. Each refreshed key is replaced by a placeholder, its
@@ -43,6 +45,17 @@ defmodule Overalls.FetchPins.CLI do
             "unclaimed: #{inspect(uncovered)}, claimed twice: #{inspect(duplicated)}, " <>
             "not in the registry: #{inspect(unknown)}"
         )
+    end
+
+    {listing, _} = DependencyPins.run!(root, "git", ["ls-files", "-z", "--", "nix"], echo: false)
+
+    case DependencyPins.domain_problems(
+           DependencyPins.domain_targets!(root),
+           String.split(listing, <<0>>, trim: true),
+           &File.exists?(Path.join(root, &1))
+         ) do
+      [] -> :ok
+      problems -> fail(Enum.join(problems, "; "))
     end
 
     entries = Keyword.get_values(opts, :entry)
