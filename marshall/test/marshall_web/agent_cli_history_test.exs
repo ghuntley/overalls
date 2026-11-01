@@ -33,8 +33,10 @@ defmodule MarshallWeb.AgentCLIHistoryTest do
   # persisted rows, including prior turns, sessions, audit and wake operations.
 
   # Five complete SQL/LiveView histories took 34.379s under the default profile's
-  # 30s TooSlow heuristic. At b0dec2a / engine 0.43.7, CI derandomizes from test
-  # identity, disables the example database and only suppresses TooSlow;
+  # 30s TooSlow heuristic. At hegel-erlang 44b4c8e / engine 0.43.7, CI
+  # derandomizes (one fixed seed for every property: hegel_ex sets no database
+  # key; HEGEL_SEED overrides it), disables the example database and only
+  # suppresses TooSlow;
   # shrinking/blob replay and all other health checks remain. Keep all 100 cases.
   @tag :hegel_case_sandbox
   @tag timeout: 900_000

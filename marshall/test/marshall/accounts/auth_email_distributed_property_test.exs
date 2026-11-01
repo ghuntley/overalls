@@ -44,8 +44,9 @@ defmodule Marshall.Accounts.AuthEmailDistributedPropertyTest do
 
     # Real three/four-BEAM cases measured 8-14s each; 100 cases require more
     # than the old 180s aggregate. Every existing boot/RPC/SMTP deadline remains.
-    # At b0dec2a / engine 0.43.7, CI derandomizes from test identity, disables the
-    # example database and only suppresses TooSlow; shrinking/blob replay remain.
+    # At hegel-erlang 44b4c8e / engine 0.43.7, CI derandomizes (one fixed seed for
+    # every property: hegel_ex sets no database key; HEGEL_SEED overrides it),
+    # disables the example database and only suppresses TooSlow; shrinking/blob replay remain.
     @tag timeout: 1_800_000
     property name, profile: :ci, test_cases: 100 do
       crash? = unquote(crash?)

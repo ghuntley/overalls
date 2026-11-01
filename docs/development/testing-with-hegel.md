@@ -225,8 +225,10 @@ secrets into the serial log, keep `assert` messages value-free.
 ## Elixir and BEAM properties
 
 Elixir properties use the same native Hegel engine but run inside the Mix test VM.
-The current protocol, Marshall and Lilly frontend ref is `b0dec2a`, resolved as
-`b0dec2abf868c7036950c00256a2ebf5af2929e7`. The recorded
+The current frontend ref of every Mix project is `44b4c8e`, resolved as
+`44b4c8e109313f14733b06f2025e64f3c65a0bc9`. It is `b0dec2a` plus one fix: a
+property without a `seed` option keeps the profile seed, so `HEGEL_SEED`
+applies (before, the NIF cleared it). The recorded
 299-test protocol gate used the earlier `2c9f7a4` frontend; the review preserves
 the passing `6a62795` result separately. Those historical results do not verify
 the current pin or changed consumer tests.
@@ -234,6 +236,17 @@ Use them for pure functions, protocol codecs, Ash changesets, lifecycle models,
 authorization decisions, bounded retry/reconciliation models, and BEAM-visible
 process or socket behavior. Keep NixOS, native Rust/KVM, physical isolation,
 filesystem durability, and multi-host recovery claims in their dedicated suites.
+
+Seeds in the Mix test VM come from the engine environment, which it reads once
+per VM. Use `HEGEL_SEED=<n>` to replay or explore a fixed draw sequence, and
+`HEGEL_DERANDOMIZE=true` (or the `ci` profile, which `CI=true` selects) for
+derandomized draws. An explicit `seed:` option on a property overrides both.
+`hegel_ex` sets no database key, so derandomized draws come from the engine's
+constant `unnamed-test` key: every property without a seed starts from the same
+seed, not one derived from its identity. A per-property key would also turn on
+the engine's `.hegel/examples` replay database wherever `HEGEL_DATABASE` is not
+`disabled`. That changes which examples run, so it is an open follow-up rather
+than part of this pin.
 
 The `b0dec2a` installer publishes the NIF through a sibling temporary file and
 atomic rename. The previous in-place copy truncated a loaded library inode,

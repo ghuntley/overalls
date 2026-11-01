@@ -196,8 +196,9 @@ defmodule Marshall.Access.PinsPropertyTest do
 
   # The full 100-case isolated run measured 276 seconds; the default profile's
   # 30s heuristic counted SQL body costs and stopped after only seven cases.
-  # At b0dec2a / engine 0.43.7, CI derandomizes from test identity, disables the
-  # example database and only suppresses TooSlow. Shrinking/blob replay and other
+  # At hegel-erlang 44b4c8e / engine 0.43.7, CI derandomizes (one fixed seed for
+  # every property: hegel_ex sets no database key; HEGEL_SEED overrides it),
+  # disables the example database and only suppresses TooSlow. Shrinking/blob replay and other
   # health checks remain. Keep all cases, the SQL deadline and complete oracle.
   @tag timeout: 600_000
   property "pin histories match the per-user ordered-set model", profile: :ci, test_cases: 100 do

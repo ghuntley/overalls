@@ -59,9 +59,10 @@ storage durability, physical recovery or deployed fleet behavior.
 - [Elixir Hegel testing guide](../../development/testing-with-hegel.md)
 - [Hegel Elixir skill](../../../.agents/skills/hegel-elixir-tests/SKILL.md)
 - [Protocol test-only dependency pin](../../../protocol/mix.exs)
-  currently selects frontend ref `b0dec2a`, resolved as
-  `b0dec2abf868c7036950c00256a2ebf5af2929e7`,
-  as do Marshall and Lilly. The historical complete protocol gate at
+  currently selects frontend ref `44b4c8e`, resolved as
+  `44b4c8e109313f14733b06f2025e64f3c65a0bc9`, as do Marshall, Lilly and every
+  other Mix project. It differs from the earlier `b0dec2a` only in honouring
+  `HEGEL_SEED` when a property gives no seed (ADR-0269 seed policy). The historical complete protocol gate at
   `2c9f7a4a9f2cf156de063bbc8058bcf297be5cf0` passed 299 tests and properties;
   the linked review retains that source hash and the earlier `6a62795` result.
   Those historical results do not establish execution at the current pin.
