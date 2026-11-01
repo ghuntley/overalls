@@ -176,9 +176,10 @@ PR runs the affected machine-test set, and the approved migration plan.
   near 125 GB), and runs 41169053536 and 41194732683 failed with ENOSPC.
   Verifying substitutes instead of downloading them does not help: a new
   toplevel takes `overalls-images.json`, and so every image, in its input
-  closure. The images are mostly zeros (27.2 GiB as zstd NARs), so a
-  `:deployment` job keeps its store on a loop-mounted btrfs with forced zstd
-  compression on the xl root disk (`nix-on-cache-volume: "false"` in
+  closure. The images are mostly zeros (27.2 GiB as zstd NARs), so every
+  host job except the known-small `:base`, `:install` and kexec (a
+  `:system` job hit the same ENOSPC in run 41257632603) keeps its store on a
+  loop-mounted btrfs with forced zstd compression on the xl root disk (`nix-on-cache-volume: "false"` in
   [the devenv action](../../../.github/actions/devenv/action.yml)), still
   realising and publishing the complete closure. A 16x64 profile with a
   288 GB disk was tried first and dropped: it needs half the workspace's

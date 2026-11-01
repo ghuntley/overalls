@@ -251,8 +251,8 @@ jobs:
     # image alone is 64 GiB raw): more than the ~116 GB cache volume (ENOSPC
     # in runs 41169053536 and 41194732683), and its new toplevel needs every
     # image as an input. The images are mostly zeros (27 GiB as zstd NARs),
-    # so a deployment keeps its store on a zstd-compressed btrfs on the root
-    # disk instead of the volume. Base, install and kexec fit the volume.
+    # so host builds other than base, install and kexec (which fit the volume)
+    # keep their store on a zstd-compressed btrfs on the root disk instead.
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 180
     strategy:
@@ -263,13 +263,17 @@ jobs:
     # token is set; forks and pull requests get no secret and build locally.
     env:
       NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+      # Only the known-small kinds keep their store on the cache volume; every
+      # other host target (deployment, system, and any new kind) can pull in
+      # the guest images and gets the compressed root-disk store.
+      NIX_ON_CACHE_VOLUME: ${{ (endsWith(matrix.host.name, ':base') || endsWith(matrix.host.name, ':install') || matrix.host.name == 'nix/platform:kexec') && 'true' || 'false' }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
       # Before Nix is installed: the store goes on a loop-mounted btrfs with
       # forced zstd compression, sized to the root disk less room for
       # uncompressed build directories in /tmp. A failure stops the job.
       - name: Compressed Nix store
-        if: endsWith(matrix.host.name, ':deployment')
+        if: env.NIX_ON_CACHE_VOLUME == 'false'
         run: |
           set -euo pipefail
           # The runner container ships without apt lists.
@@ -286,7 +290,7 @@ jobs:
         with:
           cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
           install-devenv: "false"
-          nix-on-cache-volume: ${{ endsWith(matrix.host.name, ':deployment') && 'false' || 'true' }}
+          nix-on-cache-volume: ${{ env.NIX_ON_CACHE_VOLUME }}
       - name: Build ${{ matrix.host.name }}
         env:
           TARGETS: ${{ toJSON(matrix.host.targets) }}
