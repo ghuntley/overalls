@@ -620,7 +620,12 @@ Remaining gaps, by milestone of the migration plan:
   ([github/default.nix](../../../nix/domains/artifacts/guest/github/default.nix),
   contract github-tools-from-buck2; Marvin through `swapLeaf`). The Nix
   builds remain only for `mila-journey-fixture`, which assembles without
-  artifacts, and for evaluation checks that import a guest module directly.
+  the other Buck2 leaves, and for evaluation checks that import a guest module directly.
+  Once the Nix Mix releases were deleted (M6), that fixture failed to
+  evaluate (trunk ci 41316059648); it now receives exactly the Marshall and
+  Porsche releases its VM runs (contract
+  nix-leaf-outputs-take-only-their-releases), so mila-builds runners build
+  those two releases with Buck2 instead of substituting them.
 - M9 leftovers: `mila-release.yml`'s signed Buck2 builds, Android signing
   and signing-leak checks have not run: the repository has no `mila-release`
   environment or signing secrets yet, and its publish job creates a public

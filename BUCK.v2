@@ -4,7 +4,7 @@
 load("//buck:nix.bzl", "nix_owned")
 load("//nix/buck:assembly_attrs.bzl", "ASSEMBLY_CHECKS", "ASSEMBLY_PACKAGES")
 load("//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
-load("//buck:mix_artifacts.bzl", "MIX_ANTITHESIS_ARTIFACTS")
+load("//buck:mix_artifacts.bzl", "MIX_ANTITHESIS_ARTIFACTS", "MIX_ARTIFACTS")
 load("//buck:assemble.bzl", "nix_assemble")
 load("//buck:nix.bzl", "nix_store_run", "owned_set")
 load("//buck:mix.bzl", "mix_sources")
@@ -67,12 +67,16 @@ owned_set(
 # lib.assemble's package outputs (nix/assemble/outputs.nix), assembled
 # over the Buck2 artifacts like hosts and machine tests (ADR-0269). CI
 # evaluates each affected one (`[drv]`); //mila:journey-fixture runs one.
-# The Mila journey fixture keeps every leaf a Nix build. The plain Ubuntu
-# runners in mila-builds.yml substitute it from Cachix, which holds what
-# publish-cache.yml builds (`//:check-mila-journey-fixture`). Those runners
-# have no Namespace cache and could not compile the Buck2 leaves in their
-# budget. Its drvPath therefore equals the flake's `mila-journey-fixture`.
-_NIX_LEAF_OUTPUTS = ["mila-journey-fixture"]
+# The Mila journey fixture keeps every other leaf a Nix build. The plain
+# Ubuntu runners in mila-builds.yml substitute it from Cachix, which holds
+# what publish-cache.yml builds (`//:check-mila-journey-fixture`). Those
+# runners have no Namespace cache and could not compile the Buck2 Rust leaves
+# in their budget. The Mix releases have no Nix build (ADR-0269 M6), so it
+# takes the two its VM runs from Buck2 (contract
+# nix-leaf-outputs-take-only-their-releases): the runner builds those two.
+_NIX_LEAF_OUTPUTS = {
+    "mila-journey-fixture": {app: MIX_ARTIFACTS[app] for app in ["marshall", "porsche"]},
+}
 
 # Operator tools that read no Buck2-built leaf (stable nixpkgs, the public
 # registry and the editor sources only). Assembling them without artifacts
@@ -94,7 +98,7 @@ _PACKAGE_VISIBILITY = {
     attr = "outputPackages.\"{}\"".format(attr),
     # The Antithesis contexts' package sets take the harness, guest and
     # integrated-host releases (lib.assemble routes them).
-    artifacts = {} if attr in _NIX_LEAF_OUTPUTS + _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS | (
+    artifacts = _NIX_LEAF_OUTPUTS[attr] if attr in _NIX_LEAF_OUTPUTS else {} if attr in _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS | (
         MIX_ANTITHESIS_ARTIFACTS if attr.startswith("antithesis-") else {}
     ),
     labels = ["flake_output"],
@@ -147,7 +151,7 @@ _ASSEMBLED_CHECKS = [attr for attr in ASSEMBLY_CHECKS if attr not in MACHINE_TES
 [nix_assemble(
     name = "check-" + attr,
     attr = "checks.\"{}\"".format(attr),
-    artifacts = {} if attr in _NIX_LEAF_OUTPUTS else ASSEMBLY_ARTIFACTS,
+    artifacts = _NIX_LEAF_OUTPUTS.get(attr, ASSEMBLY_ARTIFACTS),
     labels = ["flake_output", "check"] + (["isolated_build"] if attr in _ISOLATED_BUILDS else []),
 ) for attr in _ASSEMBLED_CHECKS]
 

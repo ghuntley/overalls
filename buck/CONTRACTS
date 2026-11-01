@@ -297,6 +297,13 @@ from nix/verification/tests/find_a_test.bzl. docs.bxl MUST fail when a curated
 key names no test target, and `tools/docs --check` MUST fail when the README
 differs from the rendering (ADR-0269).
 
+@cc [owner:ghuntley,label:build] nix-leaf-outputs-take-only-their-releases
+A BUCK.v2 `_NIX_LEAF_OUTPUTS` package or check (the Mila journey fixture)
+MUST receive exactly the Mix release artifacts its closure runs, and no other
+Buck2 leaf: its Rust leaves stay Nix builds that plain runners substitute from
+Cachix, while the Mix releases have no Nix build (ADR-0269 M6), so a missing
+one is an evaluation error. Building its `[drv]` checks the set is complete.
+
 @cc [owner:ghuntley,label:build;verification] tool-outputs-read-no-swapped-leaf
 A BUCK.v2 `_TOOL_OUTPUTS` package assembles without ASSEMBLY_ARTIFACTS, so its
 derivation MUST NOT depend on any of them; otherwise it ships a Nix-built copy
