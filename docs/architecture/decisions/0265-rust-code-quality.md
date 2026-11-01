@@ -216,7 +216,17 @@ records the verification run and the known gaps.
     clippy in [`terminald-windows.nix`](../../../nix/domains/artifacts/infrastructure/terminald-windows.nix)
   - [Lyra](../../../lyra/Cargo.toml), gated in
     [`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix) under the pinned
-    1.97.1 toolchain, including FreeBSD and illumos targets
+    1.97.1 toolchain, including FreeBSD and illumos targets. Its unsafe code is
+    confined to the [`sys`](../../../lyra/src/sys/mod.rs) shim tree, declared once in
+    [`lib.rs`](../../../lyra/src/lib.rs) with `#[allow(unsafe_code, reason)]`, and the
+    library, every binary and the integration tests deny `unsafe_code` at their roots.
+    The shims are [`unix.rs`](../../../lyra/src/sys/unix.rs),
+    [`socket.rs`](../../../lyra/src/sys/socket.rs) (sealed fixed-layout socket addresses),
+    [`native.rs`](../../../lyra/src/sys/native.rs) (FreeBSD and illumos ioctls) and
+    [`windows/`](../../../lyra/src/sys/windows/mod.rs). Clippy `-D warnings` runs for
+    the host, Windows, FreeBSD and illumos targets. `agent/managed_skills.rs` is split
+    into [`agent/managed_skills/`](../../../lyra/src/agent/managed_skills/mod.rs), with
+    its tests in a sibling `tests.rs` and the test list unchanged.
   - the Mila crates, first through `[workspace.lints]` in their own workspace
     and, since ADR-0273, as members of the root [`Cargo.toml`](../../../Cargo.toml)
     workspace, with every member opted in.
@@ -236,10 +246,9 @@ records the verification run and the known gaps.
     commands, PTY, trust, sign-in); the test list is unchanged for both feature sets
 - **proptest is gone.** Spool, the broker and the receiver now use Hegel only.
 - **Follow-ups** (not part of this decision's acceptance):
-  - confining unsafe code in Lyra and terminald, so that `unsafe_code = "deny"` can
-    join the canonical block
+  - confining unsafe code in terminald, so that `unsafe_code = "deny"` can join the
+    canonical block
   - a clippy gate in the native FreeBSD and illumos terminald derivation
-  - splitting the large non-`lib.rs` file `lyra/src/agent/managed_skills.rs`
 
 ## Open questions
 
@@ -248,8 +257,8 @@ records the verification run and the known gaps.
 - Resolved: the single root Cargo workspace is decided by
   [ADR-0273](0273-single-rust-workspace-and-toolchain.md), which amends decision 1's
   distribution clauses (see the amendment above).
-- When should Lyra and terminald unsafe confinement be scheduled, so that
-  `unsafe_code = "deny"` can join the canonical block?
+- When should terminald unsafe confinement be scheduled, so that
+  `unsafe_code = "deny"` can join the canonical block? Lyra's is done (see Evidence).
 
 ## Related decisions
 

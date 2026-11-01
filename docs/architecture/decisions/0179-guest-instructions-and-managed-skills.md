@@ -148,7 +148,7 @@ The [guest context reader](../../../lyra/src/agent/context.rs) implements bounde
 inventory, precedence, worktree discovery and digest-bound chunks. The
 [account resolver](../../../lyra/src/agent/context/account_home.rs) reads the
 Linux account database or Windows SID profile registration.
-[Managed skill operations](../../../lyra/src/agent/managed_skills.rs) implement
+[Managed skill operations](../../../lyra/src/agent/managed_skills/mod.rs) implement
 bounded public Git fetching, ordinary-blob extraction, durable guest receipts,
 content digests and local-edit refusal. These sources add no standalone service.
 The installation lock explicitly unlocks on every completed invocation,

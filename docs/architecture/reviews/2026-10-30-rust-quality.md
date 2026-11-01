@@ -134,12 +134,12 @@ ADR-0264 were re-pointed where cited items moved.
 - Android-target clippy and Gradle did not run locally. CI's android-native
   job covers them.
 - Not yet done:
-  - unsafe confinement for Lyra and terminald, so that `unsafe_code = "deny"`
-    can join the canonical block
+  - unsafe confinement for terminald (Lyra's is done; see ADR-0265's evidence),
+    so that `unsafe_code = "deny"` can join the canonical block
   - a clippy gate for the native FreeBSD/illumos terminald derivation
   - splits of the large non-`lib.rs` files. Follow-up (2026-11-01): the Mila Linux
-    `session.rs` and the broker's `windows.rs` are now split into module
-    directories as pure moves; `lyra/src/agent/managed_skills.rs` remains
+    `session.rs`, the broker's `windows.rs` and Lyra's `managed_skills.rs` are now
+    split into module directories as pure moves, so this item is done
   - rustdoc reports each `/// @cc [owner:…]` tag as an unresolved link
     (warnings, which is why rustdoc lints stay at their defaults)
 - A planned single root Cargo workspace (Buck2 track T2) would contradict the
