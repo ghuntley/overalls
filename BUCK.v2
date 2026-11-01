@@ -225,6 +225,20 @@ repo_check(
     path = ["toolchains//:erlang", "toolchains//:git"],
 )
 
+# Contract buck2-wrapper-updater-path: see tools/CONTRACTS. tools/buck2 runs
+# with only the host updater's commandPath tools (bash, coreutils, findutils,
+# git and python3 here; nix, nix-store and curl stubbed), and commandPath
+# matches the check's list. Local: the wrapper's shebang is /usr/bin/env.
+repo_check(
+    name = "buck2-updater-path",
+    cmd = ["$(exe toolchains//:python)", "tools/buck2_updater_path_test.py"],
+    include = ["tools/buck2", "tools/namespace.buckconfig", "tools/namespace-re-image.lock", "tools/buck2_updater_path_test.py", "nix/domains/system/auto-update/default.nix"],
+    labels = ["check", "precommit"],
+    local_only = True,
+    owned = ALL_OWNED_FILES,
+    path = ["toolchains//:bash", "toolchains//:findutils", "toolchains//:git", "toolchains//:python"],
+)
+
 # The cells' Elixir and OTP must be the .tool-versions ones: the toolchain
 # check as a configuration assertion. The store paths are in the command, so a
 # toolchain change reruns it.

@@ -33,6 +33,14 @@ same pins), materialised in .buck-cells as a real directory. Its configuration
 enables only non_hermetic targets, so a runner without Nix never builds a
 hermetic target from PATH tools (ADR-0269 M9).
 
+@cc [owner:ghuntley,label:deployment] buck2-wrapper-updater-path
+tools/buck2 MUST run, Namespace token or not, with only the commands of the
+host updater's commandPath (nix/domains/system/auto-update/default.nix),
+because the updater runs the candidate's wrapper with that fixed PATH and a
+missing command fails every host update as build_tool_unavailable (ADR-0271).
+//:buck2-updater-path runs the wrapper so, records every command bash cannot
+find, and fails when commandPath no longer matches its list.
+
 @cc [owner:ghuntley,label:build;security] buck2-namespace-optional
 tools/buck2 MUST enable the Namespace remote cache only by writing the
 untracked .buck-remote.buckconfig, which names tools/namespace.buckconfig,

@@ -160,6 +160,16 @@ M10 (2026-10-30) implements decision 3.
   gone, and the updater writes `BUCK2_NAMESPACE_CONFIG`. The two contracts
   remain, revised for Namespace, with unit tests `RemoteCacheConfiguration`
   and `RemoteCacheFallback`.
+- **Wrapper PATH.** On 2026-11-01 `tools/buck2` began calling `sed` and
+  `awk`, which the updater's fixed `commandPath` lacks, and every host update
+  failed as `build_tool_unavailable` until ee67cc20b removed them. The
+  precommit check `//:buck2-updater-path`
+  ([test](../../../tools/buck2_updater_path_test.py), contract
+  `buck2-wrapper-updater-path`) now runs the wrapper with only commandPath's
+  bash, coreutils, findutils, git and python3, with nix, nix-store and curl
+  stubbed, records every command bash cannot find, and fails when
+  `commandPath` no longer matches its list. It fails on the `sed` version of
+  the wrapper and passes on ee67cc20b.
 - **Fixtures.** [support/update-fixture.nix](../../../nix/verification/tests/support/update-fixture.nix)
   builds an offline Buck2 fixture repository. It contains the real wrapper,
   `.buckconfig`, toolchains and rules, plus the pinned buck2 with cut-down

@@ -131,7 +131,9 @@ let
   });
   python = pkgs.python3;
   # git, Nix, bash and findutils run the candidate's tools/buck2, which
-  # realises the candidate's pinned buck2 and cells (ADR-0271).
+  # realises the candidate's pinned buck2 and cells (ADR-0271). Contract
+  # buck2-wrapper-updater-path: //:buck2-updater-path keeps a copy of this
+  # list (tools/buck2_updater_path_test.py); change both together.
   commandPath = lib.makeBinPath [ pkgs.git pkgs.nix pkgs.nixos-rebuild pkgs.openssh
     pkgs.systemd pkgs.curl pkgs.coreutils pkgs.bash pkgs.findutils config.boot.zfs.package python ];
   runner = pkgs.writeShellScriptBin "overalls-auto-update" ''
