@@ -70,7 +70,7 @@ namespace Marshall {
   action "web" appliesTo {
     principal: [User], resource: [VM], context: {}
   };
-  action "team_read", "team_manage_members", "team_transfer" appliesTo {
+  action "team_read", "team_manage_members", "team_manage_admins", "team_transfer" appliesTo {
     principal: [User], resource: [Team], context: {}
   };
   action "artifact_read", "artifact_publish", "artifact_share", "artifact_delete",

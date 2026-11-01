@@ -115,10 +115,15 @@ permit(principal is Marshall::User,
 when { resource.team_members.contains(principal) };
 
 permit(principal is Marshall::User,
-       action in [Marshall::Action::"team_read", Marshall::Action::"team_manage_members",
-                  Marshall::Action::"team_transfer"],
+       action in [Marshall::Action::"team_read", Marshall::Action::"team_manage_members"],
        resource is Marshall::Team)
 when { resource.owner == principal || resource.admins.contains(principal) };
+
+// Granting or removing the admin role and offering ownership are the owner's alone.
+permit(principal is Marshall::User,
+       action in [Marshall::Action::"team_manage_admins", Marshall::Action::"team_transfer"],
+       resource is Marshall::Team)
+when { resource.owner == principal };
 
 permit(principal is Marshall::User, action == Marshall::Action::"team_read",
        resource is Marshall::Team)

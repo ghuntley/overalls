@@ -112,8 +112,9 @@ defmodule Marshall.Teams.Coordinator do
   end
 
   # @cc [owner:ghuntley,label:security] team-membership-authorized-replacement
-  # Only the team owner or an admin may change memberships, and only the
-  # owner may remove an admin or appoint admins. The owner role itself is
+  # Only the team owner or an admin may change memberships (Cedar
+  # `team_manage_members`), and only the owner may remove an admin or appoint
+  # admins (Cedar `team_manage_admins`). The owner role itself is
   # only ever changed through the Transfer consent workflow. Memberships
   # MUST resolve existing accounts by exact case-insensitive email and never
   # create accounts or invitations.
@@ -132,7 +133,6 @@ defmodule Marshall.Teams.Coordinator do
     Marshall.Accounts.AccountLifecycle.admit_all!([actor.id, user.id])
     team = lock_team!(arguments.team_id)
     Fence.require_native!(team)
-    member = current_member!(team.id, actor.id)
 
     unless Marshall.Authorization.allowed?(
              actor,
@@ -143,14 +143,20 @@ defmodule Marshall.Teams.Coordinator do
            do: Ledger.rollback(:forbidden)
 
     if user.id == actor.id, do: Ledger.rollback(:owner_protected)
-    if member.role != :owner and arguments.role == :admin, do: Ledger.rollback(:forbidden)
 
     existing = Ledger.read!(TeamMember, team_id: team.id, user_id: user.id)
 
     if Enum.any?(existing, &(&1.role == :owner)), do: Ledger.rollback(:owner_protected)
 
-    if member.role != :owner and Enum.any?(existing, &(&1.role == :admin)),
-      do: Ledger.rollback(:forbidden)
+    # Granting the admin role or changing an admin is a separate Cedar action.
+    if (arguments.role == :admin or Enum.any?(existing, &(&1.role == :admin))) and
+         not Marshall.Authorization.allowed?(
+           actor,
+           "team_manage_admins",
+           Marshall.Teams.Team.Cedar,
+           team.id
+         ),
+       do: Ledger.rollback(:forbidden)
 
     if arguments.role == :removed do
       Enum.each(existing, &Ledger.archive!(&1, :remove))
@@ -314,7 +320,8 @@ defmodule Marshall.Teams.Coordinator do
   end
 
   # @cc [owner:ghuntley,label:security] team-transfer-offer-consent
-  # Only the owner may offer, only to an existing non-owner member, with at
+  # Only the owner may offer (Cedar `team_transfer`), only to an existing
+  # non-owner member, with at
   # most one pending offer per team. Only the target may accept or decline
   # and only the owner may cancel; every guard MUST hold under the team lock.
   def offer(team_id, email, actor) do
@@ -324,10 +331,17 @@ defmodule Marshall.Teams.Coordinator do
           Marshall.Accounts.AccountLifecycle.admit_all!([actor.id, target.id])
           locked = lock_team!(team.id)
           Fence.require_native!(locked)
-          owner = current_member!(locked.id, actor.id)
           target_member = current_member!(locked.id, target.id)
 
-          if owner.role != :owner or target.id == actor.id or target_member.role == :owner,
+          unless Marshall.Authorization.allowed?(
+                   actor,
+                   "team_transfer",
+                   Marshall.Teams.Team.Cedar,
+                   locked.id
+                 ),
+                 do: Ledger.rollback(:forbidden)
+
+          if target.id == actor.id or target_member.role == :owner,
             do: Ledger.rollback(:forbidden)
 
           if Ledger.read!(Transfer, team_id: locked.id, state: :pending) != [],

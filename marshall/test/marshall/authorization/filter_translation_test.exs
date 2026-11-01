@@ -9,7 +9,8 @@ defmodule Marshall.Authorization.FilterTranslationTest do
   @records %{
     Marshall.Compute.VirtualMachine.Cedar => ~w(read write manage web),
     Marshall.Threads.Thread.Cedar => ~w(read write manage),
-    Marshall.Teams.Team.Cedar => ~w(team_read team_manage_members team_transfer),
+    Marshall.Teams.Team.Cedar =>
+      ~w(team_read team_manage_members team_manage_admins team_transfer),
     Marshall.Galileo.Integration.Cedar => ~w(integration_read integration_manage),
     Marshall.Terminal.Session.Cedar => ~w(terminal_session_use),
     Marshall.Artifacts.Artifact.Cedar =>

@@ -52,7 +52,12 @@ defmodule Marshall.Authorization.CedarTest do
     other = "member:" <> actor_id
 
     role = draw("role", member_of([:owner, :admin, :member, :stranger]))
-    action = draw("action", member_of(["team_read", "team_manage_members", "team_transfer"]))
+
+    action =
+      draw(
+        "action",
+        member_of(["team_read", "team_manage_members", "team_manage_admins", "team_transfer"])
+      )
 
     team =
       Cedar.entity("Team", "team", %{
@@ -70,7 +75,8 @@ defmodule Marshall.Authorization.CedarTest do
       })
 
     allowed =
-      (role in [:owner, :admin] and true) or
+      role == :owner or
+        (role == :admin and action in ["team_read", "team_manage_members"]) or
         (role == :member and action == "team_read")
 
     assert Cedar.allowed?(actor, action, team) == allowed
@@ -152,7 +158,7 @@ defmodule Marshall.Authorization.CedarTest do
         "action",
         case resource_kind do
           :vm -> member_of(~w(read write manage web))
-          :team -> member_of(~w(team_read team_manage_members team_transfer))
+          :team -> member_of(~w(team_read team_manage_members team_manage_admins team_transfer))
           :integration -> member_of(~w(integration_read integration_manage))
         end
       )
