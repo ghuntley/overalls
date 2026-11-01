@@ -224,9 +224,35 @@ Remaining gaps:
   hosts, which keep `//nix:srcs`) are unchanged. All 51 narrowed assemblies
   evaluated (`[drv]`) over their declared-only trees, and the `sysctl` and
   `access` machine tests passed through them. Splitting that catalog per
-  service is the remaining step. Most suites have not yet been
-  built through their declared-only tree; a suite that reads an undeclared
-  file fails its first run, which the daily backstop surfaces.
+  service is the remaining step. On 2026-11-01, at trunk `fed7f3e2b`, on
+  Dungarees:
+  - every narrowed suite's `.assembly[drv]` evaluated over its declared-only
+    tree (51 of 51, 354 s);
+  - ten of them ran in full: nix-ld, vm-watch, image-copy, source-export,
+    ssh-host-certificates, audi-openssh, susan-image, brady-flow,
+    database-recovery and zfs-io. The first nine passed. zfs-io built and
+    then failed its capacity assertion (`driver.py:38`), which reproduces
+    with local builders only. The failure is in Lilly's pool capacity report
+    and is unrelated to narrowing.
+
+  A suite that reads an undeclared file fails its first run, which the daily
+  backstop surfaces. The other 41 narrowed suites have evaluated but not run.
+- Replays (2026-11-01). Two regressions reached trunk before graph
+  selection. Their changes now select the suites that cover them, and two
+  fixtures in
+  [affected_fixtures.py](../../../buck/tests/affected_fixtures.py) keep it
+  so:
+  - `ab3816ebb`: a change to `lilly/lib/lilly/network/guest.ex` and to
+    hostd's `policy.rs` selects all 206 machine tests, galileo-fleet and
+    memory-suspension-fleet among them.
+  - `8fab8c411`: a change to the fleet `scenarios/audi.py` selects exactly
+    the six variants that declare it (audi-fleet, audi-relocation-fleet,
+    audi-ubuntu-fleet, audi-ubuntu-relocation-fleet,
+    memory-suspension-fleet and otel-audi-ssh-native).
+
+  The same commit also changed `scenarios/enrollment.py`. Every fleet
+  variant declares that file, so a change to it selects all 67, as it
+  should.
 - `catalog.nix` stays: it defines the checks that lib.assemble exposes and
   that the generator reads. Removing it means each suite's `BUCK` `params`
   instantiating its suite in lib.assemble, which belongs with the per-module
@@ -244,9 +270,9 @@ Remaining gaps:
 - The known-broken Inception machine tests (`inception`, `inception-checkout`,
   `inception-ssh-host-ca`) are labelled `known_inception_failure`: `ci.yml`
   skips them, and the daily run reports them without failing. `zfs-guest` and
-  `ubuntu-guest` stay required, although `zfs-guest`'s driver still runs the
-  known-failing Inception subtest; excluding it belongs in that driver.
-- Replays of `ab3816ebb` and `8fab8c411` are not yet recorded.
+  `ubuntu-guest` stay required. `zfs-guest`'s driver skips its known-failing
+  Inception subtest and logs the skip, without running it
+  ([driver.py](../../../nix/verification/tests/machines/zfs-guest/driver.py)).
 
 ## Open questions
 

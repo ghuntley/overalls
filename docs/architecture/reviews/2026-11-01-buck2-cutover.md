@@ -93,6 +93,30 @@ index, machine-test input narrowing and a fix to the host enrollment path.
    the signed path.
 8. **Low, onboarding friction.** Adding a host still needs a manual
    `OWNED_PACKAGES` entry for affected-test ownership.
+9. **Checked after the removal: host self-deploy.** At trunk `fed7f3e2b`,
+   which contains the removal (`0ee821c63`), each host's
+   `//fleet/hosts/<host>:deployment[drv]` evaluated from a clean checkout on
+   Dungarees:
+   - dungarees: `bg3mz72h…`, 459 s;
+   - panterloons: `f7nqh8px…`, 307 s;
+   - salopettes: `665hwli3…`, 88 s.
+10. **Checked: selection replays (ADR-0270).** Fixtures now replay
+    `ab3816ebb` and `8fab8c411`. The first selects galileo-fleet and
+    memory-suspension-fleet; the second selects exactly the six variants
+    that declare `scenarios/audi.py`. All 12 `//buck:affected_fixtures`
+    cases pass.
+11. **Fixed, medium, CI faults found after the removal.** None came from
+    the removal itself.
+    - `//:check-auto-update-custody` failed in publish-cache run
+      41267889589. Its harness never learned the `update.namespace_cache`
+      event that ADR-0276 added (`ba55fd444`). The harness now checks the
+      event and then drops it. No custody history runs with a Namespace
+      token present; that gap is recorded.
+    - mila-builds' Windows job could not load `//protocol`, because the M6
+      Mix macro fails when the `[mix]` cells section is absent. This was
+      handed to the M6 owner.
+    - zfs-io fails its capacity assertion even when it builds locally. This
+      was handed to the Lilly owner as a pool-capacity question.
 
 ## Status
 
@@ -108,12 +132,20 @@ index, machine-test input narrowing and a fix to the host enrollment path.
 
 - `tools/buck2 test //nix/verification/tests/machines/host-enrollment:host-enrollment`
   passed in full with the fixture fix.
-- Narrowed suites' `[drv]` targets evaluate. `sysctl` and `access` pass.
+- Narrowed suites: all 51 `.assembly[drv]` evaluate (Dungarees, 354 s).
+  Twelve ran in full and eleven passed: `sysctl`, `access`, nix-ld, vm-watch,
+  image-copy, source-export, ssh-host-certificates, audi-openssh,
+  susan-image, brady-flow and database-recovery. zfs-io failed; see
+  finding 11.
+- `//buck:affected_fixtures`: 12 of 12 pass, including the replays.
+- Fleet deployment `[drv]` for all three hosts after the removal (finding 9).
 - drvPath comparisons for `buckCells`, `lib.dependencyPins` and the Mila
   journey fixture across the removal.
-- `tools/docs --check`, the assembly attribute freshness check,
-  `elixir scripts/check_adrs.exs` and `tools/precommit` on the removal
-  commit.
+- `tools/docs --check`, the assembly attribute freshness check and
+  `elixir scripts/check_adrs.exs` on the removal tree. The removal commit
+  itself (`0ee821c63`) was pushed with hooks bypassed, on the user's
+  explicit instruction. Its full precommit hook did not finish on the
+  overloaded build host before that push.
 - Inception tests were not run; they are known broken and out of scope.
 
 ## Follow-up

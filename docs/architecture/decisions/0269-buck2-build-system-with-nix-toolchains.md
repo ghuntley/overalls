@@ -456,6 +456,14 @@ the approved migration plan.
   Apple, Android and Windows target; the review records the runs and the
   two faults the first one found.
 
+- Tracked and untracked files (M7, settled in M11). Buck2 globs see
+  untracked files. The commit hook (`tools/precommit`), CI and the former
+  flake checks used to differ here, but the hook and CI now run the same
+  Buck2 checks, so they see the same files. `py-static` is not restricted to
+  `git ls-files`. An action that read Git state would leave its key without
+  that input or make it depend on the index, and either would break caching.
+  The remaining effect is local only: ty's whole-tree pass also checks
+  untracked Python in a developer's checkout. A clean CI checkout has none.
 - M11 (partial) generates the tests README "Find a test" table from the
   graph: [docs.bxl](../../../buck/bxl/docs.bxl) lists every machine test and
   assembled check, joins the curated text in
@@ -522,8 +530,6 @@ Remaining gaps, by milestone of the migration plan:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`
     through Nix until assembly takes Buck2 artifacts (M3).
-  - Buck2 globs see untracked files, while prek and the Nix checks see only
-    tracked files. `py-static` therefore also checks untracked Python.
 - M9 leftovers: `mila-release.yml`'s signed Buck2 builds, Android signing
   and signing-leak checks have not run: the repository has no `mila-release`
   environment or signing secrets yet, and its publish job creates a public

@@ -175,6 +175,41 @@ def main() -> int:
         one_scenario,
     )
     fixture("deleted file resolves on base", lambda: (repo / first_lilly_lib(repo)).unlink(), lilly)
+
+    # Replays of two regressions that reached trunk before graph selection
+    # (ADR-0270): each fix's source change must select the suite that covers it.
+    def replay_ab3816ebb() -> None:
+        touch(repo, "lilly/lib/lilly/network/guest.ex")
+        touch(repo, "lilly/native/hostd/src/policy.rs")
+
+    def guest_reachability(s: dict[str, object]) -> None:
+        # hostd is a host package, so host-only suites are selected too; the
+        # Lilly-only exclusions of `lilly` do not apply.
+        assert s["everything"] is False, s["reasons"]
+        machines = targets(s, "machine_tests")
+        assert fleet <= machines, f"missing fleet variants {sorted(fleet - machines)[:5]}"
+        for suite in ("galileo-fleet", "memory-suspension-fleet"):
+            assert FLEET + suite in machines, f"{suite} not selected"
+
+    audi = "scenarios/audi.py"
+    audi_variants = {FLEET + v for v, used in scenarios.items() if audi in used}
+
+    def audi_scenario(s: dict[str, object]) -> None:
+        assert s["everything"] is False, s["reasons"]
+        assert FLEET + "audi-fleet" in audi_variants, "audi-fleet no longer uses audi.py"
+        fleet_selected = targets(s, "machine_tests") & fleet
+        assert fleet_selected == audi_variants, sorted(fleet_selected ^ audi_variants)
+
+    fixture(
+        "replay ab3816ebb: guest network change selects galileo-fleet",
+        replay_ab3816ebb,
+        guest_reachability,
+    )
+    fixture(
+        "replay 8fab8c411: audi scenario selects only its fleet variants",
+        lambda: touch(repo, f"nix/verification/tests/machines/fleet/{audi}"),
+        audi_scenario,
+    )
     # A target whose ci.yml job failed since the last green run, untouched by
     # this range, is selected again; a label head no longer has is dropped.
     # A fleet scenario change selects only its fleet variants among the

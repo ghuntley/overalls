@@ -272,13 +272,27 @@ Remaining:
   parameter, and antithesis flags apply to the antithesis contexts, not to
   hosts.
 - Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater unless CI has
-  uploaded them for the same cells and revision; that needs CI's cache
-  secrets (ADR-0272). The offline update fixture holds no
-  application sources, so it replaces `buck/artifacts.bzl` with an empty
-  dict. Its assemblies take every leaf from Nix, which means the in-VM tests
-  do not exercise Buck2-built leaves on the update path. Machine-test
-  assemblies and the `[drv]` evaluation of the real host targets do cover
-  them.
+  uploaded them for the same cells and revision. That needs CI to write to
+  the Namespace cache
+  ([ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md)).
+
+Accepted limit: the offline update fixture holds no application sources, so
+it replaces `buck/artifacts.bzl` with an empty dict and its assemblies take
+every leaf from Nix. The in-VM tests therefore do not build Buck2 leaves on
+the update path, and none is planned:
+- Building them in the VM means preloading the rust-overlay toolchain and
+  vendored crates into an offline image.
+- The behaviour such a test would add is already covered elsewhere:
+  - The updater runs the same `tools/buck2 build` whether a leaf comes from
+    Nix or Buck2. The fixture exercises that path, and so does
+    host-enrollment.
+  - Machine-test assemblies import Buck2-built leaves.
+  - Every fleet host builds them in its updater on each update. All three
+    report `builder = "buck2"`, and their deployment targets evaluated at
+    `fed7f3e2b` on 2026-11-01.
+- A faulty Buck2 leaf therefore fails a machine-test assembly or a host's
+  update, and the host keeps its running system. It does not need the in-VM
+  test to catch it.
 
 ## Open questions
 
