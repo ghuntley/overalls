@@ -212,6 +212,24 @@ the approved migration plan.
     reference and lock mismatch each failed exactly the expected check, and
     the [migration review](../reviews/2026-10-30-buck2-migration.md) records
     the selections and timings.
+  - Every gate of the retired `mix precommit` aliases is a Buck2 check
+    (2026-11-01): the runtime, ADR and contract gates are
+    `//:toolchain-versions`, `//:adrs`, `//:contracts` and
+    `//:contracts-tests`; logging is `//:logging-<app>` and `[logging]`;
+    `compile --warnings-as-errors` is the compile actions; format,
+    `[unused_deps]` (`deps.unlock --check-unused`; not Marshall, whose
+    dev-only phoenix_live_reload child `file_system` the test-only sandbox
+    cannot see, so its lock goes unchecked), Dialyzer, gettext and the
+    diagnostics `[schema]` check are `//<app>:check` sub-targets
+    ([mix.bzl](../../../buck/mix.bzl)); the suite and Covenant are
+    `//<app>:test`. Marshall's extra gates are `[monospace]` and the three
+    `[localization_*]` sub-targets, `//:marshall-browser` (the terminal and
+    workspace node suites) and `//:marshall-workspace-types` (tsc). The
+    aliases, publish-cache.yml's `precommit` matrix and its `gates` job, whose
+    prek, ADR and contract steps the ci.yml `precommit` job runs, are
+    deleted; the per-app test counts of the last matrix run (dispatch
+    41272274142) and ci.yml's `mix` job are compared in the commit that
+    deleted them.
 
 - **M6 test shards.**
   - `mix_test` runs a suite as separately cached shard actions
@@ -626,14 +644,10 @@ Remaining gaps, by milestone of the migration plan:
   `04ef3b4227e7a578c4cac7036b5c8ffc6e2583bd2557847b22855cfa8c2453eb`; the
   CI run is recorded in the migration review. Release signing of the DLL
   and of the .NET client remains with `mila-release.yml`;
-- the `publish-cache.yml` gates job, which reaches Buck2 through
-  `prek run --all-files` and still repeats the ADR and contract steps that the
-  `ci.yml` precommit job now runs;
-- M8 leftovers: each project's `mix precommit` (compile, format, tests,
-  Covenant, Dialyzer, gettext, Marshall's extra gates) stays, and CI keeps its
-  matrix, until the M6 Mix rules provide `precommit` sub-targets. The Rust
-  `<pkg>-rustfmt` and `<pkg>-clippy` checks exist for the Buck2-built crates
-  (M5).
+- the M8 leftovers (implemented, see "M8 (precommit)" above): the
+  `mix precommit` aliases, publish-cache.yml's matrix and its `gates` job
+  are deleted. The Rust `<pkg>-rustfmt` and `<pkg>-clippy` checks exist for
+  the Buck2-built crates (M5).
 
 ## Open questions
 

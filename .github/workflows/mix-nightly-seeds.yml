@@ -58,9 +58,8 @@ jobs:
             exit 1
           fi
           # Same split as ci.yml's mix job: Marshall's shards, then every other
-          # suite. `publish_cache_gate` suites (Lilly's, ADR-0269 M8 gap) stay
-          # with publish-cache.yml until they pass in the sandbox.
-          mix=$(jq -c '[.tests[] | select((.labels | index("expensive")) and (.labels | index("publish_cache_gate") | not)) | .target]
+          # suite.
+          mix=$(jq -c '[.tests[] | select(.labels | index("expensive")) | .target]
             | [{name: "marshall", targets: map(select(startswith("root//marshall:")))},
                {name: "suites", targets: map(select(startswith("root//marshall:") | not))}]
             | map(select(.targets | length > 0))' all.json)

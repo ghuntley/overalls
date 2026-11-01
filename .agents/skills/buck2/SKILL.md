@@ -418,10 +418,12 @@ command, the single prek hook and CI call it.
   alone, top-level prose (`*.md`, `CONTRACTS`) selects nothing, and any other
   source change or a deletion runs the whole check. The `:test` shards have
   no provider yet, so a change in a project runs them (cache hits when
-  unchanged). There are no `[fix/<path>]` sub-targets for `mix format` yet. CI runs the
-  suites in ci.yml's `mix` job. publish-cache.yml's `mix precommit` matrix
-  runs only Lilly's leg on push; a workflow_dispatch runs it whole once, to
-  compare per-app test counts with `mix` before the matrix is deleted.
+  unchanged). There are no `[fix/<path>]` sub-targets for `mix format` yet.
+  CI runs the suites in ci.yml's `mix` job and the checks in its `precommit`
+  job. There is no `mix precommit` alias any more: every gate it ran is a
+  Buck2 check (ADR-0269 M8), including `[unused_deps]`, diagnostics
+  `[schema]`, Marshall's `[monospace]` and `[localization_*]`,
+  `//:marshall-browser` and `//:marshall-workspace-types`.
 
 ### Adding a check to precommit (the convention)
 

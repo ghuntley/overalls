@@ -97,7 +97,7 @@ Review each property for:
 ## Run and report
 
 Run the smallest focused property or replay first, then the target application's
-`mix precommit`. Shared protocol changes require both Marshall and Lilly consumer
+Buck2 `:check` and `:test` (`tools/precommit` selects them). Shared protocol changes require both Marshall and Lilly consumer
 checks. Run contract, ADR, logging, and conflict-marker checks required by the
 repository. Record exact seeds/replay identifiers, test counts, and known skipped
 boundaries; do not describe a passing BEAM property as proof of physical isolation or

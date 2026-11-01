@@ -35,18 +35,7 @@ defmodule Overalls.Diagnostics.MixProject do
         "contracts.check": [
           fn _ -> Code.eval_file("../../scripts/check_contracts.exs", __DIR__) end
         ],
-        "schema.check": ["run --no-start generate_schema.exs --check"],
-        precommit: [
-          "toolchain.check",
-          "architecture.check",
-          "contracts.check",
-          "compile --warnings-as-errors",
-          "schema.check",
-          "format --check-formatted",
-          "test --warnings-as-errors",
-          "covenant.check --no-run",
-          "dialyzer --force-check"
-        ]
+        "schema.check": ["run --no-start generate_schema.exs --check"]
       ]
     ]
   end
@@ -57,7 +46,4 @@ defmodule Overalls.Diagnostics.MixProject do
       extra_applications: [:logger, :crypto, :ssl],
       mod: {Overalls.Diagnostics.Application, []}
     ]
-
-  @spec cli() :: keyword()
-  def cli, do: [preferred_envs: [precommit: :test]]
 end

@@ -18,6 +18,6 @@ and no dependency on Marshall, Lilly or Porsche.
 - The audit table is append-only in the database (trigger and REVOKE). When
   adding an audit action, update `Susan.Audit.AuditEntry` and the Events
   catalog `susan.audit_appended` enum in the same change.
-- Run `mix precommit` here. The NixOS checks `susan-release`, `susan-service`,
+- Run `tools/precommit` (`//susan:check` and `//susan:test`). The NixOS checks `susan-release`, `susan-service`,
   `susan-secrets` and `susan-image` exercise the release, secret custody and
   OCI image; Covenant evidence covers only BEAM-observable behaviour.

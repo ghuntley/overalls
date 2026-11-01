@@ -25,21 +25,10 @@ defmodule Overalls.RequestAccounting.MixProject do
         ],
         "contracts.check": [
           fn _ -> Code.eval_file("../../scripts/check_contracts.exs", __DIR__) end
-        ],
-        precommit: [
-          "toolchain.check",
-          "architecture.check",
-          "contracts.check",
-          "compile --warnings-as-errors",
-          "format --check-formatted",
-          "test --warnings-as-errors",
-          "covenant.check --no-run",
-          "dialyzer --force-check"
         ]
       ]
     ]
   end
 
   def application, do: [extra_applications: [:crypto]]
-  def cli, do: [preferred_envs: [precommit: :test]]
 end

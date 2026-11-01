@@ -24,24 +24,12 @@ defmodule OverallsProtocol.MixProject do
       aliases: [
         "toolchain.check": [fn _ -> Code.eval_file("../scripts/check_toolchain.exs", __DIR__) end],
         "architecture.check": [&check_adrs/1],
-        "contracts.check": [fn _ -> Code.eval_file("../scripts/check_contracts.exs", __DIR__) end],
-        precommit: [
-          "toolchain.check",
-          "architecture.check",
-          "contracts.check",
-          "compile --warnings-as-errors",
-          "deps.unlock --unused",
-          "format --check-formatted",
-          "test --warnings-as-errors",
-          "covenant.check --no-run",
-          "dialyzer --force-check"
-        ]
+        "contracts.check": [fn _ -> Code.eval_file("../scripts/check_contracts.exs", __DIR__) end]
       ]
     ]
   end
 
   def application, do: [extra_applications: [:crypto, :ssl, :public_key]]
-  def cli, do: [preferred_envs: [precommit: :test]]
 
   defp check_adrs(_) do
     Code.require_file("../scripts/adr_validator.ex", __DIR__)

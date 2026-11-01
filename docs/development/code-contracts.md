@@ -30,7 +30,8 @@ node --test scripts/test/check_contracts_test.mjs
 ```
 
 Run these commands from the repository root. Each project's `mix contracts.check`
-and `mix precommit` also run the repository check and checker regression tests.
+and precommit's `//:contracts` and `//:contracts-tests` checks also run the
+repository check and checker regression tests.
 Checks never install packages or rewrite source. A missing or mismatched
 installation fails with a setup instruction. Node 24.16+ and npm 11.11+ are
 required by the pinned `@spolu/cc-check` 0.2.0; the development shell supplies Node.

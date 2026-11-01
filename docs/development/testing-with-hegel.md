@@ -349,7 +349,8 @@ failures fail the case. Redact drawn values, exception terms, payloads, terminal
 credentials, and replay blobs by default; report only safe labels, locations, seeds,
 and bounded structural metadata unless a test explicitly opts in.
 
-Run a focused property or replay before the application's `mix precommit`. Protocol
+Run a focused property or replay before the application's Buck2 `:check` and
+`:test` (`tools/precommit`). Protocol
 changes require both Marshall and Lilly consumer gates. Preserve contract, ADR,
 logging, and machine-test evidence boundaries when reporting results.
 

@@ -23,10 +23,6 @@ defmodule Audi.MixProject do
     ]
   end
 
-  def cli do
-    [preferred_envs: [precommit: :test]]
-  end
-
   defp deps do
     [
       {:covenant, "~> 0.2.0", only: [:dev, :test], runtime: false},
@@ -61,19 +57,7 @@ defmodule Audi.MixProject do
       "toolchain.check": [fn _ -> Code.eval_file("../scripts/check_toolchain.exs", __DIR__) end],
       "architecture.check": [&check_adrs/1],
       "contracts.check": [fn _ -> Code.eval_file("../scripts/check_contracts.exs", __DIR__) end],
-      "logging.check": [fn _ -> Code.eval_file("../scripts/check_logging.exs", __DIR__) end],
-      precommit: [
-        "toolchain.check",
-        "architecture.check",
-        "contracts.check",
-        "logging.check",
-        "compile --warnings-as-errors",
-        "deps.unlock --unused",
-        "format --check-formatted",
-        "test --warnings-as-errors",
-        "covenant.check --no-run",
-        "dialyzer --force-check"
-      ]
+      "logging.check": [fn _ -> Code.eval_file("../scripts/check_logging.exs", __DIR__) end]
     ]
   end
 

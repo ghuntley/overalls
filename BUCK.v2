@@ -267,6 +267,34 @@ repo_check(
     path = ["toolchains//:erlang"],
 )
 
+# Marshall's browser-script suites and the workspace scripts' type check, the
+# `terminal.check` and `workspace.check` gates of the retired `mix precommit`
+# alias (ADR-0269 M8). Node and TypeScript come from the cells.
+repo_check(
+    name = "marshall-browser",
+    cmd = [_NODE, "--test"] + ["marshall/test/browser/{}_test.mjs".format(t) for t in [
+        "terminals",
+        "xterm_accessibility",
+        "repository_launch",
+        "localization",
+        "admin_elevation",
+        "browser_extension_presence",
+    ]],
+    include = ["marshall/test/browser/*", "marshall/assets/js/*", "marshall/assets/vendor/*"],
+    labels = ["check", "precommit"],
+    owned = ALL_OWNED_FILES,
+    path = ["toolchains//:node"],
+)
+
+repo_check(
+    name = "marshall-workspace-types",
+    cmd = [_NODE, "$(exe toolchains//:code_contracts_node_modules)/typescript/bin/tsc", "-p", "marshall/assets/tsconfig.workspace.json"],
+    include = ["marshall/assets/tsconfig.workspace.json", "marshall/assets/js/*"],
+    labels = ["check", "precommit"],
+    owned = ALL_OWNED_FILES,
+    path = ["toolchains//:node"],
+)
+
 # The structured-event catalog gate per application (`mix logging.check`).
 LOGGING_APPS = ["audi", "brady", "enrico", "galileo", "lilly", "marshall", "peach", "porsche", "susan", "ziggy"]
 

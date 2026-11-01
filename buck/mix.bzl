@@ -841,7 +841,9 @@ def overalls_mix_project(
         postgres: bool = False,
         checks: dict[str, str] = {},
         dialyzer: bool = True,
-        covenant: bool = True):
+        covenant: bool = True,
+        # `mix deps.unlock --check-unused` as [unused_deps].
+        unused_deps: bool = True):
     """Release, compile, check and test targets for one Mix project.
 
     `release_srcs` and `test_srcs` are mix_sources targets: the first mirrors
@@ -916,7 +918,8 @@ def overalls_mix_project(
         pre_configure = pre_configure,
         dialyzer = dialyzer,
         checks = {"format": "format --check-formatted"} |
-                 ({"logging": "logging.check"} if release else {}) | ({"dialyzer": "dialyzer --force-check --no-compile"} if dialyzer else {}) | checks,
+                 ({"logging": "logging.check"} if release else {}) | ({"dialyzer": "dialyzer --force-check --no-compile"} if dialyzer else {}) |
+                 ({"unused_deps": "deps.unlock --check-unused"} if unused_deps else {}) | checks,
         labels = ["mix", "check", "precommit"],
         visibility = ["PUBLIC"],
     )

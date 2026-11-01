@@ -134,10 +134,14 @@ it is empty.
 - Run `elixir scripts/check_adrs.exs` from the repository root for architecture
   changes. From Marshall, use `elixir ../scripts/check_adrs.exs`. The checker
   validates structure and ADR references, not whether the design is sound or implemented.
-- Enter `devenv shell` for the pinned Elixir/OTP runtime. Run `mix precommit` in
-  each changed project (`marshall/`, `lilly/`, `protocol/`); all enforce the runtime,
-  ADR, compiler, test and Dialyzer gates. For shared governance tooling, run
-  Marshall's suite too because it contains the shared validator regression tests.
+- Enter `devenv shell` for the pinned Elixir/OTP runtime. `tools/precommit`
+  (or `tools/buck2 build //<app>:check //<app>:test`) runs each changed Mix
+  project's gates as Buck2 checks: compile with warnings as errors, format,
+  logging, unused deps, Dialyzer, gettext and Marshall's extra gates in
+  `:check`, and the sharded suite with Covenant in `:test`; the runtime, ADR
+  and contract gates are the root `//:toolchain-versions`, `//:adrs` and
+  `//:contracts` checks. For shared governance tooling, run Marshall's suite
+  too because it contains the shared validator regression tests.
 - Shared protocol changes require checks in both consumers as well as the
   library. Marshall's test-only Lilly dependency exercises the real client
   against its API; neither production release depends on the other application.
@@ -156,9 +160,9 @@ it is empty.
   or pull requests.
 - Read ancestor `CONTRACTS` files and local source notes before edits. See the
   [contract guide](docs/development/code-contracts.md) for the pinned tool installation,
-  native-language annotation conventions and discovery limits. All three
-  `mix precommit` gates include `mix contracts.check`; syntax success is not
-  semantic verification.
+  native-language annotation conventions and discovery limits. Precommit's
+  `//:contracts` and `//:contracts-tests` checks run the contract checker;
+  syntax success is not semantic verification.
 
 ## Covenant contract verification
 

@@ -5,8 +5,9 @@ Follow [root guidance](../AGENTS.md) and the relevant
 capacity, networking and assurance. Lilly is an independent Elixir release;
 Firecracker process lifetime must not depend on the Lilly application lifetime.
 
-- Run `mix precommit` in this directory with the pinned `devenv shell` runtime.
-  Both applications use the shared runtime and ADR checks.
+- Run `tools/precommit`, which builds `//lilly:check` and `//lilly:test` for a
+  Lilly change, inside the pinned `devenv shell`. Both applications use the
+  shared runtime and ADR checks.
 - Use typespecs on public APIs and validated types at host/protocol boundaries.
   Unknown or unreadable capacity must not become fabricated schedulable capacity.
 - Host operations must use fixed executable names and argument lists, never

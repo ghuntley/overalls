@@ -196,9 +196,7 @@ jobs:
           # Buck2 running many shards at once; unchanged shards are cache hits
           # (contract mix-test-sharded).
           tests=$(jq -c '[.tests[] | select(.labels | index("expensive") | not) | .target]' affected.json)
-          # Suites labelled `publish_cache_gate` stay with publish-cache.yml's
-          # matrix until they pass in the sandbox (none at present, ADR-0269).
-          mix=$(jq -c '[.tests[] | select((.labels | index("expensive")) and (.labels | index("publish_cache_gate") | not)) | .target]
+          mix=$(jq -c '[.tests[] | select(.labels | index("expensive")) | .target]
             | [{name: "marshall", targets: map(select(startswith("root//marshall:")))},
                {name: "suites", targets: map(select(startswith("root//marshall:") | not))}]
             | map(select(.targets | length > 0))' affected.json)

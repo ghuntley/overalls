@@ -53,7 +53,20 @@ overalls_mix_project(
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:marshall"],
     postgres = True,
-    checks = {"gettext": "gettext.extract --check-up-to-date"},
+    # The gates of the retired `mix precommit` alias that read the compiled
+    # project (ADR-0269 M8); the browser-script gates are //:marshall-browser
+    # and //:marshall-workspace-types.
+    # The sandbox holds only the test dependencies, so Mix cannot see that
+    # file_system is phoenix_live_reload's (dev-only) child and reports it
+    # unused; the lock's unused entries stay unchecked (ADR-0269 M8 gap).
+    unused_deps = False,
+    checks = {
+        "gettext": "gettext.extract --check-up-to-date",
+        "monospace": "monospace.check",
+        "localization_data": "localization.data",
+        "localization_documentation": "localization.documentation",
+        "localization_catalogs": "localization.catalogs",
+    },
     # Phoenix LiveView and tz derive generated code from atom-index map order
     # and the wall clock; the patches make both deterministic (contract
     # mix-dep-patches).

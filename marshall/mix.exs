@@ -36,12 +36,6 @@ defmodule Marshall.MixProject do
     ]
   end
 
-  def cli do
-    [
-      preferred_envs: [precommit: :test]
-    ]
-  end
-
   # Specifies which paths to compile per environment.
   defp elixirc_paths(:test), do: ["lib", "test/support"] ++ antithesis_paths()
   defp elixirc_paths(_), do: ["lib"] ++ antithesis_paths()
@@ -161,61 +155,14 @@ defmodule Marshall.MixProject do
       "gettext.check": [&check_gettext/1],
       "localization.catalogs": ["run --no-start scripts/check_locale_catalogs.exs --strict"],
       "localization.documentation": ["run --no-start scripts/extract_documentation.exs --check"],
-      "localization.data": [fn _ -> Code.eval_file("scripts/check_locale_data.exs", __DIR__) end],
-      precommit:
-        [
-          "toolchain.check",
-          "architecture.check",
-          "contracts.check",
-          "logging.check",
-          "compile --warnings-as-errors",
-          "deps.unlock --unused",
-          "format"
-        ] ++
-          precommit_tests() ++
-          [
-            "terminal.check",
-            "workspace.check",
-            "monospace.check",
-            "localization.data",
-            "localization.documentation",
-            "localization.catalogs",
-            "gettext.check",
-            "dialyzer --force-check"
-          ]
+      "localization.data": [fn _ -> Code.eval_file("scripts/check_locale_data.exs", __DIR__) end]
     ]
-  end
-
-  # @cc [owner:ghuntley,label:verification] marshall-precommit-test-partitions
-  # With MARSHALL_TEST_PARTITIONS unset or empty, precommit MUST run the whole suite with
-  # distributed tests and check Covenant against those results. With it set to
-  # an integer N >= 2, precommit MUST run `mix test --partitions N` (the slice
-  # chosen by MIX_TEST_PARTITION, still including distributed tests) and MUST
-  # rerun the complete contract suite through `covenant.check`, so contract
-  # coverage never depends on which slice ran. Any other value MUST fail.
-  @spec precommit_tests() :: [String.t()]
-  defp precommit_tests do
-    test = "test --include distributed --warnings-as-errors"
-
-    case System.get_env("MARSHALL_TEST_PARTITIONS", "") do
-      "" ->
-        [test, "covenant.check --no-run"]
-
-      value ->
-        case Integer.parse(value) do
-          {count, ""} when count >= 2 ->
-            ["#{test} --partitions #{count}", "covenant.check"]
-
-          _ ->
-            Mix.raise("MARSHALL_TEST_PARTITIONS must be an integer of at least 2")
-        end
-    end
   end
 
   # @cc [owner:ghuntley,label:verification] marshall-gettext-check-own-vm
   # The catalog freshness gate MUST run `mix gettext.extract --check-up-to-date`
-  # in a separate test-environment VM and MUST fail precommit when it fails.
-  # In the precommit VM its forced recompile runs with protocols already
+  # in a separate test-environment VM and MUST fail `gettext.check` when it
+  # fails. In the calling VM its forced recompile runs with protocols already
   # consolidated. That records "already consolidated" warnings in the compile
   # manifest, and the next `compile --warnings-as-errors` on that _build
   # replays them and fails.

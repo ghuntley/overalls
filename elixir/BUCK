@@ -64,6 +64,9 @@ mix_sources(
     release = False,
     release_srcs = [],
     test_srcs = [":{}_test_srcs".format(library)],
+    # The libraries' locks were never checked for unused entries.
+    unused_deps = False,
+    checks = {"schema": "run --no-start generate_schema.exs --check"} if library == "diagnostics" else {},
     # The trace schema check scans every service's lib/ sources.
     test_support = ["root//scripts:mix_support", "root//marshall:tls_fixtures", "root//protocol:test_fixtures"] + (
         ["root//{}:release_srcs".format(app) for app in ["marshall", "lilly", "audi", "brady", "porsche", "ziggy", "enrico", "galileo", "susan", "peach"]] if library == "diagnostics" else []
