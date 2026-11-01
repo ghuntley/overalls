@@ -339,7 +339,8 @@ def resume(name: str) -> None:
 def inventory(vm_id: str) -> dict[str, dict[str, str]]:
     """@cc [owner:ghuntley,label:verification] cli-native-refusal-inventory
     Approval GET and stale-form refusal MUST preserve exact persisted scoped
-    session, turn, thread, audit, model, command and lifecycle-operation rows.
+    session, turn, thread, audit, model, command and lifecycle-operation rows;
+    refusal adds only its cli_refused receipt (cli-native-refusal-receipt).
     Comparison uses row digests so prompt and result content cannot be logged.
     """
     assert str(uuid.UUID(vm_id)) == vm_id
@@ -371,6 +372,36 @@ def inventory(vm_id: str) -> dict[str, dict[str, str]]:
             rows[identifier] = row["digest"]
         result[table] = rows
     return result
+
+
+def assert_refusal_receipt_only(
+    before: dict[str, dict[str, str]], after: dict[str, dict[str, str]], actor_id: str
+) -> None:
+    """@cc [owner:ghuntley,label:verification;security] cli-native-refusal-receipt
+    A refused stale-form approval MUST leave every inventoried row byte-identical
+    and add exactly one content-free audit row: the cli_refused receipt for the
+    refused actor that agent-cli-approval-once requires. It names no session,
+    thread, turn or target, so the refusal cannot have created or woken work.
+    """
+    assert str(uuid.UUID(actor_id)) == actor_id
+    for table, rows in before.items():
+        if table != "agent_audit_events":
+            assert after[table] == rows, "Refusal changed persisted " + table
+    audits = after["agent_audit_events"]
+    previous = before["agent_audit_events"]
+    assert {key: audits[key] for key in previous if key in audits} == previous
+    added = sorted(set(audits) - set(previous))
+    assert len(added) == 1 and len(audits) == len(previous) + 1, "Refusal audit rows added: " + str(
+        len(audits) - len(previous)
+    )
+    assert (
+        sql(
+            f"SELECT count(*) FROM agent_audit_events WHERE id='{added[0]}' "
+            f"AND kind='cli_refused' AND outcome='failed' AND actor_id='{actor_id}' "
+            "AND thread_id IS NULL AND turn_id IS NULL AND target_id IS NULL"
+        )
+        == "1"
+    )
 
 
 with subtest("ordinary browser shares a stopped real agent guest"):
@@ -549,7 +580,7 @@ with subtest("ordinary owner withdrawal refuses a mounted approval without promp
     refused_inventory = inventory(vm_id)
     resume("withdrawn")
     checkpoint("refused")
-    assert inventory(vm_id) == refused_inventory
+    assert_refusal_receipt_only(refused_inventory, inventory(vm_id), member)
     assert len(refused_inventory["agent_cli_sessions"]) == 2
     assert len(refused_inventory["agent_turns"]) == 2
     ordinary_accounts()
