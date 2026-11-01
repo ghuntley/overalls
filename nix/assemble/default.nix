@@ -138,6 +138,15 @@ let
       ../domains/system/nix-cache.nix
       ({ config, pkgs, ... }: {
         system.kexec-installer.name = "overalls-host-installer";
+        # The installer's static iproute2 pulls in static python3 and so a
+        # static tzdata built from source. tzdata's `now.ck` check compares the
+        # build clock against zonenow.tab and fails once 2026e's data diverges
+        # from it (as of 2026-11-01). Run every other
+        # tzdata check; the native tzdata is substituted, not rebuilt.
+        nixpkgs.overlays = [ (_final: prev: {
+          tzdata = if prev.stdenv.hostPlatform.isStatic
+            then prev.tzdata.overrideAttrs { checkTarget = "check_mild back.ck"; } else prev.tzdata;
+        }) ];
         environment.systemPackages = [ pkgs.python3 config.boot.zfs.package ];
         boot.kernelModules = [ "kvm-intel" "kvm-amd" ];
       }) ];
