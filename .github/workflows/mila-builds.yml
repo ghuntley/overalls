@@ -123,7 +123,7 @@ jobs:
           retention-days: 7
 
   apple-native:
-    runs-on: macos-15
+    runs-on: namespace-profile-cached-arm64
     timeout-minutes: 120
     env:
       MILA_TAILSCALE_AUTHKEY: ${{ secrets.MILA_TAILSCALE_AUTHKEY }}

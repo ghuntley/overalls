@@ -144,7 +144,7 @@ jobs:
           if-no-files-found: error
 
   apple:
-    runs-on: macos-15
+    runs-on: namespace-profile-cached-arm64
     environment: mila-release
     timeout-minutes: 150
     # No Namespace remote cache: signed builds and their Buck2 state never
