@@ -111,8 +111,8 @@ Operator rollout order:
 3. Encrypt the four values into the inventoried documents
    (`overalls-audi.production.AUDI_GATEWAY_TOKEN`,
    `overalls-audi-dns.production.AUDI_DNS_TOKEN`) with
-   `nix run .#secrets -- encrypt HOST-audi --input ... --replace` and run
-   `nix run .#secrets -- check`.
+   `tools/buck2 run //:secrets -- encrypt HOST-audi --input ... --replace` and run
+   `tools/buck2 run //:secrets -- check`.
 4. Provision the encrypted backup document and S3 destination, enable
    `services.overallsBackups`, and complete a PostgreSQL/keyring recovery point
    before making the shared wildcard key a production dependency. Deploy

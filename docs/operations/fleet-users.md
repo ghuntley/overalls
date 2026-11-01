@@ -90,13 +90,13 @@ Both kinds participate in the same `check`, `decrypt` and `rekey` commands. Reci
 and new keys during a staged rotation. Authenticate host keys out of band before
 adding them; an unauthenticated key scan is not sufficient.
 
-Only ciphertext and public declarations belong in Git. Register new Nix files
-with Git before evaluating a Git-backed flake. Build public conversion artifacts:
+Only ciphertext and public declarations belong in Git. Build public conversion
+artifacts:
 
 ```sh
-nix build .#user-recipients
-cat result/recipients.json
-cat result/ghuntley.age
+recipients=$(cat "$(tools/buck2 build --show-full-simple-output //:package-security-user-recipients)")
+cat "$recipients/recipients.json"
+cat "$recipients/ghuntley.age"
 ```
 
 Per-user `.pub` and `.age` files can contain multiple
@@ -104,15 +104,15 @@ lines. Only recovery-enabled users appear in the aggregate recovery list.
 
 ## Local commands
 
-Run from the repository root, or supply `--root /path/to/checkout`. `nix run`
-builds the public policy from the flake being invoked; use that same checkout as
-the document root. Rebuild/rerun from updated source after changing the registry.
+Run from the repository root, or supply `--root /path/to/checkout`.
+`tools/buck2 run` builds the public policy from the checkout it runs in; use that
+same checkout as the document root. Rebuild/rerun from updated source after changing the registry.
 
 ```sh
-nix run .#secrets -- check
-nix run .#secrets -- encrypt marshall --input /private/marshall.json
-nix run .#secrets -- decrypt marshall --ssh-key /private/id_ed25519 --output /private/recovered.json
-nix run .#secrets -- rekey --ssh-key /private/id_ed25519
+tools/buck2 run //:secrets -- check
+tools/buck2 run //:secrets -- encrypt marshall --input /private/marshall.json
+tools/buck2 run //:secrets -- decrypt marshall --ssh-key /private/id_ed25519 --output /private/recovered.json
+tools/buck2 run //:secrets -- rekey --ssh-key /private/id_ed25519
 ```
 
 Create the ciphertext's parent directory first. Plaintext input and recovered
@@ -133,9 +133,9 @@ each registry change:
 1. Add the successor alongside the incumbent. Reconcile with the incumbent's
    key, then verify the joined generation:
    ```sh
-   nix run .#secrets -- rekey --ssh-key /private/incumbent_id_ed25519
-   nix run .#secrets -- check
-   nix run .#secrets -- decrypt marshall --ssh-key /private/successor_id_ed25519 --output /private/verify.json
+   tools/buck2 run //:secrets -- rekey --ssh-key /private/incumbent_id_ed25519
+   tools/buck2 run //:secrets -- check
+   tools/buck2 run //:secrets -- decrypt marshall --ssh-key /private/successor_id_ed25519 --output /private/verify.json
    ```
 2. Remove the incumbent. Reconcile with the successor's key and verify again;
    the retired identity still decrypts preserved historical ciphertext but

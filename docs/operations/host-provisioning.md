@@ -1,6 +1,6 @@
 # Bare-metal host provisioning
 
-`nix run .#host -- --help` exposes `discover`, `plan`, `install`, `enroll` and
+`tools/buck2 run //:host -- --help` exposes `discover`, `plan`, `install`, `enroll` and
 `verify`. There are no default production machines. Every declaration lives in
 `fleet/hosts/NAME/host.json` (lowercase names, at most 28 characters, excluding
 the reserved `-base` suffix); NixOS configurations and secret recipients derive
@@ -34,7 +34,7 @@ entries use `[hostname]:port`.
 ## Discovery and review
 
 ```sh
-nix run .#host -- discover --platform hetzner --name example \
+tools/buck2 run //:host -- discover --platform hetzner --name example \
   --target root@HOST --known-hosts /private/rescue-known-hosts \
   --identity /private/operator-key --output /private/example.candidate.json
 ```
@@ -75,7 +75,7 @@ the tool does not create provider resources or push commits.
 ## Plan and install
 
 ```sh
-nix run .#host -- plan --host example --revision FULL_COMMIT \
+tools/buck2 run //:host -- plan --host example --revision FULL_COMMIT \
   --target root@HOST --known-hosts /private/rescue-known-hosts \
   --identity /private/operator-key --output /private/example.plan.json
 ```
@@ -87,7 +87,7 @@ before any destructive operation. The host tool patches the pinned
 nixos-anywhere SSH default to strict checking and uses a locked kexec image.
 
 ```sh
-nix run .#host -- install --plan /private/example.plan.json --erase PLAN_SHA256 \
+tools/buck2 run //:host -- install --plan /private/example.plan.json --erase PLAN_SHA256 \
   --target root@HOST --known-hosts /private/rescue-known-hosts \
   --identity /private/operator-key
 ```
@@ -131,7 +131,7 @@ Stage the public declaration so Nix's Git source includes it. Supply the **share
 Git deploy key as a mode-0600 file outside the checkout:
 
 ```sh
-nix run .#host -- enroll --host example --deploy-key /private/shared-git-key \
+tools/buck2 run //:host -- enroll --host example --deploy-key /private/shared-git-key \
   --root . --target ghuntley@HOST --known-hosts /private/installed-known-hosts \
   --identity /private/operator-key
 ```
@@ -141,11 +141,11 @@ start polling. Publish the updated declaration, ciphertext, and any explicitly
 configured roles. Then activate that exact commit:
 
 ```sh
-nix run .#host -- enroll --host example --revision ENROLLED_FULL_COMMIT \
+tools/buck2 run //:host -- enroll --host example --revision ENROLLED_FULL_COMMIT \
   --install-receipt /private/example.plan.json.installed.json \
   --target ghuntley@HOST --known-hosts /private/installed-known-hosts \
   --identity /private/operator-key
-nix run .#host -- verify --target ghuntley@HOST \
+tools/buck2 run //:host -- verify --target ghuntley@HOST \
   --known-hosts /private/installed-known-hosts --identity /private/operator-key
 ```
 
@@ -247,7 +247,7 @@ After installation, authenticate the installed host using its receipt's SSH key.
 Deploy the new Marshall release/module and its migration first, then run:
 
 ```sh
-nix run .#host -- prepare-enrollment --host NAME --root . \
+tools/buck2 run //:host -- prepare-enrollment --host NAME --root . \
   --target admin@installed-host --marshall-target admin@marshall-host \
   --identity /private/admin-key --known-hosts /private/known-hosts \
   --install-receipt /private/host-plan.installed.json \

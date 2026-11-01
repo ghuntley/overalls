@@ -5,7 +5,7 @@ nix_owned()
 
 # Hermetic Mila journey backend (ADR-0264):
 #   tools/buck2 run //mila:journey-fixture -- --bind <address> ...
-# replaces `nix run .#mila-journey-fixture`. The launcher is a NixOS VM that
+# replaced the flake app `mila-journey-fixture`. The launcher is a NixOS VM that
 # lib.assemble builds over the Buck2 artifacts (//:package-mila-journey-fixture).
 nix_store_run(
     name = "journey-fixture",

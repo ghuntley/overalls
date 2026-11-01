@@ -15,14 +15,14 @@ toolchain. Hosts enable compact output through the public
 `programs.nix-compact.enable` option. Explicit NixOS package choices retain
 ordinary precedence.
 
-Existing package/check names remain available:
+The packages and checks are Buck2 targets:
 
 ```sh
-nix build .#nix-compact .#nix-compact-host
-nix build .#checks.x86_64-linux.nix-compact-core \
-  .#checks.x86_64-linux.nix-compact-native \
-  .#checks.x86_64-linux.nix-compact-native-host \
-  .#checks.x86_64-linux.nix-compact-configuration
+tools/buck2 build //:package-tool-nix-compact //:package-tool-nix-compact-host
+tools/buck2 build //:check-nix-compact-core \
+  //:check-nix-compact-native \
+  //:check-nix-compact-native-host \
+  //:check-nix-compact-configuration
 ```
 
 The first three checks delegate to the standalone factories; configuration

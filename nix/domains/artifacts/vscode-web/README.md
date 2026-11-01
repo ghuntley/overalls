@@ -121,9 +121,9 @@ adapters.
 Run extension maintenance from the repository root:
 
 ```sh
-nix run .#update-vscode-extensions -- --check
-nix run .#update-vscode-extensions -- --write
-nix run .#update-vscode-extensions -- --write --only rust-lang.rust-analyzer --version 0.3.3073
+tools/buck2 run //:update-vscode-extensions -- --check
+tools/buck2 run //:update-vscode-extensions -- --write
+tools/buck2 run //:update-vscode-extensions -- --write --only rust-lang.rust-analyzer --version 0.3.3073
 ```
 
 `--check` is the default and returns 1 when reviewed pins need updating; `--write`
@@ -154,7 +154,7 @@ update the immutable source/hash/version/Node inputs and refresh the recursive
 npm cache hash manually; the extension updater does not change these inputs.
 Rebase the maintained patch on that unmodified source, inspect
 the resulting diff, then run `node check-patches.mts <upstream-source-directory>`
-and `nix build .#vscode-web`. The Nix build runs upstream TypeScript checking and
+and `tools/buck2 build //:package-tool-vscode-web`. The Nix build runs upstream TypeScript checking and
 the REH-web bundle offline. A patch application check alone is not build or
 runtime verification. The package also starts its actual workbench in pinned
 Chromium through a private TLS-to-Unix fixture, checking visible initialization

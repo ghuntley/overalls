@@ -161,7 +161,7 @@ one tagged, base64-encoded 32-byte AES key (`marshall-20260917-v1`).
 inventory check, decrypt and rekey commands manage it. Decrypt it with:
 
 ```sh
-nix run .#secrets -- decrypt marshall-bootstrap \
+tools/buck2 run //:secrets -- decrypt marshall-bootstrap \
   --ssh-key /private/recovery_id_ed25519 --output /private/marshall.json
 ```
 
@@ -190,7 +190,7 @@ The matching private PEM is stored only as SOPS ciphertext in
 entry is recovery-only and participates in the same checks and rekeying:
 
 ```sh
-nix run .#secrets -- decrypt crash-dump-bootstrap \
+tools/buck2 run //:secrets -- decrypt crash-dump-bootstrap \
   --ssh-key /private/recovery_id_ed25519 --output /private/crash-dump-recovery.json
 ```
 
@@ -206,8 +206,8 @@ See the [crash-dump guide](../docs/operations/observability.md#encrypted-erlang-
 `hosts = []; recoveryOnly = true;`. The standard inventory commands include it:
 
 ```sh
-nix run .#secrets -- check
-nix run .#secrets -- decrypt git-bootstrap \
+tools/buck2 run //:secrets -- check
+tools/buck2 run //:secrets -- decrypt git-bootstrap \
   --ssh-key /private/recovery_id_ed25519 --output /private/git.json
 ```
 
@@ -221,14 +221,14 @@ host document in the inventory, using a distinct path such as
 `secrets/HOST-git.enc.json`. Encrypt the recovered JSON for that document:
 
 ```sh
-nix run .#secrets -- encrypt HOST-git --input /private/git.json
-nix run .#secrets -- check
+tools/buck2 run //:secrets -- encrypt HOST-git --input /private/git.json
+tools/buck2 run //:secrets -- check
 ```
 
 For an existing document, authorize an atomic payload replacement explicitly:
 
 ```sh
-nix run .#secrets -- encrypt HOST-git --input /private/git.json --replace
+tools/buck2 run //:secrets -- encrypt HOST-git --input /private/git.json --replace
 ```
 
 The command verifies recipients and replaces the ciphertext only if the document
@@ -248,8 +248,8 @@ After changing recovery membership or authenticated host recipients, reconcile
 and `crash-dump-bootstrap`:
 
 ```sh
-nix run .#secrets -- rekey --ssh-key /private/retained_recovery_id_ed25519
-nix run .#secrets -- check
+tools/buck2 run //:secrets -- rekey --ssh-key /private/retained_recovery_id_ed25519
+tools/buck2 run //:secrets -- check
 ```
 
 The supplied operator must remain a recovery recipient and decrypt every changed
@@ -353,8 +353,8 @@ and the document is encrypted to the recovery recipients plus salopettes, whose
 1. Add `{ "name": "overalls-susan", "path": "secrets/overalls-susan.enc.json" }`
    to the chosen host's `host.json` `credentials`. The recovery-only entry steps
    aside automatically.
-2. Run `nix run .#secrets -- rekey --ssh-key /private/recovery_id_ed25519` to
-   add the host recipient, then `nix run .#secrets -- check`.
+2. Run `tools/buck2 run //:secrets -- rekey --ssh-key /private/recovery_id_ed25519` to
+   add the host recipient, then `tools/buck2 run //:secrets -- check`.
 3. Replace the placeholders through private decrypt/edit/encrypt custody,
    using `encrypt overalls-susan --input /private/susan.json --replace`. Keep
    the plaintext outside the checkout.
@@ -428,7 +428,7 @@ root-only recovery copy (`/var/lib/overalls-host/uplink.conf`), so a decryption
 failure never strands it.
 
 To rotate, decrypt to a private 0600 file outside the checkout, edit it and run
-`nix run .#secrets -- encrypt fleet-addresses --input FILE --replace`, then
-`nix run .#secrets -- check`. Update DNS for any published name in the same
+`tools/buck2 run //:secrets -- encrypt fleet-addresses --input FILE --replace`, then
+`tools/buck2 run //:secrets -- check`. Update DNS for any published name in the same
 change window. Rotating a Lilly-protected address changes Lilly's network claim
 and needs the deliberate rebind flow, not an ordinary update.

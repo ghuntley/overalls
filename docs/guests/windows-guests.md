@@ -32,8 +32,8 @@ uptime. Production use needs licensed media swapped into `iso.json`.
 ## Building
 
 ```sh
-nix build .#windows-firmware
-nix build .#windows-guest       # ~6 GiB download, then 20-40 min of installation on KVM
+tools/buck2 build //:check-windows-firmware
+tools/buck2 build //:package-guest-windows   # ~6 GiB download, then 20-40 min of installation on KVM
 ```
 
 The image build runs QEMU with KVM inside the Nix sandbox
@@ -111,8 +111,8 @@ driver's exit code in `evidence/result` and the image derivation refuses a
 non-zero result. The evidence of a failed run therefore stays in the store:
 
 ```sh
-nix build .#windows-guest            # fails: "Windows installation failed with result 5; evidence kept in /nix/store/...-disk/evidence"
-nix build .#legacyPackages.x86_64-linux.windowsGuest.disk --print-out-paths
+tools/buck2 build //:package-guest-windows   # fails: "Windows installation failed with result 5; evidence kept in /nix/store/...-disk/evidence"
+nix build --impure --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).packages.windowsGuest.disk' --print-out-paths
 ```
 
 Result codes: `2` timeout, `3` guest powered off without the completion marker,
@@ -143,7 +143,9 @@ initialization failures that involve driver paths; `paths` is the default.
 ## Booting
 
 ```sh
-sudo $(nix build --print-out-paths .#windows-boot)/bin/overalls-windows-boot result work
+image=$(cat "$(tools/buck2 build --show-full-simple-output //:package-guest-windows)")
+boot=$(nix build --impure --print-out-paths --no-link --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).packages.windowsBoot')
+sudo "$boot/bin/overalls-windows-boot" "$image" work
 ```
 
 The launcher copies `disk.raw` into `work/` (sparse, reflink where possible),
@@ -245,7 +247,7 @@ editor and Inception refused.
 The agents are Rust binaries cross-built from the Lyra crate:
 
 ```sh
-nix build .#legacyPackages.x86_64-linux.lyraWindows   # bin/*.exe + manifest.json
+tools/buck2 build //lyra:windows --show-output   # bin/*.exe + manifest.json
 ```
 
 The image ships the virtio-win `viosock` driver (virtio-vsock, PCI `1AF4:1053`)
@@ -316,7 +318,7 @@ The [matrix review](../architecture/reviews/2026-10-18-guest-os-matrix.md)
 records exact image, NAR and private receipt identities.
 
 Terminal (gate 4): `overalls-terminald.exe` (task `Overalls\Terminald`,
-`nix build .#legacyPackages.x86_64-linux.terminaldWindows`) is the Linux
+`tools/buck2 build //:check-terminald-windows`) is the Linux
 terminald source built for Windows. It listens on vsock port 1075, derives its
 HELLO key from the MMDS boot challenge and runs each session as PowerShell in
 ConPTY inside a kill-on-close job: `root` is LocalSystem and any other name must

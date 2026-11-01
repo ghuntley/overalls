@@ -9,8 +9,8 @@ behavior.
 devenv shell
 mila-rust-check
 mila-rust-build
-nix build .#tool-mila-linux-native
-nix build .#tool-mila-rust
+tools/buck2 build //:package-tool-mila-linux-native
+tools/buck2 build //:package-tool-mila-rust
 ```
 
 The native clients live under `native/`: Swift packages for Apple, a Jetpack

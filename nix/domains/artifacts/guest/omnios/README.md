@@ -1,6 +1,6 @@
 # OmniOS native candidate installation
 
-`nix build .#omnios-image-candidate-kit` builds immutable installation inputs,
+`tools/buck2 build //:package-omnios-image-candidate-kit` builds immutable installation inputs,
 not an admitted guest image. The kit contains the compiled kernel objects,
 native link/install helpers, complete daemon and bootstrap service roots, pinned
 Git runtime, and exact hashes of the stock GPT disk and every payload file.
@@ -11,7 +11,7 @@ separately from its immutable source permissions.
 
 ## Nix KVM assembly
 
-`nix build .#omnios-image-candidate` performs the procedure below inside a
+`tools/buck2 build //:package-omnios-image-candidate` performs the procedure below inside a
 `kvm`-feature Nix build. It decompresses the pinned stock disk twice, checks the
 scratch copy against the kit's whole-disk digest, and boots the administration
 copy offline in QEMU twice through the serial console in single-user mode

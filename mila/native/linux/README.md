@@ -117,7 +117,7 @@ GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory MILA_GTK_TESTS
 ```
 
 Install `data/dev.overalls.Mila.desktop` with the executable on the desktop search path to enable
-system URI activation. CI runs both journeys against `nix run .#mila-journey-fixture` and always
+system URI activation. CI runs both journeys against `tools/buck2 run //mila:journey-fixture` and always
 runs a GTK journey wiring smoke against an unreachable deployment. Locally against the fixture, every
 step of both journeys passes, including resize, pause and threads through the fixture's action
 hook. The journeys observe each deleted machine so repeated runs against one fixture do not exhaust

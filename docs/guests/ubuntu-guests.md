@@ -62,9 +62,9 @@ images only. See [ADR-0150](../architecture/decisions/0150-default-guest-starshi
 ## Build the standard image
 
 ```sh
-nix build .#ubuntu-guest
+image=$(cat "$(tools/buck2 build --show-full-simple-output //:package-guest-ubuntu)")
 # kernel, initrd, rootfs.ext4, manifest.json
-ls result/
+ls "$image"
 ```
 
 The build requires an x86-64 Linux Nix builder with KVM. Dependencies are fetched
@@ -129,7 +129,8 @@ Those packages come from the repository's pinned Nixpkgs input. Ubuntu's
 Generate a lock after changing the requested package list:
 
 ```sh
-nix run .#ubuntu-lock -- \
+nix build --impure --print-out-paths --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).packages.ubuntuLock'
+result/bin/ubuntu-lock \
   --snapshot 20260918T000000Z \
   --packages git build-essential python3 postgresql-client \
   --output ./ubuntu-development.lock.json
@@ -171,10 +172,10 @@ new provisioning only; it is not an in-place operating-system conversion.
 ## Verification
 
 ```sh
-nix build .#checks.x86_64-linux.ubuntu-guest-unit .#checks.x86_64-linux.ubuntu-build-boundaries
-nix build .#ubuntu-guest.rootfs --rebuild
-nix build .#checks.x86_64-linux.ubuntu-guest --extra-system-features nested-kvm
-nix build .#checks.x86_64-linux.ubuntu-fleet --extra-system-features nested-kvm
+tools/buck2 build //:check-ubuntu-guest-unit //:check-ubuntu-build-boundaries
+nix build --impure --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).outputPackages."guest-ubuntu".rootfs' --rebuild
+tools/buck2 test //nix/verification/tests/machines/zfs-guest:ubuntu-guest
+tools/buck2 test //nix/verification/tests/machines/fleet:ubuntu-fleet
 ```
 
 Unit/evaluation and Hypothesis tests exercise real parsing and builder boundaries.

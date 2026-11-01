@@ -38,16 +38,16 @@ and passes pinned `ty` against the same Python and Playwright used at runtime.
 Composed-driver typing cannot check these separate processes, and ordinary
 repository type discovery excludes machine helpers.
 
-Build these artifacts without booting machines:
+Build these artifacts without booting machines. They are attributes of the
+checks, not Buck2 targets, so they come from lib.assemble directly (see
+[Run checks](#run-checks)):
 
 ```sh
-nix build .#checks.x86_64-linux.teams-browser.checkedBrowser \
-  .#checks.x86_64-linux.control-room-browser.checkedBrowser \
-  .#checks.x86_64-linux.credential-self-service-browser.checkedBrowser \
-  .#checks.x86_64-linux.default-oss-creation.defaultOssBrowser \
-  .#checks.x86_64-linux.inception.checkedBrowser \
-  .#checks.x86_64-linux.audi-fleet.audiBrowser \
-  .#checks.x86_64-linux.porsche-fleet.porscheBrowser
+for a in '"teams-browser".checkedBrowser' '"control-room-browser".checkedBrowser' \
+  '"credential-self-service-browser".checkedBrowser' '"default-oss-creation".defaultOssBrowser' \
+  'inception.checkedBrowser' '"audi-fleet".audiBrowser' '"porsche-fleet".porscheBrowser'; do
+  nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.'"$a" --no-link
+done
 ```
 
 The [gate review](../../../docs/architecture/reviews/2026-09-25-browser-type-gates.md)
@@ -483,12 +483,26 @@ explicit migrations, guest execution and failure assertions.
 
 ## Run checks
 
+Buck2 is the only entry point (ADR-0269). Each test's target is in
+[Find a test](#find-a-test):
+
 ```sh
-nix flake check --no-build
-nix build -L .#checks.x86_64-linux.sysctl
-nix build -L .#checks.x86_64-linux.service-roles --extra-system-features nested-kvm
-nix build -L .#checks.x86_64-linux.fleet --extra-system-features nested-kvm
-nix flake check -L --extra-system-features nested-kvm
+tools/buck2 test //nix/verification/tests/machines/sysctl:sysctl
+tools/buck2 test //nix/verification/tests/machines/service-roles:service-roles
+tools/buck2 test //nix/verification/tests/machines/fleet:fleet
+tools/buck2 build //:check-module-configuration
+tools/buck2 build //nix/verification/tests/machines/fleet:fleet.assembly[drv]   # evaluate only
+tools/affected --base origin/trunk   # what a change selects
+```
+
+Nested-KVM suites carry the `nested_kvm` label; the builder still needs the
+`nested-kvm` system feature. Attributes of a check that are not targets (an
+interactive `.driver`, a typed browser artifact) come from lib.assemble over
+the checkout. That is a plain Nix build without the Buck2 artifacts, so use it
+for debugging, never as test evidence:
+
+```sh
+nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.fleet.driver'
 ```
 
 ### Continuous integration
@@ -524,8 +538,8 @@ device access; declaring a feature does not provide it. See the
 Retain each suite's timeouts and the framework's lint/type checks. An evaluation
 or driver build alone does not establish a successful machine run.
 
-For an interactive driver, build the suite's `.driver` attribute, for example
-`nix build .#checks.x86_64-linux.fleet.driver`, then run
+For an interactive driver, build the check's `.driver` attribute from
+lib.assemble ([Run checks](#run-checks)), then run
 `result/bin/nixos-test-driver`. Failed builds can retain diagnostic artifacts with
 `--keep-failed`; private fixture material must not be copied into public logs.
 
@@ -567,7 +581,7 @@ automatic update. Application roles remain disabled in this host-specific suite.
 
 ### Account lifecycle journey
 
-`nix build .#checks.x86_64-linux.account-lifecycle` runs a strictly typed bounded
+`tools/buck2 test //nix/verification/tests/machines/fleet:account-lifecycle` runs a strictly typed bounded
 fleet driver with source-built Marshall, Lilly, real Firecracker and ZFS. The
 browser invites an ordinary user, registers real virtual-WebAuthn and SSH
 credentials, creates a Customer machine and retires the account with elevated

@@ -193,7 +193,7 @@ Validate the local code with:
 
 ```sh
 devenv shell -- prek run --all-files
-nix build .#checks.x86_64-linux.python-static
+tools/buck2 build //:py-static
 python3.13 -m unittest discover -s antithesis/verification/tests -v
 node scripts/check_contracts.mjs format
 ```

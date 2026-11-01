@@ -183,7 +183,7 @@ suite itself:
 - `profile = "ci"` (default): derandomized seed from the test identity, no
   database, `too_slow` health check suppressed — byte-identical runs in CI.
 - Local fuzzing: build and run the interactive driver
-  (`nix build .#checks.x86_64-linux.myservice.driverInteractive`, then
+  (`nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.myservice.driverInteractive'`, then
   `./result/bin/nixos-test-driver`), and in the REPL call
   `_run_registered(profile="development")` for fresh entropy each run;
   `HEGEL_TEST_CASES`/`HEGEL_SEED` and friends override per process.
@@ -191,7 +191,7 @@ suite itself:
   counterexample:
 
   ```sh
-  nix build .#checks.x86_64-linux.myservice.driver
+  nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.myservice.driver'
   HEGEL_REPLAY_BLOB="…" result/bin/nixos-test-driver
   ```
 

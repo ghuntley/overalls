@@ -40,8 +40,8 @@ recovery-enabled users are recipients. At runtime the secret preparer publishes
 2. Add its public key alongside the old key in the owning host's
    `clientPublicKeys` list. Publish and verify that the peer authorizes both.
 3. Wrap the new private key in the SecretSpec JSON shape above. Run
-   `nix run .#secrets -- encrypt HOST-remote-builders --input /private/payload.json`.
-   Run `nix run .#secrets -- check`; privately decrypt with a retained recovery
+   `tools/buck2 run //:secrets -- encrypt HOST-remote-builders --input /private/payload.json`.
+   Run `tools/buck2 run //:secrets -- check`; privately decrypt with a retained recovery
    identity and verify the derived public key matches before deleting plaintext.
 4. Commit the ciphertext and publish. The updater stages and validates the
    bundle, stops identified consumers, prepares the candidate and restores Nix.
@@ -61,8 +61,8 @@ on production hosts. See [secret custody](../../secrets/README.md).
 Run:
 
 ```sh
-nix build .#checks.x86_64-linux.remote-builders-configuration \
-  .#checks.x86_64-linux.remote-builders
+tools/buck2 build //:check-remote-builders-configuration
+tools/buck2 test //nix/verification/tests/machines/remote-builders:remote-builders
 ```
 
 The machine check uses runtime-generated synthetic keys and actual

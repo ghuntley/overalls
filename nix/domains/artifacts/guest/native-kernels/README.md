@@ -13,7 +13,7 @@ and compile layout assertions against the actual pinned operating-system headers
 Illumos now includes a separate public header, modern virtio backport and
 bounded socket/transport implementation; its source receipt remains unavailable.
 
-`nix build .#freebsd-kernel-candidate` builds a complete amd64 GENERIC kernel
+`tools/buck2 build //:package-freebsd-kernel-candidate` builds a complete amd64 GENERIC kernel
 with the static FreeBSD socket domain, virtio-vsock PCI/MMIO driver and shared
 `common/ov_vsock` wire/credit implementation. The Linux cross-build uses pinned
 Clang 19.1.7 (matching FreeBSD 14.3), LLD and host tools, executes the complete
@@ -66,10 +66,10 @@ regression executes the actual helper with socket-lifetime mocks and the shared
 core under address/undefined-behavior sanitizers; it does not execute native
 kernel queue ownership or scheduling.
 
-`nix build .#illumos-sdk` provides the hash-verified official OmniOS IPS sysroot;
+`tools/buck2 build //:package-illumos-sdk` provides the hash-verified official OmniOS IPS sysroot;
 `illumos/sdk.nix` also supplies its pinned cross compiler/linker and checks. This
 is userland compilation evidence, separate from native kernel-module linkage
-and native image assembly. `.#native-vsock-core-check` tests the actual common
+and native image assembly. `//:package-native-vsock-core-check` tests the actual common
 wire/state implementation with generated malformed frames and transitions plus
 address/undefined-behavior sanitizers; it establishes no target runtime behavior.
 

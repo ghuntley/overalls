@@ -84,8 +84,8 @@ Prepare a mode-0600 private JSON input with these keys:
 Use the existing operator secret workflow:
 
 ```sh
-nix run .#secrets -- encrypt overalls-backup --input /private/overalls-backup.json
-nix run .#secrets -- check
+tools/buck2 run //:secrets -- encrypt overalls-backup --input /private/overalls-backup.json
+tools/buck2 run //:secrets -- check
 ```
 
 Repeat for Dungarees with a different Restic password. The inventory workflow
@@ -140,7 +140,7 @@ systemctl stop overalls-backup.timer overalls-backup-prune.timer \
 3. Replace the value in the host's backup document and deploy:
 
    ```sh
-   nix run .#secrets -- encrypt HOST-backup --input /private/HOST-backup.json --replace
+   tools/buck2 run //:secrets -- encrypt HOST-backup --input /private/HOST-backup.json --replace
    ```
 
    Deployment republishes `/run/overalls-secrets/backup/password` through the
@@ -177,7 +177,7 @@ identities through Git history:
 git show PREVIOUS_REVISION:secrets/HOST-backup.enc.json > /private/previous.enc.json
 # place the historical ciphertext at the document's declared path inside a
 # private checkout copy, then decrypt it with a retained recovery identity
-nix run .#secrets -- decrypt HOST-backup \
+tools/buck2 run //:secrets -- decrypt HOST-backup \
   --ssh-key /private/recovery_id_ed25519 --output /private/previous-backup.json \
   --root /private/checkout
 # copy the recovered RESTIC_PASSWORD value into a private mode-0600 file

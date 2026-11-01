@@ -20,10 +20,10 @@ describes upgrade ordering, ownership and the remaining acceptance work.
 ## Build
 
 ```sh
-nix build .#marshall .#lilly
-nix build .#checks.x86_64-linux.marshall-release
-nix build .#checks.x86_64-linux.lilly-release
-nix build .#checks.x86_64-linux.module-configuration
+tools/buck2 build //:package-service-marshall //:package-service-lilly
+tools/buck2 build //:check-marshall-release
+tools/buck2 build //:check-lilly-release
+tools/buck2 build //:check-module-configuration
 ```
 
 Dependency fetching uses hashes in `nix/domains/artifacts/dependency-hashes.json`, checked
@@ -33,10 +33,17 @@ After changing a lockfile, update the corresponding fetch hash deliberately.
 The dependency output includes a copy of the Mix lock: a cached fetch with an
 outdated lock fails the release build. No production secrets are needed to build.
 
-For flake inspection use `nix flake show --allow-import-from-derivation`; the
-pinned devenv package input evaluates a patched Nixpkgs derivation. Build commands
-permit that evaluation by default. Files must be tracked by Git for a Git flake
-to include them; review the dirty-tree warning before recording provenance.
+Buck2 is the only build entry point (ADR-0269); list targets with
+`tools/buck2 uquery 'attrfilter(labels, flake_output, //:)'` (packages and
+checks) or `tools/buck2 targets //nix/verification/tests/machines/...`. The
+flake keeps only `buckCells`, `lib.assemble`, `lib.dependencyPins` and
+`nixosModules`. Buck2 globs see untracked files too, so commit before recording
+provenance: assembly names the checkout revision, not the working tree.
+Internal packages and attributes without a target (a check's `.driver`,
+`windowsGuest.disk`) evaluate lib.assemble directly:
+`nix build --impure --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).<attr>'`.
+That build uses no Buck2 artifacts, so it can differ from what hosts and machine
+tests run; use it for debugging only.
 
 `scripts/package_release.sh marshall|lilly` builds the selected release, runs its
 payload check and exports the complete Nix closure using the existing transfer
@@ -91,7 +98,7 @@ are never planned for standbys (a size check, no hashing). Unknown IOPS stays
 unknown; `max_iops` requires `max_iops_source`.
 
 Images whose build is not byte-stable (the Windows installation is one) must be
-built once and distributed before they are staged: `nix build .#windows-guest`,
+built once and distributed before they are staged: `tools/buck2 build //:package-guest-windows`,
 then `nix copy --to ssh://<host> <store path>` for every host, verify with
 `nix path-info` that each host holds the same store path (and `du` versus
 `du --apparent-size` that `disk.raw` stayed sparse), and only then push the
@@ -478,9 +485,9 @@ the protected operator workflow in the deployment guide.
 Build the registry-derived public recovery recipients with:
 
 ```sh
-nix build .#user-recipients --out-link result-recipient
-cat result-recipient/ghuntley.age
-nix shell .#legacyPackages.x86_64-linux.secretTools.ssh-to-age \
+recipients=$(tools/buck2 build --show-full-simple-output //:package-security-user-recipients)
+cat "$(cat "$recipients")/ghuntley.age"
+nix shell --inputs-from . buildNixpkgs#ssh-to-age \
   -c ssh-to-age -i ./authenticated-host-ed25519.pub
 ```
 
@@ -601,8 +608,8 @@ The detailed fleet collector has isolated measurement/buffering and configuratio
 checks:
 
 ```sh
-nix build .#checks.x86_64-linux.fleet-monitor
-nix build .#checks.x86_64-linux.fleet-monitor-configuration
+tools/buck2 build //:check-fleet-monitor
+tools/buck2 build //:check-fleet-monitor-configuration
 ```
 
 These do not establish native fleet monitoring acceptance. Its opt-in
@@ -612,12 +619,12 @@ Keep it disabled until ingestion is deployed. Sampling is five seconds, with ZFS
 accounting every 30 seconds and bounded 30-minute retry storage.
 
 ```sh
-nix build -L .#checks.x86_64-linux.service-roles
-nix build -L .#checks.x86_64-linux.secret-custody
-nix build -L .#checks.x86_64-linux.credential-rotation
-nix build -L .#checks.x86_64-linux.acme-lookup
-nix build -L .#checks.x86_64-linux.acme-http01
-nix build -L .#checks.x86_64-linux.acme-route53
+tools/buck2 test //nix/verification/tests/machines/service-roles:service-roles
+tools/buck2 test //nix/verification/tests/machines/secret-custody:secret-custody
+tools/buck2 test //nix/verification/tests/machines/credential-rotation:credential-rotation
+tools/buck2 build //:check-acme-lookup
+tools/buck2 test //nix/verification/tests/machines/acme-http01:acme-http01
+tools/buck2 test //nix/verification/tests/machines/acme-route53:acme-route53
 ```
 
 This uses `pkgs.testers.runNixOSTest`, actual releases and four QEMU nodes for
@@ -664,7 +671,7 @@ the additional `nested-kvm` capability for real Firecracker guests.
 ### Fleet coordination check
 
 ```sh
-nix build .#checks.x86_64-linux.fleet --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/fleet:fleet
 ```
 
 This nested-KVM suite boots nine machines: three Marshall nodes, two Lilly nodes,
@@ -684,7 +691,7 @@ reclamation and deletion while unrelated guests continue running.
 ### Native ZFS observation check
 
 ```sh
-nix build .#checks.x86_64-linux.native-zfs --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/native-zfs:native-zfs
 ```
 
 This check requires usable KVM and exercises the source-built Lilly reader on
@@ -702,7 +709,7 @@ verify disk mutations and simulated host-loss recovery.
 ### Owned ZFS disk lifecycle
 
 ```sh
-nix build .#checks.x86_64-linux.zfs-lifecycle --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/zfs-lifecycle:zfs-lifecycle
 ```
 
 This separate check invokes Lilly's actual disk/ownership APIs using the verified
@@ -743,7 +750,7 @@ The dedicated relocation acceptance fixture runs three Marshall instances and tw
 Lilly nodes with real ZFS pools and pinned transfer SSH identities:
 
 ```sh
-nix build .#checks.x86_64-linux.relocation-fleet --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/fleet:relocation-fleet
 ```
 
 It exercises public automatic admission, a running baseline, writes after that
@@ -757,7 +764,7 @@ the expanded matrix remains pending. Exact revisions and results belong in the
 [relocation review](../architecture/reviews/2026-09-16-workload-relocation.md).
 
 ```sh
-nix build .#checks.x86_64-linux.zfs-guest --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/zfs-guest:zfs-guest
 ```
 
 This check requires a verified `nested-kvm` builder. It imports Lilly's module
@@ -773,7 +780,7 @@ three-Marshall/two-Lilly fleet scenarios. Executed results are recorded in the
 ### Native ZFS I/O observations
 
 ```sh
-nix build .#checks.x86_64-linux.zfs-io --no-link --print-build-logs
+tools/buck2 test //nix/verification/tests/machines/zfs-io:zfs-io
 ```
 
 This KVM machine check runs the actual source-built Lilly collector on two ZFS
@@ -788,7 +795,7 @@ and [I/O review](../architecture/reviews/2026-09-16-native-zfs-io.md).
 
 Use the [host provisioning workflow](host-provisioning.md) for reviewed Hetzner
 and EC2 machines. `fleet/hosts/NAME/host.json` derives base/enrolled configurations
-and secret recipients. `nix run .#host -- …` provides discovery, published plans,
+and secret recipients. `tools/buck2 run //:host -- …` provides discovery, published plans,
 explicit installation, enrollment and verification. Production budgets are
 explicit; image sizes remain in fixtures. The generic bootstrap, installer-ISO
 and mirrored-module exports have been removed under ADR-0043.
@@ -1012,7 +1019,7 @@ limit to each receive stream, including resumed streams, with a 64 KiB burst
 allowance. This is a transport limit; it is not durable-byte progress or a storage
 reservation. Relocation acceptance remains partial as recorded in ADR-0037.
 
-`nix build .#checks.x86_64-linux.audi-fleet` targets the Audi acceptance composition:
+`tools/buck2 test //nix/verification/tests/machines/fleet:audi-fleet` targets the Audi acceptance composition:
 three Marshall nodes, two Lilly/Audi hosts, independent Audi DNS on two control
 nodes, and a DNS-validating Pebble CA. It provisions a real nested Firecracker
 HTTP/WebSocket guest and exercises browser access, policy revocation and gateway

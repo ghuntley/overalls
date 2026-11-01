@@ -82,8 +82,9 @@ On failure the build log shows a reproduce blob. Re-run exactly that
 counterexample locally (values and all):
 
 ```sh
-HEGEL_REPLAY_BLOB="AAEAAAAA..." \
-  nix build .#checks.x86_64-linux.<name>.driver && \
+# The driver is an attribute of the check, built from lib.assemble (see the
+# tests README, "Run checks"); <name> is the check name.
+nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks."<name>".driver' && \
   HEGEL_REPLAY_BLOB="AAEAAAAA..." result/bin/nixos-test-driver
 ```
 
@@ -116,7 +117,7 @@ The interactive driver carries the same environment, so properties are
 importable in its REPL:
 
 ```sh
-nix build .#checks.x86_64-linux.<name>.driverInteractive
+nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks."<name>".driverInteractive'
 ./result/bin/nixos-test-driver
 # in the REPL:
 from hegel import _run_registered

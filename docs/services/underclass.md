@@ -23,7 +23,7 @@ UI and `/admin/api/*` require that host's `UNDERCLASS_UI_TOKEN`.
 
 The encrypted documents are `overalls-underclass` and
 `dungarees-underclass`. Recover a document to a private file outside the checkout
-with the ordinary `nix run .#secrets -- decrypt ...` workflow in
+with the ordinary `tools/buck2 run //:secrets -- decrypt ...` workflow in
 [fleet-users.md](../operations/fleet-users.md). Never put either value in a command argument,
 Nix expression, issue, or diagnostic output.
 

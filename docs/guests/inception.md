@@ -13,7 +13,7 @@ The profile uses `10.40.0.0/16` and the existing guest isolation rules.
 
 ## Deployment configuration
 
-Build `nix build .#guest-inception`. Register its `manifest.json` through the
+Build `tools/buck2 build //:package-guest-inception`. Register its `manifest.json` through the
 protected `Marshall.Compute.Images.register/2` operator action, and install
 the resulting immutable image on the intended Lilly hosts. Use the canonical
 image ID returned by registration for both Nix options:
