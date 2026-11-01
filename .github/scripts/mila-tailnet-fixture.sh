@@ -23,10 +23,15 @@ nohup "$python" -I .github/scripts/mila-tailnet-forward.py "$address" 8443 2222 
   > "${RUNNER_TEMP:-/tmp}/mila-tailnet-forward.log" 2>&1 &
 "$python" -I -c 'import json,sys; open(sys.argv[2], "w").write(json.load(open(sys.argv[1]))["tls"]["ca_pem"])' \
   "$descriptor" "$descriptor.ca.pem"
+# Windows curl uses Schannel, which also checks revocation. The fixture's
+# per-run test CA publishes no CRL or OCSP endpoint, so Schannel answers
+# "the revocation status is unknown". Only the --cacert pin applies here.
+curl_tls=()
+if [[ $(curl -V) == *Schannel* ]]; then curl_tls=(--ssl-no-revoke); fi
 error=""
 for attempt in $(seq 1 60); do
   if error=$(curl -fsS --max-time 5 -o /dev/null --cacert "$descriptor.ca.pem" \
-    "https://localhost:8443/health/ready" 2>&1); then
+    ${curl_tls[@]+"${curl_tls[@]}"} "https://localhost:8443/health/ready" 2>&1); then
     echo "tunnelled fixture reachable on localhost"
     exit 0
   fi
