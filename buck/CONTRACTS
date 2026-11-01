@@ -268,9 +268,9 @@ differs from the rendering (ADR-0269).
 
 @cc [owner:ghuntley,label:build;verification] tool-outputs-read-no-swapped-leaf
 A BUCK.v2 `_TOOL_OUTPUTS` package assembles without ASSEMBLY_ARTIFACTS, so its
-closure MUST contain no Buck2-swapped leaf; otherwise it ships a Nix-built copy
-that bypasses the leaf parity tests. tool_outputs_leaf_free fails when one does
-(ADR-0269).
+derivation MUST NOT depend on any of them; otherwise it ships a Nix-built copy
+that bypasses the leaf parity tests. tool_outputs_leaf_free binds every
+ASSEMBLY_ARTIFACTS key to a stand-in and fails when a drvPath changes (ADR-0269).
 
 @cc [owner:ghuntley,label:build;verification] machine-test-module-inputs
 A machine test MUST declare //nix:system_modules when its catalog parameters
