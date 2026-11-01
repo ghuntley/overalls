@@ -382,6 +382,22 @@ with subtest("notification device register, list, preferences and remove"):
     assert sql(f"SELECT enabled FROM notification_devices WHERE id = {literal(device)}") == "t"
     mila("device-rm", device)
     assert sql(f"SELECT state FROM notification_devices WHERE id = {literal(device)}") == "revoked"
+    # The stand-in "other device" the Linux journeys manage (ADR-0278 item 4):
+    # an Android device registered through Marshall's own actions, listed to
+    # the owner's session.
+    status, body = hook("notification-device", "{}")
+    assert status == 200, body
+    other = text(json.loads(body), "device_id")
+    assert (
+        sql(
+            "SELECT platform::text || ':' || state::text || ':' || enabled::text "
+            f"FROM notification_devices WHERE id = {literal(other)}"
+        )
+        == "android:active:true"
+    )
+    assert other in json.dumps(mila("device-ls"))
+    assert hook("notification-device", json.dumps({"extra": 1}))[0] == 400
+    mila("device-rm", other)
 
 with subtest("SSH key list and revoke; the revoked key is no longer authorized"):
     keys = items(mila("ssh-keys"), "keys", "result", "keys")

@@ -168,26 +168,33 @@ Client evidence:
   apple-native job yet, so the cell stays open. The job's journey step
   previously filtered on `MilaJourneyTests`, which matches no test case name,
   so the Apple fixture journey had not run; the filter now names the classes.
-- **Linux: open.** [`notifications.rs`](../../../mila/native/linux/src/notifications.rs)
-  tests the explicit local desktop enablement and that push registration is
-  refused (no provider). The GTK settings page has list, remove and
-  enable/disable controls, but neither Linux journey
-  ([`journey.rs`](../../../mila/native/linux/src/journey.rs), the
-  `gtk-journey` window) drives them against the fixture.
-- **Windows: open.**
+- **Linux: open (journey steps added; awaiting a passing linux-native run).**
+  [`notifications.rs`](../../../mila/native/linux/src/notifications.rs)
+  tests the explicit local desktop enablement, that registration-related
+  calls are refused with `LocallyDisabled` before it
+  (`local_enablement_gates_registration_behaviour`), and that push
+  registration is refused (no provider). Linux registers no device: the
+  fixture's `notification-device` hook
+  ([`fixture.exs`](../../../nix/verification/tests/machines/mila-journey/fixture.exs))
+  registers a stand-in Android "other device" for the owner through
+  Marshall's own SSH key and notification registration actions, and the
+  headless driver asserts it in PostgreSQL. Both Linux journeys
+  ([`journey.rs`](../../../mila/native/linux/src/journey.rs)
+  `notification_device_*`, and the `gtk-journey` window's Settings controls
+  in [`gtk_journey.rs`](../../../mila/native/linux/src/gtk_journey.rs)
+  `gtk_notification_device_*`) list it, disable and enable it, and remove
+  it, reading each effect back through `device ls`. No linux-native run has
+  recorded these steps passing yet.
+- **Windows: implemented.** In mila-builds run 41305124503, windows-native passed in full.
   [`JourneySmoke.cs`](../../../mila/windows-dotnet-smoke/JourneySmoke.cs)
-  lists devices against the fixture ("notification device listing").
-  [`WindowsNotificationsSmoke.cs`](../../../mila/windows-dotnet-smoke/WindowsNotificationsSmoke.cs)
-  covers WNS channel metadata validation and the signed-out refusal.
-  Journey steps for register, preferences and remove are pending (being
-  added separately).
+  registers, lists, disables and enables, and removes a device against the
+  fixture, using WNS and Susan stand-ins. `LifecycleSmoke.cs` refuses
+  registration without a live, unexpired, Microsoft-hosted WNS channel or a poke key.
 
 ## Open questions
 
-- The Linux journey needs notification-device steps. The Apple steps and
-  refusal test await a passing apple-native run. Until then those cells stay
-  open.
-- Windows register, preferences and remove journey steps are pending.
+- The Apple and Linux journey steps await passing apple-native and
+  linux-native runs. Until then those cells stay open.
 - Susan's `susan-fixed-provider-egress` contract (`susan/CONTRACTS`) still
   names only the APNs, Google OAuth and FCM origins. ADR-0236 added
   Entra ID and per-device WNS channel hosts, so the contract text should be

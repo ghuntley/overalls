@@ -549,8 +549,11 @@ impl NativeState {
             });
             notification_actions.append(&button);
         }
-        settings_page.append(&notification_id);
-        settings_page.append(&notification_actions);
+        let notification_devices = Box::new(Orientation::Vertical, 6);
+        notification_devices.set_widget_name(pages::NOTIFICATION_DEVICES);
+        notification_devices.append(&notification_id);
+        notification_devices.append(&notification_actions);
+        settings_page.append(&notification_devices);
         let machine_id = pages::build_machines(self, &machines_page, &content);
         // The terminal page binds the authenticated PTY (HostPtyTransport over
         // the session FFI) to a GTK text view through the library surface.

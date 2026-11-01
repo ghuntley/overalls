@@ -13,11 +13,12 @@ use crate::deployments::{DeploymentHost, DeploymentStore};
 use crate::device_key::{load_or_create, write_private};
 use crate::journey_checks::{
     action_failed, check_answered, check_created, check_deleted, check_desired,
-    check_plan_approved, check_prompted, check_resize_created, check_resized, check_resumed,
-    check_share, check_web, first_thread, load_thread_controls, refusal_code, web_endpoint, Check,
-    PageContext, CREATE_SIZE, RESIZE_SIZE,
+    check_notification_device, check_plan_approved, check_prompted, check_resize_created,
+    check_resized, check_resumed, check_share, check_web, first_thread, load_thread_controls,
+    refusal_code, web_endpoint, Check, PageContext, CREATE_SIZE, RESIZE_SIZE,
 };
 use crate::machine_view::project_snapshot;
+use crate::notifications::{NotificationState, NotificationUnavailable};
 use crate::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
 use crate::session::{
     ApprovalInfo, DeviceSigner, FileDeviceSigner, HttpsTrustFetcher, LiveSession, SessionBinding,
@@ -467,8 +468,9 @@ fn approve(descriptor: &JourneyDescriptor, workdir: &Path, ca: &Path, info: &App
 }
 
 /// @cc [owner:ghuntley,label:verification;security] linux-journey-fixture-actions
-/// The fixture's stand-ins for the absent provisioner and model (`observe`,
-/// `thread-create`, `thread-ready`, `thread-question`, `thread-proposal`) MUST
+/// The fixture's stand-ins for the absent provisioner, model and the
+/// account's other devices (`observe`, `thread-create`, `thread-ready`,
+/// `thread-question`, `thread-proposal`, `notification-device`) MUST
 /// be requested only through the bearer-protected approver origin with the
 /// bearer in an owner-only config file; returned identifiers MUST NOT be
 /// reported. A missing hook is reported as `fixture_hook_unavailable`.
@@ -545,6 +547,15 @@ impl FixtureHook {
             &serde_json::json!({ "thread_id": thread }),
         )?;
         Self::identifier(&asked, "question_id")
+    }
+
+    /// Registers a stand-in "other device" of the signed-in account (an
+    /// Android device with random push and encryption keys, through
+    /// Marshall's own actions) and returns its id. Linux registers no device
+    /// itself (ADR-0278 item 4); this is the device the journeys manage.
+    pub fn notification_device(&self) -> Option<String> {
+        let seeded = self.action("notification-device", &serde_json::json!({}))?;
+        Self::identifier(&seeded, "device_id")
     }
 
     /// Has the agent propose a plan in `thread`; returns its id.
@@ -721,6 +732,10 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         machine_id.as_deref(),
         &mut report,
     );
+
+    // 8b. Notifications: the local enablement gate, then list, disable,
+    // enable and remove the account's other device (Linux registers none).
+    run_notifications(&binding, &hook, &mut report);
 
     // 9. Terminal stream through HostPtyTransport and the GTK surface model.
     let terminal_outcome = run_terminal(&binding, machine_id.as_deref());
@@ -1021,6 +1036,107 @@ fn page_step(
         }
         Err(code) => report.record(name, false, code),
     }
+}
+
+/// One notification-device mutation through the bound session, then a
+/// read back of its effect in the account's device listing.
+fn device_step(
+    report: &mut JourneyReport,
+    binding: &Rc<RefCell<SessionBinding>>,
+    name: &'static str,
+    device: &str,
+    op: impl FnOnce(&mut LiveSession) -> Result<(), SessionError>,
+    expected: Option<bool>,
+    pass: &'static str,
+) -> bool {
+    let submitted = match binding.borrow_mut().session_mut() {
+        Some(live) => op(live).map_err(|error| match error {
+            SessionError::InvalidInput => refusal_code(live.last_refusal().as_deref()),
+            other => action_failed(other),
+        }),
+        None => Err("not_bound"),
+    };
+    if let Err(code) = submitted {
+        return report.record(name, false, code);
+    }
+    let (ok, code) = await_check(binding, |live| {
+        check_notification_device(live, device, expected, pass)
+    });
+    report.record(name, ok, code)
+}
+
+/// @cc [owner:ghuntley,label:verification;desktop] linux-journey-notification-devices
+/// The Linux journey MUST show that local desktop enablement gates
+/// registration and that Linux never registers a push device, then MUST list,
+/// disable, enable and remove the fixture's stand-in other device through the
+/// authenticated session, reading each effect back from the listing. The
+/// device id MUST NOT be reported.
+fn run_notifications(
+    binding: &Rc<RefCell<SessionBinding>>,
+    hook: &FixtureHook,
+    report: &mut JourneyReport,
+) {
+    // The same NotificationState the GTK settings page holds.
+    let mut local = NotificationState::desktop();
+    let gated = local.register_device("mila-linux-journey")
+        == Err(NotificationUnavailable::LocallyDisabled)
+        && local.register() == Err(NotificationUnavailable::LocallyDisabled)
+        && local.enable().is_ok()
+        && local.register() == Err(NotificationUnavailable::NoPushProvider)
+        && local.devices().is_empty();
+    report.record(
+        "notifications_local_gate",
+        gated,
+        if gated {
+            "gated_no_push_provider"
+        } else {
+            "ungated"
+        },
+    );
+
+    let Some(device) = hook.notification_device() else {
+        report.record(
+            "notification_device_seed",
+            false,
+            "fixture_hook_unavailable",
+        );
+        return;
+    };
+    report.record("notification_device_seed", true, "other_device_registered");
+    let (listed, code) = await_check(binding, |live| {
+        check_notification_device(live, &device, Some(true), "other_device_listed")
+    });
+    report.record("notification_device_list", listed, code);
+    if !listed {
+        return;
+    }
+    device_step(
+        report,
+        binding,
+        "notification_device_disable",
+        &device,
+        |live| live.device_preference(&device, false),
+        Some(false),
+        "disabled_read_back",
+    );
+    device_step(
+        report,
+        binding,
+        "notification_device_enable",
+        &device,
+        |live| live.device_preference(&device, true),
+        Some(true),
+        "enabled_read_back",
+    );
+    device_step(
+        report,
+        binding,
+        "notification_device_remove",
+        &device,
+        |live| live.device_remove(&device),
+        None,
+        "removed_read_back",
+    );
 }
 
 /// Asks the fixture to observe the journey machine; records a missing hook

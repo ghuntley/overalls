@@ -32,6 +32,7 @@ pub(super) const MACHINE_SHARING: &str = "mila-machine-sharing";
 pub(super) const MACHINE_WEB: &str = "mila-machine-web";
 pub(super) const THREAD_LIST: &str = "mila-thread-list";
 pub(super) const THREAD_DETAIL: &str = "mila-thread-detail";
+pub(super) const NOTIFICATION_DEVICES: &str = "mila-notification-devices";
 
 /// Wire role values in the order the role selector shows them.
 const ROLES: [(&str, M); 3] = [

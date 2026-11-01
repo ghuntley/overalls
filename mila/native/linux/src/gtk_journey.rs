@@ -25,10 +25,10 @@ use mila_native_linux::journey::{
     GUEST_BOOT_DEADLINE, GUEST_RESIZE, HOOK_MAX_SECONDS, JOURNEY_PROMPT,
 };
 use mila_native_linux::journey_checks::{
-    check_answered, check_created, check_deleted, check_desired, check_plan_approved,
-    check_prompted, check_resize_created, check_resized, check_resumed, check_share, check_web,
-    first_thread, load_thread_controls, machine_named, refusal_code, web_endpoint, Check,
-    PageContext, CREATE_SIZE, RESIZE_SIZE,
+    check_answered, check_created, check_deleted, check_desired, check_notification_device,
+    check_plan_approved, check_prompted, check_resize_created, check_resized, check_resumed,
+    check_share, check_web, first_thread, load_thread_controls, machine_named, refusal_code,
+    web_endpoint, Check, PageContext, CREATE_SIZE, RESIZE_SIZE,
 };
 use mila_native_linux::machine_view::project_snapshot;
 use mila_native_linux::session::{LiveSession, SessionError, SignInPhase};
@@ -363,6 +363,8 @@ struct PageWork {
     seed_name: String,
     /// Whether the pause step took effect.
     paused: bool,
+    /// The fixture's stand-in other notification device.
+    notification_device: Option<String>,
 }
 
 impl PageWork {
@@ -801,7 +803,87 @@ fn page_steps() -> VecDeque<PageStep> {
         },
         |state, work| live_check(state, |live| check_plan_approved(live, &work.context)),
     ));
+    steps.extend(notification_steps());
     steps
+}
+
+/// Waits for the Settings page's notification controls to answer, then reads
+/// the effect back through the window's session.
+fn notification_check(
+    state: &NativeState,
+    work: &PageWork,
+    expected: Option<bool>,
+    pass: &'static str,
+) -> Check {
+    let status = status_text(state);
+    if status == strings::text(M::NotificationRejected) {
+        return Check::Fail("rejected");
+    }
+    if status == strings::text(M::NotificationRequireSignIn) {
+        return Check::Fail("not_bound");
+    }
+    if status != strings::text(M::NotificationAccepted) {
+        return Check::Wait;
+    }
+    let device = work.notification_device.clone().unwrap_or_default();
+    live_check(state, |live| {
+        check_notification_device(live, &device, expected, pass)
+    })
+}
+
+/// Types the device id into the Settings page and presses `message`.
+fn notification_press(
+    state: &NativeState,
+    work: &PageWork,
+    message: M,
+) -> Result<(), &'static str> {
+    let device = work.notification_device.clone().ok_or("no_device")?;
+    fill(
+        state,
+        Page::Settings,
+        pages::NOTIFICATION_DEVICES,
+        M::NotificationDeviceId,
+        &device,
+    )?;
+    press(state, Page::Settings, pages::NOTIFICATION_DEVICES, message)
+}
+
+/// Settings page notification controls on the fixture's stand-in other
+/// device: Linux registers none itself (ADR-0278 item 4).
+fn notification_steps() -> [PageStep; 4] {
+    [
+        step(
+            "gtk_notification_device_list",
+            |state, work, _| {
+                work.notification_device = work.hook.notification_device();
+                work.notification_device
+                    .as_ref()
+                    .ok_or("fixture_hook_unavailable")?;
+                press(
+                    state,
+                    Page::Settings,
+                    pages::NOTIFICATION_DEVICES,
+                    M::NotificationRefresh,
+                )
+            },
+            |state, work| notification_check(state, work, Some(true), "other_device_listed"),
+        ),
+        step(
+            "gtk_notification_device_disable",
+            |state, work, _| notification_press(state, work, M::NotificationDisable),
+            |state, work| notification_check(state, work, Some(false), "disabled_read_back"),
+        ),
+        step(
+            "gtk_notification_device_enable",
+            |state, work, _| notification_press(state, work, M::NotificationEnable),
+            |state, work| notification_check(state, work, Some(true), "enabled_read_back"),
+        ),
+        step(
+            "gtk_notification_device_remove",
+            |state, work, _| notification_press(state, work, M::NotificationRemove),
+            |state, work| notification_check(state, work, None, "removed_read_back"),
+        ),
+    ]
 }
 
 enum Stage {
@@ -1629,6 +1711,7 @@ fn run_window(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) ->
             revision: 0,
             seed_name: descriptor.seed.machine_name.clone(),
             paused: false,
+            notification_device: None,
         },
         steps: page_steps(),
         current: None,

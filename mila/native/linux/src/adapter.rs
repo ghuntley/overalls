@@ -600,16 +600,16 @@ pub struct NotificationDevice {
     pub route: String,
 }
 
+/// Decodes `device ls --json`: Porsche's version-1 envelope
+/// (`{"version":1,"status":"succeeded","result":{"items":[..]}}`, see
+/// `protocol/test/fixtures/porsche_device_results.json`) or the bare result.
 pub fn decode_notification_devices(bytes: &[u8]) -> Result<Vec<NotificationDevice>, RuntimeError> {
     #[derive(Deserialize)]
     struct Envelope {
         items: Vec<NotificationDevice>,
     }
-    if bytes.len() > 256 * 1024 {
-        return Err(RuntimeError::InvalidInput);
-    }
-    let envelope: Envelope =
-        serde_json::from_slice(bytes).map_err(|_| RuntimeError::InvalidInput)?;
+    let envelope: Envelope = serde_json::from_value(crate::porsche_results::result_value(bytes)?)
+        .map_err(|_| RuntimeError::InvalidInput)?;
     if envelope.items.len() > 256
         || envelope.items.iter().any(|device| {
             device.id.is_empty()
@@ -1024,6 +1024,20 @@ mod web_tests {
     fn notification_devices_are_bounded_and_commands_are_catalogued() {
         let payload = br#"{"items":[{"id":"01234567-89ab-cdef-0123-456789abcdef","platform":"android","label":"phone","enabled":true,"state":"active","route":"overalls://fleet.example/settings"}]}"#;
         assert_eq!(decode_notification_devices(payload).unwrap().len(), 1);
+        // Porsche's real reply wraps the listing in the version-1 envelope.
+        let fixture: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../../protocol/test/fixtures/porsche_device_results.json"
+        ))
+        .unwrap();
+        let reply = serde_json::to_vec(&fixture["commands"]["device ls"]["response"]).unwrap();
+        let devices = decode_notification_devices(&reply).unwrap();
+        assert_eq!(devices.len(), 1);
+        assert_eq!(devices[0].platform, "android");
+        assert!(devices[0].enabled);
+        assert!(decode_notification_devices(
+            br#"{"version":1,"status":"failed","result":{"items":[]}}"#
+        )
+        .is_err());
         assert_eq!(
             format_notification_device_command("ls", None, None).unwrap(),
             "device ls"

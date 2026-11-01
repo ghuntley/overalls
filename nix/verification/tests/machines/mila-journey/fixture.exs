@@ -3,7 +3,9 @@
 # synthetic image catalog entry and a synthetic host (control session,
 # headroom reports, a host credential for the terminal stand-in's stream, and
 # explicit per-machine operation completion and state observation standing in
-# for the absent provisioner), and MAY
+# for the absent provisioner), MAY register a stand-in "other device" for the
+# owner (an SSH key and an Android notification device with random push and
+# encryption keys) through Marshall's own SSH and Notifications actions, and MAY
 # stand in for the model's question and plan tool calls through the same
 # Planning domain functions. Every tested Mila operation MUST still enter
 # through Porsche SSH and Marshall's production authority. Login tokens and
@@ -296,6 +298,40 @@ defmodule MilaJourneyFixture do
       end)
 
     %{"plan_id" => proposal.id}
+  end
+
+  # Stand in for another of the owner's devices (a phone that registered for
+  # push), which the Linux journeys list, disable, enable and remove: Linux
+  # has no push provider and registers no device itself (ADR-0278 item 4).
+  # The device enters through Marshall's own SSH key and notification
+  # registration actions as the owner, with fresh keys per call so repeated
+  # journeys never share one. Only the device id is returned.
+  def run("notification-device") do
+    owner = Ash.get!(Marshall.Accounts.User, seed()["owner_id"], authorize?: false)
+    {ssh_public, _} = :crypto.generate_key(:eddsa, :ed25519)
+    blob = <<11::32, "ssh-ed25519", 32::32, ssh_public::binary>>
+
+    {:ok, key} =
+      Marshall.SSH.add_key(
+        %{public_key: "ssh-ed25519 " <> Base.encode64(blob), label: "Mila journey other device"},
+        actor: owner
+      )
+
+    {enc_public, _} = :crypto.generate_key(:ecdh, :x25519)
+
+    {:ok, device} =
+      Marshall.Notifications.register_device(
+        %{
+          platform: :android,
+          push_key: Base.url_encode64(:crypto.strong_rand_bytes(48), padding: false),
+          enc_public_key: Base.url_encode64(enc_public, padding: false),
+          label: "Mila journey other device",
+          key_id: key.id
+        },
+        actor: owner
+      )
+
+    %{"device_id" => device.id}
   end
 
   defp wait_ready(_id, 0), do: raise("thread did not become ready")

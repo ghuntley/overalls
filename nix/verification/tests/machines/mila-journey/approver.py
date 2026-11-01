@@ -34,6 +34,7 @@ FIXTURE_ACTIONS: dict[str, tuple[str, str] | None] = {
     "thread-ready": ("thread_id", "MILA_FIXTURE_THREAD"),
     "thread-question": ("thread_id", "MILA_FIXTURE_THREAD"),
     "thread-proposal": ("thread_id", "MILA_FIXTURE_THREAD"),
+    "notification-device": None,
 }
 
 # Closed failure codes a failed fixture hook may return (see the fixture's

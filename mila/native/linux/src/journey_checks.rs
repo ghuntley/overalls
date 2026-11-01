@@ -10,7 +10,9 @@
 //! Outcome codes are fixed strings; no identifier, name, address or text
 //! reaches a report.
 
-use crate::adapter::{decode_share_listing, decode_web_endpoint, WebEndpoint};
+use crate::adapter::{
+    decode_notification_devices, decode_share_listing, decode_web_endpoint, WebEndpoint,
+};
 use crate::machine_view::project_snapshot;
 use crate::porsche_results::{
     decode_machine_detail, decode_thread_detail, decode_thread_events, decode_thread_rows,
@@ -71,6 +73,36 @@ impl PageContext {
             share_principal: share_principal.to_owned(),
             ..Self::default()
         })
+    }
+}
+
+/// Polls the account's notification device listing (`device ls`) for
+/// `device`: with `expected` set, it must be listed as an active Android
+/// device with that `enabled` preference; with `None`, it must no longer be
+/// listed (removal revokes it, and the listing omits revoked devices).
+pub fn check_notification_device(
+    live: &mut LiveSession,
+    device: &str,
+    expected: Option<bool>,
+    pass: &'static str,
+) -> Check {
+    let devices = match live.device_list() {
+        Ok(bytes) => match decode_notification_devices(&bytes) {
+            Ok(devices) => devices,
+            Err(_) => return Check::Fail("listing_invalid"),
+        },
+        Err(SessionError::Busy) => return Check::Wait,
+        Err(_) => return Check::Fail("read_refused"),
+    };
+    let listed = devices.into_iter().find(|row| row.id == device);
+    match (listed, expected) {
+        (Some(row), Some(_)) if row.platform != "android" => Check::Fail("unexpected_platform"),
+        (Some(row), Some(enabled)) if row.enabled == enabled && row.state == "active" => {
+            Check::Pass(pass)
+        }
+        (None, None) => Check::Pass(pass),
+        (Some(_), _) => Check::Wait,
+        (None, Some(_)) => Check::Fail("device_missing"),
     }
 }
 

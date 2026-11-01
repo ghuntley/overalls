@@ -8,6 +8,8 @@
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NotificationUnavailable {
     NoPushProvider,
+    /// The user has not enabled local desktop notifications on this host.
+    LocallyDisabled,
 }
 
 /// Capability exposed by the platform profile.
@@ -80,7 +82,17 @@ impl NotificationState {
         serde_json::to_vec(&self.devices).map_err(|_| NotificationUnavailable::NoPushProvider)
     }
 
+    /// @cc [owner:ghuntley,label:security;desktop] linux-notifications-enablement-gate
+    /// Registration-related behaviour (recording a device in the local
+    /// projection, or attempting push registration) MUST be refused with
+    /// `LocallyDisabled` until the user has enabled local desktop
+    /// notifications, and MUST leave the projection unchanged.
+    ///
+    /// Records a device identifier in the local projection.
     pub fn register_device(&mut self, id: &str) -> Result<(), NotificationUnavailable> {
+        if !self.enabled {
+            return Err(NotificationUnavailable::LocallyDisabled);
+        }
         if !Self::valid_device_id(id) {
             return Err(NotificationUnavailable::NoPushProvider);
         }
@@ -126,6 +138,9 @@ impl NotificationState {
     /// registration operation prevents the GTK host from treating a local
     /// toggle as a completed server registration.
     pub fn register(&mut self) -> Result<(), NotificationUnavailable> {
+        if !self.enabled {
+            return Err(NotificationUnavailable::LocallyDisabled);
+        }
         self.enabled = false;
         Err(NotificationUnavailable::NoPushProvider)
     }
@@ -173,7 +188,7 @@ mod tests {
         assert!(!state.enabled());
         assert_eq!(
             state.register(),
-            Err(NotificationUnavailable::NoPushProvider)
+            Err(NotificationUnavailable::LocallyDisabled)
         );
         assert!(!state.enabled());
     }
@@ -184,8 +199,6 @@ mod tests {
         assert!(state.can_display_locally());
         assert_eq!(state.enable(), Ok(()));
         assert!(state.enabled());
-        state.disable();
-        assert!(!state.enabled());
         assert_eq!(
             state.register(),
             Err(NotificationUnavailable::NoPushProvider)
@@ -194,8 +207,45 @@ mod tests {
     }
 
     #[test]
+    fn local_enablement_gates_registration_behaviour() {
+        let mut state = NotificationState::desktop();
+        // Before enablement: every registration-related call is refused and
+        // the local projection stays empty.
+        assert_eq!(
+            state.register(),
+            Err(NotificationUnavailable::LocallyDisabled)
+        );
+        assert_eq!(
+            state.register_device("desktop-a"),
+            Err(NotificationUnavailable::LocallyDisabled)
+        );
+        assert!(state.devices().is_empty());
+        // After enablement the local projection accepts a device, while push
+        // registration still fails closed (no Linux push provider).
+        assert_eq!(state.enable(), Ok(()));
+        assert_eq!(state.register_device("desktop-a"), Ok(()));
+        assert_eq!(state.devices(), &["desktop-a"]);
+        state.disable();
+        assert_eq!(
+            state.register_device("desktop-b"),
+            Err(NotificationUnavailable::LocallyDisabled)
+        );
+        assert_eq!(state.devices(), &["desktop-a"]);
+        // A platform without local desktop presentation can never enable, so
+        // it never reaches registration.
+        let mut unsupported = NotificationState::linux();
+        assert!(unsupported.enable().is_err());
+        assert_eq!(
+            unsupported.register_device("desktop-a"),
+            Err(NotificationUnavailable::LocallyDisabled)
+        );
+        assert!(unsupported.devices().is_empty());
+    }
+
+    #[test]
     fn desktop_devices_round_trip_with_bounds() {
         let mut state = NotificationState::desktop();
+        state.enable().expect("enable");
         state.register_device("desktop-a").expect("register");
         state.register_device("desktop-a").expect("idempotent");
         let bytes = state.persist_devices().expect("persist");
@@ -209,6 +259,7 @@ mod tests {
     #[test]
     fn invalidation_is_idempotent_and_identifiers_are_bounded() {
         let mut state = NotificationState::desktop();
+        state.enable().expect("enable");
         assert!(state.register_device("desktop-a").is_ok());
         assert!(state.invalidate_device("desktop-a"));
         assert!(!state.invalidate_device("desktop-a"));
@@ -219,6 +270,7 @@ mod tests {
         let duplicate = serde_json::to_vec(&["desktop-a", "desktop-a"]).expect("json");
         assert!(state.load_devices(&duplicate).is_err());
         let mut full = NotificationState::desktop();
+        full.enable().expect("enable");
         for index in 0..32 {
             full.register_device(&format!("desktop-{index}"))
                 .expect("register");
