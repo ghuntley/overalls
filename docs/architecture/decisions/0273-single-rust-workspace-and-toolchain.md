@@ -74,7 +74,8 @@ Partial: decisions 1 and 4 are implemented by track T2. Decisions 2 and 3 are
 partial, in milestone M5.
 
 - **One workspace, one lock.** The root [`Cargo.toml`](../../../Cargo.toml)
-  lists all 32 first-party crates as members: the 13 Lilly helpers, Lyra,
+  lists all 31 first-party crates as members (the count was misstated as 32
+  until 2026-11-01; the list below always summed to 31): the 13 Lilly helpers, Lyra,
   terminald, the editor broker, the diagnostics spool, Enrico's git-owner,
   Marshall's Cedar NIF, the guest telemetry receiver, observability-runtimes,
   the Mila Linux client and the nine `mila/rust` crates. No crate is exempt.
@@ -194,8 +195,9 @@ partial, in milestone M5.
   `makeRustPlatform` over this toolchain was rejected: its build scripts
   crashed with SIGSEGV. The leaves' derivations, and so every host's
   system derivation, changed on purpose; the closures differ only in those
-  leaves and their dependents. Third-party builds (NativeLink, underclass),
-  Marshall's Cedar NIF and lints stay on nixpkgs Rust until M6. Both
+  leaves and their dependents. Marshall's Cedar NIF and its lint gate
+  followed on 2026-11-01 (238933607; see the correction below). Third-party
+  builds (NativeLink, underclass) stay on nixpkgs Rust. Both
   test-only Hegel engine builds use this toolchain:
   [`hegelNif`](../../../nix/domains/artifacts/default.nix) (the hegel_ex
   NIF, through `cargoWorkspace.rustPlatform`) and
@@ -232,8 +234,16 @@ partial, in milestone M5.
   helpers then built `release` like the Nix builds, with the panic strategy
   in the parity test. Since the T2 fix both sides build `hardened`.
   Since M2 (7ccb4f72a) a host's `:deployment` target carries the same
-  `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too; the flake's
-  Nix builds remain the fallback until M11. terminald and the editor broker
+  `ASSEMBLY_ARTIFACTS`, so hosts deploy these Buck2 builds too. Since M11
+  (0ee821c63) the flake exports no packages, but `lib.assemble` without
+  artifacts still falls back to each leaf's Nix build. Buck2's own cells
+  ([`cells.nix`](../../../nix/buck/cells.nix), evaluated without artifacts)
+  give the Mix test rules the Nix-built Lilly helpers (`host_tools`) and
+  Enrico's git owner; `lib.dependencyPins.cargo` builds every Nix Rust leaf;
+  the otel-request-recorder fixtures patch and rebuild the receiver through
+  its Nix build; and fleet scenario selection evaluates test scripts without
+  artifacts. The Nix leaves cannot be deleted until those consumers stop
+  using them. terminald and the editor broker
   followed: `rust_musl_binary` ([buck/rust.bzl](../../../buck/rust.bzl))
   transitions a binary to `toolchains//:musl`, under which the same toolchain
   targets x86_64-unknown-linux-musl and links a static-pie executable with its
@@ -256,7 +266,14 @@ partial, in milestone M5.
   over it, which differ between two Nix builds of one derivation too. The
   Buck2 action runs inside bubblewrap with the Nix sandbox's `/build` root,
   because vendored OpenSSL embeds absolute build paths (an open finding in the
-  migration review). Remaining: Marshall's Cedar NIF and Mila.
+  migration review). Lyra's builds are therefore Buck2 actions that run
+  Cargo, not prelude Rust rules; that departure from decision 3 is
+  recorded here rather than resolved. Marshall's Cedar NIF is likewise built
+  by Cargo (through Rustler) inside the Buck2 Mix release since M6
+  (857c2bea3), and its Buck2 and Nix NIFs are byte-identical. Mila's Linux
+  client and its nine `mila/rust` crates build through Buck2 targets that
+  run Nix or Cargo ([ADR-0277](0277-mila-native-builds-on-buck2.md)), not
+  through prelude Rust rules.
 - **Correction (2026-10-31): Lyra's cargo.** "Lyra … rebuilt under it" was
   true of rustc only. Lyra's client, Windows and native builds and its tests
   check took `cargo` (and, for the check, clippy and rustfmt) from nixpkgs,
@@ -307,10 +324,12 @@ partial, in milestone M5.
 
 Remaining for this decision:
 
-- the Buck2 builds of terminald, the broker, Lyra, the Cedar NIF and Mila
-  (decision 3), in M5;
-- per-consumer Nix source filters, until M5 deletes the `buildRustPackage`
-  leaves.
+- prelude-rule Buck2 builds of Mila's ten crates, and a decision on whether
+  Lyra's, the Cedar NIF's and Mila's Cargo-driven Buck2 builds satisfy
+  decision 3;
+- deleting the Nix `buildRustPackage` leaves and the per-consumer Nix source
+  filters, once the consumers listed under "Buck2 builds" above no longer
+  build them.
 
 ## Open questions
 
