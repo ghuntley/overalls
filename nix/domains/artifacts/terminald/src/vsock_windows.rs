@@ -6,22 +6,14 @@
 //! is discovered at runtime from the `\\.\Viosock` control device, then the
 //! Winsock catalog. `SOCKADDR_VM` is 12 bytes in host byte order.
 use crate::conn::Conn;
+use crate::sys::windows as sys;
 use std::io;
-use std::mem::{size_of, zeroed};
-use std::ptr::{null, null_mut};
+use std::mem::size_of;
 use std::time::{Duration, Instant};
-use windows_sys::Win32::Foundation::{
-    CloseHandle, GetLastError, GENERIC_READ, GENERIC_WRITE, INVALID_HANDLE_VALUE,
-};
+use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 use windows_sys::Win32::Networking::WinSock::{
-    accept as wsa_accept, bind, closesocket, getpeername, listen as wsa_listen, socket,
-    WSAEnumProtocolsW, WSAGetLastError, WSAStartup, INVALID_SOCKET, SOCKADDR, SOCKET, SOCKET_ERROR,
-    SOCK_STREAM, WSADATA, WSAPROTOCOL_INFOW,
+    INVALID_SOCKET, SOCKET, SOCKET_ERROR, SOCK_STREAM, WSAPROTOCOL_INFOW,
 };
-use windows_sys::Win32::Storage::FileSystem::{
-    CreateFileW, FILE_ATTRIBUTE_NORMAL, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING,
-};
-use windows_sys::Win32::System::IO::DeviceIoControl;
 
 /// The host side of every Firecracker vsock connection.
 pub(crate) const CID_HOST: u32 = 2;
@@ -37,74 +29,30 @@ pub(crate) type Listener = SOCKET;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
-struct SockaddrVm {
+pub(crate) struct SockaddrVm {
     family: u16,
     reserved: u16,
     port: u32,
     cid: u32,
 }
 
-/// `size_of::<SockaddrVm>()` as a Winsock address length.
-#[expect(
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "SOCKADDR_VM is 12 bytes, far below i32::MAX"
-)]
-const SOCKADDR_VM_LEN: i32 = size_of::<SockaddrVm>() as i32;
-
 fn wsa_error() -> io::Error {
-    // SAFETY: WSAGetLastError only reads this thread's last Winsock error.
-    io::Error::from_raw_os_error(unsafe { WSAGetLastError() })
-}
-
-fn wide(text: &str) -> Vec<u16> {
-    text.encode_utf16().chain(std::iter::once(0)).collect()
+    io::Error::from_raw_os_error(sys::wsa_last_error())
 }
 
 fn ioctl_family() -> io::Result<u16> {
-    let name = wide(DEVICE);
-    // SAFETY: `name` is NUL-terminated UTF-16 that outlives the call.
-    let handle = unsafe {
-        CreateFileW(
-            name.as_ptr(),
-            GENERIC_READ | GENERIC_WRITE,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
-            null(),
-            OPEN_EXISTING,
-            FILE_ATTRIBUTE_NORMAL,
-            null_mut(),
-        )
-    };
+    let handle = sys::open_device(DEVICE);
     if handle == INVALID_HANDLE_VALUE {
         return Err(io::Error::from_raw_os_error(
-            // SAFETY: GetLastError only reads this thread's last error code.
-            unsafe { GetLastError() }.cast_signed(),
+            sys::last_error().cast_signed(),
         ));
     }
     let mut out = [0u8; 4];
     let mut returned = 0u32;
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "`out` is a four-byte array"
-    )]
-    let out_len = out.len() as u32;
-    // SAFETY: `out` and `returned` are writable and live across the synchronous call.
-    let ok = unsafe {
-        DeviceIoControl(
-            handle,
-            IOCTL_GET_AF,
-            null(),
-            0,
-            out.as_mut_ptr().cast(),
-            out_len,
-            &raw mut returned,
-            null_mut(),
-        )
-    };
-    // SAFETY: GetLastError only reads this thread's last error code.
-    let error = unsafe { GetLastError() };
-    // SAFETY: the handle came from CreateFileW above and is closed exactly once.
-    unsafe { CloseHandle(handle) };
+    let ok = sys::device_io_control_out(handle, IOCTL_GET_AF, &mut out, &mut returned);
+    let error = sys::last_error();
+    // The handle came from open_device above and is closed exactly once.
+    sys::close_handle(handle);
     if ok == 0 {
         return Err(io::Error::from_raw_os_error(error.cast_signed()));
     }
@@ -118,21 +66,12 @@ fn ioctl_family() -> io::Result<u16> {
 
 fn catalog_family() -> io::Result<u16> {
     let mut length = 0u32;
-    // SAFETY: a null buffer with a zero length asks Winsock for the size.
-    if unsafe { WSAEnumProtocolsW(null(), null_mut(), &raw mut length) } != SOCKET_ERROR {
+    if sys::enum_protocols_size(&mut length) != SOCKET_ERROR {
         return Err(io::Error::new(io::ErrorKind::NotFound, "no vsock provider"));
     }
     let count = length as usize / size_of::<WSAPROTOCOL_INFOW>() + 1;
-    // SAFETY: WSAPROTOCOL_INFOW is plain data; zero is a valid bit pattern.
-    let mut buffer: Vec<WSAPROTOCOL_INFOW> = vec![unsafe { zeroed() }; count];
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the buffer is one record above the u32 size Winsock just reported \
-                  for its catalog of a few KiB"
-    )]
-    let mut length = (buffer.len() * size_of::<WSAPROTOCOL_INFOW>()) as u32;
-    // SAFETY: `buffer` holds `length` writable bytes.
-    let filled = unsafe { WSAEnumProtocolsW(null(), buffer.as_mut_ptr(), &raw mut length) };
+    let mut buffer: Vec<WSAPROTOCOL_INFOW> = vec![sys::empty_protocol_info(); count];
+    let filled = sys::enum_protocols(&mut buffer);
     if filled == SOCKET_ERROR {
         return Err(wsa_error());
     }
@@ -174,16 +113,12 @@ fn discover() -> io::Result<u16> {
 /// `VMADDR_CID_ANY`, and MUST fail (closing the socket) rather than listen on
 /// another port or family when Winsock, discovery, bind or listen refuses.
 pub(crate) fn listen(port: u32) -> io::Result<Listener> {
-    // SAFETY: WSADATA is plain data that WSAStartup fills.
-    let mut data: WSADATA = unsafe { zeroed() };
-    // SAFETY: WSAStartup writes one WSADATA to `data`, a live local.
-    let started = unsafe { WSAStartup(0x0202, &raw mut data) };
+    let started = sys::wsa_startup();
     if started != 0 {
         return Err(io::Error::from_raw_os_error(started));
     }
     let family = discover()?;
-    // SAFETY: plain socket creation after WSAStartup.
-    let handle = unsafe { socket(i32::from(family), SOCK_STREAM, 0) };
+    let handle = sys::open_socket(i32::from(family), SOCK_STREAM, 0);
     if handle == INVALID_SOCKET {
         return Err(wsa_error());
     }
@@ -193,21 +128,11 @@ pub(crate) fn listen(port: u32) -> io::Result<Listener> {
         port,
         cid: CID_ANY,
     };
-    // SAFETY: `address` is a 12-byte SOCKADDR_VM passed with its exact size.
-    let bound = unsafe {
-        bind(
-            handle,
-            (&raw const address).cast::<SOCKADDR>(),
-            SOCKADDR_VM_LEN,
-        )
-    };
-    if bound == SOCKET_ERROR
-        // SAFETY: listen takes a socket handle and a backlog and touches no memory.
-        || unsafe { wsa_listen(handle, 64) } == SOCKET_ERROR
-    {
+    let bound = sys::bind_socket(handle, &address);
+    if bound == SOCKET_ERROR || sys::listen_socket(handle, 64) == SOCKET_ERROR {
         let error = wsa_error();
-        // SAFETY: closed exactly once on this failure path.
-        unsafe { closesocket(handle) };
+        // Closed exactly once on this failure path.
+        sys::close_socket(handle);
         return Err(error);
     }
     Ok(handle)
@@ -218,26 +143,18 @@ pub(crate) fn listen(port: u32) -> io::Result<Listener> {
 /// `getpeername` when the accept left it zero; an unknown peer stays CID 0,
 /// which is never the host.
 pub(crate) fn accept(listener: Listener) -> io::Result<(Conn, u32, u32)> {
-    // SAFETY: SockaddrVm is plain data; zero is a valid bit pattern.
-    let mut peer: SockaddrVm = unsafe { zeroed() };
-    let mut size = SOCKADDR_VM_LEN;
-    // SAFETY: `peer` is a writable 12-byte address buffer and `size` its length.
-    let connection =
-        unsafe { wsa_accept(listener, (&raw mut peer).cast::<SOCKADDR>(), &raw mut size) };
+    let mut peer = SockaddrVm {
+        family: 0,
+        reserved: 0,
+        port: 0,
+        cid: 0,
+    };
+    let connection = sys::accept_socket(listener, &mut peer);
     if connection == INVALID_SOCKET {
         return Err(wsa_error());
     }
     if peer.cid == 0 {
-        let mut size = SOCKADDR_VM_LEN;
-        // SAFETY: `peer` is a writable 12-byte address buffer and `size` its
-        // length, both live across the call.
-        unsafe {
-            getpeername(
-                connection,
-                (&raw mut peer).cast::<SOCKADDR>(),
-                &raw mut size,
-            )
-        };
+        sys::peer_name(connection, &mut peer);
     }
     Ok((connection, peer.cid, peer.port))
 }

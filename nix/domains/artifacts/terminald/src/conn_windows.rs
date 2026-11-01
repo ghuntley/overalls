@@ -8,12 +8,12 @@
 //! non-blocking mode and every wait is a bounded `select`, which gives writers
 //! the same "pause on withheld credit, observe departure" behaviour as the
 //! Linux send timeout.
+use crate::sys::windows as sys;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Mutex;
 use windows_sys::Win32::Networking::WinSock::{
-    closesocket, ioctlsocket, recv, select, send, shutdown as wsa_shutdown, WSAGetLastError,
-    FD_SET, FIONBIO, SD_BOTH, SOCKET, SOCKET_ERROR, TIMEVAL, WSAEWOULDBLOCK,
+    FIONBIO, SD_BOTH, SOCKET, SOCKET_ERROR, TIMEVAL, WSAEWOULDBLOCK,
 };
 
 /// An accepted viosock connection handle.
@@ -23,38 +23,23 @@ pub(crate) type Conn = SOCKET;
 static HOLDERS: Mutex<Option<HashMap<SOCKET, usize>>> = Mutex::new(None);
 
 fn wsa_error() -> io::Error {
-    // SAFETY: WSAGetLastError only reads this thread's last Winsock error.
-    io::Error::from_raw_os_error(unsafe { WSAGetLastError() })
+    io::Error::from_raw_os_error(sys::wsa_last_error())
 }
 
 fn wait(conn: Conn, millis: i32, for_write: bool) {
-    let mut set = FD_SET {
-        fd_count: 1,
-        fd_array: [0; 64],
-    };
-    set.fd_array[0] = conn;
     let timeout = TIMEVAL {
         tv_sec: millis / 1000,
         tv_usec: (millis % 1000) * 1000,
     };
-    let set_pointer: *mut FD_SET = &raw mut set;
-    let (reads, writes) = if for_write {
-        (std::ptr::null_mut(), set_pointer)
-    } else {
-        (set_pointer, std::ptr::null_mut())
-    };
-    // SAFETY: one valid FD_SET and TIMEVAL live across the call; nfds is ignored.
-    unsafe { select(0, reads, writes, std::ptr::null_mut(), &raw const timeout) };
+    sys::select_one(conn, for_write, &timeout);
 }
 
 /// One receive; `Ok(0)` is end of stream. A non-blocking viewer socket waits
 /// in bounded slices instead of returning `WouldBlock`, so readers block as
 /// they do on Linux and still wake on shutdown.
 pub(crate) fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
-    let len = i32::try_from(buf.len()).unwrap_or(i32::MAX);
     loop {
-        // SAFETY: `buf` is writable for `len` bytes during the call.
-        let received = unsafe { recv(conn, buf.as_mut_ptr(), len, 0) };
+        let received = sys::receive(conn, buf);
         if received != SOCKET_ERROR {
             #[expect(
                 clippy::cast_sign_loss,
@@ -62,8 +47,7 @@ pub(crate) fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
             )]
             return Ok(received as usize);
         }
-        // SAFETY: WSAGetLastError only reads this thread's last Winsock error.
-        if unsafe { WSAGetLastError() } == WSAEWOULDBLOCK {
+        if sys::wsa_last_error() == WSAEWOULDBLOCK {
             wait(conn, 100, false);
             continue;
         }
@@ -73,9 +57,7 @@ pub(crate) fn read(conn: Conn, buf: &mut [u8]) -> io::Result<usize> {
 
 /// One send; a full non-blocking socket reports `WouldBlock`.
 pub(crate) fn write(conn: Conn, buf: &[u8]) -> io::Result<usize> {
-    let len = i32::try_from(buf.len()).unwrap_or(i32::MAX);
-    // SAFETY: `buf` is readable for `len` bytes during the call.
-    let sent = unsafe { send(conn, buf.as_ptr(), len, 0) };
+    let sent = sys::transmit(conn, buf);
     if sent == SOCKET_ERROR {
         return Err(wsa_error());
     }
@@ -91,8 +73,7 @@ pub(crate) fn write(conn: Conn, buf: &[u8]) -> io::Result<usize> {
 
 /// Shut both directions down, waking any thread waiting on this socket.
 pub(crate) fn shutdown(conn: Conn) {
-    // SAFETY: shutting down an open or already shut socket has no memory effects.
-    unsafe { wsa_shutdown(conn, SD_BOTH) };
+    sys::shutdown_socket(conn, SD_BOTH);
 }
 
 /// Release one holder; the socket closes when the last holder releases it.
@@ -117,8 +98,8 @@ pub(crate) fn close(conn: Conn) {
         }
     };
     if last {
-        // SAFETY: the final holder closes the socket exactly once.
-        unsafe { closesocket(conn) };
+        // The final holder closes the socket exactly once.
+        sys::close_socket(conn);
     }
 }
 
@@ -144,8 +125,7 @@ pub(crate) fn duplicate(conn: Conn) -> io::Result<Conn> {
 /// Switch a viewer's socket to non-blocking mode for bounded writer waits.
 pub(crate) fn prepare_viewer(conn: Conn) -> io::Result<()> {
     let mut enabled: u32 = 1;
-    // SAFETY: FIONBIO takes a writable u32 flag.
-    if unsafe { ioctlsocket(conn, FIONBIO, &raw mut enabled) } == SOCKET_ERROR {
+    if sys::ioctl_socket(conn, FIONBIO, &mut enabled) == SOCKET_ERROR {
         return Err(wsa_error());
     }
     Ok(())

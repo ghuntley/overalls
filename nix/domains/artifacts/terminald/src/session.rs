@@ -1170,25 +1170,8 @@ fn random_token() -> std::io::Result<[u8; 16]> {
 
 #[cfg(windows)]
 fn random_token() -> std::io::Result<[u8; 16]> {
-    use windows_sys::Win32::Security::Cryptography::{
-        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-    };
     let mut token = [0u8; 16];
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "the token is a 16-byte array"
-    )]
-    let token_length = token.len() as u32;
-    // SAFETY: `token` is writable for its full length; no algorithm handle is
-    // needed with the system-preferred RNG flag.
-    let status = unsafe {
-        BCryptGenRandom(
-            std::ptr::null_mut(),
-            token.as_mut_ptr(),
-            token_length,
-            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-        )
-    };
+    let status = crate::sys::windows::system_random(&mut token);
     if status != 0 {
         return Err(std::io::Error::other("system RNG unavailable"));
     }
