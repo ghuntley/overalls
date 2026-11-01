@@ -38,7 +38,10 @@ let
     chmod -R u+w "$out/buck"
     # The fixture holds no application sources, so its assemblies take every
     # leaf from the Nix package set: production hosts pass ASSEMBLY_ARTIFACTS.
-    printf '%s\n' 'ASSEMBLY_ARTIFACTS = {}' > "$out/buck/artifacts.bzl"
+    # The stub empties every top-level dict the real file exports, so each
+    # load() of artifacts.bzl (buck/BUCK, fleet.bzl, nixos.bzl) still resolves.
+    sed -nE 's/^([A-Z][A-Z0-9_]*) = .*/\1 = {}/p' ${root + "/buck/artifacts.bzl"} > "$out/buck/artifacts.bzl"
+    grep -qx 'ASSEMBLY_ARTIFACTS = {}' "$out/buck/artifacts.bzl"
     # A host package declares itself exactly as fleet/hosts/<host>/BUCK does.
     printf '%s\n' 'load("@root//buck:fleet.bzl", "fleet_host")' "" 'fleet_host()' > "$out/fleet/hosts/host/BUCK"
     cat > "$out/BUCK" <<'EOF'
