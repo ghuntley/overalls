@@ -114,6 +114,7 @@ console):
   secrets `MILA_TAILSCALE_OAUTH_CLIENT_ID` and `MILA_TAILSCALE_OAUTH_SECRET`.
   The OAuth client replaced the earlier `MILA_TAILSCALE_AUTHKEY` auth key,
   which had been created without the tag, so no grant applied to its nodes.
+  That secret was deleted on 2026-11-01, after run 41305124503 passed.
 - MagicDNS is not required. Peers are found by their tailnet host names,
   `mila-{fixture,apple,windows}-<run id>-<attempt>`.
 
@@ -216,8 +217,9 @@ Remaining gaps:
   and Linux journeys therefore accept an admitted resume or
   `desired_state = running` as a deliberate choice; the refusal itself
   remains to be reproduced and fixed in Marshall.
-- The tunnel for macOS and Windows has not run until the secret and policy
-  above exist.
+- The tunnel has carried both journeys: in mila-builds run 41305124503 the
+  Apple and Windows journey jobs reported success to the tunnelled fixture,
+  and the Windows journey passed every step.
 
 ## Open questions
 

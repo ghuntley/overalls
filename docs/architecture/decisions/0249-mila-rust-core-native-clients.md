@@ -155,7 +155,8 @@ client workflow and that poke key, lists it as an enabled `windows` device,
 turns it off and on again with each change read back, refuses a malformed id
 and removes it, as the Android journey does. WNS and Susan are stand-ins there:
 the channel URI is made up and the push key is a random Susan-shaped reply.
-Real WNS delivery and a recorded passing journey run remain open.
+The whole Windows journey passed through the tunnelled fixture in
+mila-builds run 41305124503. Real WNS delivery remains open.
 
 The Linux GTK client keeps its decisions in GTK-independent library modules:
 the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),
