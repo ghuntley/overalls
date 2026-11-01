@@ -2,11 +2,15 @@
 
 - ID: ADR-0227
 - Date: 2026-10-18
-- Status: accepted
+- Status: superseded
 - Implementation: partial
 - Components: Mila, Nix
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0277
+
+> Superseded by [ADR-0277](0277-mila-native-builds-on-buck2.md): Mila builds through
+> Buck2 targets with Nix toolchains, and the Flutter client, dartssh2 overlay
+> and Flutter checks are retired. The text below is the Flutter-era record.
 
 ## Context
 
@@ -98,4 +102,5 @@ with network access, and its cache cost has not been measured.
 [ADR-0191](0191-elixir-hegel-property-verification.md),
 [ADR-0220](0220-mila-client-over-porsche-ssh.md),
 [ADR-0228](0228-strict-host-certificates-in-mila.md),
-[ADR-0235](0235-mila-desktop-clients.md) (Linux dev/release packages; Windows builds from the source bundle outside Nix).
+[ADR-0235](0235-mila-desktop-clients.md) (Linux dev/release packages; Windows builds from the source bundle outside Nix),
+[ADR-0277](0277-mila-native-builds-on-buck2.md) (supersedes this record).

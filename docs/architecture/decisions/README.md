@@ -17,6 +17,9 @@ workspace and toolchain.
 [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md) supersedes
 ADR-0272. Namespace becomes the Buck2 cache and remote-execution backend,
 and developers, host updaters and CI all write to it under one tenant token.
+[ADR-0277](0277-mila-native-builds-on-buck2.md) supersedes ADR-0227: Mila builds
+only through Buck2 targets on Nix-pinned toolchains, and the Flutter client,
+dartssh2 overlay and Flutter checks are retired.
 
 [ADR-0275](0275-bounded-control-request-execution.md) bounds each Lilly control
 socket to two running requests, queueing the rest in FIFO order with a deadline
@@ -1105,7 +1108,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0224](0224-susan-push-relay.md) | accepted | partial | Susan, the push relay at notifications.overalls.dev |
 | [ADR-0225](0225-marshall-notifications-domain.md) | accepted | partial | Marshall Notifications domain |
 | [ADR-0226](0226-monospace-web-on-flutter.md) | accepted | partial | The Monospace Web on Flutter |
-| [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) | accepted | partial | Flutter toolchain, patched dartssh2 overlay and Mila checks in Nix |
+| [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) | superseded | partial | Flutter toolchain, patched dartssh2 overlay and Mila checks in Nix |
 | [ADR-0228](0228-strict-host-certificates-in-mila.md) | accepted | partial | Strict SSH host-certificate verification in Mila |
 | [ADR-0229](0229-scim-managed-identity-and-teams.md) | accepted | partial | SCIM-managed identity and teams |
 | [ADR-0230](0230-terminal-image-decoder-webassembly.md) | accepted | partial | WebAssembly compilation for the terminal image decoder |
@@ -1153,6 +1156,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0274](0274-fenced-capacity-snapshots.md) | accepted | partial | Fenced capacity snapshots outside the pool lock |
 | [ADR-0275](0275-bounded-control-request-execution.md) | accepted | partial | Bounded control request execution per Lilly socket |
 | [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md) | accepted | partial | Namespace remote cache and execution for Buck2 |
+| [ADR-0277](0277-mila-native-builds-on-buck2.md) | accepted | partial | Mila native builds on Buck2 with Nix toolchains |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

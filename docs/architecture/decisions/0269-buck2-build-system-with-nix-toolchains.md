@@ -517,7 +517,7 @@ Remaining gaps, by milestone of the migration plan:
   the
   Robolectric `android-all` jar Gradle downloads at test time is outside the
   verification metadata; the gnu Windows DLL is a check, not a reproducible
-  artifact; and the record superseding ADR-0227 is not yet written;
+  artifact;
 - the `publish-cache.yml` gates job, which reaches Buck2 through
   `prek run --all-files` and still repeats the ADR and contract steps that the
   `ci.yml` precommit job now runs;
@@ -547,7 +547,7 @@ packaged in nixpkgs ([ADR-0270](0270-graph-driven-machine-test-selection.md)).
   [ADR-0189](0189-cachix-watch-store-publishing.md) and
   [ADR-0248](0248-fleet-build-scheduling.md) cover the Nix stores and caches
   that assembly keeps using.
-- [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) builds Mila checks
-  in Nix. M9 moved the native platform builds to Buck2 targets; the
-  superseding record is still to be written.
+- [ADR-0227](0227-flutter-toolchain-and-dartssh2-overlay.md) built Mila checks
+  in Nix. M9 moved the native platform builds to Buck2 targets, and
+  [ADR-0277](0277-mila-native-builds-on-buck2.md) supersedes it.
 - Review: [Buck2 migration](../reviews/2026-10-30-buck2-migration.md).

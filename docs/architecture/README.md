@@ -19,6 +19,9 @@ thin native clients over Rust. The separate `mila-session` crate composes pure
 runtime projections with certificate-pinned SSH machine reads and pagination;
 native adapter integration and full Flutter replacement remain partial, as
 recorded in the [session review](reviews/2026-10-21-mila-native-session.md).
+[ADR-0277](decisions/0277-mila-native-builds-on-buck2.md) supersedes ADR-0227's
+Flutter toolchain and dartssh2 overlay: Mila builds only through Buck2 targets on
+Nix-pinned toolchains, and one transitional Windows Flutter release job remains.
 
 [ADR-0263](decisions/0263-retire-hldd.md) retires the authenticated HLDD handbook,
 its review receipts and all HLDD gates, superseding ADR-0250. ADRs, architecture
