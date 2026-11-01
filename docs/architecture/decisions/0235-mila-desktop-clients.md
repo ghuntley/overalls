@@ -166,7 +166,10 @@ from XCTest, CTest, Dart tests and CI builds.
   (`Platform`, `SoftwarePlatformUnavailable`, `SoftwarePlatformNotReady` or
   `SoftwareExisting`), and the SSH keys page marks this device's key as a
   software key. `MilaDeviceKeyPolicy.AllowSoftwareFallback` is the single switch
-  that refuses software custody, should the "no refusal" choice be replaced.
+  that refuses software custody, should the "no refusal" choice be replaced. It
+  ships as `true` (fall back, as decision 3 states). That default is pending the
+  user's policy decision on whether production should refuse software keys
+  unless a test setting is present.
   [`DeviceKeyCustodySmoke.cs`](../../../mila/windows-dotnet-smoke/DeviceKeyCustodySmoke.cs)
   covers retry-then-success, retry-then-fallback, immediate fallback, reuse of an
   existing software key, access denial and the strict switch against a scripted
@@ -186,6 +189,13 @@ Remaining gaps:
   not delivered by the native client.
 - The Windows runner has not been compiled or run on Windows, and no TPM or
   software-provider key has been exercised.
+- A Windows device that fell back keeps its software key permanently. Its next
+  sign-in reuses it as `SoftwareExisting`, even after its TPM becomes usable,
+  because replacing the key would change the device's identity and require a new
+  approval. A later "re-key into the TPM" path is proposed: create a platform
+  key, sign in and approve it, then revoke the software key. It needs the
+  Marshall custody attribute from the open question below, so that the
+  deployment can see which keys are software and confirm the replacement.
 - The release workflows have not run with real signing material: the
   `mila-release` environment and its Apple and Android signing secrets are
   not yet provisioned, so the signed paths, including the Android apksigner
