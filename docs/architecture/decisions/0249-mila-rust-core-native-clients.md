@@ -142,8 +142,16 @@ it reads every effect back as the Linux journey does: share add/remove through
 device's SSH key revoked once through the client controller (and then refused),
 and a guest terminal ended on the server through `mila_session_terminal_end`, which
 the client's Kill action now calls ([`SessionReads.cs`](../../../mila/windows-dotnet/Interop/SessionReads.cs)).
-Windows X25519 poke-key custody, WNS delivery, notification device registration
-in the journey and a recorded passing journey run remain open.
+Windows X25519 poke-key custody is implemented in
+[`PokeKeyStore.cs`](../../../mila/windows-dotnet/Interop/PokeKeyStore.cs): one
+CNG Curve25519 key per deployment, sealed with user-scope DPAPI under
+deployment-bound entropy in an owner-only directory, refused when its ACL or
+binding is wrong and never silently replaced.
+[`PokeKeySmoke.cs`](../../../mila/windows-dotnet-smoke/PokeKeySmoke.cs) checks
+the RFC 7748 vector, persistence, per-deployment separation, tamper and
+cross-deployment refusal and the ACL; the DPAPI and ACL checks run only on
+Windows CI. WNS delivery, notification device registration in the journey and
+a recorded passing journey run remain open.
 
 The Linux GTK client keeps its decisions in GTK-independent library modules:
 the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),

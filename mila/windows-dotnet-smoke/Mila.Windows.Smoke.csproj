@@ -38,6 +38,7 @@
     <Compile Include="../windows-dotnet/Interop/SignInCoordinator.cs" Link="Interop/SignInCoordinator.cs" />
     <Compile Include="../windows-dotnet/Interop/WindowsPushRegistration.cs" Link="Interop/WindowsPushRegistration.cs" />
     <Compile Include="../windows-dotnet/Interop/MilaPresentation.cs" Link="Interop/MilaPresentation.cs" />
+    <Compile Include="../windows-dotnet/Interop/PokeKeyStore.cs" Link="Interop/PokeKeyStore.cs" />
   </ItemGroup>
   <ItemGroup>
     <!-- Catalog and wire fixtures checked by the hermetic smoke; never shipped. -->

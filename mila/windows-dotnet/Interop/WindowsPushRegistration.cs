@@ -19,7 +19,7 @@ internal interface IMilaPokeKeySource
     string? PublicKey(string deployment);
 }
 
-/// <summary>Placeholder until Windows X25519 poke-key custody exists; registration reports KeyUnavailable.</summary>
+/// <summary>No poke key (tests, or a host where custody is unavailable); registration reports KeyUnavailable.</summary>
 internal sealed class MilaUnavailablePokeKeySource : IMilaPokeKeySource
 {
     public string? PublicKey(string deployment) => null;

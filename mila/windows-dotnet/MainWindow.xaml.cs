@@ -44,7 +44,7 @@ public sealed partial class MainWindow : Window
         _coordinator.Changed += state => DispatcherQueue.TryEnqueue(() => ShowSignInState(state));
         _picker = new MilaDeploymentPicker(MilaDeploymentStore.Repository, _ => SignOutActiveDeployment());
         _pushRegistration = new MilaWindowsPushRegistration(
-            new MilaWindowsAppSdkChannelSource(WnsRemoteId()), new MilaUnavailablePokeKeySource(),
+            new MilaWindowsAppSdkChannelSource(WnsRemoteId()), new MilaWindowsPokeKeyStore(),
             new MilaSusanKeyClient(MilaSusanKeyClient.DefaultOrigin), _notificationController);
         _terminalPollTimer = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread().CreateTimer();
         _terminalPollTimer.Interval = TimeSpan.FromMilliseconds(100);

@@ -29,6 +29,12 @@ internal static class Program
             Console.Error.WriteLine("usage: Mila.Windows.Smoke [--descriptor PATH]");
             return 2;
         }
+        if (OperatingSystem.IsWindows())
+        {
+            // CNG device custody and DPAPI poke-key custody exist only on Windows.
+            DeviceKeySmoke.Run();
+            PokeKeySmoke.Run();
+        }
         SessionLifecycleSmoke.Run();
         SignInFlowSmoke.Run();
         WindowsNotificationsSmoke.Run();
