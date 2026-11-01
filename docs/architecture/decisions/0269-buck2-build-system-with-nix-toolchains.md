@@ -310,7 +310,14 @@ the approved migration plan.
   `mila-release.yml`'s `android` on the uncached `release-arm64`. The
   emulator instrumentation and the hermetic journey fixture need KVM, which
   an Apple Silicon macOS VM lacks, so the Linux `android-emulator` job runs
-  the macOS-built APKs (an artifact checked against its `SHA256SUMS`). Local evidence: the Android targets build and pass
+  the macOS-built APKs (an artifact checked against its `SHA256SUMS`).
+  The `cached-arm64` image runs macOS 27 with Xcode 27. There, rustc's
+  release debuginfo strip of a proc macro built for the 15.0 deployment
+  target leaves a dylib that dyld rejects, so `//mila:<platform>-dev` failed
+  with E0463 for `thiserror_impl`.
+  [build.sh](../../../mila/native/apple/build.sh) therefore leaves host units
+  unstripped through `CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false`.
+  Local evidence: the Android targets build and pass
   their unit tests, the Windows gnu targets build, and `--no-nix` loads and
   tests a non_hermetic target on Linux. CI run 41114668466 built every
   Apple, Android and Windows target; the review records the runs and the

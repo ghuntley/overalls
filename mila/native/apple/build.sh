@@ -62,6 +62,14 @@ export CARGO_TARGET_AARCH64_APPLE_DARWIN_LINKER=$CC
 export CARGO_TARGET_AARCH64_APPLE_IOS_LINKER=$CC
 export CARGO_TARGET_AARCH64_APPLE_IOS_SIM_LINKER=$CC
 export MACOSX_DEPLOYMENT_TARGET=15.0 IPHONEOS_DEPLOYMENT_TARGET=18.0
+# The deployment target also reaches the host proc macros. With Xcode 27,
+# rustc's release debuginfo strip leaves a minos-15.0 proc-macro dylib that
+# dyld rejects ("mis-aligned LINKEDIT string pool"), so rustc reports E0463 for
+# thiserror_impl. Leave host units (proc macros, build scripts) unstripped; the
+# shipped target library keeps the release profile. Workaround for Xcode 27
+# (ld-27037) dyld LINKEDIT rejection under rustc 1.97.1: remove this line
+# once `mila-build macos dev` passes without it on the macOS 27 runner.
+export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false
 
 case "$platform-$mode" in
   macos-*) rust_target=aarch64-apple-darwin swift_triple=arm64-apple-macosx15.0 sdk=macosx ;;
