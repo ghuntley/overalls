@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Ключ без имени",
   "sshKeyAlgorithm": "Тип",
   "sshKeyThisDevice": "Это устройство",
+  "sshKeyThisDeviceSoftware": "Это устройство (программный ключ, не в TPM)",
   "sshKeyRevoke": "Отозвать",
   "sshKeyRevokeConfirm": "Отозвать ключ {fingerprint}? Устройство, которое его использует, нужно будет снова одобрить для входа.",
   "deploymentOpen": "Открыть",

@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Namnlös nyckel",
   "sshKeyAlgorithm": "Typ",
   "sshKeyThisDevice": "Den här enheten",
+  "sshKeyThisDeviceSoftware": "Den här enheten (programvarunyckel, inte i en TPM)",
   "sshKeyRevoke": "Återkalla",
   "sshKeyRevokeConfirm": "Återkalla nyckeln {fingerprint}? En enhet som använder den måste godkännas igen för att logga in.",
   "deploymentOpen": "Öppna",

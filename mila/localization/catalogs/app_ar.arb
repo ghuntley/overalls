@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "مفتاح بلا اسم",
   "sshKeyAlgorithm": "النوع",
   "sshKeyThisDevice": "هذا الجهاز",
+  "sshKeyThisDeviceSoftware": "هذا الجهاز (مفتاح برمجي، ليس في TPM)",
   "sshKeyRevoke": "إلغاء",
   "sshKeyRevokeConfirm": "هل تريد إلغاء المفتاح {fingerprint}؟ يجب اعتماد الجهاز الذي يستخدمه مرة أخرى لتسجيل الدخول.",
   "deploymentOpen": "فتح",

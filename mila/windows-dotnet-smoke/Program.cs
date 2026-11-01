@@ -169,6 +169,7 @@ internal static class Program
         catch (InvalidDataException) { failedKeyEnvelope = true; }
         Require(failedKeyEnvelope, "failed SSH key envelope refusal");
         AssertSessionReads();
+        DeviceKeyCustodySmoke.Run();
         Require(MilaSshKeysController.Fingerprint("ssh-ed25519 !!!") is null,
             "invalid SSH base64 fingerprint refusal");
         int revokeCount = 0;

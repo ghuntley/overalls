@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Nimetu võti",
   "sshKeyAlgorithm": "Tüüp",
   "sshKeyThisDevice": "See seade",
+  "sshKeyThisDeviceSoftware": "See seade (tarkvaravõti, mitte TPM-is)",
   "sshKeyRevoke": "Tühista",
   "sshKeyRevokeConfirm": "Kas tühistada võti {fingerprint}? Seda kasutav seade tuleb sisselogimiseks uuesti kinnitada.",
   "deploymentOpen": "Ava",

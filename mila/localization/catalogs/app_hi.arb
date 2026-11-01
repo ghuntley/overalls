@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "बिना नाम की कुंजी",
   "sshKeyAlgorithm": "प्रकार",
   "sshKeyThisDevice": "यह डिवाइस",
+  "sshKeyThisDeviceSoftware": "यह डिवाइस (सॉफ़्टवेयर कुंजी, TPM में नहीं)",
   "sshKeyRevoke": "रद्द करें",
   "sshKeyRevokeConfirm": "कुंजी {fingerprint} रद्द करें? इसका उपयोग करने वाले डिवाइस को साइन इन करने के लिए फिर से स्वीकृत करना होगा।",
   "deploymentOpen": "खोलें",

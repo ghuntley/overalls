@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Key na walang pangalan",
   "sshKeyAlgorithm": "Uri",
   "sshKeyThisDevice": "Ang device na ito",
+  "sshKeyThisDeviceSoftware": "Ang device na ito (software key, wala sa TPM)",
   "sshKeyRevoke": "Bawiin",
   "sshKeyRevokeConfirm": "Bawiin ang key na {fingerprint}? Kailangang aprubahan muli ang device na gumagamit nito para makapag-sign in.",
   "deploymentOpen": "Buksan",

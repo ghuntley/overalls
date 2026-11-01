@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "未命名密钥",
   "sshKeyAlgorithm": "类型",
   "sshKeyThisDevice": "此设备",
+  "sshKeyThisDeviceSoftware": "此设备（软件密钥，不在 TPM 中）",
   "sshKeyRevoke": "撤销",
   "sshKeyRevokeConfirm": "撤销密钥 {fingerprint}?使用它的设备需要重新获得批准才能登录。",
   "deploymentOpen": "打开",

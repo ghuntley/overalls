@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "名前のないキー",
   "sshKeyAlgorithm": "種類",
   "sshKeyThisDevice": "このデバイス",
+  "sshKeyThisDeviceSoftware": "このデバイス（ソフトウェアキー、TPM 外）",
   "sshKeyRevoke": "取り消す",
   "sshKeyRevokeConfirm": "キー {fingerprint} を取り消しますか?このキーを使うデバイスは、サインインするためにもう一度承認が必要です。",
   "deploymentOpen": "開く",

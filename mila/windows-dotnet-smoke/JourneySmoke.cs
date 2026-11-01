@@ -219,6 +219,7 @@ internal static class JourneySmoke
 
         bool keyExisted = KeyExists(host);
         DeviceKey key = DeviceKey.OpenOrCreate(host);
+        Console.WriteLine($"journey: device key custody {key.Custody}");
         try
         {
             using MilaSessionConnection session = new();

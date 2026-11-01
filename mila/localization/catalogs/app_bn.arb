@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "নামহীন কী",
   "sshKeyAlgorithm": "ধরন",
   "sshKeyThisDevice": "এই ডিভাইস",
+  "sshKeyThisDeviceSoftware": "এই ডিভাইস (সফটওয়্যার কী, TPM-এ নয়)",
   "sshKeyRevoke": "প্রত্যাহার করুন",
   "sshKeyRevokeConfirm": "{fingerprint} কী প্রত্যাহার করবেন? এটি ব্যবহারকারী ডিভাইসকে সাইন ইন করতে আবার অনুমোদন করতে হবে।",
   "deploymentOpen": "খুলুন",

@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Makulli mara suna",
   "sshKeyAlgorithm": "Iri",
   "sshKeyThisDevice": "Wannan na'ura",
+  "sshKeyThisDeviceSoftware": "Wannan na'ura (maɓallin manhaja, ba a cikin TPM ba)",
   "sshKeyRevoke": "Soke",
   "sshKeyRevokeConfirm": "Soke makullin {fingerprint}? Dole a sake amincewa da na'urar da ke amfani da shi kafin ta shiga.",
   "deploymentOpen": "Buɗe",

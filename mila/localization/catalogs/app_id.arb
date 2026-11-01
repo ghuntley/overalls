@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Kunci tanpa nama",
   "sshKeyAlgorithm": "Jenis",
   "sshKeyThisDevice": "Perangkat ini",
+  "sshKeyThisDeviceSoftware": "Perangkat ini (kunci perangkat lunak, tidak di TPM)",
   "sshKeyRevoke": "Cabut",
   "sshKeyRevokeConfirm": "Cabut kunci {fingerprint}? Perangkat yang menggunakannya harus disetujui lagi untuk masuk.",
   "deploymentOpen": "Buka",

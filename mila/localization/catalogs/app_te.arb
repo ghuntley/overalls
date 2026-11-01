@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "పేరు లేని కీ",
   "sshKeyAlgorithm": "రకం",
   "sshKeyThisDevice": "ఈ పరికరం",
+  "sshKeyThisDeviceSoftware": "ఈ పరికరం (సాఫ్ట్‌వేర్ కీ, TPMలో లేదు)",
   "sshKeyRevoke": "రద్దు చేయండి",
   "sshKeyRevokeConfirm": "{fingerprint} కీని రద్దు చేయాలా? దాన్ని ఉపయోగించే పరికరం సైన్ ఇన్ చేయడానికి మళ్లీ ఆమోదం పొందాలి.",
   "deploymentOpen": "తెరువు",

@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Khóa không tên",
   "sshKeyAlgorithm": "Loại",
   "sshKeyThisDevice": "Thiết bị này",
+  "sshKeyThisDeviceSoftware": "Thiết bị này (khóa phần mềm, không nằm trong TPM)",
   "sshKeyRevoke": "Thu hồi",
   "sshKeyRevokeConfirm": "Thu hồi khóa {fingerprint}? Thiết bị dùng khóa này phải được phê duyệt lại để đăng nhập.",
   "deploymentOpen": "Mở",

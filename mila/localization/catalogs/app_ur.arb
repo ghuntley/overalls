@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "بے نام کلید",
   "sshKeyAlgorithm": "قسم",
   "sshKeyThisDevice": "یہ آلہ",
+  "sshKeyThisDeviceSoftware": "یہ ڈیوائس (سافٹ ویئر کلید، TPM میں نہیں)",
   "sshKeyRevoke": "منسوخ کریں",
   "sshKeyRevokeConfirm": "کلید {fingerprint} منسوخ کریں؟ اسے استعمال کرنے والے آلے کو سائن ان کے لیے دوبارہ منظور کرنا ہوگا۔",
   "deploymentOpen": "کھولیں",

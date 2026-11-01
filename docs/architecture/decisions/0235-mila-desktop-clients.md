@@ -155,6 +155,23 @@ from XCTest, CTest, Dart tests and CI builds.
   beside decision 4's dev and release targets, not release plans, and are
   never published (`.github/CONTRACTS` mila-release-publish-tag-only and
   mila-release-signing-leak).
+- Windows device-key custody (decision 3) in the native client:
+  [`DeviceKey.cs`](../../../mila/windows-dotnet/Interop/DeviceKey.cs). "When it
+  works" is applied as follows. NTE_DEVICE_NOT_READY from the Platform Crypto
+  Provider is often transient (early boot, TBS starting, TPM provisioning), so it
+  is retried with a bounded backoff of about 5 s before any fallback. A missing,
+  undefined or unsupported platform provider falls back at once. Access denial and
+  any other error propagate. An existing key is reopened from its own provider.
+  The fallback is never silent: every key carries a recorded custody
+  (`Platform`, `SoftwarePlatformUnavailable`, `SoftwarePlatformNotReady` or
+  `SoftwareExisting`), and the SSH keys page marks this device's key as a
+  software key. `MilaDeviceKeyPolicy.AllowSoftwareFallback` is the single switch
+  that refuses software custody, should the "no refusal" choice be replaced.
+  [`DeviceKeyCustodySmoke.cs`](../../../mila/windows-dotnet-smoke/DeviceKeyCustodySmoke.cs)
+  covers retry-then-success, retry-then-fallback, immediate fallback, reuse of an
+  existing software key, access denial and the strict switch against a scripted
+  key store. The `windows-native` journey prints the custody it obtained. The
+  Windows client has no diagnostic event catalogue, so no event is emitted.
 
 Remaining gaps:
 
@@ -179,7 +196,10 @@ Remaining gaps:
 ## Open questions
 
 - Whether Marshall should record and display the custody kind (hardware or
-  software) of a desktop device key.
+  software) of a desktop device key. The Windows client now records it and
+  shows it locally. Reporting it needs a key attribute in Marshall, a
+  Porsche command or sign-in field the client sends, and the Rust grammar and
+  FFI to carry it. That is a protocol and persistence change for a new ADR.
 
 ## Related decisions
 

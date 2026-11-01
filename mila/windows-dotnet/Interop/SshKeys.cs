@@ -4,7 +4,15 @@ using System.Text.Json;
 
 namespace Mila.Windows.Interop;
 
-internal sealed record MilaSshKey(Guid Id, string Fingerprint, string Algorithm, string? Label, bool IsCurrentDevice);
+internal sealed record MilaSshKey(Guid Id, string Fingerprint, string Algorithm, string? Label, bool IsCurrentDevice)
+{
+    /// <summary>Localized note shown beside the fingerprint (this device, and its key custody).</summary>
+    internal string? Note { get; init; }
+
+    /// <summary>The row text bound by the SSH key list.</summary>
+    /// <remarks>The fingerprint is bidi-isolated so the row reads correctly in right-to-left locales.</remarks>
+    public string Display => Note is null ? Fingerprint : "\u2068" + Fingerprint + "\u2069 \u00b7 " + Note;
+}
 internal enum MilaSshKeysStatus { SignedOut, Loading, Loaded, Failed }
 
 internal sealed class MilaSshKeysController

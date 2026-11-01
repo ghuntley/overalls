@@ -31,51 +31,39 @@ internal sealed class DeviceKey : IDisposable
         return "dev.overalls.mila.device." + host;
     }
 
+    /// <summary>How this deployment's key is held; anything but Platform is a recorded software downgrade.</summary>
+    internal MilaDeviceKeyCustody Custody { get; }
+
+    private DeviceKey(CngKey key, MilaDeviceKeyCustody custody) : this(key) => Custody = custody;
+
     /// <summary>
     /// @cc [owner:ghuntley,label:security] mila-dotnet-device-key-custody
     /// Existing deployment keys MUST be reused without exporting private material.
-    /// New keys MUST be nonexportable P-256, preferring the TPM with software fallback.
+    /// New keys MUST be nonexportable P-256, preferring the TPM with software fallback
+    /// under <see cref="MilaDeviceKeyPolicy"/>, and the custody MUST be recorded.
     /// Access errors opening existing keys MUST propagate rather than replacing identity.
     /// </summary>
-    internal static DeviceKey OpenOrCreate(string host)
+    internal static DeviceKey OpenOrCreate(string host, MilaDeviceKeyPolicy? policy = null)
     {
         string name = KeyName(host);
-        CngProvider platform = CngProvider.MicrosoftPlatformCryptoProvider;
-        CngProvider software = CngProvider.MicrosoftSoftwareKeyStorageProvider;
-        if (Exists(name, platform)) return new(CngKey.Open(name, platform));
-        if (CngKey.Exists(name, software)) return new(CngKey.Open(name, software));
-        try { return Create(name, platform); }
-        catch (CryptographicException)
-        {
-            // A concurrent creator may have won; never replace its identity.
-            if (Exists(name, platform)) return new(CngKey.Open(name, platform));
-            if (CngKey.Exists(name, software)) return new(CngKey.Open(name, software));
-            return Create(name, software);
-        }
+        (CngKey key, MilaDeviceKeyCustody custody) = MilaDeviceKeyCustodyPolicy.OpenOrCreate(
+            name, CngKeyStore.Instance, policy ?? MilaDeviceKeyPolicy.Default, Thread.Sleep);
+        return new(key, custody);
     }
 
-    private static bool Exists(string name, CngProvider provider)
+    private sealed class CngKeyStore : IMilaKeyStore<CngKey>
     {
-        try { return CngKey.Exists(name, provider); }
-        catch (CryptographicException error) when (PlatformUnavailable(error.HResult))
-        {
-            return false;
-        }
+        internal static readonly CngKeyStore Instance = new();
+        private static CngProvider Provider(MilaKeyProvider provider) => provider == MilaKeyProvider.Platform
+            ? CngProvider.MicrosoftPlatformCryptoProvider : CngProvider.MicrosoftSoftwareKeyStorageProvider;
+        public bool Exists(string name, MilaKeyProvider provider) => CngKey.Exists(name, Provider(provider));
+        public CngKey Open(string name, MilaKeyProvider provider) => CngKey.Open(name, Provider(provider));
+        public CngKey Create(string name, MilaKeyProvider provider) => CngKey.Create(
+            CngAlgorithm.ECDsaP256, name, new CngKeyCreationParameters {
+                Provider = Provider(provider), ExportPolicy = CngExportPolicies.None,
+                KeyUsage = CngKeyUsages.Signing,
+            });
     }
-
-    /// <summary>
-    /// A missing, undefined or unsupported platform provider, or one with no
-    /// usable TPM (NTE_DEVICE_NOT_READY, as on hosted CI runners), is not a key
-    /// access denial: the software provider is used instead.
-    /// </summary>
-    internal static bool PlatformUnavailable(int hresult) => hresult is
-        unchecked((int)0x80090013) or unchecked((int)0x80090017) or unchecked((int)0x80090029) or unchecked((int)0x80090030);
-
-    private static DeviceKey Create(string name, CngProvider provider) => new(CngKey.Create(
-        CngAlgorithm.ECDsaP256, name, new CngKeyCreationParameters {
-            Provider = provider, ExportPolicy = CngExportPolicies.None,
-            KeyUsage = CngKeyUsages.Signing,
-        }));
 
     internal byte[] PublicPoint()
     {
@@ -109,4 +97,120 @@ internal sealed class DeviceKey : IDisposable
     }
 
     public void Dispose() => key.Dispose();
+}
+
+/// <summary>The CNG key storage provider a device key lives in.</summary>
+internal enum MilaKeyProvider { Platform, Software }
+
+/// <summary>Recorded custody of a deployment device key.</summary>
+internal enum MilaDeviceKeyCustody
+{
+    /// <summary>Non-exportable key in the TPM (Microsoft Platform Crypto Provider).</summary>
+    Platform,
+    /// <summary>Software key: the platform provider is missing, undefined or unsupported.</summary>
+    SoftwarePlatformUnavailable,
+    /// <summary>Software key: the TPM stayed not ready for the whole retry budget.</summary>
+    SoftwarePlatformNotReady,
+    /// <summary>An existing software key for this deployment, reused so the identity is kept.</summary>
+    SoftwareExisting,
+}
+
+/// <summary>
+/// Software-fallback policy. ADR-0235 decision 3: a Windows machine without a
+/// usable TPM is not refused. Set <see cref="AllowSoftwareFallback"/> false to
+/// refuse every software custody instead.
+/// </summary>
+internal sealed record MilaDeviceKeyPolicy(IReadOnlyList<TimeSpan> NotReadyBackoff, bool AllowSoftwareFallback)
+{
+    /// <summary>About 5 s of backoff for a TPM that is starting (TBS, early boot, provisioning).</summary>
+    internal static MilaDeviceKeyPolicy Default { get; } = new(
+        [TimeSpan.FromMilliseconds(250), TimeSpan.FromMilliseconds(500), TimeSpan.FromSeconds(1),
+         TimeSpan.FromMilliseconds(1250), TimeSpan.FromSeconds(2)],
+        AllowSoftwareFallback: true);
+}
+
+/// <summary>Software custody refused by <see cref="MilaDeviceKeyPolicy.AllowSoftwareFallback"/>.</summary>
+internal sealed class MilaDeviceKeyCustodyRefusedException(MilaDeviceKeyCustody refused)
+    : System.Security.Cryptography.CryptographicException($"Software device key refused ({refused})")
+{
+    internal MilaDeviceKeyCustody Refused { get; } = refused;
+}
+
+/// <summary>Key operations the custody policy needs; CNG in production, a fake in tests.</summary>
+internal interface IMilaKeyStore<TKey>
+{
+    bool Exists(string name, MilaKeyProvider provider);
+    TKey Open(string name, MilaKeyProvider provider);
+    TKey Create(string name, MilaKeyProvider provider);
+}
+
+/// <summary>
+/// @cc [owner:ghuntley,label:security] mila-dotnet-device-key-fallback
+/// NTE_DEVICE_NOT_READY from the platform provider MUST be retried within the
+/// policy's bounded backoff before any software fallback. A missing, undefined or
+/// unsupported platform provider falls back at once. Every software outcome MUST
+/// be returned as a non-Platform custody (never silent) and MUST be refused when
+/// the policy disallows software keys. Any other error, including access denial,
+/// MUST propagate. An existing key is always reopened from its own provider.
+/// </summary>
+internal static class MilaDeviceKeyCustodyPolicy
+{
+    internal const int NotReady = unchecked((int)0x80090030);
+    private const int AlreadyExists = unchecked((int)0x8009000F);
+
+    /// <summary>NTE_BAD_KEYSET_PARAM, NTE_PROV_DLL_NOT_FOUND, NTE_NOT_SUPPORTED: no usable platform provider.</summary>
+    internal static bool PlatformUnavailable(int hresult) => hresult is
+        unchecked((int)0x80090013) or unchecked((int)0x80090017) or unchecked((int)0x80090029);
+
+    private enum Step { Done, NotReady, Unavailable }
+
+    internal static (TKey Key, MilaDeviceKeyCustody Custody) OpenOrCreate<TKey>(
+        string name, IMilaKeyStore<TKey> store, MilaDeviceKeyPolicy policy, Action<TimeSpan> wait)
+    {
+        MilaDeviceKeyCustody fallback;
+        for (int attempt = 0; ; attempt++)
+        {
+            Step step = TryPlatform(name, store, out TKey? key, out bool software);
+            if (step == Step.Done)
+            {
+                if (!software) return (key!, MilaDeviceKeyCustody.Platform);
+                return Software(policy, MilaDeviceKeyCustody.SoftwareExisting, key!);
+            }
+            if (step == Step.Unavailable) { fallback = MilaDeviceKeyCustody.SoftwarePlatformUnavailable; break; }
+            if (attempt >= policy.NotReadyBackoff.Count) { fallback = MilaDeviceKeyCustody.SoftwarePlatformNotReady; break; }
+            wait(policy.NotReadyBackoff[attempt]);
+        }
+        if (!policy.AllowSoftwareFallback) throw new MilaDeviceKeyCustodyRefusedException(fallback);
+        return store.Exists(name, MilaKeyProvider.Software)
+            ? (store.Open(name, MilaKeyProvider.Software), MilaDeviceKeyCustody.SoftwareExisting)
+            : (store.Create(name, MilaKeyProvider.Software), fallback);
+    }
+
+    private static (TKey, MilaDeviceKeyCustody) Software<TKey>(MilaDeviceKeyPolicy policy, MilaDeviceKeyCustody custody, TKey key)
+    {
+        if (policy.AllowSoftwareFallback) return (key, custody);
+        (key as IDisposable)?.Dispose();
+        throw new MilaDeviceKeyCustodyRefusedException(custody);
+    }
+
+    /// <summary>One platform attempt: reopen the existing key (platform first), or create it in the TPM.</summary>
+    private static Step TryPlatform<TKey>(string name, IMilaKeyStore<TKey> store, out TKey? key, out bool software)
+    {
+        key = default;
+        software = false;
+        try
+        {
+            if (store.Exists(name, MilaKeyProvider.Platform)) { key = store.Open(name, MilaKeyProvider.Platform); return Step.Done; }
+            if (store.Exists(name, MilaKeyProvider.Software)) { key = store.Open(name, MilaKeyProvider.Software); software = true; return Step.Done; }
+            try { key = store.Create(name, MilaKeyProvider.Platform); return Step.Done; }
+            catch (System.Security.Cryptography.CryptographicException error) when (error.HResult == AlreadyExists)
+            {
+                // A concurrent creator won; never replace its identity.
+                key = store.Open(name, MilaKeyProvider.Platform);
+                return Step.Done;
+            }
+        }
+        catch (System.Security.Cryptography.CryptographicException error) when (error.HResult == NotReady) { return Step.NotReady; }
+        catch (System.Security.Cryptography.CryptographicException error) when (PlatformUnavailable(error.HResult)) { return Step.Unavailable; }
+    }
 }

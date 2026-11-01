@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Clave sin nombre",
   "sshKeyAlgorithm": "Tipo",
   "sshKeyThisDevice": "Este dispositivo",
+  "sshKeyThisDeviceSoftware": "Este dispositivo (clave de software, no en un TPM)",
   "sshKeyRevoke": "Revocar",
   "sshKeyRevokeConfirm": "¿Revocar la clave {fingerprint}? El dispositivo que la use deberá aprobarse de nuevo para iniciar sesión.",
   "deploymentOpen": "Abrir",

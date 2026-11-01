@@ -1108,6 +1108,10 @@
   "@sshKeyThisDevice": {
     "description": "Marks the key this device is signed in with; it cannot be revoked here."
   },
+  "sshKeyThisDeviceSoftware": "This device (software key, not in a TPM)",
+  "@sshKeyThisDeviceSoftware": {
+    "description": "Marks this device's SSH key when Windows holds it as a software key because no usable TPM was available."
+  },
   "sshKeyRevoke": "Revoke",
   "@sshKeyRevoke": {
     "description": "Button that revokes an approved SSH key."

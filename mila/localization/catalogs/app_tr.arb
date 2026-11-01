@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Adsız anahtar",
   "sshKeyAlgorithm": "Tür",
   "sshKeyThisDevice": "Bu cihaz",
+  "sshKeyThisDeviceSoftware": "Bu cihaz (yazılım anahtarı, TPM'de değil)",
   "sshKeyRevoke": "İptal et",
   "sshKeyRevokeConfirm": "{fingerprint} anahtarı iptal edilsin mi? Onu kullanan cihazın giriş yapmak için yeniden onaylanması gerekir.",
   "deploymentOpen": "Aç",

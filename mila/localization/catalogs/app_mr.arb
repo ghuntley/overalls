@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "नाव नसलेली की",
   "sshKeyAlgorithm": "प्रकार",
   "sshKeyThisDevice": "हे डिव्हाइस",
+  "sshKeyThisDeviceSoftware": "हे डिव्हाइस (सॉफ्टवेअर की, TPM मध्ये नाही)",
   "sshKeyRevoke": "रद्द करा",
   "sshKeyRevokeConfirm": "{fingerprint} की रद्द करायची? ती वापरणाऱ्या डिव्हाइसला साइन इन करण्यासाठी पुन्हा मंजुरी लागेल.",
   "deploymentOpen": "उघडा",

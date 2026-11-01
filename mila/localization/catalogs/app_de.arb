@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Unbenannter Schlüssel",
   "sshKeyAlgorithm": "Typ",
   "sshKeyThisDevice": "Dieses Gerät",
+  "sshKeyThisDeviceSoftware": "Dieses Gerät (Software-Schlüssel, nicht im TPM)",
   "sshKeyRevoke": "Widerrufen",
   "sshKeyRevokeConfirm": "Schlüssel {fingerprint} widerrufen? Ein Gerät, das ihn verwendet, muss zum Anmelden erneut genehmigt werden.",
   "deploymentOpen": "Öffnen",

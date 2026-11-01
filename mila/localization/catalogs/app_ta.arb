@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "பெயரில்லா விசை",
   "sshKeyAlgorithm": "வகை",
   "sshKeyThisDevice": "இந்தச் சாதனம்",
+  "sshKeyThisDeviceSoftware": "இந்தச் சாதனம் (மென்பொருள் விசை, TPM-இல் இல்லை)",
   "sshKeyRevoke": "திரும்பப்பெறு",
   "sshKeyRevokeConfirm": "{fingerprint} விசையைத் திரும்பப்பெறவா? அதைப் பயன்படுத்தும் சாதனம் உள்நுழைய மீண்டும் அனுமதிக்கப்பட வேண்டும்.",
   "deploymentOpen": "திற",

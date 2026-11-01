@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Nimetön avain",
   "sshKeyAlgorithm": "Tyyppi",
   "sshKeyThisDevice": "Tämä laite",
+  "sshKeyThisDeviceSoftware": "Tämä laite (ohjelmistoavain, ei TPM:ssä)",
   "sshKeyRevoke": "Peru",
   "sshKeyRevokeConfirm": "Perutaanko avain {fingerprint}? Sitä käyttävä laite on hyväksyttävä uudelleen kirjautumista varten.",
   "deploymentOpen": "Avaa",

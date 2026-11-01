@@ -313,8 +313,14 @@ public sealed partial class MainWindow : Window
         if (!result.Succeeded || result.Data is not { } bytes)
             throw new IOException($"SSH key listing failed: {result.Status}");
         string? currentFingerprint = _deviceFingerprint;
+        // A software device key is never silent: this device's row says so (ADR-0235).
+        string currentNote = _deviceKey?.Custody is null or MilaDeviceKeyCustody.Platform
+            ? S("sshKeyThisDevice", "This device")
+            : S("sshKeyThisDeviceSoftware", "This device (software key, not in a TPM)");
         return MilaSshKeysController.DecodeListing(bytes)
-            .Select(key => key with { IsCurrentDevice = key.Fingerprint == currentFingerprint })
+            .Select(key => key.Fingerprint == currentFingerprint
+                ? key with { IsCurrentDevice = true, Note = currentNote }
+                : key with { IsCurrentDevice = false })
             .ToArray();
     }
 
@@ -678,7 +684,9 @@ public sealed partial class MainWindow : Window
                     { Phase = MilaSignInPhase.Failed, Failure = MilaSignInFailure.HostUntrusted }, host).Render(S);
                 return;
             }
-            DeviceKey deviceKey = DeviceKey.OpenOrCreate(host);
+            // Off the UI thread: a TPM that is not ready is retried for about 5 s.
+            DeviceKey deviceKey = await Task.Run(() => DeviceKey.OpenOrCreate(host));
+            if (_closed || !_picker.IsCurrent(selection, deployment)) { deviceKey.Dispose(); return; }
             _deviceKey?.Dispose();
             _deviceKey = deviceKey;
             byte[] publicKey = deviceKey.PublicPoint();

@@ -97,7 +97,7 @@
         <StackPanel Spacing="6">
           <TextBlock x:Name="SshKeysTitle" />
           <TextBlock x:Name="SshKeysStatus" TextWrapping="Wrap" Opacity="0.7" />
-          <ListView x:Name="SshKeyRows" DisplayMemberPath="Fingerprint" MinHeight="60" SelectionChanged="OnSshKeySelected" />
+          <ListView x:Name="SshKeyRows" DisplayMemberPath="Display" MinHeight="60" SelectionChanged="OnSshKeySelected" />
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="RefreshSshKeys" Click="RefreshSshKeysClicked" HorizontalAlignment="Left" />
             <Button x:Name="RevokeSshKey" Click="RevokeSelectedSshKey" HorizontalAlignment="Left" IsEnabled="False" />

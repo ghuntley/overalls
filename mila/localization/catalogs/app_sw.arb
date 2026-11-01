@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "Ufunguo usio na jina",
   "sshKeyAlgorithm": "Aina",
   "sshKeyThisDevice": "Kifaa hiki",
+  "sshKeyThisDeviceSoftware": "Kifaa hiki (ufunguo wa programu, si ndani ya TPM)",
   "sshKeyRevoke": "Batilisha",
   "sshKeyRevokeConfirm": "Ungependa kubatilisha ufunguo {fingerprint}? Kifaa kinachoutumia kitahitaji kuidhinishwa tena ili kuingia.",
   "deploymentOpen": "Fungua",

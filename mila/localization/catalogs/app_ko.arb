@@ -259,6 +259,7 @@
   "sshKeyUnlabelled": "이름 없는 키",
   "sshKeyAlgorithm": "유형",
   "sshKeyThisDevice": "이 기기",
+  "sshKeyThisDeviceSoftware": "이 기기(소프트웨어 키, TPM에 없음)",
   "sshKeyRevoke": "취소",
   "sshKeyRevokeConfirm": "{fingerprint} 키를 취소할까요? 이 키를 사용하는 기기는 로그인하려면 다시 승인받아야 합니다.",
   "deploymentOpen": "열기",
