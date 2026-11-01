@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "public-grafana",
     suite = "public-grafana",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "module": "modules.select [ \"otel-guest\" \"otel-fleet\" \"fleet-firewall\" \"nix-cache\" \"fleet-network\" \"nix-compact\" \"marshall\" \"proxy\" \"auto-update\" ]",

@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "team-ssh",
     suite = "team-ssh",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

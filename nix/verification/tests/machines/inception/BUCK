@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "inception",
     suite = "inception",
     nested_kvm = True,
+    packages = True,
     labels = [
         "known_inception_failure",
     ],
@@ -25,6 +26,7 @@ nixos_machine_test(
     check = "inception-checkout",
     suite = "inception",
     nested_kvm = True,
+    packages = True,
     labels = [
         "known_inception_failure",
     ],

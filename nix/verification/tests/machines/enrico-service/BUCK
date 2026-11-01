@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "enrico-service",
     suite = "enrico-service",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "module": "modules.services.enrico",

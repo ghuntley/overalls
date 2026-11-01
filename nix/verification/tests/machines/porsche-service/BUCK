@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "porsche-service",
     suite = "porsche-service",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

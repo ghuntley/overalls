@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "host-images",
     suite = "host-images",
     nested_kvm = False,
+    packages = False,
     labels = [],
     params = {
         "images": "fixtures.hetzner-uefi.config.system.build.overallsTestImages",

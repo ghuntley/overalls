@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "brady-large-storage",
     suite = "brady-network",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "large": "true",
@@ -26,6 +27,7 @@ nixos_machine_test(
     check = "brady-native-storage",
     suite = "brady-network",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "storage": "true",
@@ -41,6 +43,7 @@ nixos_machine_test(
     check = "brady-network",
     suite = "brady-network",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

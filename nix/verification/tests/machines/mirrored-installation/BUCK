@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "mirrored-installation",
     suite = "mirrored-installation",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "hostFixture": "fixtures.hetzner-uefi",
@@ -26,6 +27,7 @@ nixos_machine_test(
     check = "host-hetzner-bios",
     suite = "mirrored-installation",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "firmwareMode": "\"bios\"",
@@ -44,6 +46,7 @@ nixos_machine_test(
     check = "host-ec2-bios",
     suite = "mirrored-installation",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "firmwareMode": "\"bios\"",
@@ -62,6 +65,7 @@ nixos_machine_test(
     check = "host-ec2-uefi",
     suite = "mirrored-installation",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "firmwareMode": "\"uefi\"",

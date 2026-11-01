@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "android-firecracker",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "android": "true",
@@ -26,6 +27,7 @@ nixos_machine_test(
     check = "guest-backups",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "backups": "true",
@@ -41,6 +43,7 @@ nixos_machine_test(
     check = "zfs-guest-clone",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "cloneMatrix": "true",
@@ -56,6 +59,7 @@ nixos_machine_test(
     check = "ubuntu-guest",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "guest": "import ./fixtures/ubuntu { inherit packages; }",
@@ -72,6 +76,7 @@ nixos_machine_test(
     check = "zfs-guest",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
@@ -85,6 +90,7 @@ nixos_machine_test(
     check = "guest-boot-profile",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "bootProfile": "true",
@@ -101,6 +107,7 @@ nixos_machine_test(
     check = "ubuntu-guest-boot-profile",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "bootProfile": "true",
@@ -118,6 +125,7 @@ nixos_machine_test(
     check = "lilly-native-actor-recovery",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "actorRecovery": "true",
@@ -133,6 +141,7 @@ nixos_machine_test(
     check = "zfs-namespace-cleanup",
     suite = "zfs-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "namespaceCleanup": "true",

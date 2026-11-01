@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "inception-ssh-host-ca",
     suite = "inception-ssh-host-ca",
     nested_kvm = False,
+    packages = False,
     labels = [
         "known_inception_failure",
     ],

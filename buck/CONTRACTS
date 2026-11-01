@@ -313,6 +313,15 @@ that its module path reads. Flake output, check and host assemblies MUST keep
 the full //nix:srcs. Restrict-eval over the declared copy turns a missed file
 into an evaluation error (ADR-0270).
 
+@cc [owner:ghuntley,label:build;verification] machine-test-release-artifacts
+A machine test MUST receive the Mix release artifacts (MIX_ARTIFACTS) only
+when its suite takes the package set, the same condition that declares
+PACKAGE_INPUTS (machine_tests.py emits it as `packages`). A suite that does not
+take the package set MUST NOT depend on any Mix release, so an application
+change does not select it. It keeps every other Buck2 leaf and test fixture.
+Reading a release without its artifact is an evaluation error, so a suite that
+needs one fails its assembly rather than running without it (ADR-0270).
+
 @cc [owner:ghuntley,label:build] mix-sources-declared
 mix_sources MUST name every file a Mix action reads by its repository path,
 and Mix actions MUST read sources only from that manifest, copied into the

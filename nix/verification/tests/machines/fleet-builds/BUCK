@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "fleet-builds",
     suite = "fleet-builds",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "fleetModule": "modules.fleetBuilds",

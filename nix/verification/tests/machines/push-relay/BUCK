@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "push-relay",
     suite = "push-relay",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

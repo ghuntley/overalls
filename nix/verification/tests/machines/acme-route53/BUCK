@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "acme-route53",
     suite = "acme-route53",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

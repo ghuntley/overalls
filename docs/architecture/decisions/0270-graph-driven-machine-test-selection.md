@@ -259,6 +259,16 @@ Remaining gaps:
 
   A suite that reads an undeclared file fails its first run, which the daily
   backstop surfaces. The other 41 narrowed suites have evaluated but not run.
+- Release artifacts follow the package set. Once assemblies took the Mix
+  releases from Buck2 (ADR-0269 M6), every machine test depended on every
+  release import, so a `lilly/lib` change selected suites that take no
+  application package (`affected_fixtures` failed on `sysctl`). A test now
+  receives the Mix release artifacts only when its suite takes the package
+  set, the condition that already declares `PACKAGE_INPUTS` (contract
+  `machine-test-release-artifacts`). Seven tests take none: access,
+  fleet-network, host-images, inception-ssh-host-ca, nix-ld,
+  otel-burn-delivery and sysctl. Rust leaves and test fixtures still reach
+  every test.
 - Replays (2026-11-01). Two regressions reached trunk before graph
   selection. Their changes now select the suites that cover them, and two
   fixtures in

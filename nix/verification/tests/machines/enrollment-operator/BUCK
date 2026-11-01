@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "enrollment-operator",
     suite = "enrollment-operator",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

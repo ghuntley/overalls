@@ -458,6 +458,7 @@ def render_target(entry: Entry, inputs: str, scenarios: Sequence[str]) -> str:
         f'    check = "{entry.name}",',
         f'    suite = "{entry.suite}",',
         f"    nested_kvm = {entry.nested_kvm},",
+        f"    packages = {entry.packages},",
         f"    labels = {_string_list(labels, '    ')},",
         f"    params = {_dict(entry.params, '    ')},",
         f"    inputs = {inputs},",

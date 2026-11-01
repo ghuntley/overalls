@@ -1,7 +1,7 @@
 # NixOS machine tests and script tests as Buck2 test targets (ADR-0270).
 
 load(":artifacts.bzl", "MACHINE_TEST_ARTIFACTS")
-load(":mix_artifacts.bzl", "MIX_FIXTURE_ARTIFACTS", "MIX_FIXTURE_SUITES")
+load(":mix_artifacts.bzl", "MIX_ARTIFACTS", "MIX_FIXTURE_ARTIFACTS", "MIX_FIXTURE_SUITES")
 load(":assemble.bzl", "nix_assemble")
 load(":nix.bzl", "owned_set")
 
@@ -65,9 +65,11 @@ _nixos_machine_test = rule(
 _RESERVED_LABELS = ["machine_test", "nested_kvm"]
 
 # Contract nixos-machine-test-labels: see buck/CONTRACTS.
-def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str], labels: list[str] = [], **kwargs):
+# Contract machine-test-release-artifacts: see buck/CONTRACTS.
+def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str], packages: bool, labels: list[str] = [], **kwargs):
     """A NixOS machine test: builds `lib.assemble {}.checks.<check>` over a
-    copy of `inputs` only (leaf owned file groups), then checks its labels."""
+    copy of `inputs` only (leaf owned file groups), then checks its labels.
+    `packages` is whether the suite takes the package set (PACKAGE_INPUTS)."""
     for label in labels:
         if label in _RESERVED_LABELS:
             fail("{}: label {} is derived from nested_kvm; do not set it".format(name, label))
@@ -79,7 +81,14 @@ def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str
         # Every Buck2-built leaf replaces its Nix build in the test, as it
         # will on hosts (ADR-0269), plus the test-only fixtures; suites that
         # run fixture releases also receive those (their release_variants).
-        artifacts = MACHINE_TEST_ARTIFACTS | (MIX_FIXTURE_ARTIFACTS if kwargs.get("suite") in MIX_FIXTURE_SUITES else {}),
+        # The Mix releases are reached only through the package set, so a
+        # suite that does not take it gets none, and an application change
+        # does not select it.
+        artifacts = {
+            artifact: target
+            for artifact, target in MACHINE_TEST_ARTIFACTS.items()
+            if packages or artifact not in MIX_ARTIFACTS
+        } | (MIX_FIXTURE_ARTIFACTS if kwargs.get("suite") in MIX_FIXTURE_SUITES else {}),
         labels = ["machine_test_assembly"],
     )
     _nixos_machine_test(

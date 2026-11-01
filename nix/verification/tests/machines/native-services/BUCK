@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "native-freebsd-services",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
@@ -23,6 +24,7 @@ nixos_machine_test(
     check = "github-tools-freebsd-retained",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "github": "true",
@@ -39,6 +41,7 @@ nixos_machine_test(
     check = "github-tools-illumos-retained",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "github": "true",
@@ -56,6 +59,7 @@ nixos_machine_test(
     check = "native-freebsd-isolation",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "isolation": "true",
@@ -71,6 +75,7 @@ nixos_machine_test(
     check = "native-freebsd-growth",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "growth": "true",
@@ -86,6 +91,7 @@ nixos_machine_test(
     check = "native-freebsd-recovery",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "recovery": "true",
@@ -101,6 +107,7 @@ nixos_machine_test(
     check = "native-freebsd-crash-recovery",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "crash": "true",
@@ -116,6 +123,7 @@ nixos_machine_test(
     check = "native-omnios-transport",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "image": "packages.omniosImageCandidate",
@@ -135,6 +143,7 @@ nixos_machine_test(
     check = "native-omnios-reset",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "image": "packages.omniosImageCandidate",
@@ -154,6 +163,7 @@ nixos_machine_test(
     check = "native-omnios-services",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "allowNativeAdmission": "true",
@@ -171,6 +181,7 @@ nixos_machine_test(
     check = "native-omnios-isolation",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "allowNativeAdmission": "true",
@@ -189,6 +200,7 @@ nixos_machine_test(
     check = "native-omnios-growth",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "allowNativeAdmission": "true",
@@ -207,6 +219,7 @@ nixos_machine_test(
     check = "native-omnios-recovery",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "allowNativeAdmission": "true",
@@ -225,6 +238,7 @@ nixos_machine_test(
     check = "native-omnios-crash-recovery",
     suite = "native-services",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "allowNativeAdmission": "true",

@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "private-services-network",
     suite = "private-services",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [

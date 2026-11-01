@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "database-recovery",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
@@ -22,6 +23,7 @@ nixos_machine_test(
     check = "database-recovery-active",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "activeHolder": "true",
@@ -36,6 +38,7 @@ nixos_machine_test(
     check = "database-recovery-silent",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "faultMode": "\"silent\"",
@@ -50,6 +53,7 @@ nixos_machine_test(
     check = "database-recovery-asymmetric",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "faultMode": "\"asymmetric\"",
@@ -64,6 +68,7 @@ nixos_machine_test(
     check = "database-recovery-active-silent",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "activeHolder": "true",
@@ -79,6 +84,7 @@ nixos_machine_test(
     check = "database-recovery-active-asymmetric",
     suite = "database-recovery",
     nested_kvm = False,
+    packages = True,
     labels = [],
     params = {
         "activeHolder": "true",

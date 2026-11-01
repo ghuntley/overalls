@@ -10,6 +10,7 @@ nixos_machine_test(
     check = "windows-lilly-guest",
     suite = "windows-lilly-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
@@ -23,6 +24,7 @@ nixos_machine_test(
     check = "windows-lilly-guest-agents",
     suite = "windows-lilly-guest",
     nested_kvm = True,
+    packages = True,
     labels = [],
     params = {
         "agents": "true",
