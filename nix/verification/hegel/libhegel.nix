@@ -2,7 +2,9 @@
 # The Hegel engine MUST be pinned by tag and content hash; the Python binding
 # in ./python verifies `hegel_version` against expectedVersion at load time.
 { pkgs }:
-pkgs.rustPlatform.buildRustPackage {
+# Built with the one rust-overlay toolchain (ADR-0273 decision 2), not
+# nixpkgs' rustPlatform.
+(import ../../rust-toolchain.nix { inherit pkgs; }).rustPlatform.buildRustPackage {
   pname = "libhegel";
   version = "0.47.4";
 

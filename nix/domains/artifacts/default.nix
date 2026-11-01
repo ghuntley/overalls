@@ -256,7 +256,8 @@ let
   # The hegel_ex property-test NIF MUST be built here from the pinned Git
   # dependency's own Cargo.lock with vendored crates, and reach Mix through
   # HEGEL_NIF_PATH, so no test compile runs cargo against the network.
-  hegelNif = pkgs.rustPlatform.buildRustPackage {
+  # The single rust-overlay toolchain (ADR-0273 decision 2), like every leaf.
+  hegelNif = cargoWorkspace.rustPlatform.buildRustPackage {
     pname = "hegel-nif";
     version = "0.1.0";
     src = "${testDependencies.protocol}/hegel_ex/native/hegel_nif";

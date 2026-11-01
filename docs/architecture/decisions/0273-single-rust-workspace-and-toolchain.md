@@ -195,7 +195,12 @@ partial, in milestone M5.
   crashed with SIGSEGV. The leaves' derivations, and so every host's
   system derivation, changed on purpose; the closures differ only in those
   leaves and their dependents. Third-party builds (NativeLink, underclass),
-  Marshall's Cedar NIF and lints and libhegel stay on nixpkgs Rust until M6.
+  Marshall's Cedar NIF and lints stay on nixpkgs Rust until M6. Both
+  test-only Hegel engine builds use this toolchain:
+  [`hegelNif`](../../../nix/domains/artifacts/default.nix) (the hegel_ex
+  NIF, through `cargoWorkspace.rustPlatform`) and
+  [libhegel.nix](../../../nix/verification/hegel/libhegel.nix) (the Python
+  machine-test engine).
 - **Buck2 builds (decision 3, partial).** [rust.nix](../../../nix/buck/rust.nix)
   generates the `rust//` cell in Nix from the root lock:
   [rust_cell.py](../../../nix/buck/rust_cell.py) writes a pseudo-package of
@@ -302,9 +307,8 @@ partial, in milestone M5.
 
 Remaining for this decision:
 
-- libhegel (the test-only hegel_ex NIF, built from its own lock) on nixpkgs
-  Rust (decision 2), and the Buck2 builds of terminald, the broker, Lyra, the
-  Cedar NIF and Mila (decision 3), in M5;
+- the Buck2 builds of terminald, the broker, Lyra, the Cedar NIF and Mila
+  (decision 3), in M5;
 - per-consumer Nix source filters, until M5 deletes the `buildRustPackage`
   leaves.
 
