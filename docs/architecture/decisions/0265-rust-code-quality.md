@@ -194,7 +194,11 @@ records the verification run and the known gaps.
   - guest editor broker: split into
     [`validate.rs`](../../../nix/domains/artifacts/vscode-web-broker/src/validate.rs) and
     [`boot.rs`](../../../nix/domains/artifacts/vscode-web-broker/src/boot.rs); Windows-target
-    clippy in [`windows.nix`](../../../nix/domains/artifacts/vscode-web-broker/windows.nix)
+    clippy in [`windows.nix`](../../../nix/domains/artifacts/vscode-web-broker/windows.nix).
+    The `cfg(windows)` launcher is split into
+    [`windows/`](../../../nix/domains/artifacts/vscode-web-broker/src/windows/mod.rs) (file
+    custody, accounts, processes, jobs, worker); the Linux test list, including the
+    `windows_model` Hegel properties, and the four Windows-only test names are unchanged
   - guest telemetry receiver: split into `intake.rs`, `binding.rs` and `sanitize.rs`, with
     its property contract in
     [`CONTRACTS`](../../../nix/domains/system/otel-guest/receiver/CONTRACTS); gated in
@@ -227,14 +231,15 @@ records the verification run and the known gaps.
     The `mila-builds` Apple, Windows, Linux and Android jobs run clippy for mila-ffi.
   - the [Mila Linux client](../../../mila/native/linux/Cargo.toml), gated in
     [`native-linux.nix`](../../../nix/domains/artifacts/mila/native-linux.nix) and the
-    linux-native CI job for both feature sets
+    linux-native CI job for both feature sets. Its session module is split into
+    [`session/`](../../../mila/native/linux/src/session/mod.rs) (signer, connection,
+    commands, PTY, trust, sign-in); the test list is unchanged for both feature sets
 - **proptest is gone.** Spool, the broker and the receiver now use Hegel only.
 - **Follow-ups** (not part of this decision's acceptance):
   - confining unsafe code in Lyra and terminald, so that `unsafe_code = "deny"` can
     join the canonical block
   - a clippy gate in the native FreeBSD and illumos terminald derivation
-  - splitting the large non-`lib.rs` files: `mila/native/linux/src/session.rs`,
-    `vscode-web-broker/src/windows.rs` and `lyra/src/agent/managed_skills.rs`
+  - splitting the large non-`lib.rs` file `lyra/src/agent/managed_skills.rs`
 
 ## Open questions
 
