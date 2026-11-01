@@ -13,7 +13,7 @@ import sys
 import tempfile
 from collections.abc import Callable, Generator, Mapping
 from pathlib import Path
-from typing import NotRequired, TypedDict
+from typing import Literal, NotRequired, TypedDict
 
 import remote
 from remote import Binding, Facts, Identity, Inventory, StorageFacts
@@ -106,11 +106,19 @@ class InstallReceipt(TypedDict):
 
 
 def run(
-    args: list[str | Path], data: bytes | None = None, env: dict[str, str] | None = None
+    args: list[str | Path],
+    data: bytes | None = None,
+    env: dict[str, str] | None = None,
+    cwd: Path | None = None,
 ) -> bytes:
     try:
         return subprocess.check_output(
-            [str(a) for a in args], input=data, stderr=subprocess.DEVNULL, env=env, timeout=7200
+            [str(a) for a in args],
+            input=data,
+            stderr=subprocess.DEVNULL,
+            env=env,
+            timeout=7200,
+            cwd=cwd,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         raise Failure("Command failed: " + Path(str(args[0])).name) from None
@@ -307,17 +315,66 @@ def published(repository: str, revision: str) -> Generator[Path]:
         run(["git", "-C", root, "checkout", "--detach", revision])
         if not (root / "flake.lock").is_file():
             raise Failure("Published lockfile required")
-        yield root
+        try:
+            yield root
+        finally:
+            stop_buck2(root)
 
 
-def build(root: Path, name: str, attr: str) -> str:
-    if not re.fullmatch(r"[a-z][a-z0-9-]{0,63}", name):
-        raise Failure("Invalid configuration attribute")
-    ref = f"git+file://{root}#nixosConfigurations.{name}.config.system.build.{attr}"
-    paths: list[dict[str, dict[str, str]]] = json.loads(
-        run(["nix", "build", "--no-link", "--json", "--no-write-lock-file", ref])
-    )
-    return paths[0]["outputs"]["out"]
+# Fleet host targets (buck/fleet.bzl) that installation and enrollment build.
+HostTarget = Literal["base", "install", "system", "binding", "enrollment"]
+STORE_PATH = re.compile(r"/nix/store/[0-9a-z]{32}-[^/\s]+")
+
+
+def buck2_build(root: Path, target: str) -> str:
+    """Builds a published checkout's target with its own tools/buck2 (ADR-0269).
+
+    The revision is the checkout's commit, which assembly records in place of
+    the flake's self.rev; the target's output file names the store path."""
+    revision = run(["git", "-C", root, "rev-parse", "HEAD"]).decode().strip()
+    listing = run(
+        [
+            root / "tools/buck2",
+            "build",
+            "-c",
+            f"overalls.revision={revision}",
+            "--show-full-output",
+            target,
+        ],
+        cwd=root,
+    ).decode()
+    lines = listing.strip().splitlines()
+    fields = lines[-1].split(" ", 1) if lines else []
+    if len(fields) != 2 or fields[0].removeprefix("root") != target:
+        raise Failure("Buck2 reported no output for " + target)
+    path = Path(fields[1]).read_text().strip()
+    if not STORE_PATH.fullmatch(path):
+        raise Failure("Buck2 output is not a store path: " + target)
+    return path
+
+
+def build(root: Path, host: str, target: HostTarget) -> str:
+    """A published host's assembled system, installer or enrollment output."""
+    name = safe_name(host)
+    if not (root / "fleet/hosts" / name / "BUCK").is_file():
+        raise Failure(
+            "Publish fleet/hosts/" + name + "/BUCK declaring fleet_host() before building it"
+        )
+    return buck2_build(root, f"//fleet/hosts/{name}:{target}")
+
+
+def stop_buck2(root: Path) -> None:
+    """Stops the daemon a published checkout started; it outlives the command."""
+    if (root / ".buck-cells").exists():
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+            subprocess.run(
+                [str(root / "tools/buck2"), "kill"],
+                cwd=root,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                timeout=120,
+                check=False,
+            )
 
 
 def write_new(path: str, value: object) -> None:
@@ -457,22 +514,9 @@ def plan(args: argparse.Namespace) -> None:
         remote.match(h["inventory"], facts["inventory"])
         if h["firmware"] != facts["firmware"]:
             raise Failure("Reviewed firmware differs")
-        system = build(root, args.host + "-base", "toplevel")
-        install = build(root, args.host + "-base", "overallsHostInstall")
-        tarball = (
-            run(
-                [
-                    "nix",
-                    "build",
-                    "--no-link",
-                    "--print-out-paths",
-                    "--no-write-lock-file",
-                    f"git+file://{root}#host-kexec",
-                ]
-            )
-            .decode()
-            .strip()
-        )
+        system = build(root, args.host, "base")
+        install = build(root, args.host, "install")
+        tarball = buck2_build(root, "//nix/platform:kexec")
         tarballs = list(Path(tarball).rglob("*.tar.*"))
         if len(tarballs) != 1:
             raise Failure("Expected exactly one pinned kexec tarball")
@@ -574,24 +618,11 @@ def install(args: argparse.Namespace) -> None:
             )
             if (
                 declared != p["host"]
-                or build(root, p["host"]["name"] + "-base", "toplevel") != p["system"]
-                or build(root, p["host"]["name"] + "-base", "overallsHostInstall") != p["install"]
+                or build(root, p["host"]["name"], "base") != p["system"]
+                or build(root, p["host"]["name"], "install") != p["install"]
             ):
                 raise Failure("Plan differs from published build")
-            tarball = (
-                run(
-                    [
-                        "nix",
-                        "build",
-                        "--no-link",
-                        "--print-out-paths",
-                        "--no-write-lock-file",
-                        f"git+file://{root}#host-kexec",
-                    ]
-                )
-                .decode()
-                .strip()
-            )
+            tarball = buck2_build(root, "//nix/platform:kexec")
             if str(next(Path(tarball).rglob("*.tar.*"))) != p["kexec"]:
                 raise Failure("Installer differs from published build")
         facts: Facts = probe(args)
@@ -730,14 +761,12 @@ def enroll(args: argparse.Namespace) -> None:
             raise Failure("Installed storage receipt differs")
         old_binding: Binding = json.loads(json.dumps(baseline["binding"]))
         old_binding["identity"].pop("sshKeys", None)
-        proposed: Binding = json.loads(
-            Path(build(root, args.host, "overallsHostBinding")).read_text()
-        )
+        proposed: Binding = json.loads(Path(build(root, args.host, "binding")).read_text())
         proposed["identity"].pop("sshKeys", None)
         if old_binding != proposed:
             raise Failure("Enrollment cannot change installation bindings")
-        build(root, args.host, "toplevel")
-        activation = build(root, args.host, "overallsHostEnrollment")
+        build(root, args.host, "system")
+        activation = build(root, args.host, "enrollment")
         env = dict(os.environ, NIX_SSHOPTS=shlex.join(connection(args)[1:-1]))
         # Locally built closures are unsigned. Trust is the pinned admin SSH
         # connection and exact published build, not a public binary-cache key.

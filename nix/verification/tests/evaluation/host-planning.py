@@ -1084,7 +1084,7 @@ class HostPlanning(unittest.TestCase):
                 ) -> str:
                     if failure == "build":
                         raise cli.Failure("build failed")
-                    return p["system"] if attr == "toplevel" else p["install"]
+                    return p["system"] if attr == "base" else p["install"]
 
                 def probe(
                     _args: SimpleNamespace,
@@ -1119,6 +1119,7 @@ class HostPlanning(unittest.TestCase):
                 with (
                     patch.object(cli, "published", return_value=nullcontext(root)),
                     patch.object(cli, "build", side_effect=build),
+                    patch.object(cli, "buck2_build", return_value=str(root)),
                     patch.object(cli, "run", return_value=str(root).encode()),
                     patch.object(cli, "probe", side_effect=probe),
                     patch.object(cli, "anywhere", side_effect=anywhere),
@@ -1136,6 +1137,61 @@ class HostPlanning(unittest.TestCase):
                 state = json.loads(Path(str(plan) + ".state.json").read_text())
                 self.assertNotEqual(state["phase"], "complete")
                 self.assertEqual(state["plan"], cli.digest(p))
+
+    def test_published_builds_name_fleet_host_targets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(cli.Failure, "fleet_host"):
+                cli.build(root, "example", "base")
+            package = root / "fleet/hosts/example"
+            package.mkdir(parents=True)
+            (package / "BUCK").write_text("fleet_host()\n")
+            built: list[str] = []
+
+            def buck2_build(_root: Path, target: str) -> str:
+                built.append(target)
+                return "/nix/store/" + "a" * 32 + "-system"
+
+            with patch.object(cli, "buck2_build", side_effect=buck2_build):
+                for target in ("base", "install", "system", "binding", "enrollment"):
+                    cli.build(root, "example", target)
+            self.assertEqual(
+                built,
+                [
+                    f"//fleet/hosts/example:{t}"
+                    for t in ("base", "install", "system", "binding", "enrollment")
+                ],
+            )
+            with self.assertRaises(cli.Failure):
+                cli.build(root, "example-base", "base")
+
+    def test_buck2_build_reads_the_reported_store_path(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = root / "out"
+            store = "/nix/store/" + "b" * 32 + "-overalls-host-install"
+            out.write_text(store + "\n")
+            target = "//fleet/hosts/example:install"
+            calls: list[list[str | Path]] = []
+
+            def run(args: list[str | Path], *_rest: object, **_kwargs: object) -> bytes:
+                calls.append(args)
+                if args[0] == "git":
+                    return b"c" * 40 + b"\n"
+                return f"root{target} {out}\n".encode()
+
+            with patch.object(cli, "run", side_effect=run):
+                self.assertEqual(cli.buck2_build(root, target), store)
+            self.assertIn("overalls.revision=" + "c" * 40, [str(a) for a in calls[1]])
+            out.write_text("not a store path\n")
+            with patch.object(cli, "run", side_effect=run), self.assertRaises(cli.Failure):
+                cli.buck2_build(root, target)
+
+            def other(args: list[str | Path], *_rest: object, **_kwargs: object) -> bytes:
+                return b"c" * 40 if args[0] == "git" else b"root//other:x /tmp/x\n"
+
+            with patch.object(cli, "run", side_effect=other), self.assertRaises(cli.Failure):
+                cli.buck2_build(root, target)
 
     def test_encryption_uses_shared_key_in_existing_git_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

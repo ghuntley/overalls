@@ -41,3 +41,20 @@ def fleet_host():
         artifacts = ASSEMBLY_ARTIFACTS,
         visibility = ["PUBLIC"],
     )
+
+    # What `host enroll` (nix/domains/artifacts/host/cli.py) builds. No labels:
+    # :deployment alone carries "deployment", which CI's host builds select.
+    for name, build in [
+        # The enrolled system, built before enrollment activates it.
+        ("system", "toplevel"),
+        # The installation binding enrollment must not change.
+        ("binding", "overallsHostBinding"),
+        # The activation enrollment copies to the host and runs.
+        ("enrollment", "overallsHostEnrollment"),
+    ]:
+        nix_assemble(
+            name = name,
+            attr = "systems.{}.config.system.build.{}".format(host, build),
+            artifacts = ASSEMBLY_ARTIFACTS,
+            visibility = ["PUBLIC"],
+        )

@@ -55,31 +55,14 @@ let
         || lib.hasPrefix "fleet/" relative
         || (lib.hasPrefix "nix/" relative && relative != "nix/verification" && !lib.hasPrefix "nix/verification/tests/" relative);
   };
-  # Locked archives let repeated native builds reuse the immutable Nixpkgs input
-  # instead of rescanning its many files through a path-flake input each time.
-  nixpkgsArchive = pkgs.runCommand "host-enrollment-nixpkgs.tar.gz" {
-    nativeBuildInputs = [ pkgs.gnutar pkgs.gzip ];
-  } ''
-    tar --sort=name --mtime=@1 --owner=0 --group=0 -czf "$out" -C ${nixpkgs} .
-  '';
   # Application roles remain disabled in this host-only acceptance test; their
   # unused package defaults need no application builds. Secret tools are real.
   recipe = pkgs.writeText "fixture-flake.nix" ''
     {
       inputs = {
-        nixpkgs = { type = "tarball"; url = "file://${nixpkgsArchive}"; flake = false; };
-        project = { url = "path:${source}"; flake = false; };
-        disko = { url = "path:${diskoSource}"; flake = false; };
-        nixCompact = { url = "path:${nixCompactSource}"; flake = false; };
-        marshall = { url = "path:${pkgs.hello}"; flake = false; };
-        lilly = { url = "path:${pkgs.hello}"; flake = false; };
-        secretspec = { url = "path:${packages.secretTools.secretspec}"; flake = false; };
-        sops = { url = "path:${packages.secretTools.sops}"; flake = false; };
-        sshToAge = { url = "path:${packages.secretTools.ssh-to-age}"; flake = false; };
-        observabilityRuntimes = { url = "path:${packages.observabilityRuntimes}"; flake = false; };
         cells = { url = "path:${buck2Fixture.cells}"; flake = false; };
       };
-      outputs = { self, nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes, cells }:
+      outputs = { self, cells }:
       let
         system = { nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
           system = "x86_64-linux";
@@ -122,7 +105,6 @@ let
         source = name: store (toString (builtins.findFile builtins.nixPath name));
       in {
         buckCells.x86_64-linux = cells.outPath;
-        nixosConfigurations.fixture-enrollment = system { inherit nixpkgs project disko nixCompact marshall lilly secretspec sops sshToAge observabilityRuntimes; };
         lib.assemble = { revision ? null, artifacts ? { }, params ? { } }: {
           systems.fixture-enrollment = system {
             nixpkgs = source "overalls-fixture-nixpkgs"; project = source "overalls-fixture-project";
@@ -173,7 +155,7 @@ let
       })
     ];
   };
-  extraTools = [ nixpkgsArchive buck2Fixture.skeleton target.config.system.build.toplevel enrolled.config.system.build.toplevel
+  extraTools = [ buck2Fixture.skeleton target.config.system.build.toplevel enrolled.config.system.build.toplevel
     (pkgs.perl.withPackages (p: with p; [ ConfigIniFiles FileSlurp ]))
     pkgs.remarshal pkgs.cpio pkgs.zstd pkgs.nixos-rebuild pkgs.curl pkgs.jq
     pkgs.desktop-file-utils pkgs.getconf pkgs.texinfo pkgs.libxslt.bin pkgs.lndir ] ++ pkgs.bind.all;

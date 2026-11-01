@@ -9,7 +9,10 @@ let
   anywhere = import ./installer.nix { inherit pkgs; };
 in pkgs.writeShellApplication {
   name = "host";
-  runtimeInputs = [ python pkgs.sops pkgs.age pkgs.ssh-to-age pkgs.nix pkgs.git pkgs.openssh anywhere ];
+  # tools/buck2 of the published checkout builds every host output (ADR-0269);
+  # it runs bash, coreutils, awk, sed, findutils, git, nix and python3.
+  runtimeInputs = [ python pkgs.sops pkgs.age pkgs.ssh-to-age pkgs.nix pkgs.git pkgs.openssh anywhere
+    pkgs.bash pkgs.coreutils pkgs.gawk pkgs.gnused pkgs.findutils ];
   text = ''
     exec ${python}/bin/python ${source}/cli.py "$@"
   '';

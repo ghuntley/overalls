@@ -89,7 +89,8 @@ M10 (2026-10-30) implements decision 3.
 
 - **Targets.** [buck/fleet.bzl](../../../buck/fleet.bzl) declares
   `:deployment`, `:base` and `:install` in each
-  `fleet/hosts/<host>/BUCK`. It uses `nix_assemble`
+  `fleet/hosts/<host>/BUCK`, and (M11) the unlabelled `:system`, `:binding`
+  and `:enrollment` that `host enroll` builds. It uses `nix_assemble`
   ([buck/assemble.bzl](../../../buck/assemble.bzl)) over `lib.assemble`.
   `//nix/platform:kexec` assembles `kexec`. Every one of them passes
   `ASSEMBLY_ARTIFACTS` ([buck/artifacts.bzl](../../../buck/artifacts.bzl)),
@@ -206,14 +207,25 @@ M10 (2026-10-30) implements decision 3.
   their deployment targets. Salopettes was offline in the tailnet and could
   not be checked.
 
+- **Operator CLI (M11).** [cli.py](../../../nix/domains/artifacts/host/cli.py)
+  builds every published output with the candidate checkout's `tools/buck2`
+  and `-c overalls.revision=<commit>`: `plan` and `install` build `:base`,
+  `:install` and `//nix/platform:kexec`, and `enroll` builds `:binding`,
+  `:system` and `:enrollment`. It refuses a host without a published
+  `fleet/hosts/<host>/BUCK` and stops the checkout's daemon afterwards. For
+  dungarees at one revision, `:system[drv]` is the toplevel inside
+  `:deployment[drv]` and `:enrollment[drv]`, and `:binding[drv]` equals the
+  flake's `overallsHostBinding` derivation. The host-enrollment fixture no
+  longer defines `nixosConfigurations`; its `[drv]` evaluates, and its
+  machine run is pending. Unit tests in
+  [host-planning.py](../../../nix/verification/tests/evaluation/host-planning.py)
+  cover the target names and output parsing.
+
 Remaining:
 
 - The per-host parameters stay fleet-wide `lib.assemble` defaults, because
   no host sets crash-dump encryption, antithesis flags or private service
   roots individually today. `nix_assemble` has no `params` channel yet.
-- The operator CLI ([cli.py](../../../nix/domains/artifacts/host/cli.py))
-  still builds `nixosConfigurations`. It moves to `:base` and `:install`
-  before the gate.
 - Hosts compile the `ASSEMBLY_ARTIFACTS` leaves in the updater unless CI has
   uploaded them for the same cells and revision; that needs CI's cache
   secrets (ADR-0272). The offline update fixture holds no
