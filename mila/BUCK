@@ -126,6 +126,18 @@ mila_platform(
     srcs = _APPLE,
 ) for platform in ["macos", "ios"]]
 
+# Unsigned release-configuration builds (`mila-build <platform> unsigned`):
+# ad-hoc signed, reading no signing input, for mila-release.yml runs without a
+# mila-v* tag. build.sh reads MILA_VERSION from the daemon's environment.
+[mila_platform(
+    name = "{}-unsigned".format(platform),
+    os = "macos",
+    steps = [{"argv": ["mila/native/mila-build", platform, "unsigned"], "cwd": "."}],
+    outputs = {"unsigned": "mila/build/{}-unsigned".format(platform)},
+    require = ["cargo", "xcrun"],
+    srcs = _APPLE,
+) for platform in ["macos", "ios"]]
+
 # --- Android (Linux or macOS; JDK, Gradle, the Android SDK/NDK and cargo-ndk from PATH). ---
 
 # Gradle resolves only artifacts listed in gradle/verification-metadata.xml.

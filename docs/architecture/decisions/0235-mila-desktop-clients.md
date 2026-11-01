@@ -144,7 +144,17 @@ from XCTest, CTest, Dart tests and CI builds.
 - Platform enum: [`ssh_command.ex`](../../../protocol/lib/overalls_protocol/ssh_command.ex)
   and [`device.ex`](../../../marshall/lib/marshall/notifications/device.ex).
 - CI: [`mila-builds.yml`](../../../.github/workflows/mila-builds.yml) and
-  [`mila-release.yml`](../../../.github/workflows/mila-release.yml).
+  [`mila-release.yml`](../../../.github/workflows/mila-release.yml). Only a
+  pushed `mila-v*` tag is a signed run: it alone enters the `mila-release`
+  environment, refuses a missing signing input (Apple through `build.sh`,
+  Android in the apksigner step) and publishes. Dispatches and trunk pushes
+  touching the mobile build run the Android and Apple jobs unsigned, without
+  the environment or any signing secret: the unsigned release APK and
+  `mila-build <ios|macos> unsigned`, an ad-hoc signed release-configuration
+  DMG and device IPA that reads no signing input. These are CI build checks
+  beside decision 4's dev and release targets, not release plans, and are
+  never published (`.github/CONTRACTS` mila-release-publish-tag-only and
+  mila-release-signing-leak).
 
 Remaining gaps:
 
@@ -159,7 +169,12 @@ Remaining gaps:
   not delivered by the native client.
 - The Windows runner has not been compiled or run on Windows, and no TPM or
   software-provider key has been exercised.
-- The release workflows have not run with real signing material.
+- The release workflows have not run with real signing material: the
+  `mila-release` environment and its Apple and Android signing secrets are
+  not yet provisioned, so the signed paths, including the Android apksigner
+  step, are untested. The apksigner path is hard-coded to Android
+  build-tools 36.0.0 and has never run. The unsigned Android and Apple builds
+  are not yet recorded as passing in CI.
 
 ## Open questions
 

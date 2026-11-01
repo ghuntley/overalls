@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 if [[ $# -ne 2 ]]; then
-  echo 'usage: mila-build <ios|macos> <dev|release>' >&2
+  echo 'usage: mila-build <ios|macos> <dev|release|unsigned>' >&2
   exit 2
 fi
 case "$1" in

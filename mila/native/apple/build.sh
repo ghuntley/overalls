@@ -6,14 +6,19 @@
 #   release  macOS: Developer ID signed Mila.app in a notarized, stapled DMG.
 #            iOS: a device IPA. Both are signed with the provisioning profile
 #            named by MILA_APPLE_PROFILE_RUNNER.
+#   unsigned macOS: an ad-hoc signed release-configuration Mila.app in an
+#            unsigned Mila-<version>-unsigned.dmg. iOS: an ad-hoc signed device
+#            Mila-<version>-unsigned.ipa. It reads no signing input; CI builds
+#            it when no signing material is available. Neither installs as a
+#            signed release: ad-hoc builds cannot sign in (see README).
 #
 # A release refuses any missing signing input rather than substituting one, and
 # verifies every signature as its final step. Output goes to
 # mila/build/<platform>-<mode>/.
 set -euo pipefail
 
-if [[ $# -ne 2 || ! "$1" =~ ^(ios|macos)$ || ! "$2" =~ ^(dev|release)$ ]]; then
-  echo "usage: mila/native/apple/build.sh <ios|macos> <dev|release>" >&2
+if [[ $# -ne 2 || ! "$1" =~ ^(ios|macos)$ || ! "$2" =~ ^(dev|release|unsigned)$ ]]; then
+  echo "usage: mila/native/apple/build.sh <ios|macos> <dev|release|unsigned>" >&2
   exit 2
 fi
 platform=$1
@@ -41,6 +46,9 @@ version=${MILA_VERSION:-0.0.0}
 if [[ "$mode" == release ]]; then
   require MILA_APPLE_TEAM MILA_APPLE_IDENTITY MILA_APPLE_PROFILE_RUNNER MILA_VERSION
   [[ "$platform" == ios ]] || require MILA_NOTARY_PROFILE
+fi
+if [[ "$mode" != dev ]]; then
+  require MILA_VERSION
   [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || refuse "MILA_VERSION must be MAJOR.MINOR.PATCH"
 fi
 
@@ -74,7 +82,7 @@ export CARGO_PROFILE_RELEASE_BUILD_OVERRIDE_STRIP=false
 case "$platform-$mode" in
   macos-*) rust_target=aarch64-apple-darwin swift_triple=arm64-apple-macosx15.0 sdk=macosx ;;
   ios-dev) rust_target=aarch64-apple-ios-sim swift_triple=arm64-apple-ios18.0-simulator sdk=iphonesimulator ;;
-  ios-release) rust_target=aarch64-apple-ios swift_triple=arm64-apple-ios18.0 sdk=iphoneos ;;
+  ios-release | ios-unsigned) rust_target=aarch64-apple-ios swift_triple=arm64-apple-ios18.0 sdk=iphoneos ;;
 esac
 
 # The devenv Nix Rust toolchain carries only the host standard library.
@@ -92,7 +100,7 @@ python3 "$repo/mila/localization/generate_catalogs.py" \
   --source "$repo/mila/localization/catalogs" --output "$package_dir/Sources/MilaNativeUI/Resources"
 
 swift_config=debug
-[[ "$mode" == release ]] && swift_config=release
+[[ "$mode" != dev ]] && swift_config=release
 swift_args=(--package-path "$package_dir/App" --scratch-path "$package_dir/App/.build/$platform-$mode"
   --configuration "$swift_config" --triple "$swift_triple" --sdk "$(xcrun --sdk "$sdk" --show-sdk-path)")
 xcrun swift build "${swift_args[@]}"
@@ -123,7 +131,7 @@ python3 "$repo/mila/localization/apple_infoplist_strings.py" \
   --source "$repo/mila/localization/catalogs" --resources "$resources"
 
 keychain_args=()
-[[ -n "${MILA_KEYCHAIN:-}" ]] && keychain_args=(--keychain "$MILA_KEYCHAIN")
+[[ "$mode" != unsigned && -n "${MILA_KEYCHAIN:-}" ]] && keychain_args=(--keychain "$MILA_KEYCHAIN")
 
 # Find the installed profile by name and check that it belongs to this team and
 # bundle identifier before its entitlements are used.
@@ -158,7 +166,7 @@ if [[ "$mode" == release ]]; then
   use_profile
   sign_args=(--sign "$MILA_APPLE_IDENTITY" --entitlements "$out/entitlements.plist" --timestamp)
   [[ "$platform" == macos ]] && sign_args+=(--options runtime)
-elif [[ "$platform" == macos && -n "${MILA_APPLE_IDENTITY:-}" ]]; then
+elif [[ "$mode" == dev && "$platform" == macos && -n "${MILA_APPLE_IDENTITY:-}" ]]; then
   sign_args=(--sign "$MILA_APPLE_IDENTITY")
   if [[ -n "${MILA_APPLE_PROFILE_RUNNER:-}" ]]; then
     require MILA_APPLE_TEAM
@@ -174,6 +182,23 @@ codesign --verify --deep --strict "$app"
 
 if [[ "$mode" == dev ]]; then
   echo "mila-build: built $app"
+  exit 0
+fi
+
+if [[ "$mode" == unsigned ]]; then
+  # No identity, profile, timestamp or notarization: the artifact name says so.
+  if [[ "$platform" == macos ]]; then
+    artifact="Mila-$version-unsigned.dmg"
+    hdiutil create -quiet -volname Mila -srcfolder "$app" -format UDZO -ov "$out/$artifact"
+  else
+    artifact="Mila-$version-unsigned.ipa"
+    mkdir "$out/Payload"
+    cp -R "$app" "$out/Payload/"
+    (cd "$out" && zip -qry "$artifact" Payload)
+    rm -rf "$out/Payload"
+  fi
+  (cd "$out" && shasum -a 256 "$artifact" > SHA256SUMS)
+  echo "mila-build: built unsigned $out/$artifact"
   exit 0
 fi
 

@@ -23,7 +23,7 @@ with the `aarch64-apple-ios` and `aarch64-apple-ios-sim` standard libraries.
 
 ## Build targets
 
-`mila-build <ios|macos> <dev|release>` (`build.sh`) builds `mila-ffi` for the
+`mila-build <ios|macos> <dev|release|unsigned>` (`build.sh`) builds `mila-ffi` for the
 target, builds `App/`, assembles `Mila.app` under `mila/build/<platform>-<mode>/`
 and signs it. It uses the system Xcode, not the Nix apple-sdk that devenv exports.
 
@@ -33,12 +33,16 @@ and signs it. It uses the system Xcode, not the Nix apple-sdk that devenv export
 | `ios dev` | iOS-simulator `Mila.app` | ad hoc |
 | `macos release` | notarized, stapled `Mila-<version>.dmg` | Developer ID, hardened runtime, profile entitlements |
 | `ios release` | device `Mila-<version>.ipa` | distribution identity, embedded profile |
+| `macos unsigned` | `Mila-<version>-unsigned.dmg`, release configuration | ad hoc; no notarization |
+| `ios unsigned` | device `Mila-<version>-unsigned.ipa`, release configuration | ad hoc |
 
 A release needs `MILA_APPLE_TEAM`, `MILA_APPLE_IDENTITY`,
 `MILA_APPLE_PROFILE_RUNNER` (an installed profile's name), `MILA_VERSION`
 (`MAJOR.MINOR.PATCH`) and, for macOS, `MILA_NOTARY_PROFILE` (a `notarytool`
 keychain profile). `MILA_KEYCHAIN` selects the signing keychain. A missing
-input, or a profile for another team or bundle identifier, is refused.
+input, or a profile for another team or bundle identifier, is refused. An
+`unsigned` build needs only `MILA_VERSION` and reads no signing input;
+`mila-release.yml` builds it on runs without a `mila-v*` tag.
 
 Ad-hoc builds have no keychain entitlements, so `MilaDeviceSigner` cannot
 create a Secure Enclave key and sign-in is unavailable. Signing in needs a

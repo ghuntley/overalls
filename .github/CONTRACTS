@@ -24,3 +24,24 @@ job environment variable NAMESPACE_RBE_TOKEN from the repository secret, never
 in argv, a file in the checkout or a log, so tools/buck2 enables the Namespace
 cache. A run without the secret (a fork or pull request) MUST still build
 locally through the same steps (ADR-0276).
+
+@cc [owner:ghuntley,label:security;release] mila-release-publish-tag-only
+mila-release.yml MUST create a GitHub release, or upload to any store, only in
+a run for a pushed `refs/tags/mila-v*` tag (`github.event_name == 'push'`): the
+publish job and its tag-only needs (source-bundle, linux, windows) carry that
+explicit `if:`. A run on any other trigger (workflow_dispatch on any ref, a
+trunk push) MUST NOT publish and MUST NOT enter the `mila-release`
+environment or read a signing secret; its android and apple jobs build
+unsigned (`unsigned-*` artifacts, 7-day retention). A tag run MUST refuse a
+missing signing input rather than publish an unsigned artifact (ADR-0235).
+
+@cc [owner:ghuntley,label:security;release] mila-release-signing-leak
+mila-release.yml's android and apple jobs MUST run with
+OVERALLS_BUCK2_REMOTE=off and, in signed runs, MUST fail when a signing value
+(the Apple keychain and certificate passwords, notary key id and issuer, the
+decoded ExportOptions.plist, the Android upload passwords, keystore path or
+keystore bytes) reaches a Buck2 log, buck-out, the daemon's files or a buck2
+temporary directory, or the Apple identity reaches an action command or
+environment. Signing material MUST live only in owner-only $RUNNER_TEMP files
+removed by an always() step, and passwords MUST NOT appear in argv
+(ADR-0235, ADR-0269 M9).
