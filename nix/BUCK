@@ -4,6 +4,7 @@ load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:mix.bzl", "mix_sources")
 load("@root//nix/verification/tests/machines:modules.bzl", "SYSTEM_MODULE_GROUPS")
 load("@root//buck:rust.bzl", "overalls_rust_crate", "overalls_rust_crate_variant", "rust_leaf_parity_test", "rust_musl_binary")
+load("@root//buck:rust_cargo_clippy.bzl", "rust_cargo_clippy")
 
 nix_owned()
 
@@ -82,6 +83,37 @@ overalls_rust_crate("nix/domains/artifacts/terminald", profile = "hardened", tes
     "TERMINALD_TEST_HEAD": read_root_config("nix", "coreutils") + "/head",
     "TERMINALD_TEST_SHELL": read_root_config("nix", "test_login_shell"),
 })
+
+# terminald's FreeBSD and illumos cfg code (ADR-0265): Clippy with the pinned
+# toolchain's own target standard libraries, through Cargo, since the
+# prelude toolchain only targets Linux. The Windows cfg code is linted by the
+# terminald-windows.nix cross build.
+filegroup(
+    name = "terminald-srcs",
+    srcs = glob(
+        ["domains/artifacts/terminald/**"],
+        exclude = ["domains/artifacts/terminald/target/**", "domains/artifacts/terminald/.hegel/**"],
+    ),
+)
+
+[rust_cargo_clippy(
+    name = "lilly-terminald-clippy-" + os,
+    package = "lilly-terminald",
+    member = "nix/domains/artifacts/terminald",
+    target = "x86_64-unknown-" + os,
+    srcs = [
+        "//:workspace_files",
+        "//elixir:cargo_manifests",
+        "//enrico:cargo_manifests",
+        "//lilly:cargo_manifests",
+        "//lyra:cargo_manifests",
+        "//marshall:cargo_manifests",
+        "//mila:cargo_manifests",
+        ":cargo_manifests",
+        ":terminald-srcs",
+    ],
+    labels = ["check", "precommit"],
+) for os in ["freebsd", "illumos"]]
 
 # The editor broker, the other static musl leaf (vscode-web-broker/default.nix).
 overalls_rust_crate("nix/domains/artifacts/vscode-web-broker", profile = "hardened")

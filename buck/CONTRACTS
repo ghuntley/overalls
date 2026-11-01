@@ -224,6 +224,15 @@ workspace lints and root clippy.toml), and `<name>-rustfmt` MUST fail on any
 unformatted Rust source; both are `check`/`precommit` labelled, with
 per-target and per-file `[rustfmt/<path>]` sub-targets (ADR-0265, ADR-0273).
 
+@cc [owner:ghuntley,label:build;verification] rust-cargo-target-clippy
+rust_cargo_clippy MUST run `cargo clippy -p <package> --all-targets --locked
+--offline --target <triple> -- -D warnings` with the single Nix Rust toolchain
+(its own target standard libraries), over a copy of the root workspace with
+the declared filegroups and empty stubs for the other members, against only
+the rust// cell's vendored root-lock crates, in a clean environment. Any
+clippy diagnostic for that target MUST fail the check. It exists for `cfg`
+code that the Linux-only prelude toolchain never compiles (ADR-0265, ADR-0273).
+
 @cc [owner:ghuntley,label:build;verification] lyra-cross-buck2
 lyra_cross MUST build Lyra's client, Windows agents and native agents with
 the shared lyra-build.sh over cargo-workspace.nix's source layout (Lyra's
