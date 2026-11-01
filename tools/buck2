@@ -63,6 +63,19 @@ except Exception:
   fi
   printf '%s ok\n' "$host" > "$remote_probe_file"
 }
+# Pure-bash line matching: the host updater runs this script with a fixed
+# PATH that has coreutils and findutils but no sed or awk (ADR-0271).
+# Prints capture group 1 of the first stdin line matching the regex.
+first_match() {
+  local re=$1 line
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    if [[ "$line" =~ $re ]]; then
+      printf '%s\n' "${BASH_REMATCH[1]}"
+      return 0
+    fi
+  done
+  return 0
+}
 remote_resolve() {
   command -v nsc >/dev/null || return 0
   if [[ -e "$remote_endpoints" && -z "$(find "$remote_endpoints" -mmin +60 2>/dev/null)" ]]; then
@@ -73,8 +86,10 @@ remote_resolve() {
   # attempt waits an hour too.
   : > "$remote_endpoints"
   json=$(timeout 30 nsc bazel setup -o json 2>/dev/null </dev/null) || return 0
-  engine=$(sed -n 's/.*"scheduler_endpoint": *"grpcs:\/\/reapi-\([^":]*\):[0-9]*".*/reapih-\1:443/p' <<<"$json")
-  storage=$(sed -n 's/.*"storage_endpoint": *"grpcs:\/\/storage-\([^":]*\):[0-9]*".*/storageh-\1:443/p' <<<"$json")
+  engine=$(first_match '"scheduler_endpoint": *"grpcs://reapi-([^":]*):[0-9]*"' <<<"$json")
+  storage=$(first_match '"storage_endpoint": *"grpcs://storage-([^":]*):[0-9]*"' <<<"$json")
+  engine=${engine:+reapih-$engine:443}
+  storage=${storage:+storageh-$storage:443}
   if [[ -n "$engine" && -n "$storage" ]]; then
     printf '%s %s\n' "$engine" "$storage" > "$remote_endpoints"
   fi
@@ -86,22 +101,22 @@ remote_config() {
     fi
     local personal="${HOME:-/nonexistent}/.config/overalls/namespace-rbe-token.json"
     if [[ -z "${NAMESPACE_RBE_TOKEN:-}" && -r "$personal" ]]; then
-      NAMESPACE_RBE_TOKEN=$(sed -n 's/.*"bearer_token"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' "$personal")
+      NAMESPACE_RBE_TOKEN=$(first_match '"bearer_token"[[:space:]]*:[[:space:]]*"([^"]*)"' < "$personal")
     fi
   fi
   if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off && -n "${NAMESPACE_RBE_TOKEN:-}" ]]; then
     export NAMESPACE_RBE_TOKEN
     local wanted='<file:tools/namespace.buckconfig>' engine storage
     remote_resolve
-    if ! read -r engine storage < "$remote_endpoints" 2>/dev/null || [[ -z "$storage" ]]; then
-      storage=$(sed -n 's/^  cas_address = //p' tools/namespace.buckconfig)
+    if ! read -r engine storage 2>/dev/null < "$remote_endpoints" || [[ -z "$storage" ]]; then
+      storage=$(first_match '^  cas_address = (.*)$' < tools/namespace.buckconfig)
     fi
     if ! remote_alive "$storage" && [[ -s "$remote_endpoints" ]]; then
       # The cluster may have been recreated within the hour: look it up again.
       rm -f "$remote_endpoints" "$remote_probe_file"
       remote_resolve
-      read -r engine storage < "$remote_endpoints" 2>/dev/null || true
-      [[ -n "$storage" ]] || storage=$(sed -n 's/^  cas_address = //p' tools/namespace.buckconfig)
+      read -r engine storage 2>/dev/null < "$remote_endpoints" || true
+      [[ -n "$storage" ]] || storage=$(first_match '^  cas_address = (.*)$' < tools/namespace.buckconfig)
     fi
     if ! remote_alive "$storage"; then
       echo "tools/buck2: the Namespace cache at $storage does not answer; building locally without it (ADR-0276 decision 7)." >&2
@@ -122,8 +137,14 @@ remote_config() {
     # OVERALLS_BUCK2_REMOTE_EXECUTION=off keeps a build cache-only, and the
     # host updater's .buckconfig.local turns it off for deployments.
     local cells_id image
-    cells_id=$(sed -n 's/^  cells_id = \([0-9a-f]\{64\}\)$/\1/p' .buck-cells/toolchains.buckconfig 2>/dev/null || true)
-    image=$(awk -v id="$cells_id" '$1 == id && id != "" { print $2 }' tools/namespace-re-image.lock 2>/dev/null || true)
+    cells_id=$(first_match '^  cells_id = ([0-9a-f]{64})$' < .buck-cells/toolchains.buckconfig 2>/dev/null || true)
+    image=
+    if [[ -n "$cells_id" && -r tools/namespace-re-image.lock ]]; then
+      local lock_id lock_image
+      while read -r lock_id lock_image _; do
+        if [[ "$lock_id" == "$cells_id" ]]; then image=$lock_image; break; fi
+      done < tools/namespace-re-image.lock
+    fi
     if [[ -n "$image" ]]; then
       wanted+=$'\n[overalls]\n  re_image = '"$image"
       if [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-on}" != off ]]; then
