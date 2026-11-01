@@ -272,7 +272,9 @@ jobs:
         if: endsWith(matrix.host.name, ':deployment')
         run: |
           set -euo pipefail
-          sudo apt-get install -y -qq btrfs-progs > /dev/null
+          # The runner container ships without apt lists.
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq btrfs-progs > /dev/null
           avail=$(df --output=avail -B1 / | tail -1)
           size=$(( avail - 32 * 1024 * 1024 * 1024 ))
           sudo truncate -s "$size" /var/lib/nix-store.btrfs
