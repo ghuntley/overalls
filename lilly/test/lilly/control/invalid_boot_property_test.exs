@@ -109,7 +109,14 @@ defmodule Lilly.Control.InvalidBootPropertyTest do
           refute File.exists?(Path.join(root, "vms"))
           refute File.exists?(Path.join(root, "network"))
         end,
-        test_cases: 100
+        test_cases: 100,
+        # Each case boots a fresh BEAM (several seconds). Under a loaded host
+        # the engine's wall-clock `too_slow` health check (fewer than about
+        # ten inputs in 30 s) failed 2 to 8 of these mutations on 2026-11-01
+        # although every boot was correct. The shipped `ci` profile
+        # suppresses only that check (and derandomizes, as the gate does);
+        # HEGEL_DERANDOMIZE and HEGEL_SEED still override it.
+        profile: :ci
       )
     end
   end
