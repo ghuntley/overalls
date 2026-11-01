@@ -86,8 +86,10 @@ The [daemon](../../../nix/domains/artifacts/terminald/src/session.rs),
 [ring](../../../nix/domains/artifacts/terminald/src/ring.rs),
 [PTY execution](../../../nix/domains/artifacts/terminald/src/pty.rs) and
 [vsock listener](../../../nix/domains/artifacts/terminald/src/vsock.rs) implement the
-multiplexer with tests run by the
-[native check gate](../../../nix/domains/artifacts/infrastructure/terminald-checks.nix). Both guest
+multiplexer with tests run by the Buck2
+[native check gate](../../../nix/BUCK) (`//nix:lilly-terminald-bin-unittest`,
+`-clippy` and `-rustfmt`; correction 2026-11-01: the Nix
+`terminald-checks.nix` gate was replaced by these targets). Both guest
 images install the daemon and unit
 ([NixOS](../../../nix/domains/artifacts/guest/terminald.nix),
 [Ubuntu](../../../nix/domains/artifacts/guest/ubuntu/units/lilly-terminals.service)).

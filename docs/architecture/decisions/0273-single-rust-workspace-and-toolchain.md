@@ -185,8 +185,9 @@ partial, in milestone M5.
   `rustTools` (its clippy and rustfmt) and `buildStaticMusl`, which builds a
   static-pie musl binary with rustc's self-contained CRT and `rust-lld`
   (`allowedReferences = [ ]`). The 13 Lilly helpers, Enrico's git owner,
-  the guest telemetry receiver, observability-runtimes, the trace spool,
-  terminald's checks and Mila's Rust and Linux builds use `rustPlatform`;
+  the guest telemetry receiver, observability-runtimes, the trace spool
+  and Mila's Rust and Linux builds use `rustPlatform` (terminald's Nix
+  check gate did too until 2026-11-01; see "Lint gate");
   terminald's musl build and the editor broker use `buildStaticMusl`
   with the profile the leaf declares through `buildType` (`hardened` for
   both; see the T2 regression above). The exported
@@ -296,8 +297,8 @@ partial, in milestone M5.
   clippy and rustfmt from the toolchain now, and their rebuilt outputs (3, 2
   and 2 files) are byte-identical to the previous ones. Marshall's Cedar NIF
   (both the Nix release and the Buck2 Mix build state in
-  [`mix.nix`](../../../nix/buck/mix.nix)) and its lint gate
-  ([`marshall-cedar-lints.nix`](../../../nix/domains/artifacts/applications/marshall-cedar-lints.nix))
+  [`mix.nix`](../../../nix/buck/mix.nix)) and its lint gate (then
+  `marshall-cedar-lints.nix`, now a Buck2 check; see "Lint gate")
   now take rustc, cargo, clippy and rustfmt from the toolchain too; the NIF
   was built by nixpkgs rustc 1.99.0 and is now built by 1.97.1, with the same
   `NEEDED` entries and the same release closure.
@@ -311,7 +312,18 @@ partial, in milestone M5.
   `cargo fmt --all -- --check` passed on the workspace under nixpkgs Rust 1.99,
   and the clippy gate passes in the devenv shell under the pinned 1.97.1.
   The per-crate Nix gates still run their crate's clippy, including Lyra's and
-  terminald's cross-target clippy under the pinned 1.97.1 toolchain.
+  terminald's cross-target clippy under the pinned 1.97.1 toolchain. Since
+  2026-11-01 the Cedar NIF's and terminald's Linux gates are Buck2 targets
+  instead of Nix checks: `//marshall:marshall_cedar-clippy` and `-rustfmt`
+  (`overalls_rust_crate(..., lib_test = False)` in
+  [marshall/BUCK](../../../marshall/BUCK), because the NIF's test harness
+  cannot link outside the BEAM) replace `marshall-cedar-lints.nix`, and
+  `//nix:lilly-terminald-bin-unittest` (one test thread, the pinned `head`
+  and login shell), `-clippy` and `-rustfmt` replace `terminald-checks.nix`.
+  An injected `needless_return` fails the Cedar clippy target, as it failed
+  the Nix gate. Buck2 Rust targets now also set Cargo's per-target
+  `CARGO_CRATE_NAME` and `CARGO_PRIMARY_PACKAGE`, which Rustler's `init!`
+  reads.
 - **Platform builds.** The Mila Apple script, the Android Gradle task and the
   `mila-builds`/`mila-release` workflows build `mila-ffi` through its own
   manifest inside the root workspace. Gradle also tracks the root lock as an

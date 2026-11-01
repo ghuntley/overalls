@@ -267,7 +267,6 @@ an entry shows `—`.
 | `logging-transports` | `//:check-logging-transports` | — | — |
 | `lyra` | `//:check-lyra` | — | — |
 | `maintenance-evacuation` | `//nix/verification/tests/machines/fleet:maintenance-evacuation` | `machines/fleet/` | — |
-| `marshall-cedar-lints` | `//:check-marshall-cedar-lints` | — | — |
 | `marshall-release` | `//:check-marshall-release` | `release/` | Actual source-built release payloads, runtime versions and application independence. |
 | `memory-suspension-fleet` | `//nix/verification/tests/machines/fleet:memory-suspension-fleet` | `machines/fleet/` | — |
 | `mfa-login-browser` | `//nix/verification/tests/machines/mfa-login:mfa-login-browser` | `machines/mfa-login/` | Three colocated packaged Marshall replicas over verified TLS; subsequent magic-link and remembered MFA, actual backend/WebSocket observations, admin revocation and copied-cookie refusal, plus an SQL-backdated expired-ceremony refusal with a fresh cross-replica retry. Virtual authenticators only; execution is recorded in the campaign review. |
@@ -378,7 +377,6 @@ an entry shows `—`.
 | `telemetry-diagnostics` | `//:check-telemetry-diagnostics` | — | — |
 | `terminal-fleet` | `//nix/verification/tests/machines/fleet:terminal-fleet` | `machines/fleet/` | — |
 | `terminal-ubuntu-fleet` | `//nix/verification/tests/machines/fleet:terminal-ubuntu-fleet` | `machines/fleet/` | — |
-| `terminald` | `//:check-terminald` | — | — |
 | `terminald-windows` | `//:check-terminald-windows` | — | — |
 | `thread-tool` | `//nix/verification/tests/machines/fleet:thread-tool` | `machines/fleet/` | — |
 | `trace-spool-native` | `//nix/verification/tests/machines/trace-spool:trace-spool-native` | `machines/trace-spool/` | — |

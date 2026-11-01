@@ -29,7 +29,16 @@ def _crate_env(crate: dict, path: str) -> dict[str, str]:
         "CARGO_PKG_VERSION_MAJOR": major,
         "CARGO_PKG_VERSION_MINOR": minor,
         "CARGO_PKG_VERSION_PATCH": patch,
+        # Cargo sets this for the workspace members it builds; Rustler's
+        # `init!` emits the NIF entry point only for a primary package.
+        "CARGO_PRIMARY_PACKAGE": "1",
     }
+
+def _for_crate(attrs: dict, crate_name: str) -> dict:
+    """`attrs` with Cargo's per-target CARGO_CRATE_NAME added to its env."""
+    out = dict(attrs)
+    out["env"] = attrs["env"] | {"CARGO_CRATE_NAME": crate_name}
+    return out
 
 def _deps(crate: dict, kinds: list[str]) -> (list[str], dict[str, list[str]], dict[str, str]):
     """Unconditional labels, per-platform labels and extern renames for `kinds`."""
@@ -59,7 +68,7 @@ def _with_platform_deps(kwargs: dict, crate: dict, kinds: list[str], extra: list
         kwargs["named_deps"] = named
     return apply_platform_attrs({p: {"deps": labels} for p, labels in by_platform.items()}, kwargs)
 
-def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[str] = [], test_env: dict[str, str] = {}, visibility: list[str] = ["PUBLIC"]):
+def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[str] = [], test_env: dict[str, str] = {}, lib_test: bool = True, visibility: list[str] = ["PUBLIC"]):
     """Targets for the workspace member at repository path `path`.
 
     Called from the BUCK file of the path's top-level directory. Defines
@@ -69,7 +78,10 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
     `release` or `hardened`. `native_libs` names `[nix]` library directories
     (cells.nix) searched for the crate's `#[link]` libraries; the cc wrapper
     records them as the binaries' rpath. `test_env` is added to every test's
-    environment (the Nix build's check environment).
+    environment (the Nix build's check environment). `lib_test = False` drops
+    the library's test target, for a crate whose test harness cannot link
+    (a Rustler NIF resolves its `enif_*` symbols only inside the BEAM); its
+    clippy and rustfmt checks still cover the library.
     """
     crate = CRATES.get(path)
     if crate == None:
@@ -101,11 +113,11 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             proc_macro = lib["proc_macro"],
             rustc_flags = lints + _RELEASE_FLAGS,
             visibility = visibility,
-            **common
+            **_for_crate(common, lib["crate"])
         ), crate, ["normal"]))
         lib_label = [":" + name + "-lib"]
         targets.append(name + "-lib")
-        if lib["test"]:
+        if lib["test"] and lib_test:
             targets.append(name + "-unittest")
             native.rust_test(**_with_platform_deps(dict(
                 name = name + "-unittest",
@@ -113,7 +125,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
                 crate_root = sub + "/" + lib["root"],
                 rustc_flags = lints,
                 run_env = _TEST_ENV | test_env,
-                **common
+                **_for_crate(common, lib["crate"])
             ), crate, ["normal", "dev"]))
     for binary in crate["bins"]:
         targets.append(binary["name"])
@@ -123,7 +135,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             crate_root = sub + "/" + binary["root"],
             rustc_flags = lints + profile_flags,
             visibility = visibility,
-            **common
+            **_for_crate(common, binary["name"].replace("-", "_"))
         ), crate, ["normal"], lib_label))
         # The binary's own `#[cfg(test)]` modules, as `cargo test` runs them.
         if binary["test"]:
@@ -134,7 +146,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
                 crate_root = sub + "/" + binary["root"],
                 rustc_flags = lints,
                 run_env = _TEST_ENV | test_env,
-                **common
+                **_for_crate(common, binary["name"].replace("-", "_"))
             ), crate, ["normal", "dev"], lib_label))
     # Cargo gives integration tests each binary's path at compile time.
     bin_env = {"CARGO_BIN_EXE_" + b["name"]: "$(location :{})".format(b["name"]) for b in crate["bins"]}
@@ -148,7 +160,7 @@ def overalls_rust_crate(path: str, profile: str = "release", native_libs: list[s
             crate_root = sub + "/" + test["root"],
             rustc_flags = lints,
             run_env = _TEST_ENV | test_env,
-            **test_attrs
+            **_for_crate(test_attrs, test["name"].replace("-", "_"))
         ), crate, ["normal", "dev"], lib_label))
 
     rust_srcs = [f for f in srcs if f.endswith(".rs")]

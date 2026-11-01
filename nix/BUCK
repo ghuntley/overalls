@@ -66,10 +66,11 @@ script_check(
 ]]
 
 # terminald, the guest terminal multiplexer: a static musl executable with the
-# `hardened` profile infrastructure/terminald.nix builds (ADR-0273). Its tests get
-# terminald-checks.nix's environment: the pinned head, a login shell without
-# the host's startup files (the sandbox has none), and one test thread, so
-# each PTY history's process budget measures only its own workload.
+# `hardened` profile infrastructure/terminald.nix builds (ADR-0273). Its tests,
+# the native check gate since terminald-checks.nix was deleted, get the pinned
+# head, a login shell without the host's startup files (the sandbox has none),
+# and one test thread, so each PTY history's process budget measures only its
+# own workload.
 overalls_rust_crate("nix/domains/artifacts/terminald", profile = "hardened", test_env = {
     "RUST_TEST_THREADS": "1",
     "TERMINALD_TEST_HEAD": read_root_config("nix", "coreutils") + "/head",

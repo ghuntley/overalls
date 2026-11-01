@@ -162,7 +162,9 @@ match Nix byte for byte. Compare them with `diff -r`.
   `nix/buck/rust/fixups/<crate>/fixups.toml` (libc's is the example).
 - **First-party crates.** In the top-level directory's `BUCK`, call
   `overalls_rust_crate("<member path>", profile = "hardened"|"release",
-  native_libs = [...], test_env = {...})`. It reads the member from
+  native_libs = [...], test_env = {...})`; a Rustler NIF passes
+  `lib_test = False` (its harness cannot link outside the BEAM; Marshall's
+  Cedar crate is the example). It reads the member from
   `rust//:workspace.bzl` and defines `<pkg>-lib`, one target per binary,
   `<pkg>-unittest`, `<pkg>-test-<name>`, and the `<pkg>-clippy` and
   `<pkg>-rustfmt` precommit checks (`[rustfmt/<path>]` checks one file).

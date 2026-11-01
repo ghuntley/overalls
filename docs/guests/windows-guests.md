@@ -364,7 +364,8 @@ executor ships with a rebuilt image. Log: `agentd.log`.
 - `//:check-lyra`: Linux tests and clippy plus a type check of the
   library and the Windows bins for `x86_64-pc-windows-gnu`.
 - `//:check-terminald-windows`: builds the Windows terminal daemon;
-  `//:check-terminald` keeps the Linux suite on the shared engine.
+  `//nix:lilly-terminald-bin-unittest`, `//nix:lilly-terminald-clippy` and
+  `//nix:lilly-terminald-rustfmt` keep the Linux suite on the shared engine.
 - `//nix/verification/tests/machines/windows-lilly-guest:windows-lilly-guest-agents`: the `windows-v1` image
   (`windowsGuestAgents`) through the real Lilly driver: vsock in the jail,
   trust `installed` by the guest's trust daemon, provisioning `ready` with the

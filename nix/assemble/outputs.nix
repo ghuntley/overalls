@@ -113,8 +113,6 @@ in
       module = modules.default; fleetModule = modules.fleetBuilds;
       hosts = systems;
     };
-    marshall-cedar-lints = built.cedarLints;
-    terminald = built.terminaldChecks;
     terminald-windows = built.terminaldWindows;
     lyra = built.lyra.tests;
     mila-rust = built.mila.rustCheck;

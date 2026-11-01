@@ -44,7 +44,6 @@ let
   version = "0.1.0";
   hostLock = import ./hosts/host-tools.nix { inherit pkgs; buck = artifacts.lilly-host-helpers or null; };
   terminald = swapLeaf "terminald" (import ./infrastructure/terminald.nix { inherit pkgs; });
-  terminaldChecks = import ./infrastructure/terminald-checks.nix { inherit pkgs; };
   # Hash-pinned Windows native runtime inputs. This is a staging closure only:
   # it does not contain the Code OSS bundle or broker and cannot widen
   # windows-v1 editor capability (ADR-0171).
@@ -271,7 +270,6 @@ let
     '';
   };
 
-  cedarLints = import ./applications/marshall-cedar-lints.nix { inherit pkgs cargoWorkspace cedarSource; };
 
   # Every Mix application with fixed-output dependencies, keyed like
   # dependency-hashes.json; adding one to `dependencies` adds it here.
@@ -313,7 +311,8 @@ let
           terminaldWindows
           terminald.native
           hostLock
-          cedarLints
+          # Rustler compiles the Cedar NIF inside Marshall's release.
+          mixReleases.marshall
           enricoGitOwner
           traceSpool
           (import ./vscode-web-broker { inherit pkgs; })
@@ -455,8 +454,8 @@ in
 assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
   inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool hostLock;
-  inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource cedarLints hostTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
-  inherit terminald terminaldChecks terminaldWindows;
+  inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource hostTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit terminald terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;
   marvin = import ./marvin { inherit pkgs; };
