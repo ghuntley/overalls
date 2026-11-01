@@ -17,6 +17,8 @@ workspace and toolchain.
 [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md) supersedes
 ADR-0272. Namespace becomes the Buck2 cache and remote-execution backend,
 and developers, host updaters and CI all write to it under one tenant token.
+ADR-0272's dormant NativeLink module, credentials and tests were removed on
+2026-11-01.
 [ADR-0277](0277-mila-native-builds-on-buck2.md) supersedes ADR-0227: Mila builds
 only through Buck2 targets on Nix-pinned toolchains, and the Flutter client,
 dartssh2 overlay and Flutter checks are retired.

@@ -687,7 +687,6 @@ def make_config() -> updater.Configuration:
         secretUnits=[],
         secretHelper=str(PREPARE_PATH),
         resourcePolicyHelper="",
-        remoteCache=None,
     )
 
 

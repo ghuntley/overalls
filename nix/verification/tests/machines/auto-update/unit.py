@@ -682,69 +682,18 @@ class MigrationUnits(unittest.TestCase):
 
 
 class RemoteCacheConfiguration(unittest.TestCase):
-    """The updater's Buck2 configuration never uploads and reads only a reachable cache."""
+    """The updater's Buck2 configuration never executes remotely (ADR-0276)."""
 
-    def cache(self, identity: Path) -> dict[str, object]:
-        return {
-            "address": "100.98.214.120",
-            "port": 50071,
-            "instanceName": "main",
-            "caCertificate": "/nix/store/fixture-ca.crt",
-            "clientIdentity": str(identity),
-        }
+    def test_namespace_config_leaves_uploads_to_the_include(self) -> None:
+        # Namespace decides uploads; remote execution stays off.
+        self.assertNotIn("default_allow_cache_upload", updater.BUCK2_NAMESPACE_CONFIG)
+        self.assertNotIn("buck2_re_client", updater.BUCK2_NAMESPACE_CONFIG)
+        self.assertIn("remote_execution = false", updater.BUCK2_NAMESPACE_CONFIG)
 
-    def test_read_only_section_only_with_identity_and_listener(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            identity = Path(directory) / "client.pem"
-            cache = updater.remote_cache_value(self.cache(identity))
-            local, state = updater.buck2_local_config(None)
-            self.assertEqual((local, state), (updater.BUCK2_NAMESPACE_CONFIG, "not_configured"))
-            # Namespace decides uploads; remote execution stays off (ADR-0276).
-            self.assertNotIn("default_allow_cache_upload", local)
-            self.assertIn("remote_execution = false", local)
-            local, state = updater.buck2_local_config(cache, lambda *_: True)
-            self.assertEqual((local, state), (updater.BUCK2_LOCAL_CONFIG, "identity_missing"))
-            identity.write_text("")
-            self.assertEqual(
-                updater.buck2_local_config(cache, lambda *_: True)[1], "identity_missing"
-            )
-            identity.write_text("certificate and key")
-            local, state = updater.buck2_local_config(cache, lambda *_: False)
-            self.assertEqual((local, state), (updater.BUCK2_LOCAL_CONFIG, "unreachable"))
-            probes: list[tuple[str, int]] = []
-            local, state = updater.buck2_local_config(
-                cache, lambda address, port: probes.append((address, port)) is None
-            )
-            self.assertEqual(state, "enabled")
-            self.assertEqual(probes, [("100.98.214.120", 50071)])
-            self.assertTrue(local.startswith(updater.BUCK2_LOCAL_CONFIG))
-            self.assertIn("address = grpc://100.98.214.120:50071\n", local)
-            self.assertIn(f"tls_client_cert = {identity}\n", local)
-            for configured in [updater.BUCK2_LOCAL_CONFIG, local]:
-                self.assertIn("default_allow_cache_upload = false", configured)
-                self.assertIn("remote_execution = false", configured)
-
-    def test_malformed_cache_configuration_is_refused(self) -> None:
-        good = self.cache(Path("/run/overalls-secrets/buck-re/client.pem"))
-        for change in [
-            {"address": "100.98.214.120\n[buck2]"},
-            {"address": "300.1.1.1"},
-            {"port": 0},
-            {"instanceName": "main\n  default_allow_cache_upload = true"},
-            {"clientIdentity": "relative.pem"},
-            {"caCertificate": "/ca.crt\n[buck2]"},
-        ]:
-            with self.assertRaises(ValueError):
-                updater.remote_cache_value(dict(good, **change))
-        self.assertIsNone(updater.remote_cache_value(None))
-
-    def test_unreachable_listener_probe_is_bounded(self) -> None:
-        with socket.socket() as listener:
-            listener.bind(("127.0.0.1", 0))
-            port = listener.getsockname()[1]
-        started = time.monotonic()
-        self.assertFalse(updater.cache_reachable("127.0.0.1", port))
-        self.assertLess(time.monotonic() - started, updater.REMOTE_CACHE_PROBE_TIMEOUT + 1)
+    def test_local_fallback_config_never_uploads(self) -> None:
+        self.assertIn("default_allow_cache_upload = false", updater.BUCK2_LOCAL_CONFIG)
+        self.assertNotIn("buck2_re_client", updater.BUCK2_LOCAL_CONFIG)
+        self.assertIn("remote_execution = false", updater.BUCK2_LOCAL_CONFIG)
 
 
 class NamespaceCache(unittest.TestCase):
@@ -792,7 +741,7 @@ class RemoteCacheFallback(unittest.TestCase):
         self.assertIn('"state": "fallback"', log.getvalue())
 
     def test_failure_without_cache_is_not_retried(self) -> None:
-        for state in ["not_configured", "identity_missing", "unreachable"]:
+        for state in ["token_missing"]:
             calls: list[str] = []
 
             def run(calls: list[str] = calls) -> str:

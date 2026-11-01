@@ -309,8 +309,9 @@ one without building it.
 Namespace (namespace.so) is the Buck2 remote cache and remote-execution
 backend for developers, hosts and CI under one tenant token
 ([ADR-0276](../../../docs/architecture/decisions/0276-namespace-buck2-remote-cache-and-execution.md)).
-The fleet's NativeLink services ([ADR-0272](../../../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md))
-are retired; their module stays dormant.
+It replaced the fleet's NativeLink services
+([ADR-0272](../../../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)),
+which have been removed from the repository.
 
 - **How it turns on.** `tools/buck2` looks for a token in
   `NAMESPACE_RBE_TOKEN`, then `/run/overalls-secrets/fleet-namespace/token`

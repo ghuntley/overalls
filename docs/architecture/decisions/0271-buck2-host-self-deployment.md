@@ -154,6 +154,12 @@ M10 (2026-10-30) implements decision 3.
   machine test builds as the updater does (cache hit for a CI-uploaded
   action; local builds with the cache stopped, the identity absent, and the
   identity rejected by the listener or not a certificate).
+  This NativeLink client was removed on 2026-11-01 with the other NativeLink
+  leftovers (ADR-0276 decision 1, revised): the updater has no `remoteCache`
+  setting, `buck2_local_config` and the `buck-remote-cache` machine test are
+  gone, and the updater writes `BUCK2_NAMESPACE_CONFIG`. The two contracts
+  remain, revised for Namespace, with unit tests `RemoteCacheConfiguration`
+  and `RemoteCacheFallback`.
 - **Fixtures.** [support/update-fixture.nix](../../../nix/verification/tests/support/update-fixture.nix)
   builds an offline Buck2 fixture repository. It contains the real wrapper,
   `.buckconfig`, toolchains and rules, plus the pinned buck2 with cut-down

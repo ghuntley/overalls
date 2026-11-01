@@ -63,7 +63,7 @@ nix_cxx_toolchain(
 # Rust target needs it to exist. The Nix stdenv toolchain has no default deps.
 nix_cxx_toolchain(name = "cxx_no_default_deps", visibility = ["PUBLIC"])
 
-# Local execution, plus the NativeLink cache when configured (ADR-0272).
+# Local execution, plus the Namespace cache when configured (ADR-0276).
 overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"])
 
 [nix_tool(name = tool, visibility = ["PUBLIC"]) for tool in [

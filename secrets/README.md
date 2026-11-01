@@ -58,42 +58,6 @@ preserving other fields (such as `DB_PASSWORD`), and update the bundle in the
 same change. Without a recovery identity, generate a fresh CA and replace all
 three documents together.
 
-## Buck2 remote cache identities
-
-These NativeLink identities are dormant: Namespace replaced the NativeLink
-services on 2026-10-31 (ADR-0276). [`fleet/buck-re`](../fleet/buck-re) holds the public certificates of the
-NativeLink cache ([ADR-0272](../docs/architecture/decisions/0272-nativelink-remote-cache-and-execution.md)).
-`ca.crt` issues the Panterloons server certificate and the read-only host
-client certificates. `uploader-ca.crt` issues only the CI uploader
-certificate. Both CAs were issued on 2026-10-30, expire in 2036, and had their
-private keys discarded after issuance. Leaves expire in 2028.
-`panterloons-buck-re.enc.json` holds `SERVER_KEY` and `CLIENT_IDENTITY`, and
-`dungarees-buck-re.enc.json` holds `CLIENT_IDENTITY`, under
-`overalls-buck-re.production`. A client identity is the PEM certificate
-followed by its key. `buck-re-uploader-recovery.enc.json` is recovery-only. It
-holds `overalls-buck-re-uploader.production.UPLOADER_IDENTITY` for loading into
-CI, and is never delivered to a host. To rotate, or to add a host, issue new
-CAs and every leaf in private storage, replace all three documents with
-`encrypt --replace`, and commit the certificates in the same change.
-
-Remote execution (M10) added two more CAs on 2026-10-30, also expiring in 2036
-with their private keys discarded after issuance. `executor-ca.crt` issues
-`executor-developer.crt`, the developer identity for the execute listener; it
-is recovery-only in `buck-re-executor-recovery.enc.json` as
-`overalls-buck-re-executor.production.EXECUTOR_IDENTITY`, for operators to
-load on their own machines. `worker-ca.crt` issues one worker certificate per
-host: `panterloons-buck-re-worker.enc.json` and
-`dungarees-buck-re-worker.enc.json` hold
-`overalls-buck-re-worker.production.WORKER_IDENTITY`. These are separate
-documents so the worker identities could be added without decrypting the
-M4b documents. Leaves expire in 2028. Rotate each set the same way: new CA,
-every leaf, `encrypt --replace` of each of its documents, certificates in the
-same change. For CI, operators load `UPLOADER_IDENTITY` into the
-`BUCK_RE_UPLOADER_IDENTITY` repository secret and an ephemeral, pre-authorised
-Tailscale key tagged `tag:buck-re-ci` into `BUCK_RE_TAILSCALE_AUTHKEY`, set
-the tailnet policy so `tag:buck-re-ci` reaches only Panterloons' port 50072,
-and then set the repository variable `BUCK_RE` to `enabled`.
-
 ## Namespace Buck2 token
 
 [`fleet-namespace.enc.json`](fleet-namespace.enc.json) holds the tenant-scoped,

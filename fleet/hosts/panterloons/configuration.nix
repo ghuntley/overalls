@@ -15,7 +15,4 @@
     enable = true;
     localName = "panterloons";
   } // import ../../fleet-builds.nix { inherit lib; };
-  # The NativeLink cache, scheduler and worker (ADR-0272) are retired:
-  # Namespace is the Buck2 cache and remote-execution backend (ADR-0276).
-  # The module and fleet/buck-re.nix stay for reactivation.
 }

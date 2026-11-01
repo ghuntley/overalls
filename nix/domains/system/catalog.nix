@@ -18,7 +18,6 @@
     ./tailscale.nix
     (import ./underclass.nix { inherit packages; })
     ./remote-builders.nix
-    (import ./buck-remote-execution.nix { inherit packages; })
     ./nix-cache.nix
     ./fleet-network.nix
     ./nix-gc.nix

@@ -36,6 +36,15 @@ chose on 2026-10-31. Observed facts:
    (ADR-0272). The fleet stops running the NativeLink server, scheduler,
    workers and host clients. Their module, registry, credentials and machine
    tests stay in the repository, dormant, for reactivation.
+
+   Revised on 2026-11-01: the user approved retiring the dormant NativeLink
+   leftovers, so they no longer stay for reactivation. The module, the
+   worker sandbox, the package and its pins, the registry and its
+   certificates, the host credentials and SOPS documents, the tailnet ports,
+   the updater's NativeLink `remoteCache` client, the CI step and the
+   `buck-remote-cache` and `buck-remote-execution` machine tests are removed.
+   Reactivating NativeLink would need a new decision. ADR-0272 records the
+   retiring commit.
 2. **One tenant token, many writers.** A single tenant-scoped, revocable token
    authorises everyone. Every holder can read and write the cache, and the
    holders are:
@@ -213,6 +222,10 @@ Elixir rules (M6) are not on trunk yet.
   the `-v 4` build output, `--version` or the daemon directory after a cached
   build.
 - **Hosts.**
+  - The NativeLink leftovers are removed from the repository (decision 1,
+    revised 2026-11-01). The updater keeps only the Namespace path:
+    `BUCK2_NAMESPACE_CONFIG` normally and `BUCK2_LOCAL_CONFIG`, which refuses
+    uploads, for the fallback build.
   - [profile.nix](../../../nix/platform/hosts/profile.nix) declares the
     `fleet-namespace` bundle (group `wheel`, started at boot) for every host
     whose `host.json` names the credential (all three).
@@ -226,7 +239,8 @@ Elixir rules (M6) are not on trunk yet.
   and the source-bundle job of
   [mila-builds.yml](../../../.github/workflows/mila-builds.yml) set
   `NAMESPACE_RBE_TOKEN` from the secret. The NativeLink `buck-re` action and
-  its script are removed.
+  its script are removed, and so, on 2026-11-01, is ci.yml's dangling step
+  that still named the action and the `BUCK_RE_*` secrets.
 
 - **Remote execution, opt-in.**
   - [tools/namespace-re-image](../../../tools/namespace-re-image) builds the

@@ -947,7 +947,8 @@ Buck2's remote cache and remote execution are on Namespace
 ([ADR-0276](decisions/0276-namespace-buck2-remote-cache-and-execution.md)). It
 supersedes the NativeLink services of
 [ADR-0272](decisions/0272-nativelink-remote-cache-and-execution.md), which
-the fleet no longer runs. Every host decrypts the tenant token for root and
+the fleet no longer runs; their module, credentials and machine tests were
+removed from the repository on 2026-11-01. Every host decrypts the tenant token for root and
 `wheel`, `tools/buck2` enables the cache whenever a token is present, and
 host updates read and upload but never execute remotely.
 

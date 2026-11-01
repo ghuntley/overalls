@@ -140,10 +140,9 @@ let
     else lib.mapAttrs (name: path: if lib.elem name hostTools then path else "${unavailable}") allTools;
   rustCellPath = if fixture == null && hermeticHost then rustCell else pkgs.emptyDirectory;
   toolLines = lib.concatStrings (lib.mapAttrsToList (name: path: "  ${name} = ${path}\n") tools);
-  # The identity of this cells closure for remote execution (ADR-0272):
-  # every store path an action can name, so a worker advertising the same id
-  # holds the same toolchains. Actions carry it as overalls-cells, and the
-  # NativeLink worker reads it back from this file.
+  # The identity of this cells closure for remote execution (ADR-0276):
+  # every store path an action can name, so a worker image recorded for the
+  # same id holds the same toolchains. Actions carry it as overalls-cells.
   cellsId = builtins.hashString "sha256" (toolLines + "rust = ${rustCellPath}\nbuck2 = ${buck2}\n");
   # The [mix] section needs the package set; fixtures (ADR-0271) load no Mix
   # targets and omit it, as do the macOS host-tool cells. Mix actions run

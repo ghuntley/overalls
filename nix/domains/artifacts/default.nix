@@ -465,10 +465,6 @@ rec {
   vscodeWebBroker = swapLeaf "vscode-web-broker" (import ./vscode-web-broker { inherit pkgs; });
   smtprelay = pkgs.callPackage ./smtprelay {};
   underclass = pkgs.callPackage ./underclass {};
-  # NativeLink is FSL-1.1-ALv2 (source-available, unfree in nixpkgs terms);
-  # build it from the same pinned input with only the licence policy relaxed,
-  # as for the Android SDK (ADR-0272).
-  nativelink = androidPkgs.callPackage ./nativelink {};
   secretTools = { inherit (pkgs) secretspec sops ssh-to-age age; };
   # The buck2 that buckCells pins, for offline updater fixtures (ADR-0271).
   inherit (pkgs) buck2;

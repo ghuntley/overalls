@@ -32,16 +32,18 @@ BUCK2_HOME = STATE / "buck2-home"
 BUCK2_GCROOTS = STATE / "gcroots"
 BUCK2_ISOLATION = "overalls-update"
 BUCK2_PRESERVED = ["/buck-out", "/.buck-cells", "/.buck-cells.key", "/.buck-cells.gcroot"]
-# Hosts never execute remotely (ADR-0271, ADR-0276): the updater's checkout
-# configuration says so whatever the candidate's committed .buckconfig
-# contains. With the Namespace cache they upload what they build, like every
-# other holder of the tenant token, so hosts warm each other (ADR-0276).
+# @cc [owner:ghuntley,label:deployment;recovery] updater-remote-cache-read-only
+# The updater's Buck2 configuration MUST always refuse remote execution,
+# whatever the candidate's committed .buckconfig contains (ADR-0271). It
+# leaves uploads to the Namespace include that tools/buck2 adds while the
+# host's Namespace token exists, so hosts read and write that cache like every
+# other token holder and warm each other (ADR-0276). The local fallback
+# configuration MUST refuse cache uploads.
 BUCK2_NAMESPACE_CONFIG = (
     "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
     "[overalls]\n  remote_execution = false\n"
 )
-# With a NativeLink cache (ADR-0272), and for the local fallback build, they
-# never upload either.
+# The local fallback build never uploads.
 BUCK2_LOCAL_CONFIG = (
     "# Written by overalls-auto-update.\n[buck2]\n  file_watcher = fs_hash_crawler\n"
     "  default_allow_cache_upload = false\n[overalls]\n  remote_execution = false\n"
@@ -49,11 +51,6 @@ BUCK2_LOCAL_CONFIG = (
 # The Namespace token (ADR-0276): the candidate's tools/buck2 reads it and
 # enables the Namespace cache while it exists.
 NAMESPACE_TOKEN = Path("/run/overalls-secrets/fleet-namespace/token")
-# Seconds to wait for the cache listener before building without it.
-REMOTE_CACHE_PROBE_TIMEOUT = 5.0
-IPV4_OCTET = r"(?:25[0-5]|2[0-4][0-9]|1?[0-9]?[0-9])"
-IPV4_ADDRESS = re.compile(rf"(?:{IPV4_OCTET}\.){{3}}{IPV4_OCTET}")
-INSTANCE_NAME = re.compile(r"[A-Za-z0-9_-]{1,64}")
 DEPLOYMENT_PATH = re.compile(r"/nix/store/[0-9a-df-np-sv-z]{32}-[A-Za-z0-9+._?=-]{1,180}")
 
 
@@ -74,16 +71,6 @@ def unit_identity(system: Path, unit: str) -> tuple[str | None, tuple[tuple[str,
 KEYS = ["DATABASE_URL", "SECRET_KEY_BASE", "TOKEN_SIGNING_SECRET", "MARSHALL_CLOAK_KEYS"]
 
 
-class RemoteCache(TypedDict):
-    """The host's read-only NativeLink cache client (ADR-0272)."""
-
-    address: str
-    port: int
-    instanceName: str
-    caCertificate: str
-    clientIdentity: str
-
-
 class Configuration(TypedDict):
     repository: str
     branch: str
@@ -94,7 +81,6 @@ class Configuration(TypedDict):
     secretUnits: list[str]
     secretHelper: str
     resourcePolicyHelper: str
-    remoteCache: RemoteCache | None
 
 
 class SecretsHelper(Protocol):
@@ -281,78 +267,7 @@ def configuration_value(raw: object) -> Configuration:
         secretUnits=[string_value(item) for item in list_value(row["secretUnits"])],
         secretHelper=string_value(row["secretHelper"]),
         resourcePolicyHelper=string_value(row["resourcePolicyHelper"]),
-        remoteCache=remote_cache_value(row.get("remoteCache")),
     )
-
-
-def remote_cache_value(raw: object) -> RemoteCache | None:
-    if raw is None:
-        return None
-    row = object_value(raw)
-    address = string_value(row["address"])
-    port = integer_value(row["port"])
-    instance = string_value(row["instanceName"])
-    paths = [string_value(row["caCertificate"]), string_value(row["clientIdentity"])]
-    if (
-        not IPV4_ADDRESS.fullmatch(address)
-        or not 0 < port < 65536
-        or not INSTANCE_NAME.fullmatch(instance)
-        or not all(path.startswith("/") and not re.search(r"\s", path) for path in paths)
-    ):
-        raise ValueError("invalid remote cache")
-    return RemoteCache(
-        address=address,
-        port=port,
-        instanceName=instance,
-        caCertificate=paths[0],
-        clientIdentity=paths[1],
-    )
-
-
-def cache_reachable(address: str, port: int) -> bool:
-    try:
-        with socket.create_connection((address, port), timeout=REMOTE_CACHE_PROBE_TIMEOUT):
-            return True
-    except OSError:
-        return False
-
-
-# @cc [owner:ghuntley,label:deployment;recovery] updater-remote-cache-read-only
-# The updater's Buck2 configuration MUST always refuse remote execution. With
-# no NativeLink cache configured it leaves uploads to the Namespace include
-# that tools/buck2 adds while the host's Namespace token exists, so hosts read
-# and write that cache like every other token holder (ADR-0276). Otherwise it
-# MUST refuse cache uploads, and MAY add the host's read-only NativeLink cache
-# client only while
-# the host's decrypted client identity is a non-empty regular file and the
-# cache listener accepts a connection; otherwise the build runs locally with
-# no cache section, so a missing credential or an unreachable cache never
-# blocks an update (ADR-0271, ADR-0272).
-def buck2_local_config(
-    cache: RemoteCache | None,
-    reachable: Callable[[str, int], bool] = cache_reachable,
-) -> tuple[str, str]:
-    """The checkout's .buckconfig.local and why the cache is or is not used."""
-    if cache is None:
-        return BUCK2_NAMESPACE_CONFIG, "not_configured"
-    identity = Path(cache["clientIdentity"])
-    try:
-        info = identity.stat()
-    except OSError:
-        return BUCK2_LOCAL_CONFIG, "identity_missing"
-    if not stat.S_ISREG(info.st_mode) or info.st_size == 0:
-        return BUCK2_LOCAL_CONFIG, "identity_missing"
-    if not reachable(cache["address"], cache["port"]):
-        return BUCK2_LOCAL_CONFIG, "unreachable"
-    section = (
-        "[buck2_re_client]\n"
-        f"  address = grpc://{cache['address']}:{cache['port']}\n"
-        "  tls = true\n"
-        f"  instance_name = {cache['instanceName']}\n"
-        f"  tls_ca_certs = {cache['caCertificate']}\n"
-        f"  tls_client_cert = {cache['clientIdentity']}\n"
-    )
-    return BUCK2_LOCAL_CONFIG + section, "enabled"
 
 
 def namespace_cache_state(token: Path = NAMESPACE_TOKEN) -> str:
@@ -367,10 +282,10 @@ def namespace_cache_state(token: Path = NAMESPACE_TOKEN) -> str:
 
 
 # @cc [owner:ghuntley,label:recovery] updater-remote-cache-fail-open
-# A build that fails while a remote cache is enabled (the NativeLink section
-# or the Namespace token) MUST be retried once with every remote cache
-# removed, so a cache that answers but fails (a rejected, revoked or corrupt
-# credential, a broken endpoint) never fails an update.
+# A build that fails while the remote cache is enabled (the Namespace token)
+# MUST be retried once with the remote cache removed, so a cache that answers
+# but fails (a rejected, revoked or corrupt credential, a broken endpoint)
+# never fails an update.
 def build_with_cache_fallback(
     run: Callable[[], str], cache_state: str, disable_cache: Callable[[], None]
 ) -> str:
@@ -615,18 +530,13 @@ class Deployment:
         # One build per daemon needs no inotify watcher, and notify would follow
         # buck-out's Nix result links through the whole system closure.
         local = CHECKOUT / ".buckconfig.local"
-        local_config, cache_state = buck2_local_config(self.config["remoteCache"])
-        local.write_text(local_config)
+        local.write_text(BUCK2_NAMESPACE_CONFIG)
         local.chmod(0o600)
-        if self.config["remoteCache"] is not None:
-            print(json.dumps({"event": "update.remote_cache", "state": cache_state}), flush=True)
-        namespace_state = namespace_cache_state()
+        cache_state = namespace_cache_state()
         print(
-            json.dumps({"event": "update.namespace_cache", "state": namespace_state}),
+            json.dumps({"event": "update.namespace_cache", "state": cache_state}),
             flush=True,
         )
-        if namespace_state == "enabled":
-            cache_state = "enabled"
         wrapper = CHECKOUT / "tools" / "buck2"
         if not wrapper.is_file() or not os.access(wrapper, os.X_OK):
             raise UpdateError("build_tool_unavailable")

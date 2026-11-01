@@ -6,9 +6,6 @@ let
 in
 {
   imports = [ ../../fleet-network.nix ];
-  # The NativeLink cache client and worker (ADR-0272) are retired: Namespace
-  # is the Buck2 cache and remote-execution backend (ADR-0276). The module and
-  # fleet/buck-re.nix stay for reactivation.
   services.overallsOtelFleet = {
     enable = true;
     role = "worker";
