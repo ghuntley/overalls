@@ -321,8 +321,10 @@ _rust_leaf_parity_test = rule(
 )
 
 def rust_leaf_parity_test(name: str, buck: str, nix_attr: str, labels: list[str] = [], compare: str = "linkage"):
-    """Fails when an imported Buck2 Rust leaf links differently from the flake
-    attribute `nix_attr` it replaces, or with `compare = "bytes"` (a leaf
+    """Fails when an imported Buck2 Rust leaf links differently from the Nix
+    build it replaces, `nix_attr` in lib.assemble's package set without
+    artifacts (`(lib.assemble { }).packages.<nix_attr>`), or with
+    `compare = "bytes"` (a leaf
     built by the same script as its Nix build) when any output byte differs.
     Builds the Nix side, so callers label it `heavy`."""
     _rust_leaf_parity_test(

@@ -28,10 +28,10 @@ nix_store_import(
     visibility = ["PUBLIC"],
 )
 
-# Parity with the Nix build it replaces (deleted at M11). Builds the Nix side.
+# Parity with the Nix build it replaces (deleted with that Nix build). Builds the Nix side.
 rust_leaf_parity_test(
     name = "trace-spool-parity",
     buck = ":trace-spool-import",
-    nix_attr = "legacyPackages.x86_64-linux.traceSpool",
+    nix_attr = "traceSpool",
     labels = ["heavy"],
 )

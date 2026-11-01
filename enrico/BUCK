@@ -33,10 +33,10 @@ nix_store_import(
     visibility = ["PUBLIC"],
 )
 
-# Parity with the Nix build it replaces (deleted at M11). Builds the Nix side.
+# Parity with the Nix build it replaces (deleted with that Nix build). Builds the Nix side.
 rust_leaf_parity_test(
     name = "git-owner-parity",
     buck = ":git-owner-import",
-    nix_attr = "legacyPackages.x86_64-linux.enricoGitOwner",
+    nix_attr = "enricoGitOwner",
     labels = ["heavy"],
 )

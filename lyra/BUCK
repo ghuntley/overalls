@@ -22,7 +22,7 @@ _WORKSPACE = [
     "//nix:cargo_manifests",
 ]
 
-# name, mode, flake attribute of the Nix build it replaces (deleted at M11).
+# name, mode, package-set attribute of the Nix build it replaces (deleted with that Nix build).
 [(
     lyra_cross(
         name = name,
@@ -34,7 +34,7 @@ _WORKSPACE = [
     rust_leaf_parity_test(
         name = name + "-parity",
         buck = ":" + name + "-import",
-        nix_attr = "legacyPackages.x86_64-linux." + attr,
+        nix_attr = attr,
         compare = "bytes",
         labels = ["heavy"],
     ),
@@ -49,7 +49,7 @@ nix_store_import(name = "native-probes-import", src = ":native[probes]", visibil
 rust_leaf_parity_test(
     name = "native-probes-parity",
     buck = ":native-probes-import",
-    nix_attr = "legacyPackages.x86_64-linux.lyra.native.probes",
+    nix_attr = "lyra.native.probes",
     compare = "bytes",
     labels = ["heavy"],
 )

@@ -55,12 +55,12 @@ nix_store_import(
     visibility = ["PUBLIC"],
 )
 
-# Parity with the Nix-built helpers this bundle replaces (deleted at M11):
+# Parity with the Nix-built helpers this bundle replaces (deleted with that Nix build):
 # same executables, ELF interpreter, NEEDED libraries and RUNPATH, and every
 # rpath store path inside the imported closure. Builds the Nix side.
 rust_leaf_parity_test(
     name = "host-helpers-parity",
     buck = ":host-helpers-import",
-    nix_attr = "legacyPackages.x86_64-linux.hostLock",
+    nix_attr = "hostLock",
     labels = ["heavy"],
 )

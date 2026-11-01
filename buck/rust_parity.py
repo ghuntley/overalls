@@ -2,7 +2,7 @@
 
 Contract rust-leaf-parity: see buck/CONTRACTS.
 
-Usage: rust_parity.py [--bytes] NIX READELF NIX_STORE STORE_PATH_FILE FLAKE_ATTR [RUNTIME_REF...]
+Usage: rust_parity.py [--bytes] NIX READELF NIX_STORE STORE_PATH_FILE PACKAGE_ATTR [RUNTIME_REF...]
 
 With --bytes (a Cargo-driven leaf built by the same script as its Nix build,
 such as Lyra's cross builds) the two trees must instead hold the same files
@@ -12,7 +12,8 @@ there too; LC_UUID and the code-signature blob (which hashes it) are masked
 before comparing, and manifest.json's sha256 for such a file is not compared.
 
 STORE_PATH_FILE holds the imported Buck2 artifact's store path. Its bin/ must
-name the same executables as the Nix build of FLAKE_ATTR, each with the same
+name the same executables as the Nix build of PACKAGE_ATTR (an attribute
+path in lib.assemble's package set without Buck2 artifacts), each with the same
 ELF interpreter, RUNPATH and panic strategy (unwind or abort), no NEEDED
 library and no `.debug_*` section the Nix build lacks, and
 every store path in the RUNPATH or anywhere in the bytes (a vendored crate in
@@ -185,8 +186,12 @@ def main(argv: list[str]) -> int:
     nix, readelf, nix_store, store_path_file, attr = argv[1:6]
     refs = [store_root(ref) for ref in argv[6:]]
     buck = Path(Path(store_path_file).read_text().strip())
+    # lib.assemble without artifacts is the package set of Nix builds alone.
+    # The installable names the output (lyra.native.probes, not its `out`).
+    expression = f'a: let d = (a {{ }}).packages.{attr}; in "${{d.drvPath}}^${{d.outputName}}"'
+    installable = run(nix, "eval", "--raw", ".#lib.assemble", "--apply", expression).strip()
     reference = Path(
-        run(nix, "build", "--no-link", "--print-out-paths", f".#{attr}").strip().splitlines()[-1]
+        run(nix, "build", "--no-link", "--print-out-paths", installable).strip().splitlines()[-1]
     )
     if by_bytes:
         failures = compare_bytes(buck, reference)
