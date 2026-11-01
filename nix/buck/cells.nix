@@ -1,4 +1,4 @@
-{ pkgs, toolchain ? null, buck2 ? pkgs.buck2, fixture ? null }:
+{ pkgs, toolchain ? null, artifacts ? null, buck2 ? pkgs.buck2, fixture ? null }:
 # @cc [owner:ghuntley,label:build] buck-cells-from-pins
 # Buck2's prelude and every toolchain path MUST come from this derivation,
 # built only from flake.lock-pinned nixpkgs and the dependency registry, so
@@ -133,6 +133,7 @@ let
     chromium = "${lib.getExe pkgs.chromium}";
     unzip = "${pkgs.unzip}/bin";
     fonts_conf = "${pkgs.makeFontsConf { fontDirectories = [ pkgs.dejavu_fonts ]; }}";
+    bwrap = "${pkgs.bubblewrap}/bin/bwrap";
   } (lib.attrValues inputs);
   tools = if fixture != null then lib.mapAttrs (name: _: fixture.tools.${name} or fixture.stub) allTools
     else if hermeticHost then allTools
@@ -144,13 +145,63 @@ let
   # holds the same toolchains. Actions carry it as overalls-cells, and the
   # NativeLink worker reads it back from this file.
   cellsId = builtins.hashString "sha256" (toolLines + "rust = ${rustCellPath}\nbuck2 = ${buck2}\n");
+  # The [mix] section needs the package set; fixtures (ADR-0271) load no Mix
+  # targets and omit it, as do the macOS host-tool cells. Mix actions run
+  # locally only, so cells_id leaves the section out.
+  withMix = artifacts != null && fixture == null && hermeticHost;
+  mixState = import ./mix.nix { inherit pkgs artifacts; };
+  # @cc [owner:ghuntley,label:build] mix-cells-from-pins
+  # Mix rules MUST read their dependency sets, OTP variants and runtime paths
+  # from this section only: the prod fixed-output fetches that the Nix releases
+  # use, the test fetches, both OTP builds' mixRelease shell state and the
+  # store paths the releases record (ADR-0269).
+  mixProjects = [ "marshall" "lilly" "audi" "porsche" "ziggy" "brady" "galileo" "enrico" "peach" "susan" ];
+  mix = {
+    state_plain = "${mixState.plain}/state.sh";
+    state_encrypted = "${mixState.encrypted}/state.sh";
+    elixir_version = toolchain.elixir.version;
+    otp_version = toolchain.erlang.version;
+    erlang_encrypted = "${artifacts.encrypted.toolchain.erlang}";
+    crash_dump_public_key = "${../domains/artifacts/build-crash-dump-public.pem}";
+    cedar_vendor = "${artifacts.cargoWorkspace.vendor}";
+    cedar_source = "${artifacts.cedarSource}";
+    esbuild = lib.getExe pkgs.esbuild;
+    esbuild_version = pkgs.esbuild.version;
+    hegel_nif = "${artifacts.hegelNif}/lib/hegel_nif.so";
+    postgres = "${pkgs.postgresql}/bin";
+    enrico_git_owner = "${artifacts.enricoGitOwner}/bin";
+    # Tools the suites run that devenv takes from the developer's PATH.
+    test_tools = "${pkgs.buildEnv { name = "overalls-mix-test-tools"; paths = [ pkgs.openssl.bin pkgs.openssh pkgs.python3 ]; }}/bin";
+    git = "${pkgs.git}/bin";
+    # The OS trust store that the release probe and the suites expect at
+    # /etc/ssl (:public_key.cacerts_get).
+    ca_bundle = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    host_tools = "${artifacts.hostTools}";
+    vmm = "${artifacts.vmm}";
+    util_linux_bin = "${pkgs.util-linux.bin}";
+  } // lib.listToAttrs (map (app: lib.nameValuePair "deps_${app}_prod" "${artifacts.dependencies.${app}}") mixProjects)
+    // lib.mapAttrs' (project: deps: lib.nameValuePair "deps_${project}_test" "${deps}") artifacts.testDependencies;
+  # Every store path a release may reference at runtime: both OTP builds and
+  # their libraries, the release wrapper's runtime PATH, Marshall's esbuild
+  # and Lilly's host tools. The Cargo vendor is a build input only, so it is
+  # absent. mix_release fails on a reference outside this closure; assembly
+  # keeps only what it finds (RuntimeRefsInfo).
+  runtimeClosure = pkgs.closureInfo {
+    rootPaths = [
+      toolchain.erlang artifacts.encrypted.toolchain.erlang pkgs.bash pkgs.coreutils pkgs.gnused
+      pkgs.gnugrep pkgs.gawk pkgs.esbuild artifacts.hostTools artifacts.vmm
+      pkgs.util-linux.bin
+    ];
+  };
   buckconfig = pkgs.writeText "toolchains.buckconfig" (''
     [nix]
-  '' + toolLines + "  cells_id = ${cellsId}\n");
+  '' + toolLines + "  cells_id = ${cellsId}\n" + lib.optionalString withMix (''
+    [mix]
+  '' + lib.concatStrings (lib.mapAttrsToList (name: value: "  ${name} = ${value}\n") mix)));
 in
 # A symlink farm: build it locally rather than through a remote builder
 # (a wedged relay once held every checkout's cells rebuild).
-pkgs.runCommandLocal "overalls-buck-cells" { } ''
+pkgs.runCommandLocal "overalls-buck-cells" { } (''
   mkdir -p "$out/prelude" "$out/bin"
   ${lib.concatStrings (lib.mapAttrsToList (cell: group: lib.concatStrings (lib.mapAttrsToList (name: path: ''
     mkdir -p "$out/${cell}"
@@ -160,4 +211,8 @@ pkgs.runCommandLocal "overalls-buck-cells" { } ''
   ln -s ${rustCellPath} "$out/rust"
   tar -xzf ${buck2.prelude} -C "$out/prelude" --strip-components=1
   cp ${buckconfig} "$out/toolchains.buckconfig"
-''
+'' + lib.optionalString withMix ''
+  # [mix] is the last section, so the closure computed at build time joins it.
+  chmod u+w "$out/toolchains.buckconfig"
+  printf '  runtime_refs = %s\n' "$(tr '\n' ' ' < ${runtimeClosure}/store-paths)" >> "$out/toolchains.buckconfig"
+'')

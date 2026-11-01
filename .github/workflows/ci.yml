@@ -2,7 +2,7 @@ name: "ci"
 
 # Builds and tests what each trunk push changed, chosen from the Buck2 graph
 # (ADR-0270): affected -> build -> test -> one job per affected NixOS machine
-# test. tools/affected compares the pushed range's base and head target hashes;
+# test, plus one job per affected Mix suite. tools/affected compares the pushed range's base and head target hashes;
 # it loads targets only and never builds a Nix derivation. The precommit job runs
 # tools/precommit over the same range. The daily full run
 # stays in nixos-machine-tests.yml.
@@ -11,6 +11,10 @@ name: "ci"
 on:
   push:
     branches: [trunk]
+  # Same-repository pull requests run the affected set against their base;
+  # fork pull requests run nothing (no secrets, no fleet runners). Never
+  # pull_request_target.
+  pull_request:
   workflow_dispatch:
     inputs:
       base:
@@ -43,6 +47,9 @@ permissions:
 
 jobs:
   affected:
+    # Fork pull requests get no secrets and no Namespace runners; every
+    # other job needs this one.
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 60
     outputs:
@@ -50,6 +57,7 @@ jobs:
       evaluate: ${{ steps.plan.outputs.evaluate }}
       evaluate_shards: ${{ steps.plan.outputs.evaluate_shards }}
       tests: ${{ steps.plan.outputs.tests }}
+      mix: ${{ steps.plan.outputs.mix }}
       builds: ${{ steps.plan.outputs.builds }}
       host_builds: ${{ steps.plan.outputs.host_builds }}
       errors: ${{ steps.plan.outputs.errors }}
@@ -72,6 +80,7 @@ jobs:
           EVENT: ${{ github.event_name }}
           BEFORE: ${{ github.event.before }}
           BASE: ${{ inputs.base }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
           ALL: ${{ inputs.all }}
           GH_TOKEN: ${{ github.token }}
           REPO: ${{ github.repository }}
@@ -99,6 +108,8 @@ jobs:
             else
               args=(--base "$BEFORE")
             fi
+          elif [ "$EVENT" = pull_request ]; then
+            args=(--base "$PR_BASE")
           elif [ "$ALL" = true ]; then
             args=(--all)
           else
@@ -176,7 +187,17 @@ jobs:
             ([range(0; $m | length; $ms) as $i | $m[$i:$i + $ms]]
              + [range(0; $p | length; $ps) as $i | $p[$i:$i + $ps]])
             | to_entries | map({index: (.key + 1), targets: .value})')
-          tests=$(jq -c '[.tests[].target]' affected.json)
+          # Mix suites (`expensive`) build in the mix job on at most two
+          # runners, Marshall's shards and every other suite, each runner's
+          # Buck2 running many shards at once; unchanged shards are cache hits
+          # (contract mix-test-sharded).
+          tests=$(jq -c '[.tests[] | select(.labels | index("expensive") | not) | .target]' affected.json)
+          # `publish_cache_gate` suites (Lilly's, ADR-0269 M8 gap) stay with
+          # publish-cache.yml's matrix until they pass in the sandbox.
+          mix=$(jq -c '[.tests[] | select((.labels | index("expensive")) and (.labels | index("publish_cache_gate") | not)) | .target]
+            | [{name: "marshall", targets: map(select(startswith("root//marshall:")))},
+               {name: "suites", targets: map(select(startswith("root//marshall:") | not))}]
+            | map(select(.targets | length > 0))' affected.json)
           # flake_output assemblies are evaluated above or built by
           # publish-cache.yml. expected_failure targets are soundness probes
           # that must not build.
@@ -196,6 +217,7 @@ jobs:
             echo "evaluate=$evaluate"
             echo "evaluate_shards=$evaluate_shards"
             echo "tests=$tests"
+            echo "mix=$mix"
             echo "builds=$builds"
             echo "host_builds=$host_builds"
             echo "errors=$errors"
@@ -207,6 +229,7 @@ jobs:
             echo "- machine tests: $(jq length <<<"$machine") (deferred to the daily run: $deferred)"
             echo "- machine-test evaluations: $(jq length <<<"$evaluate")"
             echo "- tests: $(jq length <<<"$tests")"
+            echo "- Mix suites: $(jq '[.[].targets[]] | length' <<<"$mix") on $(jq length <<<"$mix") runners"
             echo "- builds: $(jq length <<<"$builds")"
             echo "- host system builds: $(jq length <<<"$host_builds") runners"
             echo "- selection errors: $errors"
@@ -327,6 +350,69 @@ jobs:
         if: always()
         run: tools/namespace-token-scan
 
+  # The affected Mix suites (ADR-0269 M8): every shard of a suite is its own
+  # cached action with its own PostgreSQL, and Buck2 runs them side by side,
+  # weighted by their BEAM schedulers, on at most two runners (Marshall, and
+  # the other suites) to stay inside the runner cap. A failed shard fails the
+  # build and prints its failed tests. This replaces publish-cache.yml's
+  # `mix precommit` matrix.
+  mix:
+    needs: affected
+    if: needs.affected.outputs.mix != '[]'
+    name: mix ${{ matrix.suite.name }}
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: ${{ fromJSON(needs.affected.outputs.mix) }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      # Remote cache and execution (ADR-0272). Off unless the repository
+      # variable BUCK_RE is "enabled" and both secrets exist; only this
+      # repository's trunk pushes and dispatches use it, and a failure here
+      # leaves Buck2 local instead of failing the job.
+      - if: >-
+          vars.BUCK_RE == 'enabled' && github.repository == 'ghuntley/overalls'
+          && ((github.event_name == 'push' && github.ref == 'refs/heads/trunk')
+          || github.event_name == 'workflow_dispatch')
+        continue-on-error: true
+        uses: ./.github/actions/buck-re
+        with:
+          tailscale-authkey: ${{ secrets.BUCK_RE_TAILSCALE_AUTHKEY }}
+          uploader-identity: ${{ secrets.BUCK_RE_UPLOADER_IDENTITY }}
+      - name: Test ${{ matrix.suite.name }}
+        env:
+          TARGETS: ${{ toJSON(matrix.suite.targets) }}
+        run: |
+          set -euo pipefail
+          echo "$(nproc) CPUs"
+          mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
+          tools/buck2 build --keep-going --console simple "${targets[@]}"
+      # Contract mix-test-known-failures: the known Inception failures run in
+      # the known_failures shard, which passed only if nothing else failed.
+      - name: Report known Inception failures
+        if: always()
+        env:
+          TARGETS: ${{ toJSON(matrix.suite.targets) }}
+        run: |
+          set -euo pipefail
+          for target in $(jq -r '.[]' <<<"$TARGETS"); do
+            tools/buck2 audit subtargets "$target" 2>/dev/null | grep -q '\[known_failures\]' || continue
+            out=$(tools/buck2 build --console none --show-full-output "${target}[known_failures]" 2>/dev/null | awk '{print $2}') || continue
+            [ -f "$out/known.txt" ] || continue
+            {
+              echo "### known Inception failures (${target})"
+              echo
+              awk -F '\t' '$1 == "failing" { print "- failing: " $2 }' "$out/known.txt"
+              awk -F '\t' '$1 == "passing" { print "- now passing, remove from test_known_failures: " $2 }' "$out/known.txt"
+            } | tee -a "$GITHUB_STEP_SUMMARY"
+          done
+
   evaluate:
     needs: affected
     if: needs.affected.outputs.evaluate != '[]'
@@ -434,8 +520,8 @@ jobs:
         run: tools/namespace-token-scan
 
   ci:
-    needs: [affected, build, hosts, test, evaluate, machine, precommit]
-    if: always()
+    needs: [affected, build, hosts, test, mix, evaluate, machine, precommit]
+    if: always() && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: namespace-profile-cached-amd64
     steps:
       - name: Require selection, builds and tests to succeed
@@ -444,6 +530,7 @@ jobs:
           BUILD: ${{ needs.build.result }}
           HOSTS: ${{ needs.hosts.result }}
           TEST: ${{ needs.test.result }}
+          MIX: ${{ needs.mix.result }}
           MACHINE: ${{ needs.machine.result }}
           EVALUATE: ${{ needs.evaluate.result }}
           PRECOMMIT: ${{ needs.precommit.result }}
@@ -453,7 +540,7 @@ jobs:
           if [ "$AFFECTED" != success ]; then
             echo "::error::selection did not succeed ($AFFECTED)"; status=1
           fi
-          for job in "build:$BUILD" "hosts:$HOSTS" "test:$TEST" "evaluate:$EVALUATE" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
+          for job in "build:$BUILD" "hosts:$HOSTS" "test:$TEST" "mix:$MIX" "evaluate:$EVALUATE" "machine:$MACHINE" "precommit:$PRECOMMIT"; do
             case "${job#*:}" in
               success|skipped) ;;
               *) echo "::error::${job%%:*} did not succeed (${job#*:})"; status=1 ;;

@@ -374,9 +374,12 @@ command, the single prek hook and CI call it.
   `OVERALLS_PRECOMMIT_DIRECT=1`, the hook scripts run directly with the pinned
   tools devenv passes in `OVERALLS_PRECOMMIT_*`. The ADR, contract,
   package-input-lock and toolchain checks are then reported as skipped.
-- **Not yet covered:** `mix precommit` in each project (compile, format,
-  tests, Covenant, Dialyzer, gettext, Marshall's extra gates) until the Mix
-  rules land; CI's `mix precommit` matrix stays.
+- **Mix projects.** Each project's `:check` and `:test` shards (see Elixir
+  targets) are precommit checks without `PrecommitInfo` yet, so a change in a
+  project runs its whole check and its shards (cache hits when unchanged).
+  There are no `[fix/<path>]` sub-targets for `mix format` yet. CI runs the
+  suites in ci.yml's `mix` job; publish-cache.yml's `mix precommit` matrix
+  still runs beside it until the comparison run.
 
 ### Adding a check to precommit (the convention)
 
@@ -418,6 +421,96 @@ command, the single prek hook and CI call it.
   repositories. Restricted evaluation refuses `path:` inputs, so fixture
   `lib.assemble` names prebuilt candidates with `builtins.storePath`.
 
+## Elixir targets
+
+Rules are in `buck/mix.bzl`; their contracts are in `buck/CONTRACTS`.
+
+- **Per project.** A project's `BUCK` declares two `mix_sources` targets and
+  calls `overalls_mix_project`:
+  - `release_srcs` mirrors the Nix release source allowlist exactly;
+  - `test_srcs` holds the whole project plus its path dependencies.
+
+  The macro creates:
+  - `:compile` (prod) and `:compile_test`;
+  - `:test`, whose `[test_result]` and `[covenant]` are subtargets;
+  - `:check`, with `[format]`, `[logging]`, `[dialyzer]` (using `[plt]`) and,
+    where the project has catalogues, `[gettext]`;
+  - for applications, `:release`, `:release_probe` and `:<app>_import` (the
+    release as a store path with its `self_reference`, for
+    `nix_assemble(artifacts = …)`).
+
+  `:test` and `:check` carry the `precommit` label, and `:test` also carries
+  `expensive`. A failed shard fails its run action and prints every failed
+  test plus the log tail, so no cache keeps it; `[test_result]` holds every
+  shard's passing record.
+- **Shards.** `test_shards = N` (Marshall: 16) splits a suite into N cached
+  `mix test <files>` actions, `[shard-1]` … `[shard-N]`, each with its own
+  sandbox and PostgreSQL and only its own test files in its tree. One test
+  file's change reruns one shard; a change under `lib/` reruns them all.
+  - Unweighted files go to the shard their path hashes to (FNV-1a), so
+    adding a file moves no other file. Slow files listed in
+    `test_shard_weights` (seconds) go heaviest-first to the lightest shard.
+  - `repository_tests` prefixes (Marshall: `test/architecture/`) form a
+    `[repository]` shard, the only one that sees `repository_support`
+    (`root//:mix_repository`), so a docs or ADR change reruns only it.
+  - `[shard_plan]` is a JSON map of shard -> files: build it to find which
+    shard runs a test.
+  - `test_schedulers` (default 4) sets `+S n:n` and the action's local
+    weight, so Buck2 never starts more scheduler threads than job slots.
+  - `[covenant]` checks the union of the shards' Covenant results.
+  - **Seeds.** A cached shard keeps the ExUnit and Hegel draws of the run
+    that recorded it; the shard log has ExUnit's `Randomized with seed`.
+    `tools/buck2 build -c mix.test_salt=$(date +%s) //marshall:test` reruns
+    every shard with fresh seeds.
+  - Run one shard: `tools/buck2 build '//marshall:test[shard-3]'`.
+
+  Libraries in `elixir/` use a target prefix, for example
+  `//elixir:diagnostics_test`.
+- **Dependencies.** Mix dependencies come from the `[mix]` cells section.
+  - `deps_<project>_prod` and `deps_<project>_test` are fixed-output fetches
+    keyed in `dependency-hashes.json`.
+  - A new project needs entries in `testDependencyProjects` in
+    `nix/domains/artifacts/default.nix`, plus a hash.
+  - To find a new hash, put a fake one in the registry, run
+    `nix build .#legacyPackages.x86_64-linux.testDependencies.<project>`, and
+    copy the `got:` value.
+- **Sandbox.** Every Mix action runs in `buck/mix_sandbox.sh`:
+  - bubblewrap, no network, uid 1000;
+  - `/build` as the work directory, as in the Nix sandbox, because Mix and
+    Spark embed absolute paths;
+  - a writable overlay on `/nix/store`.
+
+  Unprivileged user namespaces are required, so these actions are local only.
+- **Shell state.** Actions source the `mixRelease` shell state captured from
+  `beam.mixRelease` (`nix/buck/mix.nix`). Releases therefore run the same
+  hooks and compiler flags as the Nix build.
+- **Self-reference.** A release names itself as
+  `/nix/store/00000000000000000000000000000000-overalls-<app>-0.1.0`.
+  Assembly rewrites that placeholder to its `$out`. The probe copies the
+  release to that path inside a sandbox and runs it there.
+- **Variants.**
+  - Encrypted crash dumps and Antithesis builds are `select()`s on
+    `//buck:encrypted_crash_dumps` and `//buck:antithesis_*`. Pick one with
+    `--target-platforms //buck:<variant>_platform`.
+  - Fixture releases are `release_variants`, which take extra `srcs`, a
+    `pre_build` source patch and `post_install` lines.
+- **Parity.** To compare a release byte for byte with a Nix build, pass
+  `-c mix.random_seed_<app>=<first 10 characters of the Nix output hash>`.
+  This makes stdenv's `-frandom-seed` match. Then compare the trees after
+  replacing the Nix output path with the placeholder.
+- **Hermetic tests.** Tests run offline:
+  - Hegel's NIF comes from `HEGEL_NIF_PATH` (the `hegelNif` Nix build);
+  - LazyHTML's precompiled NIF is in the test fetch;
+  - Postgres runs on a socket under `/build/pgs`.
+
+  Marshall's validator tests read the whole repository, so its
+  `[repository]` shard depends on `root//:mix_repository`; the other shards
+  and `:check` do not. Other suites get the default
+  `test_support`: the scripts helpers, Marshall's TLS fixtures and the
+  protocol's test support and vectors. A suite that reads another file
+  outside its project needs a `mix_sources` for it, or it fails with
+  `File.Error` in the sandbox.
+
 ## Troubleshooting
 
 - **Socket path too long** (Chromium, Postgres). `buck-out` paths are deep.
@@ -444,6 +537,10 @@ command, the single prek hook and CI call it.
   committed build output.
 - **"duplicate names" from a filegroup.** Nested filegroups that share short
   paths cannot be merged. Use `owned_set` from `buck/nix.bzl`.
+- **"[mix] … is missing".** `.buck-cells` predates the Mix section; run
+  `tools/buck2` once so it rebuilds the cells.
+- **A Mix action fails with `bwrap: … Operation not permitted`.** The host
+  has no unprivileged user namespaces; run the build where they are enabled.
 - **Stale toolchain.** Check that `readlink .buck-cells` matches
   `nix build --print-out-paths .#buckCells.x86_64-linux`, then run
   `tools/buck2 kill`.

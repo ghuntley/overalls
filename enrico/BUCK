@@ -1,4 +1,5 @@
 load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
 
@@ -39,4 +40,30 @@ rust_leaf_parity_test(
     buck = ":git-owner-import",
     nix_attr = "enricoGitOwner",
     labels = ["heavy"],
+)
+
+# The release source allowlist (contract release-source-allowlist).
+mix_sources(
+    name = "release_srcs",
+    srcs = mix_tree(dirs = ["lib", "config"], files = ["mix.exs", "mix.lock"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs", "//elixir:request_accounting_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(
+    name = "test_srcs",
+    srcs = mix_tree(files = ["**", "**/.*", "**/.*/**"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs", "//elixir:request_accounting_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+overalls_mix_project(
+    name = "enrico",
+    project = "enrico",
+    release_srcs = [":release_srcs"],
+    test_srcs = [":test_srcs"],
+    antithesis_srcs = ["//antithesis:sdk"],
+    # The packaged helper, which test_helper.exs uses instead of building the
+    # crate with cargo.
+    test_path = [read_root_config("mix", "test_tools"), read_root_config("mix", "enrico_git_owner")],
 )

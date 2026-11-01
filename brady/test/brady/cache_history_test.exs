@@ -100,7 +100,12 @@ defmodule Brady.CacheHistoryTest do
   # responses and completed owner operations, never Policy/Range/key decisions.
   # Every history MUST exercise each interrupted publication outcome and restart;
   # asserted hits MUST stream the exact modeled origin/variant bytes from disk.
-  property "public download histories publish only complete current origin and variant bytes" do
+  # Each history restarts the cache store, so generation is I/O-bound: under
+  # host load the default profile's TooSlow health check failed it (only 7
+  # inputs in 31 s, 2026-11-01). The :ci profile suppresses only that check;
+  # every generated history is still asserted.
+  property "public download histories publish only complete current origin and variant bytes",
+    profile: :ci do
     body = draw("body", binary(min_length: 2, max_length: 96))
     commands = draw("commands", list_of(command(), min_length: 8, max_length: 20))
 

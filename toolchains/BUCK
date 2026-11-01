@@ -67,7 +67,7 @@ nix_cxx_toolchain(name = "cxx_no_default_deps", visibility = ["PUBLIC"])
 overalls_execution_platform(name = "execution_platform", visibility = ["PUBLIC"])
 
 [nix_tool(name = tool, visibility = ["PUBLIC"]) for tool in [
-    "bash", "coreutils", "elixir", "erlang", "jq", "nix", "nix_store", "python",
+    "bash", "bwrap", "coreutils", "elixir", "erlang", "jq", "nix", "nix_store", "python",
     # Go, JavaScript, Python and script-check tools (M7).
     "chromium", "esbuild", "findutils", "fonts_conf", "gnugrep", "gnused",
     "git", "go", "node", "patch", "pwsh", "ruff", "strip", "ty", "unzip",

@@ -280,3 +280,117 @@ reaches only plain modules MUST declare their //nix:module-* groups. Flake
 output, check and host assemblies MUST keep the full //nix:srcs. Restrict-eval
 over the declared copy turns a missed module into an evaluation error
 (ADR-0270).
+
+@cc [owner:ghuntley,label:build] mix-sources-declared
+mix_sources MUST name every file a Mix action reads by its repository path,
+and Mix actions MUST read sources only from that manifest, copied into the
+sandbox with mtime 1. A whole owned package is allowed only for suites that
+read the repository itself, and then any owned change reruns them.
+
+@cc [owner:ghuntley,label:build;security] mix-actions-sandboxed
+Every Mix action MUST run in the bubblewrap sandbox from buck/mix_sandbox.sh:
+no network, a fresh /build work directory, a writable overlay of /nix/store,
+uid 1000, and an environment holding only the mixRelease shell state. Only
+test actions also see the cells' pinned CA bundle at
+/etc/ssl/certs/ca-certificates.crt, the OS trust store their suites check. Mix,
+Spark and Rustler embed absolute build paths, so a fixed layout keeps outputs
+independent of the checkout and the host. A sandbox whose action process is
+orphaned (its Buck2 daemon exited) MUST exit with every process in it, so no
+survivor writes into a scratch path a later action reuses
+(//buck:mix_sandbox_orphan).
+
+@cc [owner:ghuntley,label:build;deployment] mix-release-parity
+mix_release MUST run the phases and setup hooks of nixpkgs' mixRelease for
+its OTP variant: unpack, deps.compile, `compile --warnings-as-errors`,
+release, the cookie drop, the bin wrap, the ERTS path rewrite and stdenv's
+fixup. Its tree MUST equal the Nix release's byte for byte once the output
+path is normalised, except where the Nix build is itself not reproducible:
+four Marshall beams whose atom, literal and fun tables vary between builds,
+and Marshall's cache_manifest.json, where phx.digest stamps the build time.
+This rule pins those manifest mtimes to SOURCE_DATE_EPOCH. Mix and Rustler
+setup MUST otherwise follow the same hooks and environment as mixRelease,
+including the builder's TERM, which decides sys.config's map order.
+
+@cc [owner:ghuntley,label:build;deployment] mix-release-self-reference
+A release MUST name itself only by the placeholder
+/nix/store/00000000000000000000000000000000-overalls-<app>-0.1.0, published
+as MixReleaseInfo.self_reference, and only in non-ELF files. Assembly
+replaces that string with its $out, which has the same length; the rule fails
+if an ELF file embeds the placeholder.
+
+@cc [owner:ghuntley,label:build;deployment] mix-release-runtime-refs
+mix_release MUST list in RuntimeRefsInfo every store path the release may
+reference at runtime: the [mix] runtime_refs closure from the cells. The rule
+MUST fail on any store reference outside that list, because assembly records
+only declared references and the rest would be missing from the closure.
+
+@cc [owner:ghuntley,label:build] mix-compile-shared-build
+mix_compile MUST produce the project's `_build/<env>` and compiled dependency
+tree from the fixed-output dependency set, after the mix.lock comparison.
+mix_test and mix_check MUST restore that output at the same sandbox paths and
+MUST NOT recompile the project or its dependencies.
+
+@cc [owner:ghuntley,label:build;verification] mix-check-subtargets
+mix_check MUST expose each check as its own subtarget ([format], [logging],
+[gettext], [dialyzer]) that fails the build when the Mix task fails.
+[dialyzer] MUST consume the PLT built once by the [plt] action.
+
+@cc [owner:ghuntley,label:verification] mix-test-cacheable-result
+mix_test MUST run each shard of the suite as a build action whose
+[shard-<n>] (and [repository]) output records the log, the exit status and
+the Covenant results of a passing run, so unchanged inputs reuse it, and
+[test_result] MUST hold every shard's record. A failed shard MUST fail its
+action itself, so no local or shared action cache stores it as a success,
+and the failure MUST recur on every rebuild
+(//buck:mix_test_failure_uncached). [covenant] MUST check the union of the
+shards' recorded results. mix_test and mix_check carry the precommit label;
+mix_test also carries `expensive`.
+
+@cc [owner:ghuntley,label:verification;build] mix-test-sharded
+mix_test with `shards` N MUST run every test file the project's `mix test`
+loads in exactly one of N shard actions (plus the `repository` shard for
+`repository_tests`), each with its own sandbox and PostgreSQL, and each
+shard's source tree MUST omit the other shards' test files, so a change to
+one test file reruns only its shard. Assignment MUST depend only on the
+file paths and the declared `shard_weights`: unweighted files by a stable
+hash of their path, weighted files heaviest first onto the least-loaded
+shard. Only the `repository` shard may depend on `repository_srcs`. Each
+shard runs with `+S <schedulers>` and claims that many local job slots. A
+shard's `mix test` MUST be bounded by `timeout_minutes`; exceeding it fails
+the shard.
+
+@cc [owner:ghuntley,label:verification] mix-test-known-failures
+Known failures (AGENTS.md's Inception rule) MUST be one explicit list per
+suite, `test_known_failures` in the project's BUCK. A whole-module entry's
+file MUST run whole, only in the `known_failures` shard; a `Module: test name`
+entry MUST leave its file in the ordinary, blocking shards, which skip only
+that test, while the `known_failures` shard runs it. That shard MUST fail on any
+failure the list does not name (a crash or exit without failure reports
+included) and MUST write known.txt marking each entry `failing` or
+`passing`, so a fixed test is reported and the list can shrink. ci.yml's mix
+job MUST print that file under a "known Inception failures" heading.
+
+@cc [owner:ghuntley,label:verification] mix-test-seeds-explicit
+A cached shard verdict freezes the ExUnit and Hegel draws of the run that
+produced it; mix_test MUST NOT hide that. The shard log MUST keep ExUnit's
+seed line, and the `[mix] test_salt` configuration MUST enter every shard's
+action key, so `-c mix.test_salt=<value>` reruns every suite with fresh
+seeds (ADR-0269).
+
+@cc [owner:ghuntley,label:verification;security] mix-test-hermetic-postgres
+A mix_test that needs a database MUST start its own PostgreSQL on a unix
+socket under the sandbox's /build, with TCP disabled, and stop it before the
+action ends. It MUST NOT reach a developer or host database. The only host
+state a suite may read is the read-only /sys/fs/cgroup of a mix_test with
+`host_cgroup` (Lilly's collector), which is not part of the action key.
+
+@cc [owner:ghuntley,label:verification;deployment] mix-release-probe
+release_probe MUST run nix/verification/tests/release/probe.exs in the Buck2
+release, unmodified, at its placeholder store path inside a sandbox, with
+the same environment and Marshall rejection checks as the Nix release check.
+
+@cc [owner:ghuntley,label:build;verification] mix-release-variants
+Fixture releases MUST be overalls_mix_project release_variants, labelled
+`fixture`. They may add sources, a preBuild source patch or postInstall
+additions to the ordinary release recipe, and nothing else, so a fixture
+differs from production only by its declared patch.

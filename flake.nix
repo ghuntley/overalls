@@ -90,7 +90,7 @@
       legacyPackages.${system} = built;
 
       # Buck2 prelude and Nix toolchain paths (ADR-0269); tools/buck2 links it.
-      buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (built) toolchain; };
+      buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (built) toolchain; artifacts = built; };
       # macOS runners build the Mila Apple targets (non_hermetic) through the
       # same wrapper; these cells carry buck2, the prelude and host tools only.
       buckCells.aarch64-darwin = import ./nix/buck/cells.nix { pkgs = buildNixpkgs.legacyPackages.aarch64-darwin; };

@@ -5,7 +5,8 @@ head of the newest earlier started, non-cancelled push run (so replaced pushes s
 covered), or everything when there is no usable base, and MUST run the
 affected builds, tests and machine tests, evaluate every selected machine
 test's assembly (`[drv]`, deferred ones included), run each machine test as its own
-job wrapped in `cachix watch-exec`, and tools/precommit over the same range.
+job wrapped in `cachix watch-exec`, and each affected Mix suite (`expensive`) as its own job
+building every shard, and tools/precommit over the same range.
 A push run MUST also reselect every target whose job failed in a trunk run
 since the last green one (contract ci-reselect-failed). Known Inception failures, and the full
 machine-test set when everything or more than 40 suites are selected (unless dispatched with

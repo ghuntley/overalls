@@ -114,13 +114,14 @@ esac
 # macOS has shasum, not sha256sum.
 if command -v sha256sum >/dev/null; then sha=(sha256sum); else sha=(shasum -a 256); fi
 key_inputs() {
+  # The [mix] cells section also records the release hub's Mix inputs and
+  # Lilly's host tools, so their Nix definitions key the cells too.
   git ls-files -z -- flake.nix flake.lock nix/buck \
     nix/domains/artifacts/dependency-hashes.json \
-    nix/domains/artifacts/infrastructure/toolchain.nix \
-    nix/rust-toolchain.nix \
-    nix/domains/artifacts/infrastructure/cargo-workspace.nix \
-    nix/domains/artifacts/infrastructure/locked-cargo-vendor.nix \
-    lyra/vendor/fs2 \
+    nix/domains/artifacts/default.nix nix/domains/artifacts/applications \
+    nix/domains/artifacts/infrastructure nix/domains/artifacts/hosts \
+    nix/domains/artifacts/build-crash-dump-public.pem nix/platform/patches lilly/native \
+    nix/rust-toolchain.nix lyra/vendor/fs2 \
     nix/domains/artifacts/guest/github/default.nix \
     antithesis/nix/python-wheels.nix tools/buck2-no-nix.json \
     '**/Cargo.lock' '**/Cargo.toml' '**/package-lock.json' marvin/package.json tools/code-contracts/package.json | sort -z | xargs -0 "${sha[@]}"

@@ -6,6 +6,7 @@ load("//nix/buck:assembly_attrs.bzl", "ASSEMBLY_CHECKS", "ASSEMBLY_PACKAGES")
 load("//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
 load("//buck:assemble.bzl", "nix_assemble")
 load("//buck:nix.bzl", "nix_store_run", "owned_set")
+load("//buck:mix.bzl", "mix_sources")
 load("//buck:checks.bzl", "conflict_markers", "contract_check", "repo_check")
 load("//buck:python.bzl", "py_static")
 load("//nix/verification/tests/machines:suites.bzl", "MACHINE_PACKAGES", "MACHINE_TESTS")
@@ -263,3 +264,9 @@ LOGGING_APPS = ["audi", "brady", "enrico", "galileo", "lilly", "marshall", "peac
     owned = ["//" + app + ":srcs_files", "//scripts:srcs_files"],
     path = ["toolchains//:erlang"],
 ) for app in LOGGING_APPS]
+
+export_file(name = ".tool-versions", visibility = ["PUBLIC"])
+
+# The whole owned repository, for Mix suites that read it (Marshall's shared
+# validator tests): any owned change reruns them.
+mix_sources(name = "mix_repository", owned = [":flake_srcs"], visibility = ["PUBLIC"])

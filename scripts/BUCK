@@ -1,3 +1,13 @@
+load("@root//buck:mix.bzl", "mix_sources")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# Shared Elixir helpers that Mix tests and checks load from ../scripts.
+mix_sources(
+    name = "mix_support",
+    srcs = glob(["*.ex", "*.exs", "test/**"]),
+    visibility = ["PUBLIC"],
+)
+
+export_file(name = "check_toolchain.exs", visibility = ["PUBLIC"])

@@ -207,6 +207,108 @@ the approved migration plan.
     reference and lock mismatch each failed exactly the expected check, and
     the [migration review](../reviews/2026-10-30-buck2-migration.md) records
     the selections and timings.
+
+- **M6 test shards.**
+  - `mix_test` runs a suite as separately cached shard actions
+    ([mix.bzl](../../../buck/mix.bzl), contract `mix-test-sharded` in
+    [buck/CONTRACTS](../../../buck/CONTRACTS)). Each shard has its own
+    sandbox and PostgreSQL, and its tree holds only its own test files, so
+    one test file's change reruns one shard. Files are assigned by a stable
+    hash of their path, and the slow ones in `test_shard_weights` go
+    heaviest-first to the lightest shard. The weights come from the shards'
+    `--slowest-modules` reports, via
+    [mix_test_weights.py](../../../buck/mix_test_weights.py). Marshall runs 16
+    shards at `+S 2:2`, replacing the blanket `+S 4:4`, and each action
+    weighs its scheduler count. Its validator tests (`test/architecture/`)
+    form a `[repository]` shard, the only one that depends on
+    `root//:mix_repository`. `:check` no longer depends on it either.
+    `[covenant]` checks the union of the shards' Covenant results, and
+    `[shard_plan]` maps shards to files.
+  - Known Inception failures (AGENTS.md) run in a `[known_failures]` shard
+    instead of being excluded (contract `mix-test-known-failures`):
+    - `Marshall.Compute.InceptionTest` and `Audi.Inception.AuthorityTest` run
+      there whole;
+    - MachinesLiveTest's single "Inception selection…" test runs there by
+      name, and the rest of its file stays in the blocking shards;
+    - any other failure fails the shard;
+    - known.txt marks each entry failing or now passing, and ci.yml's `mix`
+      job prints it under "known Inception failures".
+  - Seeds (contract `mix-test-seeds-explicit`). A cached verdict keeps the
+    ExUnit and Hegel draws of the run that recorded it, and the shard log
+    keeps ExUnit's seed. `-c mix.test_salt=<value>` changes every shard's
+    action key and reruns it with fresh draws. Deriving the seeds from the
+    input digest remains open.
+  - `//buck:mix_test_failure_uncached` now runs its fixture in two shards.
+  - ci.yml's `mix` job builds the affected suites on at most two runners:
+    Marshall, and the rest. It also runs on same-repository pull requests,
+    and fork pull requests run nothing.
+  - Timings on panterloons (96 threads): a cold 16-shard Marshall run at
+    `+S 4`, before the weights existed, finished 12 shards in 200–1045 s
+    with a hash-only tail past 50 minutes; the weights come from those
+    shards, and the weighted plan's heaviest shard is estimated at about
+    20 minutes. A measured cold and warm wall time is still open.
+
+- **M6 (Elixir).** [mix.bzl](../../../buck/mix.bzl) defines `mix_sources`,
+  `mix_compile`, `mix_release`, `mix_check`, `mix_test` and
+  `mix_release_probe`, plus the `overalls_mix_project` macro used by every
+  project's `BUCK`. Their contracts are in [buck/CONTRACTS](../../../buck/CONTRACTS).
+  - The `[mix]` cells section carries the prod fixed-output dependency sets,
+    new test-environment sets (keyed `<project>Test` in
+    [dependency-hashes.json](../../../nix/domains/artifacts/dependency-hashes.json)),
+    the encrypted-crash-dump OTP, the Hegel NIF (`hegelNifCargo`), esbuild,
+    PostgreSQL and a `runtime_refs` closure.
+  - Actions source the shell state captured from a real `beam.mixRelease`
+    ([mix.nix](../../../nix/buck/mix.nix)), so the release runs nixpkgs' own
+    hooks and fixup. They run in a bubblewrap sandbox
+    ([mix_sandbox.sh](../../../buck/mix_sandbox.sh)) that mirrors the Nix
+    sandbox's `/build` layout, because Spark and Mix embed build paths.
+  - Each `//<app>:release` names itself by a zero-hash placeholder, and
+    `//<app>:<app>_import` imports it with that `self_reference`.
+  - Parity on 2026-10-30, after `importArtifact`, against
+    `nix build .#service-<app>` at the same revision:
+    - audi, brady, enrico, galileo, lilly, peach, porsche, susan and ziggy
+      are NAR-identical once the store path is normalised, and their
+      `nix-store -qR` closures and references are equal;
+    - Marshall's closure and references are equal. With the vendor remap
+      from 9619afe9f, neither side retains the Cargo vendor, and the cells'
+      `runtime_refs` no longer list it, so the rule refuses it too. Its tree
+      differs only where the Nix build is itself not reproducible:
+      `nix-store --check` of the Nix release changes the same four beams
+      (Cinder.Collection, MarshallWeb.MachinesLive, MarshallWeb.ThreadsLive,
+      Tz.PeriodsProvider: atom, literal and fun tables) and
+      `cache_manifest.json`. `sys.config` matched once the release action
+      sets the builder's `TERM`, which decides its map order.
+  - Two clean Marshall builds in separate isolation directories differ only
+    in those four beams. `phx.digest` stamps `cache_manifest.json` with the
+    build time; Nix keeps it, and Buck2 pins it to `SOURCE_DATE_EPOCH`.
+  - `buck2 test` passes for protocol (cold 15m25s, mostly its 900 s
+    property suite; warm 0.2 s from the action cache), peach, susan,
+    porsche, request_accounting and diagnostics. Suites read sibling fixtures
+    through declared `mix_sources` and take openssl, ssh-keygen, python3 and
+    Enrico's git-owner helper from the cells instead of the developer PATH.
+    `mix_test` patches the shebangs under `test/`, because the sandbox, like
+    Nix's, has no `/usr/bin/env`, and binds the cells' CA bundle at the OS
+    trust-store path that `:public_key.cacerts_get/0` reads. Marshall's
+    suite also takes the cells' Lilly host tools on PATH, as devenv does.
+    That is where its Lilly connector fixture finds the private
+    `lilly-hostd`. The Dialyzer PLT and check run with
+    `--no-compile`: Dialyxir reloads dependencies after its own `compile`,
+    and recompiling a path dependency (Hegel) prunes the code path, which
+    drops OTP `extra_applications` such as `:ssh`.
+  - Buck2 leaves a local action's process tree running when its daemon
+    exits. [mix_sandbox.sh](../../../buck/mix_sandbox.sh) therefore kills
+    bwrap, and with it the sandbox's PID namespace, once the script is
+    reparented. Otherwise a survivor writes into a scratch path that the next
+    daemon reuses. The
+    [orphan test](../../../buck/tests/mix_sandbox_orphan.py)
+    (`//buck:mix_sandbox_orphan`) fails without this.
+  - A failed suite fails the `mix_test` run action itself, which prints the
+    log tail. Buck2 caches only successful actions, so neither the daemon
+    nor a shared cache can replay a flaky failure as a result. Only passing
+    runs reach `[test_result]`. The
+    [failure test](../../../buck/tests/mix_test_failure_uncached.py)
+    (`//buck:mix_test_failure_uncached`) builds a deliberately failing
+    fixture suite twice on one daemon, and both builds must fail.
 - [nix/assemble](../../../nix/assemble/default.nix) is `lib.assemble`.
   - It holds the single package set and its parameterised variants. Today
     these are the default set and the host set with private service roots.
@@ -359,7 +461,41 @@ the approved migration plan.
 Remaining gaps, by milestone of the migration plan:
 
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
-  NIF, Mila) and the Elixir rules (M5, M6);
+  NIF, Mila) (M5);
+- M6 leftovers:
+  - Assembly still uses `beam.mixRelease`
+    ([source.nix](../../../nix/domains/artifacts/applications/source.nix))
+    until the coordinator switches each application to its
+    `<app>_import`; both stay until every consumer moves.
+  - The six fleet fixtures built with `overrideAttrs` need
+    `release_variants`.
+  - Marshall's dev `assets.setup` alias still calls `esbuild.install`;
+    Buck2 builds use the cells esbuild. Changing `mix.exs` would change the
+    Nix release before the switch.
+  - Mix actions need unprivileged user namespaces, so they run locally only
+    until remote workers provide them (ADR-0272).
+  - Mix checks have no per-file `PrecommitInfo` yet; precommit runs each
+    check whole.
+  - Lilly's suite is not a precommit check, and publish-cache.yml's
+    `mix precommit` matrix keeps gating it (`publish_cache_gate`). About 30
+    tests fail in the sandbox:
+    - the fake `lilly-vm-watch` shebang and the TEST-NET-1 stall are test
+      faults (fixes follow);
+    - the collector's cgroup reads use `test_host_cgroup`, a read-only
+      `/sys/fs/cgroup` bind that is not part of the action key;
+    - 16 tests (`Lilly.Control.ConfigTest`'s three startup loads and every
+      `InvalidBootPropertyTest` mutation) need `/etc/machine-id` and the VMM
+      helpers owned by uid 0, which an unprivileged user namespace shows as
+      65534. The fix (a reviewed test seam or a uid-0-mapped shard) is open.
+  - Marshall's four nondeterministic beams are a Nix-side reproducibility
+    gap too; neither build fixes them yet.
+  - The known Inception failures run in the `[known_failures]` shards of
+    `//audi:test` and `//marshall:test`, as above, not excluded.
+  - Hegel and ExUnit still draw fresh seeds per run, so a cached verdict
+    freezes one draw per input tree, and a cached failure cannot be replayed
+    from its seed. `-c mix.test_salt=<value>` reruns every suite with new
+    seeds. Deriving the seeds from the input digest, and a scheduled
+    fresh-seed run, remain open.
 - the remaining M3 item: `nix_assemble` has no per-host `params` channel, so
   hosts take lib.assemble's fleet-wide defaults
   ([ADR-0271](0271-buck2-host-self-deployment.md));

@@ -1,3 +1,28 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# The release source allowlist (contract release-source-allowlist).
+mix_sources(
+    name = "release_srcs",
+    srcs = mix_tree(dirs = ["lib", "config", "priv"], files = ["mix.exs", "mix.lock"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(
+    name = "test_srcs",
+    srcs = mix_tree(files = ["**", "**/.*", "**/.*/**"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+overalls_mix_project(
+    name = "susan",
+    project = "susan",
+    release_srcs = [":release_srcs"],
+    test_srcs = [":test_srcs"],
+    antithesis_srcs = ["//antithesis:sdk"],
+    postgres = True,
+)

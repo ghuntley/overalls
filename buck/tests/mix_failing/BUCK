@@ -1,0 +1,29 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree", "overalls_mix_project")
+load("@root//buck:nix.bzl", "nix_owned")
+
+nix_owned()
+
+# A deliberately failing suite, defined only when //buck:mix_test_failure_uncached
+# sets mix_failing.enabled, so no other build or precommit selection sees it.
+# It shares request_accounting's lock and fixed-output dependencies.
+# Contract mix-test-cacheable-result: see buck/CONTRACTS.
+mix_sources(
+    name = "fixture_srcs",
+    srcs = mix_tree(dirs = ["test"], files = ["mix.exs", "mix.lock"]),
+)
+
+# BUCK files have no top-level `if`; the comprehension defines the targets
+# once when the config is set and not at all otherwise.
+[overalls_mix_project(
+    name = "request_accounting",
+    project = "buck/tests/mix_failing",
+    release = False,
+    release_srcs = [],
+    test_srcs = [":fixture_srcs"],
+    test_support = [],
+    test_precommit = False,
+    # Two shards (contract mix-test-sharded): a failed shard fails the target.
+    test_shards = 2,
+    covenant = False,
+    dialyzer = False,
+) for enabled in [read_root_config("mix_failing", "enabled", "")] if enabled == "true"]

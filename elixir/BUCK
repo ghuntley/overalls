@@ -1,3 +1,4 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
@@ -35,3 +36,36 @@ rust_leaf_parity_test(
     nix_attr = "traceSpool",
     labels = ["heavy"],
 )
+
+# Shared observability and request-accounting libraries, as releases include
+# them (contract release-source-allowlist).
+mix_sources(
+    name = "diagnostics_release_srcs",
+    srcs = mix_tree(dirs = ["diagnostics/lib", "diagnostics/priv"], files = ["diagnostics/mix.exs", "diagnostics/mix.lock"]),
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(
+    name = "request_accounting_release_srcs",
+    srcs = mix_tree(dirs = ["request_accounting/lib"], files = ["request_accounting/mix.exs", "request_accounting/mix.lock"]),
+    visibility = ["PUBLIC"],
+)
+
+[mix_sources(
+    name = library + "_test_srcs",
+    srcs = mix_tree(dirs = [library], exclude = [library + "/native/**"]),
+    visibility = ["PUBLIC"],
+) for library in ["diagnostics", "request_accounting"]]
+
+[overalls_mix_project(
+    name = library,
+    prefix = library + "_",
+    project = "elixir/" + library,
+    release = False,
+    release_srcs = [],
+    test_srcs = [":{}_test_srcs".format(library)],
+    # The trace schema check scans every service's lib/ sources.
+    test_support = ["root//scripts:mix_support", "root//marshall:tls_fixtures", "root//protocol:test_fixtures"] + (
+        ["root//{}:release_srcs".format(app) for app in ["marshall", "lilly", "audi", "brady", "porsche", "ziggy", "enrico", "galileo", "susan", "peach"]] if library == "diagnostics" else []
+    ),
+) for library in ["diagnostics", "request_accounting"]]

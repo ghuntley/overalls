@@ -145,3 +145,5 @@ filegroup(
 
 # Lyra's build script, shared by lyra.nix and buck/lyra.bzl (lyra-shared-build).
 export_file(name = "lyra-build.sh", src = "domains/artifacts/infrastructure/lyra-build.sh", visibility = ["PUBLIC"])
+
+export_file(name = "release_probe.exs", src = "verification/tests/release/probe.exs", visibility = ["PUBLIC"])

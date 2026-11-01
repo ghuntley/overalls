@@ -1,3 +1,7 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# Marshall references the vendored SCIM integration by path.
+mix_sources(name = "ash_scim", srcs = mix_tree(dirs = ["ash_scim"]), visibility = ["PUBLIC"])

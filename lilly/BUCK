@@ -1,3 +1,4 @@
+load("@root//buck:mix.bzl", "mix_host_tools_link", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test")
@@ -61,4 +62,45 @@ rust_leaf_parity_test(
     buck = ":host-helpers-import",
     nix_attr = "hostLock",
     labels = ["heavy"],
+)
+
+# The release source allowlist (contract release-source-allowlist).
+mix_sources(
+    name = "release_srcs",
+    srcs = mix_tree(dirs = ["lib", "config"], files = ["mix.exs", "mix.lock"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(
+    name = "test_srcs",
+    # tmp/ holds untracked runtime locks that break the glob.
+    srcs = mix_tree(files = ["**", "**/.*", "**/.*/**"], exclude = ["tmp/**"]),
+    deps = ["//protocol:release_srcs", "//elixir:diagnostics_release_srcs"],
+    visibility = ["PUBLIC"],
+)
+
+overalls_mix_project(
+    name = "lilly",
+    project = "lilly",
+    release_srcs = [":release_srcs"],
+    test_srcs = [":test_srcs"],
+    antithesis_srcs = ["//antithesis:lilly"],
+    post_install = mix_host_tools_link(),
+    # The suite runs the native host helpers and Firecracker as devenv
+    # provides them: host tools (hostLock included) and the VMM on PATH.
+    test_path = [read_root_config("mix", "test_tools"), read_root_config("mix", "host_tools") + "/bin", read_root_config("mix", "vmm") + "/bin"],
+    test_env = {"OVERALLS_TEST_VMM_DIR": read_root_config("mix", "vmm") + "/bin"},
+    # The collector samples cgroup limits from /sys/fs/cgroup.
+    test_host_cgroup = True,
+    # About 30 tests fail in the unprivileged sandbox (ADR-0269 M6 gap); 16
+    # of them because Lilly's
+    # configuration requires /etc/machine-id and the VMM helpers to be owned
+    # by uid 0, and a user namespace that maps only the build user shows
+    # host-root files as 65534 (Lilly.Control.ConfigTest's three startup
+    # loads and every Lilly.Control.InvalidBootPropertyTest mutation). Until a
+    # reviewed fix, the suite is not a precommit check and publish-cache.yml's
+    # `mix precommit` matrix keeps gating it (`publish_cache_gate`).
+    test_precommit = False,
+    test_labels = ["publish_cache_gate"],
 )

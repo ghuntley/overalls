@@ -80,3 +80,54 @@ script_test(
     script = "tests/ci_failures_test.py",
     srcs = ["ci_failures.py"],
 )
+
+export_file(name = "mix_sandbox.sh", visibility = ["PUBLIC"])
+
+# An orphaned Mix sandbox exits with its process tree (contract
+# mix-actions-sandboxed). Local only: it needs user namespaces.
+script_test(
+    name = "mix_sandbox_orphan",
+    script = "tests/mix_sandbox_orphan.py",
+    srcs = ["mix_sandbox.sh"],
+)
+
+# A failed Mix suite fails every build instead of being cached as a result
+# (contract mix-test-cacheable-result). Local only: it needs user namespaces
+# and runs its own daemon.
+script_test(
+    name = "mix_test_failure_uncached",
+    script = "tests/mix_test_failure_uncached.py",
+    srcs = ["mix.bzl", "mix_phases.sh", "mix_sandbox.sh", "//buck/tests/mix_failing:srcs"],
+)
+
+export_file(name = "mix_phases.sh", visibility = ["PUBLIC"])
+
+export_file(name = "mix_release_probe.sh", visibility = ["PUBLIC"])
+
+# Release variant selectors (ADR-0269). The defaults are the ordinary
+# production build; hosts and fleet tests choose a variant with
+# --target-platforms //buck:<platform>.
+constraint_setting(name = "crash_dumps", visibility = ["PUBLIC"])
+
+constraint_value(name = "encrypted_crash_dumps", constraint_setting = ":crash_dumps", visibility = ["PUBLIC"])
+
+constraint_setting(name = "antithesis", visibility = ["PUBLIC"])
+
+constraint_value(name = "antithesis_harness", constraint_setting = ":antithesis", visibility = ["PUBLIC"])
+
+constraint_value(name = "antithesis_guest", constraint_setting = ":antithesis", visibility = ["PUBLIC"])
+
+constraint_value(name = "antithesis_integrated_host", constraint_setting = ":antithesis", visibility = ["PUBLIC"])
+
+[platform(
+    name = name,
+    deps = ["prelude//platforms:default"],
+    constraint_values = values,
+    visibility = ["PUBLIC"],
+) for name, values in {
+    "antithesis_guest_platform": [":antithesis_guest"],
+    "antithesis_harness_platform": [":antithesis_harness"],
+    "antithesis_integrated_host_platform": [":antithesis_integrated_host"],
+    "encrypted_crash_dumps_platform": [":encrypted_crash_dumps"],
+    "encrypted_antithesis_integrated_host_platform": [":encrypted_crash_dumps", ":antithesis_integrated_host"],
+}.items()]

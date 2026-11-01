@@ -210,6 +210,66 @@ let
       '';
     });
 
+  # @cc [owner:ghuntley,label:build] test-dependency-hashes
+  # Buck2 compile, check and test actions (ADR-0269) MUST read test-environment
+  # Mix dependencies only from these fixed-output fetches, keyed in
+  # dependency-hashes.json, so `mix test` and Dialyzer run with Hex offline.
+  # Precompiled NIF artefacts that elixir_make would download at compile time
+  # are fetched here too and verified again by each package's checksum.exs.
+  testDependencyProjects = {
+    marshall = { path = "marshall"; key = "marshallTest"; };
+    lilly = { path = "lilly"; key = "lillyTest"; };
+    audi = { path = "audi"; key = "audiTest"; };
+    porsche = { path = "porsche"; key = "porscheTest"; };
+    ziggy = { path = "ziggy"; key = "ziggyTest"; };
+    brady = { path = "brady"; key = "bradyTest"; };
+    galileo = { path = "galileo"; key = "galileoTest"; };
+    enrico = { path = "enrico"; key = "enricoTest"; };
+    peach = { path = "peach"; key = "peachTest"; };
+    susan = { path = "susan"; key = "susanTest"; };
+    protocol = { path = "protocol"; key = "protocolTest"; };
+    diagnostics = { path = "elixir/diagnostics"; key = "diagnosticsTest"; };
+    request_accounting = { path = "elixir/request_accounting"; key = "requestAccountingTest"; };
+  };
+  testDependencies = lib.mapAttrs (name: project: plainBeam.fetchMixDeps {
+    pname = "overalls-${name}-test-deps";
+    inherit version;
+    src = import ./applications/deps-source.nix { inherit lib; };
+    sourceRoot = "source/${project.path}";
+    mixEnv = "test";
+    hash = hashes.${project.key};
+    env.ERL_FLAGS = "+S 4:4";
+    postInstall = ''
+      cp mix.lock "$out/.overalls-mix.lock"
+      if [ -f "$out/lazy_html/checksum.exs" ]; then
+        lazyHtml=$(sed -n 's/^ *@version "\(.*\)"$/\1/p' "$out/lazy_html/mix.exs")
+        artefact="lazy_html-nif-2.16-x86_64-linux-gnu-$lazyHtml.tar.gz"
+        mkdir -p "$out/.overalls-elixir-make"
+        ${pkgs.curl}/bin/curl -fsSL --retry 3 --cacert ${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt \
+          -o "$out/.overalls-elixir-make/$artefact" \
+          "https://github.com/dashbitco/lazy_html/releases/download/v$lazyHtml/$artefact"
+      fi
+    '';
+  }) testDependencyProjects;
+
+  # @cc [owner:ghuntley,label:build;verification] hegel-nif-offline
+  # The hegel_ex property-test NIF MUST be built here from the pinned Git
+  # dependency's own Cargo.lock with vendored crates, and reach Mix through
+  # HEGEL_NIF_PATH, so no test compile runs cargo against the network.
+  hegelNif = pkgs.rustPlatform.buildRustPackage {
+    pname = "hegel-nif";
+    version = "0.1.0";
+    src = "${testDependencies.protocol}/hegel_ex/native/hegel_nif";
+    cargoHash = hashes.hegelNifCargo;
+    doCheck = false;
+    installPhase = ''
+      runHook preInstall
+      install -D -m 0555 target/*/release/libhegel_nif.so "$out/lib/hegel_nif.so" 2>/dev/null \
+        || install -D -m 0555 target/release/libhegel_nif.so "$out/lib/hegel_nif.so"
+      runHook postInstall
+    '';
+  };
+
   cedarLints = import ./applications/marshall-cedar-lints.nix { inherit pkgs cargoWorkspace cedarSource; };
 
   # Every Mix application with fixed-output dependencies, keyed like
@@ -223,11 +283,21 @@ let
   # scripts/cargo_security_upgrades.exs refresh hashes and build only through
   # this registry; the Cargo script refuses a tracked Cargo.lock missing here.
   dependencyPins = {
-    mix = lib.mapAttrs (application: build: {
+    mix = lib.mapAttrs (application: release: {
       locks = [ "${application}/mix.lock" ];
-      inherit build;
-      hashes = { ${application} = dependencies.${application}; };
-    }) mixReleases;
+      build = pkgs.linkFarmFromDrvs "${application}-pins" [ release testDependencies.${application} ];
+      hashes = {
+        ${application} = dependencies.${application};
+        ${testDependencyProjects.${application}.key} = testDependencies.${application};
+      };
+    }) mixReleases // lib.genAttrs [ "protocol" "diagnostics" "request_accounting" ] (library: {
+      locks = [ "${testDependencyProjects.${library}.path}/mix.lock" ];
+      build = if library == "protocol"
+        then pkgs.linkFarmFromDrvs "protocol-pins" [ testDependencies.protocol hegelNif ]
+        else testDependencies.${library};
+      hashes = { ${testDependencyProjects.${library}.key} = testDependencies.${library}; }
+        // lib.optionalAttrs (library == "protocol") { hegelNifCargo = hegelNif.cargoDeps; };
+    });
     # ADR-0273: the root workspace has the only Cargo.lock. Its build links
     # every Nix output that compiles a first-party crate, so a lock refresh
     # MUST rebuild them all.
@@ -384,7 +454,7 @@ in
 assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
   inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool hostLock;
-  inherit dependencies cedarLints cargoWorkspace hostTools toolchain vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource cedarLints hostTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldChecks terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;

@@ -1,3 +1,29 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# The shared protocol as releases include it (contract release-source-allowlist).
+mix_sources(
+    name = "release_srcs",
+    srcs = mix_tree(dirs = ["lib", "priv"], files = ["mix.exs", "mix.lock"]),
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(
+    name = "test_srcs",
+    srcs = mix_tree(files = ["**", "**/.*", "**/.*/**"]),
+    deps = ["//lyra:workspace_source_vectors"],
+    visibility = ["PUBLIC"],
+)
+
+overalls_mix_project(
+    name = "protocol",
+    project = "protocol",
+    release = False,
+    release_srcs = [],
+    test_srcs = [":test_srcs"],
+)
+
+# Test support and vectors that consumer suites load from ../protocol.
+mix_sources(name = "test_fixtures", srcs = glob(["test/support/**", "test/fixtures/**"]), visibility = ["PUBLIC"])

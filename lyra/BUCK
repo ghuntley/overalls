@@ -1,5 +1,6 @@
 load("@root//buck:assemble.bzl", "nix_store_import")
 load("@root//buck:lyra.bzl", "lyra_cross")
+load("@root//buck:mix.bzl", "mix_sources")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:rust.bzl", "rust_leaf_parity_test")
 
@@ -53,3 +54,6 @@ rust_leaf_parity_test(
     compare = "bytes",
     labels = ["heavy"],
 )
+
+# Shared workspace-source vectors that the protocol suite also checks.
+mix_sources(name = "workspace_source_vectors", srcs = ["tests/fixtures/workspace_sources.json"], visibility = ["PUBLIC"])

@@ -1,3 +1,16 @@
+load("@root//buck:mix.bzl", "mix_sources", "mix_tree")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# Fallback SDK and harness sources, selected only by the antithesis release
+# variants (contract harness-source-isolation).
+mix_sources(
+    name = "sdk",
+    srcs = mix_tree(dirs = ["sdk/lib", "sdk/native"], files = ["sdk/mix.exs", "sdk/mix.lock"]),
+    visibility = ["PUBLIC"],
+)
+
+mix_sources(name = "lilly", srcs = mix_tree(dirs = ["lilly/lib"]), deps = [":sdk"], visibility = ["PUBLIC"])
+
+mix_sources(name = "marshall", srcs = mix_tree(dirs = ["marshall/lib"]), deps = [":sdk"], visibility = ["PUBLIC"])
