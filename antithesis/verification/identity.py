@@ -226,6 +226,31 @@ def command(args: list[str], cwd: Path | None = None) -> str:
         raise EvidenceError(f"required query returned non-UTF-8 output: {args[0]}") from exc
 
 
+# A cold Buck2 evaluation first builds the artifacts the assembly imports.
+BUCK2_TIMEOUT = 3600
+
+
+def buck2_output(root: Path, target: str) -> str:
+    """The text of the single output file `tools/buck2 build` reports for target."""
+    args = [str(root / "tools/buck2"), "build", "--show-full-output", target]
+    try:
+        result = subprocess.run(
+            args, check=True, capture_output=True, timeout=BUCK2_TIMEOUT, cwd=root
+        )
+        listing = result.stdout.decode("utf-8").strip().splitlines()
+    except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+        raise EvidenceError(f"required Buck2 build failed: {target}: {exc}") from exc
+    except UnicodeDecodeError as exc:
+        raise EvidenceError(f"Buck2 returned non-UTF-8 output: {target}") from exc
+    fields = listing[-1].split(" ", 1) if listing else []
+    if len(fields) != 2 or fields[0].removeprefix("root") != target:
+        raise EvidenceError(f"Buck2 reported no output for {target}")
+    try:
+        return Path(fields[1]).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise EvidenceError(f"unreadable Buck2 output for {target}: {exc}") from exc
+
+
 def verify_current_context(
     root: Path, stage: str, staged: Path
 ) -> tuple[str, str, list[dict[str, Json]]]:
@@ -234,7 +259,12 @@ def verify_current_context(
     repository for its stage, including all paths, modes, links and file bytes.
     An unbuilt current output or changed staged context MUST prevent a freeze.
     """
-    output = command(["nix", "eval", "--raw", f".#antithesis-{stage}-context.outPath"], cwd=root)
+    # The derivation only, as `nix eval` gave it: an unbuilt output still fails
+    # below. The Buck2 target is what prepare-contexts.sh builds (ADR-0269).
+    derivation = buck2_output(root, f"//:package-antithesis-{stage}-context[drv]")
+    if STORE.fullmatch(derivation) is None:
+        raise EvidenceError(f"invalid current Nix context derivation for {stage}")
+    output = command(["nix-store", "--query", "--outputs", derivation])
     if STORE.fullmatch(output) is None:
         raise EvidenceError(f"invalid current Nix context output for {stage}")
     expected = Path(output)

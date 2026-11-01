@@ -6,6 +6,7 @@ import json
 import multiprocessing
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -28,6 +29,7 @@ from campaign import (
 from identity import (
     CopyInput,
     _image_hashes,
+    buck2_output,
     compare_context_trees,
     docker_copies,
     selected_stages,
@@ -163,11 +165,36 @@ class VerificationTests(unittest.TestCase):
             (staged / "rootfs/opt/overalls/context-output.txt").write_bytes(b"old output\n")
             with self.assertRaisesRegex(EvidenceError, "no current output stamp"):
                 compare_context_trees(staged, expected, "workload", output)
+            derivation = "/nix/store/" + "d" * 32 + "-workload-context.drv"
             with (
+                patch("identity.buck2_output", return_value=derivation) as buck2,
                 patch("identity.command", return_value="/nix/store/" + "a" * 32 + "-unbuilt"),
                 self.assertRaisesRegex(EvidenceError, "not built"),
             ):
                 verify_current_context(root, "workload", staged)
+            buck2.assert_called_once_with(root, "//:package-antithesis-workload-context[drv]")
+            with (
+                patch("identity.buck2_output", return_value="not a derivation"),
+                self.assertRaisesRegex(EvidenceError, "invalid current Nix context derivation"),
+            ):
+                verify_current_context(root, "workload", staged)
+
+    def test_buck2_output_reads_the_reported_output_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            out = root / "drv.txt"
+            out.write_text("/nix/store/" + "d" * 32 + "-x.drv\n", encoding="utf-8")
+            target = "//:package-antithesis-workload-context[drv]"
+            listing = f"root{target} {out}\n".encode()
+            ran = subprocess.CompletedProcess([], 0, stdout=listing, stderr=b"")
+            with patch("identity.subprocess.run", return_value=ran):
+                self.assertEqual(buck2_output(root, target), "/nix/store/" + "d" * 32 + "-x.drv")
+            other = subprocess.CompletedProcess([], 0, stdout=b"root//:other /x\n", stderr=b"")
+            with (
+                patch("identity.subprocess.run", return_value=other),
+                self.assertRaisesRegex(EvidenceError, "reported no output"),
+            ):
+                buck2_output(root, target)
 
     def test_image_context_evidence_is_exact_bytes(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

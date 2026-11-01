@@ -20,7 +20,11 @@ for stage in "$@"; do
     *) echo "unknown Antithesis image stage: $stage" >&2; exit 2 ;;
   esac
 
-  mapfile -t outputs < <(nix build ".#antithesis-${stage}-context" --no-link --print-out-paths)
+  # Buck2 builds the context (ADR-0269); its output file names the store path.
+  # verification/identity.py checks staged contexts against the same target.
+  target="//:package-antithesis-${stage}-context"
+  listing=$(tools/buck2 build --show-full-output "$target")
+  mapfile -t outputs < "$(awk 'END { print $2 }' <<< "$listing")"
   if [ "${#outputs[@]}" -ne 1 ] || [ ! -d "${outputs[0]}/rootfs" ]; then
     echo "missing Nix context output for $stage" >&2
     exit 1
