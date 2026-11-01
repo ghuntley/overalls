@@ -5,7 +5,7 @@ load("//buck:nix.bzl", "nix_owned")
 load("//nix/buck:assembly_attrs.bzl", "ASSEMBLY_CHECKS", "ASSEMBLY_PACKAGES")
 load("//buck:artifacts.bzl", "ASSEMBLY_ARTIFACTS")
 load("//buck:assemble.bzl", "nix_assemble")
-load("//buck:nix.bzl", "owned_set")
+load("//buck:nix.bzl", "nix_store_run", "owned_set")
 load("//buck:checks.bzl", "conflict_markers", "contract_check", "repo_check")
 load("//buck:python.bzl", "py_static")
 load("//nix/verification/tests/machines:suites.bzl", "MACHINE_PACKAGES", "MACHINE_TESTS")
@@ -72,13 +72,33 @@ owned_set(
 # budget. Its drvPath therefore equals the flake's `mila-journey-fixture`.
 _NIX_LEAF_OUTPUTS = ["mila-journey-fixture"]
 
+# Operator tools that read no Buck2-built leaf (stable nixpkgs, the public
+# registry and the editor sources only). Assembling them without artifacts
+# spares `tools/buck2 run //:host` from building every leaf first, and is
+# sound only while no swapped leaf is in their closure; otherwise they would
+# ship a Nix-built copy that bypasses the parity tests. Contract
+# tool-outputs-read-no-swapped-leaf (//buck:tool_outputs_leaf_free).
+_TOOL_OUTPUTS = ["host", "security-secrets", "security-user-recipients", "tool-update-vscode-extensions"]
+
 [nix_assemble(
     name = "package-" + attr,
     attr = "outputPackages.\"{}\"".format(attr),
-    artifacts = {} if attr in _NIX_LEAF_OUTPUTS else ASSEMBLY_ARTIFACTS,
+    artifacts = {} if attr in _NIX_LEAF_OUTPUTS + _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS,
     labels = ["flake_output"],
     visibility = ["//mila:"] if attr == "mila-journey-fixture" else [],
 ) for attr in ASSEMBLY_PACKAGES]
+
+# Operator commands from package outputs (`nix run .#<app>` before M11):
+#   tools/buck2 run //:host -- --help
+[nix_store_run(
+    name = name,
+    package = ":package-" + package,
+    program = "bin/" + program,
+) for name, package, program in [
+    ("host", "host", "host"),
+    ("secrets", "security-secrets", "overalls-secrets"),
+    ("update-vscode-extensions", "tool-update-vscode-extensions", "update-vscode-extensions"),
+]]
 
 filegroup(name = "flake", srcs = ["flake.lock", "flake.nix"], visibility = ["PUBLIC"])
 

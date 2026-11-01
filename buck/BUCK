@@ -28,6 +28,15 @@ script_test(
     labels = ["nix_eval"],
 )
 
+# BUCK.v2's _TOOL_OUTPUTS read no Buck2-swapped leaf, so assembling them
+# without artifacts is sound (tools/buck2 run //:host and friends).
+script_test(
+    name = "tool_outputs_leaf_free",
+    script = "tests/tool_outputs_leaf_free.py",
+    deps = ["//:flake", "//nix:srcs"],
+    labels = ["nix_eval"],
+)
+
 # M1 follow-up: a toolchain path change changes a consumer's target hash.
 script_test(
     name = "toolchain_hash",
