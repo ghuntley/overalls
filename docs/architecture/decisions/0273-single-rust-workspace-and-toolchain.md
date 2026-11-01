@@ -239,8 +239,15 @@ partial, in milestone M5.
   (0ee821c63) the flake exports no packages, but `lib.assemble` without
   artifacts still falls back to each leaf's Nix build. Buck2's own cells
   ([`cells.nix`](../../../nix/buck/cells.nix), evaluated without artifacts)
-  give the Mix test rules the Nix-built Lilly helpers (`host_tools`) and
-  Enrico's git owner; `lib.dependencyPins.cargo` builds every Nix Rust leaf;
+  gave the Mix test rules the Nix-built Lilly helpers (`host_tools`) and
+  Enrico's git owner until gap 18 step (ii): `mix_test` now puts the store
+  imports of the Buck2 builds (`//lilly:host-helpers-import`,
+  `//enrico:git-owner-import`) on the test `PATH` (`test_path_deps` in
+  [buck/mix.bzl](../../../buck/mix.bzl)); the suites run them from the store
+  path, which Lilly's root-owner checks accept in the sandbox as they did the
+  Nix builds, and the cells
+  give the tests only the host system tools (`host_system_tools`), while
+  `host_tools` remains for the Lilly release; `lib.dependencyPins.cargo` builds every Nix Rust leaf;
   the otel-request-recorder fixtures patch and rebuild the receiver through
   its Nix build; and fleet scenario selection evaluates test scripts without
   artifacts. The Nix leaves cannot be deleted until those consumers stop

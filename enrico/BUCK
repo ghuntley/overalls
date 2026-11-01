@@ -65,5 +65,6 @@ overalls_mix_project(
     antithesis_srcs = ["//antithesis:sdk"],
     # The packaged helper, which test_helper.exs uses instead of building the
     # crate with cargo.
-    test_path = [read_root_config("mix", "test_tools", ""), read_root_config("mix", "enrico_git_owner", "")],
+    test_path = [read_root_config("mix", "test_tools", "")],
+    test_path_deps = [":git-owner-import"],
 )

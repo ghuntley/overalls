@@ -88,8 +88,10 @@ overalls_mix_project(
     antithesis_srcs = ["//antithesis:lilly"],
     post_install = mix_host_tools_link(),
     # The suite runs the native host helpers and Firecracker as devenv
-    # provides them: host tools (hostLock included) and the VMM on PATH.
-    test_path = [read_root_config("mix", "test_tools", ""), read_root_config("mix", "host_tools", "") + "/bin", read_root_config("mix", "vmm", "") + "/bin"],
+    # provides them: the imported Buck2 helpers, host system tools and the VMM
+    # on PATH. The helpers run from the store, which Lilly trusts as root-owned.
+    test_path = [read_root_config("mix", "test_tools", ""), read_root_config("mix", "host_system_tools", ""), read_root_config("mix", "vmm", "") + "/bin"],
+    test_path_deps = [":host-helpers-import"],
     test_env = {"OVERALLS_TEST_VMM_DIR": read_root_config("mix", "vmm", "") + "/bin"},
     # The collector samples cgroup limits from /sys/fs/cgroup.
     test_host_cgroup = True,

@@ -151,12 +151,19 @@ let
     cp ${lyra}/bin/overalls-workspaced "$out/bin/overalls-workspaced"
     chmod 0755 "$out/bin/overalls" "$out/bin/overalls-ssh-authorize" "$out/bin/overalls-trustd" "$out/bin/overalls-host-certificate" "$out/bin/overalls-workspaced"
   '';
+  hostSystemPackages = [
+    pkgs.coreutils pkgs.diffutils pkgs.util-linux pkgs.iproute2 pkgs.nftables pkgs.procps
+    pkgs.zfs pkgs.openssh toolchain.elixir toolchain.erlang
+  ];
   hostTools = pkgs.buildEnv {
     name = "lilly-host-tools";
-    paths = [
-      pkgs.coreutils pkgs.diffutils pkgs.util-linux pkgs.iproute2 pkgs.nftables pkgs.procps
-      pkgs.zfs pkgs.openssh toolchain.elixir toolchain.erlang hostLock
-    ];
+    paths = hostSystemPackages ++ [ hostLock ];
+  };
+  # hostTools without the Rust helpers: Buck2's Mix suites put these on PATH
+  # and take the helpers from //lilly:host-helpers (ADR-0273).
+  hostSystemTools = pkgs.buildEnv {
+    name = "lilly-host-system-tools";
+    paths = hostSystemPackages;
   };
 
   nestingProbeGuest = import ./guest {
@@ -454,7 +461,7 @@ in
 assert unknownArtifacts == [ ] || throw "assembly artifacts not consumed by the package set: ${toString unknownArtifacts}";
 rec {
   inherit otelReceiver enricoGitOwner observabilityRuntimes traceSpool hostLock;
-  inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource hostTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
+  inherit dependencies testDependencies hegelNif cargoWorkspace cedarSource hostTools hostSystemTools toolchain beam vmm windowsFirmware windowsFirmwareDebug mkWindowsGuest mkWindowsEditorCandidate windowsGuest windowsGuestAgents windowsGuestRuntime windowsGuestPublished windowsGuestDrvload windowsBoot windowsEditorRuntime windowsEditorSource windowsEditorBroker mkWindowsEditorBundle androidSdk;
   inherit terminald terminaldWindows;
   inherit codingClis githubTools;
   inherit lyra lyraLinux lyraWindows lyraNative githubBootstrapRelease;

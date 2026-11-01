@@ -61,8 +61,9 @@ overalls_mix_project(
     release_env = {"CARGO_BUILD_JOBS": "4", "CARGO_NET_OFFLINE": "true"},
     test_env = {"CARGO_BUILD_JOBS": "4", "CARGO_NET_OFFLINE": "true"},
     # IngressTransportTest's Lilly connector fixture starts a private
-    # lilly-hostd from PATH, as devenv's lilly-host-tools provides.
-    test_path = [read_root_config("mix", "test_tools", ""), read_root_config("mix", "host_tools", "") + "/bin"],
+    # lilly-hostd from PATH: the Buck2-built helper bundle, as hosts deploy it.
+    test_path = [read_root_config("mix", "test_tools", ""), read_root_config("mix", "host_system_tools", "")],
+    test_path_deps = ["//lilly:host-helpers-import"],
     # Known Inception failures (AGENTS.md: "Inception is known broken and out
     # of scope ... Report them as known Inception failures"). The one
     # reviewed list: these files run in the `known_failures` shard, which

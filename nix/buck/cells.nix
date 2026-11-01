@@ -168,14 +168,17 @@ let
     esbuild_version = pkgs.esbuild.version;
     hegel_nif = "${artifacts.hegelNif}/lib/hegel_nif.so";
     postgres = "${pkgs.postgresql}/bin";
-    enrico_git_owner = "${artifacts.enricoGitOwner}/bin";
     # Tools the suites run that devenv takes from the developer's PATH.
     test_tools = "${pkgs.buildEnv { name = "overalls-mix-test-tools"; paths = [ pkgs.openssl.bin pkgs.openssh pkgs.python3 ]; }}/bin";
     git = "${pkgs.git}/bin";
     # The OS trust store that the release probe and the suites expect at
     # /etc/ssl (:public_key.cacerts_get).
     ca_bundle = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
+    # Lilly's release metadata and host-tools link only.
     host_tools = "${artifacts.hostTools}";
+    # The host tools minus the Rust helpers, which Mix suites take from
+    # //lilly:host-helpers (test_path_deps).
+    host_system_tools = "${artifacts.hostSystemTools}/bin";
     vmm = "${artifacts.vmm}";
     util_linux_bin = "${pkgs.util-linux.bin}";
   } // lib.listToAttrs (map (app: lib.nameValuePair "deps_${app}_prod" "${artifacts.dependencies.${app}}") mixProjects)

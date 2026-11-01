@@ -8,7 +8,7 @@
 # location-independent (cacheable across checkouts and hosts) and lets the
 # release reproduce beam.mixRelease byte for byte.
 
-load(":assemble.bzl", "RuntimeRefsInfo", "nix_store_import")
+load(":assemble.bzl", "NixStorePathInfo", "RuntimeRefsInfo", "nix_store_import")
 load(":nix.bzl", "OwnedSrcsInfo")
 
 # Repository-relative path -> source artifact (a file, or a whole owned
@@ -369,7 +369,12 @@ def _mix_test_impl(ctx: AnalysisContext) -> list[Provider]:
             "test_timeout=" + shell_quote("{}m".format(ctx.attrs.timeout_minutes)),
         ] + (["known_failures=" + shell_quote("\n".join([e for f in sorted(ctx.attrs.known_failures) for e in ctx.attrs.known_failures[f]]))] if name == "known_failures" else []) +
           (["export MIX_TEST_PARTITION={}".format(index + 1)] if selected != None else []) +
-          (["export PATH={}:\"$PATH\"".format(shell_quote(":".join(ctx.attrs.path)))] if ctx.attrs.path else []) + [
+          (["export PATH={}:\"$PATH\"".format(shell_quote(":".join(ctx.attrs.path)))] if ctx.attrs.path else []) +
+          # Imported Buck2 tool trees come first on PATH. Each import's
+          # store-path file is bound at /arg/2... after the state and the
+          # result (mix_sandbox.sh); the tools run from the store path itself,
+          # which the sandbox sees root-owned like any Nix-built tool.
+          (["export PATH={}:\"$PATH\"".format(":".join(["$(cat /arg/{})/bin".format(2 + i) for i in range(len(ctx.attrs.path_deps))]))] if ctx.attrs.path_deps else []) + [
             "mix_test " + " ".join([shell_quote(a) for a in ctx.attrs.args + (known_filters if name == "known_failures" else known_excludes) + (selected or [])]),
         ], extra = {"ERL_FLAGS": "+S {}:{}".format(schedulers, schedulers)})
         # Suites check TLS configuration against the OS trust store; releases
@@ -379,7 +384,7 @@ def _mix_test_impl(ctx: AnalysisContext) -> list[Provider]:
             "mix_test",
             script,
             tree,
-            cmd_args(compiled.state, result.as_output()),
+            cmd_args(compiled.state, result.as_output(), [dep[NixStorePathInfo].store_path for dep in ctx.attrs.path_deps]),
             identifier = name,
             env = {"MIX_SANDBOX_CA_BUNDLE": ctx.attrs.ca_bundle} | ({"MIX_SANDBOX_CGROUP": "1"} if ctx.attrs.host_cgroup else {}) | ({"MIX_SANDBOX_HOST_IDENTITY": "1"} if ctx.attrs.host_identity else {}),
             weight = schedulers,
@@ -435,6 +440,10 @@ mix_test = rule(
         # Directories put before the state's PATH, as devenv does for suites
         # that run native helpers.
         "path": attrs.list(attrs.string(), default = []),
+        # nix_store_import targets of tool trees with bin/, put on PATH
+        # before `path` (e.g. //lilly:host-helpers-import), so suites run the
+        # Buck2-built native helpers rather than a Nix build of them.
+        "path_deps": attrs.list(attrs.dep(providers = [NixStorePathInfo]), default = []),
         "compiled": attrs.dep(providers = [MixCompileInfo]),
         "covenant": attrs.bool(default = False),
         "env": attrs.dict(attrs.string(), attrs.string(), default = {}),
@@ -651,6 +660,7 @@ def overalls_mix_project(
         # and check actions restore the compiled build and read declared files.
         source_overlays: list[str] = [],
         test_path: list[str] | None = None,
+        test_path_deps: list[str] = [],
         test_precommit: bool = True,
         release_reset_modes: bool = False,
         test_args: list[str] = ["--warnings-as-errors"],
@@ -724,6 +734,7 @@ def overalls_mix_project(
         repository_srcs = repository_support,
         seed_salt = read_root_config("mix", "test_salt", ""),
         path = test_path,
+        path_deps = test_path_deps,
         postgres = _mix_config("postgres") if postgres else "",
         ca_bundle = _mix_config("ca_bundle"),
         covenant = covenant,
