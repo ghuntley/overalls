@@ -59,15 +59,22 @@ it is empty.
 ## Builds
 
 - Buck2 is the only build entry point (ADR-0269). Run `tools/buck2`, never a
-  buck2 from `PATH` or a new `nix build .#…` entry point. Use the
+  buck2 from `PATH`, `nix build .#…`, `nix run .#…` or `nix flake check`. Nix
+  only supplies pins and toolchains (`buckCells`, `lib.dependencyPins`) and
+  assembles NixOS (`lib.assemble`, `nixosModules`). Use the
   [buck2 skill](.agents/skills/buck2/SKILL.md) for BUCK, `.bzl`, BXL,
-  toolchain and wrapper changes. Use the
-  [nix-builds skill](.agents/skills/nix-builds/SKILL.md) for pins, the Buck2
-  cells, NixOS modules and assembly.
-- Until an output moves to a Buck2 rule, it builds through the bootstrap
-  `nix_flake_attr` targets (`tools/buck2 build //:package-<name>` or
-  `//:check-<name>`). Delete the bootstrap use in the same change that moves
-  the output.
+  toolchain and wrapper changes, and to find the target for a build or test.
+  Use the [nix-builds skill](.agents/skills/nix-builds/SKILL.md) for pins, the
+  Buck2 cells, NixOS modules and assembly.
+- NixOS outputs build through `nix_assemble` targets over `lib.assemble`:
+  `tools/buck2 build //:package-<name>` and `//:check-<name>`,
+  `tools/buck2 test` for machine tests (listed in the generated
+  [Find a test](nix/verification/tests/README.md#find-a-test) table), and
+  `//fleet/hosts/<host>:deployment` for hosts. Define new package outputs and
+  non-script checks in `nix/assemble/outputs.nix` (contract
+  `assembly-flake-outputs`), never in `flake.nix`.
+- Documentation generated from the graph is refreshed with `tools/docs`;
+  `tools/docs --check` fails when it is stale.
 
 ## Verification and implementation
 
@@ -113,7 +120,7 @@ it is empty.
   copy files aside instead.
 - Committed merge-conflict markers are refused by `elixir scripts/check_conflict_markers.exs`,
   which runs through the `tools/precommit` hook at commit and merge-commit time
-  (merge commits skip ordinary pre-commit hooks) and as the `conflict-markers` Nix check. Resolve
+  (merge commits skip ordinary pre-commit hooks) and as the `//:conflict-markers` Buck2 check. Resolve
   every conflict before committing a merge; never commit with hooks bypassed.
 - `tools/precommit` (the devenv `precommit` command and the single prek hook)
   runs `buck/bxl/precommit.bxl` over the staged files: it builds only the

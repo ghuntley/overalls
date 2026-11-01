@@ -29,6 +29,24 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
   as `machine_tests` (with labels), `tests` and `builds`. It only loads targets;
   it never builds. `buck2` and `affected` in the devenv shell are these
   wrappers.
+- **Finding the target for a Nix output.** Never use `nix build .#…`;
+  every output has a Buck2 target:
+  - a `lib.assemble` package output `<name>` (`nix/assemble/outputs.nix`,
+    listed in `nix/buck/assembly_attrs.bzl`) is `//:package-<name>`;
+  - a machine test is `//nix/verification/tests/machines/<suite>:<name>`, and
+    any other check is `//:check-<name>`; the generated "Find a test" table
+    in `nix/verification/tests/README.md` lists every one with its target;
+  - a host system is `//fleet/hosts/<host>:deployment` (`:base`, `:install`);
+  - `tools/buck2 uquery 'attrregexfilter(attr, "<regex>", //...)'` finds the
+    `nix_assemble` target for a `lib.assemble` attribute.
+  A `nix_assemble` output is a file holding the store path:
+  `cat "$(tools/buck2 build //:package-host --show-full-simple-output)"`.
+  A `nix_store_run` target makes one runnable (`tools/buck2 run
+  //mila:journey-fixture`).
+- **Generated documentation.** `tools/docs` rewrites the sections that
+  `buck/bxl/docs.bxl` renders from the graph (the "Find a test" table, from
+  every test target plus `nix/verification/tests/find_a_test.bzl`);
+  `tools/docs --check` fails when one is stale.
 - **Ownership:**
   `tools/buck2 bxl //buck/bxl/ownership.bxl:main -- --files $(git ls-files)`.
   Pass list arguments after `--`; an `@argfile` is not expanded there.
@@ -58,14 +76,16 @@ Nix supplies the cells. Use the `nix-builds` skill for pins and NixOS assembly.
    ([ADR-0270](../../../docs/architecture/decisions/0270-graph-driven-machine-test-selection.md)).
 4. **Actions that touch `/nix/store` or the Nix daemon** are `local_only = True`
    and `allow_cache_upload = False`.
-5. **Nothing evaluates the flake.** Every Nix output Buck2 builds goes
-   through `nix_assemble` over `lib.assemble` (the bootstrap `nix_flake_attr`
-   is gone). Flake package outputs and non-script checks are defined in
-   `nix/assemble/outputs.nix`, never in `flake.nix`, and BUCK.v2 declares
-   `//:package-<name>` and `//:check-<name>` for each (label `flake_output`).
-   After lib.assemble gains or loses one, regenerate the list with
-   `nix/buck/assembly-attrs.sh`; `//buck:assembly_attrs_fresh` fails until
-   you do.
+5. **Nothing evaluates the flake's build outputs.** Every Nix output Buck2
+   builds goes through `nix_assemble` over `lib.assemble`. Package outputs
+   and non-script checks are defined in `nix/assemble/outputs.nix`, never in
+   `flake.nix`, and BUCK.v2 declares `//:package-<name>` and
+   `//:check-<name>` for each (label `flake_output`). After lib.assemble
+   gains or loses one, regenerate the list with `nix/buck/assembly-attrs.sh`;
+   `//buck:assembly_attrs_fresh` fails until you do. The flake itself only
+   exports `buckCells`, `lib.assemble`, `lib.dependencyPins` and
+   `nixosModules`; never add a `packages`, `checks`, `apps` or
+   `nixosConfigurations` consumer.
 6. **`.buckconfig` ignores are root-relative.** Use `**/name` for nested
    build directories.
 7. **Default globs skip dotfiles.** `nix_owned` adds `**/.*` patterns; do the
@@ -394,6 +414,15 @@ command, the single prek hook and CI call it.
   not to the package.
 
 
+- **`nix_assemble` fails with "access to absolute path … is forbidden in
+  restricted mode" or "path … does not exist".** The assembly read a file
+  outside its declared tree. Add the owning group to the target's `srcs` or
+  `inputs` (for machine tests, in `buck/inputs.bzl` or the generator), never
+  an `--impure` escape. Reproduce without building:
+  `tools/buck2 build '<target>[drv]'` (machine tests: `<test>.assembly[drv]`).
+- **A failed machine test.** `tools/machine-test-log <target> <file>` writes
+  the full Nix build log; `<test>.assembly[drv]` names the exact derivation
+  without building it.
 - **"function is unavailable during analysis".** Move the
   `read_root_config` call into a macro (rule 2).
 - **"File not found … Included in X/BUCK".** A glob matched a dangling

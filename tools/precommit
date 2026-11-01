@@ -160,4 +160,7 @@ fi
 # Contract rust-artifacts-have-parity: see buck/CONTRACTS. Unconfigured
 # queries only, so it runs on every invocation.
 "$root/tools/buck2" bxl --console simple //buck/bxl/rust_parity_coverage.bxl:main
+# Contract find-a-test-from-graph: see buck/CONTRACTS. One unconfigured
+# query; fails when the generated README sections are stale.
+"$root/tools/docs" --check
 bxl --mode check

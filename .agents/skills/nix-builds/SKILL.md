@@ -28,8 +28,8 @@ Third-party inputs are pinned in exactly one place
    - `mix.lock`, verified against `fetchMixDeps`;
    - the guest domain locks.
 
-The `pins` check (`elixir scripts/check_pins.exs`; also the Buck2 `//:pins`
-precommit check and a flake check) refuses all of these:
+The `pins` check (`elixir scripts/check_pins.exs`, run as the Buck2 `//:pins`
+precommit check) refuses all of these:
 
 - inline `hash`/`sha256` literals outside its reviewed exemptions;
 - registry keys that nothing reads;
@@ -79,8 +79,14 @@ To add a tool:
   - It builds one package set, instantiates every module over it
     (`nix/assemble/modules.nix`), and returns `systems`, `checks`, `kexec`,
     `packages`, `hostPackages` and `imported`.
-  - The flake outputs are views of it. Add new modules and host wiring there,
-    never in `flake.nix`.
+  - The flake exports only `buckCells`, `lib.assemble`,
+    `lib.dependencyPins` and `nixosModules`; `packages`, `checks`,
+    `legacyPackages`, `apps` and `nixosConfigurations` are not entry points.
+    Add package outputs and non-script checks to `nix/assemble/outputs.nix`
+    (contract `assembly-flake-outputs`) and machine tests to
+    `nix/verification/tests/catalog.nix`, then regenerate the Buck2 lists
+    (`nix/buck/assembly-attrs.sh`, `python3 buck/machine_tests.py generate`).
+    Never add an output or host wiring to `flake.nix`.
   - Buck2's `nix_assemble` evaluates it with
     `builtins.getFlake "path:<copied tree>"` under
     `--option restrict-eval true`, so only declared files are readable. Pass
@@ -96,10 +102,38 @@ To add a tool:
   on purpose. Read the exemption reasons in `scripts/pins.ex` before you
   change them.
 
+## Flake inputs and devenv
+
+- `flake.lock` pins every flake input. `buildNixpkgs` (the application and
+  toolchain nixpkgs) follows the same `devenv-nixpkgs` branch as
+  `devenv.yaml`; the `//:package-input-lock` check fails when `flake.lock`
+  and `devenv.lock` lock different revisions of the inputs both carry
+  (`buildNixpkgs`/`nixpkgs` and `nix-compact`). Update both locks together.
+- Inputs that take a nixpkgs `follows` the flake's, so one nixpkgs serves
+  each role. `nix-upgrades.yml` runs `devenv update`, pins `buildNixpkgs` to
+  devenv's revision and commits both locks. A bump can invalidate registry
+  hashes: `scripts/dependency_pins.ex` `refresh!` (used by the Mix and Cargo
+  security-upgrade scripts) builds `lib.dependencyPins.<ecosystem>.<name>.build`
+  until every hash converges.
+- The devenv shell imports the same toolchain files as the cells
+  (`infrastructure/toolchain.nix`, `nix/rust-toolchain.nix`,
+  `nix/buck/python.nix`) and runs `tools/buck2` as `buck2`; it never
+  installs a second buck2 or toolchain.
+
+## Guest lock files
+
+Guest images pin their distribution inputs in domain locks next to the
+image: `guest/ubuntu/packages.lock.json` (refreshed by
+`guest/ubuntu/update-lock.py`) and `vscode-web/extensions.lock.json`
+(`tool-update-vscode-extensions`). Fetched files read their hashes from
+those locks or the registry, never from inline literals. Read the guest's
+README before refreshing one, and rebuild the image's `//:package-guest-*`
+target and the machine tests that boot it.
+
 ## Verification
 
 - Run `elixir scripts/check_pins.exs .`.
-- Build the affected leaves.
+- Build the affected targets (`tools/affected` lists them).
 - For moved hashes, compare `nix derivation show` drvPaths with trunk.
 - Run the machine tests that consume a changed module. A successful
   evaluation does not show runtime behaviour.
