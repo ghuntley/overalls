@@ -329,6 +329,28 @@ the approved migration plan.
   [find_a_test.bzl](../../../nix/verification/tests/find_a_test.bzl) and fails
   on a key that names no target; [tools/docs](../../../tools/docs) writes the
   table and `tools/docs --check` fails on a stale README.
+  The Project Glasswing (Anthropic OSS Scanner) image builds only through
+  Buck2: `container_image` ([container_image.bzl](../../../buck/container_image.bzl),
+  driver [container_image.py](../../../buck/container_image.py)) declares
+  `//.oss-scanner:image` (build, load into the local image store and scan
+  every layer for the Namespace token prefix) and the `buck2 run` target
+  `//.oss-scanner:image-publish` (push with the registry layer cache, then
+  pull back and scan). They run `docker buildx` with the builder in the
+  environment, so like the Mila platforms they are `non_hermetic`, Linux
+  only, `local_only` and uncached; `oss-scanner.yml` calls them through
+  `tools/buck2` with Namespace's remote BuildKit builder and publishes only
+  from trunk. The Marshall release is a Buck2 dependency
+  (`//:package-service-marshall`) whose closure the driver exports as a Nix
+  binary cache and passes as a named build context; the Dockerfile imports
+  it with `nix copy`. Building it inside the image (92b89ea0e) could not
+  work: Lyra's cross-build actions run bubblewrap, which an unprivileged
+  BuildKit step cannot start, and it would have put Buck2 state in a layer.
+  The image stays a Dockerfile rather than a `lib.assemble` dockerTools
+  output: it must carry the checkout's full `.git` history, which a flake
+  source never contains, and a mutable single-user Nix with a registered
+  store database that the offline auditor's own layer extends
+  ([.oss-scanner/CONTRACTS](../../../.oss-scanner/CONTRACTS)). The scan's
+  fixtures are `//buck:container_image_scan`.
 
 Remaining gaps, by milestone of the migration plan:
 

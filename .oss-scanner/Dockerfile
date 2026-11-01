@@ -46,21 +46,38 @@ RUN groupadd --system nixbld \
 WORKDIR /src
 COPY . /src
 
-# Build the primary control-plane release through Buck2, the only build entry
-# point (ADR-0269): tools/buck2 links the flake's pinned buckCells and the
-# release is the same assembly production hosts run. The repository's checks
-# cover the other non-inception releases; inception guest workloads remain
-# excluded. The daemon is stopped so no process outlives the layer.
-RUN tools/buck2 build --show-full-output //:package-service-marshall > /tmp/marshall.txt \
-    && nix path-info "$(cat "$(awk 'END { print $2 }' /tmp/marshall.txt)")" \
-    && tools/buck2 kill \
-    && rm /tmp/marshall.txt
+# Fetch every pinned flake input into the store, so the auditor can evaluate
+# the flake offline.
+RUN nix flake archive /src
+
+# Import the primary control-plane release that Buck2, the only build entry
+# point (ADR-0269), built outside this image: //.oss-scanner:image depends on
+# //:package-service-marshall, the same assembly production hosts run, and
+# passes its closure as the named build context `release`, a Nix binary cache
+# with `store-path` naming the release. The repository's checks cover the
+# other non-inception releases; inception guest workloads remain excluded.
+# Nothing runs Buck2 here: Lyra's cross builds need bubblewrap, which an
+# unprivileged build step cannot start, and no Buck2 state or Namespace token
+# can reach a layer (contracts container-image-buck2-only and
+# container-image-no-token in CONTRACTS). The bind mount keeps the cache
+# itself out of the image; the release gets a GC root for the auditor.
+RUN --mount=type=bind,from=release,target=/release \
+    release=$(cat /release/store-path) \
+    && nix copy --no-check-sigs --from file:///release "$release" \
+    && nix path-info "$release" \
+    && mkdir -p /nix/var/nix/gcroots/oss-scanner \
+    && ln -sfn "$release" /nix/var/nix/gcroots/oss-scanner/service-marshall
 
 # Leave a small, deterministic assertion that the image contains the source,
 # history and compiled release closures needed by an offline auditor.
 RUN set -eu; \
     test -d /src/.git; \
-    test -f /src/flake.lock
+    test ! -s /src/.git/objects/info/alternates; \
+    git -C /src fsck --connectivity-only --no-progress; \
+    test -f /src/flake.lock; \
+    test ! -e /src/buck-out; \
+    test ! -e /src/.buck-remote.buckconfig; \
+    nix path-info "$(readlink /nix/var/nix/gcroots/oss-scanner/service-marshall)" >/dev/null
 
 WORKDIR /src
 ENTRYPOINT []

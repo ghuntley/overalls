@@ -1,0 +1,24 @@
+@cc [owner:ghuntley,label:build;verification] container-image-buck2-only
+The offline-analysis image MUST be built only through the Buck2 targets
+`//.oss-scanner:image` (build, load and scan) and `//.oss-scanner:image-publish`
+(`buck2 run`: push and scan), which buck/container_image.py drives with
+`docker buildx` over this Dockerfile and the repository root, `.git` included.
+The Marshall release it carries MUST be the Buck2 dependency
+`//:package-service-marshall`, imported from the `release` build context;
+nothing in the Dockerfile may build it. oss-scanner.yml MUST call those
+targets through tools/buck2, never a Docker build action or `docker build`
+directly, and MUST push only from trunk. The targets MUST stay non_hermetic,
+Linux-only, local_only and uncached, so `buck2 build //...`, verification and
+tools/affected skip them (ADR-0269). The context's `.git` MUST be
+self-contained (no objects/info/alternates).
+
+@cc [owner:ghuntley,label:security;build] container-image-no-token
+No Namespace token may enter any image layer, the image configuration or a
+build context. docker MUST receive no token as a build argument, secret or
+environment variable (the driver drops NAMESPACE_RBE_TOKEN), no Buck2 may run
+inside the image build, and the repository context MUST exclude the
+checkout's Buck2 state (Dockerfile.dockerignore). Both targets MUST stream
+every member of the built or published image, decompressed, through the
+token scan and fail on any token-shaped string (`nsrt_` and at least 20 token
+characters; a bare mention of the prefix in documentation is not one),
+printing member names only (ADR-0276).

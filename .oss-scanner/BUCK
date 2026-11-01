@@ -1,3 +1,18 @@
+load("@root//buck:container_image.bzl", "container_image")
 load("@root//buck:nix.bzl", "nix_owned")
 
 nix_owned()
+
+# The Project Glasswing (Anthropic OSS Scanner) offline-analysis image
+# (Dockerfile here). non_hermetic: needs docker with buildx and the network.
+#   tools/buck2 build -c overalls.non_hermetic=true //.oss-scanner:image
+#   tools/buck2 run -c overalls.non_hermetic=true //.oss-scanner:image-publish -- \
+#     --registry "$NSC_CONTAINER_REGISTRY" --tag "$GITHUB_SHA" --tag trunk
+# .github/workflows/oss-scanner.yml runs both. Contracts: see CONTRACTS here.
+container_image(
+    name = "image",
+    dockerfile = ".oss-scanner/Dockerfile",
+    repository = "overalls-oss-scanner",
+    # The Marshall release, imported as the `release` build context.
+    stores = {"release": "//:package-service-marshall"},
+)

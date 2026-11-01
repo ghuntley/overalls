@@ -18,8 +18,8 @@ on dispatch the space-separated check names given in `checks`, each through
 `tools/buck2 test` in its own job (ADR-0270).
 
 @cc [owner:ghuntley,label:security;build] ci-namespace-cache
-ci.yml's affected, build, hosts, test, evaluate, machine and precommit jobs and
-nixos-machine-tests.yml's jobs MUST receive the Namespace token only as the
+ci.yml's affected, build, hosts, test, evaluate, machine and precommit jobs,
+nixos-machine-tests.yml's jobs and oss-scanner.yml's image job MUST receive the Namespace token only as the
 job environment variable NAMESPACE_RBE_TOKEN from the repository secret, never
 in argv, a file in the checkout or a log, so tools/buck2 enables the Namespace
 cache. A run without the secret (a fork or pull request) MUST still build

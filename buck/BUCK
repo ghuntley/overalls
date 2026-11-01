@@ -21,6 +21,10 @@ export_file(name = "cargo_workspace_stubs.py", visibility = ["PUBLIC"])
 # The non_hermetic Mila platform build driver (buck/mila.bzl).
 export_file(name = "mila_platform.py", visibility = ["PUBLIC"])
 
+# The non_hermetic Dockerfile image driver (buck/container_image.bzl).
+# Referenced in place: the driver finds the repository root from its own path.
+export_file(name = "container_image.py", mode = "reference", visibility = ["PUBLIC"])
+
 # assembly_attrs.bzl matches lib.assemble's package output and check names.
 script_test(
     name = "assembly_attrs_fresh",
@@ -61,6 +65,13 @@ script_test(
     srcs = ["affected.py", "bxl/affected.bxl", "inputs.bzl", "nixos.bzl"],
     deps = ["//nix/verification/tests/machines:suites"],
     labels = ["slow"],
+)
+
+# The image layer scan for the Namespace token prefix (buck/container_image.py).
+script_test(
+    name = "container_image_scan",
+    script = "tests/container_image_scan_test.py",
+    srcs = ["container_image.py"],
 )
 
 # Failure history for reselection in ci.yml (ADR-0270); pure, no network.

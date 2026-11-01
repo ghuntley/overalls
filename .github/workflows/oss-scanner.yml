@@ -1,8 +1,13 @@
 name: "project glasswing oss scanner"
 
 # Rebuilds the Project Glasswing (Anthropic OSS Scanner) offline-analysis
-# image from .oss-scanner/Dockerfile daily, or on demand, and publishes it from
-# trunk to the workspace's private Namespace registry.
+# image from .oss-scanner/Dockerfile daily, or on demand, through its Buck2
+# targets (ADR-0269): trunk publishes it to the workspace's private Namespace
+# registry with //.oss-scanner:image-publish; any other ref builds, loads and
+# token-scans it with //.oss-scanner:image. Both are non_hermetic targets that
+# run `docker buildx` with the Namespace remote builder configured below.
+# Contracts container-image-buck2-only and container-image-no-token: see
+# .oss-scanner/CONTRACTS.
 on:
   schedule:
     # Daily at 16:00 UTC
@@ -18,8 +23,15 @@ permissions:
 
 jobs:
   image:
-    runs-on: namespace-profile-cached-amd64-xl
+    # Privileged: the devenv action's Nix runs sandboxed builds, and Lyra's
+    # cross builds in the release run bubblewrap.
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 120
+    # The Namespace Buck2 cache (ADR-0276) for the Marshall release the image
+    # depends on. The image driver drops the token from docker's environment
+    # and the Dockerfile runs no Buck2 (contract container-image-no-token).
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
       # A plain full clone: the image must contain a self-contained .git, not
       # one that borrows objects from a runner-side mirror.
@@ -27,19 +39,39 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+
       - name: Configure Namespace remote builders
         uses: namespacelabs/nscloud-setup-buildx-action@d059ed7184f0bc7c8b27e8810cea153d02bcc6dd # v0
 
+      # Buck2 actions inherit the daemon's environment, which must include the
+      # buildx builder configured above.
+      - name: Stop any Buck2 daemon
+        run: tools/buck2 kill
+
+      - name: Build, load and scan the image
+        if: github.ref != 'refs/heads/trunk'
+        run: |
+          tools/buck2 build -c overalls.non_hermetic=true \
+            -c "overalls.revision=$GITHUB_SHA" \
+            //.oss-scanner:image --show-full-output | tee image.txt
+          out=$(awk 'END { print $2 }' image.txt)
+          cat "$out/token-scan" "$out/size" "$out/image-id"
+
+      # Every stage's layers are cached in the registry (mode=max,
+      # <registry>/overalls-oss-scanner:buildcache) on top of the remote
+      # builder's own cache; only trunk pushes and writes the cache.
       - name: Build and publish
-        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
-        with:
-          context: .
-          file: .oss-scanner/Dockerfile
-          push: ${{ github.ref == 'refs/heads/trunk' }}
-          tags: |
-            ${{ env.NSC_CONTAINER_REGISTRY }}/overalls-oss-scanner:${{ github.sha }}
-            ${{ env.NSC_CONTAINER_REGISTRY }}/overalls-oss-scanner:trunk
-          # Every stage's layers are cached in the registry (mode=max), on top
-          # of the remote builder's own cache; only trunk writes the cache.
-          cache-from: type=registry,ref=${{ env.NSC_CONTAINER_REGISTRY }}/overalls-oss-scanner:buildcache
-          cache-to: ${{ github.ref == 'refs/heads/trunk' && format('type=registry,ref={0}/overalls-oss-scanner:buildcache,mode=max,image-manifest=true', env.NSC_CONTAINER_REGISTRY) || '' }}
+        if: github.ref == 'refs/heads/trunk'
+        run: |
+          tools/buck2 run -c overalls.non_hermetic=true \
+            -c "overalls.revision=$GITHUB_SHA" \
+            //.oss-scanner:image-publish -- \
+            --registry "$NSC_CONTAINER_REGISTRY" --tag "$GITHUB_SHA" --tag trunk
+
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan

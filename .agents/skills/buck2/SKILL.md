@@ -241,6 +241,19 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   SDK and NDK and cargo-ndk on `PATH`, then
   `tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug`.
 
+**Dockerfile images** (`buck/container_image.bzl`). `container_image(name,
+dockerfile, repository, stores)` declares `<name>` (`docker buildx build
+--load` with the repository root as context, then a layer scan for the
+Namespace token prefix) and the `buck2 run` target `<name>-publish` (`--
+--registry REG --tag TAG...`: push with a registry cache, pull back, scan).
+`stores` maps a build-context name to a `nix_assemble` target; its closure
+goes in as a Nix binary cache the Dockerfile imports with `nix copy`, so
+nothing builds Nix or Buck2 outputs inside the image. Both are
+`non_hermetic` and Linux-only like the Mila platforms; docker and the buildx
+builder come from the daemon's environment for the build, so run
+`tools/buck2 kill` after changing them. The OSS scanner image is
+`//.oss-scanner:image`.
+
 **Checks that evaluate NixOS** (`nix-compact-*`,
 `fleet-builds-configuration`) are `//:check-<name>` assemblies of
 lib.assemble's `checks`; `tools/buck2 build '//:check-<name>[drv]'` evaluates

@@ -80,12 +80,19 @@ _NIX_LEAF_OUTPUTS = ["mila-journey-fixture"]
 # tool-outputs-read-no-swapped-leaf (//buck:tool_outputs_leaf_free).
 _TOOL_OUTPUTS = ["host", "security-secrets", "security-user-recipients", "tool-update-vscode-extensions"]
 
+# Package outputs other packages consume: //mila:journey-fixture runs one, and
+# the OSS scanner image carries the Marshall release (//.oss-scanner:image).
+_PACKAGE_VISIBILITY = {
+    "mila-journey-fixture": ["//mila:"],
+    "service-marshall": ["//.oss-scanner:"],
+}
+
 [nix_assemble(
     name = "package-" + attr,
     attr = "outputPackages.\"{}\"".format(attr),
     artifacts = {} if attr in _NIX_LEAF_OUTPUTS + _TOOL_OUTPUTS else ASSEMBLY_ARTIFACTS,
     labels = ["flake_output"],
-    visibility = ["//mila:"] if attr == "mila-journey-fixture" else [],
+    visibility = _PACKAGE_VISIBILITY.get(attr, []),
 ) for attr in ASSEMBLY_PACKAGES]
 
 # Operator commands from package outputs (`nix run .#<app>` before M11):

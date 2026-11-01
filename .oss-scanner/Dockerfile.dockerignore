@@ -25,5 +25,16 @@ result-*
 **/.coverage.*
 **/htmlcov/
 antithesis/scratchbook
+# Buck2 state of the checkout that builds the image: outputs, the cells link,
+# the generated remote-cache include and local configuration. The image runs
+# no Buck2; the release arrives as a separate build context
+# (contract container-image-no-token).
+buck-out
+.buck-cells
+.buck-cells.key
+.buck-cells.gcroot
+.buck-remote.buckconfig
+.buckconfig.local
+.buckd
 # Nix runtime closures may contain required bytecode and are copied verbatim.
 !antithesis/build/contexts/**
