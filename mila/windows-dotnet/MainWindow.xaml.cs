@@ -586,7 +586,7 @@ public sealed partial class MainWindow : Window
             return;
         }
         bool attached = RustNative.TryValidateTerminalAttach(0, 80, 24, true).IsValid &&
-            _terminalStream.Attach(machine.Id, machine.CanWrite, 80, 24);
+            _terminalStream.Open(machine.Id, machine.CanWrite, 80, 24);
         TerminalOutput.Text = string.Empty;
         TerminalStatus.Text = attached ? S("terminalAttaching", "attaching") : S("terminalRefused", "Terminal refused");
         if (attached) _terminalPollTimer?.Start();

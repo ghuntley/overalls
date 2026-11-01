@@ -83,6 +83,9 @@ internal sealed class MilaTerminalStream
     private ushort _rows = 24;
     private Guid _machine;
     private string? _terminalId;
+    // The last session attached on each machine, so reopening the terminal page
+    // rejoins it (as the Linux client does) instead of opening a new one.
+    private readonly Dictionary<Guid, string> _rejoin = [];
 
     internal MilaTerminalStream(IMilaTerminalTransport transport, Func<ulong?> sessionHandle, int maxReconnects = DefaultMaxReconnects)
     {
@@ -109,6 +112,23 @@ internal sealed class MilaTerminalStream
     /// </summary>
     internal bool AttachSession(Guid machineId, string terminalId, bool readWrite, ushort columns, ushort rows) =>
         !string.IsNullOrEmpty(terminalId) && AttachNamed(machineId, terminalId, readWrite, columns, rows);
+
+    /// <summary>
+    /// The terminal page's attach: rejoins this machine's previous session by
+    /// name, and opens a new one only when there is no saved name or the rejoin
+    /// is refused (the session is gone). A lost transport keeps the name and is
+    /// left to the bounded reconnect, so it never opens a second session.
+    /// </summary>
+    internal bool Open(Guid machineId, bool readWrite, ushort columns, ushort rows)
+    {
+        if (_rejoin.TryGetValue(machineId, out string? saved))
+        {
+            if (AttachSession(machineId, saved, readWrite, columns, rows)) return true;
+            if (_terminalId is not null) return false;
+            _rejoin.Remove(machineId);
+        }
+        return Attach(machineId, readWrite, columns, rows);
+    }
 
     private bool AttachNamed(Guid machineId, string? terminalId, bool readWrite, ushort columns, ushort rows)
     {
@@ -169,6 +189,7 @@ internal sealed class MilaTerminalStream
         Guid machine = _machine;
         Kill();
         _terminalId = null;
+        _rejoin.Remove(machine);
         return terminalId is not null && machine != Guid.Empty && _sessionHandle() is { } handle && handle != 0 &&
             _transport.End(handle, machine, terminalId);
     }
@@ -176,6 +197,7 @@ internal sealed class MilaTerminalStream
     internal void SignOut()
     {
         KillNative();
+        _rejoin.Clear();
         Session.SignOut();
         _generation = checked(_generation + 1);
     }
@@ -221,6 +243,7 @@ internal sealed class MilaTerminalStream
         }
         _generation = generation;
         _decoder.Reset();
+        _rejoin[_machine] = _terminalId!;
         if (Session.BeginAuthenticatedAttach(handle, generation, _readWrite) == 0 || !Session.SetNativeTerminal(terminal.Value))
         {
             _transport.Kill(terminal.Value);

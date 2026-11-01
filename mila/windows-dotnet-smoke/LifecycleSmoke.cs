@@ -328,6 +328,44 @@ internal static class LifecycleSmoke
         transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
         Program.Require(!refused.AttachSession(Machine, named, true, 80, 24) && refused.TerminalId is null && transport.OpenCount == 1,
             "a refused rejoin forgets the gone session");
+        TerminalPageOpen();
+    }
+
+    /// <summary>The terminal page's Open: rejoin the saved session, fall back to a new one only when none is saved or it is refused.</summary>
+    private static void TerminalPageOpen()
+    {
+        ulong? handle = 7;
+        FakeTerminal transport = new();
+        MilaTerminalStream page = new(transport, () => handle);
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 31));
+        Program.Require(page.Open(Machine, true, 80, 24) && transport.OpenCount == 1, "first open has no saved name and opens a session");
+        string saved = page.TerminalId!;
+        page.Kill();
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 32));
+        Program.Require(page.Open(Machine, true, 80, 24) && page.TerminalId == saved && transport.OpenCount == 1 &&
+            transport.AttachedTerminals[^1] == saved, "reopening rejoins the saved session without terminal new");
+        page.Kill();
+        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 33));
+        Program.Require(page.Open(Machine, true, 80, 24) && transport.OpenCount == 2 && page.TerminalId != saved &&
+            transport.AttachedTerminals[^2] == saved, "a refused rejoin falls back to a new session");
+        string replacement = page.TerminalId!;
+        page.Kill();
+        int opens = transport.OpenCount;
+        transport.Attaches.Enqueue((MilaNativeStatus.Transport, null));
+        Program.Require(!page.Open(Machine, true, 80, 24) && transport.OpenCount == opens && page.TerminalId == replacement,
+            "a lost transport keeps the name and opens no second session");
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 34));
+        Program.Require(page.Open(Machine, true, 80, 24) && page.TerminalId == replacement && transport.OpenCount == opens,
+            "the next open still rejoins after a lost transport");
+        Program.Require(page.End() && transport.Ended[^1] == replacement, "end closes the rejoined session");
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 35));
+        Program.Require(page.Open(Machine, true, 80, 24) && transport.OpenCount == opens + 1 && page.TerminalId != replacement,
+            "after end the page opens a new session");
+        page.SignOut();
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 36));
+        Program.Require(page.Open(Machine, true, 80, 24) && transport.OpenCount == opens + 2,
+            "sign-out forgets saved sessions");
     }
 
     private static void TerminalReconnect()
