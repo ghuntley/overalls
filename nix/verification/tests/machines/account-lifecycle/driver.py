@@ -1146,12 +1146,13 @@ with subtest("real Customer and shared-only OSS guests precede offline busy clea
 
 with subtest("fresh same-email registration inherits nothing while old cleanup remains pinned"):
     # Respect the real shared recipient cooldown instead of mutating its clock.
-    # Marshall stamps inserted_at with its node clock and this compares it with
-    # the database VM's clock, so allow nested-VM skew beyond the 60 s cooldown.
+    # The cooldown has passed once no outbox row is younger than 60 s; expired
+    # rows are purged, so an empty outbox also means the cooldown has passed.
     eventually(
         lambda: (
             sql(
-                "SELECT clock_timestamp() > max(inserted_at) + interval '60 seconds' FROM account_auth_emails"
+                "SELECT NOT EXISTS (SELECT 1 FROM account_auth_emails "
+                "WHERE inserted_at > clock_timestamp() - interval '60 seconds')"
             )
             == "t"
         ),
