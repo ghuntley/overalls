@@ -57,13 +57,13 @@ jobs:
     timeout-minutes: 240
     strategy:
       fail-fast: false
+      # ADR-0269 M8 comparison window: ci.yml's `mix` job runs every suite
+      # but Lilly's on push and pull request, so pushes keep only Lilly's leg
+      # (publish_cache_gate) here; a workflow_dispatch runs the whole matrix
+      # once on the same commit to compare per-app test counts with `mix`.
       matrix:
-        project: [protocol, lilly, audi, brady, ziggy, porsche, galileo, enrico, peach, susan]
-        include:
-          - {project: marshall, partition: 1}
-          - {project: marshall, partition: 2}
-          - {project: marshall, partition: 3}
-          - {project: marshall, partition: 4}
+        project: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '["protocol","lilly","audi","brady","ziggy","porsche","galileo","enrico","peach","susan"]' || '["lilly"]') }}
+        include: ${{ fromJSON(github.event_name == 'workflow_dispatch' && '[{"project":"marshall","partition":1},{"project":"marshall","partition":2},{"project":"marshall","partition":3},{"project":"marshall","partition":4}]' || '[]') }}
     steps:
       - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
         with:

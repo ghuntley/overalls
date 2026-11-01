@@ -378,8 +378,9 @@ command, the single prek hook and CI call it.
   targets) are precommit checks without `PrecommitInfo` yet, so a change in a
   project runs its whole check and its shards (cache hits when unchanged).
   There are no `[fix/<path>]` sub-targets for `mix format` yet. CI runs the
-  suites in ci.yml's `mix` job; publish-cache.yml's `mix precommit` matrix
-  still runs beside it until the comparison run.
+  suites in ci.yml's `mix` job. publish-cache.yml's `mix precommit` matrix
+  runs only Lilly's leg on push; a workflow_dispatch runs it whole once, to
+  compare per-app test counts with `mix` before the matrix is deleted.
 
 ### Adding a check to precommit (the convention)
 
