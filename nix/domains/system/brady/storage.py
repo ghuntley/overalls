@@ -118,6 +118,28 @@ def properties(config: Config, dataset: str, names: list[str]) -> dict[str, str]
     return result
 
 
+def dataset_properties(config: Config, names: Mapping[str, list[str]]) -> dict[str, dict[str, str]]:
+    """Read each dataset's properties in one ``zfs get`` and require exactly those pairs."""
+    datasets = list(names)
+    if len(set(datasets)) != len(datasets) or not datasets:
+        raise ValueError("invalid_storage_datasets")
+    union = sorted({name for wanted in names.values() for name in wanted})
+    output = command(
+        config,
+        "zfs",
+        ["get", "-Hp", "-o", "name,property,value", ",".join(union), *datasets],
+    )
+    rows: dict[str, dict[str, str]] = {dataset: {} for dataset in datasets}
+    for line in output.splitlines():
+        fields = line.split("\t", 2)
+        if len(fields) != 3 or fields[0] not in rows or fields[1] in rows[fields[0]]:
+            raise ValueError("invalid_storage_properties")
+        rows[fields[0]][fields[1]] = fields[2]
+    if any(set(rows[dataset]) != set(union) for dataset in datasets):
+        raise ValueError("invalid_storage_properties")
+    return {dataset: {key: rows[dataset][key] for key in names[dataset]} for dataset in datasets}
+
+
 def prepare(config: Config) -> None:
     pool = config["pool"]
     parent = pool["storage"]["dataset"]
@@ -194,7 +216,13 @@ def prepare(config: Config) -> None:
 
 
 def observe(config: Config) -> Observation:
-    """Read-only native pressure proof; never infer freed bytes from cache intentions."""
+    """Read-only native pressure proof; never infer freed bytes from cache intentions.
+
+    The freshness timestamp is taken before the first ZFS read, so every reported
+    value is at least as new as ``observed_ms`` (ADR-0069 three-second expiry).
+    The parent, pool and cache properties come from one ``zfs get`` so a loaded
+    host spends fewer process launches between that timestamp and publication.
+    """
     with open("/proc/uptime", encoding="ascii") as stream:
         started = int(float(stream.read(128).split()[0]) * 1000)
     parent = config["pool"]["storage"]["dataset"]
@@ -205,9 +233,25 @@ def observe(config: Config) -> Observation:
         != bound["zpool_guid"]
     ):
         raise ValueError("pool_identity_changed")
-    guest = properties(
-        config, parent, ["guid", "used", "available", "readonly", "reservation", "refreservation"]
+    observed = dataset_properties(
+        config,
+        {
+            parent: ["guid", "used", "available", "readonly", "reservation", "refreservation"],
+            zpool: ["used", "available"],
+            config["dataset"]: [
+                "org.overalls:brady-host",
+                "mountpoint",
+                "mounted",
+                "quota",
+                "refquota",
+                "reservation",
+                "refreservation",
+                "readonly",
+                "usedbysnapshots",
+            ],
+        },
     )
+    guest = observed[parent]
     if (
         guest["guid"] != bound["dataset_guid"]
         or guest["readonly"] != "off"
@@ -215,22 +259,8 @@ def observe(config: Config) -> Observation:
         or guest["refreservation"] != "0"
     ):
         raise ValueError("parent_policy_changed")
-    pool = properties(config, zpool, ["used", "available"])
-    cache = properties(
-        config,
-        config["dataset"],
-        [
-            "org.overalls:brady-host",
-            "mountpoint",
-            "mounted",
-            "quota",
-            "refquota",
-            "reservation",
-            "refreservation",
-            "readonly",
-            "usedbysnapshots",
-        ],
-    )
+    pool = observed[zpool]
+    cache = observed[config["dataset"]]
     if (
         cache["org.overalls:brady-host"] != config["host_id"]
         or cache["mountpoint"] != MOUNT
@@ -268,6 +298,10 @@ def publish_pressure(config: Config) -> None:
     directory = "/run/brady-pressure"
     path = directory + "/pressure.json"
     while True:
+        # Start samples on a one-second cadence measured from the previous start,
+        # not one second after it finished: a slow sample must not also wait out a
+        # full sleep before the next one begins, or the published proof lapses.
+        cycle = time.monotonic()
         try:
             value = observe(config)
             descriptor = os.open(
@@ -281,7 +315,7 @@ def publish_pressure(config: Config) -> None:
         except Exception:
             # Keep failures closed and silent; the last proof expires after three seconds.
             pass
-        time.sleep(1)
+        time.sleep(max(0.0, cycle + 1 - time.monotonic()))
 
 
 if __name__ == "__main__":

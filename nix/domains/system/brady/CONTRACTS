@@ -14,3 +14,9 @@ configuration and use fixed executable argv, never interpolate a shell command.
 The pressure observer MUST inspect the enrolled parent and cache with their native
 mount write flags. Service sandbox remounts MUST NOT be mistaken for host ZFS
 policy changes. The observer MUST issue only read-only ZFS inspection commands.
+
+@cc [owner:ghuntley,label:storage;capacity] brady-pressure-sample-cadence
+Each observation MUST take its timestamp before its first ZFS read, so no reported
+value predates that timestamp. Samples MUST start on a one-second cadence measured
+from the previous start, so a slow sample is not followed by a full idle interval
+before the next. Freshness MUST NOT be extended to cover slow samples.

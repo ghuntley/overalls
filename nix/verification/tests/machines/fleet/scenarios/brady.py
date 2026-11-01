@@ -37,12 +37,15 @@ with subtest("real guest requests carry authoritative current VM and user attrib
     l1.succeed("fleet-brady-guest http " + brady_placement, timeout=160)
     l1.succeed("fleet-brady-guest tls " + brady_placement, timeout=160)
 
-    def attributed() -> bool:
+    def attributed_completions() -> int:
         """@cc [owner:ghuntley,label:verification] brady-fleet-authoritative-attribution
         Use real enrolled hosts, authenticated commands, Firecracker sockets and kernel
         labels. A matching log MUST name the authoritative VM/placement/owner; a host-
         side fixture request or synthetic actor response cannot satisfy this assertion.
+        Count only SLO-admitted 200 completions, which brady-slo-admitted-outcomes
+        settles into the request recorder.
         """
+        count = 0
         records = l1.succeed(
             "journalctl -u brady.service -o cat --no-pager --after-cursor="
             + shlex.quote(brady_cursor)
@@ -67,9 +70,13 @@ with subtest("real guest requests carry authoritative current VM and user attrib
                 and fields.get("host_id") == host_bindings["l1"]["host"]
                 and fields.get("execution_epoch") == brady_binding["epoch"]
                 and fields.get("generation") == brady_binding["generation"]
+                and fields.get("slo_admitted") == "yes"
             ):
-                return True
-        return False
+                count += 1
+        return count
+
+    def attributed() -> bool:
+        return attributed_completions() >= 1
 
     # Lilly attributes only while the actor's running observation is under two
     # seconds old (execution-view-exact-current-read, ADR-0140). Under nested-VM
@@ -83,6 +90,18 @@ with subtest("real guest requests carry authoritative current VM and user attrib
         return attributed()
 
     eventually(attributed_or_retried, timeout=60)
+
+    # Only resolved, admitted requests enter the SLO denominator
+    # (brady-slo-admitted-outcomes). The guest requests above can be frozen as
+    # unresolved, so log "slo_admitted": "yes" alone does not mean the recorder
+    # counted them. Settle two attributed successes before reading the snapshot.
+    def two_attributed() -> bool:
+        if attributed_completions() >= 2:
+            return True
+        l1.succeed("fleet-brady-guest http " + brady_placement, timeout=160)
+        return attributed_completions() >= 2
+
+    eventually(two_attributed, timeout=120)
     l1.wait_until_succeeds(
         'jq -e \'.service == "brady" and .requests >= 2 and .successes >= 2 '
         "and .requests == (.successes + .failures) and .duration.count >= 2 and "

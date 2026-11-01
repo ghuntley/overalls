@@ -3,6 +3,11 @@ defmodule Brady.Cache.Recovery do
   use GenServer
   require Brady.Events
 
+  # Native proofs expire three seconds after their sample began (ADR-0069). The
+  # sampler starts one per second; re-reading twice a second keeps the store's
+  # copy within half a second of the newest publication instead of a full one.
+  @check_interval_ms 500
+
   @spec start_link(keyword()) :: GenServer.on_start()
   def start_link(opts), do: GenServer.start_link(__MODULE__, opts)
 
@@ -50,7 +55,7 @@ defmodule Brady.Cache.Recovery do
       {:ok, ^binding, pressure} ->
         observe(pid, pressure)
         if state.pressure_stale, do: Brady.Events.emit("brady.cache_pressure_resumed", [])
-        Process.send_after(self(), :check, 1_000)
+        Process.send_after(self(), :check, @check_interval_ms)
         {:noreply, %{state | pressure_stale: false}}
 
       {:stale, ^binding} ->
@@ -59,7 +64,7 @@ defmodule Brady.Cache.Recovery do
         if not state.pressure_stale,
           do: Brady.Events.emit("brady.cache_pressure_paused", reason: :stale)
 
-        Process.send_after(self(), :check, 1_000)
+        Process.send_after(self(), :check, @check_interval_ms)
         {:noreply, %{state | pressure_stale: true}}
 
       _ ->

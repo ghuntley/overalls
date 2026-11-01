@@ -134,7 +134,7 @@ FIND_A_TEST = {
     },
     "brady-storage": {
         "location": "`evaluation/brady-storage.py`",
-        "description": "Bounded subprocess output and refusal of changed parent identity, guest descendants or unowned cache datasets. No native ZFS claim.",
+        "description": "Bounded subprocess output, exact combined pressure properties, start-anchored one-second sampling and refusal of changed parent identity, guest descendants or unowned cache datasets. No native ZFS claim.",
     },
     "clone-destination-loss": {
         "location": "`machines/clone-permutations/destination-loss.py`",
