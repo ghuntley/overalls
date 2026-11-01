@@ -1,5 +1,6 @@
 //! Guest terminal multiplexer: vsock listener, connection handling, boot identity.
 #![deny(clippy::dbg_macro, clippy::print_stderr, clippy::print_stdout)]
+#![deny(unsafe_code)]
 #[cfg_attr(unix, path = "conn_unix.rs")]
 #[cfg_attr(windows, path = "conn_windows.rs")]
 mod conn;
