@@ -436,14 +436,52 @@ defmodule Lilly.VM.Actor do
   # readiness still rests on an observation made by the current runtime and an
   # actor restart cannot loop. Journal contention, retry results and unknown
   # outcomes MUST NOT settle.
+
+  # @cc [owner:ghuntley,label:recovery;concurrency;capacity] applied-resize-settles-command
+  # Once this actor process has durably recorded (or identically re-recorded)
+  # a stopped outcome for the exact newest stored resize command (operation
+  # ID, placement, epoch and generation) whose applied sizes equal that
+  # command's target sizes, schedule/1 MUST NOT start executor work for that command again,
+  # exactly as for a settled failure: a re-driven resize repeats disk growth
+  # and metadata writes, and a newer command would then preempt it mid-effect.
+  # A stopped outcome without applied sizes, or with sizes other than the
+  # target, MUST NOT settle. A newer command MUST still drive at once, and a
+  # replacement actor MUST drive the resize once before settling.
   @spec settled?(map(), map()) :: boolean()
   defp settled?(%{settled: command, journal: %{outcome: %{state: :failed} = outcome}}, command),
+    do: same_operation?(outcome, command)
+
+  defp settled?(
+         %{
+           settled: %{kind: :resize} = command,
+           journal: %{outcome: %{state: :stopped} = outcome}
+         },
+         command
+       ),
+       do: applied_target?(command, outcome) and same_operation?(outcome, command)
+
+  defp settled?(_state, _command), do: false
+
+  @spec same_operation?(map(), map()) :: boolean()
+  defp same_operation?(outcome, command),
     do:
       outcome.operation_id == command.id and outcome.placement_id == command.placement_id and
         outcome.execution_epoch == command.execution_epoch and
         outcome.generation == command.generation
 
-  defp settled?(_state, _command), do: false
+  @spec settles?(map(), map()) :: boolean()
+  defp settles?(_command, %{state: :failed}), do: true
+
+  defp settles?(%{kind: :resize} = command, %{state: :stopped} = observation),
+    do: applied_target?(command, observation)
+
+  defp settles?(_command, _observation), do: false
+
+  @spec applied_target?(map(), map()) :: boolean()
+  defp applied_target?(command, %{applied_sizes: sizes}),
+    do: sizes == OverallsProtocol.Resize.sizes(command)
+
+  defp applied_target?(_command, _observation), do: false
 
   # @cc [owner:ghuntley,label:recovery;observability] actor-stop-events-precede-otp-report
   # vm.actor_stopped MUST be emitted before {:stop, reason, state} for invalid
@@ -473,7 +511,7 @@ defmodule Lilly.VM.Actor do
             do: state.steady + 1,
             else: 0
 
-        settled = if observation.state == :failed, do: command
+        settled = if settles?(command, observation), do: command
         state = %{state | steady: steady, settled: settled}
 
         # An identical observation leaves the journal unchanged: nothing new
@@ -746,7 +784,8 @@ defmodule Lilly.VM.Actor do
   defp watched_proof?(watch, target), do: Watch.watching?(watch, target)
 
   # @cc [owner:ghuntley,label:capacity;recovery;concurrency] steady-state-reconcile-backstop
-  # Apart from a settled failed outcome (failed-outcome-settles-command), a
+  # Apart from a settled failed outcome (failed-outcome-settles-command) or
+  # applied resize (applied-resize-settles-command), a
   # tick or unchanged reconcile cast MAY skip starting a reconcile only while
   # the actor is steady: at least three consecutive reconciles of the current
   # command recorded an unchanged running outcome, an armed watcher holds the
