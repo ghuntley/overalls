@@ -16,6 +16,16 @@ has been removed. The module, registry, credentials and machine tests below
 stay in the repository, dormant. The rationale and evidence below are
 historical.
 
+Retired on 2026-11-01 in commit 2b7604298, with the user's approval
+(ADR-0276 decision 1, revised). The NativeLink module and its action
+sandbox, the package and its pins, the `fleet/buck-re` registry and
+certificates, the host credentials and `buck-re` SOPS documents, the
+roster's cache roles and ports 50071-50074, the updater's NativeLink client,
+CI's dangling `BUCK_RE` step and the `buck-remote-cache` and
+`buck-remote-execution` machine tests are removed from the repository. Links
+below to those files name their state before that commit. This record stays
+as the superseded rationale.
+
 ## Context
 
 Buck2 caches actions locally ([ADR-0269](0269-buck2-build-system-with-nix-toolchains.md)).
