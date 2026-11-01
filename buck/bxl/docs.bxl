@@ -1,0 +1,48 @@
+# Documentation generated from the Buck2 graph (ADR-0269, single sources of
+# truth). `tools/docs` writes the output into the README and `tools/docs
+# --check` (a precommit check) fails when the README differs.
+#
+#   tools/buck2 bxl //buck/bxl/docs.bxl:find_a_test
+#
+# Contract find-a-test-from-graph: see buck/CONTRACTS.
+
+load("@root//nix/verification/tests:find_a_test.bzl", "FIND_A_TEST")
+
+_MACHINES = "root//nix/verification/tests/machines/..."
+_TESTS_DIR = "nix/verification/tests/"
+
+def _rows(ctx: bxl.Context) -> dict[str, (str, str)]:
+    """Every test target by test name: (Buck2 target, derived location)."""
+    rows = {}
+    for t in ctx.uquery().attrfilter("labels", "machine_test", _MACHINES):
+        package = t.label.package.removeprefix(_TESTS_DIR)
+        rows[t.get_attr("check")] = ("//{}:{}".format(t.label.package, t.label.name), "`{}/`".format(package))
+    for t in ctx.uquery().attrfilter("labels", "check", "root//:"):
+        name = t.label.name
+        if name.startswith("check-"):
+            rows[name.removeprefix("check-")] = ("//:" + name, "")
+        elif name in FIND_A_TEST:
+            # A repository check that a curated entry describes (py-static).
+            rows[name] = ("//:" + name, "")
+    return rows
+
+def _find_a_test(ctx: bxl.Context) -> None:
+    rows = _rows(ctx)
+    stale = sorted([name for name in FIND_A_TEST if name not in rows])
+    if stale:
+        fail("find_a_test.bzl names targets that no longer exist: {}".format(stale))
+    lines = [
+        "| Test | Buck2 target | Location | Verified behavior |",
+        "| --- | --- | --- | --- |",
+    ]
+    for name in sorted(rows):
+        target, location = rows[name]
+        entry = FIND_A_TEST.get(name, {})
+        location = entry.get("location", location) or "—"
+        description = entry.get("description", "—")
+        if "|" in description.replace("\\|", ""):
+            fail("{}: escape `|` in its description".format(name))
+        lines.append("| `{}` | `{}` | {} | {} |".format(name, target, location, description))
+    ctx.output.print("\n".join(lines))
+
+find_a_test = bxl_main(impl = _find_a_test, cli_args = {})

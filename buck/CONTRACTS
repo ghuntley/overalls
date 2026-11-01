@@ -258,3 +258,10 @@ from the single Nix Rust toolchain, cargo-zigbuild, zig and the rust// cell's
 vendored root-lock crates, offline and with a clean environment, and MUST keep
 checkout and store paths out of the binary; its clippy mode MUST deny warnings
 for that target (ADR-0265, ADR-0273, ADR-0269 M9).
+
+@cc [owner:ghuntley,label:verification] find-a-test-from-graph
+The tests README "Find a test" table MUST be rendered by docs.bxl from the
+Buck2 graph: one row per machine test and assembled check, with curated text
+from nix/verification/tests/find_a_test.bzl. docs.bxl MUST fail when a curated
+key names no test target, and `tools/docs --check` MUST fail when the README
+differs from the rendering (ADR-0269).

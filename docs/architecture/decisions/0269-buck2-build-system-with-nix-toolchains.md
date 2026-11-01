@@ -304,6 +304,13 @@ the approved migration plan.
   Apple, Android and Windows target; the review records the runs and the
   two faults the first one found.
 
+- M11 (partial) generates the tests README "Find a test" table from the
+  graph: [docs.bxl](../../../buck/bxl/docs.bxl) lists every machine test and
+  assembled check, joins the curated text in
+  [find_a_test.bzl](../../../nix/verification/tests/find_a_test.bzl) and fails
+  on a key that names no target; [tools/docs](../../../tools/docs) writes the
+  table and `tools/docs --check` fails on a stale README.
+
 Remaining gaps, by milestone of the migration plan:
 
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
