@@ -503,17 +503,13 @@ Remaining gaps, by milestone of the migration plan:
     until remote workers provide them (ADR-0272).
   - Mix checks have no per-file `PrecommitInfo` yet; precommit runs each
     check whole.
-  - Lilly's suite is not a precommit check, and publish-cache.yml's
-    `mix precommit` matrix keeps gating it (`publish_cache_gate`). About 30
-    tests fail in the sandbox:
-    - the fake `lilly-vm-watch` shebang and the TEST-NET-1 stall are test
-      faults (fixes follow);
-    - the collector's cgroup reads use `test_host_cgroup`, a read-only
-      `/sys/fs/cgroup` bind that is not part of the action key;
-    - 16 tests (`Lilly.Control.ConfigTest`'s three startup loads and every
-      `InvalidBootPropertyTest` mutation) need `/etc/machine-id` and the VMM
-      helpers owned by uid 0, which an unprivileged user namespace shows as
-      65534. The fix (a reviewed test seam or a uid-0-mapped shard) is open.
+  - Lilly's suite passes in the sandbox and is a precommit check, but two
+    host reads stay outside the action key: `test_host_cgroup` binds
+    `/sys/fs/cgroup` read-only for the collector, and `test_host_identity`
+    binds `/etc/machine-id` and leaves `/nix/store` the read-only host
+    store, so the uid-0 ownership checks see the overflow uid that test
+    builds alone accept (`Lilly.Host.RootOwner`, contract
+    root-owner-exact-in-production).
   - Marshall's four nondeterministic beams are a Nix-side reproducibility
     gap too; neither build fixes them yet.
   - The known Inception failures run in the `[known_failures]` shards of

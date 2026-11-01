@@ -104,10 +104,4 @@ overalls_mix_project(
     test_shard_weights = {
         "lilly/test/lilly/control/invalid_boot_property_test.exs": 1250,
     },
-    # About 14 other tests still fail in the unprivileged sandbox (ADR-0269
-    # M6 gap). Until they are fixed, the suite is not a precommit check and
-    # publish-cache.yml's `mix precommit` matrix keeps gating it
-    # (`publish_cache_gate`).
-    test_precommit = False,
-    test_labels = ["publish_cache_gate"],
 )
