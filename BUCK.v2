@@ -63,7 +63,7 @@ owned_set(
     visibility = ["PUBLIC"],
 )
 
-# lib.assemble's flake package outputs (nix/assemble/outputs.nix), assembled
+# lib.assemble's package outputs (nix/assemble/outputs.nix), assembled
 # over the Buck2 artifacts like hosts and machine tests (ADR-0269). CI
 # evaluates each affected one (`[drv]`); //mila:journey-fixture runs one.
 # The Mila journey fixture keeps every leaf a Nix build. The plain Ubuntu
@@ -119,16 +119,6 @@ filegroup(name = "buck_project", srcs = [".buckconfig", ".gitignore"], visibilit
 # clippy.toml, and pyproject.toml for the ruff checks inside machine tests.
 filegroup(name = "workspace_files", srcs = ["Cargo.lock", "Cargo.toml", "clippy.toml", "pyproject.toml"], visibility = ["PUBLIC"])
 
-# lib.assemble's checks that are neither machine tests (nixos_machine_test
-# targets under nix/verification/tests/machines) nor repository script checks
-# with a Buck2 rule of their own: release probes, evaluation checks, the
-# nix-compact checks and fleet-builds-configuration. publish-cache.yml builds
-# every one; ci.yml evaluates each affected one (`[drv]`).
-_BUCK2_NATIVE_CHECKS = {
-    # //:py-static runs the same ruff format, ruff check and ty gate.
-    "python-static": "//:py-static",
-}
-
 # Contract ci-isolated-heavy-builds: see buck/CONTRACTS. Each build closure
 # approaches a CI runner's 116 GB store volume (60-80 GB measured), so
 # publish-cache.yml builds each on a runner of its own.
@@ -140,7 +130,12 @@ _ISOLATED_BUILDS = [
     "ubuntu-guest-unit",
 ]
 
-_ASSEMBLED_CHECKS = [attr for attr in ASSEMBLY_CHECKS if attr not in MACHINE_TESTS and attr not in _BUCK2_NATIVE_CHECKS]
+# lib.assemble's checks that are not machine tests (nixos_machine_test
+# targets under nix/verification/tests/machines): release probes, evaluation
+# checks, the nix-compact checks and fleet-builds-configuration.
+# publish-cache.yml builds every one; ci.yml evaluates each affected one
+# (`[drv]`).
+_ASSEMBLED_CHECKS = [attr for attr in ASSEMBLY_CHECKS if attr not in MACHINE_TESTS]
 
 [fail("isolated build {} is not an assembled check".format(attr)) for attr in _ISOLATED_BUILDS if attr not in _ASSEMBLED_CHECKS]
 

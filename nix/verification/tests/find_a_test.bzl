@@ -445,7 +445,7 @@ FIND_A_TEST = {
         "description": "Actual Marshall release delivers through the actual Susan release behind TLS at the compiled origin to fake APNs: Susan verifies Marshall's install signature, provider 503/503/200 sends once, only the device key opens what the provider received, and provider 410 invalidates the device.",
     },
     "py-static": {
-        "location": "`evaluation/python-static.nix`",
+        "location": "`buck/python.bzl`",
         "description": "Repository-wide Python formatting, linting and type checking with pinned ruff and ty; the same gate runs locally through prek.",
     },
     "remote-builders": {

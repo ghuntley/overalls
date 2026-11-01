@@ -1,13 +1,11 @@
-# The flake's package outputs and its assembly-built checks as lib.assemble
-# attributes (ADR-0269). Buck2 builds each with nix_assemble over the Buck2
-# artifacts (`//:package-<name>`, `//:check-<name>`); the flake exposes the
-# same attributes as a view until M11 removes its outputs.
+# Package outputs and assembly-built checks as lib.assemble attributes
+# (ADR-0269). Buck2 builds each with nix_assemble over the Buck2 artifacts
+# (`//:package-<name>`, `//:check-<name>`); the flake exports none of them.
 
 # @cc [owner:ghuntley,label:build] assembly-flake-outputs
-# Every flake package output and every flake check that is not a repository
-# script check MUST be defined here, never in flake.nix, so Buck2 reaches it
-# through lib.assemble instead of evaluating the flake (`nix_flake_attr` is
-# gone). Revision-dependent outputs MUST read `revision`, never self.rev.
+# Every package output and every check that is neither a machine test nor a
+# repository script check MUST be defined here, never in flake.nix, so Buck2
+# reaches it through lib.assemble instead of evaluating flake outputs. Revision-dependent outputs MUST read `revision`, never self.rev.
 { nixpkgs, pkgs, revision, packages, modules, systems, kexec, antithesis, nix-compact }:
 let
   inherit (nixpkgs) lib;
@@ -99,8 +97,7 @@ in
 
   # Checks beyond the machine-test catalog. The repository script checks
   # (conflict markers, pins, Rust lints, the package input lock, the
-  # PowerShell installer and Marvin) are Buck2 targets of their own and stay
-  # flake-only until M11.
+  # PowerShell installer and Marvin) are Buck2 targets of their own.
   checks = {
     nix-compact-core = nix-compact.lib.mkCoreCheck { inherit pkgs; };
     nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; };

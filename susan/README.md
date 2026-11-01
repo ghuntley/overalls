@@ -22,5 +22,5 @@ flowchart LR
   and before every send. WNS is off until `services.susan.wnsAppIds` is set.
 - Operator commands: `susan-operator 'Susan.Operator.audit_verify()'` and the
   other functions in `Susan.Operator` (audit tail/export, deny-list, block).
-- Deployment: `services.susan` (NixOS) or `packages.x86_64-linux.image-susan`
+- Deployment: `services.susan` (NixOS) or `//:package-image-susan`
   (OCI). Secrets are documented in [secrets/README.md](../secrets/README.md#susan-push-relay).

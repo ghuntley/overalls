@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
 # Usage: overalls-install-ps1.sh INSTALL_PS1
-# Run by the Buck2 //nix:overalls-install-ps1 target and the
-# overalls-install-ps1 Nix check (until M11), with pwsh on PATH and a scratch
-# HOME as the working directory's parent.
-# Contract overalls-install-ps1-check: see nix/verification/tests/overalls-install-ps1.nix.
+# Run by the Buck2 //nix:overalls-install-ps1 check, with pwsh on PATH and a
+# scratch HOME as the working directory's parent.
+
+# @cc [owner:ghuntley,label:verification;security] overalls-install-ps1-check
+# The Windows installer MUST parse under PowerShell and MUST refuse a non-https
+# origin, a foreign management host, a foreign zone and a host outside the zone
+# before any network access or file write.
 set -euo pipefail
 script=$(cd "$(dirname "$1")" && pwd)/$(basename "$1")
 work=$(mktemp -d)

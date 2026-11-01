@@ -333,7 +333,7 @@ No Fluent Bit input tails dump files.
 
 ## Verification
 
-`checks.x86_64-linux.logging` exercises three independent writers, exporter restart,
+`//nix/verification/tests/machines/logging:logging` exercises three independent writers, exporter restart,
 verified-TLS CloudWatch/OTLP delivery, destination outage, collector SIGKILL,
 restricted audit routing and unread journal recovery across reboot. Local provider
 fixtures use isolated synthetic credentials; no live AWS account is contacted.

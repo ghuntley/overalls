@@ -473,7 +473,7 @@ Rules are in `buck/mix.bzl`; their contracts are in `buck/CONTRACTS`.
   - A new project needs entries in `testDependencyProjects` in
     `nix/domains/artifacts/default.nix`, plus a hash.
   - To find a new hash, put a fake one in the registry, run
-    `nix build .#legacyPackages.x86_64-linux.testDependencies.<project>`, and
+    `nix build --impure --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).packages.testDependencies.<project>'`, and
     copy the `got:` value.
 - **Sandbox.** Every Mix action runs in `buck/mix_sandbox.sh`:
   - bubblewrap, no network, uid 1000;

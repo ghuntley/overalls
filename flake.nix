@@ -41,117 +41,38 @@
     };
   };
 
-  outputs = { self, buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store, ... }:
+  # @cc [owner:ghuntley,label:build] flake-exports-pins-and-assembly
+  # Buck2 is the only build entry point (ADR-0269). The flake MUST export only
+  # what Buck2 and the hosts consume: buckCells (pinned buck2, prelude and
+  # toolchains), lib.assemble (NixOS assembly over Buck2 artifacts),
+  # lib.dependencyPins (the pin refresh builds) and nixosModules. It MUST NOT
+  # export packages, checks, legacyPackages, apps or nixosConfigurations.
+  outputs = { buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store, ... }:
     let
       system = "x86_64-linux";
       pkgs = buildNixpkgs.legacyPackages.${system};
-      # The single package set (ADR-0269), also used by every module.
-      built = assembled.packages;
       assemble = import ./nix/assemble {
         inherit nixpkgs buildNixpkgs disko nixos-images nix-compact tribuchet nix-grpc-store;
       };
-      # Flake-evaluated hosts name the checkout revision; Buck2 passes it.
-      assembled = assemble { revision = self.rev or self.dirtyRev or null; };
+      # Revision-independent: the toolchain, the pin builds and the modules.
+      # Systems name their revision through Buck2 (`-c overalls.revision`).
+      assembled = assemble { };
     in
     {
-      # @cc [owner:ghuntley,label:build] flake-releases-from-source
-      # Exported application packages MUST compile clean source and locked
-      # dependencies; existing working-tree releases MUST NOT be build inputs.
-      lib.mkUbuntuGuest = built.mkUbuntuGuest;
-      lib.mkAndroidGuest = built.mkAndroidGuest;
-      lib.mkArchGuest = built.mkArchGuest;
-      lib.mkArchLinuxGuest = built.mkArchLinuxGuest;
-      lib.mkAlmaLinuxGuest = built.mkAlmaLinuxGuest;
-      lib.mkAlmaGuest = built.mkAlmaGuest;
-      lib.mkWindowsGuest = built.mkWindowsGuest;
-      lib.mkWindowsEditorCandidate = built.mkWindowsEditorCandidate;
-      lib.mkWindowsEditorBundle = built.mkWindowsEditorBundle;
-      lib.nativeKernels = built.nativeKernels;
-      lib.mkFreeBSDGuest = built.mkFreeBSDGuest;
-      lib.mkFreeBSDImageCandidate = built.mkFreeBSDImageCandidate;
-      lib.mkOmniOSGuest = built.mkOmniOSGuest;
-      lib.mkIllumosGuest = built.mkIllumosGuest;
+      # NixOS assembly from Buck2 artifacts (ADR-0269); see nix/assemble.
+      # Buck2's nix_assemble targets build every system, image, package
+      # output and check through it.
+      lib.assemble = assemble;
       # Lock files, builds and fixed-output hash keys for the scheduled
       # Mix and Cargo security upgrade scripts.
-      lib.dependencyPins = built.dependencyPins;
-      # NixOS assembly from Buck2 artifacts (ADR-0269); see nix/assemble.
-      lib.assemble = assemble;
-      # Package outputs are lib.assemble's (nix/assemble/outputs.nix), which
-      # Buck2 builds as //:package-<name>.
-      packages.${system} = assembled.outputPackages;
-
-      # Hermetic Mila journey backend for platform journey tests (ADR-0264).
-      apps.${system}.mila-journey-fixture = {
-        type = "app";
-        program = "${self.packages.${system}.mila-journey-fixture}/bin/mila-journey-fixture";
-        meta.description = "Boot the hermetic Mila journey backend and print its descriptor";
-      };
-
-      legacyPackages.${system} = built;
+      lib.dependencyPins = assembled.packages.dependencyPins;
 
       # Buck2 prelude and Nix toolchain paths (ADR-0269); tools/buck2 links it.
-      buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (built) toolchain; artifacts = built; };
+      buckCells.${system} = import ./nix/buck/cells.nix { inherit pkgs; inherit (assembled.packages) toolchain; artifacts = assembled.packages; };
       # macOS runners build the Mila Apple targets (non_hermetic) through the
       # same wrapper; these cells carry buck2, the prelude and host tools only.
       buckCells.aarch64-darwin = import ./nix/buck/cells.nix { pkgs = buildNixpkgs.legacyPackages.aarch64-darwin; };
 
       nixosModules = assembled.modules;
-
-      nixosConfigurations = assembled.systems;
-
-      # lib.assemble's checks (the machine-test catalog and outputs.nix), plus
-      # the repository script checks that are Buck2 targets of their own.
-      checks.${system} = assembled.checks // {
-        package-input-lock =
-          let
-            flakeNodes = (builtins.fromJSON (builtins.readFile ./flake.lock)).nodes;
-            devenvNodes = (builtins.fromJSON (builtins.readFile ./devenv.lock)).nodes;
-            flakeInput = name: flakeNodes.${flakeNodes.root.inputs.${name}}.locked;
-            devenvInput = name: devenvNodes.${devenvNodes.root.inputs.${name}}.locked;
-            pinned = lock: "${lock.owner}/${lock.repo}/${lock.rev}";
-            # Inputs both locks carry: the application nixpkgs and nix-compact.
-            shared = { buildNixpkgs = "nixpkgs"; nix-compact = "nix-compact"; };
-            mismatches = nixpkgs.lib.filter (name: pinned (flakeInput name) != pinned (devenvInput shared.${name}))
-              (builtins.attrNames shared);
-          in
-          if mismatches == [ ]
-          then pkgs.runCommand "overalls-package-input-lock-check" { } "touch $out"
-          else throw (nixpkgs.lib.concatMapStringsSep "; " (name:
-            "flake.lock ${name} (${pinned (flakeInput name)}) differs from devenv.lock ${shared.${name}} (${pinned (devenvInput shared.${name})})")
-            mismatches);
-        conflict-markers = pkgs.runCommand "overalls-conflict-markers-check" {
-          nativeBuildInputs = [ built.toolchain.elixir pkgs.git ];
-          LC_ALL = "C.UTF-8";
-          source = ./.;
-        } ''
-          export HOME="$TMPDIR"
-          cd "$source"
-          find . -type f -not -path './.git/*' -print0 > "$TMPDIR/files"
-          xargs -0 elixir scripts/check_conflict_markers.exs < "$TMPDIR/files"
-          touch "$out"
-        '';
-        pins = pkgs.runCommand "overalls-pins-check" {
-          nativeBuildInputs = [ built.toolchain.elixir ];
-          LC_ALL = "C.UTF-8";
-          source = ./.;
-        } ''
-          export HOME="$TMPDIR"
-          elixir "$source/scripts/check_pins.exs" "$source"
-          touch "$out"
-        '';
-        rust-lints = pkgs.runCommand "overalls-rust-lints-check" {
-          nativeBuildInputs = [ built.toolchain.elixir ];
-          LC_ALL = "C.UTF-8";
-          source = ./.;
-        } ''
-          export HOME="$TMPDIR"
-          cd "$source"
-          find . -type f -not -path './.git/*' \( -name Cargo.toml -o -name '*.rs' \) -print0 > "$TMPDIR/files"
-          xargs -0 elixir scripts/check_rust_lints.exs --strict < "$TMPDIR/files"
-          touch "$out"
-        '';
-        overalls-install-ps1 = import ./nix/verification/tests/overalls-install-ps1.nix { inherit pkgs; };
-        marvin = built.marvin.tests;
-      };
     };
 }

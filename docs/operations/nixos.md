@@ -816,7 +816,8 @@ services.overallsAutoUpdate = {
 };
 ```
 
-The repository must expose that host under `nixosConfigurations` and commit its
+The repository must declare that host as `fleet/hosts/<host>/BUCK` (`fleet_host()`),
+which the updater builds as `//fleet/hosts/<host>:deployment`, and commit its
 lockfiles. Install the repository's SSH host key in `knownHostsFile` (default
 `/etc/ssh/ssh_known_hosts`). Deliver the Git key using the existing SecretSpec
 bundle facilities before enabling polling. Do not put private keys, tokens or

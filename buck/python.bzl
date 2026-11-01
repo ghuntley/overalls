@@ -1,6 +1,9 @@
 # The repository Python gate (ADR-0269, M7).
 # Contract py-static-prek-parity: see buck/CONTRACTS.
-# Contract python-static-repository-root: see nix/verification/tests/evaluation/python-static.nix.
+#
+# @cc [owner:ghuntley,label:verification] python-static-repository-root
+# Formatting, lint and type checks MUST run from the repository root with its
+# reviewed pyproject.toml and all maintained Python trees in scope.
 
 load(":checks.bzl", "PrecommitInfo", "check_providers", "first_artifact", "owned_paths", "search_path", "tool", "tool_attr")
 

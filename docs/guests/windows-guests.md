@@ -17,12 +17,12 @@ the [OS matrix](os-matrix.md).
 
 ## What is built
 
-| Output | Flake attribute | Contents |
+| Output | Buck2 target or `lib.assemble {}` attribute | Contents |
 |--------|-----------------|----------|
-| Patched VMM | `packages.x86_64-linux.firecracker` | nixpkgs static Firecracker 1.16.1 plus the shared reviewed firmware, PCI, device, transport and reset patches selected in `nix/domains/artifacts/infrastructure/firecracker.nix` |
-| Firmware | `packages.x86_64-linux.windows-firmware` | edk2 CloudHv UEFI as a PVH ELF, PCI aperture ending at Firecracker's MMCONFIG (`$fd/FV/CLOUDHV.fd`) |
-| Image | `packages.x86_64-linux.windows-guest` | `firmware`, sparse `disk.raw` (64 GiB GPT), eight-key `manifest.json` version 5, `evidence/` |
-| Launcher | `packages.x86_64-linux.windows-boot` | `overalls-windows-boot IMAGE_DIR WORK_DIR [MEM_MIB] [VCPUS]` |
+| Patched VMM | `packages.vmm` (checked by `//:check-firecracker-vmm`) | nixpkgs static Firecracker 1.16.1 plus the shared reviewed firmware, PCI, device, transport and reset patches selected in `nix/domains/artifacts/infrastructure/firecracker.nix` |
+| Firmware | `packages.windowsFirmware` (`//:check-windows-firmware`) | edk2 CloudHv UEFI as a PVH ELF, PCI aperture ending at Firecracker's MMCONFIG (`$fd/FV/CLOUDHV.fd`) |
+| Image | `//:package-guest-windows` | `firmware`, sparse `disk.raw` (64 GiB GPT), eight-key `manifest.json` version 5, `evidence/` |
+| Launcher | `packages.windowsBoot` | `overalls-windows-boot IMAGE_DIR WORK_DIR [MEM_MIB] [VCPUS]` |
 
 The installation ISO is the Windows Server 2025 **Evaluation** media pinned in
 `nix/domains/artifacts/guest/windows/iso.json` (URL, build and SHA-256). It is fetched
@@ -351,21 +351,21 @@ executor ships with a rebuilt image. Log: `agentd.log`.
 
 ## Checks
 
-- `checks.x86_64-linux.firecracker-vmm`: version, `--enable-pci`, static pair.
-- `checks.x86_64-linux.windows-firmware`: builds the firmware and verifies the
+- `//:check-firecracker-vmm`: version, `--enable-pci`, static pair.
+- `//:check-windows-firmware`: builds the firmware and verifies the
   PVH note and the patched aperture.
-- `checks.x86_64-linux.windows-guest-unit`: builder rules without installing.
-- `checks.x86_64-linux.windows-guest`: installs and boots to `SAC>` on nested
+- `//:check-windows-guest-unit`: builder rules without installing.
+- `//nix/verification/tests/machines/windows-guest:windows-guest`: installs and boots to `SAC>` on nested
   KVM with the operator launcher, then dials the transport probe through the
   launcher's vsock socket and reads its published log. Long-running; not part
   of any fast aggregate. First recorded execution 2026-10-14: firmware banner
   after 253 s of guest time, `SAC>` 6 s later; probe executions are recorded in
   the [agents review](../architecture/reviews/2026-10-14-windows-guest-agents.md).
-- `checks.x86_64-linux.lyra`: Linux tests and clippy plus a type check of the
+- `//:check-lyra`: Linux tests and clippy plus a type check of the
   library and the Windows bins for `x86_64-pc-windows-gnu`.
-- `checks.x86_64-linux.terminald-windows`: builds the Windows terminal daemon;
-  `checks.x86_64-linux.terminald` keeps the Linux suite on the shared engine.
-- `checks.x86_64-linux.windows-lilly-guest-agents`: the `windows-v1` image
+- `//:check-terminald-windows`: builds the Windows terminal daemon;
+  `//:check-terminald` keeps the Linux suite on the shared engine.
+- `//nix/verification/tests/machines/windows-lilly-guest:windows-lilly-guest-agents`: the `windows-v1` image
   (`windowsGuestAgents`) through the real Lilly driver: vsock in the jail,
   trust `installed` by the guest's trust daemon, provisioning `ready` with the
   guest's boot UUID within the 600 s budget, a root ConPTY session through
@@ -373,7 +373,7 @@ executor ships with a rebuilt image. Log: `agentd.log`.
   daemons' published logs, a new boot UUID after restart. Long-running;
   executions are recorded in the
   [agents review](../architecture/reviews/2026-10-14-windows-guest-agents.md).
-- `checks.x86_64-linux.windows-lilly-guest`: places the image through the real
+- `//nix/verification/tests/machines/windows-lilly-guest:windows-lilly-guest`: places the image through the real
   Lilly driver on nested KVM, asserts the firmware bundle, skipped trust and
   `unattested` provisioning, reads `SAC>` from the boot log and the guest's
   bootstrap log from the live disk's EFI system partition (no login), then

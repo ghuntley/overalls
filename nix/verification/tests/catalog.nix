@@ -301,7 +301,6 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   guest-ssh = import ./evaluation/guest-ssh.nix { pkgs = buildPkgs; };
   guest-flush = import ./evaluation/guest-flush.nix { pkgs = buildPkgs; };
   guest-toolset = import ./evaluation/guest-toolset.nix { pkgs = buildPkgs; };
-  python-static = import ./evaluation/python-static.nix { pkgs = buildPkgs; };
   backup-types = import ./evaluation/backup-types.nix { pkgs = buildPkgs; };
   backup-operators = import ./evaluation/backup-operators.nix { pkgs = buildPkgs; };
   backup-custody = import ./evaluation/backup-custody.nix { pkgs = buildPkgs; };

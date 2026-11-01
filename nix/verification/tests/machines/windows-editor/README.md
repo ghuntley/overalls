@@ -22,7 +22,7 @@ Prerequisites:
   The tunnel must retain the actual authorized guest-network source; never
   weaken peer checks or replace the account authorizer to run this fixture.
 
-Build `checks.x86_64-linux.windows-editor-acceptance-harness`, then run:
+Build `//:check-windows-editor-acceptance-harness`, then run:
 
 ```sh
 result/bin/windows-editor-acceptance \

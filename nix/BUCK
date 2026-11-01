@@ -49,7 +49,7 @@ filegroup(name = "system_modules", srcs = _SYSTEM, visibility = ["PUBLIC"])
     "sysctl": ["sysctl.nix"],
 }.items()]
 
-# Contract overalls-install-ps1-check: see nix/verification/tests/overalls-install-ps1.nix.
+# Contract overalls-install-ps1-check: see nix/verification/tests/overalls-install-ps1.sh.
 script_check(
     name = "overalls-install-ps1",
     # Commands run from the project root.

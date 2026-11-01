@@ -1,7 +1,7 @@
 # Repository-wide Python tool configuration.
 #
-# The prek git hooks (devenv.nix git-hooks) and the `python-static` Nix check
-# both run ruff and ty with this configuration. Machine-test driver fragments
+# The Buck2 `//:py-static` check (tools/precommit and its direct fallback)
+# runs ruff and ty with this configuration. Machine-test driver fragments
 # under nix/verification/tests/machines are concatenated by Nix into one driver script; they
 # are linted, formatted and annotation-checked here, and type-checked as the
 # composed driver by the NixOS test framework's own ty gate.

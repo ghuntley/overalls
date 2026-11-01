@@ -321,8 +321,12 @@ the approved migration plan.
     2026-10-31 all 89 flake packages, the moved checks and the dungarees
     toplevel kept their drvPaths when they moved there.
   - The flake's `nixosConfigurations`, `nixosModules`, `packages`, `checks`
-    and `host-kexec` are now views of it. For the same revision, all six host
-    systems have the same drvPaths as before.
+    and `host-kexec` were views of it, with the same drvPaths for all six
+    host systems. M11 removed every view but `nixosModules`: the flake now
+    exports only `buckCells`, `lib.assemble`, `lib.dependencyPins` and
+    `nixosModules` (contract `flake-exports-pins-and-assembly` in
+    [flake.nix](../../../flake.nix)). `buckCells` and the pin builds kept
+    their drvPaths across the removal.
 - The antithesis harness takes lib.assemble's package-set constructor instead
   of importing the set four times; its 21 contexts are drvPath-identical.
 - First-party builds are made once, in the package set, and modules take them
@@ -503,11 +507,8 @@ Remaining gaps, by milestone of the migration plan:
   - The flake leaves stay. Guest images, the Marshall and Ziggy modules and
     the module-configuration test consume `githubTools` and `marvin`
     through Nix until assembly takes Buck2 artifacts (M3).
-  - The `marvin`, `python-static`, `conflict-markers`, `package-input-lock`
-    and `overalls-install-ps1` checks stay in the flake until M11.
   - Buck2 globs see untracked files, while prek and the Nix checks see only
     tracked files. `py-static` therefore also checks untracked Python.
-- removal of the flake package, check and configuration outputs (M11);
 - M9 leftovers: `mila-release.yml`'s signed Buck2 builds, Android signing
   and signing-leak checks have not run: the repository has no `mila-release`
   environment or signing secrets yet, and its publish job creates a public
