@@ -30,7 +30,7 @@ def _spec(ctx: AnalysisContext) -> Artifact:
         "revision": ctx.attrs.revision,
     })
 
-def _common_args(ctx: AnalysisContext, mode: str) -> cmd_args:
+def _common_args(ctx: AnalysisContext, mode: str, spec: Artifact) -> cmd_args:
     stores = [
         cmd_args("--store", cmd_args(name, "=", dep[DefaultInfo].default_outputs[0], delimiter = ""))
         for name, dep in sorted(ctx.attrs.stores.items())
@@ -39,7 +39,7 @@ def _common_args(ctx: AnalysisContext, mode: str) -> cmd_args:
         tool(ctx.attrs._python),
         ctx.attrs._driver,
         mode,
-        _spec(ctx),
+        spec,
         "--nix",
         ctx.attrs._nix[RunInfo],
         stores,
@@ -51,7 +51,7 @@ def _container_image_impl(ctx: AnalysisContext) -> list[Provider]:
     out = ctx.actions.declare_output("out", dir = True)
     ctx.actions.run(
         cmd_args(
-            _common_args(ctx, "build"),
+            _common_args(ctx, "build", _spec(ctx)),
             "--out",
             out.as_output(),
             hidden = [ctx.attrs.srcs[DefaultInfo].default_outputs, ctx.attrs.srcs[DefaultInfo].other_outputs],
@@ -66,10 +66,10 @@ def _container_image_impl(ctx: AnalysisContext) -> list[Provider]:
     return [DefaultInfo(default_output = out)]
 
 def _container_image_publish_impl(ctx: AnalysisContext) -> list[Provider]:
-    args = _common_args(ctx, "publish")
+    spec = _spec(ctx)
     return [
-        DefaultInfo(default_output = _spec(ctx)),
-        RunInfo(args = args),
+        DefaultInfo(default_output = spec),
+        RunInfo(args = _common_args(ctx, "publish", spec)),
     ]
 
 _ATTRS = {
