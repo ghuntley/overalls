@@ -14,6 +14,7 @@ defmodule Lilly.Transfer.CloneCopy do
 
   @copy_timeout 600_000
   @type failure :: {:error, :clone_copy_unconfirmed}
+  @type busy :: {:error, :storage_busy}
 
   @doc "A same-host, same-pool clone descriptor eligible for block copies."
   @spec same_pool?(map()) :: boolean()
@@ -27,6 +28,12 @@ defmodule Lilly.Transfer.CloneCopy do
   def history?(pool, descriptor),
     do: File.exists?(Path.join(journal_directory(pool, descriptor), "copy.json"))
 
+  # @cc [owner:ghuntley,label:concurrency;recovery] clone-copy-contention-stays-busy
+  # When the pool lock is unavailable for copy/3's or adopt/2's locked
+  # sections, they MUST return `{:error, :storage_busy}`, the closed contended
+  # reason callers retry, never `clone_copy_unconfirmed`. A pool observation
+  # can hold the lock for seconds, so contention is ordinary, not a fault.
+
   # @cc [owner:ghuntley,label:security;recovery] clone-copy-source-mount-private
   # copy/3 MUST run under the destination receive lock as mutation owner. The
   # capture snapshot MUST be verified (capture/2) and the journal and destination
@@ -34,7 +41,7 @@ defmodule Lilly.Transfer.CloneCopy do
   # read only through a private read-only mount (never .zfs automounts under the
   # source placement), unmounted before completion, and re-verified before the
   # journal records completion. Bulk I/O runs outside the pool lock.
-  @spec copy(Pool.t(), DiskTransfer.descriptor(), map()) :: {:ok, String.t()} | failure()
+  @spec copy(Pool.t(), DiskTransfer.descriptor(), map()) :: {:ok, String.t()} | failure() | busy()
   def copy(pool, descriptor, wire) do
     with port when is_struct(port, Lilly.Host.Lease) <- Lock.current(),
          {:ok, spec} <- destination_spec(descriptor),
@@ -61,10 +68,12 @@ defmodule Lilly.Transfer.CloneCopy do
                  Storage.locked(pool, fn -> complete(pool, descriptor, wire, spec, names) end) do
             {:ok, guid}
           else
+            {:error, :storage_busy} = busy -> busy
             _ -> failure()
           end
       end
     else
+      {:error, :storage_busy} = busy -> busy
       _ -> failure()
     end
   end
@@ -74,7 +83,7 @@ defmodule Lilly.Transfer.CloneCopy do
   # nonce and GUID equal the destination's verified ordinary claim, the expected
   # file set and the boot bundle before publishing drives and marking the disk
   # ready. Replays of an adopted copy only re-verify. It never creates a disk.
-  @spec adopt(Pool.t(), DiskTransfer.descriptor()) :: :ok | failure()
+  @spec adopt(Pool.t(), DiskTransfer.descriptor()) :: :ok | failure() | busy()
   def adopt(pool, descriptor) do
     with {:ok, spec} <- destination_spec(descriptor),
          :ok <-
@@ -102,6 +111,7 @@ defmodule Lilly.Transfer.CloneCopy do
            end) do
       :ok
     else
+      {:error, :storage_busy} = busy -> busy
       _ -> failure()
     end
   end

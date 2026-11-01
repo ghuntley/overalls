@@ -168,6 +168,22 @@ stays retirable, and this decision keeps Marshall's protocol unchanged, so the
 deletion still requires the bound GUID
 ([journal test](../../../lilly/test/transfer/clone_copy_journal_test.exs)).
 
+**Correction (2026-11-01).** `CloneCopy.copy/3` and `adopt/2` folded a failed
+pool-lock wait into `clone_copy_unconfirmed`. A concurrent pool observation
+can hold the lock for seconds, so native `clone-cancellation` and the
+`zfs-guest` clone journey failed intermittently with an unconfirmed copy or
+`destination_cleanup_unconfirmed`. Both now return the closed contended reason
+`storage_busy`, which Marshall retries as `copy_storage_busy` or
+`adopt_storage_busy`, and the
+[VM driver](../../../lilly/lib/lilly/vm/driver.ex)'s destination retirement
+passes it through
+([adoption test](../../../lilly/test/transfer/clone_copy_test.exs), contract
+`clone-copy-contention-stays-busy`). The
+[native fixture](../../../nix/verification/tests/machines/clone-cancellation/driver.py)
+accepts contended labels and slots released by both revoke receipts while
+cancelling (contract `clone-stream-slots-require-both-revocations`). The
+decision is unchanged.
+
 Remaining:
 - native crash-after-partial-offload and source-snapshot-replacement cases;
 - a production clone measurement.

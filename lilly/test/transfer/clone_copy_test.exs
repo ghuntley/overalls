@@ -3,6 +3,7 @@ defmodule Lilly.Transfer.CloneCopyTest do
   import Hegel
   import Hegel.Gen
   alias OverallsProtocol.DiskTransfer
+  alias Lilly.Host.{Lock, Pool}
   alias Lilly.Transfer.CloneCopy
 
   defp id(n), do: "00000000-0000-4000-8000-" <> String.pad_leading(Integer.to_string(n), 12, "0")
@@ -58,5 +59,28 @@ defmodule Lilly.Transfer.CloneCopyTest do
 
     assert CloneCopy.mount_path(descriptor) ==
              "/run/lilly-clone-copies/" <> descriptor.relocation_id
+  end
+
+  # clone-copy-contention-stays-busy: a held pool lock is ordinary contention.
+  @tag :tmp_dir
+  test "adoption under a held pool lock is storage_busy, not unconfirmed", %{tmp_dir: dir} do
+    File.chmod!(dir, 0o700)
+
+    pool = %Pool{
+      id: id(5),
+      path: dir,
+      filesystem_id: "zfs:1:2",
+      host_id: id(4),
+      storage: %{dataset: "pool/lilly"}
+    }
+
+    {:ok, owner} = Lock.acquire(Path.join(dir, ".lilly-storage"))
+
+    try do
+      task = Task.async(fn -> CloneCopy.adopt(pool, descriptor(id(4), id(5))) end)
+      assert Task.await(task, 10_000) == {:error, :storage_busy}
+    after
+      Lock.release(owner)
+    end
   end
 end

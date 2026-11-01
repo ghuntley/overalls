@@ -435,7 +435,9 @@ def clone_checkpoint(clone: str, *, after_public_cancellation: bool = False) -> 
     """@cc [owner:ghuntley,label:verification;security] clone-native-failure-diagnostics
     A retryable label MUST match a bound offered/incomplete effect in its valid
     phase, with source snapshot headroom, destination disk/compute and exact host
-    slots retained. Source compute MAY release after observed restoration. Only
+    slots retained. Source compute MAY release after observed restoration, and
+    a cancelling request's slots MAY release once both endpoint revoke receipts
+    are complete (clone-stream-slots-require-both-revocations). Only
     copy/adopt may remain abandoned after this fixture's captured cancellation.
     Final states MUST clear failure. Checks MUST read one database snapshot and
     report only closed phase/failure labels, never effect payloads or keys.
@@ -494,8 +496,15 @@ def clone_checkpoint(clone: str, *, after_public_cancellation: bool = False) -> 
                   AND h.disk_held AND h.compute_held AND h.disk_bytes=6442450944
               ) AND (
                 SELECT count(*)=CASE WHEN r.source_host_id=r.destination_host_id THEN 1 ELSE 2 END
-                  AND bool_and(s.released_at IS NULL AND s.host_id IN (r.source_host_id,r.destination_host_id))
+                  AND bool_and(s.host_id IN (r.source_host_id,r.destination_host_id))
                   AND count(DISTINCT s.host_id)=count(*)
+                  AND (bool_and(s.released_at IS NULL) OR (
+                    r.phase='cancelling' AND bool_and(s.released_at IS NOT NULL)
+                    AND (SELECT count(*) FROM compute_clone_effects e
+                         WHERE e.clone_request_id=r.id AND e.kind='revoke'
+                           AND e.status='completed' AND e.completed_at IS NOT NULL
+                           AND e.host_id=CASE e.endpoint WHEN 'source' THEN r.source_host_id
+                             WHEN 'destination' THEN r.destination_host_id END)=2))
                 FROM compute_transfer_slots s WHERE s.clone_request_id=r.id
               )
             ) FROM compute_clone_requests r WHERE r.id='{clone}'
@@ -517,35 +526,42 @@ def clone_checkpoint(clone: str, *, after_public_cancellation: bool = False) -> 
         "failed",
     )
     failure = state["failure"]
-    known_failures = {
-        kind + "_unconfirmed"
-        for kind in (
-            "prepare",
-            "probe",
-            "connect",
-            "capture",
-            "copy",
-            "adopt",
-            "revoke",
-            "discard",
-            "prune",
-        )
-    } | {
-        "source_restart_failed",
-        "retry_source_restart",
-        "destination_start_failed",
-        "forbidden",
-        "vm_deleted",
-        "placement_changed",
-        "vm_busy",
-        "workload_not_stable",
-        "source_unavailable",
-        "insufficient_capacity",
-        "address_pool_exhausted",
-        "profile_image_mismatch",
-    }
+    kinds = (
+        "prepare",
+        "probe",
+        "connect",
+        "capture",
+        "copy",
+        "adopt",
+        "revoke",
+        "discard",
+        "prune",
+    )
+    # Lilly's contended host reasons (Lilly.Clone.Reason.contended?/1) recur
+    # under ordinary load and are retried; they carry no pending evidence.
+    contended = ("storage_busy", "execution_unavailable")
+    known_failures = (
+        {kind + "_unconfirmed" for kind in kinds}
+        | {f"{kind}_{reason}" for kind in kinds for reason in contended}
+        | {
+            "source_restart_failed",
+            "retry_source_restart",
+            "destination_start_failed",
+            "forbidden",
+            "vm_deleted",
+            "placement_changed",
+            "vm_busy",
+            "workload_not_stable",
+            "source_unavailable",
+            "insufficient_capacity",
+            "address_pool_exhausted",
+            "profile_image_mismatch",
+        }
+    )
     label = failure if isinstance(failure, str) and failure in known_failures else "unknown"
-    retryable_storage = isinstance(failure, str) and failure.endswith("_storage_busy")
+    retryable_storage = isinstance(failure, str) and failure.endswith(
+        tuple("_" + reason for reason in contended)
+    )
     cancellation_cleanup = (
         phase == "cancelling"
         and isinstance(failure, str)
@@ -555,7 +571,10 @@ def clone_checkpoint(clone: str, *, after_public_cancellation: bool = False) -> 
     assert failure is None or (
         state["commitments"] is True
         and (state["pending_valid"] is True or retryable_storage or cancellation_cleanup)
-    ), f"Native clone progress lacks bound pending evidence: phase={phase}, failure={label}"
+    ), (
+        f"Native clone progress lacks bound pending evidence: phase={phase}, failure={label}, "
+        f"commitments={state['commitments']}, pending_valid={state['pending_valid']}"
+    )
     captured = state["captured"]
     assert isinstance(captured, bool)
     if captured:

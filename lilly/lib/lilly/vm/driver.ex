@@ -308,7 +308,9 @@ defmodule Lilly.VM.Driver do
   # launch intent and matching deletion ownership before jail/network or storage
   # cleanup. The callback MUST hold transfer exclusion and verify exact local
   # import reclamation. Failed callbacks retain all fences; successful retries
-  # MUST NOT create a blank disk or authorize execution.
+  # MUST NOT create a blank disk or authorize execution. A callback that returns
+  # `{:error, :storage_busy}` (pool contention) MUST surface as storage_busy, the
+  # retried contended reason, not destination_cleanup_unconfirmed.
   @spec retire_transfer_destination(Config.t(), Pool.t(), Spec.t(), pos_integer(), (-> result())) ::
           result()
   def retire_transfer_destination(config, pool, spec, epoch, fun) do
@@ -343,9 +345,12 @@ defmodule Lilly.VM.Driver do
            :ok <- Jail.cleanup(pool, spec),
            :ok <- Lilly.Network.detach(config.network, spec.network),
            :ok <- remove_socket(Unit.boot_log(config, spec)),
-           :ok <- fun.(),
-           do: :ok,
-           else: (_ -> {:error, :destination_cleanup_unconfirmed})
+           {:callback, :ok} <- {:callback, fun.()} do
+        :ok
+      else
+        {:callback, {:error, :storage_busy}} -> {:error, :storage_busy}
+        _ -> {:error, :destination_cleanup_unconfirmed}
+      end
     end)
   end
 
