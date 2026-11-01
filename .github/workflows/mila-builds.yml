@@ -6,8 +6,10 @@ name: "mila builds"
 # Android build on macOS with tools/buck2 over buckCells.aarch64-darwin, and
 # Windows, which has no Nix, runs `tools/buck2 --no-nix` with the pinned buck2
 # and prelude. The Android emulator and journey fixture need KVM, so they run
-# the macOS-built APKs on Linux. Windows builds no DLL: it imports the
-# reproducible gnu FFI DLL that the Linux windows-ffi job publishes.
+# the macOS-built APKs on Linux; the journey-fixture job builds the fixture
+# once on Namespace and they substitute it from Cachix. Windows builds no DLL:
+# it imports the reproducible gnu FFI DLL that the Linux windows-ffi job
+# publishes.
 on:
   pull_request:
     paths:
@@ -369,7 +371,73 @@ jobs:
           fi
           curl -sS --max-time 10 -X POST "http://$address:8445/finished/$NODE/${OUTCOME:-skipped}" || true
 
+  # The hermetic Marshall+Porsche journey fixture (ADR-0264), built once per
+  # run where the Namespace remote cache (ADR-0276) is reachable and pushed to
+  # the public overalls Cachix cache. The GitHub-hosted KVM jobs below
+  # (linux-native, android-emulator, journey-fixture-tailnet) have no nsc, so
+  # tools/buck2 there finds no live cache endpoint and compiles the Marshall
+  # and Porsche releases from scratch (run 41335763927); they realise `path`
+  # from Cachix instead. The 4-vCPU profile suffices for a cache-hit build and
+  # keeps the shared 64-vCPU cap free for CI. Without the Cachix token (fork
+  # pull requests) nothing could be published, so the job builds nothing,
+  # `path` stays empty and the consumers build locally.
+  journey-fixture:
+    runs-on: namespace-profile-cached-amd64;container.privileged=true
+    timeout-minutes: 60
+    outputs:
+      path: ${{ steps.build.outputs.path }}
+    env:
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+      CACHIX_CONFIGURED: ${{ secrets.CACHIX_AUTH_TOKEN != '' }}
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - name: Decide whether to publish the journey fixture
+        id: plan
+        run: |
+          if ! grep -qs 'name = "journey-fixture"' mila/BUCK; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "mila-journey-fixture is not declared; nothing to publish"
+          elif [[ "$CACHIX_CONFIGURED" != true ]]; then
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            echo "CACHIX_AUTH_TOKEN is not available; the journey jobs build the fixture locally"
+          else
+            echo "publish=true" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: ./.github/actions/devenv
+        if: steps.plan.outputs.publish == 'true'
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Build and push hermetic journey fixture
+        id: build
+        if: steps.plan.outputs.publish == 'true'
+        timeout-minutes: 45
+        run: |
+          set -euo pipefail
+          # nix_assemble's Buck2 output is a file naming the store path that
+          # lib.assemble built (ADR-0269); watch-exec pushes what it realises.
+          # The second, already-built call only reports the output, apart from
+          # watch-exec's own output.
+          cachix watch-exec overalls -- tools/buck2 build //:package-mila-journey-fixture
+          path=$(cat "$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)")
+          tools/buck2 kill
+          tools/namespace-token-scan
+          [[ "$path" == /nix/store/* ]] || { echo "unexpected fixture output: $path" >&2; exit 1; }
+          test -x "$path/bin/mila-journey-fixture"
+          # Push the whole closure: watch-exec sees only what this build
+          # realised, not paths an earlier job left on the cache volume.
+          cachix push overalls "$path"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          echo "mila-journey-fixture: \`$path\`" >> "$GITHUB_STEP_SUMMARY"
+      - name: Check Buck2 state for the Namespace token
+        if: always() && steps.plan.outputs.publish == 'true'
+        run: tools/namespace-token-scan
+
   linux-native:
+    needs: journey-fixture
+    # A failed or skipped fixture job leaves `path` empty; the fixture step
+    # then builds locally, so the native checks still run.
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -469,15 +537,14 @@ jobs:
       - name: Install Nix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
-      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `//:check-mila-journey-fixture`.
+      # The journey-fixture job pushes the fixture closure (Marshall, Porsche,
+      # PostgreSQL) to the public overalls cache, so pulling needs no token.
       - name: Configure Cachix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: overalls
           extraPullNames: devenv
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           useDaemon: false
       # The fixture launcher boots a KVM QEMU VM and refuses to fall back to TCG.
       - name: Enable KVM for the journey fixture
@@ -488,29 +555,33 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          # On a remote-cache miss Buck2 runs mix_release in bwrap with its own
+          # A local fixture build runs mix_release in bwrap with its own
           # network namespace; Ubuntu 24.04's AppArmor userns restriction
           # refuses that ("bwrap: loopback: Failed RTM_NEWADDR").
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           test -r /dev/kvm -a -w /dev/kvm
-      # Building first keeps substitution/build time apart from VM startup.
-      - name: Build hermetic journey fixture
+      # Realising first keeps substitution/build time apart from VM startup.
+      - name: Realise hermetic journey fixture
         id: fixture
         if: steps.journey.outputs.declared == 'true'
         timeout-minutes: 40
-        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
-        # so the Buck2 Marshall and Porsche releases are cache hits; fork
-        # pull requests get no secret and build locally.
         env:
-          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+          FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
         run: |
           set -euo pipefail
-          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
-          # publish-cache.yml pushes, so it substitutes from Cachix.
-          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
-          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
-          tools/buck2 kill
-          tools/namespace-token-scan
+          # The journey-fixture job's store path, substituted from Cachix. A
+          # local Buck2 build (no remote cache here, so slow) covers a missing
+          # path: fork pull requests, or a failed or skipped publish.
+          if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
+            nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
+            echo "Realised $FIXTURE_PATH from Cachix"
+          else
+            echo "::warning::journey fixture not published; building it locally with Buck2"
+            out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
+            ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
+            tools/buck2 kill
+          fi
+          test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
           echo "built=true" >> "$GITHUB_OUTPUT"
       - name: Start hermetic journey fixture
         if: steps.fixture.outputs.built == 'true'
@@ -672,7 +743,10 @@ jobs:
   # Runs the APKs android-native built on an x86_64 API 35 emulator beside the
   # hermetic journey fixture. Both need /dev/kvm, so this job stays on Linux.
   android-emulator:
-    needs: android-native
+    needs: [android-native, journey-fixture]
+    # Runs whenever the APKs exist; without a published fixture path the
+    # fixture step builds locally.
+    if: ${{ !cancelled() && needs.android-native.result == 'success' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -686,7 +760,7 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          # On a remote-cache miss Buck2 runs mix_release in bwrap with its own
+          # A local fixture build runs mix_release in bwrap with its own
           # network namespace; Ubuntu 24.04's AppArmor userns restriction
           # refuses that ("bwrap: loopback: Failed RTM_NEWADDR").
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -708,27 +782,23 @@ jobs:
       - name: Install Nix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
-      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `//:check-mila-journey-fixture`.
+      # The journey-fixture job pushes the fixture closure (Marshall, Porsche,
+      # PostgreSQL) to the public overalls cache, so pulling needs no token.
       - name: Configure Cachix for the journey fixture
         if: steps.journey.outputs.declared == 'true'
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: overalls
           extraPullNames: devenv
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           useDaemon: false
-      # Building first keeps substitution/build time apart from VM startup; the
+      # Realising first keeps substitution/build time apart from VM startup; the
       # VM boots just before the emulator.
-      - name: Build hermetic journey fixture
+      - name: Realise hermetic journey fixture
         id: fixture
         if: steps.journey.outputs.declared == 'true'
         timeout-minutes: 40
-        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
-        # so the Buck2 Marshall and Porsche releases are cache hits; fork
-        # pull requests get no secret and build locally.
         env:
-          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+          FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
         run: |
           set -euo pipefail
           if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
@@ -737,12 +807,19 @@ jobs:
           fi
           # The VM closure and the Android SDK do not both fit the runner's default free space.
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
-          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
-          # publish-cache.yml pushes, so it substitutes from Cachix.
-          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
-          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
-          tools/buck2 kill
-          tools/namespace-token-scan
+          # The journey-fixture job's store path, substituted from Cachix. A
+          # local Buck2 build (no remote cache here, so slow) covers a missing
+          # path: fork pull requests, or a failed or skipped publish.
+          if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
+            nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
+            echo "Realised $FIXTURE_PATH from Cachix"
+          else
+            echo "::warning::journey fixture not published; building it locally with Buck2"
+            out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
+            ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
+            tools/buck2 kill
+          fi
+          test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
           echo "built=true" >> "$GITHUB_OUTPUT"
       - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
         continue-on-error: true
@@ -845,8 +922,9 @@ jobs:
     # windows-native waits for windows-ffi, which can queue for half an hour.
     # Starting the fixture alongside windows-ffi's result keeps the Windows node
     # inside the fixture's join window (run 41273848008 missed it). The Apple
-    # journey waits for the fixture for up to 60 minutes.
-    needs: windows-ffi
+    # journey waits for the fixture for up to 60 minutes. journey-fixture runs
+    # beside windows-ffi and usually finishes first.
+    needs: [windows-ffi, journey-fixture]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 130
@@ -862,32 +940,16 @@ jobs:
       - name: Install Nix for the journey fixture
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
-      # The fixture VM closure (Marshall, Porsche, PostgreSQL) is built and
-      # pushed by publish-cache's `//:check-mila-journey-fixture`.
+      # The journey-fixture job pushes the fixture closure (Marshall, Porsche,
+      # PostgreSQL) to the public overalls cache, so pulling needs no token.
       - name: Configure Cachix for the journey fixture
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
           name: overalls
           extraPullNames: devenv
-          authToken: ${{ secrets.CACHIX_AUTH_TOKEN }}
           useDaemon: false
-      - name: Build hermetic journey fixture
-        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
-        timeout-minutes: 40
-        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
-        # so the Buck2 Marshall and Porsche releases are cache hits; fork
-        # pull requests get no secret and build locally.
-        env:
-          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
-        run: |
-          set -euo pipefail
-          # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
-          # publish-cache.yml pushes, so it substitutes from Cachix.
-          tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
-          ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
-          tools/buck2 kill
-          tools/namespace-token-scan
+      # Before the fixture step: a local fallback build needs the sysctl.
       - name: Enable KVM for the journey fixture
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         run: |
@@ -895,11 +957,31 @@ jobs:
             | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
-          # On a remote-cache miss Buck2 runs mix_release in bwrap with its own
+          # A local fixture build runs mix_release in bwrap with its own
           # network namespace; Ubuntu 24.04's AppArmor userns restriction
           # refuses that ("bwrap: loopback: Failed RTM_NEWADDR").
           sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
           test -r /dev/kvm -a -w /dev/kvm
+      - name: Realise hermetic journey fixture
+        if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
+        timeout-minutes: 40
+        env:
+          FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
+        run: |
+          set -euo pipefail
+          # The journey-fixture job's store path, substituted from Cachix. A
+          # local Buck2 build (no remote cache here, so slow) covers a missing
+          # path: fork pull requests, or a failed or skipped publish.
+          if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
+            nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
+            echo "Realised $FIXTURE_PATH from Cachix"
+          else
+            echo "::warning::journey fixture not published; building it locally with Buck2"
+            out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
+            ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
+            tools/buck2 kill
+          fi
+          test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
       - name: Join the Mila CI tailnet
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         uses: tailscale/github-action@064b10558093f38325e838ddea35486bdc6b1d5c # v4.4.0

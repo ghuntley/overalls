@@ -255,11 +255,15 @@ Elixir rules (M6) are not on trunk yet.
     `OVERALLS_BUCK2_REMOTE=off`.
 - **CI.** [ci.yml](../../../.github/workflows/ci.yml),
   [nixos-machine-tests.yml](../../../.github/workflows/nixos-machine-tests.yml)
-  and the source-bundle job of
+  and the source-bundle, windows-ffi and journey-fixture jobs of
   [mila-builds.yml](../../../.github/workflows/mila-builds.yml) set
-  `NAMESPACE_RBE_TOKEN` from the secret. The NativeLink `buck-re` action and
-  its script are removed, and so, on 2026-11-01, is ci.yml's dangling step
-  that still named the action and the `BUCK_RE_*` secrets.
+  `NAMESPACE_RBE_TOKEN` from the secret. GitHub-hosted runners have no `nsc`
+  to resolve the live endpoints, so the KVM journey jobs there hold no token:
+  they substitute the journey-fixture job's store path from Cachix and build
+  locally only when it is missing (run 41335763927 had 0% cache hits). The
+  NativeLink `buck-re` action and its script are removed, and so, on
+  2026-11-01, is ci.yml's dangling step that still named the action and the
+  `BUCK_RE_*` secrets.
 
 - **Remote execution, opt-in.**
   - [tools/namespace-re-image](../../../tools/namespace-re-image) builds the
