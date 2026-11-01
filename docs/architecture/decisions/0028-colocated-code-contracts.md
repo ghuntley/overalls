@@ -105,7 +105,8 @@ results and the existing inline-theme-script guidance discrepancy.
 The [skill subtree contract](../../../.agents/skills/CONTRACTS) now covers installed
 development/test assets without changing their implementation or excluding them
 from the validator. It states the existing separation from production runtime
-authority and [release source filesets](../../../nix/domains/artifacts/applications/source.nix).
+authority and release source filesets (now the Buck2 `release_srcs`; contract
+`release-source-allowlist` in [buck/CONTRACTS](../../../buck/CONTRACTS)).
 This repairs the coverage omission introduced when additional skills were
 installed; it does not certify the behavior of those external tools.
 

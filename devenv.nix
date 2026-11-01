@@ -35,6 +35,10 @@ in
     OVERALLS_NIXPKGS_PATH = "${pkgs.path}";
     # std sources for rust-analyzer; the toolchain itself omits rust-src.
     RUST_SRC_PATH = rust.rustSrc;
+    # Marshall's dev asset builds use this pinned esbuild instead of
+    # downloading one (contract esbuild-single-pinned).
+    MIX_ESBUILD_PATH = lib.getExe pkgs.esbuild;
+    MIX_ESBUILD_VERSION = pkgs.esbuild.version;
   } // lib.optionalAttrs isLinux {
     OVERALLS_TEST_VMM_DIR = "${vmm}/bin";
   };

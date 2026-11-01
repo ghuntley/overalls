@@ -26,17 +26,11 @@ let
   hashes = builtins.fromJSON (builtins.readFile ./dependency-hashes.json);
   # The root Cargo workspace (ADR-0273): one lock, one vendored crate set.
   cargoWorkspace = import ./infrastructure/cargo-workspace.nix { inherit pkgs; };
-  applicationSource = application: import ./applications/source.nix { inherit lib application antithesisSdk; };
-  # Rustler compiles Marshall's Cedar NIF inside the root Cargo workspace, so
-  # its release source also carries the workspace manifest, lock and member
-  # stubs (and the crate's own sources) from cargo-workspace.nix.
-  source = application:
-    if application == "marshall" then
-      pkgs.runCommand "source" { } ''
-        cp -r --no-preserve=mode ${applicationSource application} "$out"
-        cp -r --no-preserve=mode ${cedarSource}/. "$out/"
-      ''
-    else applicationSource application;
+  # The fixed-output Mix fetches read manifests, locks and configuration only
+  # (contract test-dependency-source); the releases build in Buck2 (ADR-0269).
+  depsSource = import ./applications/deps-source.nix { inherit lib; };
+  # Marshall's Cedar NIF crate and the workspace overlay it compiles in; the
+  # cells hand it to Marshall's Buck2 release and checks.
   cedarSource = cargoWorkspace.source {
     name = "marshall-cedar-source";
     crates = [ "marshall/native/marshall_cedar" ];
@@ -200,21 +194,17 @@ let
 
   # @cc [owner:ghuntley,label:build;verification] release-fixtures-from-buck2
   # A fixture release (a patched update candidate or an instrumented build)
-  # MUST come from its Buck2 `release_variants` artifact whenever the
-  # application's release is a Buck2 artifact: an override of the import would
-  # be ignored (imported-artifacts-reject-build-hooks). Only an assembly
-  # without Buck2 releases builds the fixture by overriding the Nix release.
-  releaseFixture = application: variant: nixOverride:
+  # MUST come from its Buck2 `release_variants` artifact; an override of the
+  # import would be ignored (imported-artifacts-reject-build-hooks). A suite
+  # whose assembly lacks the artifact fails to evaluate.
+  releaseFixture = application: variant:
     let key = "fixture-${application}-${variant}"; in
-    if artifacts ? ${key} then artifacts.${key}
-    else if artifacts ? ${application} then
-      throw "${key}: assembly has a Buck2 ${application} release but no ${key} artifact (buck/mix_artifacts.bzl MIX_FIXTURE_ARTIFACTS, MIX_FIXTURE_SUITES)"
-    else mixReleases.${application}.overrideAttrs nixOverride;
+    artifacts.${key} or (throw "${key}: no Buck2 fixture release artifact (buck/mix_artifacts.bzl MIX_FIXTURE_ARTIFACTS, MIX_FIXTURE_SUITES)");
   dependencies = lib.genAttrs mixApplications (application:
     beam.fetchMixDeps {
       pname = "overalls-${application}-deps";
       inherit version;
-      src = source application;
+      src = depsSource;
       sourceRoot = "source/${application}";
       hash = hashes.${application};
       env = {
@@ -295,29 +285,38 @@ let
   };
 
 
-  # Every Mix application with fixed-output dependencies, keyed like
-  # dependency-hashes.json; adding one to `dependencies` adds it here.
-  mixReleases = lib.genAttrs (lib.attrNames dependencies) (application: artifacts.${application} or (release application));
+  # @cc [owner:ghuntley,label:build] mix-releases-from-buck2
+  # Every Mix release in this set MUST be its Buck2 `<app>_import` artifact
+  # (buck/mix_artifacts.bzl MIX_ARTIFACTS); there is no Nix build to fall back
+  # on. An assembly without the artifact fails when a consumer reads the
+  # release, never builds a different one (ADR-0269).
+  mixReleases = lib.genAttrs mixApplications (application:
+    artifacts.${application} or (throw "${application}: no Buck2 release artifact; build through a nix_assemble target (buck/mix_artifacts.bzl MIX_ARTIFACTS)"));
 
   # @cc [owner:ghuntley,label:build;security] dependency-pin-registry
-  # Each entry names the lock files it builds from, the derivation that MUST
-  # build after those locks change, and the dependency-hashes.json keys of its
-  # fixed-output fetches. scripts/mix_security_upgrades.exs and
+  # Each entry names the lock files it builds from, the fixed-output fetches
+  # that MUST build after those locks change (`build`), the Buck2 targets that
+  # MUST then build against them (`buckTargets`), and the
+  # dependency-hashes.json keys of its fixed-output fetches. scripts/mix_security_upgrades.exs and
   # scripts/cargo_security_upgrades.exs refresh hashes and build only through
   # this registry; the Cargo script refuses a tracked Cargo.lock missing here.
   dependencyPins = {
-    mix = lib.mapAttrs (application: release: {
+    mix = lib.genAttrs mixApplications (application: {
       locks = [ "${application}/mix.lock" ];
-      build = pkgs.linkFarmFromDrvs "${application}-pins" [ release testDependencies.${application} ];
+      build = pkgs.linkFarmFromDrvs "${application}-pins" [ dependencies.${application} testDependencies.${application} ];
+      buckTargets = [ "root//${application}:release" "root//${application}:check" "root//${application}:test" ];
       hashes = {
         ${application} = dependencies.${application};
         ${testDependencyProjects.${application}.key} = testDependencies.${application};
       };
-    }) mixReleases // lib.genAttrs [ "protocol" "diagnostics" "request_accounting" ] (library: {
+    }) // lib.genAttrs [ "protocol" "diagnostics" "request_accounting" ] (library: {
       locks = [ "${testDependencyProjects.${library}.path}/mix.lock" ];
       build = if library == "protocol"
         then pkgs.linkFarmFromDrvs "protocol-pins" [ testDependencies.protocol hegelNif ]
         else testDependencies.${library};
+      buckTargets = if library == "protocol"
+        then [ "root//protocol:check" "root//protocol:test" ]
+        else [ "root//elixir:${library}_check" "root//elixir:${library}_test" ];
       hashes = { ${testDependencyProjects.${library}.key} = testDependencies.${library}; }
         // lib.optionalAttrs (library == "protocol") { hegelNifCargo = hegelNif.cargoDeps; };
     });
@@ -335,8 +334,6 @@ let
           terminaldWindows
           terminald.native
           hostLock
-          # Rustler compiles the Cedar NIF inside Marshall's release.
-          mixReleases.marshall
           enricoGitOwner
           traceSpool
           (import ./vscode-web-broker { inherit pkgs; })
@@ -346,105 +343,30 @@ let
           otelReceiver
           observabilityRuntimes
         ];
+        # The Buck2 Rust leaves (buck/rust_artifacts.bzl RUST_ARTIFACTS), the
+        # Cedar NIF that Rustler compiles inside Marshall's Buck2 release, and
+        # the clippy gates over the crates with their own lints.
+        buckTargets = [
+          "root//lyra:client-import"
+          "root//lyra:windows-import"
+          "root//lyra:native-import"
+          "root//lyra:native-probes-import"
+          "root//nix:terminald-import"
+          "root//nix:vscode-web-broker-import"
+          "root//nix:otel-guest-receiver-import"
+          "root//nix:observability-runtimes-import"
+          "root//lilly:host-helpers-import"
+          "root//enrico:git-owner-import"
+          "root//elixir:trace-spool-import"
+          "root//marshall:release"
+          "root//nix:overalls-otel-guest-receiver-clippy"
+          "root//marshall:marshall_cedar-clippy"
+        ];
         hashes = { };
       };
     };
   };
 
-  release = application:
-    let
-      isMarshall = application == "marshall";
-      isLilly = application == "lilly";
-      metadata = pkgs.writeText "${application}-release.json" (builtins.toJSON ({
-        format = 1;
-        inherit application;
-        platform = pkgs.stdenv.hostPlatform.system;
-        elixir = toolchain.elixir.version;
-        otp = toolchain.erlang.version;
-        build = "nix-source";
-        encrypted_crash_dumps = encryptedCrashDumps;
-      } // lib.optionalAttrs antithesisSdk {
-        antithesis_sdk = true;
-        antithesis_guest = antithesisGuest && isLilly;
-        antithesis_integrated_host = antithesisIntegratedHost && isLilly;
-      } // lib.optionalAttrs isLilly {
-        host_tools = "${hostTools}";
-        firecracker = "${vmm}/bin/firecracker";
-        jailer = "${vmm}/bin/jailer";
-        unshare = "${pkgs.util-linux.bin}/bin/unshare";
-      }));
-    in
-    beam.mixRelease {
-      pname = "overalls-${application}";
-      inherit version;
-      src = source application;
-      sourceRoot = "source/${application}";
-      mixFodDeps = dependencies.${application};
-      compileFlags = [ "--warnings-as-errors" ];
-      nativeBuildInputs = lib.optionals isMarshall [ cargoWorkspace.rustTools pkgs.pkg-config ];
-      env = {
-        ERL_CRASH_DUMP_PUBLIC_KEY = if encryptedCrashDumps then "${./build-crash-dump-public.pem}" else "";
-        ERL_FLAGS = "+S 4:4";
-      } // lib.optionalAttrs antithesisSdk {
-        ANTITHESIS_HARNESS = "1";
-        MIX_ENV = "prod";
-      } // lib.optionalAttrs (antithesisGuest && application == "lilly") {
-        ANTITHESIS_GUEST = "1";
-      } // lib.optionalAttrs (antithesisIntegratedHost && application == "lilly") {
-        ANTITHESIS_INTEGRATED_HOST = "1";
-      } // lib.optionalAttrs isMarshall {
-        CARGO_NET_OFFLINE = "true";
-        CARGO_BUILD_JOBS = "4";
-      };
-
-      # @cc [owner:ghuntley,label:build] cedar-and-assets-prefetched
-      # Compilation MUST use the vendored root Cargo.lock and pinned Nix asset
-      # executables, with no Rustler precompiled or Mix asset downloads.
-      preConfigure = ''
-        # A fixed-output fetch can be reused from cache after inputs change.
-        # Reject a stale hash rather than compiling old deps against a new lock.
-        cmp mix.lock "$MIX_DEPS_PATH/.overalls-mix.lock"
-      '' + lib.optionalString isMarshall ''
-        export CARGO_HOME="$TMPDIR/cargo-home"
-        # Only the unpacked application directory is writable; keep Rustler's
-        # build output beside the crate instead of in the workspace root.
-        export CARGO_TARGET_DIR="$PWD/native/marshall_cedar/target"
-        # Panic locations name each vendored crate's source path. Remap the
-        # vendor so the NIF does not retain the whole crate set at runtime.
-        export RUSTFLAGS="--remap-path-prefix=${cargoWorkspace.vendor}=/vendor"
-        mkdir -p "$CARGO_HOME"
-        substitute ${cargoWorkspace.vendor}/.cargo/config.toml "$CARGO_HOME/config.toml" \
-          --subst-var-by vendor "${cargoWorkspace.vendor}"
-        cat >> config/prod.exs <<'CONFIG'
-        config :esbuild, path: "${lib.getExe pkgs.esbuild}", version: "${pkgs.esbuild.version}"
-        CONFIG
-        # Contract mix-dep-patches (buck/CONTRACTS): the same dependency
-        # patches as Buck2's mix_dep_patches, so both releases stay equal.
-        for dep_patch in dep_patches/*.patch; do
-          patch -d "$MIX_DEPS_PATH/$(basename "$dep_patch" .patch)" -p1 --forward --batch < "$dep_patch"
-        done
-      '';
-
-      postBuild = lib.optionalString isMarshall ''
-        # fetchMixDeps removes Git internals; the hash and lock snapshot above
-        # authenticate inputs. Mark dependency loading complete before the
-        # asset alias invokes compile again without the builder's flags.
-        mix do deps.loadpaths --no-deps-check + assets.deploy
-      '';
-
-      # @cc [owner:ghuntley,label:deployment] source-release-runtime-metadata
-      # Metadata MUST retain the canonical runtime tool paths used by Lilly;
-      # exporting a release closure MUST include every referenced executable.
-      postInstall = ''
-        cp ${metadata} "$out/overalls-release.json"
-        ${lib.optionalString isLilly ''ln -s ${hostTools} "$out/host-tools"''}
-      '';
-      meta = {
-        description = "Overalls ${application} source-built OTP release";
-        mainProgram = application;
-        platforms = [ "x86_64-linux" ];
-      };
-    };
   # Builds that modules used to make for themselves; modules take them from
   # this set so every system and test shares one build (ADR-0269).
 

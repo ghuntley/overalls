@@ -26,8 +26,14 @@ config :marshall, MarshallWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "Uz3frZSdnoBZe79JbJsezhN5c0apDfgp0tnJHIvyOcAjEIsaJmj1sffAaT1XPz1H",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:marshall, ~w(--sourcemap=inline --watch)]}
+    esbuild: {Esbuild, :run, [:marshall, ~w(--sourcemap=inline --watch)]}
   ]
+
+# The one pinned esbuild, from devenv (ADR-0269; contract esbuild-single-pinned
+# in buck/CONTRACTS); never an `esbuild.install` download.
+config :esbuild,
+  path: System.get_env("MIX_ESBUILD_PATH"),
+  version: System.get_env("MIX_ESBUILD_VERSION", "0.25.4")
 
 # ## SSL Support
 #

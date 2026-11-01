@@ -169,6 +169,18 @@ plan (track T1).
   removed the `rustStd*`, `rustcArchive` and `clippyArchive` registry keys
   with devenv's own rust-overlay input. The gap stayed listed below until
   2026-11-01.
+- Every `lib.dependencyPins` entry names its `buckTargets`, the Buck2 labels
+  that build against the refreshed fetches. `refresh!` in
+  [dependency_pins.ex](../../../scripts/dependency_pins.ex) builds the
+  entry's fixed-output fetches until the hashes converge, then runs
+  `tools/buck2 build` on those labels
+  ([ADR-0269](0269-buck2-build-system-with-nix-toolchains.md)). Mix entries
+  name each release, check and suite; the Cargo `workspace` entry names the
+  Buck2 Rust imports, Marshall's release (the Cedar NIF) and two clippy
+  gates. The Nix Mix releases, which `build` used to link, were deleted on
+  2026-11-01. `targets/1` accepts only plain `root//` labels, and
+  [dependency_pins_test.exs](../../../marshall/test/architecture/dependency_pins_test.exs)
+  covers the refusals.
 - The check is [pins.ex](../../../scripts/pins.ex) and [check_pins.exs](../../../scripts/check_pins.exs). It runs as the `pins` check in
   [flake.nix](../../../flake.nix) and as a prek hook in [devenv.nix](../../../devenv.nix). Its regression and
   repository tests are in [pins_test.exs](../../../marshall/test/architecture/pins_test.exs). `package-input-lock` in

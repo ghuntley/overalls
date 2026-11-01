@@ -11,11 +11,13 @@ defmodule Overalls.DependencyPinsTest do
   @targets %{
     "marshall" => %{
       locks: ["marshall/mix.lock"],
-      hashes: %{"marshall" => "/nix/store/a.drv", "cedarCargo" => "/nix/store/b.drv"}
+      hashes: %{"marshall" => "/nix/store/a.drv", "cedarCargo" => "/nix/store/b.drv"},
+      buck_targets: ["root//marshall:release"]
     },
     "lilly-native" => %{
       locks: ["lilly/native/hostd/Cargo.lock", "lilly/native/vm-watch/Cargo.lock"],
-      hashes: %{}
+      hashes: %{},
+      buck_targets: []
     }
   }
 
@@ -48,17 +50,48 @@ defmodule Overalls.DependencyPinsTest do
     decoded = %{
       "marshall" => %{
         "locks" => ["marshall/mix.lock"],
-        "hashes" => %{"marshall" => "/nix/store/a.drv"}
+        "hashes" => %{"marshall" => "/nix/store/a.drv"},
+        "buckTargets" => ["root//marshall:release", "root//marshall:test"]
       }
     }
 
-    assert {:ok, %{"marshall" => %{locks: ["marshall/mix.lock"]}}} =
+    assert {:ok,
+            %{
+              "marshall" => %{
+                locks: ["marshall/mix.lock"],
+                buck_targets: ["root//marshall:release", "root//marshall:test"]
+              }
+            }} =
              DependencyPins.targets(decoded)
 
-    assert {:error, _} =
-             DependencyPins.targets(%{"x" => %{"locks" => ["x"], "hashes" => %{"x" => 1}}})
+    entry = fn buck_targets ->
+      %{"x" => %{"locks" => ["x"], "hashes" => %{}, "buckTargets" => buck_targets}}
+    end
 
-    assert {:error, _} = DependencyPins.targets(%{"x" => %{"locks" => [], "hashes" => %{}}})
+    assert {:ok, %{"x" => %{buck_targets: []}}} = DependencyPins.targets(entry.([]))
+
+    assert {:error, _} =
+             DependencyPins.targets(%{
+               "x" => %{"locks" => ["x"], "hashes" => %{"x" => 1}, "buckTargets" => []}
+             })
+
+    assert {:error, _} =
+             DependencyPins.targets(%{
+               "x" => %{"locks" => [], "hashes" => %{}, "buckTargets" => []}
+             })
+
+    # Every Buck2 target is a plain root// label: no flags, patterns, cells
+    # other than root, or missing buckTargets reach tools/buck2's argv.
+    for bad <- [
+          ["--config=x"],
+          ["root//marshall/..."],
+          ["//marshall:release"],
+          ["cells//x:y"],
+          [1]
+        ],
+        do: assert({:error, _} = DependencyPins.targets(entry.(bad)))
+
+    assert {:error, _} = DependencyPins.targets(%{"x" => %{"locks" => ["x"], "hashes" => %{}}})
     assert {:error, _} = DependencyPins.targets([])
   end
 

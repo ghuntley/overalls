@@ -370,6 +370,24 @@ the approved migration plan.
       indirect GC root per checkout and configured target, and assembly
       refuses a collected artifact by name (contract
       `nix-store-import-gc-rooted` in [CONTRACTS](../../../buck/CONTRACTS)).
+  - The Nix releases were then deleted: `beam.mixRelease`, the release
+    source fileset (`applications/source.nix`) and the fixtures' Nix
+    overrides. The package set's releases are Buck2 imports only (contract
+    `mix-releases-from-buck2` in
+    [default.nix](../../../nix/domains/artifacts/default.nix)), and the
+    fixed-output Mix fetches read only manifests, locks and configuration
+    (`deps-source.nix`).
+    - The source-fileset contracts (`release-source-allowlist`,
+      `harness-source-isolation`) and the release's
+      `cedar-and-assets-prefetched` and `source-release-runtime-metadata`
+      contracts now live in [buck/CONTRACTS](../../../buck/CONTRACTS).
+    - The pin refresh builds each entry's `buckTargets`
+      ([ADR-0267](0267-single-dependency-pin-registry.md)).
+    - Marshall's dev shell takes devenv's pinned esbuild
+      (`MIX_ESBUILD_PATH`); the `assets.setup` alias and the dev watcher no
+      longer install one.
+    - `nix/buck/mix.nix` keeps its own `beam.mixRelease`, which only
+      captures the shell state the Buck2 actions source.
   - `buck2 test` passes for protocol (cold 15m25s, mostly its 900 s
     property suite; warm 0.2 s from the action cache), peach, susan,
     porsche, request_accounting and diagnostics. Suites read sibling fixtures
@@ -571,16 +589,6 @@ Remaining gaps, by milestone of the migration plan:
 - the Rust leaves not yet on Buck2 (terminald, the broker, Lyra, the Cedar
   NIF, Mila) (M5);
 - M6 leftovers:
-  - Buck2 assemblies take each application's `<app>_import`, but
-    `beam.mixRelease`
-    ([source.nix](../../../nix/domains/artifacts/applications/source.nix))
-    still builds the releases for an artifact-less `lib.assemble {}` and the
-    pin-refresh scripts. It goes once both build the Buck2 targets.
-    (`nix/buck/mix.nix` keeps its own `beam.mixRelease` for the shell-state
-    capture.)
-  - Marshall's dev `assets.setup` alias still calls `esbuild.install`;
-    Buck2 builds use the cells esbuild. Changing `mix.exs` would change the
-    Nix release before the switch.
   - Mix actions need unprivileged user namespaces, so they run locally only
     until remote workers provide them (ADR-0272).
   - `mix_check`'s `PrecommitInfo` is per file kind, not per file

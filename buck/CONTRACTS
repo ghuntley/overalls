@@ -48,6 +48,8 @@ the network or an ambient node_modules (ADR-0267, ADR-0269).
 @cc [owner:ghuntley,label:build] esbuild-single-pinned
 esbuild_bundle MUST use the one esbuild from buckCells, the nixpkgs esbuild
 that release builds pin, and never an esbuild.install download (ADR-0269).
+Marshall's dev shell uses the same nixpkgs esbuild (devenv's
+MIX_ESBUILD_PATH); no alias or watcher installs one.
 
 @cc [owner:ghuntley,label:verification] py-static-prek-parity
 py_static MUST run the same pinned ruff and ty as the precommit hook's direct
@@ -328,6 +330,34 @@ and Mix actions MUST read sources only from that manifest, copied into the
 sandbox with mtime 1. A whole owned package is allowed only for suites that
 read the repository itself, and then any owned change reruns them.
 
+@cc [owner:ghuntley,label:build] release-source-allowlist
+A release's `release_srcs` (each project's BUCK, through mix_sources) MUST
+hold only that application's build inputs (mix.exs, mix.lock, lib, config and
+the priv or assets it compiles, and its dep_patches), the shared protocol with its compile-time
+priv data, and the local request-accounting and diagnostics libraries it
+depends on. Local builds, fetched dependencies and generated assets MUST stay
+out. Marshall's release additionally takes the vendored SCIM integration and
+the root Cargo workspace overlay for its Cedar NIF from the cells
+(`cedar_source`).
+
+@cc [owner:ghuntley,label:build] harness-source-isolation
+The Antithesis SDK and harness sources (antithesis/BUCK) MUST enter only the
+releases built in an Antithesis configuration (`antithesis_srcs`, selected by
+the harness, guest and integrated-host constraints); production release
+sources MUST exclude antithesis/.
+
+@cc [owner:ghuntley,label:build] cedar-and-assets-prefetched
+Marshall's release MUST compile its Cedar NIF from the cells' vendored root
+Cargo set (`cedar_vendor`) and build assets with the cells' pinned esbuild,
+with no Rustler precompiled download and no Mix asset download; the sandbox
+has no network (mix-actions-sandboxed).
+
+@cc [owner:ghuntley,label:deployment] source-release-runtime-metadata
+A release's overalls-release.json MUST record the canonical runtime tool
+paths Lilly uses (host tools, firecracker, jailer, unshare), and the
+assembled release's closure MUST include every executable it names
+(mix-release-runtime-refs, mix-release-package-references).
+
 @cc [owner:ghuntley,label:build;security] mix-actions-sandboxed
 Every Mix action MUST run in the bubblewrap sandbox from buck/mix_sandbox.sh:
 no network, a fresh /build work directory, a writable overlay of /nix/store,
@@ -355,7 +385,7 @@ including the builder's TERM, which decides sys.config's map order.
 @cc [owner:ghuntley,label:build;deployment] mix-dep-patches
 A project's `dep_patches/<dep>.patch` files MUST be applied with `patch -p1`
 to the fetched `<dep>` before any dependency compiles, in every Mix action
-that compiles and in the Nix release. A patch that neither applies nor is
+that compiles. A patch that neither applies nor is
 already applied MUST fail the action. Marshall's patches make
 generated code independent of atom creation order and the wall clock:
 Phoenix LiveView's engine sorts the change-tracking keys it iterates out of

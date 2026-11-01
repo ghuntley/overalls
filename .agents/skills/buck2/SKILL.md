@@ -471,7 +471,8 @@ Rules are in `buck/mix.bzl`; their contracts are in `buck/CONTRACTS`.
 
 - **Per project.** A project's `BUCK` declares two `mix_sources` targets and
   calls `overalls_mix_project`:
-  - `release_srcs` mirrors the Nix release source allowlist exactly;
+  - `release_srcs` is the release source allowlist (contract
+    `release-source-allowlist`); there is no Nix release any more;
   - `test_srcs` holds the whole project plus its path dependencies.
 
   The macro creates:

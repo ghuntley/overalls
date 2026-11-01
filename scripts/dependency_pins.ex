@@ -9,7 +9,8 @@ defmodule Overalls.DependencyPins do
   # reports with a security advisory (or, for Hex, a security retirement).
   # Every lock change MUST refresh the fixed-output hashes of each affected
   # entry in the flake's `lib.dependencyPins` and be followed by a successful
-  # build of that entry before anything is committed. Findings that no allowed
+  # build of that entry (its fixed-output fetches, then its Buck2 targets)
+  # before anything is committed. Findings that no allowed
   # version fixes MUST fail the scheduled run after fixable updates are pushed.
   # A hash written by these jobs is checked only by that build, not by human
   # review of the fetched source.
@@ -38,8 +39,15 @@ defmodule Overalls.DependencyPins do
     @type t :: %__MODULE__{drv_path: String.t(), specified: String.t(), got: String.t()}
   end
 
-  @typedoc "One `lib.dependencyPins.<ecosystem>` entry: its lock files and hash keys to FOD drvPaths."
-  @type target :: %{locks: [Path.t()], hashes: %{String.t() => String.t()}}
+  @typedoc """
+  One `lib.dependencyPins.<ecosystem>` entry: its lock files, hash keys to FOD
+  drvPaths, and the Buck2 targets that build against those fetches.
+  """
+  @type target :: %{
+          locks: [Path.t()],
+          hashes: %{String.t() => String.t()},
+          buck_targets: [String.t()]
+        }
   @typedoc "One `lib.dependencyPins.fetch` entry: the files declaring its fetches and its registry keys."
   @type fetch_target :: %{locks: [Path.t()], keys: [String.t()]}
   @type ecosystem :: :mix | :cargo
@@ -55,6 +63,7 @@ defmodule Overalls.DependencyPins do
   pins: builtins.mapAttrs (_: pin: {
     inherit (pin) locks;
     hashes = builtins.mapAttrs (_: fod: fod.drvPath) pin.hashes;
+    buckTargets = pin.buckTargets or [ ];
   }) pins
   """
 
@@ -86,8 +95,9 @@ defmodule Overalls.DependencyPins do
   @spec targets(term()) :: {:ok, %{String.t() => target()}} | {:error, String.t()}
   def targets(decoded) when is_map(decoded) do
     Enum.reduce_while(decoded, {:ok, %{}}, fn
-      {name, %{"locks" => [_ | _] = locks, "hashes" => hashes}}, {:ok, acc}
-      when is_binary(name) and is_map(hashes) ->
+      {name, %{"locks" => [_ | _] = locks, "hashes" => hashes, "buckTargets" => buck_targets}},
+      {:ok, acc}
+      when is_binary(name) and is_map(hashes) and is_list(buck_targets) ->
         cond do
           not Enum.all?(locks, &is_binary/1) ->
             {:halt, {:error, "#{name}: locks must be paths"}}
@@ -97,12 +107,17 @@ defmodule Overalls.DependencyPins do
           end) ->
             {:halt, {:error, "#{name}: hashes must map keys to .drv paths"}}
 
+          not Enum.all?(buck_targets, &buck_label?/1) ->
+            {:halt, {:error, "#{name}: buckTargets must be root// target labels"}}
+
           true ->
-            {:cont, {:ok, Map.put(acc, name, %{locks: locks, hashes: hashes})}}
+            {:cont,
+             {:ok,
+              Map.put(acc, name, %{locks: locks, hashes: hashes, buck_targets: buck_targets})}}
         end
 
       {name, _}, _ ->
-        {:halt, {:error, "#{inspect(name)}: expected non-empty locks and hashes"}}
+        {:halt, {:error, "#{inspect(name)}: expected non-empty locks, hashes and buckTargets"}}
     end)
   end
 
@@ -341,6 +356,11 @@ defmodule Overalls.DependencyPins do
         do: {path, key}
   end
 
+  # A plain `root//package:name` label: no flags, patterns or spaces reach argv.
+  @spec buck_label?(term()) :: boolean()
+  defp buck_label?(label),
+    do: is_binary(label) and Regex.match?(~r{\Aroot//[A-Za-z0-9_./-]*:[A-Za-z0-9_.+-]+\z}, label)
+
   @doc "Names of targets that build from any of the changed lock files."
   @spec affected(%{String.t() => target()}, [Path.t()]) :: [String.t()]
   def affected(targets, changed) do
@@ -447,7 +467,20 @@ defmodule Overalls.DependencyPins do
     keys = Map.keys(Map.fetch!(targets!(root, ecosystem), name).hashes)
     write_hashes!(root, Map.new(keys, &{&1, @fake_hash}))
     build!(root, ecosystem, name, 1)
+    build_buck!(root, name, Map.fetch!(targets!(root, ecosystem), name).buck_targets)
     keys
+  end
+
+  # The Buck2 builds that consume the refreshed fetches (ADR-0269): Buck2 is
+  # the build entry point, so a release or suite against the new lock is
+  # proved here rather than by a Nix build of it.
+  @spec build_buck!(Path.t(), String.t(), [String.t()]) :: :ok
+  defp build_buck!(_root, _name, []), do: :ok
+
+  defp build_buck!(root, name, labels) do
+    IO.puts("==> #{name}: tools/buck2 build #{Enum.join(labels, " ")}")
+    {_, 0} = run!(root, Path.join(root, "tools/buck2"), ["build" | labels])
+    :ok
   end
 
   @spec build!(Path.t(), ecosystem(), String.t(), pos_integer()) :: :ok

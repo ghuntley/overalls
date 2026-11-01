@@ -27,40 +27,12 @@ let
         environment.etc."overalls-update-candidates.json".enable = lib.mkForce false;
         environment.etc."overalls-update-generation".text = "updated";
         services.overallsAutoUpdate.verbose = lib.mkForce true;
-        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-success" (previous: {
-          postInstall = (previous.postInstall or "") + ''
-            migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)
-            cat > "$migrations/20990101000000_update_success.exs" <<'ELIXIR'
-            defmodule Marshall.Repo.Migrations.UpdateSuccess do
-              use Ecto.Migration
-              def up do
-                execute "SELECT pg_sleep(20)"
-                create table(:updater_fixture) do
-                  add :marker, :text, null: false
-                end
-                execute "INSERT INTO updater_fixture (marker) VALUES ('once')"
-              end
-              def down, do: drop(table(:updater_fixture))
-            end
-            ELIXIR
-          '';
-        }));
+        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-success");
       };
       broken.configuration = {
         environment.etc."overalls-update-candidates.json".enable = lib.mkForce false;
         # Exercise an actual failing migration from an otherwise runnable release.
-        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-failure" (previous: {
-          postInstall = (previous.postInstall or "") + ''
-            migrations=$(echo "$out"/lib/marshall-*/priv/repo/migrations)
-            cat > "$migrations/20990101000001_update_failure.exs" <<'ELIXIR'
-            defmodule Marshall.Repo.Migrations.UpdateFailure do
-              use Ecto.Migration
-              def up, do: raise("isolated migration failure")
-              def down, do: :ok
-            end
-            ELIXIR
-          '';
-        }));
+        services.marshall.package = lib.mkForce (packages.releaseFixture "marshall" "update-failure");
       };
     };
     virtualisation.memorySize = 2048;

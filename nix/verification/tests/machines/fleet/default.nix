@@ -397,61 +397,26 @@ let
     cp ${../executor-loss/browser.py} "$out/browser.py"
     ty check --python ${python}/bin/python3 "$out/browser.py"
   '';
-  # Fixture releases are Buck2 release_variants (lilly, marshall and audi
-  # BUCK); the overrides below build them only when assembly has no Buck2
-  # releases (contract release-fixtures-from-buck2), and MUST stay identical
-  # to those variants.
+  # Fixture releases are Buck2 release_variants, defined with their patches in
+  # lilly/BUCK, marshall/BUCK and audi/BUCK (contract release-fixtures-from-buck2).
   # The update fixture distinguishes the candidate release by its catalogued
   # start-event message; the event name itself must stay catalogued.
-  updatedLilly = packages.releaseFixture "lilly" "updated" (previous: {
-    preBuild = (previous.preBuild or "") + ''
-      substituteInPlace lib/lilly/events.ex --replace-fail 'message: "Lilly started"' 'message: "Lilly updated"'
-    '';
-  });
+  updatedLilly = packages.releaseFixture "lilly" "updated";
   # @cc [owner:ghuntley,label:verification;security] clone-exact-guid-context-fixture
   # Only this fixture release may capture the validated map passed to readiness.
   # Changed/duplicate source seams MUST fail the build; the observer's original
   # arguments, result, lock custody and cleanup authority MUST remain unchanged.
-  observedCloneLilly = packages.releaseFixture "lilly" "observed-clone" (previous: {
-    preBuild = (previous.preBuild or "") + ''
-      cp ${../clone-cancellation/observation.ex} lib/lilly/clone_observation_fixture.ex
-      ${pkgs.python3}/bin/python3 ${cloneObservationRecorder}/instrument_clone_observation.py lib/lilly/host/zfs.ex
-    '';
-  });
+  observedCloneLilly = packages.releaseFixture "lilly" "observed-clone";
   # @cc [owner:ghuntley,label:verification;security] clone-report-guard-fixture
   # Only cloneCancellation may instrument authenticated host-report validation.
   # Exact source hashes MUST fail closed on drift; original guards, rollback and
   # external refusals remain unchanged. The sink exports only finite stage/age.
-  observedCloneMarshall = packages.releaseFixture "marshall" "observed-clone" (previous: {
-    preBuild = (previous.preBuild or "") + ''
-      cp ${../clone-cancellation/report_rejection.ex} lib/marshall/clone_report_rejection_fixture.ex
-      ${pkgs.python3}/bin/python3 ${cloneObservationRecorder}/instrument_clone_reports.py lib/marshall/compute/host_reports.ex lib/marshall/compute/provisioner_control.ex
-    '';
-  });
-  # The @moduledoc patch does not survive `mix release`; the marker keeps the
-  # candidate a distinct release.
-  updatedAudi = packages.releaseFixture "audi" "updated" (previous: {
-    preBuild = (previous.preBuild or "") + ''
-      substituteInPlace lib/audi/health.ex --replace-fail \
-        'Point-in-time role readiness for private deployment health checks.' \
-        'Updated role readiness for private deployment health checks.'
-    '';
-    postInstall = (previous.postInstall or "") + ''
-      printf 'updated\n' > "$out/overalls-fixture-variant"
-    '';
-  });
+  observedCloneMarshall = packages.releaseFixture "marshall" "observed-clone";
+  # A distinct candidate release (an @moduledoc patch plus a marker file).
+  updatedAudi = packages.releaseFixture "audi" "updated";
   # A controlled release regression keeps listeners running but fails the real
   # private health response. The updater must not call this candidate healthy.
-  unhealthyAudi = packages.releaseFixture "audi" "unhealthy" (previous: {
-    preBuild = (previous.preBuild or "") + ''
-      substituteInPlace lib/audi/health.ex --replace-fail \
-        'Point-in-time role readiness for private deployment health checks.' \
-        'Updated role readiness for private deployment health checks.'
-      substituteInPlace lib/audi/health.ex --replace-fail \
-        'System.monotonic_time(:millisecond) - started < 5000' \
-        'System.monotonic_time(:millisecond) - started < 0'
-    '';
-  });
+  unhealthyAudi = packages.releaseFixture "audi" "unhealthy";
   # The failed-activation variant is built only for journeys that compose
   # scenarios/updates.py; every other composition keeps its variant set fixed.
   updatesFleet = customerIsolation || !(porsche || relocation || audi || sshBootstrap

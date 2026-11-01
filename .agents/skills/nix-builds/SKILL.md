@@ -118,7 +118,9 @@ To add a tool:
   devenv's revision and commits both locks. A bump can invalidate registry
   hashes: `scripts/dependency_pins.ex` `refresh!` (used by the Mix and Cargo
   security-upgrade scripts) builds `lib.dependencyPins.<ecosystem>.<name>.build`
-  until every hash converges, and `nix-upgrades.yml` runs
+  (the fixed-output fetches) until every hash converges, then runs
+  `tools/buck2 build` on the entry's `buckTargets`; a new Mix project or
+  Buck2 Rust leaf adds its labels there. `nix-upgrades.yml` runs
   `scripts/fetch_pins.exs --changed flake.lock` for the fetch entries whose
   fetchers depend on nixpkgs. After bumping a fetch's version, run
   `elixir scripts/fetch_pins.exs --changed <declaring file>`.
