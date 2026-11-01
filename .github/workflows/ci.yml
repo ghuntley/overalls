@@ -391,6 +391,29 @@ jobs:
           echo "$(nproc) CPUs"
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
           tools/buck2 build --keep-going --console simple "${targets[@]}"
+      # ExUnit's result line per shard, and per-suite totals, so a suite's
+      # test count can be compared with another runner's (ADR-0269 M8).
+      - name: Report test counts
+        if: always()
+        env:
+          TARGETS: ${{ toJSON(matrix.suite.targets) }}
+        run: |
+          set -euo pipefail
+          echo "### test counts" >> "$GITHUB_STEP_SUMMARY"
+          for target in $(jq -r '.[]' <<<"$TARGETS"); do
+            out=$(tools/buck2 build --console none --show-full-output "${target}[test_result]" 2>/dev/null | awk '{print $2}') || continue
+            [ -d "$out" ] || continue
+            total=0
+            for log in "$out"/*/test.log; do
+              # ExUnit 1.20 prints "Result: <run> passed" (or "<passed>/<run>").
+              line=$(grep -E '^Result: ' "$log" | tail -n 1 || true)
+              echo "${target} $(basename "$(dirname "$log")"): ${line}"
+              n=$(sed -nE 's#^Result: ([0-9]+/)?([0-9]+) passed.*#\2#p' <<<"$line")
+              n=${n:-0}
+              total=$((total + n))
+            done
+            echo "- ${target}: ${total} tests" | tee -a "$GITHUB_STEP_SUMMARY"
+          done
       # Contract mix-test-known-failures: the known Inception failures run in
       # the known_failures shard, which passed only if nothing else failed.
       - name: Report known Inception failures
