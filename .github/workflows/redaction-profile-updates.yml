@@ -32,7 +32,7 @@ jobs:
           echo "PostgreSQL did not become ready" >&2
           exit 1
       - name: Verify profile and scanner
-        run: devenv shell -- bash -euo pipefail -c 'cd marshall && mix local.hex --force --if-missing && mix local.rebar --force --if-missing && mix deps.get && mix test test/marshall/redaction/scanner_test.exs'
+        run: devenv shell -- bash -euo pipefail -c 'scripts/install_mix_tools.sh && cd marshall && mix deps.get && mix test test/marshall/redaction/scanner_test.exs'
       - name: Commit profile
         env:
           GH_TOKEN: ${{ github.token }}

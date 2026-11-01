@@ -168,6 +168,14 @@ plan (track T1).
   `nodeWindowsX64`, `nodeHeaders`, `nodeWindowsX64Library` and
   `pythonEmbedWindowsX64` keys; [pins.ex](../../../scripts/pins.ex) no longer exempts it. Its
   source-kit input drvPaths match trunk except the release-id product overlay.
+- [install_mix_tools.sh](../../../scripts/install_mix_tools.sh) installs Hex 2.6.0 and rebar3
+  3.28.0 by URL with their builds.hex.pm SHA-512 digests, and Mix refuses a
+  mismatching download. The [Mix security upgrades](../../../.github/workflows/mix-security-upgrades.yml)
+  and [redaction profile](../../../.github/workflows/redaction-profile-updates.yml) workflows call it instead of
+  an unpinned `mix local.hex`/`mix local.rebar`. Both installs and a refused
+  wrong digest were exercised in an isolated `MIX_HOME`. The Mila
+  [builds](../../../.github/workflows/mila-builds.yml) and [release](../../../.github/workflows/mila-release.yml) workflows already install
+  `cargo-ndk --locked --version 4.1.2`.
 - [The CI devenv action](../../../.github/actions/devenv/action.yml) and [the OSS scanner image](../../../.oss-scanner/Dockerfile)
   pin the Nix installer checksum and the base image digest.
 
@@ -177,8 +185,6 @@ Remaining gaps:
   moved keys.
 - Registering the guest domain locks (Ubuntu, Windows, native Git, vscode
   extensions) with their updaters.
-- Pinning `mix local.hex` and `mix local.rebar` in the upgrade workflows, and
-  `cargo-ndk` in the Mila workflows.
 
 ## Open questions
 

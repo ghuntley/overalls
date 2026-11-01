@@ -58,8 +58,9 @@ jobs:
           summary_file="$RUNNER_TEMP/mix-security-summary.md"
           unresolved_file="$RUNNER_TEMP/mix-security-unresolved.txt"
 
-          # Audits every Mix project with the latest Hex (the script requires
-          # 2.5.3 or newer, which reports security advisories), updates only packages
+          # Audits every Mix project with the pinned Hex from
+          # scripts/install_mix_tools.sh (the script requires 2.5.3 or newer,
+          # which reports security advisories), updates only packages
           # with security advisories or security retirements, refreshes the
           # fixed-output Nix hashes of each changed application and requires
           # its source release to build. Returns non-zero when nothing changed.
@@ -67,8 +68,7 @@ jobs:
             rm -f "$summary_file" "$unresolved_file"
             # shellcheck disable=SC2016 # $1 and $2 expand inside the dev shell
             devenv shell -- bash -euo pipefail -c '
-              mix local.hex --force
-              mix local.rebar --force
+              scripts/install_mix_tools.sh
               elixir scripts/mix_security_upgrades.exs --summary "$1" --unresolved "$2"
             ' _ "$summary_file" "$unresolved_file"
 

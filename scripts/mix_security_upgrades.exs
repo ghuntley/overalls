@@ -43,7 +43,7 @@ defmodule Overalls.MixSecurityUpgrades.CLI do
 
     MixSecurityUpgrades.supported_hex?(info) ||
       fail(
-        "Hex #{MixSecurityUpgrades.minimum_hex()} or newer is required for advisories; run `mix local.hex --force`"
+        "Hex #{MixSecurityUpgrades.minimum_hex()} or newer is required for advisories; run scripts/install_mix_tools.sh"
       )
 
     :ok
