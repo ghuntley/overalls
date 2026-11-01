@@ -21,7 +21,22 @@ BUCK2 = Path(".buck-cells/bin/buck2")
 ISOLATION = "--isolation-dir=mix-test-failure-test"
 TARGET = "//buck/tests/mix_failing:test"
 MARKER = re.compile(r"mix_failing_fixture: deliberate failure run=([0-9-]+)")
-CONFIG = ["-c", "mix_failing.enabled=true"]
+# The test's environment has no Namespace token, while the checkout's
+# untracked include (tools/buck2, ADR-0276) names $NAMESPACE_RBE_TOKEN in its
+# headers: without these overrides the nested daemon retries the remote
+# connection for about 45 s before building locally. The suite runs locally
+# anyway.
+NO_REMOTE = [
+    "-c",
+    "buck2_re_client.engine_address=",
+    "-c",
+    "buck2_re_client.action_cache_address=",
+    "-c",
+    "buck2_re_client.cas_address=",
+    "-c",
+    "buck2_re_client.http_headers=",
+]
+CONFIG = ["-c", "mix_failing.enabled=true", *NO_REMOTE]
 
 
 def build(target: str) -> subprocess.CompletedProcess[str]:

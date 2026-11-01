@@ -328,6 +328,12 @@ are retired; their module stays dormant.
   (404 or no answer to a five-second probe, remembered in
   `.buck-remote.probe` for ten minutes) turns the cache off for the build
   instead of letting Buck2 retry forever.
+- **Nested daemons.** A test that runs `.buck-cells/bin/buck2` itself sees
+  the checkout's include but not the token (test environments do not carry
+  it), and Buck2 then retries the connection for about 45 s. Pass
+  `-c buck2_re_client.engine_address= -c buck2_re_client.action_cache_address=
+  -c buck2_re_client.cas_address= -c buck2_re_client.http_headers=`, as
+  `buck/tests/mix_test_failure_uncached.py` does.
 - **Never write the token** into a file in the checkout, argv or the Nix
   store. `tools/namespace-token-scan` fails if the `nsrt_` prefix appears in
   the include, `buck-out/v2/log` or `~/.buck`; CI runs it after each Buck2 job.
