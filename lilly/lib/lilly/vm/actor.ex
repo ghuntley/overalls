@@ -8,6 +8,10 @@ defmodule Lilly.VM.Actor do
   alias Lilly.VM.DeleteRetry
   alias Lilly.Execution.{Liveness, Watch}
   alias OverallsProtocol.Cadence
+  # Kinds with a launch commit point: preemptible until commit (ADR-0176).
+  @launch_kinds [:provision, :start, :resume]
+  # The fallback bound for executors without effect_deadline_ms/2.
+  @effect_deadline_ms 120_000
 
   # Backstops for published proof (ADR-0140 phase 3). With the exit watcher
   # armed on the proven VMM, death revokes within milliseconds, so the deadline
@@ -78,6 +82,8 @@ defmodule Lilly.VM.Actor do
              executor: Keyword.fetch!(options, :executor),
              task: nil,
              task_command: nil,
+             task_started_at: nil,
+             task_deadline_ms: nil,
              delete_attempts: 0,
              next_delete_attempt_at: nil,
              terminal_owner: Keyword.get(options, :terminal_owner),
@@ -98,7 +104,8 @@ defmodule Lilly.VM.Actor do
              active: false,
              steady: 0,
              last_reconcile_at: nil,
-             committed: false
+             committed: false,
+             effect_deadline_ms: Keyword.get(options, :effect_deadline_ms, @effect_deadline_ms)
            }}
 
         _ ->
@@ -235,7 +242,13 @@ defmodule Lilly.VM.Actor do
   def handle_info(:tick, state) do
     Process.send_after(self(), :tick, 1000)
     state = probe_boot(state)
-    if steady?(state), do: {:noreply, state}, else: request(state, :tick)
+
+    cond do
+      # A deferred supersession reaches its effect boundary or its deadline.
+      not is_nil(state.task) and preemptible?(state) -> preempt(state)
+      steady?(state) -> {:noreply, state}
+      true -> request(state, :tick)
+    end
   end
 
   def handle_info({ref, {:boot_probe, command, proof}}, %{probe: %Task{ref: ref}} = state) do
@@ -283,7 +296,7 @@ defmodule Lilly.VM.Actor do
   def handle_info({ref, {result, target}}, %{task: %Task{ref: ref}} = state) do
     Process.demonitor(ref, [:flush])
     command = state.task_command
-    state = %{state | task: nil, task_command: nil}
+    state = %{state | task: nil, task_command: nil, task_started_at: nil, task_deadline_ms: nil}
 
     case Store.read(state.store, command.placement_id) do
       {:ok, ^command} ->
@@ -302,7 +315,10 @@ defmodule Lilly.VM.Actor do
   end
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{task: %Task{ref: ref}} = state),
-    do: {:noreply, %{state | task: nil, task_command: nil}} |> completed()
+    do:
+      {:noreply,
+       %{state | task: nil, task_command: nil, task_started_at: nil, task_deadline_ms: nil}}
+      |> completed()
 
   def handle_info({:DOWN, ref, :process, _pid, _reason}, %{monitor: ref} = state),
     do: {:stop, :shutdown, state}
@@ -322,15 +338,56 @@ defmodule Lilly.VM.Actor do
   def format_status(status), do: Lilly.DiagnosticStatus.redact(status, public(status.state))
 
   # @cc [owner:ghuntley,label:recovery;concurrency] newer-command-preempts-uncommitted
-  # A newer stored command MUST stop an in-flight task that has not been
-  # granted its launch commit, before the newer command starts. Killing the
-  # task closes its native lock owners, which kill and reap their utilities
-  # before releasing ownership, exactly as on caller death; no launch attempt
-  # is persisted for the preempted command (ADR-0176).
-  defp preemptible?(%{task: %Task{}, committed: false, task_command: command} = state),
-    do: command_changed?(state) and not is_nil(command)
+  # A newer stored command MUST stop an in-flight launch task (provision,
+  # start, resume) that has not been granted its launch commit, before the
+  # newer command starts. Killing the task closes its native lock owners,
+  # which kill and reap their utilities before releasing ownership, exactly as
+  # on caller death; no launch attempt is persisted for the preempted command
+  # (ADR-0176).
+
+  # @cc [owner:ghuntley,label:recovery;concurrency] non-launch-effects-finish-or-deadline
+  # A newer stored command MUST NOT kill an in-flight stop, pause, resize or
+  # delete task before its effect deadline (from the task's start; the
+  # executor's `effect_deadline_ms/2`, derived from that effect's configured
+  # inner timeouts plus a margin, else the actor's `effect_deadline_ms`
+  # option): the task runs to its own end and the newer command then starts
+  # at once. An unreadable command store MUST NOT preempt a non-launch task
+  # before its deadline. Two exceptions MUST preempt as before:
+  # a newer delete (which removes every partial effect) preempts at once, and
+  # any task still running at its deadline is killed by the next tick, so a
+  # wedged effect delays the newer command by at most the deadline plus one
+  # tick (ADR-0176 amendment of 2026-11-01).
+  defp preemptible?(%{task: %Task{}, committed: false, task_command: %{} = command} = state) do
+    case Store.read(state.store, state.command.placement_id) do
+      {:ok, latest} when latest == state.command ->
+        false
+
+      {:ok, latest} ->
+        command.kind in @launch_kinds or latest.kind == :delete or past_deadline?(state)
+
+      # An unreadable store proves nothing about a newer command: it must not
+      # kill a non-launch effect mid-step before its deadline.
+      _ ->
+        command.kind in @launch_kinds or past_deadline?(state)
+    end
+  end
 
   defp preemptible?(_state), do: false
+
+  defp past_deadline?(%{task_started_at: started, task_deadline_ms: deadline})
+       when is_integer(started) and is_integer(deadline),
+       do: System.monotonic_time(:millisecond) - started >= deadline
+
+  defp past_deadline?(_state), do: false
+
+  # The executor's per-effect bound (its own configured inner timeouts plus a
+  # margin) when it provides one; otherwise the actor's configured default.
+  @spec effect_deadline(map(), map()) :: pos_integer()
+  defp effect_deadline(%{executor: {executor, context}} = state, command) do
+    if Code.ensure_loaded?(executor) and function_exported?(executor, :effect_deadline_ms, 2),
+      do: executor.effect_deadline_ms(context, command),
+      else: state.effect_deadline_ms
+  end
 
   defp preempt(state) do
     command = state.task_command
@@ -341,7 +398,15 @@ defmodule Lilly.VM.Actor do
       placement_id: command.placement_id
     )
 
-    state = %{state | task: nil, task_command: nil, committed: false, steady: 0}
+    state = %{
+      state
+      | task: nil,
+        task_command: nil,
+        task_started_at: nil,
+        task_deadline_ms: nil,
+        committed: false,
+        steady: 0
+    }
 
     case Cadence.step(state.cadence, :done) do
       {:ok, cadence, [:start]} -> start(%{state | cadence: cadence})
@@ -409,6 +474,8 @@ defmodule Lilly.VM.Actor do
                  journal: journal,
                  task: task,
                  task_command: command,
+                 task_started_at: System.monotonic_time(:millisecond),
+                 task_deadline_ms: effect_deadline(state, command),
                  committed: false,
                  last_reconcile_at: System.monotonic_time(:millisecond)
              }}

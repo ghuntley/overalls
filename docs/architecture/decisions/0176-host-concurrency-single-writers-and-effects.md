@@ -711,6 +711,74 @@ ADR-0144 would hide new guest mounts from a Lilly namespace. The privilege
 drop followed in [ADR-0182](0182-unprivileged-lilly-beam.md): the BEAM runs
 only as the unprivileged `lilly` user, and hostd is the only root component.
 
+## Amendment (2026-11-01): preemption at effect boundaries
+
+Decision 2's preemptible creates are narrowed to the work that has a launch
+commit point. The accepted invariant ("preemption before the commit always
+reaches the newer intended state") is unchanged.
+
+- **Rule.** A newer stored command kills only an uncommitted *launch* task
+  (provision, start, resume), as before. A stop, pause, resize or delete
+  task runs to its own end, and the newer command then starts at once. Two
+  exceptions keep today's behaviour:
+  - a newer delete still preempts at once, because deletion removes every
+    partial effect;
+  - an effect still running at its deadline is killed on the next one-second
+    tick, so a wedged stop or delete delays the newer command by at most the
+    deadline plus one tick. The deadline runs from the task's start
+    (`task_started_at`). `Executor.effect_deadline_ms/2` derives it from that
+    effect's own configured inner timeouts plus a 180 s margin:
+    - stop and delete: the pool's `image_io_timeout_ms` (300 s by default,
+      at most 4 h) plus the margin, which covers the 30 s graceful stop, kill
+      confirmation and lock waits;
+    - resize: also two 300 s metadata syncs;
+    - pause: also the 4 h checkpoint capture sync.
+
+    The actor's `effect_deadline_ms` option (120 s) applies only to executors
+    without that callback. An unreadable command store never preempts a
+    non-launch effect before its deadline.
+- **Tradeoff.** A wedged effect now holds a newer stop or start for up to
+  its deadline: a wedged pause capture for about 4 h, and a wedged stop or
+  delete for up to 4 h + 180 s on a pool configured with the maximum image
+  I/O timeout (300 s + 180 s by default). A newer delete always preempts at
+  once and is the escape hatch.
+- **Contracts.** `newer-command-preempts-uncommitted` (launch kinds) and
+  `non-launch-effects-finish-or-deadline` in
+  [`Lilly.VM.Actor`](../../../lilly/lib/lilly/vm/actor.ex), and
+  `effect-deadline-covers-inner-timeouts` in
+  [`Lilly.VM.Executor`](../../../lilly/lib/lilly/vm/executor.ex).
+- **Rationale.** `committed` is granted only through `commit_launch`, so every
+  non-launch task was always "uncommitted" and could be killed mid-effect.
+  A brutal kill skips `after` clauses and stops a multi-file sequence at an
+  arbitrary point: a resize replay in `fleet:account-lifecycle` (2026-11-01)
+  was killed between its disk truncate and its metadata writes by the
+  resize's own restart, and that launch ended `unknown` with
+  `cleanup_failed`. The replay itself is removed by
+  `applied-resize-settles-command`; this amendment removes the kill.
+- **Rejected alternatives.**
+  - *`begin_launch` re-derives and repairs partial state.* That requires
+    repair logic for every effect's intermediate state (pending files,
+    journals, claims, disk sizes). It hides which interruption produced the
+    state, and it still leaves non-launch effects interrupted.
+  - *Cooperative cancellation inside effects.* That needs checkpoints
+    threaded through `Driver`, `Disk` and `ZFSDataset`, and the hostd effect
+    engine of decision 3 is the place for it.
+- **Evidence.**
+  [Effect-boundary test](../../../lilly/test/vm/actor_effect_boundary_test.exs)
+  (Hegel property over newer stop, start or delete and finishing or wedged
+  stop effects; a newer stop inside the deadline; an unreadable store). The
+  first two fail on the previous rule. The
+  existing [preemption test](../../../lilly/test/vm/actor_preemption_test.exs)
+  still covers uncommitted and committed launches. No machine test yet
+  exercises a supersession during a non-launch effect.
+- **Remaining gaps.**
+  - A launch preempted during its pre-commit disk, boot or jail preparation
+    is still killed mid-step. It relies on those steps being resumable:
+    `remove_temporary`, journals and `launch_fence`.
+  - A task killed at its deadline records no outcome for its own command,
+    as before. `Journal.record` refuses a stale generation once a newer
+    command exists, and the newer command's first observation replaces it.
+
 ## Open questions
 
 - **ZFS:** channel-program instruction and memory limits for about 300

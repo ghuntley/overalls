@@ -49,6 +49,36 @@ defmodule Lilly.VM.Executor do
   @callback watch_target(term(), Execution.command()) ::
               {:ok, %{pid: pos_integer(), cgroup: Path.t()}} | :error
   @optional_callbacks watch_target: 2
+  @callback effect_deadline_ms(term(), Execution.command()) :: pos_integer()
+  @optional_callbacks effect_deadline_ms: 2
+
+  # Graceful stop (30 s) plus kill and confirmation (10 s), two placement or
+  # pool lock waits (up to 30 s each) and scheduling slack.
+  @effect_margin_ms 180_000
+  # CheckpointStorage's capture sync bound.
+  @checkpoint_sync_ms 14_400_000
+
+  # @cc [owner:ghuntley,label:recovery;concurrency] effect-deadline-covers-inner-timeouts
+  # effect_deadline_ms/2 MUST exceed the sum of the configured inner timeouts
+  # of the command's effect, so the actor's deadline never cuts a legitimate
+  # effect short: the pool's `image_io_timeout_ms` (up to 4 h) for disk
+  # syncs, the 4 h checkpoint capture sync for pause, the 30 s graceful stop,
+  # and lock waits, plus @effect_margin_ms.
+  @spec effect_deadline_ms(Config.t(), Execution.command()) :: pos_integer()
+  def effect_deadline_ms(config, command) do
+    io =
+      case Enum.find(config.pools, &(&1.id == command.pool_id)) do
+        %{image_io_timeout_ms: timeout} when is_integer(timeout) -> timeout
+        _ -> 14_400_000
+      end
+
+    case command.kind do
+      :pause -> @checkpoint_sync_ms + io + @effect_margin_ms
+      # Disk.resize's sync and ZFSDataset's metadata syncs (300 s each).
+      :resize -> io + 2 * 300_000 + @effect_margin_ms
+      _ -> io + @effect_margin_ms
+    end
+  end
 
   # @cc [owner:ghuntley,label:concurrency;recovery] boot-proof-only-for-running-unit
   # boot_proof/2 MUST NOT take the placement lock unless the VM unit is running:
