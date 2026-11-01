@@ -139,12 +139,14 @@ _ISOLATED_BUILDS = [
     "ubuntu-guest-unit",
 ]
 
-# lib.assemble's checks that are not machine tests (nixos_machine_test
-# targets under nix/verification/tests/machines): release probes, evaluation
-# checks, the nix-compact checks and fleet-builds-configuration.
-# publish-cache.yml builds every one; ci.yml evaluates each affected one
-# (`[drv]`).
-_ASSEMBLED_CHECKS = [attr for attr in ASSEMBLY_CHECKS if attr not in MACHINE_TESTS]
+# lib.assemble's checks (nix/assemble/outputs.nix): release probes,
+# evaluation checks, the nix-compact checks and fleet-builds-configuration.
+# Machine tests are nixos_machine_test targets, never lib.assemble checks
+# (contract machine-test-from-buck). publish-cache.yml builds every one;
+# ci.yml evaluates each affected one (`[drv]`).
+_ASSEMBLED_CHECKS = ASSEMBLY_CHECKS
+
+[fail("check {} is also a machine test".format(attr)) for attr in ASSEMBLY_CHECKS if attr in MACHINE_TESTS]
 
 [fail("isolated build {} is not an assembled check".format(attr)) for attr in _ISOLATED_BUILDS if attr not in _ASSEMBLED_CHECKS]
 

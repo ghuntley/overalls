@@ -239,7 +239,7 @@ bundle.
   [builder](../../../nix/domains/artifacts/guest/windows/default.nix),
   [directory contracts](../../../nix/domains/artifacts/guest/windows/CONTRACTS).
 - Checks: [Lilly-mode machine test](../../../nix/verification/tests/machines/windows-lilly-guest/default.nix)
-  registered in [the check catalog](../../../nix/verification/tests/catalog.nix).
+  registered in [its suite's BUCK](../../../nix/verification/tests/machines/windows-lilly-guest/BUCK).
 - Review: [Windows Lilly launch review](../reviews/2026-10-14-windows-lilly-launch.md)
   records which suites and machine tests were executed.
 

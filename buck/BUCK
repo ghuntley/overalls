@@ -65,7 +65,8 @@ script_test(
     deps = ["//buck/probes:elixir_version"],
 )
 
-# The per-suite BUCK files match catalog.nix and the suites' requiredFeatures.
+# The per-suite BUCK files match what their `test` expressions and suite
+# files derive (contract machine-test-targets-generated).
 script_test(
     name = "machine_tests_fresh",
     script = "machine_tests.py",

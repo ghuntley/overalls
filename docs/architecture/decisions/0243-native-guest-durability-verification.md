@@ -119,7 +119,7 @@ FreeBSD and OmniOS authorizes this decision.
   with host unit tests
   [native_durability_test.py](../../../nix/verification/tests/support/native_durability_test.py)
   and [native_write_log_test.py](../../../nix/verification/tests/support/native_write_log_test.py).
-- The [catalog](../../../nix/verification/tests/catalog.nix) declares six checks:
+- The [native-durability suite](../../../nix/verification/tests/machines/native-durability/BUCK) declares six checks:
   `native-{freebsd,omnios}-{interrupted-growth,power-loss,relocation}`.
   The OmniOS checks use the promoted `packages.omniosGuest`. The FreeBSD checks
   use the source candidate, because the fix changes the image.

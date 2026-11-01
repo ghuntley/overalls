@@ -39,14 +39,14 @@ Composed-driver typing cannot check these separate processes, and ordinary
 repository type discovery excludes machine helpers.
 
 Build these artifacts without booting machines. They are attributes of the
-checks, not Buck2 targets, so they come from lib.assemble directly (see
-[Run checks](#run-checks)):
+machine tests, not Buck2 targets, so `buck/machine_tests.py debug` builds them
+from the checkout (see [Run checks](#run-checks)):
 
 ```sh
-for a in '"teams-browser".checkedBrowser' '"control-room-browser".checkedBrowser' \
-  '"credential-self-service-browser".checkedBrowser' '"default-oss-creation".defaultOssBrowser' \
-  'inception.checkedBrowser' '"audi-fleet".audiBrowser' '"porsche-fleet".porscheBrowser'; do
-  nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.'"$a" --no-link
+for a in 'teams-browser checkedBrowser' 'control-room-browser checkedBrowser' \
+  'credential-self-service-browser checkedBrowser' 'default-oss-creation defaultOssBrowser' \
+  'inception checkedBrowser' 'audi-fleet audiBrowser' 'porsche-fleet porscheBrowser'; do
+  python3 buck/machine_tests.py debug $a
 done
 ```
 
@@ -72,7 +72,7 @@ counterexample and fail the check; the
 [framework README](../hegel/README.md) lists the `properties` options
 (`profile`, `testCases`, `statefulStepCount`, `redact`, replay blobs).
 
-The catalog exports `hegel-framework-packages` as a direct build check. It
+`hegel-framework-packages` is a direct build check (`//:check-hegel-framework-packages`). It
 executes the binding's shrink, replay, mismatch, state-machine and concurrency
 smoke suite before any machine-specific evidence is considered. The remaining
 Hypothesis references are confined to evaluation `runCommand` checks or helper
@@ -492,13 +492,15 @@ tools/affected --base origin/trunk   # what a change selects
 ```
 
 Nested-KVM suites carry the `nested_kvm` label; the builder still needs the
-`nested-kvm` system feature. Attributes of a check that are not targets (an
-interactive `.driver`, a typed browser artifact) come from lib.assemble over
-the checkout. That is a plain Nix build without the Buck2 artifacts, so use it
-for debugging, never as test evidence:
+`nested-kvm` system feature. A machine test's interactive driver is the
+`[driver]` sub-target of its assembly, built over the same declared tree and
+Buck2 artifacts. Other attributes (a typed browser artifact) come from
+`buck/machine_tests.py debug`, a plain Nix build over the checkout without
+the Buck2 artifacts, so use it for debugging, never as test evidence:
 
 ```sh
-nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks.fleet.driver'
+tools/buck2 build --show-full-output '//nix/verification/tests/machines/fleet:fleet.assembly[driver]'
+python3 buck/machine_tests.py debug sysctl driverInteractive
 ```
 
 ### Continuous integration
@@ -512,15 +514,19 @@ runner of its own. `tools/buck2 build --keep-going` reports every failing
 check by target, evaluation errors included, and `ci.yml` evaluates each
 affected one (`[drv]`) per push.
 
-Machine tests are Buck2 targets (ADR-0270): each machine check is a
-`nixos_machine_test` in `machines/<suite>/BUCK`, generated from this catalog by
-`buck/machine_tests.py` and named after the check. `ci.yml` runs the targets
+Machine tests are Buck2 targets (ADR-0270): each is a `nixos_machine_test`
+stanza in `machines/<suite>/BUCK`, named after the check. Its `test` attribute
+is the Nix expression that instantiates it, evaluated beside
+[scope.nix](scope.nix) with that file's names (`testPkgs`, `packages`,
+`service`, `serviceOf`, `featureFleet`, …) in scope; `buck/machine_tests.py
+generate` derives every other attribute. The checks that are not machine tests
+are defined in [outputs.nix](../../assemble/outputs.nix). `ci.yml` runs the targets
 that each trunk push affects (`tools/affected`), and `nixos-machine-tests.yml`
 runs all of them daily, one job per target:
 
 ```sh
 tools/buck2 test //nix/verification/tests/machines/sysctl:sysctl
-python3 buck/machine_tests.py generate   # after changing this catalog
+python3 buck/machine_tests.py generate   # after adding a stanza or changing a `test`
 ```
 
 A scheduled or dispatched run is execution evidence only for the commit it

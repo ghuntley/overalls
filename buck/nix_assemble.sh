@@ -2,7 +2,7 @@
 # Evaluates lib.assemble over a copied tree of declared sources only, under
 # restrict-eval, so an undeclared Nix input is an evaluation error (ADR-0269).
 set -euo pipefail
-nix=$1 jq=$2 manifest=$3 names=$4 artifacts=$5 params=$6 attr=$7 revision=$8 gcroot=$9 out=${10} mode=${11:-build}
+nix=$1 jq=$2 manifest=$3 names=$4 artifacts=$5 params=$6 attr=$7 revision=$8 gcroot=$9 out=${10} mode=${11:-build} test=${12:-}
 # GC roots stay outside the repository so file watchers never follow them.
 roots=${OVERALLS_GCROOT_DIR:-${XDG_STATE_HOME:-${HOME:-/tmp}/.local/state}/overalls-buck2/gcroots}
 mkdir -p "$roots"
@@ -38,10 +38,19 @@ done | "$jq" -s 'add // {}' > "$tree/.buck-artifacts.json"
 "$jq" -e 'type == "object"' "$params" > /dev/null || { echo "nix_assemble: params is not a JSON object" >&2; exit 1; }
 cp "$params" "$tree/.buck-params.json"
 [[ -f "$tree/flake.nix" && -f "$tree/flake.lock" ]] || { echo "nix_assemble: flake.nix/flake.lock not declared" >&2; exit 1; }
+# A machine test's expression sits beside the test scope, so its relative
+# paths resolve as they did in that directory (contract machine-test-from-buck).
+machine=""
+if [[ -n $test ]]; then
+  [[ -f "$tree/nix/verification/tests/scope.nix" ]] || { echo "nix_assemble: nix/verification/tests/scope.nix not declared" >&2; exit 1; }
+  cp "$test" "$tree/nix/verification/tests/.buck-test.nix"
+  machine="machineTest = flake.outPath + \"/nix/verification/tests/.buck-test.nix\";"
+fi
 expr="let flake = builtins.getFlake \"path:$tree\"; a = flake.lib.assemble {
       revision = \"$revision\";
       artifacts = builtins.fromJSON (builtins.readFile (flake.outPath + \"/.buck-artifacts.json\"));
       params = builtins.fromJSON (builtins.readFile (flake.outPath + \"/.buck-params.json\"));
+      $machine
     }; in a.$attr"
 # getFlake takes a path and flake.lock pins every input, so assembly needs
 # no flake registry. Restrict-eval resolves each lookup-path entry up front,
@@ -53,7 +62,10 @@ expr="let flake = builtins.getFlake \"path:$tree\"; a = flake.lib.assemble {
 # grants restrict-eval its pinned sources.
 restrict=(--impure --option restrict-eval true --option flake-registry ""
   --option allowed-uris "github: https://github.com/ git+https://github.com/ https://api.github.com/")
-if [[ $mode == drv ]]; then
+if [[ $mode == json ]]; then
+  # Evaluation only, to JSON (a machine test's `[meta]`).
+  "$nix" eval --json "${restrict[@]}" --expr "$expr" > "$out"
+elif [[ $mode == drv ]]; then
   # Evaluation only: the same declared tree and restrictions, no build and no
   # GC root (the derivation files stay unrooted).
   "$nix" eval --raw "${restrict[@]}" --expr "($expr).drvPath" > "$out"

@@ -285,10 +285,32 @@ Remaining gaps:
   The same commit also changed `scenarios/enrollment.py`. Every fleet
   variant declares that file, so a change to it selects all 67, as it
   should.
-- `catalog.nix` stays: it defines the checks that lib.assemble exposes and
-  that the generator reads. Removing it means each suite's `BUCK` `params`
-  instantiating its suite in lib.assemble, which belongs with the per-module
-  targets of M11.
+- `catalog.nix` is gone (2026-11-01). Each `nixos_machine_test` stanza's
+  `test` attribute is the Nix expression that instantiates it; nix_assemble
+  writes it beside [scope.nix](../../../nix/verification/tests/scope.nix) (the
+  former catalog's shared bindings) and lib.assemble evaluates it as
+  `machineTest` (contract `machine-test-from-buck`). The suite BUCK files are
+  the only list of machine tests: `buck/machine_tests.py` reads each stanza's
+  `name` and `test` and derives the rest, as it derived them from the
+  catalog. The 87 checks that are not machine tests (releases, evaluation
+  checks, runCommand probes) moved to
+  [outputs.nix](../../../nix/assemble/outputs.nix), so lib.assemble's `checks`
+  hold no machine test. The test command reads the features and composed
+  script from the target's `[meta]` (the same declared tree) instead of
+  evaluating the working tree, and `[driver]` builds the interactive driver.
+  Nine fleet variants stay defined in scope.nix (`featureFleets`) because
+  fleet-guest-trust-configuration inspects them; their stanzas name them.
+  The fetch and domain pin registries instantiate the four machine-test
+  closures they need from the same scope. Evidence: on dungarees at
+  f6eedc3d7, evaluating every assembly before and after the change in one
+  clone gave identical derivations for the 86 lib.assemble checks that
+  evaluated on both sides (fleet-builds-configuration's base evaluation
+  failed transiently there and passed on a re-run) and for 134 of the 204
+  machine tests. The other 70 differ only in the `buck/` sources their update
+  fixture copies (and host-enrollment in its repository source), which this
+  change edits. At 6ef7c1b0d every assembly and check evaluates, and the
+  auto-update machine test, //:contracts, //buck:machine_tests_fresh and
+  //buck:assembly_attrs_fresh pass.
 - Each push evaluates or builds every selected assembly exactly once. A
   successful build implies its evaluation. `ci.yml` therefore runs `[drv]`
   only for the machine tests outside its matrix (deferred, or known

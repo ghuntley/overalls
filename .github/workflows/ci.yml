@@ -148,8 +148,8 @@ jobs:
           # When everything is selected (cells, toolchain or rule changes), the
           # full machine-test set is the daily run's (nixos-machine-tests.yml);
           # dispatch with machine_all to run it here.
-          # Until M11 narrows module inputs, a shared-file change (catalog.nix,
-          # a common module) selects most suites without setting everything.
+          # A shared-file change (the test scope, a common module) still selects
+          # most suites without setting everything.
           # Above MACHINE_LIMIT suites the daily run covers them too, so one
           # push cannot occupy the shared runner pool with ~200 jobs.
           deferred=false

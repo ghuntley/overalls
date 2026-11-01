@@ -71,7 +71,7 @@ The [guest updater](../../../lyra/src/update.rs), [private Ziggy route](../../..
 [Marshall authorization](../../../marshall/lib/marshall/inference/requests.ex), and
 [guest image definitions](../../../nix/domains/artifacts/guest/default.nix) implement the basic path.
 Marshall and Ziggy precommit gates, Lyra Rust tests and Clippy, and both
-[NixOS and Ubuntu Firecracker fleet checks](../../../nix/verification/tests/catalog.nix)
+[NixOS and Ubuntu Firecracker fleet checks](../../../nix/verification/tests/machines/fleet/BUCK)
 pass. The fleet checks prove periodic replacement of an old image executable,
 private delivery, continued tool work and prompt wakeup. Live rollout to newly
 created guests remains unobserved.

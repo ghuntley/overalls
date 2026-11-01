@@ -92,7 +92,10 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
         for name, dep in ctx.attrs.artifacts.items()
     }, with_inputs = True)
     params = ctx.actions.write_json("params.json", ctx.attrs.params)
-    def run(output: OutputArtifact, mode: str, category: str):
+    # A machine test's expression (contract machine-test-from-buck), written
+    # beside nix/verification/tests/scope.nix in the copied tree.
+    test = ctx.actions.write("machine-test.nix", "tests: with tests;\n" + ctx.attrs.test + "\n") if ctx.attrs.test else None
+    def run(output: OutputArtifact, mode: str, category: str, attr: str = ctx.attrs.attr, root: str = ""):
         ctx.actions.run(
             cmd_args(
                 ctx.attrs._bash[RunInfo],
@@ -103,15 +106,16 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
                 names,
                 artifacts,
                 params,
-                ctx.attrs.attr,
+                attr,
                 ctx.attrs.revision,
-                _gcroot_name(ctx),
+                _gcroot_name(ctx) + root,
                 output,
                 mode,
+                test or "",
                 hidden = srcs,
             ),
             category = category,
-            identifier = ctx.attrs.attr,
+            identifier = attr,
             local_only = True,
             allow_cache_upload = False,
             # A NixOS system or fleet test evaluation takes several GB; at
@@ -127,7 +131,21 @@ def _nix_assemble_impl(ctx: AnalysisContext) -> list[Provider]:
     # nix-assemble-drv-evaluation).
     drv = ctx.actions.declare_output("drv-path")
     run(drv.as_output(), "drv", "nix_assemble_drv")
-    return [DefaultInfo(default_output = out, sub_targets = {"drv": [DefaultInfo(default_output = drv)]})]
+    sub_targets = {"drv": [DefaultInfo(default_output = drv)]}
+    # `[meta]` evaluates `meta_attr` to JSON over the same tree (a machine
+    # test's features and, for fleet variants, its composed script), so the
+    # runner never evaluates the working tree.
+    if ctx.attrs.meta_attr:
+        meta = ctx.actions.declare_output("meta.json")
+        run(meta.as_output(), "json", "nix_assemble_meta", ctx.attrs.meta_attr)
+        sub_targets["meta"] = [DefaultInfo(default_output = meta)]
+    # Further attributes of the same assembly, built only on request (a machine
+    # test's interactive driver).
+    for sub, attr in ctx.attrs.sub_attrs.items():
+        built = ctx.actions.declare_output(sub, "store-path")
+        run(built.as_output(), "build", "nix_assemble_" + sub, attr, "-" + sub)
+        sub_targets[sub] = [DefaultInfo(default_output = built)]
+    return [DefaultInfo(default_output = out, sub_targets = sub_targets)]
 
 _nix_assemble = rule(
     impl = _nix_assemble_impl,
@@ -135,11 +153,16 @@ _nix_assemble = rule(
         "artifacts": attrs.dict(attrs.string(), attrs.dep(providers = [NixStorePathInfo]), default = {}),
         "attr": attrs.string(),
         "labels": attrs.list(attrs.string(), default = []),
+        "meta_attr": attrs.option(attrs.string(), default = None),
         # lib.assemble's per-target parameters (contract
         # assembly-params-validated): JSON scalars and string lists only.
         "params": attrs.dict(attrs.string(), attrs.one_of(attrs.bool(), attrs.string(), attrs.list(attrs.string())), default = {}),
         "revision": attrs.string(),
         "srcs": attrs.list(attrs.dep(providers = [OwnedSrcsInfo]), default = ["root//:flake_srcs"]),
+        "sub_attrs": attrs.dict(attrs.string(), attrs.string(), default = {}),
+        # A machine test's Nix expression in the test scope; lib.assemble
+        # evaluates it as `machineTest` (contract machine-test-from-buck).
+        "test": attrs.option(attrs.string(), default = None),
         "_bash": attrs.default_only(attrs.exec_dep(default = "toolchains//:bash")),
         "_jq": attrs.default_only(attrs.exec_dep(default = "toolchains//:jq")),
         "_nix": attrs.default_only(attrs.exec_dep(default = "toolchains//:nix")),

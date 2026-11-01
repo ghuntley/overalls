@@ -86,7 +86,7 @@ not yet drive attach.
   [terminal.obligations.md](../../../porsche/contracts/porsche/terminal.obligations.md).
 - Native journey: the `porsche-terminal-fleet` machine test
   ([scenario](../../../nix/verification/tests/machines/fleet/scenarios/porsche-terminal.py),
-  registered in [catalog.nix](../../../nix/verification/tests/catalog.nix))
+  registered in the [fleet suite's BUCK](../../../nix/verification/tests/machines/fleet/BUCK))
   evaluates but has not yet recorded a passing run. Shared-session,
   read-only, revocation-within-5-seconds and journal-privacy claims are
   established natively only once it passes.

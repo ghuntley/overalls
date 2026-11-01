@@ -197,7 +197,8 @@ MMCONFIG; Windows timekeeping is unstable without synthetic timers.
 - Checks: [VMM identity](../../../nix/verification/tests/evaluation/firecracker-vmm.nix),
   [builder rules](../../../nix/verification/tests/evaluation/windows-guest.nix),
   [SAC boot machine test](../../../nix/verification/tests/machines/windows-guest/default.nix),
-  registered in [the check catalog](../../../nix/verification/tests/catalog.nix).
+  registered in [its suite's BUCK](../../../nix/verification/tests/machines/windows-guest/BUCK)
+  and [outputs.nix](../../../nix/assemble/outputs.nix).
 - Operator guide: [Windows guests](../../guests/windows-guests.md).
 - Review: [Windows Firecracker spike review](../reviews/2026-10-13-windows-firecracker-spike.md)
   records which builds and boots were executed.

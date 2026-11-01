@@ -74,16 +74,19 @@ machine-test-required-features) disagree, and when a fleet variant's declared
 scenario files differ from its composed test script (ADR-0270).
 
 @cc [owner:ghuntley,label:verification] machine-test-required-features
-buck/machine_tests.py MUST read a check's machine and nested-KVM features from
-lib.assemble's checks without forcing a lazy driver's derivation or guest
-image: requiredSystemFeatures when present, otherwise the NixOS tester's
-enabled config.requiredFeatures. A check is a machine test when it has a
-driver, requires kvm, or is a listed machine aggregate.
+buck/machine_tests.py MUST read a machine test's machine and nested-KVM
+features from its target's `[meta]` (lib.assemble's machineTestMeta over the
+same declared tree), never by evaluating the working tree, and without forcing
+a lazy driver's derivation or guest image: requiredSystemFeatures when
+present, otherwise the NixOS tester's enabled config.requiredFeatures. A check
+is a machine test when it has a driver, requires kvm, or is a listed machine
+aggregate. A fleet variant's `[meta]` also carries its composed test script.
 
 @cc [owner:ghuntley,label:verification] machine-test-targets-generated
 nix/verification/tests/machines/**/BUCK and suites.bzl MUST be exactly what
-buck/machine_tests.py generates from catalog.nix, the suites' Nix sources and
-fleet/scenarios.json; every fleet variant MUST have a scenario entry and every
+buck/machine_tests.py generates from each nixos_machine_test stanza's `name`
+and `test` expression (contract machine-test-from-buck), the suites' Nix
+sources and fleet/scenarios.json; every fleet variant MUST have a scenario entry and every
 fleet scenario file a variant. //buck:machine_tests_fresh enforces it. Each
 target's declared inputs are both what selection sees and the only tree its
 nix_assemble build may read.
@@ -311,8 +314,8 @@ that bypasses the leaf parity tests. tool_outputs_leaf_free binds every
 ASSEMBLY_ARTIFACTS key to a stand-in and fails when a drvPath changes (ADR-0269).
 
 @cc [owner:ghuntley,label:build;verification] machine-test-module-inputs
-A machine test MUST declare //nix:system_modules when its catalog parameters
-pass the whole system catalog (`service`, modules.default, featureFleet or
+A machine test MUST declare //nix:system_modules when its `test` expression
+passes the whole system catalog (`service`, modules.default, featureFleet or
 host fixtures) or when a file it reads names the catalog itself. Otherwise it
 MUST declare one generated //nix:module-* group per module it reaches: each
 catalog module named in `serviceOf`/modules.select (plus //nix:module-catalog),

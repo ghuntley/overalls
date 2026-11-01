@@ -87,8 +87,9 @@ To add a tool:
     `lib.dependencyPins` and `nixosModules`; `packages`, `checks`,
     `legacyPackages`, `apps` and `nixosConfigurations` are not entry points.
     Add package outputs and non-script checks to `nix/assemble/outputs.nix`
-    (contract `assembly-flake-outputs`) and machine tests to
-    `nix/verification/tests/catalog.nix`, then regenerate the Buck2 lists
+    (contract `assembly-flake-outputs`) and machine tests as stanzas in their
+    suite's BUCK (`test` expression, contract `machine-test-from-buck`), then
+    regenerate the Buck2 lists
     (`nix/buck/assembly-attrs.sh`, `python3 buck/machine_tests.py generate`).
     Never add an output or host wiring to `flake.nix`.
   - Buck2's `nix_assemble` evaluates it with

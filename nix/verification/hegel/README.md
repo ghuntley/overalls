@@ -58,8 +58,10 @@ hegel.runTest {
 }
 ```
 
-Register the check in `nix/verification/tests/catalog.nix` by extending its argument set
-with `hegel`, e.g. `(service // { inherit hegel; })`.
+Register the check as a `nixos_machine_test` stanza in its suite's BUCK file
+whose `test` extends the argument set with `hegel`, e.g.
+`'import ./machines/myservice (service // { inherit hegel; })'`, then run
+`python3 buck/machine_tests.py generate`.
 
 ## `properties` options
 
@@ -82,9 +84,9 @@ On failure the build log shows a reproduce blob. Re-run exactly that
 counterexample locally (values and all):
 
 ```sh
-# The driver is an attribute of the check, built from lib.assemble (see the
-# tests README, "Run checks"); <name> is the check name.
-nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks."<name>".driver' && \
+# The driver is an attribute of the machine test (see the tests README,
+# "Run checks"); <name> is the check name.
+python3 buck/machine_tests.py debug <name> driver && \
   HEGEL_REPLAY_BLOB="AAEAAAAA..." result/bin/nixos-test-driver
 ```
 
@@ -117,14 +119,14 @@ The interactive driver carries the same environment, so properties are
 importable in its REPL:
 
 ```sh
-nix build --impure -L --expr '((builtins.getFlake (toString ./.)).lib.assemble { }).checks."<name>".driverInteractive'
-./result/bin/nixos-test-driver
+tools/buck2 build --show-full-output '//nix/verification/tests/machines/<suite>:<name>.assembly[driver]'
+<printed store path>/bin/nixos-test-driver
 # in the REPL:
 from hegel import _run_registered
 _run_registered(profile="development")
 ```
 
-The catalog exports `hegel-framework-packages` as a standalone check. It builds
+`hegel-framework-packages` is a standalone check (nix/assemble/outputs.nix). It builds
 the pinned native engine and Python binding and runs the binding smoke suite,
 including shrinking, replay, replay-mismatch rejection, state machines, and a
 concurrent schedule.
@@ -137,8 +139,8 @@ both together and re-run the binding's `checkPhase` (unit properties,
 failing-property shrink/replay, an in-memory state machine) via:
 
 ```sh
-nix-build -E 'with import <nixpkgs-pinned> {}; ...'  # see nix/verification/tests/catalog.nix
+nix-build -E 'with import <nixpkgs-pinned> {}; ...'  # see nix/verification/tests/scope.nix
 ```
 
-(the pinned testPkgs expression is in `nix/verification/tests/catalog.nix`; the driver of
+(the pinned testPkgs expression is in `nix/verification/tests/scope.nix`; the driver of
 any Hegel-enabled check also re-checks everything at eval+build time.)

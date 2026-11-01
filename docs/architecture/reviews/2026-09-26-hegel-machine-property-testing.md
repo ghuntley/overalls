@@ -10,7 +10,7 @@ binding ([hegel-python.nix](../../../nix/verification/hegel/hegel-python.nix),
 ([run-test.nix](../../../nix/verification/hegel/run-test.nix),
 `hegel-test-properties-execution`) that wraps `pkgs.testers.runNixOSTest`. The
 check catalog gains no new entry; four existing suites are migrated to the
-wrapper ([nix/verification/tests/catalog.nix](../../../nix/verification/tests/catalog.nix),
+wrapper ([nix/verification/tests/scope.nix](../../../nix/verification/tests/scope.nix), then catalog.nix,
 `hegel-framework-packages`; each suite receives `hegel` through its explicit
 argument set). User documentation is
 [docs/development/testing-with-hegel.md](../../development/testing-with-hegel.md).

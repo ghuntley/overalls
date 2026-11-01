@@ -7,7 +7,13 @@
 # Assembly MUST name the deployed source through its revision argument, never
 # self.rev: Buck2 evaluates a copied tree that carries no Git metadata, so the
 # caller supplies the candidate revision (contract deployment-revision-source).
-{ revision ? null, artifacts ? { }, params ? { } }:
+
+# @cc [owner:ghuntley,label:build;verification] machine-test-from-buck
+# A machine test MUST be instantiated only from its BUCK target's `test`
+# expression: nix_assemble writes it to nix/verification/tests/.buck-test.nix
+# and passes that path as `machineTest`, which is evaluated with scope.nix's
+# names in scope. No other file lists the machine tests (ADR-0270).
+{ revision ? null, artifacts ? { }, params ? { }, machineTest ? null }:
 let
   system = "x86_64-linux";
   pkgs = buildNixpkgs.legacyPackages.${system};
@@ -156,12 +162,8 @@ let
     // lib.mapAttrs' (name: _: lib.nameValuePair "${name}-base" (hostSystem name false)) inventory.hosts;
 
   # The flake's package outputs and its non-script checks (outputs.nix).
-  outputs = import ./outputs.nix {
-    inherit nixpkgs pkgs revision packages modules systems kexec antithesis nix-compact;
-  };
-
-  # NixOS machine and evaluation tests over the same package set.
-  catalog = import ../verification/tests/catalog.nix {
+  # The scope machine tests and test checks are instantiated in.
+  tests = import ../verification/tests/scope.nix {
     buildPkgs = pkgs;
     testPkgs = nixpkgs.legacyPackages.${system};
     inherit nixpkgs packages modules fixtures kexec;
@@ -170,9 +172,26 @@ let
     imageSource = nixos-images.outPath;
     nixCompactSource = nix-compact.outPath;
   };
-  checks = assert lib.assertMsg (lib.intersectLists (lib.attrNames catalog) (lib.attrNames outputs.checks) == [ ])
-    "lib.assemble: a check is defined in both catalog.nix and outputs.nix";
-    catalog // outputs.checks;
+  outputs = import ./outputs.nix {
+    inherit nixpkgs pkgs revision packages modules systems kexec antithesis nix-compact tests;
+  };
+
+  checks = outputs.checks;
+  # A machine test's expression, evaluated in the test scope.
+  test = if machineTest == null
+    then throw "lib.assemble: machineTest is only set by a nixos_machine_test target (buck/nixos.bzl)"
+    else import machineTest tests;
+  # What the runner checks without building (buck/machine_tests.py run):
+  # whether the test needs KVM or nested KVM, read from its requirements
+  # rather than its lazy wrapper, so no driver or guest image is built
+  # (contract machine-test-required-features).
+  testFeatures = check:
+    let
+      features = if check ? requiredSystemFeatures then check.requiredSystemFeatures
+        else if check ? config && builtins.isAttrs check.config then
+          builtins.filter (n: check.config.requiredFeatures.${n}) (builtins.attrNames (check.config.requiredFeatures or { }))
+        else [ ];
+    in { machine = check ? driver || builtins.elem "kvm" features; nestedKvm = builtins.elem "nested-kvm" features; };
 in
 assert lib.assertMsg (unknownAntithesis == [ ])
   "lib.assemble: unknown Antithesis artifacts ${builtins.toJSON unknownAntithesis}";
@@ -180,14 +199,19 @@ assert lib.assertMsg (builtins.isAttrs params && unknownParams == [ ])
   "lib.assemble: unknown params ${builtins.toJSON unknownParams}; known: ${builtins.toJSON (lib.attrNames paramSchema)}";
 {
   inherit packages hostPackages imported kexec checks modules antithesis systems;
+  # The target's machine test (`machineTest`), its features and, for fleet
+  # variants, its composed script (nix_assemble `[meta]`).
+  machineTest = test;
+  machineTestMeta = testFeatures test;
+  machineTestMetaScript = testFeatures test // { testScript = test.config.testScript; };
   # The validated parameters, resolved (buck/tests/assembly_params.py).
   params = hostParams;
   # lib.dependencyPins: the package set's lock-file ecosystems plus the
   # `fetch` and guest `domain` registries, whose closures and builds include
   # machine tests (ADR-0267).
   dependencyPins = packages.dependencyPins // {
-    fetch = import ../domains/artifacts/fetch-pins.nix { inherit pkgs nixpkgs packages checks; };
-    domain = import ../domains/artifacts/domain-pins.nix { inherit pkgs packages checks; };
+    fetch = import ../domains/artifacts/fetch-pins.nix { inherit pkgs nixpkgs packages tests; };
+    domain = import ../domains/artifacts/domain-pins.nix { inherit pkgs packages tests; };
   };
   # Flake package outputs by their flake names (`//:package-<name>`).
   outputPackages = outputs.packages;

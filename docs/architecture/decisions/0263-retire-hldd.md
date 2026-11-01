@@ -69,8 +69,8 @@ cites Mermaid; xterm still requires inline styles.
   carries the updated `signed-in-source-code-navigation` contract.
 - [Marshall mix aliases](../../../marshall/mix.exs) no longer include `hldd.check`.
 - [devenv hooks](../../../devenv.nix) and [flake checks](../../../flake.nix) no
-  longer define `hldd`; [machine test catalog](../../../nix/verification/tests/catalog.nix)
-  no longer lists `hldd-browser`.
+  longer define `hldd`; no [machine test](../../../nix/verification/tests/machines)
+  is named `hldd-browser`.
 - [Localization catalog migration](../../../scripts/localization_catalog_migration.ex)
   requires every original identity to map, with no HLDD exclusion.
 

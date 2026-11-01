@@ -9,10 +9,13 @@
 # consumer's own package set, so a refreshed vendor hash matches the build
 # that reads it. scripts/fetch_pins.exs fakes the keys, finds their
 # fixed-output derivations in the closure, records the hashes Nix reports and
-# builds those fetches again; it never builds the closure itself.
-{ pkgs, nixpkgs, packages, checks }:
+# builds those fetches again; it never builds the closure itself. A machine
+# test closure is instantiated here as its BUCK `test` expression does, in the
+# same test scope (nix/verification/tests/scope.nix).
+{ pkgs, nixpkgs, packages, tests }:
 let
   testPkgs = nixpkgs.legacyPackages.${pkgs.stdenv.hostPlatform.system};
+  machines = ../../verification/tests/machines;
   artifacts = "nix/domains/artifacts";
   closureOf = name: drvs: pkgs.linkFarmFromDrvs "${name}-fetch-pins" drvs;
 in
@@ -118,16 +121,24 @@ in
   elixir-ls-test = {
     locks = [ "nix/verification/tests/machines/vscode-web/offline-elixir-ls.nix" "flake.lock" ];
     keys = [ "elixirLsSource" "elixirLsMixDeps" ];
-    closure = checks.vscode-web-package;
+    # //nix/verification/tests/machines/vscode-web:vscode-web-package
+    closure = import (machines + "/vscode-web") { pkgs = tests.testPkgs; inherit packages; };
   };
   localization-test = {
     locks = [ "nix/verification/tests/machines/localization/default.nix" ];
     keys = [ "bombadilBinary" "bombadilTypes" ];
-    closure = checks.localization-account-porsche;
+    # //nix/verification/tests/machines/localization:localization-account-porsche
+    closure = import (machines + "/localization") (tests.serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "auto-update" ]);
   };
   host-conversion-test = {
     locks = [ "nix/verification/tests/machines/host-conversion/default.nix" ];
     keys = [ "ubuntuNobleCloudImage" ];
-    closure = checks.host-conversion;
+    # //nix/verification/tests/machines/host-conversion:host-conversion
+    closure = tests.testPkgs.linkFarm "overalls-host-conversion" (map (sourceOS: {
+      name = sourceOS;
+      path = import (machines + "/host-conversion") {
+        pkgs = tests.testPkgs; inherit nixpkgs sourceOS; inherit (tests) kexec imageSource diskoModule; module = tests.modules.default;
+      };
+    }) [ "recovery" "ubuntu" ]);
   };
 }

@@ -40,11 +40,15 @@ hegel.runTest {
 }
 ```
 
-then register the check with the extended argument set in
-`nix/verification/tests/catalog.nix`:
+then add a stanza with the extended argument set to the suite's
+`nix/verification/tests/machines/myservice/BUCK` and run
+`python3 buck/machine_tests.py generate`:
 
-```nix
-myservice = import ./machines/myservice (service // { inherit hegel; });
+```python
+nixos_machine_test(
+    name = "myservice",
+    test = 'import ./machines/myservice (service // { inherit hegel; })',
+)
 ```
 
 ## Value-level properties

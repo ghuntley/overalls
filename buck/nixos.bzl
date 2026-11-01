@@ -31,6 +31,8 @@ def _nixos_machine_test_impl(ctx: AnalysisContext) -> list[Provider]:
         ctx.attrs.suite,
         "--store-path",
         assembly.default_outputs[0],
+        "--meta",
+        ctx.attrs.meta[DefaultInfo].default_outputs[0],
         cmd_args([cmd_args("--scenario", s) for s in ctx.attrs.scenarios]),
         hidden = assembly.other_outputs,
     )
@@ -52,8 +54,8 @@ _nixos_machine_test = rule(
         "assembly": attrs.dep(),
         "check": attrs.string(),
         "labels": attrs.list(attrs.string(), default = []),
+        "meta": attrs.dep(),
         "nested_kvm": attrs.bool(),
-        "params": attrs.dict(attrs.string(), attrs.string(), default = {}),
         "scenarios": attrs.list(attrs.string(), default = []),
         "suite": attrs.string(),
         "_nix": attrs.default_only(attrs.exec_dep(default = "toolchains//:nix")),
@@ -66,8 +68,10 @@ _RESERVED_LABELS = ["machine_test", "nested_kvm"]
 
 # Contract nixos-machine-test-labels: see buck/CONTRACTS.
 # Contract machine-test-release-artifacts: see buck/CONTRACTS.
-def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str], packages: bool, labels: list[str] = [], **kwargs):
-    """A NixOS machine test: builds `lib.assemble {}.checks.<check>` over a
+# Contract machine-test-from-buck: see nix/assemble/default.nix.
+def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str], packages: bool, test: str, labels: list[str] = [], **kwargs):
+    """A NixOS machine test: builds `test`, a Nix expression in the test scope
+    (nix/verification/tests/scope.nix), as lib.assemble's `machineTest` over a
     copy of `inputs` only (leaf owned file groups), then checks its labels.
     `packages` is whether the suite takes the package set (PACKAGE_INPUTS)."""
     for label in labels:
@@ -76,7 +80,12 @@ def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str
     owned_set(name = name + ".inputs", deps = inputs)
     nix_assemble(
         name = name + ".assembly",
-        attr = "checks.\"{}\"".format(check),
+        attr = "machineTest",
+        test = test,
+        # The runner's features (and a fleet variant's composed script).
+        meta_attr = "machineTestMetaScript" if kwargs.get("suite") == "fleet" else "machineTestMeta",
+        # `[driver]`: the interactive driver, built only on request.
+        sub_attrs = {"driver": "machineTest.driverInteractive"},
         srcs = [":" + name + ".inputs"],
         # Every Buck2-built leaf replaces its Nix build in the test, as it
         # will on hosts (ADR-0269), plus the test-only fixtures; suites that
@@ -95,6 +104,7 @@ def nixos_machine_test(name: str, check: str, nested_kvm: bool, inputs: list[str
         name = name,
         check = check,
         assembly = ":" + name + ".assembly",
+        meta = ":" + name + ".assembly[meta]",
         nested_kvm = nested_kvm,
         labels = ["machine_test"] + (["nested_kvm"] if nested_kvm else []) + labels,
         visibility = ["PUBLIC"],

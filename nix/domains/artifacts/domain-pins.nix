@@ -8,7 +8,7 @@
 # their output is reviewed like any other pin. scripts/fetch_pins.exs refuses
 # a tracked `*.lock.json` under nix/ that no entry names, and a lock, updater
 # or procedure path that does not exist.
-{ pkgs, packages, checks }:
+{ pkgs, packages, tests }:
 let
   guest = "nix/domains/artifacts/guest";
   nativeGit = import ./guest/native-git.nix { inherit pkgs; };
@@ -32,7 +32,11 @@ in
     locks = [ "nix/verification/tests/fixtures/ubuntu/packages.lock.json" ];
     updater = "${guest}/ubuntu/update-lock.py";
     procedure = "docs/guests/ubuntu-guests.md";
-    build = checks.ubuntu-guest;
+    # //nix/verification/tests/machines/zfs-guest:ubuntu-guest
+    build = import ../../verification/tests/machines/zfs-guest (tests.storage // {
+      ubuntu = true;
+      guest = import ../../verification/tests/fixtures/ubuntu { inherit packages; };
+    });
   };
   windows-iso = {
     locks = [ "${guest}/windows/iso.json" ];

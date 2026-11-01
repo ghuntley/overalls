@@ -277,14 +277,18 @@ one without building it.
 
 ## NixOS machine tests
 
-- **Targets.** Every machine check in `nix/verification/tests/catalog.nix` is a
-  `nixos_machine_test` (`buck/nixos.bzl`) in
-  `nix/verification/tests/machines/<suite>/BUCK`, named after the check. Fleet
-  variants carry their flags as `params` and only their own scenario files as
-  inputs. Each target builds `lib.assemble {}.checks.<name>` through
+- **Targets.** Every machine test is a `nixos_machine_test` (`buck/nixos.bzl`)
+  stanza in `nix/verification/tests/machines/<suite>/BUCK`, named after the
+  check. Its `test` attribute is the Nix expression that instantiates it,
+  evaluated beside `nix/verification/tests/scope.nix` with that scope's names
+  (`testPkgs`, `packages`, `service`, `serviceOf`, `featureFleet`, …); there is
+  no other list of machine tests. Fleet variants take only their own scenario
+  files as inputs. Each target builds lib.assemble's `machineTest` through
   `nix_assemble` over a copy of its declared `inputs` only, so reading an
   undeclared file is an evaluation error: add the owning group to `inputs`
-  (in `buck/inputs.bzl` or the generator), not a workaround.
+  (in `buck/inputs.bzl` or the generator), not a workaround. `[meta]` holds
+  the features (and a fleet variant's script) the test command checks, and
+  `[driver]` the interactive driver.
 - **Evaluate without running:** `tools/buck2 build '<test>.assembly[drv]'`
   evaluates the same declared tree under the same restrictions and writes the
   derivation path, building no VM. To check every machine test's declared
@@ -295,11 +299,14 @@ one without building it.
   Buck2 builds the assembly (the VM run) first; the test command then checks
   that the `nested_kvm` label matches the check's required features and, for fleet
   variants, that the declared scenarios match the composed script.
-- **Never edit the generated BUCK files.** After changing `catalog.nix` or a
-  suite's `requiredFeatures`, run `python3 buck/machine_tests.py generate`.
+- **Edit only `name` and `test`.** To add a machine test, add a stanza with
+  just those two attributes to its suite's BUCK file (create the file for a
+  new suite); after adding one, changing a `test` or a suite's
+  `requiredFeatures`, run `python3 buck/machine_tests.py generate`, which
+  derives every other attribute.
   After changing which scenario files a fleet variant reads, run
   `python3 buck/machine_tests.py refresh-scenarios` (evaluation only, a few
-  minutes) and then `generate`. `//buck:machine_tests_fresh` fails when they
+  minutes; it builds each variant's `[meta]`) and then `generate`. `//buck:machine_tests_fresh` fails when they
   are stale.
 - **Labels.** `machine_test` and `nested_kvm` come from the macro.
   `known_inception_failure` keeps Inception (known broken) out of `ci.yml`;
