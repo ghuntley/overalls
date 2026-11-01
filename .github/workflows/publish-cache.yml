@@ -8,8 +8,10 @@ on:
 
 # A newer push supersedes any in-flight run on the same ref, trunk included,
 # so CI always builds the latest commit instead of queueing a backlog.
+# The event is part of the group, as in ci.yml, so a pending
+# workflow_dispatch is never displaced by a later push.
 concurrency:
-  group: publish-cache-${{ github.ref }}
+  group: publish-cache-${{ github.ref }}-${{ github.event_name }}
   # Let a started run finish so trunk records a result even under a steady
   # stream of pushes; GitHub keeps only the newest pending run per group.
   cancel-in-progress: false
