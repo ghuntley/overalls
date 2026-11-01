@@ -1,4 +1,4 @@
-load("@root//buck:mix.bzl", "mix_cargo_vendor", "mix_esbuild_config", "mix_sources", "mix_tree", "overalls_mix_project")
+load("@root//buck:mix.bzl", "MIX_TEST_SUPPORT", "mix_cargo_vendor", "mix_esbuild_config", "mix_sources", "mix_tree", "overalls_mix_project")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:rust.bzl", "overalls_rust_crate")
 
@@ -79,50 +79,67 @@ overalls_mix_project(
     # took 5.3 h, so the suite runs as separately cached shards
     # (contract mix-test-sharded).
     test_shards = 16,
-    # Modules of 30 s or more in the 2026-10-31 shard logs, in seconds
-    # (`python3 buck/mix_test_weights.py marshall 30 <shard test.log>...`).
+    # Seconds per module of 30 s or more: the 2026-11-01 full run's
+    # --slowest-modules reports (buck/mix_test_weights.py), the larger of
+    # that and earlier runs, and the shards that hit the bound by hand.
     test_shard_weights = {
-        # Each a property of real ten-second post-DATA timeouts, about 30 min
-        # (2026-11-01 hook run); split from smtp_test.exs to run apart.
+        "marshall/test/marshall/accounts/auth_email_distributed_property_test.exs": 2100,
         "marshall/test/marshall/mailer/smtp_implicit_timeout_property_test.exs": 1800,
         "marshall/test/marshall/mailer/smtp_starttls_timeout_property_test.exs": 1800,
-        "marshall/test/marshall/accounts/auth_email_waiting_authority_property_test.exs": 1157,
-        "marshall/test/marshall/terminal/attachment_history_test.exs": 760,
-        "marshall/test/marshall/access/sharing_matrix_history_test.exs": 746,
+        "marshall/test/marshall/terminal/remote_test.exs": 1700,
+        "marshall/test/marshall/accounts/auth_email_waiting_authority_property_test.exs": 1669,
+        "marshall/test/marshall/agents/executor_loss_history_test.exs": 1358,
+        "marshall/test/marshall/terminal/attachment_history_test.exs": 1134,
+        "marshall/test/marshall/access/sharing_matrix_history_test.exs": 1013,
+        "marshall/test/marshall_web/agent_cli_history_test.exs": 854,
         "marshall/test/marshall/compute/distributed_capacity_race_test.exs": 623,
-        "marshall/test/marshall_web/agent_cli_history_test.exs": 522,
-        "marshall/test/marshall/access/pins_property_test.exs": 286,
-        "marshall/test/marshall/galileo/renewal_history_test.exs": 203,
+        "marshall/test/marshall/access/pins_property_test.exs": 435,
+        "marshall/test/marshall/galileo/renewal_history_test.exs": 314,
+        "marshall/test/marshall/teams_resource_history_test.exs": 250,
+        "marshall/test/marshall/compute/service_level_backlog_history_test.exs": 244,
+        "marshall/test/marshall/access/sharing_surfaces_test.exs": 225,
+        "marshall/test/marshall/compute/distributed_admission_test.exs": 188,
         "marshall/test/marshall/compute/clone_history_test.exs": 167,
-        "marshall/test/marshall/compute/distributed_admission_test.exs": 115,
+        "marshall/test/marshall/compute/enrollment_history_test.exs": 158,
+        "marshall/test/marshall/compute/relocation_competing_history_test.exs": 154,
+        "marshall/test/marshall/compute/resize_history_test.exs": 148,
+        "marshall/test/marshall/compute/clone_cleanup_deadline_test.exs": 132,
+        "marshall/test/marshall/teams_history_test.exs": 130,
+        "marshall/test/marshall/accounts/account_lifecycle_history_test.exs": 127,
+        "marshall/test/marshall/compute/lifecycle_history_test.exs": 122,
         "marshall/test/marshall/accounts/admin_account_history_test.exs": 109,
         "marshall/test/marshall/operations/operator_boot_property_test.exs": 107,
-        "marshall/test/marshall/compute/clone_cleanup_deadline_test.exs": 106,
-        "marshall/test/marshall/compute/relocation_competing_history_test.exs": 98,
-        "marshall/test/marshall/compute/resize_history_test.exs": 97,
-        "marshall/test/marshall/accounts/account_lifecycle_history_test.exs": 91,
-        "marshall/test/marshall/compute/enrollment_history_test.exs": 89,
-        "marshall/test/marshall/compute/lifecycle_history_test.exs": 84,
+        "marshall/test/marshall/compute/clone_restoration_history_test.exs": 105,
+        "marshall/test/marshall/ssh/guest_roster_migration_history_test.exs": 89,
         "marshall/test/marshall/compute/evacuation_history_test.exs": 80,
+        "marshall/test/marshall_web/teams_ssh_api_test.exs": 73,
         "marshall/test/marshall/access/sharing_matrix_distributed_test.exs": 72,
-        "marshall/test/marshall/ssh/guest_roster_migration_history_test.exs": 52,
+        "marshall/test/marshall/committed_credential_inventory_test.exs": 70,
+        "marshall/test/marshall/ingress/private_history_test.exs": 61,
+        "marshall/test/marshall/agents/agent_revocation_history_test.exs": 54,
+        "marshall/test/marshall/agents/attachment_history_test.exs": 53,
         "marshall/test/marshall/terminal/personal_session_test.exs": 47,
+        "marshall/test/marshall/ssh/credential_retirement_history_test.exs": 43,
         "marshall/test/marshall/terminal/host_stream_test.exs": 39,
-        "marshall/test/marshall/agents/agent_revocation_history_test.exs": 39,
-        "marshall/test/marshall_web/teams_ssh_api_test.exs": 38,
+        "marshall/test/marshall/message_board_cleanup_test.exs": 38,
+        "marshall/test/marshall_web/default_profile_history_test.exs": 38,
         "marshall/test/marshall_web/provisioner_api_test.exs": 38,
-        "marshall/test/marshall/agents/attachment_history_test.exs": 37,
-        "marshall/test/marshall/message_board_cleanup_test.exs": 36,
-        "marshall/test/marshall/committed_credential_inventory_test.exs": 34,
-        "marshall/test/marshall/ssh/credential_retirement_history_test.exs": 33,
+        "marshall/test/marshall_web/repository_launch_history_test.exs": 38,
+        "marshall/test/marshall/administration/job_history_test.exs": 37,
+        "marshall/test/marshall/threads_transcript_test.exs": 34,
+        "marshall/test/marshall/access/sharing_test.exs": 33,
+        "marshall/test/marshall/agents/bootstrap_test.exs": 33,
         "marshall/test/marshall/ssh/guest_roster_history_test.exs": 32,
         "marshall/test/marshall/artifacts/versioning_state_machine_property_test.exs": 31,
+        "marshall/test/marshall/compute/relocation_sources_test.exs": 30,
+        "marshall/test/marshall/ssh/host_certificates_test.exs": 30,
     },
     # Synchronous modules use about one scheduler; two leave room for the
     # async and property tests and let every shard run at once.
     test_schedulers = 2,
-    # Each SMTP timeout property alone takes about 30 minutes.
-    test_timeout_minutes = 60,
+    # Real-time properties take about 30 minutes alone, and up to twice that
+    # on a loaded host.
+    test_timeout_minutes = 90,
     test_args = [
         "--slowest-modules",
         "15",
@@ -134,6 +151,8 @@ overalls_mix_project(
     # the whole repository (pins, ADRs, contracts). They run in their own
     # `repository` shard, the only part of the suite (and not the checks)
     # that any repository change reruns (contract mix-test-sharded).
+    # HostCertificatesTest reads the SSH host CA fixture under nix/.
+    test_support = MIX_TEST_SUPPORT + ["root//nix:ssh_host_ca_fixture"],
     repository_tests = ["test/architecture/"],
     repository_support = ["root//:mix_repository"],
     # mixRelease's postBuild, then the manifest's build-time mtimes pinned to

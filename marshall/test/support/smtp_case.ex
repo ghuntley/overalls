@@ -267,7 +267,10 @@ defmodule Marshall.Mailer.SMTPCase do
             )
 
           assert [%{status: :pending}] = Ledger.read!(AuthEmail, id: record.id)
-          %{rows: rows} = Ecto.Adapters.SQL.query!(Repo, "SELECT args, errors FROM oban_jobs")
+
+          %{rows: rows} =
+            Ecto.Adapters.SQL.query!(Marshall.Repo, "SELECT args, errors FROM oban_jobs")
+
           secret_absent? = not String.contains?(inspect(rows) <> logs, token)
           assert secret_absent?
           assert logs =~ "Mail attempt finished"

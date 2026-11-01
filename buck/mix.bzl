@@ -640,6 +640,9 @@ def mix_esbuild_config() -> list[str]:
 # Marshall's TLS fixtures and the protocol's test support and vectors.
 _TEST_SUPPORT = ["root//scripts:mix_support", "root//marshall:tls_fixtures", "root//protocol:test_fixtures"]
 
+# The default `test_support`, for projects that add their own fixtures to it.
+MIX_TEST_SUPPORT = _TEST_SUPPORT
+
 def overalls_mix_project(
         name: str,
         project: str,

@@ -1,9 +1,18 @@
 load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:nix.bzl", "nix_owned")
 load("@root//buck:assemble.bzl", "nix_store_import")
+load("@root//buck:mix.bzl", "mix_sources")
 load("@root//buck:rust.bzl", "overalls_rust_crate", "rust_leaf_parity_test", "rust_musl_binary")
 
 nix_owned()
+
+# The SSH host CA fixture Marshall's HostCertificatesTest reads (its Mix
+# suite's shards see only declared sources; contract mix-sources-declared).
+mix_sources(
+    name = "ssh_host_ca_fixture",
+    srcs = glob(["verification/tests/fixtures/ssh-host-ca/**"]),
+    visibility = ["PUBLIC"],
+)
 
 # Machine-test inputs narrower than :srcs (ADR-0270, M11). :base is every file
 # here except the NixOS modules under domains/system; it keeps the files the
