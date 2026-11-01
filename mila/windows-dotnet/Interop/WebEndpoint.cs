@@ -10,7 +10,7 @@ internal static class MilaWebEndpointDecoder
     {
         if (bytes.Length is 0 or > 64 * 1024) throw new InvalidDataException("web response bounds");
         using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
-        JsonElement root = document.RootElement;
+        JsonElement root = MilaPorscheEnvelope.Result(document.RootElement);
         if (!root.TryGetProperty("machine_id", out JsonElement idValue) ||
             !Guid.TryParseExact(idValue.GetString(), "D", out Guid machine) || machine != expectedMachine)
             throw new InvalidDataException("web machine mismatch");

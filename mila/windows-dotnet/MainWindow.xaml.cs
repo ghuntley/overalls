@@ -876,7 +876,7 @@ public sealed partial class MainWindow : Window
             ThreadDetail.Text = S("signInFirst", "Sign in first");
             return;
         }
-        MilaNativeSessionBytesResult result = await Task.Run(() => RustNative.TrySessionThreadAction(handle, null, "ls", null, null, null));
+        MilaNativeSessionBytesResult result = await Task.Run(() => RustNative.TrySessionThreadAction(handle, null, "thread ls", null, null, null));
         if (!result.Succeeded || result.Data is not { } bytes)
         {
             _threadController.SetSession(false, null);

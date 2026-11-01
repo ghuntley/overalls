@@ -181,8 +181,10 @@ internal sealed class MilaJourneyApprover(MilaJourneyDescriptor descriptor, Http
 /// Journey mode runs only with `--descriptor PATH` against the tunnelled
 /// fixture: CA-pinned trust enrollment, Rust session sign-in with browser
 /// approval through the approver hook, machine listing and share mutation,
-/// terminal attach, transport-loss reconnect, authenticated share completion
-/// and notification device listing. It MUST fail on any step that does not
+/// notification device listing, web show/set, machine lifecycle, threads,
+/// the guestless terminal refusal, the guest-backed terminal (when the
+/// descriptor names one), transport-loss reconnect and authenticated share
+/// completion. It MUST fail on any step that does not
 /// complete through the staged Rust library.
 /// </summary>
 [SupportedOSPlatform("windows")]
@@ -193,7 +195,7 @@ internal static class JourneySmoke
         MilaJourneyDescriptor descriptor = MilaJourneyDescriptor.Parse(File.ReadAllBytes(descriptorPath));
         Console.WriteLine($"journey: descriptor host={descriptor.Host} ssh={descriptor.SshPort} https={descriptor.HttpsPort}");
         using SocketsHttpHandler handler = descriptor.PinnedHandler();
-        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(5));
+        using CancellationTokenSource timeout = new(TimeSpan.FromMinutes(25));
         RunAsync(descriptor, handler, timeout.Token).GetAwaiter().GetResult();
         descriptor.Ca.Dispose();
         Console.WriteLine("Windows journey smoke passed.");
@@ -254,6 +256,15 @@ internal static class JourneySmoke
             Program.Require(devices.Succeeded, "journey device listing");
             _ = MilaWindowsNotificationDevicesController.DecodeListing(devices.Data!);
             Step("notification device listing");
+
+            // Web, lifecycle and threads assert their effects through session
+            // reads; the fixture hooks stand in for the provisioner and agent.
+            MilaFixtureHook hook = new(descriptor, handler);
+            await JourneyPages.WebAsync(handle, machine.Id, cancellationToken);
+            await JourneyPages.LifecycleAsync(handle, hook, cancellationToken);
+            await JourneyPages.ThreadsAsync(handle, hook, cancellationToken);
+            if (descriptor.TerminalMachineId is { } terminalMachine)
+                await JourneyPages.GuestTerminalAsync(session, terminalMachine, cancellationToken);
 
             // Real Porsche refuses unnamed attach: `terminal new` names the session first.
             // The hermetic fixture runs no guest, so Marshall refuses it with the

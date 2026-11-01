@@ -588,8 +588,8 @@ internal static partial class RustNative
     {
         if (handle == 0 || string.IsNullOrWhiteSpace(command) || command.Length > 64 ||
             command.Contains('\0') || command.Split(' ').Any(string.IsNullOrEmpty) ||
-            (thread is null && command != "ls") ||
-            (thread is not null && command == "ls") ||
+            (thread is null && command != "thread ls") ||
+            (thread is not null && command == "thread ls") ||
             secondary?.Length > 128 || input?.Length > 64 * 1024 || requestId?.Length > 64 ||
             (requestId is not null && !IsCanonicalRequestId(requestId)))
             return new(MilaNativeStatus.InvalidRequest, null);

@@ -97,6 +97,11 @@ internal static class Program
         bool badWeb = false;
         try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"http://web.example.test\"}}"), machineId); } catch (InvalidDataException) { badWeb = true; }
         Require(badWeb, "insecure web endpoint refusal");
+        MilaWebEndpoint enveloped = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"version\":1,\"status\":\"succeeded\",\"result\":{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"private\",\"policy_revision\":5,\"url\":null}}}}"), machineId);
+        Require(enveloped is { Port: 8080, IsPublic: false, Revision: 5 }, "web endpoint reads Porsche's succeeded envelope");
+        bool failedEnvelope = false;
+        try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"version\":1,\"status\":\"failed\",\"result\":{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"private\",\"policy_revision\":5}}}}"), machineId); } catch (InvalidDataException) { failedEnvelope = true; }
+        Require(failedEnvelope, "web endpoint refuses a failed envelope");
         Uri webOrigin = new("https://web.example.test");
         Require(MilaWebOrigin.IsAllowed(webOrigin, new Uri("https://web.example.test/path")), "same web origin allowed");
         Require(!MilaWebOrigin.IsAllowed(webOrigin, new Uri("http://web.example.test/path")), "http web origin refusal");
@@ -150,8 +155,9 @@ internal static class Program
         try { RustNative.DecodeSessionListing(Encoding.UTF8.GetBytes("{\"machines\":[{\"id\":\"bad\"}]}")); } catch (InvalidDataException) { refused = true; }
         Require(refused, "invalid listing refusal");
         Guid planId = new("00000000-0000-0000-0000-000000000002");
-        MilaThreadListing threadListing = MilaThreadListing.Decode(Encoding.UTF8.GetBytes("{\"threads\":[{\"id\":\"00000000-0000-0000-0000-000000000001\",\"title\":\"build\",\"state\":\"open\",\"latest_plan\":{\"id\":\"00000000-0000-0000-0000-000000000002\"}}] }"));
-        Require(threadListing.Threads[0].PlanId == planId, "thread plan identity projection");
+        MilaThreadListing threadListing = MilaThreadListing.Decode(Encoding.UTF8.GetBytes("{\"items\":[{\"id\":\"00000000-0000-0000-0000-000000000001\",\"title\":\"build\",\"status\":\"ready\",\"latest_plan\":{\"id\":\"00000000-0000-0000-0000-000000000002\"}}],\"next_cursor\":null}"));
+        Require(threadListing.Threads[0].PlanId == planId && !threadListing.HasMore, "thread plan identity projection");
+        AssertThreadListingProtocol();
         MilaSshKey key = MilaSshKeysController.DecodeListing(Encoding.UTF8.GetBytes($"{{\"keys\":[{{\"id\":\"{keyId:D}\",\"fingerprint\":\"SHA256:test\",\"algorithm\":\"ed25519\",\"current_device\":false}}]}}"))[0];
         Require(key.Id == keyId && key.Algorithm == "ed25519", "SSH key listing projection");
         Require(MilaSshKeysController.Fingerprint("ssh-ed25519 !!!") is null,
@@ -181,6 +187,32 @@ internal static class Program
         JourneyDescriptorSmoke.Run();
         Console.WriteLine("Windows Rust FFI smoke passed.");
         return 0;
+    }
+
+    /// <summary>`thread ls --json` as Porsche returns it (the shared protocol fixture), bare and enveloped.</summary>
+    private static void AssertThreadListingProtocol()
+    {
+        string path = Path.Combine(AppContext.BaseDirectory, "fixtures", "porsche_client_results.json");
+        using JsonDocument fixtures = JsonDocument.Parse(File.ReadAllBytes(path));
+        string result = fixtures.RootElement.GetProperty("results").GetProperty("thread ls").GetRawText();
+        foreach (string body in new[] { result, $"{{\"version\":1,\"status\":\"succeeded\",\"result\":{result}}}" })
+        {
+            MilaThreadListing listing = MilaThreadListing.Decode(Encoding.UTF8.GetBytes(body));
+            Require(listing.Threads.Count > 0 && listing.Threads[0].Id == new Guid("0d9cc041-9db2-4e4c-b28b-1e41d7f472c1") &&
+                listing.Threads[0].State == "ready", "thread listing decodes Porsche's thread ls result");
+        }
+        foreach (string refused in new[]
+                 {
+                     "{\"threads\":[]}",
+                     $"{{\"version\":1,\"status\":\"failed\",\"result\":{result}}}",
+                     $"{{\"version\":2,\"status\":\"succeeded\",\"result\":{result}}}",
+                 })
+        {
+            bool threw = false;
+            try { MilaThreadListing.Decode(Encoding.UTF8.GetBytes(refused)); }
+            catch (InvalidDataException) { threw = true; }
+            Require(threw, "thread listing refuses a non-protocol shape");
+        }
     }
 
     private static void AssertRoutes()

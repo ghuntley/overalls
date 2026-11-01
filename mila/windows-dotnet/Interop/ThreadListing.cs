@@ -9,12 +9,16 @@ internal sealed record MilaThreadListing(IReadOnlyList<MilaThreadRow> Threads, b
     internal const int MaxBytes = 8 * 1024 * 1024;
     internal const int MaxThreads = 10_000;
 
+    /// <summary>
+    /// Decodes `thread ls --json` (<c>result.items[]</c>, Porsche protocol). A version-1
+    /// envelope is unwrapped only when its status is succeeded or accepted.
+    /// </summary>
     internal static MilaThreadListing Decode(ReadOnlySpan<byte> bytes)
     {
         if (bytes.Length > MaxBytes) throw new InvalidDataException("thread listing exceeds bound");
         using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
-        JsonElement root = document.RootElement;
-        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("threads", out JsonElement rows) ||
+        JsonElement root = MilaPorscheEnvelope.Result(document.RootElement);
+        if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("items", out JsonElement rows) ||
             rows.ValueKind != JsonValueKind.Array || rows.GetArrayLength() > MaxThreads)
             throw new InvalidDataException("invalid thread listing");
         List<MilaThreadRow> threads = new(rows.GetArrayLength());
@@ -24,14 +28,14 @@ internal sealed record MilaThreadListing(IReadOnlyList<MilaThreadRow> Threads, b
                 idElement.ValueKind != JsonValueKind.String || !Guid.TryParseExact(idElement.GetString(), "D", out Guid id))
                 throw new InvalidDataException("invalid thread id");
             string title = ReadString(row, "title") ?? id.ToString("D");
-            string state = ReadString(row, "state") ?? "unknown";
+            string state = ReadString(row, "status") ?? "unknown";
             Guid? planId = null;
             if (row.TryGetProperty("latest_plan", out JsonElement plan) && plan.ValueKind == JsonValueKind.Object &&
                 plan.TryGetProperty("id", out JsonElement planElement) && planElement.ValueKind == JsonValueKind.String &&
                 Guid.TryParseExact(planElement.GetString(), "D", out Guid parsedPlan)) planId = parsedPlan;
             threads.Add(new(id, title, state, planId));
         }
-        bool hasMore = root.TryGetProperty("has_more", out JsonElement more) && more.ValueKind == JsonValueKind.True;
+        bool hasMore = root.TryGetProperty("next_cursor", out JsonElement more) && more.ValueKind == JsonValueKind.String;
         return new(threads, hasMore);
     }
 
