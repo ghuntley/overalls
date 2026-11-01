@@ -76,6 +76,10 @@ jobs:
     continue-on-error: ${{ matrix.test.known }}
     strategy:
       fail-fast: false
+      # Four 8x16 runners (32 vCPU) leave half of the workspace's 64-vCPU
+      # runner cap to ci.yml; unbounded, the ~200-job matrix starved trunk
+      # ci's jobs of runners for hours (run 41314493117).
+      max-parallel: 4
       matrix:
         test: ${{ fromJSON(needs.discover.outputs.tests) }}
     # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
