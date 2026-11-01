@@ -289,7 +289,11 @@ jobs:
     # image as an input. The images are mostly zeros (27 GiB as zstd NARs),
     # so host builds other than base, install and kexec (which fit the volume)
     # keep their store on a zstd-compressed btrfs on the root disk instead.
-    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    # Even compressed, panterloons:deployment filled a 56G store on the xl
+    # profile's 96 GB root disk (run 41297096626). Namespace sizes the root
+    # disk by machine shape, so host builds run on the 8x32 cached-amd64-hosts
+    # profile (160 GB root disk, same 8 vCPU against the workspace cap).
+    runs-on: namespace-profile-cached-amd64-hosts;container.privileged=true
     timeout-minutes: 180
     strategy:
       fail-fast: false
