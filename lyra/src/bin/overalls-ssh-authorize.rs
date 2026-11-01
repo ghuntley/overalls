@@ -298,16 +298,15 @@ fn prepare_home_root(path: &Path) -> io::Result<()> {
 /// refuse a final symlink/non-directory and retain mode 0700. They MUST NOT
 /// follow a substituted home or recursively change user-owned contents.
 fn prepare_home(path: &Path, uid: u32, gid: u32) -> io::Result<()> {
-    use std::os::fd::AsRawFd;
     let directory = fs::OpenOptions::new()
         .read(true)
         .custom_flags(libc::O_DIRECTORY | libc::O_NOFOLLOW | libc::O_CLOEXEC)
         .open(path)?;
-    // SAFETY: this is the live, no-follow directory descriptor, and the
-    // validated roster UID is also its dedicated primary GID.
-    if unsafe { libc::fchown(directory.as_raw_fd(), uid, gid) } != 0 {
+    // This is the live, no-follow directory descriptor, and the validated
+    // roster UID is also its dedicated primary GID.
+    if let Err(error) = std::os::unix::fs::fchown(&directory, Some(uid), Some(gid)) {
         emit("ssh.home_ownership_failed", "warning");
-        return Err(io::Error::last_os_error());
+        return Err(error);
     }
     directory
         .set_permissions(fs::Permissions::from_mode(0o700))
@@ -334,8 +333,7 @@ fn write_atomic(path: &Path, bytes: &[u8], mode: u32) -> io::Result<()> {
 // Timer, stdin and on-demand reconciliation MUST hold the same root-owned
 // exclusive lock through state validation, account changes and state commit.
 fn account_lock() -> io::Result<File> {
-    // SAFETY: geteuid has no preconditions and cannot fail.
-    if unsafe { libc::geteuid() } != 0 {
+    if lyra::sys::unix::geteuid() != 0 {
         return Err(io::Error::other("account reconciliation requires root"));
     }
     let lock = fs::OpenOptions::new()
@@ -617,8 +615,7 @@ fn native_session() -> io::Result<()> {
     if !valid_name(&username) {
         return Err(io::Error::other("invalid SSH identity"));
     }
-    // SAFETY: obtaining the current effective UID has no pointer arguments.
-    let uid = unsafe { libc::geteuid() };
+    let uid = lyra::sys::unix::geteuid();
     let (account_uid, _, _) =
         existing(&username)?.ok_or_else(|| io::Error::other("missing SSH account"))?;
     if uid != account_uid || !(200_000..=999_999).contains(&uid) {

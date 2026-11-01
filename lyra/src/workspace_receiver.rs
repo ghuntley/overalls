@@ -389,11 +389,9 @@ impl GitGroup {
     }
 
     fn kill(&self) {
-        // SAFETY: command() creates our child's process group with its PID. The
-        // positive validated PID identifies only the group owned by this invocation.
-        unsafe {
-            libc::killpg(self.0, libc::SIGKILL);
-        }
+        // command() creates our child's process group with its PID. The positive
+        // validated PID identifies only the group owned by this invocation.
+        crate::sys::unix::kill_process_group(self.0);
     }
 }
 #[cfg(windows)]
@@ -709,8 +707,7 @@ impl Receiver {
         }
         #[cfg(unix)]
         {
-            // SAFETY: geteuid has no arguments or memory access requirements.
-            let owner = unsafe { libc::geteuid() };
+            let owner = crate::sys::unix::geteuid();
             if checkout_metadata.uid() != owner
                 || run_metadata.uid() != owner
                 || run_metadata.mode() & 0o022 != 0

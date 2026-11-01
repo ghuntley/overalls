@@ -6,7 +6,7 @@ use serde::Serialize;
 use std::fs;
 use std::io::{self, Read};
 use std::net::Ipv4Addr;
-use std::os::fd::AsRawFd;
+use std::os::fd::AsFd;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -142,16 +142,9 @@ fn output(program: &str, arguments: &[&str]) -> io::Result<String> {
             .stdout
             .take()
             .ok_or_else(|| io::Error::other("missing native network output"))?;
-        // SAFETY: pipe owns this descriptor; both fcntl calls only change its
-        // status flags so a wedged system query cannot block startup forever.
-        let flags = unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_GETFL) };
-        if flags < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned pipe.
-        if unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-            return Err(io::Error::last_os_error());
-        }
+        // Only the pipe's status flags change, so a wedged system query
+        // cannot block startup forever.
+        crate::sys::unix::set_nonblocking(pipe.as_fd())?;
         let mut bytes = Vec::new();
         let mut buffer = [0_u8; 4096];
         let started = Instant::now();
@@ -371,8 +364,7 @@ fn private_directory(path: &Path) -> io::Result<()> {
     reason = "one ordered first-boot sequence; each step gates the next"
 )]
 pub fn run(os: Os) -> io::Result<()> {
-    // SAFETY: geteuid only reads the current process credential.
-    if unsafe { libc::geteuid() } != 0 {
+    if crate::sys::unix::geteuid() != 0 {
         return Err(io::Error::other("native bootstrap requires root"));
     }
     crate::native_growth::require_success(match os {

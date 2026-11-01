@@ -1186,11 +1186,9 @@ impl ProcessGroup {
             .map_err(|_| Failure("fetch_failed"))
     }
     fn kill(&self) {
-        // SAFETY: the child starts in its own group; the validated PID belongs
-        // only to this invocation, including its HTTPS helper descendants.
-        unsafe {
-            libc::killpg(self.0, libc::SIGKILL);
-        }
+        // The child starts in its own group; the validated PID belongs only to
+        // this invocation, including its HTTPS helper descendants.
+        crate::sys::unix::kill_process_group(self.0);
     }
 }
 #[cfg(windows)]

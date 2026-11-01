@@ -4,51 +4,38 @@
 mod native {
     use lyra::guest::kernel_probe;
     use lyra::native_vsock::{Connection, Listener, AF_VSOCK};
+    use lyra::sys::socket::{self as sys_socket, RawSockaddrVm as Address};
     use std::io::{self, Read, Write};
-    use std::os::fd::{AsRawFd, FromRawFd, OwnedFd};
+    use std::os::fd::{AsFd, OwnedFd};
 
     const PORT: u32 = 1099;
     const MAX_BYTES: usize = 1_048_576;
     const SOCKETS: usize = 128;
 
-    #[repr(C)]
-    struct Address {
-        header: [u8; 4],
-        port: u32,
-        cid: u32,
-        zero: [u8; 4],
-    }
-
-    impl Address {
-        fn new(cid: u32) -> Self {
-            Self {
-                header: if cfg!(target_os = "freebsd") {
-                    [16, 45, 0, 0]
-                } else {
-                    [40, 0, 0, 0]
-                },
-                port: 1097,
-                cid,
-                zero: [0; 4],
-            }
+    /// The reviewed 16-byte native address with the probe's fixed port.
+    fn address(cid: u32) -> Address {
+        Address {
+            header: if cfg!(target_os = "freebsd") {
+                [16, 45, 0, 0]
+            } else {
+                [40, 0, 0, 0]
+            },
+            port: 1097,
+            cid,
+            zero: [0; 4],
         }
     }
 
     fn socket() -> io::Result<OwnedFd> {
-        // SAFETY: fixed native socket constants; ownership transfers on success.
-        let fd = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
-        if fd < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: fd was returned by socket and is owned only by this value.
-        Ok(unsafe { OwnedFd::from_raw_fd(fd) })
+        // Fixed native socket constants; ownership transfers on success.
+        sys_socket::socket(AF_VSOCK, libc::SOCK_STREAM, 0)
     }
 
-    fn require_errno(result: libc::c_int, expected: libc::c_int) -> io::Result<()> {
-        if result != -1 || io::Error::last_os_error().raw_os_error() != Some(expected) {
-            return Err(io::Error::other("native ABI refusal check failed"));
+    fn require_errno<T>(result: io::Result<T>, expected: libc::c_int) -> io::Result<()> {
+        match result {
+            Err(error) if error.raw_os_error() == Some(expected) => Ok(()),
+            _ => Err(io::Error::other("native ABI refusal check failed")),
         }
-        Ok(())
     }
 
     /// @cc [owner:ghuntley,label:verification;security] native-test-boundary-refusals
@@ -64,106 +51,31 @@ mod native {
             libc::EADDRNOTAVAIL
         };
         for cid in [0, 2, 4] {
-            let address = Address::new(cid);
-            require_errno(
-                // SAFETY: address is the reviewed 16-byte native ABI for this call.
-                unsafe { libc::bind(fd.as_raw_fd(), (&raw const address).cast(), 16) },
-                bad_bind_error,
-            )?;
+            require_errno(sys_socket::bind(fd.as_fd(), &address(cid)), bad_bind_error)?;
         }
-        let mut malformed = Address::new(3);
+        let mut malformed = address(3);
         malformed.zero[0] = 1;
-        require_errno(
-            // SAFETY: malformed remains a live 16-byte address; the kernel validates it.
-            unsafe { libc::bind(fd.as_raw_fd(), (&raw const malformed).cast(), 16) },
-            bad_bind_error,
-        )?;
+        // The kernel validates the malformed address.
+        require_errno(sys_socket::bind(fd.as_fd(), &malformed), bad_bind_error)?;
         immutable_buffers(&fd)?;
         socket_capacity()?;
-        let host = Address::new(2);
         require_errno(
-            // SAFETY: host is a live 16-byte address with the public native layout.
-            unsafe { libc::connect(fd.as_raw_fd(), (&raw const host).cast(), 16) },
+            sys_socket::connect(fd.as_fd(), &address(2)),
             libc::EOPNOTSUPP,
         )?;
         let mut token = [0_u8; 65];
-        let mut short: libc::socklen_t = 64;
+        // A 64-byte (short) buffer for the 65-byte identity.
         require_errno(
-            // SAFETY: token and short are writable for the synchronous option call.
-            unsafe {
-                libc::getsockopt(
-                    fd.as_raw_fd(),
-                    AF_VSOCK,
-                    1,
-                    token.as_mut_ptr().cast(),
-                    &raw mut short,
-                )
-            },
+            sys_socket::bytes_option(fd.as_fd(), AF_VSOCK, 1, &mut token[..64]),
             libc::EMSGSIZE,
         )?;
+        // The option is read-only.
         require_errno(
-            // SAFETY: token is a live 65-byte input buffer; the option is read-only.
-            unsafe { libc::setsockopt(fd.as_raw_fd(), AF_VSOCK, 1, token.as_ptr().cast(), 65) },
+            sys_socket::set_bytes_option(fd.as_fd(), AF_VSOCK, 1, &token),
             libc::EOPNOTSUPP,
         )?;
-        // SAFETY: this test process has not created threads; the child uses only
-        // native credential/socket syscalls followed by _exit, without Rust I/O.
-        let child = unsafe { libc::fork() };
-        if child < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        if child == 0 {
-            fn child_exit(code: libc::c_int) -> ! {
-                // SAFETY: _exit ends the forked child immediately, without
-                // running destructors or flushing state shared with the parent.
-                unsafe { libc::_exit(code) }
-            }
-            // No supplementary groups are retained; setuid permanently drops
-            // root. The child never returns into the parent test process.
-            // SAFETY: a null list with zero length clears every supplementary group.
-            if unsafe { libc::setgroups(0, std::ptr::null()) } != 0 {
-                child_exit(2);
-            }
-            // SAFETY: setgid takes only an integer group ID.
-            if unsafe { libc::setgid(65534) } != 0 {
-                child_exit(2);
-            }
-            // SAFETY: setuid takes only an integer user ID.
-            if unsafe { libc::setuid(65534) } != 0 {
-                child_exit(2);
-            }
-            // SAFETY: socket takes only integer arguments.
-            let unprivileged = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
-            if unprivileged >= 0 {
-                // SAFETY: the child owns the descriptor it just created.
-                unsafe { libc::close(unprivileged) };
-                child_exit(3);
-            }
-            // SAFETY: the errno accessor has no preconditions and returns this
-            // thread's errno location.
-            #[cfg(target_os = "freebsd")]
-            let location = unsafe { libc::__error() };
-            // SAFETY: as above.
-            #[cfg(any(target_os = "illumos", target_os = "solaris"))]
-            let location = unsafe { libc::___errno() };
-            // SAFETY: the errno location is valid for the current thread.
-            let error = unsafe { *location };
-            child_exit(if error == libc::EPERM || error == libc::EACCES {
-                0
-            } else {
-                4
-            });
-        }
-        let mut status: libc::c_int = 0;
-        loop {
-            // SAFETY: child is the owned fork result; status is writable.
-            if unsafe { libc::waitpid(child, &raw mut status, 0) } == child {
-                break;
-            }
-            if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
-                return Err(io::Error::last_os_error());
-            }
-        }
+        // This test process has not created threads (the precondition).
+        let status = lyra::sys::native::unprivileged_socket_status(AF_VSOCK, 65534)?;
         if !libc::WIFEXITED(status) || libc::WEXITSTATUS(status) != 0 {
             return Err(io::Error::other(
                 "unprivileged socket creation was not refused",
@@ -186,6 +98,7 @@ mod native {
             clippy::cast_possible_truncation,
             reason = "c_int is 4 bytes, far below socklen_t::MAX"
         )]
+        #[cfg(target_os = "freebsd")]
         let int_length = size_of::<libc::c_int>() as libc::socklen_t;
         for option in [
             libc::SO_SNDBUF,
@@ -194,36 +107,14 @@ mod native {
             libc::SO_RCVLOWAT,
         ] {
             require_errno(
-                // SAFETY: requested is a live native integer input, of exact size.
-                unsafe {
-                    libc::setsockopt(
-                        fd.as_raw_fd(),
-                        libc::SOL_SOCKET,
-                        option,
-                        (&raw const requested).cast(),
-                        int_length,
-                    )
-                },
+                sys_socket::set_int_option(fd.as_fd(), libc::SOL_SOCKET, option, requested),
                 expected,
             )?;
         }
         #[cfg(target_os = "freebsd")]
         for option in [libc::SO_SNDBUF, libc::SO_RCVBUF] {
-            let mut actual: libc::c_int = 0;
-            let mut length = int_length;
-            // SAFETY: actual and length are writable native integer outputs.
-            if unsafe {
-                libc::getsockopt(
-                    fd.as_raw_fd(),
-                    libc::SOL_SOCKET,
-                    option,
-                    (&raw mut actual).cast(),
-                    &raw mut length,
-                )
-            } != 0
-                || actual != 65_536
-                || length != int_length
-            {
+            let actual = sys_socket::int_option(fd.as_fd(), libc::SOL_SOCKET, option);
+            if !matches!(actual, Ok((65_536, length)) if length == int_length) {
                 return Err(io::Error::other("native socket capacity differs"));
             }
         }
@@ -300,37 +191,14 @@ mod native {
 
     #[cfg(target_os = "freebsd")]
     fn inject(bytes: &[u8]) -> Result<(), libc::c_int> {
-        // SAFETY: the OID name is NUL-terminated; bytes is a live input buffer
-        // and no output buffer is requested.
-        let result = unsafe {
-            libc::sysctlbyname(
-                c"debug.overalls_vsock_inject".as_ptr(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                bytes.as_ptr().cast(),
-                bytes.len(),
-            )
-        };
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error().raw_os_error().unwrap_or(0))
-        }
+        lyra::sys::native::sysctl_write(c"debug.overalls_vsock_inject", bytes)
+            .map_err(|error| error.raw_os_error().unwrap_or(0))
     }
 
     #[cfg(target_os = "freebsd")]
     fn pending(listener: &OwnedFd) -> io::Result<bool> {
-        let mut poll = libc::pollfd {
-            fd: listener.as_raw_fd(),
-            events: libc::POLLIN,
-            revents: 0,
-        };
-        // SAFETY: poll is one live descriptor record for this bounded wait.
-        let ready = unsafe { libc::poll(&raw mut poll, 1, 200) };
-        if ready < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        Ok(ready == 1 && poll.revents & libc::POLLIN != 0)
+        let (ready, revents) = lyra::sys::native::poll_one(listener.as_fd(), libc::POLLIN, 200)?;
+        Ok(ready == 1 && revents & libc::POLLIN != 0)
     }
 
     /// @cc [owner:ghuntley,label:verification;security] native-test-wrong-cid-injection
@@ -345,15 +213,10 @@ mod native {
     fn wrong_cid_injection() -> io::Result<()> {
         const PORT_UNDER_TEST: u32 = 1100;
         let fd = socket()?;
-        let mut address = Address::new(u32::MAX);
+        let mut address = address(u32::MAX);
         address.port = PORT_UNDER_TEST;
-        // SAFETY: address is the reviewed 16-byte native ABI for this call.
-        if unsafe { libc::bind(fd.as_raw_fd(), (&raw const address).cast(), 16) } != 0
-            // SAFETY: fd is a bound native stream socket.
-            || unsafe { libc::listen(fd.as_raw_fd(), 4) } != 0
-        {
-            return Err(io::Error::last_os_error());
-        }
+        sys_socket::bind(fd.as_fd(), &address)?;
+        sys_socket::listen(fd.as_fd(), 4)?;
         let wide = 1_u64 << 32;
         let refused = [
             (4, 3),
@@ -396,22 +259,8 @@ mod native {
     #[cfg(target_os = "freebsd")]
     fn inject_reset() -> Result<(), libc::c_int> {
         let value: libc::c_int = 1;
-        // SAFETY: the OID name is NUL-terminated; value is a live integer
-        // input and no output buffer is requested.
-        let result = unsafe {
-            libc::sysctlbyname(
-                c"debug.overalls_vsock_inject_reset".as_ptr(),
-                std::ptr::null_mut(),
-                std::ptr::null_mut(),
-                (&raw const value).cast(),
-                size_of::<libc::c_int>(),
-            )
-        };
-        if result == 0 {
-            Ok(())
-        } else {
-            Err(io::Error::last_os_error().raw_os_error().unwrap_or(0))
-        }
+        lyra::sys::native::sysctl_write(c"debug.overalls_vsock_inject_reset", &value.to_ne_bytes())
+            .map_err(|error| error.raw_os_error().unwrap_or(0))
     }
 
     /// @cc [owner:ghuntley,label:verification;recovery] native-test-reset-race

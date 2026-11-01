@@ -1,9 +1,10 @@
 //! Immutable, boot-bound public CA installer for Firecracker guests.
+use lyra::sys::socket;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::fs::{self, File};
 use std::io::{self, Read, Write};
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::{AsFd, OwnedFd};
 use std::os::unix::fs::symlink;
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::UnixDatagram;
@@ -452,14 +453,9 @@ fn notify_ready() -> io::Result<()> {
     }
 }
 
-fn listener() -> io::Result<RawFd> {
+fn listener() -> io::Result<OwnedFd> {
     // AF_VSOCK is independent of guest IP routing and the CA being installed.
-    // SAFETY: socket takes only integer arguments and returns a new descriptor
-    // or -1; no memory is shared with the kernel.
-    let fd = unsafe { libc::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
-    if fd < 0 {
-        return Err(io::Error::last_os_error());
-    }
+    let fd = socket::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0)?;
     #[expect(
         clippy::cast_possible_truncation,
         reason = "AF_VSOCK (40) fits sa_family_t (u16)"
@@ -471,26 +467,9 @@ fn listener() -> io::Result<RawFd> {
         svm_cid: libc::VMADDR_CID_ANY,
         svm_zero: [0; 4],
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
-    )]
-    // SAFETY: `address` is a fully initialised sockaddr_vm that outlives the
-    // call, and the length passed is its exact size.
-    let result = unsafe {
-        libc::bind(
-            fd,
-            (&raw const address).cast(),
-            size_of_val(&address) as libc::socklen_t,
-        )
-    };
-    // SAFETY: `fd` is the socket created above and is still owned here.
-    if result < 0 || unsafe { libc::listen(fd, 1) } < 0 {
-        let error = io::Error::last_os_error();
-        // SAFETY: `fd` is owned here and is closed exactly once before return.
-        unsafe { libc::close(fd) };
-        return Err(error);
-    }
+    // A failed bind or listen closes the owned socket exactly once on drop.
+    socket::bind(fd.as_fd(), &address)?;
+    socket::listen(fd.as_fd(), 1)?;
     Ok(fd)
 }
 
@@ -498,63 +477,26 @@ fn serve(store: &Store, boot: &Boot) -> io::Result<()> {
     let fd = listener()?;
     event("awaiting");
     loop {
-        // SAFETY: sockaddr_vm is plain old data; all-zero bytes are valid.
-        let mut peer: libc::sockaddr_vm = unsafe { std::mem::zeroed() };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
-        )]
-        let mut size = size_of_val(&peer) as libc::socklen_t;
-        // SAFETY: `peer` and `size` are live, writable and correctly sized for
-        // the address accept4 stores; `fd` is the listening socket.
-        let connection = unsafe {
-            libc::accept4(
-                fd,
-                (&raw mut peer).cast(),
-                &raw mut size,
-                libc::SOCK_CLOEXEC,
-            )
+        let mut peer = libc::sockaddr_vm {
+            svm_family: 0,
+            svm_reserved1: 0,
+            svm_port: 0,
+            svm_cid: 0,
+            svm_zero: [0; 4],
         };
-        if connection < 0 {
+        // `fd` is the listening socket; the File takes sole ownership of the
+        // accepted descriptor and closes it on drop.
+        let Ok(connection) = socket::accept_close_on_exec(fd.as_fd(), &mut peer) else {
             continue;
-        }
-        // SAFETY: accept4 returned a new descriptor that nothing else owns;
-        // the File takes sole ownership and closes it on drop.
-        let mut stream = unsafe { File::from_raw_fd(connection) };
+        };
+        let mut stream = File::from(connection);
         let timeout = libc::timeval {
             tv_sec: 5,
             tv_usec: 0,
         };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "timeval is 16 bytes, far below socklen_t::MAX"
-        )]
-        // SAFETY: `timeout` is initialised, outlives the call and the length
-        // is its exact size; `connection` is owned by `stream`.
-        let receive_timeout = unsafe {
-            libc::setsockopt(
-                connection,
-                libc::SOL_SOCKET,
-                libc::SO_RCVTIMEO,
-                (&raw const timeout).cast(),
-                size_of_val(&timeout) as libc::socklen_t,
-            )
-        };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "timeval is 16 bytes, far below socklen_t::MAX"
-        )]
-        // SAFETY: as above, for the send timeout.
-        let send_timeout = unsafe {
-            libc::setsockopt(
-                connection,
-                libc::SOL_SOCKET,
-                libc::SO_SNDTIMEO,
-                (&raw const timeout).cast(),
-                size_of_val(&timeout) as libc::socklen_t,
-            )
-        };
-        if receive_timeout < 0 || send_timeout < 0 {
+        let receive_timeout = socket::set_time_option(stream.as_fd(), libc::SO_RCVTIMEO, &timeout);
+        let send_timeout = socket::set_time_option(stream.as_fd(), libc::SO_SNDTIMEO, &timeout);
+        if receive_timeout.is_err() || send_timeout.is_err() {
             event("rejected");
             continue;
         }

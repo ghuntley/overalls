@@ -3,13 +3,14 @@
 //! Lilly delivers a single JSON line on vsock port 1031 after guest trust is
 //! installed. This process persists the source once, replies immediately and
 //! runs plain `git` in a background thread. Readiness never depends on it.
+use lyra::sys::socket;
 use lyra::workspace_receiver::{
     self as receiver, Binding, Paths, Receiver, Retry, SystemGit, PORT,
 };
 use lyra::workspace_source::WorkspaceSource;
 use std::fs::{self, File};
 use std::io;
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::{AsFd, BorrowedFd, OwnedFd};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -29,13 +30,8 @@ fn event(name: &'static str) {
     eprintln!("{{\"event\":\"guest_workspace.{name}\"}}");
 }
 
-fn listener() -> io::Result<RawFd> {
-    // SAFETY: socket takes only integer arguments and returns a new descriptor
-    // or -1; no memory is shared with the kernel.
-    let fd = unsafe { libc::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0) };
-    if fd < 0 {
-        return Err(io::Error::last_os_error());
-    }
+fn listener() -> io::Result<OwnedFd> {
+    let fd = socket::socket(libc::AF_VSOCK, libc::SOCK_STREAM | libc::SOCK_CLOEXEC, 0)?;
     #[expect(
         clippy::cast_possible_truncation,
         reason = "AF_VSOCK (40) fits sa_family_t (u16)"
@@ -47,52 +43,20 @@ fn listener() -> io::Result<RawFd> {
         svm_cid: libc::VMADDR_CID_ANY,
         svm_zero: [0; 4],
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
-    )]
-    // SAFETY: `address` is a fully initialised sockaddr_vm that outlives the
-    // call, and the length passed is its exact size.
-    let result = unsafe {
-        libc::bind(
-            fd,
-            (&raw const address).cast(),
-            size_of_val(&address) as libc::socklen_t,
-        )
-    };
-    // SAFETY: `fd` is the socket created above and is still owned here.
-    if result < 0 || unsafe { libc::listen(fd, 4) } < 0 {
-        let error = io::Error::last_os_error();
-        // SAFETY: `fd` is owned here and is closed exactly once before return.
-        unsafe { libc::close(fd) };
-        return Err(error);
-    }
+    // A failed bind or listen closes the owned socket exactly once on drop.
+    socket::bind(fd.as_fd(), &address)?;
+    socket::listen(fd.as_fd(), 4)?;
     Ok(fd)
 }
 
-fn set_timeouts(connection: RawFd) -> bool {
+fn set_timeouts(connection: BorrowedFd<'_>) -> bool {
     let timeout = libc::timeval {
         tv_sec: 5,
         tv_usec: 0,
     };
-    [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO].iter().all(|option| {
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "timeval is 16 bytes, far below socklen_t::MAX"
-        )]
-        // SAFETY: `timeout` is initialised, outlives the call and the length
-        // is its exact size; the caller owns `connection`.
-        let result = unsafe {
-            libc::setsockopt(
-                connection,
-                libc::SOL_SOCKET,
-                *option,
-                (&raw const timeout).cast(),
-                size_of_val(&timeout) as libc::socklen_t,
-            )
-        };
-        result == 0
-    })
+    [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO]
+        .iter()
+        .all(|option| socket::set_time_option(connection, *option, &timeout).is_ok())
 }
 
 fn spawn_clone(
@@ -148,30 +112,20 @@ fn serve(binding: &Binding, image: Image) -> io::Result<()> {
     let fd = listener()?;
     event("awaiting");
     loop {
-        // SAFETY: sockaddr_vm is plain old data; all-zero bytes are valid.
-        let mut peer: libc::sockaddr_vm = unsafe { std::mem::zeroed() };
-        #[expect(
-            clippy::cast_possible_truncation,
-            reason = "sockaddr_vm is 16 bytes, far below socklen_t::MAX"
-        )]
-        let mut size = size_of_val(&peer) as libc::socklen_t;
-        // SAFETY: `peer` and `size` are live, writable and correctly sized for
-        // the address accept4 stores; `fd` is the listening socket.
-        let connection = unsafe {
-            libc::accept4(
-                fd,
-                (&raw mut peer).cast(),
-                &raw mut size,
-                libc::SOCK_CLOEXEC,
-            )
+        let mut peer = libc::sockaddr_vm {
+            svm_family: 0,
+            svm_reserved1: 0,
+            svm_port: 0,
+            svm_cid: 0,
+            svm_zero: [0; 4],
         };
-        if connection < 0 {
+        // `fd` is the listening socket; the File takes sole ownership of the
+        // accepted descriptor and closes it on drop.
+        let Ok(connection) = socket::accept_close_on_exec(fd.as_fd(), &mut peer) else {
             continue;
-        }
-        // SAFETY: accept4 returned a new descriptor that nothing else owns;
-        // the File takes sole ownership and closes it on drop.
-        let mut stream = unsafe { File::from_raw_fd(connection) };
-        if !set_timeouts(connection)
+        };
+        let mut stream = File::from(connection);
+        if !set_timeouts(stream.as_fd())
             || i32::from(peer.svm_family) != libc::AF_VSOCK
             || peer.svm_cid != libc::VMADDR_CID_HOST
         {

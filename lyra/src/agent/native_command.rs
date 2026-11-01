@@ -1,7 +1,7 @@
 //! Native Unix command deadlines without an external timeout executable.
 
 use std::io::{self, Read};
-use std::os::fd::AsRawFd;
+use std::os::fd::AsFd;
 use std::os::unix::process::CommandExt;
 use std::process::{Command, ExitStatus, Stdio};
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -22,9 +22,9 @@ impl Group {
         let Some(pid) = self.0.take() else {
             return;
         };
-        // SAFETY: the child was started in a new process group with this PID.
-        // No command or parent process belongs to the executor's own group.
-        unsafe { libc::killpg(pid, libc::SIGKILL) };
+        // The child was started in a new process group with this PID. No
+        // command or parent process belongs to the executor's own group.
+        crate::sys::unix::kill_process_group(pid);
     }
 }
 
@@ -40,18 +40,10 @@ struct Pipe<R> {
     eof: bool,
 }
 
-impl<R: Read + AsRawFd> Pipe<R> {
+impl<R: Read + AsFd> Pipe<R> {
     fn new(source: R) -> io::Result<Self> {
-        let fd = source.as_raw_fd();
-        // SAFETY: source owns the descriptor; only its status flags change.
-        let flags = unsafe { libc::fcntl(fd, libc::F_GETFL) };
-        if flags < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned descriptor.
-        if unsafe { libc::fcntl(fd, libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0 {
-            return Err(io::Error::last_os_error());
-        }
+        // Source owns the descriptor; only its status flags change.
+        crate::sys::unix::set_nonblocking(source.as_fd())?;
         Ok(Self {
             source,
             bytes: Vec::new(),
@@ -299,17 +291,18 @@ mod tests {
             .map(|value| value.parse().unwrap())
             .collect();
         assert_eq!(pids.len(), 2);
-        // SAFETY: signal zero checks only the owned fixture's direct child.
-        assert_eq!(unsafe { libc::kill(pids[0], 0) }, -1);
-        assert_eq!(io::Error::last_os_error().raw_os_error(), Some(libc::ESRCH));
+        // Signal zero checks only the owned fixture's direct child.
+        assert_eq!(
+            crate::sys::unix::kill(pids[0], 0)
+                .unwrap_err()
+                .raw_os_error(),
+            Some(libc::ESRCH)
+        );
         // The direct child has already been reaped by the command runner.
         assert_eq!(
-            // SAFETY: a null status pointer is permitted and WNOHANG never blocks.
-            unsafe { libc::waitpid(pids[0], std::ptr::null_mut(), libc::WNOHANG) },
-            -1
-        );
-        assert_eq!(
-            io::Error::last_os_error().raw_os_error(),
+            crate::sys::unix::waitpid_nohang(pids[0])
+                .unwrap_err()
+                .raw_os_error(),
             Some(libc::ECHILD)
         );
     }

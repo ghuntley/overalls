@@ -117,25 +117,10 @@ pub fn writable_root() -> io::Result<()> {
 pub fn flush_root() -> io::Result<()> {
     #[cfg(target_os = "freebsd")]
     {
-        use std::mem::{size_of, MaybeUninit};
-        use std::os::fd::AsRawFd;
+        use crate::sys::native;
         use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
 
-        // FreeBSD14.3 sys/ufs/ffs/fs.h: _IOW('U', 1, fsid_t), _IO('U', 2).
-        // Stock growfs uses the same root-fsid suspension. Its kernel path
-        // waits for VFS_SYNC(MNT_SUSPEND), including UFS softdep dependencies.
-        const SUSPEND: libc::c_ulong =
-            0x8000_5501 | ((size_of::<libc::fsid_t>() as libc::c_ulong) << 16);
-        const RESUME: libc::c_ulong = 0x2000_5502;
-
-        let mut root = MaybeUninit::<libc::statfs>::uninit();
-        // SAFETY: the fixed NUL-terminated path and writable statfs storage are
-        // valid for the call; the output is read only after success.
-        if unsafe { libc::statfs(c"/".as_ptr(), root.as_mut_ptr()) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: successful statfs initialized this structure.
-        let root = unsafe { root.assume_init() };
+        let root = native::statfs_root()?;
         let kind: Vec<u8> = root
             .f_fstypename
             .iter()
@@ -155,26 +140,20 @@ pub fn flush_root() -> io::Result<()> {
         if !device.metadata()?.file_type().is_char_device() {
             return Err(io::Error::other("invalid native flush device"));
         }
-        let mut identity = root.f_fsid;
-        // SAFETY: the ioctl receives the exact statfs fsid and its correct
-        // native size. Closing the owned descriptor invokes kernel resume
-        // cleanup, including errors or process death; no filesystem write occurs here.
-        if unsafe { libc::ioctl(device.as_raw_fd(), SUSPEND, &mut identity) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
-        // SAFETY: this descriptor owns the successful suspension; UFSRESUME
-        // consumes it before a receipt can be returned.
-        if unsafe { libc::ioctl(device.as_raw_fd(), RESUME) } != 0 {
-            return Err(io::Error::last_os_error());
-        }
+        // Suspend the exact statfs fsid. Closing the owned descriptor invokes
+        // kernel resume cleanup, including errors or process death.
+        native::ufs_suspend(&device, root.f_fsid)?;
+        // This descriptor owns the successful suspension; UFSRESUME consumes
+        // it before a receipt can be returned.
+        native::ufs_resume(&device)?;
         drop(device);
         flush_disk_cache()
     }
     #[cfg(any(target_os = "illumos", target_os = "solaris"))]
     {
-        // SAFETY: sync takes no input. The pinned ZFS zfs_sync(NULL, 0)
-        // calls spa_sync_allpools(), which waits for dirty pool commits.
-        unsafe { libc::sync() };
+        // The pinned ZFS zfs_sync(NULL, 0) calls spa_sync_allpools(), which
+        // waits for dirty pool commits.
+        crate::sys::native::sync();
         Ok(())
     }
     #[cfg(not(any(target_os = "freebsd", target_os = "illumos", target_os = "solaris")))]
@@ -190,12 +169,7 @@ pub fn flush_root() -> io::Result<()> {
 /// receipt unless the flush succeeds. The descriptor MUST NOT write data.
 #[cfg(target_os = "freebsd")]
 fn flush_disk_cache() -> io::Result<()> {
-    use std::os::fd::AsRawFd;
     use std::os::unix::fs::{FileTypeExt, OpenOptionsExt};
-
-    // FreeBSD14.3 sys/sys/disk.h: DIOCGFLUSH _IO('d', 135); checked by the
-    // native-growth ABI gate.
-    const DIOCGFLUSH: libc::c_ulong = 0x2000_6487;
 
     // GEOM refuses BIO_FLUSH on a consumer without write access, and the
     // mounted root holds its provider exclusively; the swap partition does not.
@@ -207,12 +181,8 @@ fn flush_disk_cache() -> io::Result<()> {
     if !disk.metadata()?.file_type().is_char_device() {
         return Err(io::Error::other("invalid native flush disk"));
     }
-    // SAFETY: DIOCGFLUSH takes no argument and only issues BIO_FLUSH to the
-    // provider's disk; the owned descriptor stays open for the call.
-    if unsafe { libc::ioctl(disk.as_raw_fd(), DIOCGFLUSH) } != 0 {
-        return Err(io::Error::last_os_error());
-    }
-    Ok(())
+    // DIOCGFLUSH only issues BIO_FLUSH to the provider's disk.
+    crate::sys::native::flush_disk(&disk)
 }
 
 #[cfg(any(target_os = "freebsd", test))]
@@ -267,11 +237,11 @@ fn services_ready_in(directory: &Path) -> io::Result<bool> {
             Ok(pid) if pid > 1 && value == format!("{pid}\n") => pid,
             _ => return Ok(false),
         };
-        // SAFETY: signal zero only checks the process's existence/permission.
-        if unsafe { libc::kill(pid, 0) } != 0
-            && io::Error::last_os_error().kind() != io::ErrorKind::PermissionDenied
-        {
-            return Ok(false);
+        // Signal zero only checks the process's existence/permission.
+        if let Err(error) = crate::sys::unix::kill(pid, 0) {
+            if error.kind() != io::ErrorKind::PermissionDenied {
+                return Ok(false);
+            }
         }
     }
     Ok(true)

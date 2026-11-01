@@ -4,9 +4,10 @@
 //! adapter describes ADR-0190's reviewed custom kernel socket ABI; compiling
 //! it does not establish native kernel or Firecracker transport support.
 
+use crate::sys::socket;
 use std::fs::File;
 use std::io::{self, Read, Write};
-use std::os::fd::{FromRawFd, RawFd};
+use std::os::fd::{AsFd, OwnedFd};
 
 /// This custom ABI uses FreeBSD's vendor slot 45 (`AF_VENDOR03`).
 #[cfg(target_os = "freebsd")]
@@ -40,30 +41,12 @@ const BUILD_ID_BYTES: usize = 65;
 )]
 const BUILD_ID_SOCKLEN: libc::socklen_t = BUILD_ID_BYTES as libc::socklen_t;
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
 #[cfg(any(target_os = "freebsd", test))]
-struct BsdSockaddrVm {
-    length: u8,
-    family: u8,
-    reserved: u16,
-    port: u32,
-    cid: u32,
-    zero: [u8; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, Default)]
+use socket::BsdSockaddrVm;
 #[cfg(any(not(target_os = "freebsd"), test))]
-struct FlatSockaddrVm {
-    family: u16,
-    reserved: u16,
-    port: u32,
-    cid: u32,
-    zero: [u8; 4],
-}
+use socket::FlatSockaddrVm;
 
-trait VmAddress: Default {
+trait VmAddress: Default + socket::SocketAddress {
     fn any(port: u32) -> Self;
     fn host_peer(&self) -> bool;
     fn peer_cid(&self) -> u32;
@@ -115,7 +98,7 @@ type SockaddrVm = FlatSockaddrVm;
 /// returning an error when its family or peer CID is not trusted.
 #[derive(Debug)]
 pub struct Listener {
-    fd: RawFd,
+    fd: OwnedFd,
 }
 
 /// A bounded native-vsock connection with the observed peer CID.
@@ -148,21 +131,8 @@ impl Listener {
     /// output MUST refuse; a userspace environment variable cannot supply it.
     pub fn kernel_build_id(&self) -> io::Result<String> {
         let mut bytes = [0_u8; BUILD_ID_BYTES];
-        let mut length = BUILD_ID_SOCKLEN;
-        // SAFETY: the listener owns fd; bytes and length are writable for this
-        // synchronous custom-kernel getsockopt call.
-        if unsafe {
-            libc::getsockopt(
-                self.fd,
-                AF_VSOCK,
-                VSOCK_SO_BUILD_ID,
-                bytes.as_mut_ptr().cast(),
-                &raw mut length,
-            )
-        } < 0
-        {
-            return Err(io::Error::last_os_error());
-        }
+        let length =
+            socket::bytes_option(self.fd.as_fd(), AF_VSOCK, VSOCK_SO_BUILD_ID, &mut bytes)?;
         if length != BUILD_ID_SOCKLEN {
             return Err(io::Error::other("invalid kernel build identity length"));
         }
@@ -175,25 +145,13 @@ impl Listener {
     /// flat illumos layout. Its use assumes the patched kernel assigns guest
     /// CID 3; successful compilation MUST NOT establish that runtime evidence.
     pub fn bind(port: u32, backlog: libc::c_int) -> io::Result<Self> {
-        // SAFETY: all arguments are fixed ABI constants; ownership transfers
-        // to this listener when socket succeeds.
-        let fd = unsafe { libc::socket(AF_VSOCK, libc::SOCK_STREAM, 0) };
-        if fd < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        set_close_on_exec(fd)?;
+        // Ownership transfers to this listener when socket succeeds; every
+        // setup failure below closes the descriptor exactly once on drop.
+        let fd = socket::socket(AF_VSOCK, libc::SOCK_STREAM, 0)?;
+        socket::set_close_on_exec(fd.as_fd())?;
         let address = SockaddrVm::any(port);
-        // SAFETY: address is a live 16-byte sockaddr_vm for this call.
-        let bound =
-            unsafe { libc::bind(fd, (&raw const address).cast(), SOCKADDR_VM_SOCKLEN) } == 0;
-        // SAFETY: fd is valid and owned by this setup path.
-        let listening = bound && unsafe { libc::listen(fd, backlog) } == 0;
-        if !listening {
-            let error = io::Error::last_os_error();
-            // SAFETY: fd is closed exactly once on setup failure.
-            unsafe { libc::close(fd) };
-            return Err(error);
-        }
+        socket::bind(fd.as_fd(), &address)?;
+        socket::listen(fd.as_fd(), backlog)?;
         Ok(Self { fd })
     }
 
@@ -201,22 +159,17 @@ impl Listener {
     /// the stream to a protocol parser.
     pub fn accept(&self) -> io::Result<Connection> {
         let mut peer = SockaddrVm::default();
-        let mut length = SOCKADDR_VM_SOCKLEN;
-        // SAFETY: peer and length are writable buffers valid for this call.
-        let fd = unsafe { libc::accept(self.fd, (&raw mut peer).cast(), &raw mut length) };
-        if fd < 0 {
-            return Err(io::Error::last_os_error());
-        }
-        set_close_on_exec(fd)?;
-        // SAFETY: fd is newly accepted and owned by the returned connection.
-        let file = unsafe { File::from_raw_fd(fd) };
+        let (fd, length) = socket::accept(self.fd.as_fd(), &mut peer)?;
+        socket::set_close_on_exec(fd.as_fd())?;
+        // The newly accepted descriptor is owned by the returned connection.
+        let file = File::from(fd);
         if length != SOCKADDR_VM_SOCKLEN || !peer.host_peer() {
             return Err(io::Error::new(
                 io::ErrorKind::PermissionDenied,
                 "non-host vsock peer",
             ));
         }
-        set_timeouts(fd)?;
+        set_timeouts(&file)?;
         Ok(Connection {
             file,
             peer_cid: peer.peer_cid(),
@@ -237,48 +190,13 @@ fn decode_build_id(bytes: &[u8]) -> io::Result<String> {
         .map_err(|_| io::Error::other("invalid kernel build identity"))
 }
 
-impl Drop for Listener {
-    fn drop(&mut self) {
-        // SAFETY: fd is owned by this listener and closed once.
-        unsafe { libc::close(self.fd) };
-    }
-}
-
-fn set_close_on_exec(fd: RawFd) -> io::Result<()> {
-    // SAFETY: fcntl operates on the descriptor just returned by the kernel.
-    if unsafe { libc::fcntl(fd, libc::F_SETFD, libc::FD_CLOEXEC) } < 0 {
-        let error = io::Error::last_os_error();
-        // SAFETY: fd remains owned by this setup path.
-        unsafe { libc::close(fd) };
-        return Err(error);
-    }
-    Ok(())
-}
-
-fn set_timeouts(fd: RawFd) -> io::Result<()> {
+fn set_timeouts(file: &File) -> io::Result<()> {
     let timeout = libc::timeval {
         tv_sec: 5,
         tv_usec: 0,
     };
-    #[expect(
-        clippy::cast_possible_truncation,
-        reason = "timeval is 16 bytes, far below socklen_t::MAX"
-    )]
-    let timeout_length = size_of_val(&timeout) as libc::socklen_t;
     for option in [libc::SO_RCVTIMEO, libc::SO_SNDTIMEO] {
-        // SAFETY: timeout remains live for the synchronous setsockopt call.
-        if unsafe {
-            libc::setsockopt(
-                fd,
-                libc::SOL_SOCKET,
-                option,
-                (&raw const timeout).cast(),
-                timeout_length,
-            )
-        } < 0
-        {
-            return Err(io::Error::last_os_error());
-        }
+        socket::set_time_option(file.as_fd(), option, &timeout)?;
     }
     Ok(())
 }

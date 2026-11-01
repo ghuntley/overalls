@@ -6,7 +6,7 @@ use fs2::FileExt;
 use serde::{Deserialize, Serialize};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Write};
-use std::os::fd::AsRawFd;
+use std::os::fd::AsFd;
 use std::os::unix::fs::{FileTypeExt, MetadataExt, OpenOptionsExt, PermissionsExt};
 use std::path::Path;
 use std::process::{Command, Stdio};
@@ -166,16 +166,7 @@ fn command(program: &str, arguments: &[&str], capture: bool) -> io::Result<Strin
     let result = (|| {
         let mut pipe = child.stdout.take();
         if let Some(pipe) = &pipe {
-            // SAFETY: pipe owns its descriptor; these calls only set its status flags.
-            let flags = unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_GETFL) };
-            if flags < 0 {
-                return Err(invalid());
-            }
-            // SAFETY: as above; F_SETFL only adds O_NONBLOCK to the owned pipe.
-            if unsafe { libc::fcntl(pipe.as_raw_fd(), libc::F_SETFL, flags | libc::O_NONBLOCK) } < 0
-            {
-                return Err(invalid());
-            }
+            crate::sys::unix::set_nonblocking(pipe.as_fd()).map_err(|_| invalid())?;
         }
         let mut bytes = Vec::new();
         let mut eof = !capture;
@@ -390,18 +381,10 @@ fn illumos_vdev(value: &str, expected_guid: u64) -> io::Result<String> {
 
 #[cfg(target_os = "freebsd")]
 fn capacity(file: &File) -> io::Result<u64> {
-    let mut bytes: libc::off_t = 0;
-    let mut sector: libc::c_uint = 0;
-    // SAFETY: pinned FreeBSD disk.h defines these read-only ioctls with the
-    // exact off_t/u_int output objects supplied here; no disk bytes are written.
-    if unsafe { libc::ioctl(file.as_raw_fd(), 0x4008_6481, &mut bytes) } < 0 {
-        return Err(invalid());
-    }
-    // SAFETY: as above; DIOCGSECTORSIZE writes only the supplied u_int.
-    if unsafe { libc::ioctl(file.as_raw_fd(), 0x4004_6480, &mut sector) } < 0
-        || sector != 512
-        || bytes <= 0
-    {
+    // Read-only ioctls: no disk bytes are written.
+    let bytes = crate::sys::native::media_size(file).map_err(|_| invalid())?;
+    let sector = crate::sys::native::sector_size(file).map_err(|_| invalid())?;
+    if sector != 512 || bytes <= 0 {
         return Err(invalid());
     }
     u64::try_from(bytes).map_err(|_| invalid())
@@ -409,25 +392,8 @@ fn capacity(file: &File) -> io::Result<u64> {
 
 #[cfg(any(target_os = "illumos", target_os = "solaris"))]
 fn capacity(file: &File) -> io::Result<u64> {
-    #[repr(C)]
-    #[expect(
-        clippy::struct_field_names,
-        reason = "mirrors the dkio.h dk_minfo field layout"
-    )]
-    struct Media {
-        media_type: u32,
-        sector_bytes: u32,
-        sectors: u64,
-    }
-    let mut media = Media {
-        media_type: 0,
-        sector_bytes: 0,
-        sectors: 0,
-    };
-    // SAFETY: pinned dkio.h defines DKIOCGMEDIAINFO and this C-layout output;
-    // the read-only ioctl receives a live device descriptor and writable object.
-    if unsafe { libc::ioctl(file.as_raw_fd(), 0x42a, &mut media) } < 0 || media.sector_bytes != 512
-    {
+    let media = crate::sys::native::media_info(file).map_err(|_| invalid())?;
+    if media.sector_bytes != 512 {
         return Err(invalid());
     }
     media
@@ -463,8 +429,7 @@ fn disk(path: &str) -> io::Result<File> {
     reason = "one ordered grow sequence whose receipt depends on every step"
 )]
 pub fn run(os: Os) -> io::Result<()> {
-    // SAFETY: geteuid reads the process credential without modifying state.
-    if unsafe { libc::geteuid() } != 0 {
+    if crate::sys::unix::geteuid() != 0 {
         return Err(invalid());
     }
     runtime_directory()?;

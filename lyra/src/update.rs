@@ -272,20 +272,7 @@ pub(crate) fn spawn_check() -> io::Result<()> {
 /// Run the update worker outside this terminal session.
 #[cfg(unix)]
 fn detach(child: &mut Command) {
-    use std::os::unix::process::CommandExt;
-    let hook = || {
-        // SAFETY: setsid takes no arguments and is async-signal-safe.
-        if unsafe { libc::setsid() } < 0 {
-            Err(io::Error::last_os_error())
-        } else {
-            Ok(())
-        }
-    };
-    // SAFETY: the hook runs between fork and exec and only calls the
-    // async-signal-safe setsid and reads errno; it neither allocates nor locks.
-    unsafe {
-        child.pre_exec(hook);
-    }
+    lyra::sys::unix::new_session_before_exec(child);
 }
 
 #[cfg(windows)]

@@ -119,8 +119,7 @@ pub fn install(directory: &Path, identity: Option<&GitIdentity>) -> io::Result<(
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        // SAFETY: geteuid has no preconditions and cannot fail.
-        let euid = unsafe { libc::geteuid() };
+        let euid = crate::sys::unix::geteuid();
         if fs::canonicalize(directory)? != directory
             || metadata.uid() != euid
             || metadata.mode() & 0o022 != 0

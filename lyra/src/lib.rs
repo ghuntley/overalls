@@ -35,6 +35,12 @@ pub mod platform;
 pub mod private_http;
 pub mod ssh_certificate;
 pub mod ssh_files;
+#[doc(hidden)]
+#[allow(
+    unsafe_code,
+    reason = "the FFI shims are the crate's audited unsafe surface (ADR-0265)"
+)]
+pub mod sys;
 pub mod workspace_checkout;
 pub mod workspace_receiver;
 pub mod workspace_source;

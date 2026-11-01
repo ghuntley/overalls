@@ -91,8 +91,7 @@ fn windows_folder(name: &str) -> io::Result<PathBuf> {
 
 #[cfg(target_os = "linux")]
 pub(crate) fn guest_root() -> bool {
-    // SAFETY: geteuid has no preconditions and cannot fail.
-    let euid = unsafe { libc::geteuid() };
+    let euid = lyra::sys::unix::geteuid();
     euid == 0 && std::path::Path::new("/etc/overalls/guest-agent").is_file()
 }
 

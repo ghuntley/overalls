@@ -258,8 +258,7 @@ fn directory(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        // SAFETY: geteuid has no preconditions and cannot fail.
-        let euid = unsafe { libc::geteuid() };
+        let euid = crate::sys::unix::geteuid();
         for ancestor in path.ancestors().skip(1) {
             match fs::symlink_metadata(ancestor) {
                 Ok(metadata) => {
@@ -311,8 +310,7 @@ fn directory(path: &Path) -> io::Result<()> {
     #[cfg(unix)]
     {
         use std::os::unix::fs::{MetadataExt, PermissionsExt};
-        // SAFETY: geteuid has no preconditions and cannot fail.
-        let euid = unsafe { libc::geteuid() };
+        let euid = crate::sys::unix::geteuid();
         if metadata.uid() != euid {
             return Err(io::Error::other("invalid tool owner"));
         }
