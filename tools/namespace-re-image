@@ -118,6 +118,12 @@ if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_T
     exit 1
   fi
   unset oidc
+  # Non-secret state for diagnosing the exchanged identity: variable names,
+  # stored file names and the workspace check-login reports.
+  echo "tools/namespace-re-image: NSC variables: $(compgen -e | grep '^NSC_' | tr '\n' ' ')" >&2
+  echo "tools/namespace-re-image: XDG_CONFIG_HOME=${XDG_CONFIG_HOME:-unset}" >&2
+  find "$nsc_home" "${XDG_CONFIG_HOME:-$nsc_home/.config}/ns" -maxdepth 3 -printf '%P %s\n' 2>/dev/null >&2 || true
+  nsc_oidc auth check-login 2>&1 | grep -v -i -E 'token|bearer|ey[A-Za-z0-9_-]{20}' >&2 || true
   nsc_oidc base-image optimize --image_ref "$image@$digest"
 else
   nsc base-image optimize --image_ref "$image@$digest"
