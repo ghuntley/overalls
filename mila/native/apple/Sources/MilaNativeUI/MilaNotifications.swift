@@ -170,3 +170,102 @@ public final class MilaAppleNotificationService: NSObject, UNUserNotificationCen
     }
     public func disable() { guard sessionActive else { state = .off; return }; _ = store.upsert(MilaNotificationDevice(id: appID, deployment: deployment, enabled: false)); refreshDevices(); state = .off }
 }
+
+/// The OS notification permission decision. Production asks UserNotifications;
+/// tests inject a fixed answer so the gate is observable without a prompt.
+public protocol MilaNotificationAuthorizing: Sendable {
+    /// Returns whether the user has granted notification authorization.
+    func requestAuthorization() async -> Bool
+}
+
+#if canImport(UserNotifications)
+/// Asks UserNotifications. An error or a denial is a refusal.
+public struct MilaUserNotificationsAuthorization: MilaNotificationAuthorizing {
+    public init() {}
+    public func requestAuthorization() async -> Bool {
+        (try? await MilaAppleNotificationService.requestAuthorization()) ?? false
+    }
+}
+#endif
+
+/// Supplies this device's X25519 poke-decryption public key for a deployment
+/// (unpadded base64url, 43 characters), or nil when custody is unavailable.
+public protocol MilaPokeKeySource: Sendable {
+    func publicKey(deployment: String) -> String?
+}
+
+/// Status and body of Susan's key-issuance reply.
+public struct MilaSusanKeyReply: Sendable {
+    public let status: Int
+    public let body: Data
+    public init(status: Int, body: Data) { self.status = status; self.body = body }
+}
+
+/// POSTs a Rust-encoded body to Susan's `/api/push/v1/keys`.
+public protocol MilaSusanKeyIssuing: Sendable {
+    func issue(_ body: Data) async throws -> MilaSusanKeyReply
+}
+
+public enum MilaPushRegistrationOutcome: Equatable, Sendable {
+    case registered(UUID)
+    case notAuthorized
+    case invalidToken
+    case keyUnavailable
+    case relayRefused
+    case relayUnregistered
+    case relayRateLimited
+    case relayUnavailable
+    case deploymentRefused
+}
+
+/// @cc [owner:ghuntley,label:security;privacy] mila-apple-push-registration-authorization
+/// APNs registration with the deployment: OS authorization, Rust validation
+/// and encoding of Susan's body, Susan key issuance, then Porsche
+/// `device register` through the authenticated Rust session. APNs delivery
+/// itself is Susan's concern (ADR-0278). Registration MUST ask the injected
+/// authorization source first and, unless it grants, MUST return
+/// `notAuthorized` before the token is encoded, Susan is contacted or any
+/// register call reaches the Rust core. The APNs token MUST NOT be retained
+/// after the exchange.
+public struct MilaApplePushRegistration: Sendable {
+    public static let appID = "dev.overalls.mila"
+    private let authorization: any MilaNotificationAuthorizing
+    private let keys: any MilaPokeKeySource
+    private let susan: any MilaSusanKeyIssuing
+    private let platform: MilaDevicePlatform
+    private let clock: @Sendable () -> UInt64
+
+    public init(authorization: any MilaNotificationAuthorizing, keys: any MilaPokeKeySource, susan: any MilaSusanKeyIssuing,
+                platform: MilaDevicePlatform = .current,
+                clock: @escaping @Sendable () -> UInt64 = { UInt64(Date().timeIntervalSince1970) }) {
+        self.authorization = authorization; self.keys = keys; self.susan = susan; self.platform = platform; self.clock = clock
+    }
+
+    public func register(adapter: any MilaFFIAdapter, deployment: String, deviceToken: Data,
+                         environment: MilaPushEnvironment = .production, label: String? = nil) async -> MilaPushRegistrationOutcome {
+        guard await authorization.requestAuthorization() else { return .notAuthorized }
+        // APNs tokens are opaque bytes; Rust accepts 32...200 lowercase hex characters.
+        guard (16...100).contains(deviceToken.count) else { return .invalidToken }
+        guard let encryptionKey = keys.publicKey(deployment: deployment), encryptionKey.utf8.count == 43 else { return .keyUnavailable }
+        // Porsche bounds labels to 64 UTF-8 bytes; an over-long label is omitted.
+        let label = label.flatMap { (1...64).contains($0.utf8.count) ? $0 : nil }
+        let body: Data
+        do {
+            body = try adapter.encodePushKeyRequest(token: deviceToken.map { String(format: "%02x", $0) }.joined(),
+                                                    environment: environment, appID: Self.appID, deployment: deployment)
+        } catch { return .invalidToken }
+        let reply: MilaSusanKeyReply
+        do { reply = try await susan.issue(body) } catch { return .relayUnavailable }
+        switch reply.status {
+        case 201: break
+        case 400: return .relayRefused
+        case 410: return .relayUnregistered
+        case 429: return .relayRateLimited
+        default: return .relayUnavailable
+        }
+        do {
+            return .registered(try await adapter.registerNotificationDevice(platform: platform, susanReply: reply.body,
+                                                                            encryptionPublicKey: encryptionKey, label: label, now: clock()))
+        } catch { return .deploymentRefused }
+    }
+}

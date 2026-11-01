@@ -48,6 +48,7 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         case webShow(UUID)
         case webSet(UUID, UInt16, Bool, UInt64)
         case ptyAttach(UUID, UInt32, UInt32), ptyPoll(UInt64), ptyInput(UInt64, Data), ptyResize(UInt64, UInt32, UInt32), ptyKill(UInt64)
+        case deviceRegister(MilaDevicePlatform, String, String?), deviceList, devicePreferences(UUID, Bool), deviceRemove(UUID)
     }
     private let lock = NSLock()
     private var recorded: [Call] = []
@@ -90,6 +91,16 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
     }
     func webShow(machine: UUID) throws -> Data { record(.webShow(machine)); return webData }
     func webSet(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) throws { record(.webSet(machine, port, publicAccess, revision)) }
+    /// Porsche's `device register` receipt (protocol/test/fixtures/porsche_device_results.json).
+    var deviceReceipt = Data(#"{"version":1,"status":"succeeded","request_id":"porsche-0123456789abcdef0123456789abcdef","operation_id":null,"result":{"id":"5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b","platform":"macos","enabled":true,"state":"active"}}"#.utf8)
+    var deviceListing = Data(#"{"version":1,"status":"succeeded","result":{"items":[],"limit":10,"push_enabled":true}}"#.utf8)
+    func notificationDevices() throws -> Data { record(.deviceList); return deviceListing }
+    func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
+        record(.deviceRegister(platform, encryptionPublicKey, label)); if failMutations { throw MilaSessionError.invalidInput }
+        return deviceReceipt
+    }
+    func notificationDevicePreferences(id: UUID, enabled: Bool) throws { record(.devicePreferences(id, enabled)); if failMutations { throw MilaSessionError.invalidInput } }
+    func notificationDeviceRemove(id: UUID) throws { record(.deviceRemove(id)); if failMutations { throw MilaSessionError.invalidInput } }
     func close() { record(.close); lock.lock(); authenticated = false; lock.unlock() }
 
     func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64 {

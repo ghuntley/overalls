@@ -206,7 +206,9 @@ jobs:
         env:
           MILA_FFI_LIB_DIR: ${{ github.workspace }}/mila/rust/target/release
           MILA_JOURNEY_DESCRIPTOR: ${{ runner.temp }}/mila-journey-descriptor.json
-        run: swift test --filter MilaJourneyTests
+        # The filter matches test case names (`<target>.<class>/<test>`), not
+        # file names: name the journey classes of MilaJourneyTests.swift.
+        run: swift test --filter 'MilaNativeUITests\.(MilaFixtureJourneyTests|MilaJourneyDescriptorTests)/'
       # An explicit result lets the fixture job stop once every journey ended.
       - name: Report the journey result to the tailnet fixture
         if: always() && env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''

@@ -158,9 +158,16 @@ Client evidence:
 - **Apple: open.** [`MilaNotificationsTests`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaNotificationsTests.swift)
   covers the token encoding, registration through the Rust boundary, refusal
   of invalid tokens and signed-out sessions. [`MilaJourneyTests`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaJourneyTests.swift)
-  has no device register, list, preferences or remove step against the
-  fixture, and no test shows registration is refused without
-  UserNotifications authorization.
+  `testNotificationDeviceRegisterListPreferencesAndRemoveAgainstFixture`
+  registers through `MilaApplePushRegistration` (APNs-shaped token and
+  Susan stand-ins), lists, disables, enables and removes a device against the
+  fixture, reading each back. `MilaNotificationsTests`
+  `testRegistrationIsRefusedWithoutUserNotificationsAuthorization` denies the
+  injected authorization source and shows that neither Susan nor the core's
+  register call is reached. Neither has compiled or passed in the
+  apple-native job yet, so the cell stays open. The job's journey step
+  previously filtered on `MilaJourneyTests`, which matches no test case name,
+  so the Apple fixture journey had not run; the filter now names the classes.
 - **Linux: open.** [`notifications.rs`](../../../mila/native/linux/src/notifications.rs)
   tests the explicit local desktop enablement and that push registration is
   refused (no provider). The GTK settings page has list, remove and
@@ -177,9 +184,9 @@ Client evidence:
 
 ## Open questions
 
-- Apple and Linux journeys need notification-device steps. Apple also needs a
-  test that registration is refused without authorization. Until then those
-  cells stay open.
+- The Linux journey needs notification-device steps. The Apple steps and
+  refusal test await a passing apple-native run. Until then those cells stay
+  open.
 - Windows register, preferences and remove journey steps are pending.
 - Susan's `susan-fixed-provider-egress` contract (`susan/CONTRACTS`) still
   names only the APNs, Google OAuth and FCM origins. ADR-0236 added

@@ -39,7 +39,49 @@ public protocol MilaSessionClient: AnyObject, Sendable {
     func threadAction(thread: UUID?, command: String, secondary: String?, input: String?, requestID: UUID?) throws -> Data
     func webShow(machine: UUID) throws -> Data
     func webSet(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) throws
+    /// `device ls --json`: the caller's notification devices as Porsche JSON.
+    func notificationDevices() throws -> Data
+    /// `device register`: Rust validates Susan's key-issuance reply and sends its
+    /// push key to Porsche on stdin only. Returns Porsche's bounded receipt.
+    func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data
+    /// `device prefs ID --enabled=…` for one caller-owned device.
+    func notificationDevicePreferences(id: UUID, enabled: Bool) throws
+    /// `device rm ID` for one caller-owned device.
+    func notificationDeviceRemove(id: UUID) throws
+    /// The bounded JSON reason of the session's most recent refusal, if any.
+    func lastRefusal() -> String?
     func close()
+}
+
+/// Sessions that predate the notification-device operations refuse them.
+public extension MilaSessionClient {
+    func notificationDevices() throws -> Data { throw MilaSessionError.unavailable }
+    func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
+        _ = platform; _ = susanReply; _ = encryptionPublicKey; _ = label; _ = now
+        throw MilaSessionError.unavailable
+    }
+    func notificationDevicePreferences(id: UUID, enabled: Bool) throws { _ = id; _ = enabled; throw MilaSessionError.unavailable }
+    func notificationDeviceRemove(id: UUID) throws { _ = id; throw MilaSessionError.unavailable }
+    func lastRefusal() -> String? { nil }
+}
+
+/// Device platform codes of `mila_session_device_register`. Apple registers
+/// only its own platforms; Android and Windows codes are not representable.
+public enum MilaDevicePlatform: UInt8, Sendable {
+    case ios = 0
+    case macos = 2
+
+    /// The platform of the running process.
+    public static var current: MilaDevicePlatform {
+        #if os(iOS)
+        .ios
+        #else
+        .macos
+        #endif
+    }
+
+    /// Porsche's spelling in `device ls` rows.
+    public var wireName: String { self == .ios ? "ios" : "macos" }
 }
 
 /// The PTY half of an authenticated session. Handles are opaque Rust registry
@@ -226,6 +268,53 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
             }
         }
         guard status == 0 else { throw Self.error(status) }
+    }
+
+    public func notificationDevices() throws -> Data {
+        let current = try validHandle()
+        return try Self.readOnce(limit: Self.commandLimit) { mila_session_device_ls(current, $0, $1, $2) }
+    }
+
+    /// Susan's reply carries the push key; it is borrowed for the call and never
+    /// retained here. Rust refuses an unknown member, an expired key or a
+    /// malformed X25519 public key before any channel opens.
+    public func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
+        let current = try validHandle()
+        guard !susanReply.isEmpty, susanReply.count <= 4096, encryptionPublicKey.utf8.count == 43,
+              (label?.utf8.count ?? 0) <= 64 else { throw MilaSessionError.invalidInput }
+        let reply = [UInt8](susanReply)
+        let key = Array(encryptionPublicKey.utf8)
+        let labelBytes = Array((label ?? "").utf8)
+        return try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
+            reply.withUnsafeBufferPointer { r in key.withUnsafeBufferPointer { k in labelBytes.withUnsafeBufferPointer { l in
+                mila_session_device_register(current, platform.rawValue, r.baseAddress, r.count, k.baseAddress, k.count,
+                                             l.baseAddress, l.count, now, output, capacity, written)
+            }}}
+        }
+    }
+
+    public func notificationDevicePreferences(id: UUID, enabled: Bool) throws {
+        let current = try validHandle()
+        let device = Array(id.uuidString.lowercased().utf8)
+        let status = device.withUnsafeBufferPointer { d in
+            mila_session_device_prefs(current, d.baseAddress, d.count, enabled ? 1 : 0)
+        }
+        guard status == 0 else { throw Self.error(status) }
+    }
+
+    public func notificationDeviceRemove(id: UUID) throws {
+        let current = try validHandle()
+        let device = Array(id.uuidString.lowercased().utf8)
+        let status = device.withUnsafeBufferPointer { d in
+            mila_session_device_rm(current, d.baseAddress, d.count)
+        }
+        guard status == 0 else { throw Self.error(status) }
+    }
+
+    public func lastRefusal() -> String? {
+        guard let current = try? validHandle(),
+              let data = try? Self.readOnce(limit: 4096, { mila_session_last_refusal(current, $0, $1, $2) }) else { return nil }
+        return String(decoding: data, as: UTF8.self)
     }
 
     public func readMore() throws -> Data {

@@ -108,6 +108,76 @@ final class MilaNotificationsTests: XCTestCase {
         XCTAssertTrue(adapter.calls.isEmpty)
     }
 
+    private struct FixedAuthorization: MilaNotificationAuthorizing {
+        let granted: Bool
+        func requestAuthorization() async -> Bool { granted }
+    }
+
+    private struct FixedPokeKey: MilaPokeKeySource {
+        // The `enc_public_key` of protocol/test/fixtures/porsche_device_results.json.
+        func publicKey(deployment: String) -> String? { _ = deployment; return "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU" }
+    }
+
+    private final class RecordingSusan: MilaSusanKeyIssuing, @unchecked Sendable {
+        private let lock = NSLock()
+        private var bodies: [Data] = []
+        var status = 201
+        var issued: [Data] { lock.withLock { bodies } }
+        func issue(_ body: Data) async throws -> MilaSusanKeyReply {
+            let status = lock.withLock { () -> Int in bodies.append(body); return self.status }
+            return MilaSusanKeyReply(status: status, body: Data(#"{"push_key":"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA","key_id":"k","expires_at":"2099-01-01T00:00:00Z"}"#.utf8))
+        }
+    }
+
+    private static func registerCalls(_ session: RecordingSession) -> Int {
+        session.calls.filter { if case .deviceRegister = $0 { return true }; return false }.count
+    }
+
+    /// ADR-0278 item 1: without UserNotifications authorization nothing is
+    /// encoded, Susan is not asked and no register call reaches the Rust core.
+    /// The granted control runs the same workflow to the core's register call,
+    /// so the refusal is the gate's doing.
+    func testRegistrationIsRefusedWithoutUserNotificationsAuthorization() async throws {
+        let (adapter, session) = recordingAdapter()
+        let susan = RecordingSusan()
+        let token = Data((0..<32).map { UInt8($0) })
+        func registration(granted: Bool) -> MilaApplePushRegistration {
+            MilaApplePushRegistration(authorization: FixedAuthorization(granted: granted), keys: FixedPokeKey(), susan: susan,
+                                      platform: .macos, clock: { 1_000 })
+        }
+
+        let denied = await registration(granted: false).register(adapter: adapter, deployment: "mila.example.test", deviceToken: token, environment: .sandbox)
+        XCTAssertEqual(denied, .notAuthorized)
+        XCTAssertTrue(susan.issued.isEmpty, "Susan is not asked without authorization")
+        XCTAssertEqual(Self.registerCalls(session), 0, "no register call reaches the core without authorization")
+        XCTAssertTrue(session.calls.isEmpty)
+
+        let granted = await registration(granted: true).register(adapter: adapter, deployment: "mila.example.test", deviceToken: token,
+                                                                 environment: .sandbox, label: "Mila")
+        XCTAssertEqual(granted, .registered(try XCTUnwrap(UUID(uuidString: "5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b"))))
+        XCTAssertEqual(Self.registerCalls(session), 1)
+        XCTAssertEqual(session.calls.last, RecordingSession.Call.deviceRegister(.macos, "BQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQU", "Mila"))
+        // Rust encoded Susan's closed APNs body; the token is the hex of the APNs bytes.
+        let body = try XCTUnwrap(try JSONSerialization.jsonObject(with: try XCTUnwrap(susan.issued.first)) as? [String: String])
+        XCTAssertEqual(body, ["provider": "apns", "token": token.map { String(format: "%02x", $0) }.joined(), "app_id": "dev.overalls.mila",
+                              "environment": "development", "deployment": "mila.example.test"])
+    }
+
+    func testSusanRefusalOrMissingPokeKeyNeverRegisters() async {
+        let (adapter, session) = recordingAdapter()
+        let susan = RecordingSusan()
+        susan.status = 410
+        let token = Data(repeating: 0xab, count: 32)
+        let unregistered = await MilaApplePushRegistration(authorization: FixedAuthorization(granted: true), keys: FixedPokeKey(), susan: susan)
+            .register(adapter: adapter, deployment: "mila.example.test", deviceToken: token)
+        XCTAssertEqual(unregistered, .relayUnregistered)
+        XCTAssertEqual(Self.registerCalls(session), 0)
+        let empty = await MilaApplePushRegistration(authorization: FixedAuthorization(granted: true), keys: FixedPokeKey(), susan: susan)
+            .register(adapter: adapter, deployment: "mila.example.test", deviceToken: Data())
+        XCTAssertEqual(empty, .invalidToken)
+        XCTAssertEqual(susan.issued.count, 1)
+    }
+
     func testRustRejectionDoesNotEnableNotifications() {
         let adapter = Adapter()
         adapter.error = MilaFFIError.unavailable

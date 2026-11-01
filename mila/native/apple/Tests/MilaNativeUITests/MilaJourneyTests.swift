@@ -231,6 +231,51 @@ enum MilaFixtureHook {
 
 enum MilaJourneyFailure: Error, Equatable { case signIn, hook(action: String, status: Int) }
 
+/// Reports one completed journey step on stdout, where `swift test` shows it in
+/// the CI log; the same `journey: <step> ok` form as the Windows journey.
+func journeyStep(_ name: String) { print("journey: \(name) ok") }
+
+private extension Data {
+    /// Unpadded base64url, the encoding of Susan push keys and X25519 poke keys.
+    var base64URLUnpadded: String {
+        base64EncodedString().replacingOccurrences(of: "+", with: "-").replacingOccurrences(of: "/", with: "_")
+            .replacingOccurrences(of: "=", with: "")
+    }
+    static func random(count: Int) -> Data { Data((0..<count).map { _ in UInt8.random(in: .min ... .max) }) }
+}
+
+/// The CI runner's `swift test` process has no app bundle, so UserNotifications
+/// cannot be asked. The journey grants (stand-in); the refusal path is proven by
+/// `MilaNotificationsTests.testRegistrationIsRefusedWithoutUserNotificationsAuthorization`.
+private struct MilaJourneyGrantedAuthorization: MilaNotificationAuthorizing {
+    func requestAuthorization() async -> Bool { true }
+}
+
+/// A disposable X25519 poke key for the journey only; it lives in the test target.
+private struct MilaJourneyPokeKey: MilaPokeKeySource {
+    let encoded = Curve25519.KeyAgreement.PrivateKey().publicKey.rawRepresentation.base64URLUnpadded
+    func publicKey(deployment: String) -> String? { _ = deployment; return encoded }
+}
+
+/// The fixture has no Susan: a key-issuance reply in Susan's shape (stand-in),
+/// as the Android, Windows and headless journeys use. It first checks that the
+/// Rust-encoded request is Susan's closed APNs body, so a wrong body fails here.
+private struct MilaJourneyStandInSusan: MilaSusanKeyIssuing {
+    struct UnexpectedBody: Error {}
+    func issue(_ body: Data) async throws -> MilaSusanKeyReply {
+        guard let request = try JSONSerialization.jsonObject(with: body) as? [String: String],
+              Set(request.keys) == ["provider", "token", "app_id", "environment", "deployment"],
+              request["provider"] == "apns", request["app_id"] == MilaApplePushRegistration.appID,
+              request["environment"] == "development" else { throw UnexpectedBody() }
+        let reply = try JSONSerialization.data(withJSONObject: [
+            "push_key": Data.random(count: 48).base64URLUnpadded,
+            "key_id": "mila-apple-journey",
+            "expires_at": "2099-01-01T00:00:00Z",
+        ])
+        return MilaSusanKeyReply(status: 201, body: reply)
+    }
+}
+
 /// End-to-end journeys against the hermetic fixture. They run only when
 /// `MILA_JOURNEY_DESCRIPTOR` names a descriptor file; otherwise skipped.
 @MainActor final class MilaFixtureJourneyTests: XCTestCase {
@@ -306,6 +351,54 @@ enum MilaJourneyFailure: Error, Equatable { case signIn, hook(action: String, st
         XCTAssertEqual(threads.detail?.latestPlan?.id, plan.planID)
         await threads.perform(.planApprove(thread: thread, plan: plan.planID))
         guard case .applied = threads.mutation else { return XCTFail("plan approve: \(threads.mutation)") }
+    }
+
+    /// Register a notification device, list it, disable and enable it reading
+    /// each back, and remove it, through the Rust core against the fixture's
+    /// Marshall and Porsche (ADR-0278 item 1). The fixture has no APNs or Susan:
+    /// an APNs-shaped token and Susan's reply are stand-ins, so Rust's Susan
+    /// body encoding, reply validation and stdin push-key path still run.
+    /// Delivery is not proven here.
+    func testNotificationDeviceRegisterListPreferencesAndRemoveAgainstFixture() async throws {
+        let journey = try await MilaFixtureJourney.signIn(try MilaFixtureJourney.descriptor())
+        defer { journey.finish() }
+        let adapter = try XCTUnwrap(journey.model.adapter)
+        func refusal() -> String { adapter.lastRefusal() ?? "none" }
+
+        let registration = MilaApplePushRegistration(authorization: MilaJourneyGrantedAuthorization(), keys: MilaJourneyPokeKey(),
+                                                     susan: MilaJourneyStandInSusan())
+        // APNs device tokens are 32 opaque bytes; Rust receives them as 64 lowercase hex characters.
+        let outcome = await registration.register(adapter: adapter, deployment: journey.descriptor.deployment.host,
+                                                  deviceToken: Data.random(count: 32), environment: .sandbox, label: "Mila journey")
+        guard case .registered(let device) = outcome else { return XCTFail("device register: \(outcome) (\(refusal()))") }
+        journeyStep("notifications: device registered (APNs token and Susan stand-ins)")
+
+        func listed() async throws -> MilaAccountNotificationDevice? {
+            try await adapter.notificationDevices().first(where: { $0.id == device })
+        }
+        guard let row = try await listed() else { return XCTFail("device \(device) is not listed (\(refusal()))") }
+        XCTAssertEqual(row.platform, MilaDevicePlatform.current.wireName)
+        XCTAssertTrue(row.enabled, "a new device is listed enabled")
+        journeyStep("notifications: device listed")
+
+        do { try await adapter.setNotificationDeviceEnabled(device, enabled: false) }
+        catch { return XCTFail("device disable: \(refusal())") }
+        let disabled = try await listed()
+        XCTAssertEqual(disabled?.enabled, false, "device disabled (read back)")
+        journeyStep("notifications: device disabled (read back)")
+
+        do { try await adapter.setNotificationDeviceEnabled(device, enabled: true) }
+        catch { return XCTFail("device enable: \(refusal())") }
+        let enabled = try await listed()
+        XCTAssertEqual(enabled?.enabled, true, "device enabled (read back)")
+        journeyStep("notifications: device enabled (read back)")
+
+        do { try await adapter.removeNotificationDevice(device) }
+        catch { return XCTFail("device remove: \(refusal())") }
+        // Porsche lists active devices; a revoked row, if listed, must say so.
+        let removed = try await listed()
+        XCTAssertTrue(removed == nil || removed?.state == "revoked", "device still listed as \(removed?.state ?? "unknown")")
+        journeyStep("notifications: device removed (read back)")
     }
 }
 

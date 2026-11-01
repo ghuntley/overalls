@@ -281,6 +281,10 @@ private enum MilaRustFFI {
     static func pushRegistration(_ provider: UInt8, _ environment: UInt8, _ token: UnsafePointer<CChar>, _ app: UnsafePointer<CChar>, _ deployment: UnsafePointer<CChar>, _ endpoint: UnsafePointer<CChar>) -> Int32 {
         mila_push_registration_validate(provider, environment, token, app, deployment, endpoint).rawValue
     }
+    /// APNs and FCM registrations carry no endpoint, so it crosses as null.
+    static func pushKeyRequest(_ provider: UInt8, _ environment: UInt8, _ token: UnsafePointer<CChar>, _ app: UnsafePointer<CChar>, _ deployment: UnsafePointer<CChar>, _ output: MilaRouteOutput) -> Int32 {
+        mila_push_key_request_encode(provider, environment, token, app, deployment, nil, output).rawValue
+    }
 }
 
 /// Adapter for the stable C ABI exported by `mila-ffi`.
@@ -433,6 +437,63 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         guard abiCompatible() else { throw MilaFFIError.incompatibleABI }
         let status = token.withCString { tokenPtr in appID.withCString { appPtr in deployment.withCString { deploymentPtr in endpoint.withCString { endpointPtr in MilaRustFFI.pushRegistration(provider, environment, tokenPtr, appPtr, deploymentPtr, endpointPtr) } } } }
         guard status == 0 else { throw MilaFFIError.unavailable }
+    }
+
+    /// @cc [owner:ghuntley,label:security;privacy] mila-apple-susan-key-request
+    /// The APNs token MUST cross to Rust only to be validated and encoded into
+    /// Susan's closed key-issuance body; the body is the only output and the
+    /// token MUST NOT be retained or logged by the native layer.
+    public func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data {
+        guard abiCompatible() else { throw MilaFFIError.incompatibleABI }
+        var output = [UInt8](repeating: 0, count: 4096)
+        var written = 0
+        let status = output.withUnsafeMutableBufferPointer { buffer in
+            token.withCString { tokenPtr in appID.withCString { appPtr in deployment.withCString { deploymentPtr in
+                withUnsafeMutablePointer(to: &written) { writtenPointer in
+                    MilaRustFFI.pushKeyRequest(MilaPushProvider.apple.rawValue, environment.rawValue, tokenPtr, appPtr, deploymentPtr,
+                                               MilaRouteOutput(bytes: buffer.baseAddress, capacity: buffer.count, written: writtenPointer))
+                }
+            } } }
+        }
+        guard status == 0, written > 0, written <= output.count else { throw MilaFFIError.unavailable }
+        return Data(output.prefix(written))
+    }
+
+    public func notificationDevices() async throws -> [MilaAccountNotificationDevice] {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        let data: Data
+        do { data = try liveSession.notificationDevices() } catch { throw MilaFFIError.unavailable }
+        return try Self.decodeNotificationDevices(data)
+    }
+
+    public func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        let receipt: Data
+        do { receipt = try liveSession.notificationDeviceRegister(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now) }
+        catch { throw MilaFFIError.unavailable }
+        do { return try MilaPorscheEnvelope<MilaDeviceReceipt>.decode(receipt).id } catch { throw MilaFFIError.unavailable }
+    }
+
+    public func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        do { try liveSession.notificationDevicePreferences(id: id, enabled: enabled) } catch { throw MilaFFIError.unavailable }
+    }
+
+    public func removeNotificationDevice(_ id: UUID) async throws {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        do { try liveSession.notificationDeviceRemove(id: id) } catch { throw MilaFFIError.unavailable }
+    }
+
+    public func lastRefusal() -> String? { liveSession?.lastRefusal() }
+
+    /// Porsche `device ls --json`: `{"version":1,"status":"succeeded","result":{"items":[...]}}`
+    /// (protocol/test/fixtures/porsche_device_results.json).
+    static func decodeNotificationDevices(_ data: Data) throws -> [MilaAccountNotificationDevice] {
+        guard data.count <= MilaLiveSession.commandLimit else { throw MilaFFIError.outputTooSmall }
+        let listing: MilaDeviceListing
+        do { listing = try MilaPorscheEnvelope<MilaDeviceListing>.decode(data) } catch { throw MilaFFIError.unavailable }
+        guard listing.items.count <= 256, listing.items.allSatisfy(\.isDisplayable) else { throw MilaFFIError.unavailable }
+        return listing.items
     }
 
     public func decodeSnapshot(_ data: Data, host: String, port: UInt16? = nil) throws -> [MilaSnapshotMachine] {
@@ -613,6 +674,27 @@ private struct MilaSSHKeyWire: Codable {
     }
 }
 
+/// One row of the account's notification devices. Push keys and provider
+/// tokens are never part of the listing.
+public struct MilaAccountNotificationDevice: Decodable, Equatable, Sendable, Identifiable {
+    public let id: UUID
+    public let platform: String
+    public let enabled: Bool
+    public let label: String?
+    public let state: String?
+
+    var isDisplayable: Bool {
+        func bounded(_ value: String?, _ limit: Int) -> Bool {
+            guard let value else { return true }
+            return value.utf8.count <= limit && !value.unicodeScalars.contains { $0.value < 0x20 || $0.value == 0x7f }
+        }
+        return !platform.isEmpty && bounded(platform, 32) && bounded(label, 256) && bounded(state, 32)
+    }
+}
+
+private struct MilaDeviceListing: Decodable { let items: [MilaAccountNotificationDevice] }
+private struct MilaDeviceReceipt: Decodable { let id: UUID }
+
 private struct MilaSnapshotEnvelope: Codable {
     let machines: [MilaSnapshotMachine]
     let hasMore: Bool
@@ -644,6 +726,12 @@ public protocol MilaFFIAdapter: Sendable {
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind
     func classifyWebCommand(_ command: MilaWebCommand) throws -> MilaMachineCommandKind
     func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws
+    func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data
+    func notificationDevices() async throws -> [MilaAccountNotificationDevice]
+    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID
+    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws
+    func removeNotificationDevice(_ id: UUID) async throws
+    func lastRefusal() -> String?
 }
 
 public extension MilaFFIAdapter {
@@ -664,6 +752,14 @@ public extension MilaFFIAdapter {
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind { _ = line; throw MilaFFIError.unavailable }
     func classifyWebCommand(_ command: MilaWebCommand) throws -> MilaMachineCommandKind { _ = command; throw MilaFFIError.unavailable }
     func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws { throw MilaFFIError.unavailable }
+    func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data { _ = token; _ = environment; _ = appID; _ = deployment; throw MilaFFIError.unavailable }
+    func notificationDevices() async throws -> [MilaAccountNotificationDevice] { throw MilaFFIError.unavailable }
+    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {
+        _ = platform; _ = susanReply; _ = encryptionPublicKey; _ = label; _ = now; throw MilaFFIError.unavailable
+    }
+    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws { _ = id; _ = enabled; throw MilaFFIError.unavailable }
+    func removeNotificationDevice(_ id: UUID) async throws { _ = id; throw MilaFFIError.unavailable }
+    func lastRefusal() -> String? { nil }
 }
 
 /// Explicit placeholder until generated UniFFI bindings are linked by the host application.
