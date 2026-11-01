@@ -167,9 +167,11 @@ from XCTest, CTest, Dart tests and CI builds.
   `SoftwareExisting`), and the SSH keys page marks this device's key as a
   software key. `MilaDeviceKeyPolicy.AllowSoftwareFallback` is the single switch
   that refuses software custody, should the "no refusal" choice be replaced. It
-  ships as `true` (fall back, as decision 3 states). That default is pending the
-  user's policy decision on whether production should refuse software keys
-  unless a test setting is present.
+  ships as `true` (fall back, as decision 3 states). Asked on 2026-11-01
+  whether to keep `AllowSoftwareFallback=true` as shipped, the user answered
+  "software fallback is fine", so software fallback is permitted in
+  production, with the bounded retry on not-ready and the custody recorded and
+  shown.
   [`DeviceKeyCustodySmoke.cs`](../../../mila/windows-dotnet-smoke/DeviceKeyCustodySmoke.cs)
   covers retry-then-success, retry-then-fallback, immediate fallback, reuse of an
   existing software key, access denial and the strict switch against a scripted

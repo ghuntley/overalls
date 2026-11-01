@@ -58,6 +58,31 @@ android {
     }
 }
 
+// Robolectric's android-all runtime for every SDK the unit tests pin (@Config(sdk = [35])).
+// Gradle resolves it, so gradle/verification-metadata.xml checks it and the
+// cache keeps it. The tests run with robolectric.offline=true, so Robolectric's
+// MavenArtifactFetcher never downloads an unverified jar at test time. Raising
+// an @Config SDK or the Robolectric version means adding its artifact here.
+val robolectricSdkJars: Configuration by configurations.creating {
+    isTransitive = false
+    isCanBeConsumed = false
+}
+dependencies {
+    // SDK 35 for Robolectric 4.14.1 (DefaultSdkProvider: 15-robolectric-12650502, preinstrumented i7).
+    robolectricSdkJars("org.robolectric:android-all-instrumented:15-robolectric-12650502-i7")
+}
+val robolectricDependencyDir = layout.buildDirectory.dir("robolectric-sdk-jars")
+val syncRobolectricSdkJars = tasks.register<Sync>("syncRobolectricSdkJars") {
+    from(robolectricSdkJars)
+    into(robolectricDependencyDir)
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(syncRobolectricSdkJars)
+    inputs.files(robolectricSdkJars).withPropertyName("robolectricSdkJars")
+    systemProperty("robolectric.offline", "true")
+    systemProperty("robolectric.dependency.dir", robolectricDependencyDir.get().asFile.absolutePath)
+}
+
 // Generated libraries stay under build/ and enter APKs through the JNI source set.
 val rustRoot = rootProject.file("../../rust")
 val localizationSource = rootProject.file("../../localization/catalogs")
