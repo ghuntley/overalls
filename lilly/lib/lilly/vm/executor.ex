@@ -429,7 +429,7 @@ defmodule Lilly.VM.Executor do
                  System.monotonic_time(:millisecond) + 30_000
                ),
                do: ready_or_fail(config, pool, spec, command, history),
-               else: fail(config, pool, spec, command, history)
+               else: launch_failed(config, pool, spec, command, history, :running_unconfirmed)
 
           {:error, :unit_state_unavailable} ->
             {:retry, :execution_unavailable}
@@ -446,8 +446,8 @@ defmodule Lilly.VM.Executor do
                ] ->
             {:retry, reason}
 
-          _ ->
-            fail(config, pool, spec, command, history)
+          other ->
+            launch_failed(config, pool, spec, command, history, launch_reason(other))
         end
 
       # Inconclusive (slow or transitional) unit observation: retry, never a
@@ -494,7 +494,7 @@ defmodule Lilly.VM.Executor do
                  System.monotonic_time(:millisecond) + 30_000
                ),
                do: ready_or_fail(config, pool, spec, command, history),
-               else: fail(config, pool, spec, command, history)
+               else: launch_failed(config, pool, spec, command, history, :running_unconfirmed)
 
           {:error, :unit_state_unavailable} ->
             {:retry, :execution_unavailable}
@@ -511,8 +511,8 @@ defmodule Lilly.VM.Executor do
                ] ->
             {:retry, reason}
 
-          _ ->
-            fail(config, pool, spec, command, history)
+          other ->
+            launch_failed(config, pool, spec, command, history, launch_reason(other))
         end
 
       # Inconclusive (slow or transitional) unit observation: retry, never a
@@ -638,6 +638,31 @@ defmodule Lilly.VM.Executor do
     fail(config, pool, spec, command, history)
   end
 
+  # @cc [owner:ghuntley,label:observability;recovery] launch-failure-names-cause
+  # A provision or retained start whose launch fails without a retryable
+  # reason MUST emit vm.launch_failed once, with the command's identifiers and
+  # the closed reason atom (`:running_unconfirmed` when the submitted unit
+  # never proved running), before fencing through fail/5. Paths, native output
+  # and payloads MUST NOT be attached.
+  defp launch_failed(config, pool, spec, command, history, reason) do
+    Lilly.Events.emit("vm.launch_failed",
+      vm_id: command.vm_id,
+      placement_id: command.placement_id,
+      operation: command.kind,
+      execution_epoch: command.execution_epoch,
+      generation: command.generation,
+      reason: reason
+    )
+
+    fail(config, pool, spec, command, history)
+  end
+
+  defp launch_reason({:error, reason})
+       when is_atom(reason) and not is_nil(reason) and not is_boolean(reason),
+       do: reason
+
+  defp launch_reason(_result), do: :execution_unconfirmed
+
   # @cc [owner:ghuntley,label:recovery] crash-requires-proven-running-history
   # Executor.fail/5 MUST label a fenced failure crashed only when durable history proves this same
   # epoch and generation previously ran; an initial launch failure must remain execution_failed and cannot
@@ -673,24 +698,67 @@ defmodule Lilly.VM.Executor do
     end
   end
 
+  # @cc [owner:ghuntley,label:observability;recovery] disk-presence-unconfirmed-names-drive-shape
+  # disk_present/2 MUST report a drive it cannot classify as present or absent
+  # by emitting vm.disk_presence_unconfirmed with exactly one closed reason from
+  # drive_shape/3 (never a path, size or uid value) before returning :unknown.
   defp disk_present(pool, spec) do
     directory = Path.dirname(Disk.path(pool, spec))
 
     Spec.drives(spec)
     |> Enum.reduce_while(true, fn drive, true ->
-      case File.lstat(Path.join(directory, drive.name)) do
-        {:error, :enoent} ->
-          {:halt, false}
-
-        {:ok, %File.Stat{type: :regular, links: 1, size: size, uid: uid}}
-        when size == drive.bytes and uid in [0, spec.network.uid] ->
+      case drive_shape(
+             File.lstat(Path.join(directory, drive.name)),
+             drive.bytes,
+             spec.network.uid
+           ) do
+        :present ->
           {:cont, true}
 
-        _ ->
+        :absent ->
+          {:halt, false}
+
+        reason ->
+          Lilly.Events.emit("vm.disk_presence_unconfirmed",
+            placement_id: spec.id,
+            reason: reason
+          )
+
           {:halt, :unknown}
       end
     end)
   end
+
+  @typedoc "How one placement drive's lstat result classifies."
+  @type drive_shape ::
+          :present
+          | :absent
+          | :drive_unreadable
+          | :drive_not_regular
+          | :drive_links
+          | :drive_owner
+          | :drive_smaller
+          | :drive_larger
+
+  @doc false
+  @spec drive_shape({:ok, File.Stat.t()} | {:error, File.posix()}, non_neg_integer(), integer()) ::
+          drive_shape()
+  def drive_shape({:error, :enoent}, _bytes, _uid), do: :absent
+  def drive_shape({:error, _}, _bytes, _uid), do: :drive_unreadable
+
+  def drive_shape({:ok, %File.Stat{type: type}}, _bytes, _uid) when type != :regular,
+    do: :drive_not_regular
+
+  def drive_shape({:ok, %File.Stat{links: links}}, _bytes, _uid) when links != 1, do: :drive_links
+
+  def drive_shape({:ok, %File.Stat{uid: owner}}, _bytes, uid) when owner not in [0, uid],
+    do: :drive_owner
+
+  def drive_shape({:ok, %File.Stat{size: size}}, bytes, _uid) when size < bytes,
+    do: :drive_smaller
+
+  def drive_shape({:ok, %File.Stat{size: size}}, bytes, _uid) when size > bytes, do: :drive_larger
+  def drive_shape({:ok, %File.Stat{}}, _bytes, _uid), do: :present
 
   defp await_running(config, pool, spec, deadline) do
     cond do

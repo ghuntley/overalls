@@ -18,6 +18,10 @@ or [Mila guidance](mila/AGENTS.md) for the component being changed.
 - For new work, clone the repository into `~/src/overalls-<featurename>` rather
   than creating a new Git worktree. Use a short, descriptive feature name and
   coordinate the clone path with other agents through the message board.
+- Enter `devenv shell` once in every new clone or worktree before committing.
+  It installs the prek hook and the gitignored `.pre-commit-config.yaml`
+  symlink. Without that file the hook fails with "config file not found".
+  Without the hook, a commit skips `tools/precommit` silently.
 
 ## Architecture maintenance
 

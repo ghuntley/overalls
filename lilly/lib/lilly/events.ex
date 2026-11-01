@@ -328,6 +328,61 @@ defmodule Lilly.Events do
     metadata: [vm_id: :uuid, stage: :atom, reason: :atom]
   )
 
+  defevent("vm.launch_refused",
+    level: :warning,
+    message: "VM launch refused before submission",
+    metadata: [
+      placement_id: :uuid,
+      stage:
+        {:enum,
+         [
+           :socket_path,
+           :bootstrap_inputs,
+           :claim,
+           :tombstone,
+           :intent,
+           :not_attempted,
+           :checkpoint,
+           :provisioning,
+           :bundle,
+           :admission,
+           :git_identity
+         ]},
+      reason: :atom
+    ]
+  )
+
+  defevent("vm.launch_failed",
+    level: :warning,
+    message: "VM launch failed and the execution is being fenced",
+    metadata: [
+      vm_id: :uuid,
+      placement_id: :uuid,
+      operation: {:enum, [:provision, :start]},
+      execution_epoch: :int,
+      generation: :int,
+      reason: :atom
+    ]
+  )
+
+  defevent("vm.disk_presence_unconfirmed",
+    level: :warning,
+    message: "Placement disk presence unconfirmed",
+    metadata: [
+      placement_id: :uuid,
+      reason:
+        {:enum,
+         [
+           :drive_unreadable,
+           :drive_not_regular,
+           :drive_links,
+           :drive_owner,
+           :drive_smaller,
+           :drive_larger
+         ]}
+    ]
+  )
+
   defevent("vm.disk_preparation_failed",
     level: :warning,
     message: "VM disk preparation failed",

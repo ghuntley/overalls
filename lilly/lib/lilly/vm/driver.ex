@@ -460,10 +460,12 @@ defmodule Lilly.VM.Driver do
   # only the existing executor/actor reconciliation may retry that authority.
   @spec restart(Config.t(), Pool.t(), Spec.t(), keyword()) :: result()
   def restart(config, pool, spec, options \\ []) do
-    with {:ok, bundle} <- guest_bundle(pool, spec),
-         :ok <- native_admission(bundle),
-         :ok <- git_identity_capability(bundle, spec) do
+    with {_, {:ok, bundle}} <- {:bundle, guest_bundle(pool, spec)},
+         {_, :ok} <- {:admission, native_admission(bundle)},
+         {_, :ok} <- {:git_identity, git_identity_capability(bundle, spec)} do
       launch(config, pool, spec, options, fn -> Disk.ready(pool, spec) end)
+    else
+      {stage, result} -> launch_refused(spec, stage, result)
     end
   end
 
@@ -757,28 +759,68 @@ defmodule Lilly.VM.Driver do
   # The first step claims the placement and sets running intent. A unit that
   # is already running is adopted in this same section; nothing else follows.
   defp begin_launch(config, pool, spec, options) do
-    with true <- byte_size(Path.join(Jail.root(pool, spec), "api.sock")) < 108,
-         :ok <- bootstrap_inputs(config, spec),
-         :ok <- claim(config, pool, spec),
-         {:error, :enoent} <-
-           Lilly.Host.Privilege.lstat(Path.join(directory(config, spec), "deleted.json")),
-         {:ok, intent} <-
-           Intent.set(directory(config, spec), spec.id, revision(options), :running) do
+    with {_, true} <-
+           {:socket_path, byte_size(Path.join(Jail.root(pool, spec), "api.sock")) < 108},
+         {_, :ok} <- {:bootstrap_inputs, bootstrap_inputs(config, spec)},
+         {_, :ok} <- {:claim, claim(config, pool, spec)},
+         {_, {:error, :enoent}} <-
+           {:tombstone,
+            Lilly.Host.Privilege.lstat(Path.join(directory(config, spec), "deleted.json"))},
+         {_, {:ok, intent}} <-
+           {:intent, Intent.set(directory(config, spec), spec.id, revision(options), :running)} do
       case Unit.status(spec) do
         {:ok, :running} ->
           with :ok <- adoption_observation(config, pool, spec),
                do: preserve_running_boot(config, spec, intent)
 
         {:ok, :stopped} ->
-          with :ok <- not_attempted(config, spec, intent),
-               :ok <- cold_checkpoint_empty(pool, spec),
-               :ok <- Provisioning.prepare(config, spec, revision(options)),
-               do: {:launch, intent}
+          with {_, :ok} <- {:not_attempted, not_attempted(config, spec, intent)},
+               {_, :ok} <- {:checkpoint, cold_checkpoint_empty(pool, spec)},
+               {_, :ok} <- {:provisioning, Provisioning.prepare(config, spec, revision(options))} do
+            {:launch, intent}
+          else
+            {stage, result} -> launch_refused(spec, stage, result)
+          end
 
         error ->
           error
       end
+    else
+      {stage, result} -> launch_refused(spec, stage, result)
     end
+  end
+
+  @launch_contention [
+    :execution_unavailable,
+    :network_unavailable,
+    :provisioning_busy,
+    :storage_busy,
+    :unit_state_unavailable
+  ]
+
+  # @cc [owner:ghuntley,label:observability;recovery] launch-refusal-names-stage
+  # A launch or retained restart refused before any systemd submission MUST
+  # emit vm.launch_refused once with the closed stage atom and, when the step
+  # returned `{:error, atom}`, that atom (otherwise `:refused`), and MUST
+  # return the step's original result unchanged. Contention reasons that the
+  # executor retries MUST NOT emit. Paths, file contents and native output MUST
+  # NOT be attached.
+  @spec launch_refused(Spec.t(), atom(), term()) :: term()
+  defp launch_refused(_spec, _stage, {:error, reason} = result) when reason in @launch_contention,
+    do: result
+
+  defp launch_refused(spec, stage, result) do
+    reason =
+      case result do
+        {:error, reason} when is_atom(reason) and not is_nil(reason) and not is_boolean(reason) ->
+          reason
+
+        _ ->
+          :refused
+      end
+
+    Lilly.Events.emit("vm.launch_refused", placement_id: spec.id, stage: stage, reason: reason)
+    result
   end
 
   # @cc [owner:ghuntley,label:recovery;security] retained-memory-forbids-cold-launch
@@ -2074,11 +2116,18 @@ defmodule Lilly.VM.Driver do
     locked(config, spec, fn ->
       with :ok <- cleanup_step(fn -> claim(config, pool, spec) end, vm_id, spec.id, :claim),
            {:ok, intent} <-
-             Intent.set(
-               directory(config, spec),
+             cleanup_step(
+               fn ->
+                 Intent.set(
+                   directory(config, spec),
+                   spec.id,
+                   revision(options),
+                   :failed
+                 )
+               end,
+               vm_id,
                spec.id,
-               revision(options),
-               :failed
+               :intent
              ),
            :ok <-
              cleanup_step(
@@ -2095,7 +2144,13 @@ defmodule Lilly.VM.Driver do
                spec.id,
                :network
              ),
-           do: Provisioning.fail(config, spec, revision(options))
+           do:
+             cleanup_step(
+               fn -> Provisioning.fail(config, spec, revision(options)) end,
+               vm_id,
+               spec.id,
+               :provisioning
+             )
     end)
   end
 
@@ -2103,6 +2158,9 @@ defmodule Lilly.VM.Driver do
     case fun.() do
       :ok ->
         :ok
+
+      {:ok, _} = result ->
+        result
 
       error ->
         reason =
