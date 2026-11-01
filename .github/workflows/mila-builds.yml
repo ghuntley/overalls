@@ -1035,10 +1035,32 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
+          import re
+
+          # Every platform cell must open with "implemented:" and record no
+          # remaining gap. The behavior column (row titles such as
+          # "share/open actions") and ordinary prose ("opens approval") are not
+          # statuses, so match status prefixes and explicit gap phrases rather
+          # than any occurrence of "open".
           matrix = Path("mila/native/PARITY_MATRIX.md").read_text(encoding="utf-8")
-          rows = [line.lower() for line in matrix.splitlines() if line.startswith("|") and "---" not in line]
-          if any("partial" in row or "open" in row for row in rows):
-              raise SystemExit("parity matrix still contains open or partial rows")
+          rows = [line for line in matrix.splitlines() if line.startswith("| ") and "---" not in line]
+          header, body = rows[0], rows[1:]
+          platforms = [cell.strip() for cell in header.strip().strip("|").split(" | ")][2:]
+          gap = re.compile(r"\b(remains?|stays?|is|are) (open|partial|unverified|pending)\b|\bawaiting\b", re.I)
+          problems = []
+          for row in body:
+              cells = [cell.strip() for cell in row.strip().strip("|").split(" | ")]
+              if len(cells) != len(platforms) + 2:
+                  problems.append(f"{cells[0][:60]}: expected {len(platforms) + 2} cells, found {len(cells)}")
+                  continue
+              for platform, cell in zip(platforms, cells[2:]):
+                  if not cell.lower().startswith("implemented:"):
+                      problems.append(f"{cells[0][:60]} / {platform}: status is not implemented")
+                  elif gap.search(cell):
+                      problems.append(f"{cells[0][:60]} / {platform}: records a remaining gap ({gap.search(cell).group(0)})")
+          if problems:
+              print("\n".join(problems))
+              raise SystemExit("parity matrix still contains open, partial or unverified cells")
           workflow = Path(".github/workflows/mila-builds.yml").read_text(encoding="utf-8")
           if "FLUTTER_VERSION:" in workflow:
               raise SystemExit("native workflow must not retain Flutter compatibility variables")
