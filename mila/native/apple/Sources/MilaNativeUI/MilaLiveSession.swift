@@ -331,23 +331,99 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
     /// machine and session. The unnamed legacy attach is never used; Porsche
     /// refuses it. The returned handle is valid until `terminalKill` or close.
     public func terminalAttach(machine: UUID, columns: UInt32 = 120, rows: UInt32 = 40) throws -> UInt64 {
-        let current = try validHandle()
+        _ = try validHandle()
         guard (1...4096).contains(columns), (1...512).contains(rows) else { throw MilaSessionError.invalidInput }
+        let named = try terminalOpen(machine: machine, requestID: UUID())
+        return try terminalAttach(machine: machine, session: named, columns: columns, rows: rows)
+    }
+
+    /// @cc [owner:ghuntley,label:security;protocol] mila-apple-named-terminal-session
+    /// `terminal new` under one at-most-once request ID returns the named
+    /// session only when Porsche's receipt is for the requested machine. A
+    /// named attach joins exactly that machine and session, so a viewport can
+    /// detach (`terminalKill`, local channel only) and rejoin with the
+    /// server's replay. `terminalEnd` (`terminal kill`) ends the server session
+    /// for every viewer and reports true only when Porsche says that session closed.
+    public func terminalOpen(machine: UUID, requestID: UUID) throws -> UUID {
+        let current = try validHandle()
         let machineBytes = Array(machine.uuidString.lowercased().utf8)
-        let requestBytes = Array(milaRequestID(UUID()).utf8)
+        let requestBytes = Array(milaRequestID(requestID).utf8)
         let receipt = try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
             machineBytes.withUnsafeBufferPointer { m in requestBytes.withUnsafeBufferPointer { r in
                 mila_session_terminal_new(current, m.baseAddress, m.count, r.baseAddress, r.count, output, capacity, written)
             }}
         }
-        let named = try MilaTerminalReceipt.session(receipt, machine: machine)
-        let terminalBytes = Array(named.uuidString.lowercased().utf8)
+        return try MilaTerminalReceipt.session(receipt, machine: machine)
+    }
+
+    /// Attaches a PTY owned by this session to one named terminal session.
+    public func terminalAttach(machine: UUID, session: UUID, columns: UInt32, rows: UInt32) throws -> UInt64 {
+        let current = try validHandle()
+        guard (1...4096).contains(columns), (1...512).contains(rows) else { throw MilaSessionError.invalidInput }
+        let machineBytes = Array(machine.uuidString.lowercased().utf8)
+        let terminalBytes = Array(session.uuidString.lowercased().utf8)
         var terminal: UInt64 = 0
         let status = machineBytes.withUnsafeBufferPointer { m in terminalBytes.withUnsafeBufferPointer { t in
             mila_session_terminal_attach_session(current, m.baseAddress, m.count, t.baseAddress, t.count, columns, rows, &terminal)
         }}
         guard status == 0, terminal != 0 else { throw Self.error(status) }
         return terminal
+    }
+
+    /// One bounded PTY read that waits at most `waitMilliseconds` (Rust caps it
+    /// at 1000) and tells idle from closed. The buffer is the full chunk size:
+    /// Rust consumes channel data before it copies.
+    public func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead {
+        guard terminal != 0, waitMilliseconds <= 1_000 else { throw MilaSessionError.invalidInput }
+        var buffer = [UInt8](repeating: 0, count: Self.ptyChunkLimit)
+        var written = 0
+        var event: UInt8 = 0
+        let status = buffer.withUnsafeMutableBufferPointer { output in
+            mila_session_terminal_read_within(terminal, waitMilliseconds, output.baseAddress, output.count, &written, &event)
+        }
+        guard status == 0, written <= buffer.count else { throw Self.error(status) }
+        switch event {
+        case 0: return .data(Data(buffer.prefix(written)))
+        case 1: return .idle
+        case 2: return .closed
+        default: throw MilaSessionError.unavailable
+        }
+    }
+
+    /// `terminal kill MACHINE SESSION`: ends the named server session.
+    public func terminalEnd(machine: UUID, session: UUID, requestID: UUID) throws -> Bool {
+        let current = try validHandle()
+        let machineBytes = Array(machine.uuidString.lowercased().utf8)
+        let terminalBytes = Array(session.uuidString.lowercased().utf8)
+        let requestBytes = Array(milaRequestID(requestID).utf8)
+        let receipt = try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
+            machineBytes.withUnsafeBufferPointer { m in terminalBytes.withUnsafeBufferPointer { t in requestBytes.withUnsafeBufferPointer { r in
+                mila_session_terminal_end(current, m.baseAddress, m.count, t.baseAddress, t.count, r.baseAddress, r.count, output, capacity, written)
+            }}}
+        }
+        return MilaTerminalEndReceipt.reportsClosed(receipt, session: session)
+    }
+
+    /// `show MACHINE --json`: one machine's requested state and size, as Porsche JSON.
+    public func machineShow(machine: UUID) throws -> Data {
+        let current = try validHandle()
+        let machineBytes = Array(machine.uuidString.lowercased().utf8)
+        return try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
+            machineBytes.withUnsafeBufferPointer { m in
+                mila_session_machine_show(current, m.baseAddress, m.count, output, capacity, written)
+            }
+        }
+    }
+
+    /// `request show ID --json` for a request this client submitted, as Porsche JSON.
+    public func requestShow(requestID: UUID) throws -> Data {
+        let current = try validHandle()
+        let requestBytes = Array(milaRequestID(requestID).utf8)
+        return try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
+            requestBytes.withUnsafeBufferPointer { r in
+                mila_session_request_show(current, r.baseAddress, r.count, output, capacity, written)
+            }
+        }
     }
 
     /// Polls one bounded PTY output chunk. Empty data means no data or EOF.
@@ -454,6 +530,26 @@ struct MilaTerminalReceipt: Decodable {
         do { receipt = try MilaPorscheEnvelope<MilaTerminalReceipt>.decode(data) } catch { throw MilaSessionError.invalidInput }
         guard receipt.machineID == machine else { throw MilaSessionError.invalidInput }
         return receipt.sessionID
+    }
+}
+
+/// One `mila_session_terminal_read_within` outcome (`MILA_TERMINAL_READ_*`).
+public enum MilaTerminalRead: Equatable, Sendable {
+    case data(Data)
+    case idle
+    case closed
+}
+
+/// `terminal kill` receipt: `{"version":1,"status":"succeeded","result":{"machine_id","session_id","closed":true}}`.
+struct MilaTerminalEndReceipt: Decodable {
+    let sessionID: UUID
+    let closed: Bool
+    enum CodingKeys: String, CodingKey { case sessionID = "session_id", closed }
+
+    /// True only when the receipt reports exactly `session` closed.
+    static func reportsClosed(_ data: Data, session: UUID) -> Bool {
+        guard let receipt = try? MilaPorscheEnvelope<MilaTerminalEndReceipt>.decode(data) else { return false }
+        return receipt.closed && receipt.sessionID == session
     }
 }
 

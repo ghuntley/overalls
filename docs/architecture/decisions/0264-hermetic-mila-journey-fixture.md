@@ -240,6 +240,14 @@ Remaining gaps:
 - The tunnel has carried both journeys: in mila-builds run 41305124503 the
   Apple and Windows journey jobs reported success to the tunnelled fixture,
   and the Windows journey passed every step.
+- The Apple journey
+  ([`MilaJourneyTests.swift`](../../../mila/native/apple/Tests/MilaNativeUITests/MilaJourneyTests.swift))
+  now also drives create, stop, start, pause, resume, delete and resize; web
+  show and set; and the guest terminal on `seed.terminal_machine_id`. These
+  steps have not yet run in CI. To avoid contending with the Windows journey
+  on the shared fixture, the lifecycle and web steps use machines that the
+  Apple test creates, and each `terminal new` uses a fresh request ID, which
+  gives a session distinct from the Windows journey's.
 
 ## Open questions
 

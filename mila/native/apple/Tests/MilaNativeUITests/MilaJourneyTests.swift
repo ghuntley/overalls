@@ -44,7 +44,10 @@ struct MilaJourneyDescriptor: Decodable {
     struct Approver: Decodable { let url: URL; let bearerToken: String; let fixtureURL: URL?
         enum CodingKeys: String, CodingKey { case url, bearerToken = "bearer_token", fixtureURL = "fixture_url" } }
     struct Seed: Decodable { let machineName: String; let sharePrincipal: String; let machineID: UUID?
-        enum CodingKeys: String, CodingKey { case machineName = "machine_name", sharePrincipal = "share_principal", machineID = "machine_id" } }
+        /// The guest-backed terminal machine, when the fixture runs its terminal stand-in.
+        let terminalMachineID: UUID?; let terminalMachineName: String?
+        enum CodingKeys: String, CodingKey { case machineName = "machine_name", sharePrincipal = "share_principal", machineID = "machine_id",
+                                             terminalMachineID = "terminal_machine_id", terminalMachineName = "terminal_machine_name" } }
     let version: Int
     let deployment: Deployment
     let tls: TLS
@@ -58,6 +61,7 @@ struct MilaJourneyDescriptor: Decodable {
         guard value.version == 1, !value.deployment.host.isEmpty, value.deployment.sshPort > 0, value.deployment.httpsPort > 0,
               value.tls.caPEM.contains("BEGIN CERTIFICATE"), value.approver.url.scheme == "https" || value.approver.url.scheme == "http",
               !value.approver.bearerToken.isEmpty, !value.seed.machineName.isEmpty,
+              value.seed.terminalMachineName.map({ !$0.isEmpty && $0.utf8.count <= 63 }) ?? true,
               value.approver.fixtureURL.map({ $0.scheme == "https" && $0.absoluteString.hasSuffix("/fixture/") }) ?? true else { throw MilaTrustError.invalid }
         return value
     }
@@ -139,12 +143,34 @@ enum MilaFixtureHook {
     }
 }
 
+/// The `MilaLiveSession` behind the journey's adapter, so steps without an
+/// adapter method (named terminal attach, `request show`, `show`, `web set`)
+/// use the same authenticated Rust session the app model holds.
+final class MilaFixtureLiveSession: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: MilaLiveSession?
+    var current: MilaLiveSession? {
+        get { lock.lock(); defer { lock.unlock() }; return value }
+        set { lock.lock(); value = newValue; lock.unlock() }
+    }
+}
+
+/// The machine detail `show MACHINE --json` reports (requested state and size).
+struct MilaFixtureMachineDetail: Decodable {
+    let id: UUID
+    let desiredState: String
+    let vcpu: UInt32?
+    let memoryBytes: UInt64?
+    enum CodingKeys: String, CodingKey { case id, desiredState = "desired_state", vcpu, memoryBytes = "memory_bytes" }
+}
+
 /// A signed-in fixture journey: the pinned HTTPS client and the app model.
 @MainActor struct MilaFixtureJourney {
     let descriptor: MilaJourneyDescriptor
     let http: URLSession
     let model: MilaAppModel
     let env: MilaIsolatedDefaults
+    let live: MilaFixtureLiveSession
 
     /// Loads the descriptor named by `MILA_JOURNEY_DESCRIPTOR`, or skips.
     static func descriptor() throws -> MilaJourneyDescriptor {
@@ -167,8 +193,11 @@ enum MilaFixtureHook {
         let deployment = MilaDeployment(host: descriptor.deployment.host, port: descriptor.deployment.sshPort, trust: trust)
         XCTAssertTrue(env.store.upsert(deployment))
         let signer = MilaFixtureSigner()
+        let live = MilaFixtureLiveSession()
         let sessions = MilaDeploymentSessionController(store: env.store, defaults: env.defaults) { value in
-            LinkedMilaFFIAdapter(session: try MilaLiveSession(trust: value.trust, host: value.host, port: value.port, sessionSigner: signer))
+            let session = try MilaLiveSession(trust: value.trust, host: value.host, port: value.port, sessionSigner: signer)
+            live.current = session
+            return LinkedMilaFFIAdapter(session: session)
         }
         let model = MilaAppModel(session: sessions, signIn: MilaSignInController(session: sessions, pollInterval: .seconds(1), approvalLifetime: 120))
         model.signIn.signIn(deployment)
@@ -194,7 +223,7 @@ enum MilaFixtureHook {
         }
         await assertEventually({ model.machines.state == .loaded || model.machines.state == .failed }, iterations: 6_000)
         XCTAssertEqual(model.machines.state, .loaded)
-        return MilaFixtureJourney(descriptor: descriptor, http: http, model: model, env: env)
+        return MilaFixtureJourney(descriptor: descriptor, http: http, model: model, env: env, live: live)
     }
 
     func finish() {
@@ -227,9 +256,156 @@ enum MilaFixtureHook {
         let name = descriptor.seed.machineName
         return try XCTUnwrap(model.machines.machines.first { $0.machine.name == name }, "seed machine \(name) is not listed")
     }
+
+    // MARK: Steps shared with the Windows (`JourneyPages.cs`) and Linux (`journey.rs`) journeys.
+
+    /// Marshall's closed refusals that mean "busy, retry with a fresh request ID".
+    static let busyRefusals: Set<String> = ["vm_busy", "temporarily_unavailable", "workload_not_stable"]
+    /// Refusals a terminal open answers while the guest terminal is still coming up.
+    static let terminalReadiness: Set<String> = ["terminal_open_pending", "terminal_unavailable", "temporarily_unavailable"]
+
+    /// A machine name unique to this run, in Rust's accepted alphabet.
+    static func machineName(_ purpose: String) -> String {
+        "mila-apple-\(purpose)-" + String(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(12))
+    }
+
+    /// The authenticated Rust session behind the model's adapter.
+    func session() throws -> MilaLiveSession {
+        try XCTUnwrap(live.current, "no live session")
+    }
+
+    /// The session's most recent closed refusal code (`{"error": …}`), if any.
+    func refusal() -> String? {
+        guard let json = model.adapter?.lastRefusal(), let data = json.data(using: .utf8),
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+        return object["error"] as? String
+    }
+
+    /// The named machine in a freshly loaded listing; nil only when a loaded listing lacks it.
+    func listed(_ name: String) async throws -> MilaMachinePresentation? {
+        await model.machines.refresh()
+        _ = await eventually({ model.machines.state != .loading }, iterations: 2_000)
+        guard model.machines.state == .loaded else { throw MilaJourneyFailure.step("machine listing \(model.machines.state)") }
+        return model.machines.machines.first { $0.machine.name == name }
+    }
+
+    /// Polls `check` until it yields a value or `seconds` pass.
+    func until<Value>(_ name: String, seconds: Double = 60, _ check: () async throws -> Value?) async throws -> Value {
+        let deadline = Date().addingTimeInterval(seconds)
+        while true {
+            if let value = try await check() { return value }
+            guard Date() < deadline else { throw MilaJourneyFailure.step("\(name): timeout") }
+            try await Task.sleep(for: .milliseconds(500))
+        }
+    }
+
+    /// Runs one mutation, retrying a closed busy refusal with a fresh request ID
+    /// until the step deadline; any other failure fails the step. Returns the
+    /// admitted request ID.
+    func submit(_ name: String, _ operation: (UUID) async throws -> Void) async throws -> UUID {
+        let deadline = Date().addingTimeInterval(60)
+        while true {
+            let request = UUID()
+            do {
+                try await operation(request)
+                return request
+            } catch let failure as MilaJourneyFailure {
+                throw failure
+            } catch {
+                let reason = refusal()
+                guard let reason, Self.busyRefusals.contains(reason), Date() < deadline else {
+                    throw MilaJourneyFailure.step("\(name): \(reason ?? String(describing: error))")
+                }
+                try await Task.sleep(for: .seconds(1))
+            }
+        }
+    }
+
+    /// The fixture's provisioner stand-in observes `machine`'s desired state.
+    func observe(_ machine: UUID) async throws -> String {
+        try await hook(.observe(machine: machine), as: MilaFixtureObserved.self).observedState
+    }
+
+    /// Creates a machine through the adapter call the SwiftUI create sheet makes, and waits for it to be listed.
+    func create(_ name: String) async throws -> MilaMachinePresentation {
+        let adapter = try XCTUnwrap(model.adapter)
+        _ = try await submit("lifecycle create") { request in
+            try await adapter.createMachine(name: name, cpu: 1, memory: 512, disk: 2, requestID: request)
+        }
+        return try await until("lifecycle create") { try await listed(name) }
+    }
+
+    /// Submits one lifecycle action through `MilaMachineWorkflow`, as the machine
+    /// page does; the action must be one the Rust projection offers for the
+    /// machine's current listing row. Returns the admitted request ID.
+    func lifecycle(_ action: MilaMachineAction, name: String) async throws -> UUID {
+        let adapter = try XCTUnwrap(model.adapter)
+        return try await submit("lifecycle \(action)") { request in
+            guard let machine = try await listed(name) else { throw MilaJourneyFailure.step("lifecycle \(action): \(name) is not listed") }
+            guard machine.actions.values.contains(action) else {
+                throw MilaJourneyFailure.step("lifecycle \(action) is not offered for \(machine.machine.desiredState)/\(machine.machine.observedState ?? "none")")
+            }
+            let workflow = MilaMachineWorkflow(adapter: adapter)
+            workflow.submit(action, machine: machine, requestID: request)
+            await workflow.settle()
+            guard case .applied(_, let applied) = workflow.state, applied == action else {
+                throw MilaSessionError.unavailable
+            }
+        }
+    }
+
+    /// The `request show` receipt reports the request accepted or succeeded
+    /// (the receipt's own status or its result's, as the Linux and Windows journeys read it).
+    func requestAdmitted(_ request: UUID) throws -> Bool {
+        let data = try session().requestShow(requestID: request)
+        guard let root = try JSONSerialization.jsonObject(with: data) as? [String: Any] else { return false }
+        func admitted(_ value: Any?) -> Bool {
+            guard let status = (value as? [String: Any])?["status"] as? String else { return false }
+            return status == "accepted" || status == "succeeded"
+        }
+        return admitted(root) || admitted(root["result"])
+    }
+
+    /// `show MACHINE`, bound to the requested machine.
+    func machineDetail(_ machine: UUID) throws -> MilaFixtureMachineDetail {
+        let detail = try MilaPorscheEnvelope<MilaFixtureMachineDetail>.decode(try session().machineShow(machine: machine))
+        guard detail.id == machine else { throw MilaJourneyFailure.step("machine show answered for another machine") }
+        return detail
+    }
+
+    /// Best-effort removal of a machine this run created: observe it (an open
+    /// operation keeps it busy) and ask to delete it until the step deadline.
+    func remove(_ machine: UUID) async {
+        let deadline = Date().addingTimeInterval(60)
+        while Date() < deadline {
+            _ = try? await observe(machine)
+            if (try? session().machineAction(machine: machine, action: "rm", requestID: UUID())) != nil { return }
+            try? await Task.sleep(for: .seconds(1))
+        }
+    }
+
+    /// Reads the PTY until its output contains `wanted`; a closed stream or the deadline fails the step.
+    func read(_ terminal: UInt64, until wanted: String, step: String, seconds: Double = 60) throws {
+        let session = try self.session()
+        var seen = Data()
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            switch try session.terminalRead(terminal, waitMilliseconds: 250) {
+            case .data(let chunk):
+                seen.append(chunk)
+                if seen.count > 512 * 1024 { seen = Data(seen.suffix(256 * 1024)) }
+                if String(decoding: seen, as: UTF8.self).contains(wanted) { return }
+            case .idle:
+                continue
+            case .closed:
+                throw MilaJourneyFailure.step("\(step): stream closed")
+            }
+        }
+        throw MilaJourneyFailure.step("\(step): timeout")
+    }
 }
 
-enum MilaJourneyFailure: Error, Equatable { case signIn, hook(action: String, status: Int) }
+enum MilaJourneyFailure: Error, Equatable { case signIn, hook(action: String, status: Int), step(String) }
 
 /// Reports one completed journey step on stdout, where `swift test` shows it in
 /// the CI log; the same `journey: <step> ok` form as the Windows journey.
@@ -400,6 +576,191 @@ private struct MilaJourneyStandInSusan: MilaSusanKeyIssuing {
         XCTAssertTrue(removed == nil || removed?.state == "revoked", "device still listed as \(removed?.state ?? "unknown")")
         journeyStep("notifications: device removed (read back)")
     }
+
+    /// @cc [owner:ghuntley,label:verification] mila-apple-journey-lifecycle
+    /// Create, stop, start, pause, resume and delete a machine this run creates,
+    /// then resize a second one, through the adapter calls and
+    /// `MilaMachineWorkflow` the SwiftUI machine pages use. Each step MUST be
+    /// read back (listing desired state, `request show`, `show`), not only the
+    /// mutation's status. The fixture's `observe` hook stands in for the
+    /// provisioner, so this proves recorded intent, not guest execution.
+    /// Pause and resume follow the Windows and Linux journeys: the pause is not
+    /// observed, because an observed pause turns resume into a checkpoint wake
+    /// whose `request show` receipt Marshall refuses (ADR-0264 open gap
+    /// `ssh-wake-receipt-physical-readiness`). The Rust projection offers Resume
+    /// only for an observed paused machine, so resume is dispatched through
+    /// `MilaLiveSession.machineAction`, not the workflow. Resize runs on a second
+    /// machine because an unapplied resize keeps its machine busy
+    /// (`resize_in_progress`).
+    func testCreateLifecycleDeleteAndResizeAgainstFixture() async throws {
+        let journey = try await MilaFixtureJourney.signIn(try MilaFixtureJourney.descriptor())
+        defer { journey.finish() }
+        let name = MilaFixtureJourney.machineName("life")
+        let machine = try await journey.create(name).id
+        _ = try await journey.observe(machine)
+        journeyStep("lifecycle create")
+
+        for (action, desired) in [(MilaMachineAction.stop, "stopped"), (.start, "running")] {
+            _ = try await journey.lifecycle(action, name: name)
+            _ = try await journey.until("lifecycle \(action)") { () async throws -> Bool? in
+                try await journey.listed(name)?.machine.desiredState == desired ? true : nil
+            }
+            let observed = try await journey.observe(machine)
+            XCTAssertEqual(observed, desired, "lifecycle \(action) observed")
+            journeyStep("lifecycle \(action) (\(desired))")
+        }
+
+        _ = try await journey.lifecycle(.pause, name: name)
+        _ = try await journey.until("lifecycle pause") { () async throws -> Bool? in
+            try await journey.listed(name)?.machine.desiredState == "paused" ? true : nil
+        }
+        journeyStep("lifecycle pause (paused)")
+
+        // Resume is a durable wake request; with no checkpoint in the fixture it
+        // passes when Marshall admits the request or the machine is requested running.
+        let wake = try await journey.submit("lifecycle resume") { request in
+            try journey.session().machineAction(machine: machine, action: "resume", requestID: request)
+        }
+        let resumed = try await journey.until("lifecycle resume") { () async throws -> String? in
+            if try journey.requestAdmitted(wake) { return "wake_requested" }
+            return try await journey.listed(name)?.machine.desiredState == "running" ? "running" : nil
+        }
+        journeyStep("lifecycle resume (\(resumed))")
+
+        _ = try await journey.lifecycle(.delete, name: name)
+        let deleted = try await journey.until("lifecycle delete") { () async throws -> String? in
+            guard let row = try await journey.listed(name) else { return "absent" }
+            return row.machine.desiredState == "deleted" ? "deleted" : nil
+        }
+        // The deletion holds capacity until the provisioner stand-in observes it.
+        _ = try? await journey.observe(machine)
+        journeyStep("lifecycle delete (\(deleted))")
+
+        let resizeName = MilaFixtureJourney.machineName("resize")
+        let target = try await journey.create(resizeName)
+        _ = try await journey.observe(target.id)
+        let adapter = try XCTUnwrap(journey.model.adapter)
+        let resize = try await journey.submit("lifecycle resize") { request in
+            guard let row = try await journey.listed(resizeName) else { throw MilaJourneyFailure.step("lifecycle resize: \(resizeName) is not listed") }
+            try await adapter.resize(machine: row, cpu: 2, memory: 1024, disk: 3, requestID: request)
+        }
+        // As on Linux and Windows: the machine reports the new size, or (a
+        // deployment that pins resizes for the provisioner) the request was admitted.
+        let resized = try await journey.until("lifecycle resize") { () async throws -> String? in
+            let detail = try journey.machineDetail(target.id)
+            if detail.vcpu == 2, detail.memoryBytes.map({ $0 / (1024 * 1024) }) == 1024 { return "resized" }
+            return try journey.requestAdmitted(resize) ? "resize_requested" : nil
+        }
+        journeyStep("lifecycle \(resized)")
+        await journey.remove(target.id)
+    }
+
+    /// @cc [owner:ghuntley,label:verification] mila-apple-journey-web
+    /// Web show through the adapter's `web show` projection, then public and
+    /// back to private through `MilaLiveSession.webSet`, each at the current
+    /// policy revision and read back at a newer one. It runs on a machine this
+    /// test creates, not the seed: the Windows journey sets the seed's web
+    /// policy against the same tunnelled fixture, and two clients racing one
+    /// optimistic revision would refuse each other.
+    func testWebShowAndSetPublicThenPrivateAgainstFixture() async throws {
+        let journey = try await MilaFixtureJourney.signIn(try MilaFixtureJourney.descriptor())
+        defer { journey.finish() }
+        let adapter = try XCTUnwrap(journey.model.adapter)
+        let machine = try await journey.create(MilaFixtureJourney.machineName("web")).id
+        _ = try await journey.observe(machine)
+
+        let before = try await adapter.webEndpointProjection(machine: machine)
+        XCTAssertEqual(before.machineID, machine)
+        XCTAssertTrue(before.visibility == "private" || before.visibility == "public", "web show visibility \(before.visibility)")
+        journeyStep("web show")
+
+        for isPublic in [true, false] {
+            let current = try await adapter.webEndpointProjection(machine: machine)
+            _ = try await journey.submit("web set") { request in
+                try journey.session().webSet(machine: machine, port: before.port, publicAccess: isPublic, revision: current.policyRevision, requestID: request)
+            }
+            let wanted = isPublic ? "public" : "private"
+            _ = try await journey.until("web set \(wanted)") { () async throws -> Bool? in
+                let after = try await adapter.webEndpointProjection(machine: machine)
+                return after.visibility == wanted && after.policyRevision > current.policyRevision ? true : nil
+            }
+            journeyStep("web set \(wanted)")
+        }
+        await journey.remove(machine)
+    }
+
+    /// @cc [owner:ghuntley,label:verification;terminal] mila-apple-journey-guest-terminal
+    /// The fixture's guest-backed terminal machine (descriptor
+    /// `seed.terminal_machine_id`), as the Windows and Linux journeys drive it:
+    /// `terminal new` and a named attach, a shell-computed echo, a resize to
+    /// 132x40 read back with `stty size`, a local detach and named reattach
+    /// whose output MUST come back from the server's replay, and `terminal
+    /// kill`, confirmed when the ended session can no longer be attached. Each
+    /// `terminal new` uses a fresh request ID, so this session is distinct from
+    /// the Windows journey's on the same machine. The PTY is the fixture's
+    /// terminal stand-in, not a real guest. This drives `MilaLiveSession`
+    /// directly; the SwiftUI `MilaTerminalController` stream is not exercised.
+    func testGuestTerminalEchoResizeReplayAndEndAgainstFixture() async throws {
+        let descriptor = try MilaFixtureJourney.descriptor()
+        guard let machine = descriptor.seed.terminalMachineID else {
+            throw XCTSkip("the fixture descriptor names no seed.terminal_machine_id")
+        }
+        let journey = try await MilaFixtureJourney.signIn(descriptor)
+        defer { journey.finish() }
+        let session = try journey.session()
+
+        // Open and attach, retrying only the closed readiness refusals for 180 s.
+        let (named, first) = try await journey.until("guest terminal attach", seconds: 180) { () async throws -> (UUID, UInt64)? in
+            do {
+                let opened = try session.terminalOpen(machine: machine, requestID: UUID())
+                return (opened, try session.terminalAttach(machine: machine, session: opened, columns: 100, rows: 30))
+            } catch {
+                let reason = journey.refusal()
+                guard let reason, MilaFixtureJourney.terminalReadiness.contains(reason) else {
+                    throw MilaJourneyFailure.step("guest terminal attach: \(reason ?? String(describing: error))")
+                }
+                try await Task.sleep(for: .seconds(2))
+                return nil
+            }
+        }
+        journeyStep("guest terminal attach (named session)")
+
+        let marker = "mila-" + String(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(12))
+        try session.terminalInput(first, data: Data("echo \(marker)-$((6*7))\r".utf8))
+        try journey.read(first, until: "\(marker)-42", step: "guest terminal echo")
+        journeyStep("guest terminal echo")
+
+        try session.terminalResize(first, columns: 132, rows: 40)
+        try session.terminalInput(first, data: Data("stty size\r".utf8))
+        try journey.read(first, until: "40 132", step: "guest terminal resize", seconds: 30)
+        journeyStep("guest terminal resize 132x40")
+
+        // Detach this viewport only, then attach a fresh one to the same named
+        // session: the earlier output must come back from the server's replay.
+        session.terminalKill(first)
+        let second = try session.terminalAttach(machine: machine, session: named, columns: 132, rows: 40)
+        try journey.read(second, until: "\(marker)-42", step: "guest terminal replay")
+        journeyStep("guest terminal detach and reattach with replay")
+
+        session.terminalKill(second)
+        guard try session.terminalEnd(machine: machine, session: named, requestID: UUID()) else {
+            throw MilaJourneyFailure.step("guest terminal end: the session is not reported closed (\(journey.refusal() ?? "none"))")
+        }
+        // Marshall confirms the close asynchronously: a named attach must come
+        // to be refused, or its stream must end at once.
+        let ended = try await journey.until("guest terminal end") { () async throws -> String? in
+            guard let probe = try? session.terminalAttach(machine: machine, session: named, columns: 80, rows: 24) else { return "refused" }
+            defer { session.terminalKill(probe) }
+            let deadline = Date().addingTimeInterval(3)
+            while Date() < deadline {
+                guard let chunk = try? session.terminalRead(probe, waitMilliseconds: 250) else { return "stream_failed" }
+                if case .closed = chunk { return "stream_closed" }
+            }
+            try await Task.sleep(for: .seconds(2))
+            return nil
+        }
+        journeyStep("guest terminal end (server session closed: \(ended))")
+    }
 }
 
 /// Descriptor v1 parsing and hook encoding, without a live fixture.
@@ -429,6 +790,27 @@ final class MilaJourneyDescriptorTests: XCTestCase {
         XCTAssertEqual(value.approver.fixtureURL?.appendingPathComponent("thread-create").absoluteString, "https://localhost:8444/fixture/thread-create")
         XCTAssertEqual(value.seed.machineID, UUID(uuidString: "0b6f5a52-6a4e-4c39-9d3b-6f3c1d1e2f30"))
         XCTAssertNil(try MilaJourneyDescriptor.load(try write(descriptor(fixtureURL: nil))).approver.fixtureURL)
+    }
+
+    func testDescriptorCarriesTheOptionalTerminalMachine() throws {
+        var object = descriptor(fixtureURL: "https://localhost:8444/fixture/")
+        XCTAssertNil(try MilaJourneyDescriptor.load(try write(object)).seed.terminalMachineID)
+        var seed = try XCTUnwrap(object["seed"] as? [String: Any])
+        seed["terminal_machine_id"] = "cf2dc277-763f-4c33-9fa5-503956fe6af8"
+        seed["terminal_machine_name"] = "vm-cf2dc277763f4c339fa5503956fe6af8"
+        object["seed"] = seed
+        let value = try MilaJourneyDescriptor.load(try write(object))
+        XCTAssertEqual(value.seed.terminalMachineID, UUID(uuidString: "cf2dc277-763f-4c33-9fa5-503956fe6af8"))
+        XCTAssertEqual(value.seed.terminalMachineName, "vm-cf2dc277763f4c339fa5503956fe6af8")
+        for bad in ["not-a-uuid", 7] as [Any] {
+            seed["terminal_machine_id"] = bad
+            object["seed"] = seed
+            XCTAssertThrowsError(try MilaJourneyDescriptor.load(try write(object)), "\(bad)")
+        }
+        seed["terminal_machine_id"] = "cf2dc277-763f-4c33-9fa5-503956fe6af8"
+        seed["terminal_machine_name"] = ""
+        object["seed"] = seed
+        XCTAssertThrowsError(try MilaJourneyDescriptor.load(try write(object)), "empty terminal machine name")
     }
 
     func testDescriptorRefusesAFixtureHookOutsideTLSOrItsPath() throws {

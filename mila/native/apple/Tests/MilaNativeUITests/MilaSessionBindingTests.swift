@@ -139,6 +139,12 @@ final class MilaLiveSessionRustLinkTests: XCTestCase {
             ("ptyPoll", { _ = try session.terminalPoll(0xDEAD_BEEF) }),
             ("ptyInput", { try session.terminalInput(0xDEAD_BEEF, data: Data("x".utf8)) }),
             ("ptyResize", { try session.terminalResize(0xDEAD_BEEF, columns: 80, rows: 24) }),
+            ("ptyRead", { _ = try session.terminalRead(0xDEAD_BEEF, waitMilliseconds: 10) }),
+            ("terminalOpen", { _ = try session.terminalOpen(machine: id, requestID: id) }),
+            ("terminalAttachSession", { _ = try session.terminalAttach(machine: id, session: id, columns: 80, rows: 24) }),
+            ("terminalEnd", { _ = try session.terminalEnd(machine: id, session: id, requestID: id) }),
+            ("machineShow", { _ = try session.machineShow(machine: id) }),
+            ("requestShow", { _ = try session.requestShow(requestID: id) }),
         ]
         for (name, operation) in operations {
             XCTAssertThrowsError(try operation(), name) { error in
@@ -154,6 +160,9 @@ final class MilaLiveSessionRustLinkTests: XCTestCase {
         let session = MilaLiveSession(unconnectedHandleForTesting: 0xDEAD_BEEF)
         XCTAssertThrowsError(try session.terminalAttach(machine: UUID(), columns: 0, rows: 24)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.terminalInput(1, data: Data())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.terminalAttach(machine: UUID(), session: UUID(), columns: 80, rows: 0)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.terminalRead(1, waitMilliseconds: 1_001)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.terminalRead(0, waitMilliseconds: 10)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.machineResize(machine: UUID(), cpu: 0, memory: 2048, disk: 20, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.webSet(machine: UUID(), port: 0, publicAccess: true, revision: 1, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertEqual(milaRequestID(UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!), "porsche-aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa")

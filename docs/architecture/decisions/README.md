@@ -1166,6 +1166,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md) | accepted | partial | Namespace remote cache and execution for Buck2 |
 | [ADR-0277](0277-mila-native-builds-on-buck2.md) | accepted | partial | Mila native builds on Buck2 with Nix toolchains |
 | [ADR-0278](0278-mila-push-notification-parity-scope.md) | accepted | implemented | Mila push-notification parity scope |
+| [ADR-0279](0279-mila-apple-app-lock-and-link-launch-parity-scope.md) | proposed | planned | Mila Apple app-lock and link-launch parity scope |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.
