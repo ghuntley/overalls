@@ -36,7 +36,15 @@ expr="let flake = builtins.getFlake \"path:$tree\"; a = flake.lib.assemble {
       revision = \"$revision\";
       artifacts = builtins.fromJSON (builtins.readFile (flake.outPath + \"/.buck-artifacts.json\"));
     }; in a.$attr"
-restrict=(--impure --option restrict-eval true
+# getFlake takes a path and flake.lock pins every input, so assembly needs
+# no flake registry. Restrict-eval resolves each lookup-path entry up front,
+# and a `flake:` entry (NixOS's `nixpkgs=flake:nixpkgs`) would read the global
+# registry, which fails without a route to channels.nixos.org (host
+# enrollment inside a test VM). An empty flake-registry leaves such entries
+# unresolved instead. nix-path itself stays: clearing it also drops
+# extra-nix-path, through which an offline host (the enrollment fixture)
+# grants restrict-eval its pinned sources.
+restrict=(--impure --option restrict-eval true --option flake-registry ""
   --option allowed-uris "github: https://github.com/ git+https://github.com/ https://api.github.com/")
 if [[ $mode == drv ]]; then
   # Evaluation only: the same declared tree and restrictions, no build and no
