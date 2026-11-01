@@ -5,6 +5,11 @@ defmodule Lilly.VM.ActorFailureSettledTest do
   alias Lilly.Control.Store
   alias Lilly.VM.Actor
   @moduletag :tmp_dir
+  # Positive receives wait for the actual signal; the bound only fails a
+  # genuinely lost message, so it is generous for loaded hosts (a 2 s bound
+  # flaked under a load average of about 20 on 2026-11-01). Negative bounds
+  # are unchanged.
+  @receive_ms 15_000
 
   @type event :: :tick | :cast | :restart | :newer_command
   @type run :: %{actor: pid(), command: map(), store: Store.t(), options: keyword()}
@@ -63,11 +68,11 @@ defmodule Lilly.VM.ActorFailureSettledTest do
           delete = %{newer(run.command) | kind: :delete}
           {:ok, :stored} = Store.accept(run.store, delete)
           Actor.reconcile(run.actor)
-          assert_receive {:execute, worker, ^delete, _}, 2000
+          assert_receive {:execute, worker, ^delete, _}, @receive_ms
           send(worker, {:result, {:ok, observation(:deleted, :none)}})
           id = delete.placement_id
           actor = run.actor
-          assert_receive {:vm_actor_outcome, ^id, ^actor, %{state: :deleted}}, 2000
+          assert_receive {:vm_actor_outcome, ^id, ^actor, %{state: :deleted}}, @receive_ms
         after
           stop_case(run.command.placement_id)
         end
@@ -87,7 +92,7 @@ defmodule Lilly.VM.ActorFailureSettledTest do
     command = newer(run.command)
     {:ok, :stored} = Store.accept(run.store, command)
     Actor.reconcile(run.actor)
-    assert_receive {:execute, _worker, ^command, _}, 2000
+    assert_receive {:execute, _worker, ^command, _}, @receive_ms
     stop_supervised!(command.placement_id)
   end
 
@@ -106,7 +111,7 @@ defmodule Lilly.VM.ActorFailureSettledTest do
     id = run.command.placement_id
     stop_case(id)
     actor = start_supervised!({Actor, run.options}, id: id)
-    assert_receive {:vm_actor_ready, ^id, ^actor, pending}, 2000
+    assert_receive {:vm_actor_ready, ^id, ^actor, pending}, @receive_ms
     run = %{run | actor: actor}
     recorded = :sys.get_state(actor).journal.outcome
     assert pending == nil or pending.id == recorded.id
@@ -137,12 +142,12 @@ defmodule Lilly.VM.ActorFailureSettledTest do
     id = command.placement_id
     actor = run.actor
     Actor.reconcile(actor)
-    assert_receive {:execute, worker, ^command, _}, 2000
+    assert_receive {:execute, worker, ^command, _}, @receive_ms
     monitor = Process.monitor(worker)
     send(worker, {:result, {:ok, observation(:failed, reason)}})
-    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}, 2000
-    assert_receive {:vm_actor_outcome, ^id, ^actor, %{state: :failed} = pending}, 2000
-    assert_receive {:vm_actor_reconciled, ^id, ^actor, _authority}, 2000
+    assert_receive {:DOWN, ^monitor, :process, ^worker, :normal}, @receive_ms
+    assert_receive {:vm_actor_outcome, ^id, ^actor, %{state: :failed} = pending}, @receive_ms
+    assert_receive {:vm_actor_reconciled, ^id, ^actor, _authority}, @receive_ms
     _ = :sys.get_state(actor)
     refute_received {:execute, _, _, _}
     outcome = :sys.get_state(actor).journal.outcome
@@ -172,7 +177,7 @@ defmodule Lilly.VM.ActorFailureSettledTest do
     ]
 
     actor = start_supervised!({Actor, options}, id: id)
-    assert_receive {:vm_actor_ready, ^id, ^actor, nil}, 2000
+    assert_receive {:vm_actor_ready, ^id, ^actor, nil}, @receive_ms
     %{actor: actor, command: command, store: store, options: options}
   end
 
