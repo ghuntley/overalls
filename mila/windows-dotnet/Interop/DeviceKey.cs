@@ -57,13 +57,19 @@ internal sealed class DeviceKey : IDisposable
     private static bool Exists(string name, CngProvider provider)
     {
         try { return CngKey.Exists(name, provider); }
-        catch (CryptographicException error) when (error.HResult is
-            unchecked((int)0x80090013) or unchecked((int)0x80090017) or unchecked((int)0x80090029))
+        catch (CryptographicException error) when (PlatformUnavailable(error.HResult))
         {
-            // Missing/undefined/unsupported platform provider, not a key access denial.
             return false;
         }
     }
+
+    /// <summary>
+    /// A missing, undefined or unsupported platform provider, or one with no
+    /// usable TPM (NTE_DEVICE_NOT_READY, as on hosted CI runners), is not a key
+    /// access denial: the software provider is used instead.
+    /// </summary>
+    internal static bool PlatformUnavailable(int hresult) => hresult is
+        unchecked((int)0x80090013) or unchecked((int)0x80090017) or unchecked((int)0x80090029) or unchecked((int)0x80090030);
 
     private static DeviceKey Create(string name, CngProvider provider) => new(CngKey.Create(
         CngAlgorithm.ECDsaP256, name, new CngKeyCreationParameters {

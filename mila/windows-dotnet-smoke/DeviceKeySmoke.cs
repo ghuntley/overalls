@@ -7,6 +7,10 @@ internal static class DeviceKeySmoke
 {
     internal static void Run()
     {
+        // NTE_DEVICE_NOT_READY (no usable TPM, as on hosted runners) falls back to
+        // software; NTE_PERM (access denied) must still propagate.
+        Program.Require(DeviceKey.PlatformUnavailable(unchecked((int)0x80090030)) && DeviceKey.PlatformUnavailable(unchecked((int)0x80090029)) &&
+            !DeviceKey.PlatformUnavailable(unchecked((int)0x80090010)), "platform provider fallback classification");
         string host = "custody-" + Guid.NewGuid().ToString("N") + ".example.test";
         CngProvider? provider = null;
         try
