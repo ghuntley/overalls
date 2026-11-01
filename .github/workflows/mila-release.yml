@@ -316,6 +316,10 @@ jobs:
             echo 'Apple native package must remain independent of Flutter' >&2
             exit 1
           fi
+          # The bundled locale catalogs are generated (as //mila:apple-swift-test
+          # and build.sh do); the localization tests fail without them.
+          python3 ../../localization/generate_catalogs.py \
+            --source ../../localization/catalogs --output Sources/MilaNativeUI/Resources
           swift build -c release
           swift test -c release
       # Signing canaries for the Buck2 log check below: mask the values the
