@@ -17,7 +17,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-brady-storage.py",
     ],
 )
 
@@ -32,7 +32,7 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-brady-storage.py",
     ],
 )
 
@@ -45,6 +45,6 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-brady-storage.py",
     ],
 )

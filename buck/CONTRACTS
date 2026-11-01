@@ -295,12 +295,15 @@ ASSEMBLY_ARTIFACTS key to a stand-in and fails when a drvPath changes (ADR-0269)
 
 @cc [owner:ghuntley,label:build;verification] machine-test-module-inputs
 A machine test MUST declare //nix:system_modules when its catalog parameters
-pass `service`, featureFleet, host fixtures or a non-plain `modules.*`, or
-when its suite or a suite it references names a module path; a test that
-reaches only plain modules MUST declare their //nix:module-* groups. Flake
-output, check and host assemblies MUST keep the full //nix:srcs. Restrict-eval
-over the declared copy turns a missed module into an evaluation error
-(ADR-0270).
+pass the whole system catalog (`service`, modules.default, featureFleet or
+host fixtures) or when a file it reads names the catalog itself. Otherwise it
+MUST declare one generated //nix:module-* group per module it reaches: each
+catalog module named in `serviceOf`/modules.select (plus //nix:module-catalog),
+each module attribute it passes, and each module path its suite, sibling
+suites or test helpers name. A group holds the files under nix/domains/system
+that its module path reads. Flake output, check and host assemblies MUST keep
+the full //nix:srcs. Restrict-eval over the declared copy turns a missed file
+into an evaluation error (ADR-0270).
 
 @cc [owner:ghuntley,label:build] mix-sources-declared
 mix_sources MUST name every file a Mix action reads by its repository path,

@@ -16,6 +16,8 @@ nixos_machine_test(
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-enrico",
+        "//nix:module-otel-fleet-request-identities",
+        "//nix:module-otel-fleet-request-recorder",
     ],
 )

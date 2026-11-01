@@ -14,6 +14,10 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-log-store",
+        "//nix:module-logging",
+        "//nix:module-otel-fleet-grafana-logs",
+        "//nix:module-otel-fleet-logs-dashboard",
+        "//nix:module-otel-fleet-operations-dashboard",
     ],
 )

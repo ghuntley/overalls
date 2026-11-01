@@ -14,7 +14,12 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-auto-update",
+        "//nix:module-catalog",
+        "//nix:module-nix-cache",
+        "//nix:module-nix-compact",
+        "//nix:module-secrets",
+        "//nix:module-susan",
         "//nix/verification/tests/machines/susan-service:srcs",
     ],
 )

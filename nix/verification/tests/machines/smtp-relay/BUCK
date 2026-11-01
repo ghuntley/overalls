@@ -14,6 +14,16 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-auto-update",
+        "//nix:module-auto-update-runtime.py",
+        "//nix:module-catalog",
+        "//nix:module-lilly",
+        "//nix:module-marshall",
+        "//nix:module-nix-cache",
+        "//nix:module-nix-compact",
+        "//nix:module-proxy",
+        "//nix:module-secrets",
+        "//nix:module-secrets-prepare.py",
+        "//nix:module-smtp-relay-environment",
     ],
 )

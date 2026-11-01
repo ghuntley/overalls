@@ -14,7 +14,8 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-auto-update-resources.py",
+        "//nix:module-auto-update-runtime.py",
         "//nix/verification/tests/machines/auto-update:srcs",
     ],
 )

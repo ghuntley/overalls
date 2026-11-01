@@ -135,9 +135,7 @@ nixos_machine_test(
     nested_kvm = False,
     labels = [],
     params = {},
-    inputs = NIX_INPUTS + PACKAGE_INPUTS + [
-        "//nix:system_modules",
-    ],
+    inputs = NIX_INPUTS + PACKAGE_INPUTS,
 )
 
 # A KVM evaluation check (a machine test by its features) outside ./machines.
@@ -148,7 +146,5 @@ nixos_machine_test(
     nested_kvm = False,
     labels = [],
     params = {},
-    inputs = NIX_INPUTS + PACKAGE_INPUTS + [
-        "//nix:system_modules",
-    ],
+    inputs = NIX_INPUTS + PACKAGE_INPUTS,
 )

@@ -5,6 +5,9 @@
 let
   modules = {
     default = import ../domains/system/catalog.nix { packages = packages; nixCompact = nixCompact; };
+    # Only the named catalog modules, for machine tests that declare only
+    # their files (ADR-0270, buck/machine_tests.py).
+    select = names: import ../domains/system/catalog.nix { packages = packages; nixCompact = nixCompact; only = names; };
     # Kept out of the default catalog: only flake-packages hosts and tests that
     # pass the locked inputs import tribuchet and nix-grpc-store (ADR-0248).
     fleetBuilds = import ../domains/system/fleet-builds.nix { inherit tribuchet; nixGrpcStore = nix-grpc-store; };

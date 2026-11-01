@@ -14,6 +14,9 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-firecracker-logging-collector.py",
+        "//nix:module-logging",
+        "//nix:module-logging-runtime.py",
+        "//nix:module-security-audit",
     ],
 )

@@ -69,8 +69,10 @@ PR runs the affected machine-test set, and the approved migration plan.
 ## Consequences
 
 - Pull requests catch machine-test regressions before trunk.
-- Until modules have their own targets (M11), a module change selects about 60
-  suites plus all the fleet variants. Selection is correct but broad.
+- A service module change selects the suites that import it plus the 76
+  machine tests that take the whole catalog (fleet variants and host
+  installs). A change to a module every host applies (`auto-update`,
+  `nix-compact`, `nix-cache`) still selects every `service` suite.
 - CI cost rises for changes that touch shared modules. The NativeLink cache
   and Nix's own substitution of passing test outputs reduce reruns.
 
@@ -209,23 +211,43 @@ PR runs the affected machine-test set, and the approved migration plan.
 
 Remaining gaps:
 
-- Module inputs are narrowed only by catalog parameters (M11). `NIX_INPUTS`
-  names `//nix:base`, every `nix/` file except the NixOS modules under
+- Module inputs are narrowed per module (M11). `NIX_INPUTS` names
+  `//nix:base`, every `nix/` file except the NixOS modules under
   `domains/system` (it keeps the few files the package set reads there).
-  [machine_tests.py](../../../buck/machine_tests.py) adds
-  `//nix:system_modules` to a suite whose parameters pass `service`,
-  featureFleet, host fixtures or a non-plain `modules.*`, or whose files name
-  a module path, and one `//nix:module-*` group to a suite that reaches only
-  a plain module (contract `machine-test-module-inputs`). 51 of 206 machine
-  tests narrow, 49 of them to no module at all; the 155 others still take
-  every module, because `modules.default` is one catalog. `tools/affected`
-  on a one-line change to `sysctl.nix` selected 206 machine tests before and
-  156 after; on `tailscale.nix`, 155 after. The 191 builds (flake outputs and
-  hosts, which keep `//nix:srcs`) are unchanged. All 51 narrowed assemblies
-  evaluated (`[drv]`) over their declared-only trees, and the `sysctl` and
-  `access` machine tests passed through them. Splitting that catalog per
-  service is the remaining step. On 2026-11-01, at trunk `fed7f3e2b`, on
-  Dungarees:
+  The system catalog ([catalog.nix](../../../nix/domains/system/catalog.nix))
+  names each module, and `modules.select` imports only the named ones in
+  catalog order. A machine-test catalog entry passes `serviceOf [ … ]` (the
+  service inputs with such a selection) instead of `service`.
+  [machine_tests.py](../../../buck/machine_tests.py) generates one
+  `//nix:module-*` group per module path a test can reach, holding the files
+  under `domains/system` that path reads
+  ([modules.bzl](../../../nix/verification/tests/machines/modules.bzl)), and
+  gives each test the groups of the modules it selects, the module attributes
+  it passes, and the module paths its suite, sibling suites and test helpers
+  name. A test still declares `//nix:system_modules` when it reaches the whole
+  catalog: `service`, `modules.default`, featureFleet or host fixtures, or a
+  file that imports `catalog.nix` itself (contract
+  `machine-test-module-inputs`). 128 of 204 machine tests narrow (153 took
+  every module before); 76 still take every module: the 67 fleet variants and nine host-install,
+  host-image and Inception tests, whose hosts are built from the production
+  profile with the whole catalog. Three modules apply to every host unconditionally
+  (`auto-update`'s deployment descriptor, `nix-compact`'s Nix and
+  `nix-cache`'s substituters), so every selection includes them and a change
+  to them still selects every narrowed `service` suite.
+  Every selection reproduces its test's derivation exactly. On dungarees, at
+  trunk `fed7f3e2b`, the 90 non-fleet machine tests that took every module,
+  plus `fleet` and `audi-fleet`, were evaluated (`[drv]`) before and after
+  over their declared-only trees: 85 drvPaths were identical, and the other
+  five embed the repository's own sources (update fixture or project copy),
+  which this change edits. Rebased on `70a83356c`, all 128 narrowed tests
+  evaluated, and each of the 48 `serviceOf`/`modules.select` tests has the
+  same drvPath as its whole-catalog variant in the same tree. `tools/affected` on a one-line change to `susan.nix` selects
+  the suites that import it plus the whole-catalog ones (fixture
+  `one service module selects only its importers and whole-catalog tests`).
+  Fleet variants stay broad until their host fixture stops importing the
+  whole catalog, which would change what they test.
+  The first pass (parameters only) narrowed 51 suites. On 2026-11-01, at
+  trunk `fed7f3e2b`, on Dungarees:
   - every narrowed suite's `.assembly[drv]` evaluated over its declared-only
     tree (51 of 51, 354 s);
   - ten of them ran in full: nix-ld, vm-watch, image-copy, source-export,

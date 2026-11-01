@@ -12,10 +12,16 @@ nixos_machine_test(
     nested_kvm = False,
     labels = [],
     params = {
-        "module": "modules.default",
+        "module": "modules.select [ \"nix-cache\" \"nix-compact\" \"marshall\" \"proxy\" \"runtime-socket\" \"auto-update\" ]",
     },
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-auto-update",
+        "//nix:module-catalog",
+        "//nix:module-marshall",
+        "//nix:module-nix-cache",
+        "//nix:module-nix-compact",
+        "//nix:module-proxy",
+        "//nix:module-runtime-socket",
     ],
 )

@@ -2,6 +2,9 @@
 let
   # Keep the application build input separate from the stable NixOS test input.
   service = { pkgs = testPkgs; module = modules.default; inherit packages; };
+  # The service inputs with only the named system modules (ADR-0270): the
+  # machine test then declares only their files (buck/machine_tests.py).
+  serviceOf = names: service // { module = modules.select names; };
   storage = { pkgs = testPkgs; inherit packages; };
 
   # @cc [owner:ghuntley,label:verification] hegel-framework-packages
@@ -53,7 +56,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
     cargoVendor = packages.cargoWorkspace.vendor;
   }) // {
   hegel-framework-packages = hegel-framework-packages;
-  team-ssh = import ./machines/team-ssh service;
+  team-ssh = import ./machines/team-ssh (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "auto-update" ]);
   vscode-web-package = import ./machines/vscode-web { pkgs = testPkgs; inherit packages; };
   windows-editor-acceptance-harness = import ./machines/windows-editor { pkgs = testPkgs; inherit packages; };
   vscode-web-broker = packages.vscodeWebBroker;
@@ -73,49 +76,49 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   database-recovery-asymmetric = import ./machines/database-recovery { pkgs = testPkgs; inherit packages; faultMode = "asymmetric"; };
   database-recovery-active-silent = import ./machines/database-recovery { pkgs = testPkgs; inherit packages; activeHolder = true; faultMode = "silent"; };
   database-recovery-active-asymmetric = import ./machines/database-recovery { pkgs = testPkgs; inherit packages; activeHolder = true; faultMode = "asymmetric"; };
-  teams-browser = import ./machines/teams service;
-  scim = import ./machines/scim service;
-  installer-trust = import ./machines/installer-trust service;
-  admin-account-browser = import ./machines/admin-account service;
-  localization-account-porsche = import ./machines/localization service;
-  control-room-browser = import ./machines/control-room service;
-  credential-self-service-browser = import ./machines/credential-self-service service;
-  job-history-browser = import ./machines/job-history service;
-  mfa-login-browser = import ./machines/mfa-login service;
-  ziggy-service = import ./machines/ziggy-service service;
+  teams-browser = import ./machines/teams (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  scim = import ./machines/scim (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  installer-trust = import ./machines/installer-trust (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "auto-update" ]);
+  admin-account-browser = import ./machines/admin-account (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  localization-account-porsche = import ./machines/localization (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "auto-update" ]);
+  control-room-browser = import ./machines/control-room (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  credential-self-service-browser = import ./machines/credential-self-service (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  job-history-browser = import ./machines/job-history (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "secrets" "auto-update" ]);
+  mfa-login-browser = import ./machines/mfa-login (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  ziggy-service = import ./machines/ziggy-service (serviceOf [ "nix-cache" "nix-compact" "lilly" "ziggy" "galileo" "secrets" "auto-update" ]);
   agent-cli = import ./machines/agent-cli { pkgs = testPkgs; inherit packages hegel; };
-  ziggy-underclass = import ./machines/ziggy-underclass service;
+  ziggy-underclass = import ./machines/ziggy-underclass (serviceOf [ "underclass" "nix-cache" "nix-compact" "lilly" "ziggy" "galileo" "secrets" "auto-update" ]);
   fleet-network = import ./machines/fleet-network { pkgs = testPkgs; };
-  galileo-service = import ./machines/galileo-service service;
-  github-integration = import ./machines/github-integration service;
+  galileo-service = import ./machines/galileo-service (serviceOf [ "request-recorder" "nix-cache" "nix-compact" "lilly" "ziggy" "galileo" "secrets" "auto-update" ]);
+  github-integration = import ./machines/github-integration (serviceOf [ "request-recorder" "nix-cache" "nix-compact" "lilly" "ziggy" "galileo" "secrets" "auto-update" ]);
   github-integration-fleet = featureFleet { githubIntegration = true; audi = true; galileo = true; };
   github-integration-ubuntu-fleet = featureFleet { githubIntegration = true; githubFamily = "ubuntu"; audi = true; galileo = true; };
   github-integration-arch-fleet = featureFleet { githubIntegration = true; githubFamily = "arch"; audi = true; galileo = true; };
   github-integration-almalinux-fleet = featureFleet { githubIntegration = true; githubFamily = "almalinux"; audi = true; galileo = true; };
   github-integration-windows-fleet = featureFleet { githubIntegration = true; githubFamily = "windows"; audi = true; galileo = true; };
   enrico-service = import ./machines/enrico-service { pkgs = testPkgs; module = modules.services.enrico; inherit packages; };
-  git-mirrors-browser = import ./machines/git-mirrors service;
+  git-mirrors-browser = import ./machines/git-mirrors (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "enrico" "proxy" "auto-update" ]);
   underclass-package = packages.underclass;
   underclass-configuration = import ./evaluation/underclass.nix {
     pkgs = testPkgs; inherit nixpkgs; module = modules.default;
   };
-  underclass-service = import ./machines/underclass-service (service // { inherit hegel; });
-  underclass-egress = import ./machines/underclass-egress service;
-  underclass-slo = import ./machines/underclass-slo service;
-  porsche-service = import ./machines/porsche-service service;
-  push-notifications = import ./machines/push-notifications service;
-  mila-journey = import ./machines/mila-journey service;
-  push-relay = import ./machines/push-relay service;
-  porsche-secrets = import ./machines/porsche-secrets service;
+  underclass-service = import ./machines/underclass-service (serviceOf [ "underclass" "nix-cache" "nix-compact" "auto-update" ] // { inherit hegel; });
+  underclass-egress = import ./machines/underclass-egress (serviceOf [ "underclass" "nix-cache" "nix-compact" "auto-update" ]);
+  underclass-slo = import ./machines/underclass-slo (serviceOf [ "underclass" "nix-cache" "nix-compact" "auto-update" ]);
+  porsche-service = import ./machines/porsche-service (serviceOf [ "logging" "request-recorder" "nix-cache" "nix-compact" "porsche" "auto-update" ]);
+  push-notifications = import ./machines/push-notifications (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
+  mila-journey = import ./machines/mila-journey (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "auto-update" ]);
+  push-relay = import ./machines/push-relay (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "susan" "proxy" "secrets" "auto-update" ]);
+  porsche-secrets = import ./machines/porsche-secrets (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "porsche" "proxy" "secrets" "auto-update" ]);
   # Susan push relay (ADR-0224): service limits/replay/audit, SOPS custody and
   # the OCI image. Susan is deployed independently of every Marshall.
-  susan-service = import ./machines/susan-service service;
-  susan-secrets = import ./machines/susan-secrets service;
+  susan-service = import ./machines/susan-service (serviceOf [ "nix-cache" "nix-compact" "susan" "secrets" "auto-update" ]);
+  susan-secrets = import ./machines/susan-secrets (serviceOf [ "nix-cache" "nix-compact" "susan" "secrets" "auto-update" ]);
   # SOPS-delivered fleet addresses and runtime firewall rules (ADR-0233).
-  fleet-addresses = import ./machines/fleet-addresses service;
+  fleet-addresses = import ./machines/fleet-addresses (serviceOf [ "fleet-firewall" "fleet-addresses" "nix-cache" "nix-compact" "secrets" "auto-update" ]);
   susan-image = import ./machines/susan-image { pkgs = testPkgs; inherit packages; };
-  porsche-crash-dumps = import ./machines/porsche-crash-dumps service;
-  administrative-ssh = import ./machines/administrative-ssh service;
+  porsche-crash-dumps = import ./machines/porsche-crash-dumps (serviceOf [ "nix-cache" "nix-compact" "porsche" "auto-update" ]);
+  administrative-ssh = import ./machines/administrative-ssh (serviceOf [ "nix-cache" "nix-compact" "porsche" "auto-update" ]);
   porsche-configuration = import ./evaluation/porsche.nix { pkgs = testPkgs; module = modules.default; };
   logging-transports = import ./evaluation/logging.nix { pkgs = testPkgs; inherit packages; };
   encrypted-crash-dumps = buildPkgs.runCommand "overalls-encrypted-crash-dumps" { nativeBuildInputs = [ buildPkgs.python3 buildPkgs.openssl ]; } ''
@@ -124,21 +127,21 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   '';
   logging = import ./machines/logging { pkgs = testPkgs; inherit packages; };
   log-store = import ./machines/log-store { pkgs = testPkgs; inherit packages; };
-  public-grafana = import ./machines/public-grafana { pkgs = testPkgs; module = modules.default; };
+  public-grafana = import ./machines/public-grafana { pkgs = testPkgs; module = modules.select [ "otel-guest" "otel-fleet" "fleet-firewall" "nix-cache" "fleet-network" "nix-compact" "marshall" "proxy" "auto-update" ]; };
   public-grafana-configuration = import ./evaluation/public-grafana.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
-  proxy-runtime-address = import ./machines/proxy-runtime-address { pkgs = testPkgs; module = modules.default; };
+  proxy-runtime-address = import ./machines/proxy-runtime-address { pkgs = testPkgs; module = modules.select [ "nix-cache" "nix-compact" "marshall" "proxy" "runtime-socket" "auto-update" ]; };
   runtime-socket-configuration =import ./evaluation/runtime-socket.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
   trace-spool-native = import ./machines/trace-spool { pkgs = testPkgs; inherit packages; };
   otel-fleet = import ./machines/otel-fleet { pkgs = testPkgs; inherit packages; };
   otel-burn-delivery = import ./machines/otel-burn-delivery { pkgs = testPkgs; inherit hegel; };
-  otel-marshall = import ./machines/otel-marshall service;
+  otel-marshall = import ./machines/otel-marshall (serviceOf [ "otel-guest" "otel-fleet" "request-recorder" "nix-cache" "fleet-network" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ]);
   otel-request-recorder = import ./machines/otel-request-recorder { pkgs = testPkgs; inherit packages hegel; };
   otel-request-recorder-commit-reply-loss = import ./machines/otel-request-recorder {
     pkgs = testPkgs; inherit packages hegel; commitReplyLoss = true;
   };
   otel-slo-rules = import ./evaluation/otel-slo-rules.nix { pkgs = buildPkgs; };
   telemetry-diagnostics = import ./evaluation/telemetry-diagnostics.nix { pkgs = buildPkgs; };
-  application-metrics = import ./machines/application-metrics service;
+  application-metrics = import ./machines/application-metrics (serviceOf [ "logging" "nix-cache" "nix-compact" "marshall" "lilly" "ziggy" "galileo" "proxy" "secrets" "auto-update" ]);
   relocation-diagnostics = buildPkgs.runCommand "overalls-relocation-diagnostics-tests" { nativeBuildInputs = [ buildPkgs.python3 ]; } ''
     export PYTHONDONTWRITEBYTECODE=1
     python3 -W error ${./evaluation/relocation-diagnostics.py} ${./machines/fleet/relocation-diagnostics.py}
@@ -160,12 +163,12 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   brady-network = import ./machines/brady-network { pkgs = testPkgs; inherit packages; };
   brady-flow = import ./machines/brady-flow { pkgs = testPkgs; inherit packages; };
   vm-watch = import ./machines/vm-watch { pkgs = testPkgs; inherit packages; };
-  fleet-exporter-native = import ./machines/fleet-exporter service;
+  fleet-exporter-native = import ./machines/fleet-exporter (serviceOf [ "fleet-exporter" "nix-cache" "nix-compact" "lilly" "ziggy" "galileo" "secrets" "auto-update" ]);
   fleet-monitor-configuration = import ./evaluation/fleet-monitor.nix { pkgs = testPkgs; module = modules.default; };
-  remote-builders = import ./machines/remote-builders service;
+  remote-builders = import ./machines/remote-builders (serviceOf [ "access" "remote-builders" "nix-cache" "nix-compact" "secrets" "auto-update" ]);
   remote-builders-configuration = import ./evaluation/remote-builders.nix { pkgs = testPkgs; inherit nixpkgs; module = modules.default; };
   fleet-roster = import ./evaluation/fleet-roster.nix { pkgs = buildPkgs; };
-  fleet-builds = import ./machines/fleet-builds (service // { fleetModule = modules.fleetBuilds; });
+  fleet-builds = import ./machines/fleet-builds (serviceOf [ "remote-builders" "nix-cache" "nix-compact" "secrets" "auto-update" ] // { fleetModule = modules.fleetBuilds; });
   # The repository's Buck2 (buildPkgs), as tools/buck2 runs it (ADR-0272).
   access = import ./machines/access { pkgs = testPkgs; module = modules.security.access; };
   access-configuration = import ./evaluation/access.nix {
@@ -303,7 +306,7 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   backup-operators = import ./evaluation/backup-operators.nix { pkgs = buildPkgs; };
   backup-custody = import ./evaluation/backup-custody.nix { pkgs = buildPkgs; };
   backup-configuration = import ./evaluation/backup-configuration.nix { pkgs = testPkgs; module = modules.default; };
-  backup-recovery = import ./machines/backups service;
+  backup-recovery = import ./machines/backups (serviceOf [ "backups" "nix-cache" "nix-compact" "marshall" "auto-update" ]);
   guest-backups = import ./machines/zfs-guest { pkgs = testPkgs; inherit packages; backups = true; };
   zfs-guest-clone = import ./machines/zfs-guest (storage // { cloneMatrix = true; });
   private-services-guest = import ./evaluation/private-services.nix { pkgs = buildPkgs; };
@@ -328,18 +331,18 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
     pkgs = testPkgs;
     inherit fixtures;
   };
-  smtp-relay = import ./machines/smtp-relay service;
-  enrollment-operator = import ./machines/enrollment-operator service;
-  service-roles = import ./machines/service-roles service;
+  smtp-relay = import ./machines/smtp-relay (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "secrets" "auto-update" ]);
+  enrollment-operator = import ./machines/enrollment-operator (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "ziggy" "galileo" "proxy" "secrets" "auto-update" ]);
+  service-roles = import ./machines/service-roles (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "ziggy" "galileo" "proxy" "secrets" "auto-update" ]);
   ziggy-configuration = import ./evaluation/ziggy.nix { pkgs = testPkgs; module = modules.default; inherit packages; };
   audi-configuration = import ./evaluation/audi.nix { pkgs = testPkgs; module = modules.default; };
-  audi-service = import ./machines/audi-service service;
-  audi-dns = import ./machines/audi-dns service;
+  audi-service = import ./machines/audi-service (serviceOf [ "otel-guest" "otel-fleet" "request-recorder" "nix-cache" "fleet-network" "nix-compact" "marshall" "lilly" "ziggy" "galileo" "audi" "proxy" "secrets" "auto-update" ]);
+  audi-dns = import ./machines/audi-dns (serviceOf [ "request-recorder" "nix-cache" "fleet-network" "nix-compact" "audi" "auto-update" ]);
   ssh-host-certificates = import ./machines/ssh-host-certificates storage;
   audi-openssh = import ./machines/audi-openssh storage;
   sysctl = import ./machines/sysctl { pkgs = testPkgs; module = modules.platform.sysctl; };
   nix-ld = import ./machines/nix-ld { pkgs = testPkgs; };
-  auto-update = import ./machines/auto-update service;
+  auto-update = import ./machines/auto-update (serviceOf [ "nix-cache" "nix-compact" "auto-update" ]);
   nix-gc-configuration = import ./evaluation/nix-gc.nix {
     pkgs = testPkgs; inherit nixpkgs; module = modules.default; inherit fixtures;
   };
@@ -482,17 +485,17 @@ buildPkgs.lib.genAttrs [ "marshall-release" "lilly-release" "audi-release" "pors
   customer-isolation-fleet = featureFleets.customer-isolation-fleet;
   relocation-fleet = featureFleets.relocation-fleet;
   memory-suspension-fleet = featureFleets.memory-suspension-fleet;
-  secret-custody = import ./machines/secret-custody (service // { inherit hegel; });
+  secret-custody = import ./machines/secret-custody (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "secrets" "auto-update" ] // { inherit hegel; });
   sharing-surfaces = featureFleets.sharing-surfaces;
   # Artifact content origin lockdown (plan §6): proxy + Marshall + Chromium.
-  artifact-origin = import ./machines/artifact-origin (service // { inherit hegel; });
-  credential-rotation = import ./machines/credential-rotation service;
+  artifact-origin = import ./machines/artifact-origin (serviceOf [ "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "auto-update" ] // { inherit hegel; });
+  credential-rotation = import ./machines/credential-rotation (serviceOf [ "nix-cache" "nix-compact" "marshall" "secrets" "auto-update" ]);
   acme-lookup = import ./evaluation/acme-lookup.nix { pkgs = testPkgs; };
-  acme-http01 = import ./machines/acme-http01 service;
-  acme-route53 = import ./machines/acme-route53 service;
+  acme-http01 = import ./machines/acme-http01 (serviceOf [ "fleet-firewall" "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "acme" "auto-update" ]);
+  acme-route53 = import ./machines/acme-route53 (serviceOf [ "fleet-firewall" "nix-cache" "nix-compact" "marshall" "lilly" "proxy" "acme" "secrets" "auto-update" ]);
   native-zfs = import ./machines/native-zfs storage;
   native-backup-cleanup = import ./machines/backup-cleanup storage;
-  packaged-backup-cleanup = import ./machines/backup-cleanup/packaged.nix service;
+  packaged-backup-cleanup = import ./machines/backup-cleanup/packaged.nix (serviceOf [ "backups" "nix-cache" "nix-compact" "auto-update" ]);
   private-services-network = import ./machines/private-services storage;
   peach-service = import ./evaluation/peach-service.nix { pkgs = testPkgs; packages = packages; };
   audi-ingress-network = import ./machines/audi-ingress storage;

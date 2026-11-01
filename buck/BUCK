@@ -70,7 +70,12 @@ script_test(
     name = "machine_tests_fresh",
     script = "machine_tests.py",
     args = ["check"],
-    deps = ["//nix:srcs", "//nix/verification/tests/machines:suites"],
+    # machines:srcs holds the generated suites.bzl and modules.bzl.
+    deps = [
+        "//nix:srcs",
+        "//nix/verification/tests/machines:srcs",
+        "//nix/verification/tests/machines:suites",
+    ],
 )
 
 # Selection fixtures for tools/affected (ADR-0270).

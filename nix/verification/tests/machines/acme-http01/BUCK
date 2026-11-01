@@ -14,6 +14,14 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-acme",
+        "//nix:module-auto-update",
+        "//nix:module-catalog",
+        "//nix:module-fleet-firewall",
+        "//nix:module-lilly",
+        "//nix:module-marshall",
+        "//nix:module-nix-cache",
+        "//nix:module-nix-compact",
+        "//nix:module-proxy",
     ],
 )

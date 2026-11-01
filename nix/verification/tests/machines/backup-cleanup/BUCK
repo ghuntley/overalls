@@ -14,7 +14,7 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-backups",
     ],
 )
 
@@ -27,6 +27,10 @@ nixos_machine_test(
     params = {},
     inputs = NIX_INPUTS + PACKAGE_INPUTS + [
         ":srcs",
-        "//nix:system_modules",
+        "//nix:module-auto-update",
+        "//nix:module-backups",
+        "//nix:module-catalog",
+        "//nix:module-nix-cache",
+        "//nix:module-nix-compact",
     ],
 )

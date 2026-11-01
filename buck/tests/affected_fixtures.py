@@ -141,6 +141,19 @@ def main() -> int:
         for free in ("sysctl:sysctl", "nix-ld:nix-ld", "fleet-network:fleet-network"):
             assert f"root//nix/verification/tests/machines/{free}" not in machines, free
 
+    machines_root = "root//nix/verification/tests/machines/"
+
+    def one_module(s: dict[str, object]) -> None:
+        # A single service module selects the suites that import it and the
+        # whole-catalog ones (fleet variants, host installs), nothing else.
+        assert s["everything"] is False, s["reasons"]
+        machines = targets(s, "machine_tests")
+        assert machines_root + "susan-service:susan-service" in machines
+        assert fleet <= machines, f"missing fleet variants {sorted(fleet - machines)[:5]}"
+        for other in ("team-ssh:team-ssh", "ziggy-service:ziggy-service", "sysctl:sysctl"):
+            assert machines_root + other not in machines, other
+        assert len(machines) < 100, f"{len(machines)} machine tests"
+
     scenario = "scenarios/porsche-threads.py"
     expected = {FLEET + v for v, used in scenarios.items() if scenario in used}
 
@@ -173,6 +186,11 @@ def main() -> int:
         "one fleet scenario selects only its variants",
         lambda: touch(repo, f"nix/verification/tests/machines/fleet/{scenario}"),
         one_scenario,
+    )
+    fixture(
+        "one service module selects only its importers and whole-catalog tests",
+        lambda: touch(repo, "nix/domains/system/susan.nix"),
+        one_module,
     )
     fixture("deleted file resolves on base", lambda: (repo / first_lilly_lib(repo)).unlink(), lilly)
 

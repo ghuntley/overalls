@@ -49,21 +49,48 @@ NOT_MACHINE_CHECKS = frozenset({"windows-editor-acceptance-harness"})
 # Inception subtest is not a reason to skip zfs-guest: it stays required.
 KNOWN_INCEPTION_FAILURES = frozenset({"inception", "inception-checkout", "inception-ssh-host-ca"})
 
-# Modules that are plain paths and do not close over the application packages,
-# each with the //nix group holding it and the files it imports (nix/BUCK).
-PLAIN_MODULES: Mapping[str, str] = {
-    "modules.platform.sysctl": "//nix:module-sysctl",
-    "modules.security.access": "//nix:module-access",
-    "modules.network.fleet-firewall": "//nix:module-fleet-firewall",
-    "modules.fleetBuilds": "//nix:module-fleet-builds",
-}
 # Contract machine-test-module-inputs: see buck/CONTRACTS. NIX_INPUTS holds
-# //nix:base, which omits the NixOS modules; an entry that can reach them
-# also declares //nix:system_modules (M11).
+# //nix:base, which omits the NixOS modules. A test declares one //nix:module-*
+# group per module it reaches (generated into MODULES_BZL, each holding the
+# files that module imports), or //nix:system_modules when it reaches the
+# whole catalog (modules.default, `service`, featureFleet or host fixtures).
+# Restrict-eval over the declared copy turns a missed file into an error (M11).
+SYSTEM = Path("nix/domains/system")
+SYSTEM_CATALOG = SYSTEM / "catalog.nix"
+MODULES_BZL = MACHINES / "modules.bzl"
 SYSTEM_MODULES = "//nix:system_modules"
-# A suite file that names a module path or the request-source support module
-# (which imports otel-fleet) reads the modules directly.
-SYSTEM_REF = re.compile(r"domains/system|support/request-source\.nix")
+# The group of the catalog file itself, which modules.select reads.
+CATALOG_GROUP = "//nix:module-catalog"
+# Module attributes of nix/assemble/modules.nix that catalog entries pass,
+# by the files they import. A plain path does not close over the packages.
+MODULE_ATTRS: Mapping[str, tuple[str, ...]] = {
+    "modules.platform.sysctl": ("sysctl.nix",),
+    "modules.security.access": ("access.nix",),
+    "modules.network.fleet-firewall": ("fleet-firewall.nix",),
+    "modules.fleetBuilds": ("fleet-builds.nix",),
+    "modules.security.secrets": ("secrets",),
+    "modules.services.enrico": ("enrico.nix",),
+}
+PLAIN_MODULES = frozenset(
+    {
+        "modules.platform.sysctl",
+        "modules.security.access",
+        "modules.network.fleet-firewall",
+        "modules.fleetBuilds",
+    }
+)
+# `modules.select [ "a" "b" ]` or `serviceOf [ ... ]` (the service inputs with
+# only the named catalog modules) in a catalog entry.
+MODULE_SELECT = re.compile(r"\b(?:modules\.select|serviceOf)\s*\[([^\]]*)\]")
+# A whole-catalog reference in a catalog entry's parameters (not a suite
+# path such as ./machines/ziggy-service).
+WHOLE_CATALOG = re.compile(r"(?<![-/\w])(service|fixtures|modules\.default)(?![-\w])")
+# A path into the module tree, or a test helper outside the suites, named by
+# a suite's Nix file (relative or from the repository root).
+SYSTEM_PATH = re.compile(r"domains/system(/[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)*)?")
+HELPER_PATH = re.compile(r"(?:\.\./)+(support|evaluation|fixtures)/([A-Za-z0-9_./-]+\.nix)")
+# Any relative path in a module file.
+LOCAL_PATH = re.compile(r"(?<![A-Za-z0-9_])(\.\.?/[A-Za-z0-9_./-]*[A-Za-z0-9_-])")
 # Owned groups a suite reads beyond NIX_INPUTS and PACKAGE_INPUTS.
 # The offline Buck2 repository that support/update-fixture.nix copies (ADR-0271).
 UPDATE_FIXTURE_INPUTS = (
@@ -81,7 +108,7 @@ SUITE_INPUTS: Mapping[str, tuple[str, ...]] = {
     "fleet": UPDATE_FIXTURE_INPUTS,
     "host-enrollment": UPDATE_FIXTURE_INPUTS,
 }
-PACKAGE_INPUT = re.compile(r"\b(service|storage|packages)\b")
+PACKAGE_INPUT = re.compile(r"\b(service|serviceOf|storage|packages)\b")
 MODULE_REF = re.compile(r"\bmodules\.[A-Za-z0-9_.-]+")
 NESTED_KVM = re.compile(r"^\s*requiredFeatures\.nested-kvm\s*=\s*true\s*;", re.M)
 MACHINE_IMPORT = re.compile(r"import \./machines/([a-z0-9-]+)(/[a-z0-9.-]+\.nix)?")
@@ -98,8 +125,8 @@ class Entry:
     packages: bool
     nested_kvm: bool
     known_failure: bool
-    # The //nix module groups its parameters reach (SYSTEM_MODULES for all).
-    modules: tuple[str, ...]
+    # The module roots its parameters reach (under SYSTEM), or None for all.
+    modules: frozenset[str] | None
 
 
 @dataclass
@@ -214,20 +241,43 @@ def uses_packages(expr: str) -> bool:
     return any(ref not in PLAIN_MODULES for ref in MODULE_REF.findall(expr))
 
 
-def module_groups(expr: str, fleet: bool) -> tuple[str, ...]:
-    """The module groups a catalog entry's parameters reach.
+def catalog_roots(root: Path) -> dict[str, str]:
+    """Each system catalog module's name and the path it imports (under SYSTEM)."""
+    text = (root / SYSTEM_CATALOG).read_text()
+    found = re.findall(
+        r'\{ name = "([a-z0-9-]+)"; module = (?:import )?\./([A-Za-z0-9_./-]+)', text
+    )
+    roots = {name: path.removesuffix("/") for name, path in found}
+    if len(roots) != len(found) or not roots:
+        raise ValueError(f"{SYSTEM_CATALOG}: unreadable or duplicate module names")
+    return roots
+
+
+def module_roots(expr: str, fleet: bool, catalog: Mapping[str, str]) -> frozenset[str] | None:
+    """The module roots a catalog entry's parameters reach, or None for all.
 
     `service` and featureFleet pass modules.default, and host fixtures are
-    built from the module catalog; any other module reference except a plain
-    one closes over the catalog's modules too.
+    built from the whole catalog. `serviceOf` and modules.select name their
+    catalog modules; a module attribute imports the files MODULE_ATTRS lists.
     """
-    refs = set(MODULE_REF.findall(expr))
-    if fleet or re.search(r"\b(service|fixtures)\b", expr) or refs - set(PLAIN_MODULES):
-        return (SYSTEM_MODULES,)
-    return tuple(sorted(PLAIN_MODULES[r] for r in refs))
+    if fleet or WHOLE_CATALOG.search(expr):
+        return None
+    roots: set[str] = set()
+    for names in MODULE_SELECT.findall(expr):
+        for name in re.findall(r'"([^"]+)"', names):
+            if name not in catalog:
+                raise ValueError(f"unknown system catalog module {name!r}")
+            roots.add(catalog[name])
+        roots.add(SYSTEM_CATALOG.name)
+    for ref in MODULE_REF.findall(MODULE_SELECT.sub("", expr)):
+        if ref not in MODULE_ATTRS:
+            return None
+        roots.update(MODULE_ATTRS[ref])
+    return frozenset(roots)
 
 
 def parse_catalog(text: str, root: Path) -> list[Entry]:
+    catalog = catalog_roots(root)
     fleets = {
         name: expr
         for name, _, expr in (
@@ -249,10 +299,14 @@ def parse_catalog(text: str, root: Path) -> list[Entry]:
         elif match := MACHINE_IMPORT.search(expr):
             suite, module = match.group(1), (match.group(2) or "/default.nix").lstrip("/")
         elif name in KVM_EVALUATION_CHECKS:
-            # Evaluation-suite files are not scanned: they always get every module.
-            entries.append(
-                Entry(name, EVALUATION, {}, uses_packages(expr), False, False, (SYSTEM_MODULES,))
-            )
+            # The evaluation file and the helpers it imports name their modules.
+            files = [
+                root / TESTS / f for f in re.findall(r"\./(evaluation/[A-Za-z0-9_.-]+\.nix)", expr)
+            ]
+            named = named_roots(root, files) if files else None
+            reached = module_roots(expr, False, catalog)
+            modules = None if named is None or reached is None else named | reached
+            entries.append(Entry(name, EVALUATION, {}, uses_packages(expr), False, False, modules))
             continue
         else:
             continue
@@ -268,7 +322,7 @@ def parse_catalog(text: str, root: Path) -> list[Entry]:
                 packages=fleet or uses_packages(expr),
                 nested_kvm=bool(NESTED_KVM.search(source)),
                 known_failure=name in KNOWN_INCEPTION_FAILURES,
-                modules=module_groups(expr, fleet),
+                modules=module_roots(expr, fleet, catalog),
             )
         )
     names = [e.name for e in entries]
@@ -294,12 +348,76 @@ def sibling_refs(root: Path, suite: str, suites: Iterable[str]) -> set[str]:
     return refs
 
 
-def reads_system(root: Path, suite: str) -> bool:
-    """Whether a suite's own Nix files name NixOS module paths directly."""
-    return any(
-        SYSTEM_REF.search(path.read_text())
-        for path in sorted((root / MACHINES / suite).rglob("*.nix"))
-    )
+def suite_roots(root: Path, suite: str) -> frozenset[str] | None:
+    """The module paths a suite's own Nix files, or the test helpers they
+    import, name directly; None when one is the whole catalog or unresolved."""
+    return named_roots(root, sorted((root / MACHINES / suite).rglob("*.nix")))
+
+
+def named_roots(root: Path, files: Iterable[Path]) -> frozenset[str] | None:
+    """The module paths these Nix files, or the test helpers they import,
+    name directly; None when one is the whole catalog or unresolved."""
+    roots: set[str] = set()
+    seen: set[Path] = set()
+    todo = list(files)
+    while todo:
+        path = todo.pop()
+        if path in seen:
+            continue
+        seen.add(path)
+        text = path.read_text()
+        for match in SYSTEM_PATH.finditer(text):
+            rel = (match.group(1) or "").strip("/")
+            if not rel or rel == SYSTEM_CATALOG.name or not (root / SYSTEM / rel).exists():
+                return None
+            roots.add(rel)
+        for kind, rel in HELPER_PATH.findall(text):
+            helper = root / TESTS / kind / rel
+            if helper.is_file():
+                todo.append(helper)
+    return frozenset(roots)
+
+
+def module_files(root: Path, start: str) -> list[str]:
+    """The files under SYSTEM that a module path reads, transitively.
+
+    A directory reference reads the whole directory. Interpolated paths are
+    not followed; restrict-eval fails on any file this misses.
+    """
+    base = (root / SYSTEM).resolve()
+    if start == SYSTEM_CATALOG.name:
+        # modules.select imports only the named modules' paths.
+        return [start]
+    seen: set[Path] = set()
+    found: set[Path] = set()
+    todo = [base / start]
+    while todo:
+        path = todo.pop()
+        if path in seen or not path.exists():
+            continue
+        seen.add(path)
+        if path.is_dir():
+            todo.extend(p for p in path.rglob("*") if p.is_file())
+            continue
+        found.add(path)
+        if path.suffix != ".nix":
+            continue
+        for ref in LOCAL_PATH.findall(path.read_text()):
+            target = Path(os.path.normpath(path.parent / ref))
+            if target.is_relative_to(base) and target != base / SYSTEM_CATALOG.name:
+                todo.append(target)
+    return sorted(p.relative_to(base).as_posix() for p in found)
+
+
+def group_name(path: str) -> str:
+    """The //nix:module-* group name of a module path under SYSTEM."""
+    return re.sub(r"(/default)?\.nix$", "", path).replace("/", "-")
+
+
+def module_groups(roots: frozenset[str] | None) -> list[str]:
+    if roots is None:
+        return [SYSTEM_MODULES]
+    return sorted(f"//nix:module-{group_name(r)}" for r in roots)
 
 
 def closure(start: set[str], graph: Mapping[str, set[str]]) -> set[str]:
@@ -350,9 +468,12 @@ def render_target(entry: Entry, inputs: str, scenarios: Sequence[str]) -> str:
     return "\n".join(lines)
 
 
-def _inputs(entry: Entry, own: Sequence[str], siblings: Iterable[str], system: bool = False) -> str:
+def _inputs(
+    entry: Entry, own: Sequence[str], siblings: Iterable[str], reached: frozenset[str] | None
+) -> str:
     groups = "NIX_INPUTS" + (" + PACKAGE_INPUTS" if entry.packages else "")
-    modules = [SYSTEM_MODULES] if system or SYSTEM_MODULES in entry.modules else list(entry.modules)
+    roots = None if reached is None or entry.modules is None else reached | entry.modules
+    modules = module_groups(roots)
     extra = (
         list(own)
         + modules
@@ -381,8 +502,11 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
             body.append(load)
         body.append("\nnix_owned()\n")
         siblings = closure(graph[suite], graph) - {suite}
-        # The suite or a suite it references names module paths itself.
-        system = any(reads_system(root, s) for s in siblings | {suite})
+        # Module paths the suite or a suite it references names itself.
+        reached: frozenset[str] | None = frozenset()
+        for s in sorted(siblings | {suite}):
+            named = suite_roots(root, s)
+            reached = None if named is None or reached is None else reached | named
         if suite == "fleet" and by_suite[suite]:
             body.append(
                 "\n# Each variant declares the shared files and only its own scenarios.\n"
@@ -397,9 +521,9 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
                     f"    srcs = _COMMON + {_string_list(variant, '    ')},\n)\n\n"
                 )
                 own = [f":{entry.name}.files"]
-                body.append(render_target(entry, _inputs(entry, own, siblings, system), variant))
+                body.append(render_target(entry, _inputs(entry, own, siblings, reached), variant))
             else:
-                body.append(render_target(entry, _inputs(entry, [":srcs"], siblings, system), []))
+                body.append(render_target(entry, _inputs(entry, [":srcs"], siblings, reached), []))
         files[MACHINES / suite / "BUCK"] = "".join(body)
     aggregate = [HEADER, 'load("@root//buck:nix.bzl", "nix_owned", "owned_set")\n']
     if evaluation:
@@ -415,7 +539,7 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
         aggregate.append(
             "\n# A KVM evaluation check (a machine test by its features) outside ./machines.\n"
         )
-        aggregate.append(render_target(entry, _inputs(entry, [], []), []))
+        aggregate.append(render_target(entry, _inputs(entry, [], [], frozenset()), []))
     files[MACHINES / "BUCK"] = "".join(aggregate)
     names = sorted(e.name for e in entries)
     packages = [f"//{MACHINES}"] + [f"//{MACHINES}/{s}" for s in suite_names]
@@ -424,7 +548,33 @@ def render(root: Path, scenarios: Mapping[str, list[str]]) -> dict[Path, str]:
         + f"MACHINE_TESTS = {_string_list(names, '')}\n"
         + f"MACHINE_PACKAGES = {_string_list(packages, '')}\n"
     )
+    files[MODULES_BZL] = render_modules(root, entries, suite_names)
     return files
+
+
+def render_modules(root: Path, entries: Sequence[Entry], suite_names: Sequence[str]) -> str:
+    """The //nix:module-* groups: every catalog module and module attribute,
+    and every other module path a suite names, each with the files it reads."""
+    roots = {SYSTEM_CATALOG.name, *catalog_roots(root).values()}
+    roots.update(r for attr in MODULE_ATTRS.values() for r in attr)
+    for entry in entries:
+        roots.update(entry.modules or ())
+    for suite in suite_names:
+        roots.update(suite_roots(root, suite) or ())
+    # A directory and its default.nix share one group, holding both closures.
+    groups: dict[str, set[str]] = {}
+    for path in sorted(roots):
+        groups.setdefault(group_name(path), set()).update(module_files(root, path))
+    body = "".join(
+        f'    "{name}": {_string_list(sorted(files), "    ")},\n'
+        for name, files in sorted(groups.items())
+    )
+    return (
+        HEADER
+        + "# Files under nix/domains/system that each module path reads; nix/BUCK\n"
+        + "# defines one //nix:module-<name> group per entry (ADR-0270).\n"
+        + f"SYSTEM_MODULE_GROUPS = {{\n{body}}}\n"
+    )
 
 
 def load_scenarios(root: Path) -> dict[str, list[str]]:
