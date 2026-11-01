@@ -472,24 +472,21 @@ fn move_path(source: &Path, target: &Path, _replace: bool) -> Result<()> {
 }
 #[cfg(windows)]
 fn move_path(source: &Path, target: &Path, replace: bool) -> Result<()> {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
     };
-    let source: Vec<u16> = source.as_os_str().encode_wide().chain(Some(0)).collect();
-    let target: Vec<u16> = target.as_os_str().encode_wide().chain(Some(0)).collect();
     let flags = MOVEFILE_WRITE_THROUGH
         | if replace {
             MOVEFILE_REPLACE_EXISTING
         } else {
             0
         };
-    // SAFETY: both paths are validated native paths terminated with a NUL; buffers
-    // remain live throughout the call. No caller-controlled flags are accepted.
-    if unsafe { MoveFileExW(source.as_ptr(), target.as_ptr(), flags) } == 0 {
-        Err(Failure("storage_failed"))
-    } else {
+    // Both paths are validated native paths; no caller-controlled flags are
+    // accepted.
+    if crate::sys::windows::fs::move_file(source, target, flags) {
         Ok(())
+    } else {
+        Err(Failure("storage_failed"))
     }
 }
 fn sync_tree_directories(root: &Path) -> Result<()> {

@@ -27,26 +27,14 @@ fn platform_rename(from: &Path, to: &Path) -> io::Result<()> {
 
 #[cfg(windows)]
 fn platform_rename(from: &Path, to: &Path) -> io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
     use windows_sys::Win32::Storage::FileSystem::{
-        MoveFileExW, MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
+        MOVEFILE_REPLACE_EXISTING, MOVEFILE_WRITE_THROUGH,
     };
-    let wide = |path: &Path| -> Vec<u16> {
-        path.as_os_str()
-            .encode_wide()
-            .chain(std::iter::once(0))
-            .collect()
-    };
-    let (source, target) = (wide(from), wide(to));
-    // SAFETY: both paths are NUL-terminated UTF-16 buffers alive for the call.
-    let moved = unsafe {
-        MoveFileExW(
-            source.as_ptr(),
-            target.as_ptr(),
-            MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
-        )
-    };
-    if moved == 0 {
+    if !crate::sys::windows::fs::move_file(
+        from,
+        to,
+        MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH,
+    ) {
         return Err(crate::platform::windows::last_error());
     }
     Ok(())

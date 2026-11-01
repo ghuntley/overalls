@@ -1083,46 +1083,18 @@ fn windows_acl(root: &Path) -> io::Result<()> {
 
 #[cfg(windows)]
 fn windows_acl_spec(root: &Path, descriptor_text: &str) -> io::Result<()> {
-    use std::os::windows::ffi::OsStrExt;
-    use windows_sys::Win32::Foundation::LocalFree;
-    use windows_sys::Win32::Security::Authorization::ConvertStringSecurityDescriptorToSecurityDescriptorW;
     use windows_sys::Win32::Security::{
-        SetFileSecurityW, DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION,
-        PROTECTED_DACL_SECURITY_INFORMATION,
+        DACL_SECURITY_INFORMATION, OWNER_SECURITY_INFORMATION, PROTECTED_DACL_SECURITY_INFORMATION,
     };
-    let path: Vec<u16> = root.as_os_str().encode_wide().chain(Some(0)).collect();
     // Replace explicit inherited/user grants, and make SYSTEM the owner; merely
     // adding administrators' grants would leave a planted creator ACL intact.
-    let sddl: Vec<u16> = descriptor_text.encode_utf16().chain(Some(0)).collect();
-    let mut descriptor = std::ptr::null_mut();
-    // SAFETY: the SDDL buffer is NUL terminated and outlives the call; on
-    // success the function stores a LocalAlloc descriptor in `descriptor`.
-    let converted = unsafe {
-        ConvertStringSecurityDescriptorToSecurityDescriptorW(
-            sddl.as_ptr(),
-            1,
-            &raw mut descriptor,
-            std::ptr::null_mut(),
-        )
-    };
-    if converted == 0 {
-        return Err(io::Error::other("tool ACL unavailable"));
-    }
-    // SAFETY: the path buffer is NUL terminated and `descriptor` is the live
-    // descriptor returned above; it is not freed until after this call.
-    let success = unsafe {
-        SetFileSecurityW(
-            path.as_ptr(),
-            OWNER_SECURITY_INFORMATION
-                | DACL_SECURITY_INFORMATION
-                | PROTECTED_DACL_SECURITY_INFORMATION,
-            descriptor,
-        )
-    };
-    // SAFETY: `descriptor` came from LocalAlloc via the conversion above and
-    // is released exactly once here.
-    unsafe { LocalFree(descriptor) };
-    if success == 0 {
+    if !crate::sys::windows::security::set_file_security_sddl(
+        root,
+        descriptor_text,
+        OWNER_SECURITY_INFORMATION
+            | DACL_SECURITY_INFORMATION
+            | PROTECTED_DACL_SECURITY_INFORMATION,
+    ) {
         return Err(io::Error::other("tool ACL unavailable"));
     }
     Ok(())

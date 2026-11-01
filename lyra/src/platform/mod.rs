@@ -71,21 +71,8 @@ fn platform_random(buffer: &mut [u8]) -> io::Result<()> {
 
 #[cfg(windows)]
 fn platform_random(buffer: &mut [u8]) -> io::Result<()> {
-    use windows_sys::Win32::Security::Cryptography::{
-        BCryptGenRandom, BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-    };
-    let length = u32::try_from(buffer.len()).map_err(|_| io::Error::other("RNG request"))?;
-    // SAFETY: `buffer` is writable for `length` bytes; the system-preferred
-    // RNG needs no algorithm handle.
-    let status = unsafe {
-        BCryptGenRandom(
-            std::ptr::null_mut(),
-            buffer.as_mut_ptr(),
-            length,
-            BCRYPT_USE_SYSTEM_PREFERRED_RNG,
-        )
-    };
-    if status != 0 {
+    u32::try_from(buffer.len()).map_err(|_| io::Error::other("RNG request"))?;
+    if !crate::sys::windows::error::system_random(buffer) {
         return Err(io::Error::other("system RNG unavailable"));
     }
     Ok(())
