@@ -1,0 +1,84 @@
+name: Namespace RE worker image
+
+# Republishes the remote-execution worker image (ADR-0276) whenever the
+# buckCells closure changes, and commits the new digest to
+# tools/namespace-re-image.lock. Without it a cells change leaves every
+# client without a matching image, so remote execution silently stops.
+# The paths are the inputs of buckCells (buck/affected.py's GLOBAL_FILES
+# and GLOBAL_PREFIXES); `--check` decides whether anything is to do.
+# `nsc base-image optimize` starts a temporary 8x16 maintenance instance for
+# a few minutes; Namespace destroys it when the optimisation finishes.
+
+on:
+  push:
+    branches: [trunk]
+    paths:
+      - flake.lock
+      - flake.nix
+      - "nix/buck/**"
+      - "toolchains/**"
+      - nix/domains/artifacts/dependency-hashes.json
+      - nix/domains/artifacts/infrastructure/toolchain.nix
+      - tools/namespace-re-image
+  workflow_dispatch:
+
+# One publish at a time; a newer cells change replaces a pending one.
+concurrency:
+  group: namespace-re-image
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          fetch-depth: 0
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Check the lock against these cells
+        id: check
+        run: |
+          if tools/namespace-re-image --check; then
+            echo "stale=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "stale=true" >> "$GITHUB_OUTPUT"
+          fi
+      # nsc on a Namespace runner is authenticated as the workspace.
+      - name: Build, push and optimise the image
+        if: steps.check.outputs.stale == 'true'
+        run: tools/namespace-re-image --push
+      - name: Commit the lock
+        if: steps.check.outputs.stale == 'true'
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          cp tools/namespace-re-image.lock "$RUNNER_TEMP/lock"
+          for attempt in 1 2 3 4 5; do
+            git fetch origin trunk
+            git reset --hard origin/trunk
+            # trunk's cells may have moved on: only pin an image for the
+            # cells it still has, and let the newer run publish otherwise.
+            if [[ "$(tools/namespace-re-image --cells-id)" != "$(cut -d' ' -f1 "$RUNNER_TEMP/lock")" ]]; then
+              echo "trunk's cells moved on; the run for the newer push publishes them"
+              exit 0
+            fi
+            cp "$RUNNER_TEMP/lock" tools/namespace-re-image.lock
+            if git diff --quiet -- tools/namespace-re-image.lock; then
+              echo "trunk already pins this image"
+              exit 0
+            fi
+            git commit -m "tools: pin the Namespace RE worker image for these cells (ADR-0276)" -- tools/namespace-re-image.lock
+            if git push origin HEAD:trunk; then
+              exit 0
+            fi
+            sleep $((attempt * 5))
+          done
+          echo "Failed to push the lock after 5 attempts" >&2
+          exit 1

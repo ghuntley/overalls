@@ -60,27 +60,74 @@ chose on 2026-10-31. Observed facts:
    `$NAMESPACE_RBE_TOKEN`, so the token itself is never written into it.
    Without a token, or with `OVERALLS_BUCK2_REMOTE=off`, builds stay local.
    `--no-nix` platform builds always stay local.
+
+   Corrected on 2026-11-01:
+   - **Uploads.** Buck2 reads `buck2.default_allow_cache_upload` only from
+     the root `.buckconfig`, `.buckconfig.local` and user configuration, not
+     from the include. Until this correction every action reported
+     `ACTION_UPLOAD_NOT_ALLOWED`. Uploads had worked only on Panterloons,
+     through a temporary `~/.buckconfig.d` file, until that file was deleted;
+     CI and hosts never uploaded. The key now sits in the root `.buckconfig`.
+     Without a token there is no remote cache, so nothing uploads.
+   - **Endpoints.** Namespace's cache and scheduler addresses name the
+     cluster's instances, and Namespace recreated the cluster on 2026-11-01
+     (new instance IDs, so the committed addresses answered 404). Where `nsc`
+     is logged in, `tools/buck2` now re-reads the addresses at most hourly with
+     `nsc bazel setup -o json`, which also recreates a missing cluster.
+     Elsewhere (hosts) the addresses committed in
+     `tools/namespace.buckconfig` apply.
+   - **Dead endpoints fail open.** Against a dead address Buck2 does not fall
+     back: it retries every action's capability query, and builds and host
+     self-updates stalled (Dungarees, 2026-11-01). `tools/buck2` now probes
+     the cache address without credentials, bounded at five seconds and
+     remembered for ten minutes. A 404 or no answer turns the cache off for
+     that build, which then runs locally (decision 7).
 5. **What stays local.** As in ADR-0272:
    - `local_only` actions never upload;
    - Nix imports, NixOS assembly, machine tests, test commands and the
      non-hermetic Mila platform builds run locally;
    - non-hermetic CI jobs receive no token;
    - host deployment builds keep `remote_execution = false`.
-6. **Remote execution is a developer opt-in.** Remote execution runs on
-   Namespace Linux workers whose image carries the `buckCells` closure. The
-   image is digest-pinned in `nscr.io`, recorded per `cells_id` in the
-   committed `tools/namespace-re-image.lock`, and its digest is a
-   `container-image` platform property beside `overalls-cells` on every
-   action whenever the lock matches, so all clients share action keys.
-   Remote execution itself runs only under
-   `OVERALLS_BUCK2_REMOTE_EXECUTION=on`. CI and hosts are cache-only.
+6. **Remote execution is the default where it is supported.** Remote
+   execution runs on Namespace Linux workers whose image carries the
+   `buckCells` closure. The image is digest-pinned in `nscr.io`, recorded per
+   `cells_id` in the committed `tools/namespace-re-image.lock`, and its
+   digest is a `container-image` platform property beside `overalls-cells` on
+   every action whenever the lock matches, so all clients share action keys.
+   `.github/workflows/namespace-re-image.yml` republishes the image and
+   commits the lock after every trunk change to the cells' inputs, so remote
+   execution does not silently lapse when the cells move.
 
-   Revised on 2026-10-31, the same day the decision was taken. The
-   workspace's 64-vCPU Linux cap is shared by CI runners and the Namespace
-   cache, and Namespace documents no maximum worker count, idle timeout or
-   scale-to-zero for remote-execution workers. One opt-in build started a
-   16x32 worker, which kept running until it was destroyed by hand. That
-   queued CI runners behind it, so the user chose to stay inside the cap.
+   Wherever a token and a matching image exist (developer machines and CI
+   jobs), `tools/buck2` executes every remotable action remotely.
+   `OVERALLS_BUCK2_REMOTE_EXECUTION=off` keeps a build cache-only. Host
+   deployments stay cache-only through the updater's `.buckconfig.local`
+   (decision 5), and `local_only` actions stay local.
+
+   History of this decision:
+   - 2026-10-31, revised the same day: a developer opt-in, with CI and hosts
+     cache-only. The workspace's 64-vCPU Linux cap is shared by CI runners
+     and the Namespace cache, and Namespace documents no maximum worker
+     count, idle timeout or scale-to-zero for remote-execution workers. One
+     opt-in build started a 16x32 worker, which kept running until it was
+     destroyed by hand. That queued CI runners behind it, so the user chose
+     to stay inside the cap.
+   - 2026-11-01, on the coordinating session's instruction: `ci.yml`'s build
+     job also executed remotely.
+   - 2026-11-01, the user's decision, relayed by the coordinating session:
+     remote execution by default wherever it is supported, on developer
+     machines and in CI, with an `off` escape hatch.
+
+   **Trade-off accepted with the default.** Namespace still cannot bound the
+   worker pool. A build may start two or more 16x32 workers (32 vCPU or more)
+   that keep running after it ends, and they count against the same 64-vCPU
+   cap as CI runners, so concurrent CI runs can queue behind idle workers.
+   Mitigations: `nsc list` shows workers (`bazel.purpose=worker`) and
+   `nsc destroy <id> --force` frees an idle one; any build can opt out with
+   `OVERALLS_BUCK2_REMOTE_EXECUTION=off`; and a remote action that fails, or
+   a scheduler that cannot place one, falls back to local execution. A
+   separate Namespace workspace for workers, which would give them their own
+   cap, is the open alternative (see Open questions).
 7. **Fail open.** A Namespace outage, or a revoked or expired token, never
    blocks an update. The host updater retries a failed build once with
    `OVERALLS_BUCK2_REMOTE=off`.
@@ -216,29 +263,70 @@ Elixir rules (M6) are not on trunk yet.
   - On a 96-thread development host, remote execution is slower than a
     local build plus the cache. That is the second reason cache-only is the
     default.
+- **Worker image with `PATH` tools, 2026-11-01.** The lock now names
+  `sha256:20bc6fa1…`, which adds the `/bin` links for coreutils, findutils,
+  grep and sed. `nsc base-image optimize` took under five minutes. On
+  Panterloons, `root//nix:terminald` with remote execution ran
+  `Commands: 58 (cached: 0, remote: 50, local: 8)`: the `mkdir` genrule
+  that fell back to local before now runs remotely. The build started two
+  16x32 workers, destroyed by hand afterwards.
 - **Fallback without masking.**
   - A genrule that calls `mkdir` from `PATH` failed on the worker and
     succeeded locally.
   - A planted `E0308` in terminald's `main.rs` ran remotely, then locally,
     and the build failed.
 
+- **Remote execution by default and working uploads, 2026-11-01**, on
+  Panterloons, in two fresh clones of the same revision (`root//enrico:git-owner`
+  with a source edit no client had built, so no cache entry existed):
+
+  | Build | Wall time | Commands |
+  | --- | --- | --- |
+  | Clone A before the upload fix, cache-only | 42 s | 18: cached 0, remote 0, local 18 (`ACTION_UPLOAD_NOT_ALLOWED`) |
+  | Clone B before the fix, same revision | 32 s | 18: cached 0, remote 0, local 18 |
+  | Clone B after the fix, remote execution by default | 5 min 56 s | 18: cached 0, remote 15, local 3 |
+  | Clone A after the fix, after `rm -rf buck-out` | 11.7 s | 18: cached 18, remote 0, local 0 |
+
+  - The remote build waited about five minutes in the queue. The scheduler's
+    log showed `ResourceExhausted ... used all of 64 vCPU` for every attempt
+    to start a 16x32 worker while CI runners held the cap, until capacity
+    freed. Buck2's `remote_execution_queue_time_threshold_s` did not cut the
+    wait short against Namespace, so it is not configured.
+  - The lock now names `sha256:432163cc…`, rebuilt for the current cells with
+    the `/bin` tool links and optimised with a temporary 8x16 instance, which
+    Namespace removed afterwards.
+
 Remaining gaps:
 - No recorded deployment receipt for the token bundle on the hosts yet.
-- No recorded CI run showing cache hits on a rerun yet.
-- No Elixir compile has been measured remotely; the Mix rules arrive with
-  M6.
-- The recorded image predates the `/bin` tool links in
-  `tools/namespace-re-image`, so genrules that use `PATH` tools fall back to
-  local until the image is rebuilt. A rebuild costs a temporary 8x16
-  maintenance instance for `nsc base-image optimize`.
-- The cells change often, and a stale lock means no remote execution until
-  someone republishes the image.
-- No machine test exercises the Namespace path. It needs network access to a
-  vendor service, which machine tests do not have.
+- No recorded CI run showing cache hits on a rerun yet. CI never uploaded
+  before the 2026-11-01 upload fix, so earlier CI runs could not show any.
+- No Elixir compile has been measured remotely: Mix actions are `local_only`
+  (see Open questions).
+- Namespace offers no bound or idle timeout for workers, and actions wait in
+  its queue, without falling back, while the 64-vCPU cap is full.
+- Hosts have no `nsc` login, so they rely on the committed endpoints and
+  lose the cache, not the build, when Namespace recreates the cluster.
+- No machine test exercises the Namespace path (see Open questions).
 
 ## Open questions
 
-None.
+- **Bounding workers.** Whether a second Namespace workspace, holding only
+  the remote-execution workers, would give them a cap of their own so they
+  cannot queue CI runners. It would need its own token and cache, which
+  splits cache hits unless the executing workspace also serves the cache.
+- **Machine tests and the cache.** Machine tests currently build without
+  the cache. The token must never enter a test VM. A proposal: the NixOS
+  test driver, which runs on the CI runner or developer host outside the
+  VMs, resolves the Buck2 outputs a test needs through `tools/buck2` with the
+  cache before it starts the VMs, and passes them in as store paths. The VMs
+  then need no network and no token, and the cache is used only by the
+  driver's host process, as in any other build. Whether the NixOS test
+  framework can take prebuilt Buck2 outputs this way is unverified.
+- **Mix actions remotely.** Mix compile and test actions are `local_only`
+  because their bubblewrap sandbox needs unprivileged user namespaces and a
+  Nix-store build-state script outside the cells closure. Whether the
+  Namespace worker allows unprivileged user namespaces, and whether the
+  state script can join the image, is unmeasured.
 
 ## Related decisions
 

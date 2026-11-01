@@ -31,6 +31,8 @@ erl_crash.dump
 .buck-cells.key
 .buck-cells.gcroot
 .buck-remote.buckconfig
+.buck-remote.endpoints
+.buck-remote.probe
 buck-out/
 .buckconfig.local
 

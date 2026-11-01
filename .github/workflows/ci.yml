@@ -242,11 +242,15 @@ jobs:
 
   build:
     needs: affected
-    if: needs.affected.outputs.builds != '[]'
+    # Trunk pushes always build the assembly leaves (below), so this job runs
+    # for them even when nothing else is affected.
+    if: needs.affected.outputs.builds != '[]' || github.event_name == 'push'
     runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
     timeout-minutes: 180
     # Namespace remote cache (ADR-0276): tools/buck2 enables it only while the
     # token is set; forks and pull requests get no secret and build locally.
+    # tools/buck2 also executes remotable actions on the locked worker image
+    # (ADR-0276 decision 6), as in every job that holds the token.
     env:
       NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:
@@ -258,9 +262,16 @@ jobs:
       - name: Build affected targets
         env:
           TARGETS: ${{ needs.affected.outputs.builds }}
+          EVENT: ${{ github.event_name }}
         run: |
           set -euo pipefail
           mapfile -t targets < <(jq -r '.[]' <<<"$TARGETS")
+          # Every trunk push fills the Namespace cache with the assembly
+          # leaves' compile actions, so host deployments read rather than
+          # compile them (ADR-0276).
+          if [[ "$EVENT" == push ]]; then
+            targets+=(root//buck:assembly_artifacts)
+          fi
           cachix watch-exec overalls -- tools/buck2 build --keep-going "${targets[@]}"
       - name: Check Buck2 state for the Namespace token
         if: always()

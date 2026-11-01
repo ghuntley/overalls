@@ -4,13 +4,9 @@
 # daemon's environment, so the token is never written to a file or argv.
 # Endpoints are bare host:port: Buck2 rejects a grpcs:// scheme.
 [buck2_re_client]
-  engine_address = reapih-jnmsajkg9m6m8.iad4.namespaced.app:443
-  action_cache_address = storageh-tps0rip971arc.iad4.namespaced.app:443
-  cas_address = storageh-tps0rip971arc.iad4.namespaced.app:443
+  engine_address = reapih-2ps0pgjfsnp5o.iad4.namespaced.app:443
+  action_cache_address = storageh-p94hq2l163e92.iad4.namespaced.app:443
+  cas_address = storageh-p94hq2l163e92.iad4.namespaced.app:443
   tls = true
   http_headers = x-nsc-ingress-auth:Bearer $NAMESPACE_RBE_TOKEN
 
-[buck2]
-# Every token holder (developers, host updaters, CI) writes the one tenant
-# cache. local_only actions never upload (allow_cache_upload = False).
-  default_allow_cache_upload = true

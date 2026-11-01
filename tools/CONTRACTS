@@ -41,7 +41,11 @@ while a token is available from NAMESPACE_RBE_TOKEN,
 ~/.config/overalls/namespace-rbe-token.json, and MUST remove it otherwise, in
 --no-nix mode and under OVERALLS_BUCK2_REMOTE=off, so builds without a token
 stay local. It MUST restart the daemon when it switches, so buckd holds the
-token it expands (ADR-0276).
+token it expands. Where nsc is logged in it MUST take the cache and scheduler
+addresses from `nsc bazel setup -o json`, re-read at most hourly, over the
+committed ones, and MUST leave the include out, so the build runs locally,
+when a credential-free probe of the cache address, bounded at five seconds,
+gets a 404 or no answer (ADR-0276).
 
 @cc [owner:ghuntley,label:security] namespace-token-never-written
 The Namespace token MUST reach Buck2 only through the NAMESPACE_RBE_TOKEN
@@ -53,12 +57,14 @@ buck-out's Buck2 logs, the daemon state under ~/.buck or a given file
 
 @cc [owner:ghuntley,label:build] namespace-re-worker-image
 tools/namespace-re-image MUST build the Namespace worker image from exactly
-the pinned buckCells closure without derivation files, plus /bin/sh,
-/usr/bin/env and /tmp, push it digest-pinned to the workspace's nscr.io
+the pinned buckCells closure without derivation files, plus /bin links to its
+coreutils, findutils, grep, sed and bash, /usr/bin/env and /tmp, push it digest-pinned to the workspace's nscr.io
 registry, optimise it, and record `<cells_id> <image>@<digest>` in
-tools/namespace-re-image.lock. tools/buck2 MUST set `[overalls] re_image`
+tools/namespace-re-image.lock; .github/workflows/namespace-re-image.yml MUST
+republish and pin it on every trunk change to the cells' inputs.
+tools/buck2 MUST set `[overalls] re_image`
 only when the lock's cells_id equals the checkout's, so actions carry
 `container-image` only for a worker image that holds their toolchains, and
-MUST set `remote_execution = true` only then and only under
-OVERALLS_BUCK2_REMOTE_EXECUTION=on: Namespace cannot bound its worker pool
-inside the workspace CPU cap, so CI and hosts stay cache-only (ADR-0276).
+MUST set `remote_execution = true` only then, by default, unless
+OVERALLS_BUCK2_REMOTE_EXECUTION=off. The host updater's .buckconfig.local
+keeps deployments cache-only (ADR-0276).

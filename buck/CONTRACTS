@@ -133,7 +133,9 @@ The execution platform MUST query the remote cache only when a
 [buck2_re_client] address or action_cache_address is configured (the
 Namespace include tools/buck2 writes only with a token, or the untracked
 .buckconfig.local), so absent credentials mean plain local execution. Uploads
-MUST additionally require [buck2] default_allow_cache_upload = true. Every
+MUST additionally require [buck2] default_allow_cache_upload = true, which the
+root .buckconfig sets because Buck2 reads that key only from the root file,
+.buckconfig.local and user configuration, never from an include. Every
 action MUST carry the platform property overalls-cells=<[nix] cells_id>
 whenever the cells define one, and container-image=<the digest-pinned worker
 image> whenever [overalls] re_image names one, cached or executed, so cache-only

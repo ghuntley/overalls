@@ -134,3 +134,13 @@ constraint_value(name = "antithesis_integrated_host", constraint_setting = ":ant
     "encrypted_crash_dumps_platform": [":encrypted_crash_dumps"],
     "encrypted_antithesis_integrated_host_platform": [":encrypted_crash_dumps", ":antithesis_integrated_host"],
 }.items()]
+
+# Every assembly leaf (ASSEMBLY_ARTIFACTS). ci.yml's build job builds this on
+# every trunk push, so the Namespace cache holds each leaf's compile actions
+# and hosts read them instead of compiling at deploy time (ADR-0276). The
+# nix_store_import actions themselves stay local and are never uploaded.
+filegroup(
+    name = "assembly_artifacts",
+    srcs = dict(ASSEMBLY_ARTIFACTS),
+    visibility = ["PUBLIC"],
+)

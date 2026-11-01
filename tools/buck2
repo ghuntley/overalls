@@ -19,6 +19,66 @@ state=.buck-cells.key
 # included through the untracked .buck-remote.buckconfig only while a token is
 # available; otherwise, or with OVERALLS_BUCK2_REMOTE=off, builds stay local.
 remote_include=.buck-remote.buckconfig
+# Namespace's cluster endpoints name its scheduler and storage instances, and
+# change whenever Namespace recreates the cluster. Where nsc is logged in,
+# they are re-read at most hourly (`nsc bazel setup` also recreates a missing
+# cluster) into this untracked file; elsewhere the addresses committed in
+# tools/namespace.buckconfig apply, and a stale one only costs the cache.
+remote_endpoints=.buck-remote.endpoints
+# Whether the cache endpoint answers. A recreated cluster leaves the old
+# address answering 404, and Buck2 then retries every action's capability
+# query instead of building, so a dead endpoint turns the cache off for this
+# build. Any other answer (401 without credentials) counts as alive. The
+# result is kept for ten minutes in an untracked file; the probe itself sends
+# no credentials and is bounded at five seconds.
+remote_probe_file=.buck-remote.probe
+remote_alive() {
+  local host=${1%:*} cached code
+  if [[ -e "$remote_probe_file" && -z "$(find "$remote_probe_file" -mmin +10 2>/dev/null)" ]]; then
+    read -r cached code < "$remote_probe_file" 2>/dev/null || true
+    if [[ "$cached" == "$host" ]]; then
+      [[ "$code" == ok ]]
+      return
+    fi
+  fi
+  if command -v curl >/dev/null; then
+    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://$host/" 2>/dev/null || true)
+  elif command -v python3 >/dev/null; then
+    code=$(python3 -I -c '
+import sys, urllib.error, urllib.request
+try:
+    urllib.request.urlopen("https://" + sys.argv[1] + "/", timeout=5)
+    print(200)
+except urllib.error.HTTPError as error:
+    print(error.code)
+except Exception:
+    print("000")
+' "$host" 2>/dev/null || true)
+  else
+    return 0
+  fi
+  if [[ -z "$code" || "$code" == 000 || "$code" == 404 ]]; then
+    printf '%s dead\n' "$host" > "$remote_probe_file"
+    return 1
+  fi
+  printf '%s ok\n' "$host" > "$remote_probe_file"
+}
+remote_resolve() {
+  command -v nsc >/dev/null || return 0
+  if [[ -e "$remote_endpoints" && -z "$(find "$remote_endpoints" -mmin +60 2>/dev/null)" ]]; then
+    return 0
+  fi
+  local json engine storage
+  # An empty file records a failed lookup (nsc not logged in), so the next
+  # attempt waits an hour too.
+  : > "$remote_endpoints"
+  json=$(timeout 30 nsc bazel setup -o json 2>/dev/null </dev/null) || return 0
+  engine=$(sed -n 's/.*"scheduler_endpoint": *"grpcs:\/\/reapi-\([^":]*\):[0-9]*".*/reapih-\1:443/p' <<<"$json")
+  storage=$(sed -n 's/.*"storage_endpoint": *"grpcs:\/\/storage-\([^":]*\):[0-9]*".*/storageh-\1:443/p' <<<"$json")
+  if [[ -n "$engine" && -n "$storage" ]]; then
+    printf '%s %s\n' "$engine" "$storage" > "$remote_endpoints"
+  fi
+}
 remote_config() {
   if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off ]]; then
     if [[ -z "${NAMESPACE_RBE_TOKEN:-}" && -r /run/overalls-secrets/fleet-namespace/token ]]; then
@@ -31,22 +91,46 @@ remote_config() {
   fi
   if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off && -n "${NAMESPACE_RBE_TOKEN:-}" ]]; then
     export NAMESPACE_RBE_TOKEN
-    local wanted='<file:tools/namespace.buckconfig>'
+    local wanted='<file:tools/namespace.buckconfig>' engine storage
+    remote_resolve
+    if ! read -r engine storage < "$remote_endpoints" 2>/dev/null || [[ -z "$storage" ]]; then
+      storage=$(sed -n 's/^  cas_address = //p' tools/namespace.buckconfig)
+    fi
+    if ! remote_alive "$storage" && [[ -s "$remote_endpoints" ]]; then
+      # The cluster may have been recreated within the hour: look it up again.
+      rm -f "$remote_endpoints" "$remote_probe_file"
+      remote_resolve
+      read -r engine storage < "$remote_endpoints" 2>/dev/null || true
+      [[ -n "$storage" ]] || storage=$(sed -n 's/^  cas_address = //p' tools/namespace.buckconfig)
+    fi
+    if ! remote_alive "$storage"; then
+      echo "tools/buck2: the Namespace cache at $storage does not answer; building locally without it (ADR-0276 decision 7)." >&2
+      unset NAMESPACE_RBE_TOKEN
+      if [[ -e "$remote_include" ]]; then
+        remote_restart
+        rm -f "$remote_include"
+      fi
+      return 0
+    fi
+    if [[ -s "$remote_endpoints" ]]; then
+      wanted+=$'\n[buck2_re_client]\n  engine_address = '"$engine"$'\n  action_cache_address = '"$storage"$'\n  cas_address = '"$storage"
+    fi
     # The worker image for these cells, when tools/namespace-re-image has
     # recorded one: its digest joins every action's properties, so every
-    # client on these cells shares action keys. Remote execution itself is a
-    # developer opt-in (OVERALLS_BUCK2_REMOTE_EXECUTION=on): Namespace's
-    # worker pool cannot be bounded inside the workspace's shared CPU cap.
+    # client on these cells shares action keys. Remote execution is then the
+    # default for every remotable action (ADR-0276, 2026-11-01);
+    # OVERALLS_BUCK2_REMOTE_EXECUTION=off keeps a build cache-only, and the
+    # host updater's .buckconfig.local turns it off for deployments.
     local cells_id image
     cells_id=$(sed -n 's/^  cells_id = \([0-9a-f]\{64\}\)$/\1/p' .buck-cells/toolchains.buckconfig 2>/dev/null || true)
     image=$(awk -v id="$cells_id" '$1 == id && id != "" { print $2 }' tools/namespace-re-image.lock 2>/dev/null || true)
     if [[ -n "$image" ]]; then
       wanted+=$'\n[overalls]\n  re_image = '"$image"
-      if [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-off}" == on ]]; then
+      if [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-on}" != off ]]; then
         wanted+=$'\n  remote_execution = true'
       fi
-    elif [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-off}" == on ]]; then
-      echo "tools/buck2: no Namespace worker image for these cells; building locally with the cache. Regenerate it with tools/namespace-re-image --push and commit tools/namespace-re-image.lock." >&2
+    elif [[ "${OVERALLS_BUCK2_REMOTE_EXECUTION:-on}" != off ]]; then
+      echo "tools/buck2: no Namespace worker image for these cells yet, so this build runs locally with the cache. .github/workflows/namespace-re-image.yml republishes it after a cells change on trunk (or run tools/namespace-re-image --push)." >&2
     fi
     if [[ "$(cat "$remote_include" 2>/dev/null || true)" != "$wanted" ]]; then
       remote_restart
@@ -145,25 +229,4 @@ if [[ ! -e .buck-cells || "$(cat "$state" 2>/dev/null)" != "$key" ]]; then
   printf '%s\n' "$key" > "$state"
 fi
 remote_config on
-if ! grep -qx '  remote_execution = true' "$remote_include" 2>/dev/null; then
-  exec "$root/.buck-cells/bin/buck2" "$@"
-fi
-# Opt-in remote execution (ADR-0276): Namespace starts 16-vCPU workers on
-# demand inside the workspace's shared CPU cap and does not scale them to
-# zero, so after the command name every running worker and how to destroy it.
-# Another developer's build may still be using one, so nothing is destroyed
-# automatically.
-status=0
-"$root/.buck-cells/bin/buck2" "$@" || status=$?
-if command -v nsc >/dev/null; then
-  workers=$(nsc list -o json 2>/dev/null | python3 -I -c '
-import json, sys
-for item in json.load(sys.stdin):
-    if item.get("labels", {}).get("bazel.purpose") == "worker":
-        print(item["cluster_id"])
-' 2>/dev/null || true)
-  for worker in $workers; do
-    echo "tools/buck2: Namespace RE worker $worker is still running and counts against the shared CPU cap; once no build uses it: nsc destroy $worker --force" >&2
-  done
-fi
-exit "$status"
+exec "$root/.buck-cells/bin/buck2" "$@"

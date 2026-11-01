@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Contract namespace-re-worker-image: see tools/CONTRACTS.
 #
-#   tools/namespace-re-image [--push | --check]
+#   tools/namespace-re-image [--push | --check | --cells-id]
 #
 # Builds the Namespace remote-execution worker image for this checkout's
 # buckCells (ADR-0276): every store path in the cells closure except
@@ -11,22 +11,30 @@
 # overalls-buck-re-worker:<cells_id>, optimises it for remote execution and
 # records `<cells_id> <image>@<digest>` in tools/namespace-re-image.lock, which
 # tools/buck2 reads to enable remote execution for matching cells only.
+# --check exits 0 when the lock already names an image for these cells, and
+# --cells-id prints the cells id. .github/workflows/namespace-re-image.yml
+# republishes on every cells change.
 # Needs nsc logged in (`nsc login`, or a Namespace runner's identity).
 set -euo pipefail
 root=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 cd "$root"
-push=false check=false
+push=false check=false print_id=false
 case "${1:-}" in
   --push) push=true ;;
   --check) check=true ;;
+  --cells-id) print_id=true ;;
   "") ;;
-  *) echo "usage: tools/namespace-re-image [--push | --check]" >&2; exit 2 ;;
+  *) echo "usage: tools/namespace-re-image [--push | --check | --cells-id]" >&2; exit 2 ;;
 esac
 
 cells=$(nix build --no-link --print-out-paths .#buckCells.x86_64-linux)
 cells_id=$(sed -n 's/^  cells_id = \([0-9a-f]\{64\}\)$/\1/p' "$cells/toolchains.buckconfig")
 [[ -n "$cells_id" ]] || { echo "tools/namespace-re-image: no cells_id in $cells" >&2; exit 1; }
 lock=tools/namespace-re-image.lock
+if [[ "$print_id" == true ]]; then
+  echo "$cells_id"
+  exit 0
+fi
 if [[ "$check" == true ]]; then
   # Whether the committed lock names an image for these cells.
   if awk -v id="$cells_id" '$1 == id { found = 1 } END { exit !found }' "$lock" 2>/dev/null; then

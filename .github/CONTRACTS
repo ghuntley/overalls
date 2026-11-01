@@ -31,7 +31,8 @@ nixos-machine-tests.yml's jobs and oss-scanner.yml's image job MUST receive the 
 job environment variable NAMESPACE_RBE_TOKEN from the repository secret, never
 in argv, a file in the checkout or a log, so tools/buck2 enables the Namespace
 cache. A run without the secret (a fork or pull request) MUST still build
-locally through the same steps (ADR-0276).
+locally through the same steps (ADR-0276). Jobs with the token execute
+remotable actions remotely by default, as tools/buck2 does everywhere.
 
 @cc [owner:ghuntley,label:security;release] mila-release-publish-tag-only
 mila-release.yml MUST create a GitHub release, or upload to any store, only in

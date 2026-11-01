@@ -318,16 +318,26 @@ are retired; their module stays dormant.
   `.buckconfig` includes optionally, and exports the token for buckd; the
   tracked config expands `$NAMESPACE_RBE_TOKEN` in its `http_headers`.
   Without one, or with `OVERALLS_BUCK2_REMOTE=off`, it removes the include and
-  builds stay local. Switching restarts the daemon.
+  builds stay local. Switching restarts the daemon. Namespace's addresses
+  name the cluster's instances and change when Namespace recreates it; where
+  `nsc` is logged in, the wrapper re-reads them hourly into the untracked
+  `.buck-remote.endpoints` (delete it to force a re-read), otherwise the
+  committed ones in `tools/namespace.buckconfig` apply. A dead address
+  (404 or no answer to a five-second probe, remembered in
+  `.buck-remote.probe` for ten minutes) turns the cache off for the build
+  instead of letting Buck2 retry forever.
 - **Never write the token** into a file in the checkout, argv or the Nix
   store. `tools/namespace-token-scan` fails if the `nsrt_` prefix appears in
   the include, `buck-out/v2/log` or `~/.buck`; CI runs it after each Buck2 job.
-- **Who writes.** Every token holder uploads (`default_allow_cache_upload =
-  true`): developers, the host updater and CI's trunk pushes. `local_only`
-  actions keep `allow_cache_upload = False` (rule 4). The host updater keeps
-  `remote_execution = false` and retries a failed build once with
-  `OVERALLS_BUCK2_REMOTE=off` (`update.namespace_cache` event: `enabled` or
-  `token_missing`; `update.remote_cache` `fallback`).
+- **Who writes.** Every token holder uploads. `default_allow_cache_upload =
+  true` sits in the root `.buckconfig`, because Buck2 ignores that key in an
+  included file (it read `false` from the include and uploaded nothing until
+  2026-11-01); without a token there is no remote cache, so nothing uploads.
+  `local_only` actions keep `allow_cache_upload = False` (rule 4). The host
+  updater's `.buckconfig.local` keeps `remote_execution = false` and retries
+  a failed build once with `OVERALLS_BUCK2_REMOTE=off`
+  (`update.namespace_cache` event: `enabled` or `token_missing`;
+  `update.remote_cache` `fallback`).
 - **CI.** ci.yml's Buck2 jobs and nixos-machine-tests.yml set
   `NAMESPACE_RBE_TOKEN` from the repository secret; mila-builds.yml sets it
   only on the hermetic source-bundle job. Forks get no secret and build
@@ -337,25 +347,29 @@ are retired; their module stays dormant.
   `nsc token revoke`).
 - **What runs remotely** (`toolchains//:execution_platform`, from
   `buck/platforms.bzl`): Linux x86_64, with a cache configured, `[nix]
-  cells_id` and `[overalls] remote_execution = true`. Remote execution is a
-  developer opt-in, `OVERALLS_BUCK2_REMOTE_EXECUTION=on`. CI and hosts are
-  cache-only, because Namespace cannot bound its 16-vCPU workers inside the
-  workspace's shared CPU cap, and on a 96-thread host local execution plus the
-  cache is faster anyway. `tools/buck2` sets `[overalls] re_image` whenever
-  `tools/namespace-re-image.lock` names a worker image for the checkout's
-  `cells_id`, so every action carries `overalls-cells=<cells_id>` and
-  `container-image=docker://<image>@<digest>` in its digest. After an opt-in
-  build it prints `nsc destroy <id> --force` for each running worker; destroy
-  idle ones. `local_only` actions and test commands never go remote. A
+  cells_id` and `[overalls] remote_execution = true`. Remote execution is
+  the default wherever a token and a matching worker image exist, on
+  developer machines and in CI (the user's decision, 2026-11-01);
+  `OVERALLS_BUCK2_REMOTE_EXECUTION=off` keeps one build cache-only. Host
+  deployments stay cache-only. `tools/buck2` sets `[overalls] re_image`
+  whenever `tools/namespace-re-image.lock` names a worker image for the
+  checkout's `cells_id`, so every action carries `overalls-cells=<cells_id>`
+  and `container-image=docker://<image>@<digest>` in its digest. Namespace
+  starts 16x32 workers on demand inside the workspace's shared 64-vCPU cap
+  and cannot bound or scale them to zero: `nsc list` shows them
+  (`bazel.purpose=worker`) and `nsc destroy <id> --force` frees an idle one.
+  `local_only` actions and test commands never go remote. A
   remote action that fails is retried locally
   (`allow_hybrid_fallbacks_on_failure`), so a real failure costs two runs and
   still fails.
 - **Worker image.** `tools/namespace-re-image --push` (needs `nsc login`)
   builds the image from the buckCells closure without `.drv` files, plus
   `/bin` links to coreutils, findutils, grep and sed, pushes it to
-  `nscr.io`, runs `nsc base-image optimize`, and rewrites the lock. Commit the
-  lock with any change to the cells; until then those cells have no image.
-  Optimising starts a temporary 8x16 Namespace maintenance instance.
+  `nscr.io`, runs `nsc base-image optimize`, and rewrites the lock.
+  `.github/workflows/namespace-re-image.yml` does this, and commits the lock,
+  after every trunk change to the cells' inputs; until it lands, those cells
+  build locally with the cache. Optimising starts a temporary 8x16 Namespace
+  maintenance instance.
 - **Checking.** The build summary prints `Cache hits: N%` and
   `Commands: N (cached: C, remote: R, local: L)`. Force local with
   `OVERALLS_BUCK2_REMOTE=off` or `buck2 build --local-only`.
