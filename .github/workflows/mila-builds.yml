@@ -800,6 +800,12 @@ jobs:
   # until the Apple and Windows journey nodes have joined and left (or a
   # deadline passes). Skipped cleanly without MILA_TAILSCALE_OAUTH_CLIENT_ID.
   journey-fixture-tailnet:
+    # windows-native waits for windows-ffi, which can queue for half an hour.
+    # Starting the fixture alongside windows-ffi's result keeps the Windows node
+    # inside the fixture's join window (run 41273848008 missed it). The Apple
+    # journey waits for the fixture for up to 60 minutes.
+    needs: windows-ffi
+    if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
     timeout-minutes: 130
     env:

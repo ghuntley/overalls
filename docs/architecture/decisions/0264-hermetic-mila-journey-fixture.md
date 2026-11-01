@@ -56,6 +56,8 @@ harness uses for real guest execution.
    stays up until each Apple and Windows journey job has reported its result
    (`POST /finished/<node>/<outcome>`), left the tailnet, or never joined, or
    until a deadline passes. Only a reported `success` counts as finished. The
+   job starts once `windows-ffi` has finished, as `windows-native` does, so a
+   queued DLL build cannot use up the Windows node's join window. The
    journey jobs join as ephemeral `tag:mila-ci` nodes and resolve the fixture
    from `tailscale status --json`. They print a diagnostic every minute while
    waiting, download the descriptor and forward `127.0.0.1:8443/2222/8444`
