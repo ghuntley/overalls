@@ -10,9 +10,19 @@ case "$application" in marshall|lilly|audi|porsche|ziggy) ;; *) exit 2 ;; esac
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 cd -- "$repo_root"
 mkdir -p -- "$repo_root/artifacts"
-nix build --no-link --no-update-lock-file ".#checks.x86_64-linux.$application-release"
-nix build --no-update-lock-file ".#$application" --out-link "$repo_root/artifacts/$application"
-bundle=$(readlink -f -- "$repo_root/artifacts/$application")
+# Buck2 is the build entry point (ADR-0269): each nix_assemble target's output
+# names the store path it built, and the wrapper keeps a GC root for it.
+built() {
+  local listing
+  listing=$("$repo_root/tools/buck2" build --show-full-output "$1")
+  cat -- "$(awk 'END { print $2 }' <<< "$listing")"
+}
+built "//:check-$application-release" > /dev/null
+bundle=$(built "//:package-service-$application")
+[[ $bundle == /nix/store/* && -e $bundle ]]
+# The out-link stays an indirect GC root, as `nix build --out-link` made it.
+rm -f -- "$repo_root/artifacts/$application"
+nix-store --add-root "$repo_root/artifacts/$application" --realise "$bundle" > /dev/null
 closure_paths=$(nix-store --query --requisites "$bundle")
 mapfile -t closure <<< "$closure_paths"
 [[ ${#closure[@]} -gt 0 && -n ${closure[0]} ]]
