@@ -3,7 +3,7 @@ use adw::{Application, ApplicationWindow};
 use gtk::{gio, glib, Align, Box, Button, Entry, Label, Orientation, TextDirection};
 use mila_native_linux::adapter::{decode_notification_devices, RequestLedger};
 use mila_native_linux::connection_profile::ConnectionProfiles;
-use mila_native_linux::deep_link::Page;
+use mila_native_linux::deep_link::{LinkCompletion, Page, PendingLink};
 use mila_native_linux::deployments::{DeploymentError, DeploymentList, DeploymentStore};
 use mila_native_linux::notifications::NotificationState;
 use mila_native_linux::route::ActivationBatch;
@@ -59,6 +59,9 @@ struct NativeState {
     terminal_polling: Rc<Cell<bool>>,
     ssh_keys: Rc<RefCell<SshKeysView>>,
     links: Rc<RefCell<Option<views::LinkTargets>>>,
+    /// A link received while its deployment was signed out; signing in to
+    /// that deployment completes it (`linux-share-completion`).
+    pending_link: Rc<RefCell<PendingLink>>,
     rerender: RenderList,
     /// Request ids of page mutations whose outcome is unknown because the
     /// transport failed; a retry of the same action reuses the id so the
@@ -94,6 +97,7 @@ impl NativeState {
             terminal_polling: Rc::new(Cell::new(false)),
             ssh_keys: Rc::new(RefCell::new(SshKeysView::default())),
             links: Rc::new(RefCell::new(None)),
+            pending_link: Rc::new(RefCell::new(PendingLink::default())),
             rerender: Rc::new(RefCell::new(Vec::new())),
             requests: Rc::new(RefCell::new(RequestLedger::default())),
         }
@@ -175,6 +179,8 @@ impl NativeState {
     /// machine listing, terminal generation and SSH-key rows.
     fn drop_authority(&self) {
         self.driver.borrow_mut().sign_out();
+        // A held link belongs to the signed-out deployment it arrived for.
+        self.pending_link.borrow_mut().discard();
         // Retained request ids belong to this deployment and account; a
         // reconnect after loss keeps them, a switch or sign-out does not.
         self.requests.borrow_mut().clear();
@@ -285,6 +291,7 @@ impl NativeState {
                     for render in self.rerender.borrow().iter() {
                         render();
                     }
+                    self.complete_pending_link();
                 }
                 DriverEvent::Lost => self.release_session(),
             }
@@ -298,6 +305,26 @@ impl NativeState {
             self.render_sign_in();
         }
         self.driver.borrow().is_active()
+    }
+
+    /// Opens the link held while signed out, now that the selected
+    /// deployment has an authenticated session.
+    fn complete_pending_link(&self) {
+        let selected = self
+            .deployment_list()
+            .ok()
+            .and_then(|list| list.selected().map(|host| host.as_str().to_owned()));
+        let authenticated = self.session.borrow().is_authenticated();
+        let completion = self.pending_link.borrow_mut().complete(
+            selected.as_deref(),
+            authenticated,
+            Instant::now(),
+        );
+        if let LinkCompletion::Opened(decision) = completion {
+            if let Some(status) = self.status.borrow().clone() {
+                views::present_decision(self, &decision, &status);
+            }
+        }
     }
 
     fn show_page(&self, page: Page) {
@@ -796,8 +823,38 @@ mod gtk_tests {
             "",
             "signed-out links never pre-fill targets"
         );
+        let held = format!("overalls://mila.example/machines/{machine_id}/terminals");
+        assert_eq!(
+            state.pending_link.borrow().held().as_deref(),
+            Some(held.as_str()),
+            "a signed-out link is held for completion after sign-in"
+        );
+        state.complete_pending_link();
+        assert_eq!(stack.visible_child_name().as_deref(), Some("sign-in"));
+        assert!(
+            state.pending_link.borrow().held().is_some(),
+            "an unauthenticated window never completes a held link"
+        );
+        state.drop_authority();
+        assert_eq!(
+            state.pending_link.borrow().held(),
+            None,
+            "sign-out discards a held link"
+        );
+        views::handle_batch(
+            &state,
+            &share_inbound(&format!(
+                "overalls://mila.example/machines/{machine_id}/terminals"
+            )),
+            &status,
+        );
         views::handle_batch(&state, &share_inbound("not a link"), &status);
         assert_eq!(status.label(), strings::text(strings::Message::LinkRefused));
+        assert_eq!(
+            state.pending_link.borrow().held(),
+            None,
+            "a newer activation replaces the held link"
+        );
 
         // Copy link uses the selected deployment and canonical route.
         machine.set_text(machine_id);

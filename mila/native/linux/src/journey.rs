@@ -8,7 +8,7 @@
 //! no credentials, tokens, terminal bytes or server payloads are reported.
 
 use crate::adapter::{new_request_id, RuntimeError};
-use crate::deep_link::{present, Page};
+use crate::deep_link::{present, LinkCompletion, Page, PendingLink};
 use crate::deployments::{DeploymentHost, DeploymentStore};
 use crate::device_key::{load_or_create, write_private};
 use crate::journey_checks::{
@@ -635,6 +635,12 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
         gated,
         if gated { "gated" } else { "ungated" },
     );
+    // The signed-out link is held until this deployment signs in (step 5b).
+    let mut pending = PendingLink::default();
+    let held = signed_out
+        .decisions(Some(&host), false)
+        .first()
+        .is_some_and(|decision| pending.offer(decision, Instant::now()));
 
     // 3. Trust: HTTPS fetch against the fixture CA, reconciled by Rust.
     let ca_path = workdir.join("fixture-ca.pem");
@@ -674,6 +680,26 @@ pub fn run(descriptor: &JourneyDescriptor, workdir: &Path) -> JourneyReport {
     report.record("approval", true, outcome);
     let binding = Rc::new(RefCell::new(SessionBinding::default()));
     binding.borrow_mut().bind(live);
+
+    // 5b. The link held while signed out opens once the session is bound.
+    let authenticated = binding.borrow().is_authenticated();
+    let completion = if held {
+        match pending.complete(Some(&host), authenticated, Instant::now()) {
+            LinkCompletion::Opened(decision) if present(&decision).page == Page::Machines => {
+                "opened"
+            }
+            LinkCompletion::Opened(_) => "wrong_page",
+            LinkCompletion::Expired => "expired",
+            LinkCompletion::Nothing => "not_completed",
+        }
+    } else {
+        "not_held"
+    };
+    report.record(
+        "deep_link_share_completion",
+        completion == "opened",
+        completion,
+    );
 
     // 6. Machine listing and the seeded machine.
     let machine_id = {

@@ -17,18 +17,19 @@ internal fun externalMilaUri(intent: Intent): String? = when (intent.action) {
 internal fun acceptExternalIntent(controller: MilaDeepLinkController, intent: Intent, generation: Long): Boolean =
     externalMilaUri(intent)?.let { controller.queue(it, generation) } ?: false
 
-/** Accepts an external route only while the native session is authenticated. */
+/** Accepts an external route only while the native session is authenticated to the host it names. */
 internal fun acceptAuthenticatedExternalIntent(
     controller: MilaDeepLinkController,
     intent: Intent,
     generation: Long,
-    signedIn: Boolean,
-): Boolean = signedIn && acceptExternalIntent(controller, intent, generation) && controller.acceptPending(generation)
+    authenticatedHost: String?,
+): Boolean = authenticatedHost != null &&
+    deliverExternalIntent(controller, intent, generation, authenticatedHost) == MilaLinkDelivery.Applied
 
 /** Hands one external VIEW/SEND intent to [MilaDeepLinkController.deliver] for the current session. */
 internal fun deliverExternalIntent(
     controller: MilaDeepLinkController,
     intent: Intent,
     generation: Long,
-    signedIn: Boolean,
-): MilaLinkDelivery = externalMilaUri(intent)?.let { controller.deliver(it, generation, signedIn) } ?: MilaLinkDelivery.Refused
+    authenticatedHost: String?,
+): MilaLinkDelivery = externalMilaUri(intent)?.let { controller.deliver(it, generation, authenticatedHost) } ?: MilaLinkDelivery.Refused

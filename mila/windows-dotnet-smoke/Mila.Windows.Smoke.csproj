@@ -35,6 +35,7 @@
     <Compile Include="../windows-dotnet/Interop/TerminalStream.cs" Link="Interop/TerminalStream.cs" />
     <Compile Include="../windows-dotnet/Interop/RustNativeLifecycle.cs" Link="Interop/RustNativeLifecycle.cs" />
     <Compile Include="../windows-dotnet/Interop/DeploymentPicker.cs" Link="Interop/DeploymentPicker.cs" />
+    <Compile Include="../windows-dotnet/Interop/DeploymentPickerController.cs" Link="Interop/DeploymentPickerController.cs" />
     <Compile Include="../windows-dotnet/Interop/SignInCoordinator.cs" Link="Interop/SignInCoordinator.cs" />
     <Compile Include="../windows-dotnet/Interop/WindowsPushRegistration.cs" Link="Interop/WindowsPushRegistration.cs" />
     <Compile Include="../windows-dotnet/Interop/MilaPresentation.cs" Link="Interop/MilaPresentation.cs" />

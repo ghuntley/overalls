@@ -18,6 +18,7 @@ internal static class LifecycleSmoke
     internal static void Run()
     {
         DeploymentPicker();
+        DeploymentPickerController();
         WhoamiDecoding();
         SignInApprovalOutcomes();
         SignInReconnect();
@@ -66,6 +67,80 @@ internal static class LifecycleSmoke
             File.WriteAllText(path, "{\"Host\":\"legacy.example\"}");
             Program.Require(new MilaDeploymentFileRepository(path).LoadAll() is [{ Host: "legacy.example", Port: 22 }],
                 "legacy single-entry migration");
+        }
+        finally { if (File.Exists(path)) File.Delete(path); }
+    }
+
+    /// <summary>The WinUI picker's decisions through the controller MainWindow binds to.</summary>
+    private static void DeploymentPickerController()
+    {
+        string path = Path.Combine(Path.GetTempPath(), $"mila-deployments-{Guid.NewGuid():N}.json");
+        try
+        {
+            int signOuts = 0;
+            MilaDeploymentPicker picker = new(new MilaDeploymentFileRepository(path), _ => signOuts++);
+            MilaShareCompletion shares = new(new MilaExternalActivationGate());
+            MilaDeploymentPickerController controller = new(picker, shares);
+            MilaDeploymentPickerView view = controller.View;
+            Program.Require(view.Rows.Count == 0 && view.Selected is null && !view.ForgetEnabled &&
+                view.HostText is null && view.Status is null, "controller starts empty");
+
+            view = controller.Add("bad host", "22", select: true, out MilaDeployment? refused);
+            Program.Require(refused is null && view.Status?.Id == "invalidHost" && view.HostText is null && view.Rows.Count == 0,
+                "controller refuses an invalid host and keeps the typed entry");
+            view = controller.Add("a.example", "0", select: true, out refused);
+            Program.Require(refused is null && view.Status?.Id == "invalidHost", "controller refuses port 0");
+            view = controller.Add("a.example", "x22", select: true, out refused);
+            Program.Require(refused is null && view.Status?.Id == "invalidHost", "controller refuses a non-numeric port");
+
+            view = controller.Add(" A.Example ", "2222", select: true, out MilaDeployment? a);
+            Program.Require(a == new MilaDeployment("a.example", 2222) && view.Selected == a && view.ForgetEnabled &&
+                view.HostText == "a.example" && view.PortText == "2222" && view.Status is null && signOuts == 1,
+                "controller adds, selects and fills canonical entries");
+            view = controller.Add("b.example", "22", select: false, out MilaDeployment? b);
+            Program.Require(view.Rows.Count == 2 && view.Selected == a && view.HostText is null && signOuts == 1,
+                "controller adds without selecting");
+
+            Program.Require(controller.Choose(null) is null && controller.Choose(a) is null && signOuts == 1,
+                "list events without a new row are no-ops");
+            long before = view.SelectionGeneration;
+            view = controller.Choose(b) ?? throw new InvalidOperationException("controller choose");
+            Program.Require(view.Selected == b && view.HostText == "b.example" && view.PortText == "22" &&
+                view.SelectionGeneration == before + 1 && !picker.IsCurrent(before, a!) && signOuts == 2,
+                "choosing a row signs out the previous deployment and fences its generation");
+            Program.Require(controller.Choose(new MilaDeployment("c.example")) is null && picker.State.Selected == b,
+                "choosing an unknown row is refused");
+
+            // A pending share survives selecting its own host and is dropped by another selection.
+            MilaExternalActivation share = MilaExternalActivationParser.ParseArguments("--share overalls://a.example/threads")
+                ?? throw new InvalidOperationException("controller share route");
+            Program.Require(shares.Offer(share, false, null, out _) == MilaShareCompletionOutcome.Deferred, "controller share deferred");
+            _ = controller.Choose(a);
+            Program.Require(shares.PendingHost == "a.example", "pending share survives selecting its host");
+            _ = controller.Choose(b);
+            Program.Require(shares.PendingHost is null, "pending share dropped by another selection");
+
+            // Connect: the selected deployment, an existing typed one, a new typed one, or nothing.
+            view = controller.Connect("b.example", "22", out MilaDeployment? target, out long selection);
+            Program.Require(target == b && selection == picker.State.SelectionGeneration && view.Status is null && signOuts == 4,
+                "connect uses the selected deployment");
+            view = controller.Connect("A.EXAMPLE", "2222", out target, out selection);
+            Program.Require(target == a && picker.IsCurrent(selection, a!) && signOuts == 5, "connect selects an existing typed deployment");
+            view = controller.Connect("new.example", "22", out target, out _);
+            Program.Require(target == new MilaDeployment("new.example") && view.Rows.Count == 3, "connect adds a new typed deployment");
+            view = controller.Connect("https://evil.example", "22", out target, out _);
+            Program.Require(target is null && view.Status?.Id == "invalidHost" && picker.State.Selected?.Host == "new.example",
+                "connect refuses non-canonical input");
+
+            MilaExternalActivation newShare = MilaExternalActivationParser.ParseArguments("--share overalls://new.example/threads")
+                ?? throw new InvalidOperationException("controller share route before forget");
+            Program.Require(shares.Offer(newShare, false, null, out _) == MilaShareCompletionOutcome.Deferred, "controller share deferred before forget");
+            view = controller.Forget(picker.State.Selected) ?? throw new InvalidOperationException("controller forget");
+            Program.Require(view.Selected is null && !view.ForgetEnabled && view.Rows.Count == 2 && view.Status?.Id == "signInTitle" &&
+                shares.PendingHost is null, "forget signs out, clears selection and cancels the pending share");
+            Program.Require(controller.Forget(null) is null && controller.Forget(new MilaDeployment("new.example")) is null,
+                "forget without a stored row is a no-op");
+            Program.Require(new MilaDeploymentFileRepository(path).LoadAll().Count == 2, "controller persists through the repository");
         }
         finally { if (File.Exists(path)) File.Delete(path); }
     }

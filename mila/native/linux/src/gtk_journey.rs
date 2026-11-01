@@ -1041,6 +1041,9 @@ struct Script {
     /// Attach presses that failed without a server answer, such as while
     /// the heartbeat probe held the session.
     terminal_attempts: u32,
+    /// The link handed to the signed-out window, when the window held it
+    /// for completion after sign-in.
+    held_link: Option<String>,
 }
 
 /// Switch to the second deployment, then back to the fixture.
@@ -1051,6 +1054,76 @@ const SWITCH_AWAY: Switch = Switch {
 };
 
 impl Script {
+    /// The shared link's target: the seeded machine when the fixture
+    /// publishes its id, else the machine list.
+    fn shared_target(&self) -> (mila_native_linux::route::Target, Option<String>) {
+        use mila_native_linux::route::{MachinePage, Target};
+        self.descriptor
+            .seed
+            .machine_id
+            .clone()
+            .map_or((Target::Machines, None), |id| {
+                (
+                    Target::Machine {
+                        id: id.clone(),
+                        page: MachinePage::Overview,
+                    },
+                    Some(id),
+                )
+            })
+    }
+
+    /// Hands a link for the selected, signed-out fixture to the window the
+    /// way a drop or paste does; returns it when the window held it.
+    fn offer_signed_out_link(&self, state: &NativeState) -> Option<String> {
+        let host = &self.descriptor.deployment.host;
+        let link = mila_native_linux::route::share_route(host, &self.shared_target().0).ok()?;
+        let status = state.status.borrow().clone()?;
+        super::views::handle_batch(
+            state,
+            &mila_native_linux::route::share_inbound(&link),
+            &status,
+        );
+        let page = state
+            .links
+            .borrow()
+            .as_ref()
+            .and_then(|targets| targets.stack.visible_child_name());
+        let held = state.pending_link.borrow().held();
+        (page.as_deref() == Some(Page::SignIn.name()) && held.as_deref() == Some(link.as_str()))
+            .then_some(link)
+    }
+
+    /// After sign-in: the held link opened its page with its target filled.
+    fn share_completion(&self, state: &NativeState) -> &'static str {
+        if self.held_link.is_none() {
+            return "not_held";
+        }
+        if state.pending_link.borrow().held().is_some() {
+            return "still_held";
+        }
+        let (page, machine) = state
+            .links
+            .borrow()
+            .as_ref()
+            .map(|targets| {
+                (
+                    targets.stack.visible_child_name(),
+                    targets.machine.text().to_string(),
+                )
+            })
+            .unzip();
+        let expected = self.shared_target().1;
+        let filled = expected
+            .as_deref()
+            .is_none_or(|id| machine.as_deref() == Some(id));
+        if page.flatten().as_deref() == Some(Page::Machines.name()) && filled {
+            "opened"
+        } else {
+            "not_opened"
+        }
+    }
+
     /// After the guestless refusal check: the guest PTY steps when the
     /// fixture runs its terminal machine, then loss detection.
     fn after_terminal(&self) -> Stage {
@@ -1348,6 +1421,10 @@ impl Script {
                         "not_selected"
                     },
                 );
+                // Share a link into the signed-out window: it must land on
+                // sign-in and be held; `gtk_share_completion` checks that
+                // signing in opens it.
+                self.held_link = self.offer_signed_out_link(state);
                 Some(Stage::SignIn)
             }
             Stage::SignIn => {
@@ -1379,6 +1456,9 @@ impl Script {
                         "already"
                     };
                     report.record("gtk_sign_in", true, code);
+                    let completion = self.share_completion(state);
+                    self.report
+                        .record("gtk_share_completion", completion == "opened", completion);
                     return Some(Stage::SshKeys);
                 }
                 if self.approver.failed() {
@@ -1716,6 +1796,7 @@ fn run_window(descriptor: &JourneyDescriptor, workdir: &Path, ca_path: &Path) ->
         steps: page_steps(),
         current: None,
         terminal_attempts: 0,
+        held_link: None,
     }));
     let finished = Rc::new(Cell::new(false));
     let application = adw::Application::builder()

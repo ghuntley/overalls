@@ -5,7 +5,8 @@
 //! command, a deployment change or an approval: the user still presses the
 //! page's own control to act.
 
-use crate::route::{MachinePage, NavigationDecision, Target};
+use crate::route::{ActivationRoute, MachinePage, NavigationDecision, Target};
+use std::time::{Duration, Instant};
 
 /// The GTK stack page a link selects.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -128,6 +129,81 @@ fn open_target(target: &Target) -> (Page, Prefill) {
         }
     };
     (page, prefill)
+}
+
+/// How long a link received while signed out stays eligible for completion.
+pub const PENDING_LINK_LIFETIME: Duration = Duration::from_secs(600);
+
+/// The result of offering an authenticated session to a held link.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub enum LinkCompletion {
+    /// Nothing is held, or the session is not yet authenticated.
+    Nothing,
+    /// The held link outlived its lifetime or no longer resolves to the
+    /// authenticated selected deployment; it was discarded.
+    Expired,
+    /// The held link now opens its target on the authenticated deployment.
+    Opened(NavigationDecision),
+}
+
+/// One share or open activation that arrived while its deployment was
+/// selected but signed out, held so that signing in completes it.
+#[derive(Clone, Debug, Default)]
+pub struct PendingLink {
+    held: Option<(ActivationRoute, Instant)>,
+}
+
+impl PendingLink {
+    /// @cc [owner:ghuntley,label:security;navigation] linux-share-completion
+    /// Only a `SignInRequired` decision MAY be held, at most one at a time:
+    /// any newer activation, accepted or refused, replaces or clears it. A held link MUST complete
+    /// at most once, only within [`PENDING_LINK_LIFETIME`], and only when it
+    /// re-resolves to `Open` against the authenticated selected deployment;
+    /// sign-out and a deployment switch MUST discard it. Completion is
+    /// navigation only, through the same [`present`] projection.
+    pub fn offer(&mut self, decision: &NavigationDecision, now: Instant) -> bool {
+        self.held = match decision {
+            NavigationDecision::SignInRequired { .. } => {
+                ActivationRoute::parse(&decision.canonical())
+                    .ok()
+                    .map(|route| (route, now))
+            }
+            NavigationDecision::UnknownDeployment { .. } | NavigationDecision::Open { .. } => None,
+        };
+        self.held.is_some()
+    }
+
+    /// The canonical link being held, if any.
+    pub fn held(&self) -> Option<String> {
+        self.held.as_ref().map(|(route, _)| route.canonical())
+    }
+
+    /// Drops the held link (sign-out, deployment switch or removal).
+    pub fn discard(&mut self) {
+        self.held = None;
+    }
+
+    /// Completes the held link once the selected deployment is authenticated.
+    pub fn complete(
+        &mut self,
+        selected_authority: Option<&str>,
+        authenticated: bool,
+        now: Instant,
+    ) -> LinkCompletion {
+        if !authenticated {
+            return LinkCompletion::Nothing;
+        }
+        let Some((route, received)) = self.held.take() else {
+            return LinkCompletion::Nothing;
+        };
+        let fresh = now
+            .checked_duration_since(received)
+            .is_some_and(|age| age <= PENDING_LINK_LIFETIME);
+        match route.navigation(selected_authority, true) {
+            decision @ NavigationDecision::Open { .. } if fresh => LinkCompletion::Opened(decision),
+            _ => LinkCompletion::Expired,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -266,5 +342,70 @@ mod tests {
         let bounded = share_inbound(&many);
         assert_eq!(bounded.routes().len(), 64);
         assert_eq!(bounded.rejected(), 36);
+    }
+
+    #[test]
+    fn signed_out_links_complete_once_after_sign_in() {
+        let now = Instant::now();
+        let uri = format!("overalls://mila.example/machines/{MACHINE}/terminals");
+        let signed_out =
+            ActivationBatch::parse([uri.as_str()]).decisions(Some("mila.example"), false);
+        let mut pending = PendingLink::default();
+        assert!(pending.offer(&signed_out[0], now));
+        assert_eq!(pending.held().as_deref(), Some(uri.as_str()));
+        assert_eq!(
+            pending.complete(Some("mila.example"), false, now),
+            LinkCompletion::Nothing,
+            "an unauthenticated session leaves the link held"
+        );
+        let LinkCompletion::Opened(decision) = pending.complete(Some("mila.example"), true, now)
+        else {
+            panic!("authenticated completion opens the held link");
+        };
+        let presentation = present(&decision);
+        assert_eq!(presentation.page, Page::Terminal);
+        assert_eq!(presentation.prefill.machine_id.as_deref(), Some(MACHINE));
+        assert_eq!(
+            pending.complete(Some("mila.example"), true, now),
+            LinkCompletion::Nothing,
+            "a held link completes at most once"
+        );
+    }
+
+    #[test]
+    fn held_links_fail_closed_on_other_hosts_age_and_newer_activations() {
+        let now = Instant::now();
+        let uri = "overalls://mila.example/threads";
+        let signed_out = ActivationBatch::parse([uri]).decisions(Some("mila.example"), false);
+        let mut pending = PendingLink::default();
+        assert!(pending.offer(&signed_out[0], now));
+        assert_eq!(
+            pending.complete(Some("other.example"), true, now),
+            LinkCompletion::Expired,
+            "another deployment's session never completes the link"
+        );
+        assert_eq!(pending.held(), None);
+        assert!(pending.offer(&signed_out[0], now));
+        let late = now + PENDING_LINK_LIFETIME + Duration::from_secs(1);
+        assert_eq!(
+            pending.complete(Some("mila.example"), true, late),
+            LinkCompletion::Expired
+        );
+        assert!(pending.offer(&signed_out[0], now));
+        pending.discard();
+        assert_eq!(
+            pending.complete(Some("mila.example"), true, now),
+            LinkCompletion::Nothing
+        );
+        // Unknown-deployment and already-open decisions are never held, and
+        // a newer activation replaces the held one.
+        assert!(pending.offer(&signed_out[0], now));
+        let unknown = ActivationBatch::parse(["overalls://other.example/threads"])
+            .decisions(Some("mila.example"), false);
+        assert!(!pending.offer(&unknown[0], now));
+        assert_eq!(pending.held(), None);
+        let open = ActivationBatch::parse([uri]).decisions(Some("mila.example"), true);
+        assert!(!pending.offer(&open[0], now));
+        assert_eq!(pending.held(), None);
     }
 }

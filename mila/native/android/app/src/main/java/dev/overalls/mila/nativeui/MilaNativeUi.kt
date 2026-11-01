@@ -78,7 +78,7 @@ fun MilaNativeRoot(
     initialRoute: MilaRoute? = null,
     routeState: State<MilaRoute>? = null,
     appLockController: MilaAppLockController? = null,
-    onAuthenticatedRoute: (() -> Unit)? = null,
+    onAuthenticatedRoute: ((MilaDeployment) -> Unit)? = null,
     onSessionEnded: (() -> Unit)? = null,
 ) {
     val scope = rememberCoroutineScope()
@@ -116,7 +116,10 @@ fun MilaNativeRoot(
     var refreshedListing by remember { mutableStateOf<MilaSessionListing?>(null) }
     LaunchedEffect(signInState) {
         refreshedListing = null
-        if (signInState is MilaSignInState.SignedIn) onAuthenticatedRoute?.invoke() else onSessionEnded?.invoke()
+        when (val current = signInState) {
+            is MilaSignInState.SignedIn -> onAuthenticatedRoute?.invoke(current.deployment)
+            else -> onSessionEnded?.invoke()
+        }
     }
     var threadListing by remember { mutableStateOf<MilaThreadListing?>(null) }
     // Changing the selected deployment fences the authenticated session immediately. This keeps
@@ -243,7 +246,7 @@ fun MilaNativeRoot(
             Button({ route = MilaRoute.Threads }) { Text(MilaStrings.text(MilaMessage.Threads)) }
             Button({ route = MilaRoute.Settings }) { Text(MilaStrings.text(MilaMessage.Settings)) }
             Button(enabled = signedIn, onClick = {
-                MilaShareIntentFactory.authenticatedChooser(route, signInState is MilaSignInState.SignedIn)?.let(context::startActivity)
+                MilaShareIntentFactory.authenticatedChooser(route, (signInState as? MilaSignInState.SignedIn)?.deployment?.host)?.let(context::startActivity)
             }) { Text(MilaStrings.text(MilaMessage.ShareRoute)) }
             Button(::refresh) { Text(MilaStrings.text(MilaMessage.Refresh)) }
         }

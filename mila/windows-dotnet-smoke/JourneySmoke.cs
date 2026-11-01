@@ -213,7 +213,24 @@ internal static class JourneySmoke
         Program.Require(trust.Status == MilaNativeStatus.Ok && trust.Document is not null, "journey trust enrollment");
         Step("trust enrollment");
 
+        // The WinUI picker's controller over a private list: the fixture and a
+        // second deployment that is never reached, then the fixture selected.
+        string pickerPath = Path.Combine(Path.GetTempPath(), $"mila-journey-deployments-{Guid.NewGuid():N}.json");
+        Action? signOutSelected = null;
         MilaShareCompletion shares = new(new MilaExternalActivationGate());
+        MilaDeploymentPicker picker = new(new MilaDeploymentFileRepository(pickerPath), _ => signOutSelected?.Invoke());
+        MilaDeploymentPickerController deployments = new(picker, shares);
+        string sshPort = descriptor.SshPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        _ = deployments.Add(host, sshPort, select: false, out MilaDeployment? fixture);
+        MilaDeploymentPickerView view = deployments.Add(SecondDeployment, sshPort, select: true, out MilaDeployment? second);
+        Program.Require(fixture is not null && second is not null && view.Rows.Count == 2 && view.Selected == second,
+            "journey picker lists two deployments");
+        Step("deployment picker: two deployments listed");
+        view = deployments.Choose(fixture) ?? throw new InvalidOperationException("journey picker select");
+        Program.Require(view.Selected == fixture && view.HostText == host && view.PortText == sshPort && view.ForgetEnabled,
+            "journey picker selects the fixture");
+        Step("deployment picker: fixture selected");
+
         MilaExternalActivation share = MilaExternalActivationParser.ParseArguments($"--share overalls://{host}/threads")
             ?? throw new InvalidOperationException("journey share route");
         Program.Require(shares.Offer(share, false, null, out _) == MilaShareCompletionOutcome.Deferred, "journey share deferred while signed out");
@@ -228,7 +245,10 @@ internal static class JourneySmoke
             MilaJourneyApprover approver = new(descriptor, handler);
             MilaSignInCoordinator coordinator = new(flow, session, approver,
                 policy: new MilaSignInPolicy(TimeSpan.FromSeconds(1), 3, TimeSpan.FromSeconds(1), 30_000));
-            MilaSignInTarget target = new(host, descriptor.SshPort, descriptor.HttpsPort, trust.Document!, key.PublicPoint(), bytes => key.Sign(bytes));
+            signOutSelected = coordinator.SignOut;
+            _ = deployments.Connect(host, sshPort, out MilaDeployment? selected, out long selection);
+            Program.Require(selected == fixture && picker.IsCurrent(selection, fixture!), "journey picker sign-in target");
+            MilaSignInTarget target = new(selected!.Host, selected.Port, descriptor.HttpsPort, trust.Document!, key.PublicPoint(), bytes => key.Sign(bytes));
             MilaSignInState state = await coordinator.SignInAsync(target, cancellationToken);
             Program.Require(state.Phase == MilaSignInPhase.SignedIn && session.Handle is > 0 && !string.IsNullOrEmpty(state.Account),
                 $"journey sign-in ({state.Phase}/{state.Failure})");
@@ -239,6 +259,29 @@ internal static class JourneySmoke
             Program.Require(shares.Complete(host, out MilaRoute shared) == MilaShareCompletionOutcome.Navigated &&
                 shared.Kind == MilaRouteKind.Threads, "journey share completion");
             Step("authenticated share completion");
+
+            // Switching away through the picker releases the session and fences
+            // the fixture's selection generation before the second is visible.
+            ulong first = session.Handle!.Value;
+            view = deployments.Choose(second) ?? throw new InvalidOperationException("journey picker switch");
+            Program.Require(view.Selected == second && session.Handle is null && flow.State.Phase == MilaSignInPhase.SignedOut &&
+                !picker.IsCurrent(selection, fixture!), "journey picker switch releases the session");
+            Step("deployment picker: switch away released the session and fenced its generation");
+
+            // A share for the fixture received meanwhile is held, survives selecting
+            // the fixture again, and completes once the picker's target signs in.
+            Program.Require(shares.Offer(share, false, null, out _) == MilaShareCompletionOutcome.Deferred,
+                "journey picker share deferred on another deployment");
+            view = deployments.Choose(fixture) ?? throw new InvalidOperationException("journey picker switch back");
+            Program.Require(view.Selected == fixture && shares.PendingHost == host, "journey picker share survives its own host");
+            _ = deployments.Connect(host, sshPort, out selected, out selection);
+            Program.Require(selected == fixture && picker.IsCurrent(selection, fixture!), "journey picker switch-back target");
+            state = await coordinator.SignInAsync(target, cancellationToken);
+            Program.Require(state.Phase == MilaSignInPhase.SignedIn && session.Handle is > 0 && session.Handle != first &&
+                picker.IsCurrent(selection, fixture!), $"journey picker sign-in after switch back ({state.Phase}/{state.Failure})");
+            Program.Require(shares.Complete(host, out shared) == MilaShareCompletionOutcome.Navigated &&
+                shared.Kind == MilaRouteKind.Threads, "journey picker held share completion");
+            Step("deployment picker: switch back signed in again and completed the held share");
 
             ulong handle = session.Handle!.Value;
             Program.Require(RustNative.TrySessionReadMachines(handle, false) == MilaNativeStatus.Ok, "journey machine read");
@@ -279,8 +322,12 @@ internal static class JourneySmoke
         {
             key.Dispose();
             if (!keyExisted) DeleteKey(host);
+            if (File.Exists(pickerPath)) File.Delete(pickerPath);
         }
     }
+
+    /// <summary>A second, never-reached deployment for the picker steps; canonical, unlike Linux's IP-literal alias.</summary>
+    private const string SecondDeployment = "mila-journey-second.localhost";
 
     private static string RequestId() => "porsche-" + Guid.NewGuid().ToString("N");
 

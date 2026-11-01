@@ -335,4 +335,34 @@ class MilaJourneyTest {
         expect(terminal.kill()) { "kill: ${terminal.state} ${refusal()}" }
         assertEquals(MilaTerminalSessionState.Ended(session), terminal.state)
     }
+
+    /**
+     * Authenticated share-provider completion, as the Windows journey proves it: a SEND share for
+     * the fixture deployment received while signed out is held, is not completed by another host,
+     * and completes once the fixture deployment signs in through the packaged JNI session. A share
+     * the signed-in client creates for the seed machine navigates at once and resolves against the
+     * authenticated listing.
+     */
+    @Test fun j13_signedOutShareCompletesAfterFixtureSignIn() = runBlocking<Unit> {
+        val deepLinks = MilaDeepLinkController()
+        val generation = deepLinks.beginSession()
+        val share = android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+            .putExtra(android.content.Intent.EXTRA_TEXT, "overalls://${fixture.host}/threads")
+        assertEquals(MilaLinkDelivery.Queued, deliverExternalIntent(deepLinks, share, generation, authenticatedHost = null))
+        assertEquals(MilaRoute.Machines, deepLinks.target)
+        assertEquals(MilaLinkDelivery.Queued, deepLinks.completePending("other.example", generation))
+
+        val state = signedIn()
+        assertEquals(fixture.host, state.deployment.host)
+        assertEquals(MilaLinkDelivery.Applied, deepLinks.completePending(state.deployment.host, generation))
+        assertEquals(MilaRoute.Threads, deepLinks.target)
+        assertEquals(MilaLinkDelivery.Refused, deepLinks.completePending(state.deployment.host, generation))
+
+        val seed = seed(state.listing)
+        val chooser = checkNotNull(MilaShareIntentFactory.authenticatedChooser(MilaRoute.Machine(seed.id), state.deployment.host)) { "authenticated share chooser" }
+        @Suppress("DEPRECATION") val outbound = chooser.getParcelableExtra<android.content.Intent>(android.content.Intent.EXTRA_INTENT)!!
+        assertEquals(MilaLinkDelivery.Applied, deliverExternalIntent(deepLinks, outbound, generation, state.deployment.host))
+        assertEquals(MilaRoute.Machine(seed.id), deepLinks.target)
+        assertEquals(MilaRouteResolution.Resolved, resolveMilaRoute(deepLinks.target, true, state.listing, null))
+    }
 }

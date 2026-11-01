@@ -38,11 +38,12 @@ class MainActivity : FragmentActivity() {
     private val deepLinks = MilaDeepLinkController()
     private val routeState = mutableStateOf<MilaRoute>(MilaRoute.Machines)
     private var deepLinkGeneration: Long = 0
-    private var sessionAuthenticated = false
+    /** Host of the authenticated deployment, or null while signed out. */
+    private var authenticatedHost: String? = null
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         deepLinkGeneration = deepLinks.beginSession()
-        deliverExternalIntent(deepLinks, intent, deepLinkGeneration, signedIn = false)
+        deliverExternalIntent(deepLinks, intent, deepLinkGeneration, authenticatedHost = null)
         routeState.value = deepLinks.target
         val persisted = MilaSettingsController(
             MilaSharedPreferencesStore(getSharedPreferences("mila.settings", MODE_PRIVATE)),
@@ -64,14 +65,17 @@ class MainActivity : FragmentActivity() {
                     Text(MilaStrings.text(MilaMessage.LockExplain))
                     Button(onClick = ::authenticate) { Text(MilaStrings.text(MilaMessage.LockUnlock)) }
                     if (state.lastFailed) Text(MilaStrings.text(MilaMessage.LockFailed))
-                } else MilaNativeRoot(adapter = nativeAdapter, routeState = routeState, appLockController = lockController, onAuthenticatedRoute = {
-                    sessionAuthenticated = true
-                    if (deepLinks.acceptPending(deepLinkGeneration)) routeState.value = deepLinks.target
+                } else MilaNativeRoot(adapter = nativeAdapter, routeState = routeState, appLockController = lockController, onAuthenticatedRoute = { deployment ->
+                    authenticatedHost = deployment.host
+                    // A share held while signed out completes only for the deployment it names.
+                    if (deepLinks.completePending(deployment.host, deepLinkGeneration) == MilaLinkDelivery.Applied) {
+                        routeState.value = deepLinks.target
+                    }
                 }, onSessionEnded = {
                     // Only an authenticated session can end; the initial signed-out state must keep
                     // a link that launched the app pending until the first sign-in.
-                    if (sessionAuthenticated) {
-                        sessionAuthenticated = false
+                    if (authenticatedHost != null) {
+                        authenticatedHost = null
                         deepLinkGeneration = deepLinks.endSession()
                         routeState.value = deepLinks.target
                     }
@@ -83,7 +87,7 @@ class MainActivity : FragmentActivity() {
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        if (deliverExternalIntent(deepLinks, intent, deepLinkGeneration, sessionAuthenticated) == MilaLinkDelivery.Applied) {
+        if (deliverExternalIntent(deepLinks, intent, deepLinkGeneration, authenticatedHost) == MilaLinkDelivery.Applied) {
             routeState.value = deepLinks.target
         }
     }

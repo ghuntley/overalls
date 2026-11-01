@@ -10,7 +10,9 @@ use super::{strings, NativeState};
 use gtk::prelude::*;
 use gtk::{gdk, glib, Align, Box, Button, Entry, Label, ListBox, Orientation, TextView};
 use mila_native_linux::deep_link::{present, LinkNotice, Page};
-use mila_native_linux::route::{share_inbound, share_route, ActivationBatch, MachinePage, Target};
+use mila_native_linux::route::{
+    share_inbound, share_route, ActivationBatch, MachinePage, NavigationDecision, Target,
+};
 use mila_native_linux::session::{ApprovalInfo, SignInFailure, SignInPhase};
 use mila_native_linux::session::{LiveSession, SessionPtyBackend};
 use mila_native_linux::ssh_keys_view::{RevokeOutcome, SshKeySource, SshKeysStatus};
@@ -814,9 +816,21 @@ pub(super) fn handle_batch(state: &NativeState, batch: &ActivationBatch, status:
     let authenticated = state.session.borrow().is_authenticated();
     let decisions = batch.decisions(selected.as_deref(), authenticated);
     let Some(decision) = decisions.first() else {
+        state.pending_link.borrow_mut().discard();
         status.set_label(&strings::text(strings::Message::LinkRefused));
         return;
     };
+    // The newest link replaces any held one; a signed-out link is held so
+    // that signing in to its deployment completes it.
+    state
+        .pending_link
+        .borrow_mut()
+        .offer(decision, std::time::Instant::now());
+    present_decision(state, decision, status);
+}
+
+/// Shows a resolved link: pre-fills the target entries and selects its page.
+pub(super) fn present_decision(state: &NativeState, decision: &NavigationDecision, status: &Label) {
     let presentation = present(decision);
     if let Some(targets) = state.links.borrow().as_ref() {
         let prefill = &presentation.prefill;

@@ -39,8 +39,11 @@ decisions live in GTK-independent library modules that the headless journey driv
 | `journey_checks` | Backend-effect checks both journeys poll after an action (`ls`, `show`, `share show`, `web show`, `request show`, `thread show`, `thread turns`). |
 
 Every inbound link (desktop `open`, the link entry, or text dropped on the window) goes through
-`ActivationBatch` and `deep_link::present`. "Copy link" buttons place only a `route::share_route`
-canonical link on the clipboard; Linux has no system share sheet.
+`ActivationBatch` and `deep_link::present`. A link for the selected deployment that arrives while
+it is signed out lands on sign-in and is held by `deep_link::PendingLink`; signing in to that
+deployment opens it once (within ten minutes), and sign-out or a deployment switch discards it.
+"Copy link" buttons place only a `route::share_route` canonical link on the clipboard; Linux has no
+system share sheet.
 
 ## Live journey
 

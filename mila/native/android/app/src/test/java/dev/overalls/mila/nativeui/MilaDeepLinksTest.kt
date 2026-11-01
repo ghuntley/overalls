@@ -27,40 +27,88 @@ class MilaDeepLinksTest {
         val id = UUID.randomUUID()
         val controller = MilaDeepLinkController()
         val generation = controller.beginSession()
-        assertEquals(MilaLinkDelivery.Queued, controller.deliver("overalls://mila/machines/$id", generation, signedIn = false))
+        assertEquals(MilaLinkDelivery.Queued, controller.deliver("overalls://a.example/machines/$id", generation, authenticatedHost = null))
         assertEquals(MilaRoute.Machines, controller.target)
         assertTrue(controller.hasPending)
-        assertTrue(controller.acceptPending(generation))
+        assertEquals("a.example", controller.pendingHost)
+        assertEquals(MilaLinkDelivery.Applied, controller.completePending("a.example", generation))
         assertEquals(MilaRoute.Machine(id), controller.target)
-        assertFalse(controller.acceptPending(generation))
+        assertEquals(MilaLinkDelivery.Refused, controller.completePending("a.example", generation))
     }
 
     @Test fun authenticatedDeliveryNavigatesImmediatelyAndSupersedesPending() {
         val controller = MilaDeepLinkController()
         val generation = controller.beginSession()
-        controller.deliver("overalls://mila/settings", generation, signedIn = false)
-        assertEquals(MilaLinkDelivery.Applied, controller.deliver("overalls://mila/threads", generation, signedIn = true))
+        controller.deliver("overalls://a.example/settings", generation, authenticatedHost = null)
+        assertEquals(MilaLinkDelivery.Applied, controller.deliver("overalls://a.example/threads", generation, authenticatedHost = "a.example"))
         assertEquals(MilaRoute.Threads, controller.target)
         assertFalse(controller.hasPending)
+    }
+
+    @Test fun pendingShareCompletesOnlyForTheHostItNames() {
+        val controller = MilaDeepLinkController()
+        val generation = controller.beginSession()
+        // Signed in to another deployment: the link is held, not applied to the wrong host.
+        assertEquals(MilaLinkDelivery.Queued, controller.deliver("overalls://b.example/threads", generation, authenticatedHost = "a.example"))
+        assertEquals(MilaRoute.Machines, controller.target)
+        assertEquals(MilaLinkDelivery.Queued, controller.completePending("a.example", generation))
+        assertTrue(controller.hasPending)
+        assertEquals(MilaLinkDelivery.Applied, controller.completePending("B.Example", generation))
+        assertEquals(MilaRoute.Threads, controller.target)
+    }
+
+    @Test fun pendingShareExpiresAfterItsLifetime() {
+        var now = 1_000L
+        val controller = MilaDeepLinkController { now }
+        val generation = controller.beginSession()
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
+        now += MilaDeepLinkController.PENDING_LIFETIME_SECONDS + 1
+        assertEquals(MilaLinkDelivery.Refused, controller.completePending("a.example", generation))
+        assertFalse(controller.hasPending)
+        assertEquals(MilaRoute.Machines, controller.target)
+        // A clock that moved backwards is refused rather than trusted.
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
+        now -= 10
+        assertEquals(MilaLinkDelivery.Refused, controller.completePending("a.example", generation))
+        assertEquals(MilaRoute.Machines, controller.target)
+    }
+
+    @Test fun pendingShareWithinItsLifetimeCompletes() {
+        var now = 1_000L
+        val controller = MilaDeepLinkController { now }
+        val generation = controller.beginSession()
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
+        now += MilaDeepLinkController.PENDING_LIFETIME_SECONDS
+        assertEquals(MilaLinkDelivery.Applied, controller.completePending("a.example", generation))
+        assertEquals(MilaRoute.Threads, controller.target)
     }
 
     @Test fun endingSessionDropsPendingAndFencesOldGeneration() {
         val controller = MilaDeepLinkController()
         val generation = controller.beginSession()
-        controller.deliver("overalls://mila/threads", generation, signedIn = false)
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
         val next = controller.endSession()
         assertFalse(controller.hasPending)
-        assertFalse(controller.acceptPending(next))
-        assertEquals(MilaLinkDelivery.Refused, controller.deliver("overalls://mila/threads", generation, signedIn = true))
+        assertEquals(MilaLinkDelivery.Refused, controller.completePending("a.example", next))
+        assertEquals(MilaLinkDelivery.Refused, controller.deliver("overalls://a.example/threads", generation, authenticatedHost = "a.example"))
+        assertEquals(MilaRoute.Machines, controller.target)
+    }
+
+    @Test fun staleGenerationCompletionIsRefusedAndDropsPending() {
+        val controller = MilaDeepLinkController()
+        val generation = controller.beginSession()
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
+        assertEquals(MilaLinkDelivery.Refused, controller.completePending("a.example", generation - 1))
+        assertFalse(controller.hasPending)
         assertEquals(MilaRoute.Machines, controller.target)
     }
 
     @Test fun refusedDeliveryKeepsPendingTarget() {
         val controller = MilaDeepLinkController()
         val generation = controller.beginSession()
-        controller.deliver("overalls://mila/threads", generation, signedIn = false)
-        assertEquals(MilaLinkDelivery.Refused, controller.deliver("overalls://mila/machines?command=rm", generation, signedIn = false))
-        assertTrue(controller.acceptPending(generation))
+        controller.deliver("overalls://a.example/threads", generation, authenticatedHost = null)
+        assertEquals(MilaLinkDelivery.Refused, controller.deliver("overalls://a.example/machines?command=rm", generation, authenticatedHost = null))
+        assertEquals(MilaLinkDelivery.Applied, controller.completePending("a.example", generation))
         assertEquals(MilaRoute.Threads, controller.target)
     }
 

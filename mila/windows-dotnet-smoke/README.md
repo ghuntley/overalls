@@ -20,7 +20,8 @@ invoked adapter behavior, not UI, device custody or lifecycle acceptance.
 
 ## Lifecycle checks
 
-`LifecycleSmoke.cs` covers the deployment picker, `whoami` decoding, sign-in
+`LifecycleSmoke.cs` covers the deployment picker and the controller the WinUI
+picker binds to, `whoami` decoding, sign-in
 approval outcomes and bounded reconnect, terminal reconnect, the WNS exchange,
 share completion, the shared Porsche device fixture and catalog coverage for
 every lifecycle message. Fakes replace only the network peer and OS services
@@ -52,7 +53,9 @@ Unknown members, another version, a non-canonical host, zero ports, a server
 name other than the host, an unparsable CA or a non-HTTPS approver are refused
 before any connection. The journey trusts only the fixture CA, fetches
 `https://host:https_port/bin/ssh-trust.json`, reconciles it in Rust, signs in
-with a CNG device key (deleted afterwards when the journey created it), lets the
+with a CNG device key (deleted afterwards when the journey created it), first
+adding the fixture and a never-reached second deployment through the WinUI
+picker's controller and selecting the fixture, lets the
 approver hook approve the browser link (`POST {approval_url, fingerprint}` with
 the Bearer token), then lists machines, adds and removes a viewer share on the
 seed machine (matched by `machine_id` and name, signed in as `account_email`),
@@ -61,6 +64,9 @@ and never observes (no guest runs there, so it requires the closed
 `terminal_unavailable` refusal; the seed machine is not used because the Apple
 journey on the same fixture observes it running), simulates a
 transport loss and reconnects, and completes a share deferred before sign-in.
+After that share completes it switches the picker to the second deployment
+(the session must be released and the fixture's selection generation fenced),
+holds a share for the fixture, switches back, signs in again and completes it.
 The bearer token is never printed. The `windows-native` job runs it only when
 the repository variable `MILA_WINDOWS_JOURNEY` is `enabled` and the fixture
 tunnel has written `$RUNNER_TEMP/mila-journey-descriptor.json`.

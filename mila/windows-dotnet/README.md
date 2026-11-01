@@ -61,6 +61,13 @@ forgetting the selected one advances the selection generation and signs the
 old deployment out first, so a pending approval, session handle or deferred
 share for it cannot complete against the new one.
 
+`Interop/DeploymentPickerController.cs` makes every decision of the WinUI
+deployment controls (rows, selected row, Forget, host and port entries, status
+message, sign-in target) and returns a typed view; `MainWindow` only forwards
+the controls' events and assigns that view. The smoke and the fixture journey
+drive the same controller. The XAML `ListView` binding itself has no UI
+automation in CI.
+
 `Interop/SignInCoordinator.cs` drives `MilaSignInFlow` with the Rust session:
 it connects through `mila_session_connect`, polls `mila_session_whoami` on the
 same session while browser approval is pending, opens the approval link once

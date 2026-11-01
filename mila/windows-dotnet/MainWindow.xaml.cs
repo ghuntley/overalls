@@ -31,6 +31,7 @@ public sealed partial class MainWindow : Window
     private readonly MilaSignInFlow _signIn = new();
     private readonly MilaSignInCoordinator _coordinator;
     private readonly MilaDeploymentPicker _picker;
+    private readonly MilaDeploymentPickerController _deployments;
     private readonly MilaShareCompletion _shareCompletion = new(new MilaExternalActivationGate());
     private readonly MilaWindowsPushRegistration _pushRegistration;
     private MilaSignInTarget? _signInTarget;
@@ -43,6 +44,7 @@ public sealed partial class MainWindow : Window
         _coordinator = new MilaSignInCoordinator(_signIn, _session, new MilaLauncherApprovalBrowser());
         _coordinator.Changed += state => DispatcherQueue.TryEnqueue(() => ShowSignInState(state));
         _picker = new MilaDeploymentPicker(MilaDeploymentStore.Repository, _ => SignOutActiveDeployment());
+        _deployments = new MilaDeploymentPickerController(_picker, _shareCompletion);
         _pushRegistration = new MilaWindowsPushRegistration(
             new MilaWindowsAppSdkChannelSource(WnsRemoteId()), new MilaWindowsPokeKeyStore(),
             new MilaSusanKeyClient(MilaSusanKeyClient.DefaultOrigin), _notificationController);
@@ -76,48 +78,28 @@ public sealed partial class MainWindow : Window
     }
     private static Guid? WnsRemoteId() =>
         Guid.TryParse(Environment.GetEnvironmentVariable("MILA_WNS_REMOTE_ID"), out Guid id) ? id : null;
-    private void LoadDeployments()
+    private void LoadDeployments() => ShowDeployments(_deployments.View);
+    /// <summary>Assigns a picker view to the deployment controls; the controller owns every decision.</summary>
+    private void ShowDeployments(MilaDeploymentPickerView view)
     {
-        MilaDeploymentPickerState state = _picker.State;
-        DeploymentRows.ItemsSource = state.Deployments;
-        DeploymentRows.SelectedItem = state.Selected;
-        ForgetDeployment.IsEnabled = state.Selected is not null;
+        if (!ReferenceEquals(DeploymentRows.ItemsSource, view.Rows)) DeploymentRows.ItemsSource = view.Rows;
+        if (!Equals(DeploymentRows.SelectedItem, view.Selected)) DeploymentRows.SelectedItem = view.Selected;
+        ForgetDeployment.IsEnabled = view.ForgetEnabled;
+        if (view.HostText is { } host) DeploymentHost.Text = host;
+        if (view.PortText is { } port) DeploymentPort.Text = port;
+        if (view.Status is { } status) StatusText.Text = status.Render(S);
     }
     private void OnDeploymentSelected(object sender, SelectionChangedEventArgs args)
     {
-        if (DeploymentRows.SelectedItem is not MilaDeployment deployment || _picker.State.Selected == deployment) return;
-        if (_picker.Select(deployment) is null) return;
-        _shareCompletion.OnDeploymentSelected(deployment.Host);
-        DeploymentHost.Text = deployment.Host;
-        DeploymentPort.Text = deployment.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        ForgetDeployment.IsEnabled = true;
+        if (_deployments.Choose(DeploymentRows.SelectedItem as MilaDeployment) is not { } view) return;
+        ShowDeployments(view);
         ShowSignInState(_signIn.State);
     }
-    private void AddDeploymentClicked(object sender, RoutedEventArgs args) => AddDeploymentFromInput(select: true);
-    private MilaDeployment? AddDeploymentFromInput(bool select)
-    {
-        ushort port = ushort.TryParse(DeploymentPort.Text.Trim(), System.Globalization.NumberStyles.None,
-            System.Globalization.CultureInfo.InvariantCulture, out ushort parsed) ? parsed : (ushort)0;
-        MilaDeploymentAddResult result = _picker.Add(DeploymentHost.Text, port, out MilaDeployment? deployment);
-        if (MilaPresentation.DeploymentAdd(result) is { } message)
-        {
-            StatusText.Text = message.Render(S);
-            return null;
-        }
-        if (select && deployment is not null && _picker.Select(deployment) is not null)
-            _shareCompletion.OnDeploymentSelected(deployment.Host);
-        LoadDeployments();
-        return _picker.State.Selected ?? deployment;
-    }
+    private void AddDeploymentClicked(object sender, RoutedEventArgs args) =>
+        ShowDeployments(_deployments.Add(DeploymentHost.Text, DeploymentPort.Text, select: true, out _));
     private void ForgetDeploymentClicked(object sender, RoutedEventArgs args)
     {
-        if (DeploymentRows.SelectedItem is not MilaDeployment deployment) return;
-        if (_picker.Forget(deployment))
-        {
-            _shareCompletion.Cancel();
-            LoadDeployments();
-            StatusText.Text = MilaPresentation.SignIn(MilaSignInState.Initial, null).Render(S);
-        }
+        if (_deployments.Forget(DeploymentRows.SelectedItem as MilaDeployment) is { } view) ShowDeployments(view);
     }
     /// <summary>Tears down every authenticated surface of the active deployment.</summary>
     private void SignOutActiveDeployment()
@@ -642,14 +624,10 @@ public sealed partial class MainWindow : Window
     }
     private void ConnectToDeployment(object sender, RoutedEventArgs args)
     {
-        MilaDeployment? deployment = _picker.State.Selected;
-        string typed = MilaDeploymentHost.Canonicalize(DeploymentHost.Text) ?? string.Empty;
-        if (deployment is null || deployment.Host != typed) deployment = AddDeploymentFromInput(select: true) ?? _picker.State.Selected;
-        if (deployment is null || deployment.Host != typed)
-        {
-            StatusText.Text = MilaPresentation.DeploymentAdd(MilaDeploymentAddResult.InvalidHost)!.Render(S);
-            return;
-        }
+        MilaDeploymentPickerView view = _deployments.Connect(DeploymentHost.Text, DeploymentPort.Text,
+            out MilaDeployment? deployment, out _);
+        ShowDeployments(view);
+        if (deployment is null) return;
         SignOutActiveDeployment();
         long selection = _picker.State.SelectionGeneration;
         _ = ConnectDeploymentAsync(deployment, selection);

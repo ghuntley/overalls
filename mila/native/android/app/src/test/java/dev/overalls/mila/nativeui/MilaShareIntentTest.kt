@@ -12,13 +12,13 @@ import java.util.UUID
 @Config(sdk = [35])
 class MilaShareIntentTest {
     @Test fun refusesShareChooserWhenSignedOut() {
-        assertEquals(null, MilaShareIntentFactory.authenticatedChooser(MilaRoute.Machines, false))
+        assertEquals(null, MilaShareIntentFactory.authenticatedChooser(MilaRoute.Machines, null))
     }
 
     @Test fun createsCanonicalTextShareIntent() {
-        val intent = MilaShareIntentFactory.create(MilaRoute.Machine(UUID.fromString("11111111-1111-1111-1111-111111111111")))
+        val intent = MilaShareIntentFactory.create(MilaRoute.Machine(UUID.fromString("11111111-1111-1111-1111-111111111111")), "a.example")
         assertEquals(Intent.ACTION_SEND, intent.action)
         assertEquals("text/plain", intent.type)
-        assertEquals("overalls://mila/machines/11111111-1111-1111-1111-111111111111", intent.getStringExtra(Intent.EXTRA_TEXT))
+        assertEquals("overalls://a.example/machines/11111111-1111-1111-1111-111111111111", intent.getStringExtra(Intent.EXTRA_TEXT))
     }
 }
