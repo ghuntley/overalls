@@ -213,7 +213,19 @@ records the verification run and the known gaps.
     transfer-stream credit-throttle and boot-log custody properties that `CONTRACTS`
     previously over-claimed now exist.
   - [`terminald`](../../../nix/domains/artifacts/terminald/Cargo.toml), with Windows-target
-    clippy in [`terminald-windows.nix`](../../../nix/domains/artifacts/infrastructure/terminald-windows.nix)
+    clippy in [`terminald-windows.nix`](../../../nix/domains/artifacts/infrastructure/terminald-windows.nix).
+    Its unsafe code is confined to the
+    [`sys`](../../../nix/domains/artifacts/terminald/src/sys.rs) shims, one per platform
+    family (`sys/unix.rs`, `sys/pty.rs`, `sys/windows.rs`, `sys/conpty.rs`), behind safe
+    wrappers. The crate root [`main.rs`](../../../nix/domains/artifacts/terminald/src/main.rs)
+    is `#![deny(unsafe_code)]`, and the one `allow` sits on `mod sys;`. Its FreeBSD
+    and illumos `cfg` code has native-target clippy:
+    `//nix:lilly-terminald-clippy-freebsd` and `-clippy-illumos`
+    ([`rust_cargo_clippy.bzl`](../../../buck/rust_cargo_clippy.bzl), in
+    [`nix/BUCK`](../../../nix/BUCK)) run `cargo clippy --all-targets --target
+    x86_64-unknown-{freebsd,illumos} -D warnings` with the pinned toolchain's own target
+    standard libraries. On 2026-11-01 each target failed on a lint injected into that
+    target's `cfg` code alone and passed without it.
   - [Lyra](../../../lyra/Cargo.toml), gated in
     [`lyra.nix`](../../../nix/domains/artifacts/infrastructure/lyra.nix) under the pinned
     1.97.1 toolchain, including FreeBSD and illumos targets. Its unsafe code is
@@ -246,9 +258,9 @@ records the verification run and the known gaps.
     commands, PTY, trust, sign-in); the test list is unchanged for both feature sets
 - **proptest is gone.** Spool, the broker and the receiver now use Hegel only.
 - **Follow-ups** (not part of this decision's acceptance):
-  - confining unsafe code in terminald, so that `unsafe_code = "deny"` can join the
-    canonical block
-  - a clippy gate in the native FreeBSD and illumos terminald derivation
+  - none remain: Lyra and terminald unsafe code is confined under crate-root
+    `#![deny(unsafe_code)]`, terminald has native FreeBSD and illumos clippy, and the
+    three large non-`lib.rs` files are split (2026-11-01; see the evidence above)
 
 ## Open questions
 
@@ -257,8 +269,11 @@ records the verification run and the known gaps.
 - Resolved: the single root Cargo workspace is decided by
   [ADR-0273](0273-single-rust-workspace-and-toolchain.md), which amends decision 1's
   distribution clauses (see the amendment above).
-- When should terminald unsafe confinement be scheduled, so that
-  `unsafe_code = "deny"` can join the canonical block? Lyra's is done (see Evidence).
+- Lyra and terminald now confine unsafe code (2026-11-01). Should
+  `unsafe_code = "deny"` join the canonical block for every crate, with each shim
+  module's `#[allow(unsafe_code, reason)]` as the only exception? This needs its
+  own decision, because it also covers mila-ffi's exported symbols and the Lilly
+  helper shims.
 
 ## Related decisions
 
