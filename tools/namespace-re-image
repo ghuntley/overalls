@@ -103,7 +103,14 @@ if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_T
   [[ -n "$oidc" && "$oidc" != null ]] || { echo "tools/namespace-re-image: no GitHub OIDC token" >&2; exit 1; }
   tenant=$(nsc workspace describe -o json 2>/dev/null | sed -n 's/.*"tenant_id": *"\([^"]*\)".*/\1/p')
   [[ -n "$tenant" ]] || { echo "tools/namespace-re-image: no Namespace tenant id" >&2; exit 1; }
-  if ! nsc auth exchange-oidc-token --tenant_id "$tenant" --token "$oidc" --duration 1h >/dev/null; then
+  # A Namespace runner points NSC_TOKEN_FILE/NSC_TOKEN_SPEC* at the
+  # workspace identity, which overrides any stored token. Exchange into a
+  # private HOME with those unset so the optimise runs as the exchanged
+  # (baseimage:optimize) identity.
+  nsc_home="$work/nsc-home"
+  mkdir -m 700 "$nsc_home"
+  nsc_oidc() { env -u NSC_TOKEN_FILE -u NSC_TOKEN_SPEC -u NSC_TOKEN_SPEC_FILE HOME="$nsc_home" nsc "$@"; }
+  if ! nsc_oidc auth exchange-oidc-token --tenant_id "$tenant" --token "$oidc" --duration 1h >/dev/null; then
     # Name the claims the trust relationship matches on (never the token).
     payload=$(cut -d. -f2 <<<"$oidc" | tr '_-' '/+')
     while (( ${#payload} % 4 )); do payload+="="; done
@@ -111,7 +118,9 @@ if [[ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && -n "${ACTIONS_ID_TOKEN_REQUEST_T
     exit 1
   fi
   unset oidc
+  nsc_oidc base-image optimize --image_ref "$image@$digest"
+else
+  nsc base-image optimize --image_ref "$image@$digest"
 fi
-nsc base-image optimize --image_ref "$image@$digest"
 printf '%s %s@%s\n' "$cells_id" "$image" "$digest" > "$lock"
 echo "tools/namespace-re-image: $image@$digest"
