@@ -922,7 +922,15 @@ on nixpkgs Rust.
   Lyra derivation changes 16 bytes of `LC_UUID` in `darwin-amd64` and
   `darwin-arm64` (plus the ad-hoc signature hashes over it on arm64); the
   zig Mach-O link takes something per-run into the UUID. The Linux, Windows,
-  FreeBSD and illumos outputs rebuild identically.
+  FreeBSD and illumos outputs rebuild identically. **Resolved 2026-11-01:**
+  zig derives `LC_UUID` from the whole linked image, which still held the
+  debug map (N_OSO stabs naming each object's path and mtime); rustc's
+  post-link strip removed the stabs but kept the UUID. `lyra-build.sh` now
+  links the macOS clients with `-Wl,-S`, so no debug map is written, and two
+  clean `//lyra:client` builds in separate isolation directories are
+  identical in every file. The other outputs are unchanged, and the macOS
+  clients differ from the previous build only in the masked `LC_UUID` and
+  signature bytes.
 - *Vendored OpenSSL embeds build paths.* Every Lyra binary that links
   `openssl-sys` with `vendored` carries three absolute paths from the build
   sandbox: `ENGINESDIR` and `MODULESDIR` under Cargo's `OUT_DIR`

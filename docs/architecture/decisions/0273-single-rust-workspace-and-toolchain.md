@@ -307,7 +307,10 @@ partial, in milestone M5.
   The two macOS clients differ only in `LC_UUID` (and, on arm64, the ad-hoc
   signature hashes over it). A `nix build --rebuild` of the unchanged
   derivation differs in the same 16 bytes, so the macOS clients were never
-  reproducible; that is an open finding, not an effect of cargo. terminald's
+  reproducible; that is an open finding, not an effect of cargo. (Fixed
+  2026-11-01: the zig link wrote a debug map of object paths and mtimes that
+  fed `LC_UUID` before rustc stripped it; `lyra-build.sh` now passes
+  `-Wl,-S` for the macOS targets, and two clean builds are identical.) terminald's
   native and Windows builds and the editor broker's Windows build had the
   same split (and the broker's nixpkgs rustfmt); they also take cargo,
   clippy and rustfmt from the toolchain now, and their rebuilt outputs (3, 2

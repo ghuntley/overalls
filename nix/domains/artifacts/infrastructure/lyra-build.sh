@@ -81,7 +81,17 @@ case $mode in
     tar -xJf "$LYRA_MACOS_SDK" -C "$TMPDIR"
     export SDKROOT="$TMPDIR/MacOSX11.3.sdk"
     for target in x86_64-unknown-linux-musl aarch64-unknown-linux-musl x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-gnu; do
-      cargo zigbuild --profile hardened --locked --offline --target "$target" --bin overalls
+      case $target in
+        # zig's Mach-O link writes a debug map (N_OSO stabs naming each
+        # object's path and mtime) and derives LC_UUID from the whole
+        # image; rustc's strip then drops the stabs but keeps the UUID, so
+        # every run got a new one. -S stops the linker writing the debug map
+        # the hardened profile strips anyway, so LC_UUID (and the arm64
+        # ad-hoc signature over it) depends on content alone.
+        *-apple-darwin) target_rustflags="$RUSTFLAGS -C link-arg=-Wl,-S" ;;
+        *) target_rustflags=$RUSTFLAGS ;;
+      esac
+      RUSTFLAGS="$target_rustflags" cargo zigbuild --profile hardened --locked --offline --target "$target" --bin overalls
     done
     for binary in overalls-ssh-authorize overalls-host-certificate overalls-trustd overalls-workspaced; do
       cargo zigbuild --profile hardened --locked --offline --target x86_64-unknown-linux-musl --bin "$binary"
