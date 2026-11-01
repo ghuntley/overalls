@@ -378,7 +378,64 @@ defmodule Marshall.Control.SocketConcurrencyTest do
         queue_interval: 100
       )
 
-    start_supervised!(%{id: :control_pool, start: {Marshall.Repo, :start_link, [options]}})
+    pool = start_supervised!(%{id: :control_pool, start: {Marshall.Repo, :start_link, [options]}})
+    await_connected(pool, System.monotonic_time(:millisecond) + 30_000)
+    pool
+  end
+
+  # The pool connects asynchronously. On a loaded host the three connections
+  # can take longer than queue_target to come up, and a burst started before
+  # then has every checkout dropped as queue_timeout even within the bound.
+  # The burst MUST start only once all three connections hold a checkout at
+  # the same time, so the bounded case measures the bound, not connect time.
+  @spec await_connected(pid(), integer()) :: :ok
+  defp await_connected(pool, deadline) do
+    test = self()
+
+    holders =
+      for _ <- 1..3 do
+        spawn(fn ->
+          Marshall.Repo.put_dynamic_repo(pool)
+
+          result =
+            try do
+              Marshall.Repo.checkout(fn ->
+                send(test, {:pool_held, self()})
+                receive do: (:pool_release -> :ok)
+              end)
+            rescue
+              DBConnection.ConnectionError -> :retry
+            end
+
+          if result == :retry, do: send(test, {:pool_retry, self()})
+        end)
+      end
+
+    outcomes =
+      for holder <- holders do
+        receive do
+          {:pool_held, ^holder} -> :held
+          {:pool_retry, ^holder} -> :retry
+        after
+          30_000 -> flunk("pool connections never came up")
+        end
+      end
+
+    Enum.each(holders, &send(&1, :pool_release))
+
+    cond do
+      Enum.all?(outcomes, &(&1 == :held)) ->
+        :ok
+
+      System.monotonic_time(:millisecond) < deadline ->
+        Process.sleep(100)
+        await_connected(pool, deadline)
+
+      true ->
+        # Usually PostgreSQL's max_connections is exhausted by the shared test
+        # pool (config/test.exs), so these three can never connect.
+        flunk("pool connections never came up; check PostgreSQL max_connections headroom")
+    end
   end
 
   @spec db_burst(pid(), pos_integer()) :: {[Driver.response()], non_neg_integer()}

@@ -42,7 +42,10 @@ config :marshall,
              "marshall_test#{System.get_env("MIX_TEST_PARTITION")}"
            ),
          pool: Ecto.Adapters.SQL.Sandbox,
-         pool_size: System.schedulers_online() * 2
+         # Capped below PostgreSQL's default max_connections (100): on a
+         # 96-core host twice the schedulers took every connection, and the
+         # tests that start their own small pool could never connect.
+         pool_size: min(System.schedulers_online() * 2, 64)
        ] ++ transport
 
 # We don't run a server during test. If one is required,
