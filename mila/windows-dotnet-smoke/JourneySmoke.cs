@@ -5,6 +5,7 @@ using System.Security.Cryptography;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Mila.Windows.Interop;
 
 /// <summary>Validated fixture descriptor v1 written by the hermetic Marshall+Porsche fixture.</summary>
@@ -14,11 +15,23 @@ using Mila.Windows.Interop;
 /// ports, a parseable CA certificate whose server name equals the host, an
 /// HTTPS approver hook and bounded seed values; anything else MUST refuse
 /// before a network connection. The bearer token MUST NOT be printed.
+/// The fixture's optional v1 members (`approver.fixture_url`,
+/// `seed.terminal_machine_id`, `seed.terminal_machine_name` and the
+/// `launcher` block) are accepted and validated when present, as the Linux and
+/// Apple journeys accept them; any other member still refuses.
 /// </remarks>
 internal sealed record MilaJourneyDescriptor(
     string Host, ushort SshPort, ushort HttpsPort, X509Certificate2 Ca, Uri ApproverUrl, string ApproverToken,
     string MachineName, Guid MachineId, string SharePrincipal, string AccountEmail)
 {
+    /// <summary>Base of the fixture's stand-in action hook, when the fixture serves one.</summary>
+    internal Uri? FixtureUrl { get; init; }
+
+    /// <summary>The guest-backed terminal machine, when the fixture runs its terminal mode.</summary>
+    internal Guid? TerminalMachineId { get; init; }
+
+    internal string? TerminalMachineName { get; init; }
+
     private const int MaxBytes = 64 * 1024;
 
     internal static MilaJourneyDescriptor Parse(ReadOnlySpan<byte> bytes)
@@ -26,13 +39,29 @@ internal sealed record MilaJourneyDescriptor(
         if (bytes.Length is 0 or > MaxBytes) throw new InvalidDataException("descriptor size");
         using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
         JsonElement root = document.RootElement;
-        Exact(root, "version", "deployment", "tls", "approver", "seed");
+        Members(root, ["version", "deployment", "tls", "approver", "seed"], ["launcher"]);
         if (root.GetProperty("version").ValueKind != JsonValueKind.Number || root.GetProperty("version").GetInt32() != 1)
             throw new InvalidDataException("descriptor version");
-        JsonElement deployment = Exact(root.GetProperty("deployment"), "host", "ssh_port", "https_port");
-        JsonElement tls = Exact(root.GetProperty("tls"), "ca_pem", "server_name");
-        JsonElement approver = Exact(root.GetProperty("approver"), "url", "bearer_token");
-        JsonElement seed = Exact(root.GetProperty("seed"), "machine_name", "machine_id", "share_principal", "account_email");
+        JsonElement deployment = Members(root.GetProperty("deployment"), ["host", "ssh_port", "https_port"], []);
+        JsonElement tls = Members(root.GetProperty("tls"), ["ca_pem", "server_name"], []);
+        JsonElement approver = Members(root.GetProperty("approver"), ["url", "bearer_token"], ["fixture_url"]);
+        JsonElement seed = Members(root.GetProperty("seed"), ["machine_name", "machine_id", "share_principal", "account_email"],
+            ["terminal_machine_id", "terminal_machine_name"]);
+        // The launcher block records the fixture's bind address; the journey
+        // reaches the fixture through localhost and does not use it.
+        if (root.TryGetProperty("launcher", out JsonElement launcher)) Text(Members(launcher, ["bind"], []), "bind", 253);
+        Uri? fixtureUrl = null;
+        if (approver.TryGetProperty("fixture_url", out _) &&
+            (!Uri.TryCreate(Text(approver, "fixture_url", 2048), UriKind.Absolute, out fixtureUrl) || !HttpsHook(fixtureUrl)))
+            throw new InvalidDataException("descriptor approver fixture_url");
+        Guid? terminalId = null;
+        if (seed.TryGetProperty("terminal_machine_id", out _))
+        {
+            if (!Guid.TryParseExact(Text(seed, "terminal_machine_id", 36), "D", out Guid parsedTerminal) || parsedTerminal == Guid.Empty)
+                throw new InvalidDataException("descriptor seed terminal machine id");
+            terminalId = parsedTerminal;
+        }
+        string? terminalName = seed.TryGetProperty("terminal_machine_name", out _) ? Text(seed, "terminal_machine_name", 63) : null;
         string host = Text(deployment, "host", 253);
         if (!MilaDeploymentHost.IsCanonical(host)) throw new InvalidDataException("descriptor host");
         ushort ssh = Port(deployment, "ssh_port");
@@ -41,8 +70,7 @@ internal sealed record MilaJourneyDescriptor(
         X509Certificate2 ca;
         try { ca = X509Certificate2.CreateFromPem(Text(tls, "ca_pem", 32 * 1024)); }
         catch (CryptographicException) { throw new InvalidDataException("descriptor CA"); }
-        if (!Uri.TryCreate(Text(approver, "url", 2048), UriKind.Absolute, out Uri? hook) || hook.Scheme != Uri.UriSchemeHttps ||
-            hook.UserInfo.Length != 0 || hook.Fragment.Length != 0)
+        if (!Uri.TryCreate(Text(approver, "url", 2048), UriKind.Absolute, out Uri? hook) || !HttpsHook(hook))
         {
             ca.Dispose();
             throw new InvalidDataException("descriptor approver url");
@@ -66,17 +94,26 @@ internal sealed record MilaJourneyDescriptor(
             ca.Dispose();
             throw new InvalidDataException("descriptor seed machine id");
         }
-        return new(host, ssh, https, ca, hook, token, machine, machineId, principal, account);
+        return new(host, ssh, https, ca, hook, token, machine, machineId, principal, account)
+        {
+            FixtureUrl = fixtureUrl, TerminalMachineId = terminalId, TerminalMachineName = terminalName,
+        };
     }
+
+    private static bool HttpsHook(Uri hook) =>
+        hook.Scheme == Uri.UriSchemeHttps && hook.UserInfo.Length == 0 && hook.Fragment.Length == 0;
 
     private static bool Email(string value) =>
         value.IndexOf('@') is > 0 and var at && at < value.Length - 1 && !value.Any(char.IsWhiteSpace);
 
-    private static JsonElement Exact(JsonElement element, params string[] names)
+    /// <summary>Every required member and otherwise only the named optional ones, each once.</summary>
+    private static JsonElement Members(JsonElement element, string[] required, string[] optional)
     {
-        if (element.ValueKind != JsonValueKind.Object ||
-            !element.EnumerateObject().Select(property => property.Name).Order(StringComparer.Ordinal)
-                .SequenceEqual(names.Order(StringComparer.Ordinal)))
+        if (element.ValueKind != JsonValueKind.Object) throw new InvalidDataException("descriptor members");
+        string[] names = element.EnumerateObject().Select(property => property.Name).ToArray();
+        if (names.Distinct(StringComparer.Ordinal).Count() != names.Length ||
+            !required.All(name => names.Contains(name, StringComparer.Ordinal)) ||
+            !names.All(name => required.Contains(name, StringComparer.Ordinal) || optional.Contains(name, StringComparer.Ordinal)))
             throw new InvalidDataException("descriptor members");
         return element;
     }
@@ -329,8 +366,36 @@ internal static class JourneyDescriptorSmoke
             Program.Require(handler.SslOptions.CertificateChainPolicy?.CustomTrustStore.Count == 1 && !handler.AllowAutoRedirect,
                 "journey handler pins only the fixture CA");
         parsed.Ca.Dispose();
+
+        // The fixture's current v1 descriptor (run 41263134077): the optional
+        // approver.fixture_url, seed terminal machine and launcher block.
+        string Current(Action<JsonObject>? change = null)
+        {
+            JsonObject node = JsonNode.Parse(Descriptor())!.AsObject();
+            node["approver"]!["fixture_url"] = "https://localhost:8444/fixture/";
+            node["seed"]!["terminal_machine_id"] = "cf2dc277-763f-4c33-9fa5-503956fe6af8";
+            node["seed"]!["terminal_machine_name"] = "vm-cf2dc277763f4c339fa5503956fe6af8";
+            node["launcher"] = new JsonObject { ["bind"] = "100.81.223.13" };
+            change?.Invoke(node);
+            return node.ToJsonString();
+        }
+        MilaJourneyDescriptor current = MilaJourneyDescriptor.Parse(Encoding.UTF8.GetBytes(Current()));
+        Program.Require(current.FixtureUrl == new Uri("https://localhost:8444/fixture/") &&
+            current.TerminalMachineId == Guid.Parse("cf2dc277-763f-4c33-9fa5-503956fe6af8") &&
+            current.TerminalMachineName == "vm-cf2dc277763f4c339fa5503956fe6af8", "journey descriptor v1 accepts the fixture's optional members");
+        current.Ca.Dispose();
+        Program.Require(parsed.FixtureUrl is null && parsed.TerminalMachineId is null && parsed.TerminalMachineName is null,
+            "journey descriptor optional members default to absent");
+
         foreach ((string label, string json) in new[]
                  {
+                     ("fixture url scheme", Current(node => node["approver"]!["fixture_url"] = "http://localhost:8444/fixture/")),
+                     ("terminal machine id", Current(node => node["seed"]!["terminal_machine_id"] = "not-a-uuid")),
+                     ("terminal machine name", Current(node => node["seed"]!["terminal_machine_name"] = "")),
+                     ("launcher member", Current(node => node["launcher"]!["extra"] = 1)),
+                     ("launcher shape", Current(node => node["launcher"] = "100.81.223.13")),
+                     ("unknown approver member", Current(node => node["approver"]!["extra"] = "x")),
+                     ("unknown seed member", Current(node => node["seed"]!["extra"] = "x")),
                      ("version", Descriptor(version: 2)),
                      ("host", Descriptor(host: "Bad Host")),
                      ("port", Descriptor(ssh: 0)),

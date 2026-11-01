@@ -20,6 +20,8 @@ on:
       - "nix/platform/dartssh2.nix"
       - "nix/platform/patches/dartssh2-*"
       - ".github/workflows/mila-builds.yml"
+      # The tailnet join, forward and peer scripts the journey jobs run.
+      - ".github/scripts/mila-tailnet-*"
       # The Buck2 build of the //mila: targets (ADR-0269 M9): the wrapper and
       # its no-Nix mode, the cells and toolchains, and only the rule files
       # mila/BUCK loads (`buck2 audit includes mila/BUCK`) plus the driver.
@@ -46,6 +48,8 @@ on:
       - "nix/platform/dartssh2.nix"
       - "nix/platform/patches/dartssh2-*"
       - ".github/workflows/mila-builds.yml"
+      # The tailnet join, forward and peer scripts the journey jobs run.
+      - ".github/scripts/mila-tailnet-*"
       # The Buck2 build of the //mila: targets (ADR-0269 M9): the wrapper and
       # its no-Nix mode, the cells and toolchains, and only the rule files
       # mila/BUCK loads (`buck2 audit includes mila/BUCK`) plus the driver.
