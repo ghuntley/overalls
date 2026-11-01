@@ -22,7 +22,10 @@ import subprocess
 import sys
 from pathlib import Path
 
-FLAKE = "(builtins.getFlake (toString ./.))"
+# A bare path would make a `path:` flake that copies the whole working tree,
+# buck-out included, and fails on a concurrent test's PostgreSQL socket there.
+# `git+file:` takes tracked files only; shallow allows CI's shallow checkouts.
+FLAKE = '(builtins.getFlake ("git+file://" + toString ./. + "?shallow=1"))'
 
 
 def tool_outputs() -> list[str]:
@@ -49,13 +52,17 @@ def drv_paths(nix: str, tools: list[str], keys: list[str], poisoned: bool) -> di
         f"let a = {FLAKE}.lib.assemble {{ artifacts = {artifacts}; }}; in "
         f"builtins.listToAttrs (map (n: {{ name = n; value = a.outputPackages.${{n}}.drvPath; }}) [ {names} ])"
     )
-    out = subprocess.run(
+    result = subprocess.run(
         [nix, "eval", "--json", "--impure", "--expr", expr],
-        check=True,
+        check=False,
         capture_output=True,
         text=True,
-    ).stdout
-    data: object = json.loads(out)
+    )
+    if result.returncode != 0:
+        # The expression is ours, not secret; Nix's reason is the diagnosis.
+        print(result.stderr, file=sys.stderr)
+        raise RuntimeError(f"nix eval failed (poisoned={poisoned}, exit {result.returncode})")
+    data: object = json.loads(result.stdout)
     if not isinstance(data, dict):
         raise TypeError("expected an attribute set of drvPaths")
     return {str(k): str(v) for k, v in data.items()}

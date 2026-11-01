@@ -18,7 +18,10 @@ import subprocess
 import sys
 from typing import TypedDict
 
-FLAKE = "(builtins.getFlake (toString ./.))"
+# A bare path would make a `path:` flake that copies the whole working tree,
+# buck-out included, and fails on a concurrent test's PostgreSQL socket there.
+# `git+file:` takes tracked files only; shallow allows CI's shallow checkouts.
+FLAKE = '(builtins.getFlake ("git+file://" + toString ./. + "?shallow=1"))'
 
 ROOTS = ["secrets/brady-root.pem"]
 
