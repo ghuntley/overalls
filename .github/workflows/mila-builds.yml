@@ -494,6 +494,11 @@ jobs:
         id: fixture
         if: steps.journey.outputs.declared == 'true'
         timeout-minutes: 40
+        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
+        # so the Buck2 Marshall and Porsche releases are cache hits; fork
+        # pull requests get no secret and build locally.
+        env:
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
         run: |
           set -euo pipefail
           # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
@@ -501,6 +506,7 @@ jobs:
           tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
           ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
           tools/buck2 kill
+          tools/namespace-token-scan
           echo "built=true" >> "$GITHUB_OUTPUT"
       - name: Start hermetic journey fixture
         if: steps.fixture.outputs.built == 'true'
@@ -710,6 +716,11 @@ jobs:
         id: fixture
         if: steps.journey.outputs.declared == 'true'
         timeout-minutes: 40
+        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
+        # so the Buck2 Marshall and Porsche releases are cache hits; fork
+        # pull requests get no secret and build locally.
+        env:
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
         run: |
           set -euo pipefail
           if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
@@ -723,6 +734,7 @@ jobs:
           tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
           ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
           tools/buck2 kill
+          tools/namespace-token-scan
           echo "built=true" >> "$GITHUB_OUTPUT"
       - uses: android-actions/setup-android@138b5fb1cf087fdb4c5f3c621466fe304d0cf2e3 # v4.0.4
         continue-on-error: true
@@ -855,6 +867,11 @@ jobs:
       - name: Build hermetic journey fixture
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         timeout-minutes: 40
+        # Namespace remote cache (ADR-0276) for the hermetic fixture build only,
+        # so the Buck2 Marshall and Porsche releases are cache hits; fork
+        # pull requests get no secret and build locally.
+        env:
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
         run: |
           set -euo pipefail
           # Buck2 assembles lib.assemble's fixture (ADR-0269): the same drv
@@ -862,6 +879,7 @@ jobs:
           tools/buck2 build //mila:journey-fixture --show-full-output | tee "$RUNNER_TEMP/journey-fixture.txt"
           ln -sfn "$(cat "$(awk 'END { print $2 }' "$RUNNER_TEMP/journey-fixture.txt")")" "$RUNNER_TEMP/mila-journey-fixture"
           tools/buck2 kill
+          tools/namespace-token-scan
       - name: Enable KVM for the journey fixture
         if: env.MILA_TAILSCALE_OAUTH_CLIENT_ID != ''
         run: |
