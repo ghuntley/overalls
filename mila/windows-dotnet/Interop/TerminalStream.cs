@@ -10,6 +10,8 @@ internal interface IMilaTerminalTransport
     (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows);
     MilaNativeTerminalRead Read(ulong terminalHandle);
     MilaNativeStatus Kill(ulong terminalHandle);
+    /// <summary>Closes the named server terminal session (`terminal kill`); true when the server reports it closed.</summary>
+    bool End(ulong sessionHandle, Guid machineId, string terminalId);
 }
 
 internal sealed class MilaRustTerminalTransport : IMilaTerminalTransport
@@ -22,6 +24,13 @@ internal sealed class MilaRustTerminalTransport : IMilaTerminalTransport
         => RustNative.TrySessionTerminalAttachSession(sessionHandle, machineId, terminalId, columns, rows);
     public MilaNativeTerminalRead Read(ulong terminalHandle) => RustNative.TrySessionTerminalRead(terminalHandle);
     public MilaNativeStatus Kill(ulong terminalHandle) => RustNative.TrySessionTerminalKill(terminalHandle);
+    public bool End(ulong sessionHandle, Guid machineId, string terminalId)
+    {
+        MilaNativeSessionBytesResult ended = RustNative.TrySessionTerminalEnd(
+            sessionHandle, machineId, terminalId, "porsche-" + Guid.NewGuid().ToString("N"));
+        try { return ended.Succeeded && ended.Data is { } bytes && MilaSessionReads.TerminalClosed(bytes, terminalId); }
+        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return false; }
+    }
 }
 
 internal enum MilaTerminalPoll
@@ -137,6 +146,20 @@ internal sealed class MilaTerminalStream
     {
         KillNative();
         Session.Kill(_generation);
+    }
+
+    /// <summary>
+    /// Detaches like <see cref="Kill"/> and then closes the named server session,
+    /// so a later attach opens a new one. True only when the server reports it closed.
+    /// </summary>
+    internal bool End()
+    {
+        string? terminalId = _terminalId;
+        Guid machine = _machine;
+        Kill();
+        _terminalId = null;
+        return terminalId is not null && machine != Guid.Empty && _sessionHandle() is { } handle && handle != 0 &&
+            _transport.End(handle, machine, terminalId);
     }
 
     internal void SignOut()

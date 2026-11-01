@@ -236,6 +236,68 @@ internal static partial class RustNative
         finally { machinePin.Free(); sessionPin.Free(); }
     }
 
+    /// <summary>`show MACHINE --json` through the authenticated session.</summary>
+    internal static MilaNativeSessionBytesResult TrySessionMachineShow(ulong handle, Guid machineId) =>
+        MachineRead(handle, machineId, (machine, length, bytes, capacity, written) => SessionMachineShowNative(handle, machine, length, bytes, capacity, written));
+
+    /// <summary>`share show MACHINE --json` through the authenticated session.</summary>
+    internal static MilaNativeSessionBytesResult TrySessionShareShow(ulong handle, Guid machineId) =>
+        MachineRead(handle, machineId, (machine, length, bytes, capacity, written) => SessionShareShowNative(handle, machine, length, bytes, capacity, written));
+
+    private static MilaNativeSessionBytesResult MachineRead(
+        ulong handle, Guid machineId, Func<IntPtr, nuint, IntPtr, nuint, IntPtr, MilaNativeStatus> call)
+    {
+        if (handle == 0 || machineId == Guid.Empty) return new(MilaNativeStatus.InvalidRequest, null);
+        byte[] machine = Encoding.UTF8.GetBytes(machineId.ToString("D"));
+        GCHandle pin = GCHandle.Alloc(machine, GCHandleType.Pinned);
+        try
+        {
+            return TrySessionBytesOnce((bytes, capacity, written) => call(pin.AddrOfPinnedObject(), (nuint)machine.Length, bytes, capacity, written),
+                256 * 1024);
+        }
+        finally { pin.Free(); }
+    }
+
+    /// <summary>`request show ID --json`: the receipt of one earlier mutation.</summary>
+    internal static MilaNativeSessionBytesResult TrySessionRequestShow(ulong handle, string requestId)
+    {
+        if (handle == 0 || !IsCanonicalRequestId(requestId)) return new(MilaNativeStatus.InvalidRequest, null);
+        byte[] request = Encoding.UTF8.GetBytes(requestId);
+        GCHandle pin = GCHandle.Alloc(request, GCHandleType.Pinned);
+        try
+        {
+            return TrySessionBytesOnce((bytes, capacity, written) => SessionRequestShowNative(
+                handle, pin.AddrOfPinnedObject(), (nuint)request.Length, bytes, capacity, written), 64 * 1024);
+        }
+        finally { pin.Free(); }
+    }
+
+    /// <summary>
+    /// @cc [owner:ghuntley,label:protocol] mila-windows-terminal-end
+    /// Ending a terminal MUST name the server session obtained from `terminal new`
+    /// and close it on the server (`terminal kill`) with a fresh request id;
+    /// detaching the local PTY alone leaves the session running.
+    /// </summary>
+    internal static MilaNativeSessionBytesResult TrySessionTerminalEnd(ulong handle, Guid machineId, string terminalId, string requestId)
+    {
+        if (handle == 0 || machineId == Guid.Empty || !IsCanonicalRequestId(requestId) ||
+            !Guid.TryParseExact(terminalId, "D", out Guid terminal) || terminal == Guid.Empty)
+            return new(MilaNativeStatus.InvalidRequest, null);
+        byte[] machine = Encoding.UTF8.GetBytes(machineId.ToString("D"));
+        byte[] session = Encoding.UTF8.GetBytes(terminal.ToString("D"));
+        byte[] request = Encoding.UTF8.GetBytes(requestId);
+        GCHandle machinePin = GCHandle.Alloc(machine, GCHandleType.Pinned);
+        GCHandle sessionPin = GCHandle.Alloc(session, GCHandleType.Pinned);
+        GCHandle requestPin = GCHandle.Alloc(request, GCHandleType.Pinned);
+        try
+        {
+            return TrySessionBytesOnce((bytes, capacity, written) => SessionTerminalEndNative(
+                handle, machinePin.AddrOfPinnedObject(), (nuint)machine.Length, sessionPin.AddrOfPinnedObject(), (nuint)session.Length,
+                requestPin.AddrOfPinnedObject(), (nuint)request.Length, bytes, capacity, written), 64 * 1024);
+        }
+        finally { machinePin.Free(); sessionPin.Free(); requestPin.Free(); }
+    }
+
     /// <summary>
     /// Returns the closed refusal code of the session's most recent refused
     /// command (for example <c>terminal_unavailable</c>), or null.
@@ -302,6 +364,23 @@ internal static partial class RustNative
     private static partial MilaNativeStatus SessionTerminalAttachSessionNative(
         ulong sessionHandle, IntPtr machine, nuint machineLength, IntPtr terminal, nuint terminalLength,
         uint columns, uint rows, out ulong terminalHandle);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_machine_show")]
+    private static partial MilaNativeStatus SessionMachineShowNative(
+        ulong handle, IntPtr machine, nuint machineLength, IntPtr output, nuint capacity, IntPtr written);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_share_show")]
+    private static partial MilaNativeStatus SessionShareShowNative(
+        ulong handle, IntPtr machine, nuint machineLength, IntPtr output, nuint capacity, IntPtr written);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_request_show")]
+    private static partial MilaNativeStatus SessionRequestShowNative(
+        ulong handle, IntPtr requestId, nuint requestIdLength, IntPtr output, nuint capacity, IntPtr written);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_end")]
+    private static partial MilaNativeStatus SessionTerminalEndNative(
+        ulong handle, IntPtr machine, nuint machineLength, IntPtr terminal, nuint terminalLength,
+        IntPtr requestId, nuint requestIdLength, IntPtr output, nuint capacity, IntPtr written);
 
     [LibraryImport(LibraryName, EntryPoint = "mila_session_last_refusal")]
     private static partial MilaNativeStatus SessionLastRefusalNative(ulong handle, IntPtr output, nuint capacity, IntPtr written);

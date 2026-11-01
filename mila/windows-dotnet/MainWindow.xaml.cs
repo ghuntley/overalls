@@ -627,9 +627,11 @@ public sealed partial class MainWindow : Window
     private void KillTerminal(object sender, RoutedEventArgs args)
     {
         // Kill is valid while an authenticated attach is still negotiating or
-        // reconnecting; it also stops any further reconnect attempt.
-        _terminalStream.Kill();
+        // reconnecting; it also stops any further reconnect attempt. It ends the
+        // named server session (`terminal kill`), not just the local PTY, on the
+        // UI thread like the other terminal calls so the stream is never shared.
         _terminalPollTimer?.Stop();
+        _terminalStream.End();
         TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.Ended).Render(S);
     }
     private void ConnectToDeployment(object sender, RoutedEventArgs args)

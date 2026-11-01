@@ -77,8 +77,10 @@ internal sealed class MilaSshKeysController
     {
         if (bytes.Length > 256 * 1024) throw new InvalidDataException("SSH key listing too large");
         using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
-        JsonElement keys = document.RootElement.GetProperty("keys");
-        if (keys.ValueKind != JsonValueKind.Array || keys.GetArrayLength() > 256) throw new InvalidDataException("Invalid SSH key listing");
+        // `ssh-key list --json` answers in Porsche's version-1 envelope.
+        JsonElement body = MilaPorscheEnvelope.Result(document.RootElement);
+        if (body.ValueKind != JsonValueKind.Object || !body.TryGetProperty("keys", out JsonElement keys) ||
+            keys.ValueKind != JsonValueKind.Array || keys.GetArrayLength() > 256) throw new InvalidDataException("Invalid SSH key listing");
         List<MilaSshKey> result = new(keys.GetArrayLength());
         foreach (JsonElement item in keys.EnumerateArray())
         {

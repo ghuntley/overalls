@@ -22,6 +22,7 @@ internal static class LifecycleSmoke
         SignInApprovalOutcomes();
         SignInReconnect();
         TerminalReconnect();
+        TerminalEnd();
         TerminalNewReceipt();
         PushRegistration();
         ShareCompletion();
@@ -268,6 +269,14 @@ internal static class LifecycleSmoke
         public MilaNativeTerminalRead Read(ulong terminalHandle) =>
             Reads.Count > 0 ? Reads.Dequeue() : new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Idle, null);
         public MilaNativeStatus Kill(ulong terminalHandle) { Killed.Add(terminalHandle); return MilaNativeStatus.Ok; }
+        internal List<string> Ended { get; } = [];
+        internal bool EndReply { get; set; } = true;
+        public bool End(ulong sessionHandle, Guid machineId, string terminalId)
+        {
+            Program.Require(machineId == Machine && sessionHandle != 0, "end names the attached machine on a live session");
+            Ended.Add(terminalId);
+            return EndReply;
+        }
     }
 
     private static readonly Guid Machine = Guid.Parse("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a");
@@ -275,6 +284,29 @@ internal static class LifecycleSmoke
     private static MilaNativeTerminalRead Data(string text) =>
         new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Data, Encoding.UTF8.GetBytes(text));
     private static readonly MilaNativeTerminalRead Lost = new(MilaNativeStatus.Transport, MilaTerminalReadEvent.Idle, null);
+
+    private static void TerminalEnd()
+    {
+        ulong? session = 7;
+        FakeTerminal transport = new();
+        MilaTerminalStream stream = new(transport, () => session);
+        Program.Require(!stream.End() && transport.Ended.Count == 0, "end without an attached session closes nothing");
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 11));
+        Program.Require(stream.Attach(Machine, true, 80, 24) && stream.TerminalId is not null, "attach names a session");
+        string terminal = stream.TerminalId!;
+        Program.Require(stream.End() && transport.Ended.SequenceEqual([terminal]) && transport.Killed.Contains(11UL),
+            "end detaches the PTY and closes the named server session");
+        Program.Require(stream.TerminalId is null && stream.Poll() == MilaTerminalPoll.Detached, "an ended stream stays detached");
+        Program.Require(!stream.End() && transport.Ended.Count == 1, "a second end has no session to close");
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 12));
+        Program.Require(stream.Attach(Machine, true, 80, 24) && transport.OpenCount == 2, "attach after end opens a new session");
+        transport.EndReply = false;
+        Program.Require(!stream.End(), "a refused close is reported");
+        transport.Attaches.Enqueue((MilaNativeStatus.Ok, 13));
+        Program.Require(stream.Attach(Machine, true, 80, 24), "reattach");
+        session = null;
+        Program.Require(!stream.End() && transport.Ended.Count == 2, "end without a session handle cannot reach the server");
+    }
 
     private static void TerminalReconnect()
     {

@@ -160,6 +160,15 @@ internal static class Program
         AssertThreadListingProtocol();
         MilaSshKey key = MilaSshKeysController.DecodeListing(Encoding.UTF8.GetBytes($"{{\"keys\":[{{\"id\":\"{keyId:D}\",\"fingerprint\":\"SHA256:test\",\"algorithm\":\"ed25519\",\"current_device\":false}}]}}"))[0];
         Require(key.Id == keyId && key.Algorithm == "ed25519", "SSH key listing projection");
+        // Marshall's `ssh-key list` reply: the version-1 envelope over `view/1` (no current_device).
+        MilaSshKey served = MilaSshKeysController.DecodeListing(Encoding.UTF8.GetBytes(
+            $"{{\"version\":1,\"status\":\"succeeded\",\"result\":{{\"keys\":[{{\"id\":\"{keyId:D}\",\"label\":\"\",\"algorithm\":\"ecdsa-sha2-nistp256\",\"fingerprint\":\"SHA256:test\",\"inserted_at\":\"2026-11-01T00:00:00Z\"}}]}}}}"))[0];
+        Require(served.Id == keyId && !served.IsCurrentDevice, "enveloped SSH key listing projection");
+        bool failedKeyEnvelope = false;
+        try { _ = MilaSshKeysController.DecodeListing(Encoding.UTF8.GetBytes("{\"version\":1,\"status\":\"failed\",\"result\":{\"keys\":[]}}")); }
+        catch (InvalidDataException) { failedKeyEnvelope = true; }
+        Require(failedKeyEnvelope, "failed SSH key envelope refusal");
+        AssertSessionReads();
         Require(MilaSshKeysController.Fingerprint("ssh-ed25519 !!!") is null,
             "invalid SSH base64 fingerprint refusal");
         int revokeCount = 0;
@@ -190,6 +199,59 @@ internal static class Program
     }
 
     /// <summary>`thread ls --json` as Porsche returns it (the shared protocol fixture), bare and enveloped.</summary>
+    private static bool Refuses(Action decode)
+    {
+        try { decode(); return false; }
+        catch (Exception error) when (error is InvalidDataException or System.Text.Json.JsonException) { return true; }
+    }
+
+    private static void AssertSessionReads()
+    {
+        static byte[] B(string json) => Encoding.UTF8.GetBytes(json);
+        Guid machine = new("019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a");
+        const string grant = "{\"id\":\"g1\",\"user_id\":\"u1\",\"email\":\"Teammate@Example.test\",\"role\":\"viewer\"}";
+        IReadOnlyList<MilaShareGrant> grants = MilaSessionReads.DecodeShares(B(
+            "{\"version\":1,\"status\":\"succeeded\",\"result\":{\"owner\":{\"email\":\"owner@example.test\"},\"items\":[" + grant + "]}}"));
+        Require(grants.Count == 1 && grants[0] == new MilaShareGrant("Teammate@Example.test", "viewer"), "share listing projection");
+        Require(MilaSessionReads.DecodeShares(B("{\"owner\":{\"email\":\"owner@example.test\"},\"items\":[]}")).Count == 0, "bare empty share listing");
+        Require(Refuses(() => MilaSessionReads.DecodeShares(B("{\"items\":[]}"))), "share listing requires the owner");
+        Require(Refuses(() => MilaSessionReads.DecodeShares(B("{\"owner\":{\"email\":\"o@x.test\"},\"items\":[" + grant.Replace("viewer", "owner") + "]}"))),
+            "share listing refuses an owner grant");
+        Require(Refuses(() => MilaSessionReads.DecodeShares(B("{\"owner\":{\"email\":\"o@x.test\"},\"items\":[" + grant + "," + grant + "]}"))),
+            "share listing refuses duplicate grants");
+        Require(Refuses(() => MilaSessionReads.DecodeShares(B("{\"version\":1,\"status\":\"failed\",\"result\":{}}"))), "failed share envelope");
+
+        string detail = $"{{\"id\":\"{machine:D}\",\"name\":\"seed\",\"desired_state\":\"running\",\"vcpu\":2,\"memory_bytes\":1073741824}}";
+        MilaMachineDetail shown = MilaSessionReads.DecodeMachine(B("{\"version\":1,\"status\":\"succeeded\",\"result\":" + detail + "}"), machine);
+        Require(shown is { Vcpu: 2, MemoryMib: 1024, DesiredState: "running" }, "machine detail projection");
+        Require(MilaSessionReads.DecodeMachine(B($"{{\"id\":\"{machine:D}\",\"desired_state\":\"stopped\"}}"), machine) is { Vcpu: null, MemoryMib: null },
+            "machine detail without size");
+        Require(Refuses(() => MilaSessionReads.DecodeMachine(B(detail), Guid.NewGuid())), "machine detail names the requested machine");
+
+        Require(MilaSessionReads.RequestAdmitted(B("{\"status\":\"accepted\"}")), "bare accepted receipt");
+        Require(MilaSessionReads.RequestAdmitted(B("{\"result\":{\"status\":\"succeeded\"}}")), "nested succeeded receipt");
+        Require(!MilaSessionReads.RequestAdmitted(B("{\"status\":\"pending\",\"result\":{\"status\":\"failed\"}}")), "pending receipt is not admitted");
+        Require(!MilaSessionReads.RequestAdmitted(B("[]")), "non-object receipt is not admitted");
+
+        const string session = "019a0f73-3d4e-7f5a-8b6c-7d8e9f0a1b2c";
+        string closed = $"{{\"machine_id\":\"{machine:D}\",\"session_id\":\"{session}\",\"closed\":true}}";
+        Require(MilaSessionReads.TerminalClosed(B(closed), session), "bare terminal kill result");
+        Require(MilaSessionReads.TerminalClosed(B("{\"version\":1,\"status\":\"succeeded\",\"result\":" + closed + "}"), session), "enveloped terminal kill result");
+        Require(!MilaSessionReads.TerminalClosed(B(closed), "019a0f73-3d4e-7f5a-8b6c-000000000000"), "terminal kill names the ended session");
+        Require(!MilaSessionReads.TerminalClosed(B(closed.Replace("true", "false")), session), "terminal kill not closed");
+        Require(Refuses(() => MilaSessionReads.TerminalClosed(ReadOnlySpan<byte>.Empty, session)), "empty terminal kill result");
+        Require(RustNative.TrySessionTerminalEnd(0, machine, session, "porsche-" + Guid.NewGuid().ToString("N")).Status == MilaNativeStatus.InvalidRequest &&
+            RustNative.TrySessionTerminalEnd(1, machine, "not-a-session", "porsche-" + Guid.NewGuid().ToString("N")).Status == MilaNativeStatus.InvalidRequest &&
+            RustNative.TrySessionRequestShow(1, "bad").Status == MilaNativeStatus.InvalidRequest &&
+            RustNative.TrySessionShareShow(1, Guid.Empty).Status == MilaNativeStatus.InvalidRequest,
+            "session read arguments are validated before the native call");
+        // The protocol fixture's terminal kill result decodes as closed.
+        using System.Text.Json.JsonDocument fixture = System.Text.Json.JsonDocument.Parse(File.ReadAllBytes(
+            Path.Combine(AppContext.BaseDirectory, "fixtures", "porsche_client_results.json")));
+        System.Text.Json.JsonElement kill = fixture.RootElement.GetProperty("results").GetProperty("terminal kill");
+        Require(MilaSessionReads.TerminalClosed(B(kill.GetRawText()), kill.GetProperty("session_id").GetString()!), "fixture terminal kill result");
+    }
+
     private static void AssertThreadListingProtocol()
     {
         string path = Path.Combine(AppContext.BaseDirectory, "fixtures", "porsche_client_results.json");

@@ -30,6 +30,7 @@
     <Compile Include="../windows-dotnet/Interop/WebEndpoint.cs" Link="Interop/WebEndpoint.cs" />
     <Compile Include="../windows-dotnet/Interop/WebOrigin.cs" Link="Interop/WebOrigin.cs" />
     <Compile Include="../windows-dotnet/Interop/PorscheEnvelope.cs" Link="Interop/PorscheEnvelope.cs" />
+    <Compile Include="../windows-dotnet/Interop/SessionReads.cs" Link="Interop/SessionReads.cs" />
     <Compile Include="../windows-dotnet/Interop/TerminalSession.cs" Link="Interop/TerminalSession.cs" />
     <Compile Include="../windows-dotnet/Interop/TerminalStream.cs" Link="Interop/TerminalStream.cs" />
     <Compile Include="../windows-dotnet/Interop/RustNativeLifecycle.cs" Link="Interop/RustNativeLifecycle.cs" />

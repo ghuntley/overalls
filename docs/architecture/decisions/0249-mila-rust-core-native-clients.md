@@ -136,8 +136,14 @@ fixture, and the Rust WNS channel check matches Susan's. The
 adapters against scripted peers in the `windows-native` CI job; its
 [journey mode](../../../mila/windows-dotnet-smoke/JourneySmoke.cs) needs the hermetic
 Marshall+Porsche fixture and is gated by the `MILA_WINDOWS_JOURNEY` repository
-variable. Windows X25519 poke-key custody, WNS delivery and live journey execution
-remain open.
+variable. Through [`JourneyPages.cs`](../../../mila/windows-dotnet-smoke/JourneyPages.cs)
+it reads every effect back as the Linux journey does: share add/remove through
+`share show`, resize through `show` or the `request show` receipt, a second
+device's SSH key revoked once through the client controller (and then refused),
+and a guest terminal ended on the server through `mila_session_terminal_end`, which
+the client's Kill action now calls ([`SessionReads.cs`](../../../mila/windows-dotnet/Interop/SessionReads.cs)).
+Windows X25519 poke-key custody, WNS delivery, notification device registration
+in the journey and a recorded passing journey run remain open.
 
 The Linux GTK client keeps its decisions in GTK-independent library modules:
 the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),

@@ -180,8 +180,9 @@ internal sealed class MilaJourneyApprover(MilaJourneyDescriptor descriptor, Http
 /// @cc [owner:ghuntley,label:verification] mila-windows-journey-smoke
 /// Journey mode runs only with `--descriptor PATH` against the tunnelled
 /// fixture: CA-pinned trust enrollment, Rust session sign-in with browser
-/// approval through the approver hook, machine listing and share mutation,
-/// notification device listing, web show/set, machine lifecycle, threads,
+/// approval through the approver hook, machine listing, share add/remove read
+/// back, notification device listing, web show/set, machine lifecycle with
+/// resize read-back, threads, SSH key listing and second-device revoke,
 /// the guestless terminal refusal, the guest-backed terminal (when the
 /// descriptor names one), transport-loss reconnect and authenticated share
 /// completion. It MUST fail on any step that does not
@@ -246,11 +247,7 @@ internal static class JourneySmoke
                 ?? throw new InvalidOperationException("journey seed machine missing");
             Step("machine listing");
 
-            Program.Require(RustNative.TrySessionShareMutation(handle, machine.Id, descriptor.SharePrincipal, "viewer", true, RequestId()).Succeeded,
-                "journey share add");
-            Program.Require(RustNative.TrySessionShareMutation(handle, machine.Id, descriptor.SharePrincipal, null, false, RequestId()).Succeeded,
-                "journey share remove");
-            Step("machine share add/remove");
+            await JourneyPages.SharingAsync(handle, machine.Id, descriptor.SharePrincipal, cancellationToken);
 
             MilaNativeSessionBytesResult devices = RustNative.TrySessionDevices(handle);
             Program.Require(devices.Succeeded, "journey device listing");
@@ -288,6 +285,8 @@ internal static class JourneySmoke
                 Step($"named terminal attach ({poll})");
             }
 
+            await SshKeysAsync(descriptor, handler, target, session, key, cancellationToken);
+
             Program.Require(coordinator.ReportTransportLoss(state.Generation) && session.Handle is null, "journey transport loss");
             state = await coordinator.ReconnectAsync(target, cancellationToken);
             Program.Require(state.Phase == MilaSignInPhase.SignedIn && session.Handle is > 0 && session.Handle != handle,
@@ -303,6 +302,90 @@ internal static class JourneySmoke
     }
 
     private static string RequestId() => "porsche-" + Guid.NewGuid().ToString("N");
+
+    /// <summary>
+    /// SSH keys through the client controller: this device's key is listed and
+    /// protected from revoke; a second device signs in, the first revokes it
+    /// once, and the revoked key must be approved again before it can sign in.
+    /// </summary>
+    private static async Task SshKeysAsync(MilaJourneyDescriptor descriptor, SocketsHttpHandler handler, MilaSignInTarget target,
+        MilaSessionConnection session, DeviceKey key, CancellationToken cancellationToken)
+    {
+        string own = MilaSshKeysController.Fingerprint(Encoding.ASCII.GetString(key.PublicPoint()))
+            ?? throw new InvalidOperationException("journey device fingerprint");
+        int revokes = 0;
+        MilaSshKeysController keys = new(
+            _ =>
+            {
+                MilaNativeSessionBytesResult listing = RustNative.TrySessionSshKeys(session.Handle ?? 0);
+                Program.Require(listing.Succeeded, $"journey ssh-key list ({listing.Status})");
+                return Task.FromResult<IReadOnlyList<MilaSshKey>>(MilaSshKeysController.DecodeListing(listing.Data!)
+                    .Select(row => row with { IsCurrentDevice = row.Fingerprint == own }).ToArray());
+            },
+            (id, _) =>
+            {
+                revokes++;
+                MilaNativeSessionActionResult revoked = RustNative.TrySessionSshKeyRevoke(session.Handle ?? 0, id, RequestId());
+                Program.Require(revoked.Succeeded, $"journey ssh-key remove ({revoked.Status}/{RustNative.TrySessionLastRefusal(session.Handle ?? 0) ?? "none"})");
+                return Task.CompletedTask;
+            });
+        await keys.LoadAsync(true, cancellationToken);
+        MilaSshKey ownRow = keys.Keys.SingleOrDefault(row => row.IsCurrentDevice)
+            ?? throw new InvalidOperationException($"journey ssh keys: device key missing ({keys.Status})");
+        Step("ssh keys: device key listed");
+        await keys.RevokeAsync(ownRow, cancellationToken);
+        Program.Require(revokes == 0 && keys.Keys.Any(row => row.Id == ownRow.Id), "journey ssh keys: this device is not revocable");
+        Step("ssh keys: this device not submitted");
+
+        string secondHost = "mila-journey-second." + target.Host;
+        bool secondExisted = KeyExists(secondHost);
+        DeviceKey second = DeviceKey.OpenOrCreate(secondHost);
+        try
+        {
+            byte[] secondPoint = second.PublicPoint();
+            string secondFingerprint = MilaSshKeysController.Fingerprint(Encoding.ASCII.GetString(secondPoint))
+                ?? throw new InvalidOperationException("journey second fingerprint");
+            MilaSignInTarget secondTarget = target with { PublicKey = secondPoint, Signer = bytes => second.Sign(bytes) };
+            using (MilaSessionConnection secondSession = new())
+            {
+                MilaSignInCoordinator secondCoordinator = new(new MilaSignInFlow(), secondSession, new MilaJourneyApprover(descriptor, handler),
+                    policy: new MilaSignInPolicy(TimeSpan.FromSeconds(1), 3, TimeSpan.FromSeconds(1), 30_000));
+                MilaSignInState signedIn = await secondCoordinator.SignInAsync(secondTarget, cancellationToken);
+                Program.Require(signedIn.Phase == MilaSignInPhase.SignedIn &&
+                    string.Equals(signedIn.Account, descriptor.AccountEmail, StringComparison.OrdinalIgnoreCase),
+                    $"journey second device sign-in ({signedIn.Phase}/{signedIn.Failure})");
+                secondCoordinator.SignOut();
+            }
+            Step("ssh keys: second device signed in");
+
+            await keys.LoadAsync(true, cancellationToken);
+            MilaSshKey secondRow = keys.Keys.SingleOrDefault(row => row.Fingerprint == secondFingerprint)
+                ?? throw new InvalidOperationException("journey ssh keys: second key missing");
+            await keys.RevokeAsync(secondRow, cancellationToken);
+            await keys.RevokeAsync(secondRow, cancellationToken);
+            Program.Require(revokes == 1 && keys.Status == MilaSshKeysStatus.Loaded && keys.Keys.All(row => row.Id != secondRow.Id),
+                $"journey ssh keys: second key revoked once ({revokes}/{keys.Status})");
+
+            MilaNativeSessionConnectResult fresh = RustNative.TrySessionConnect(
+                target.Trust, target.Host, secondPoint, target.SshPort, 30_000, bytes => second.Sign(bytes));
+            if (fresh.Succeeded)
+            {
+                try
+                {
+                    MilaNativeSessionBytesResult whoami = RustNative.TrySessionWhoami(fresh.Handle!.Value);
+                    Program.Require(!whoami.Succeeded || MilaWhoamiDecoder.Decode(whoami.Data!) is not MilaWhoami.Approved,
+                        "journey ssh keys: revoked key still authenticates");
+                }
+                finally { RustNative.TrySessionClose(fresh.Handle!.Value); }
+            }
+            Step("ssh keys: revoked, reapproval required");
+        }
+        finally
+        {
+            second.Dispose();
+            if (!secondExisted) DeleteKey(secondHost);
+        }
+    }
 
     private static async Task<byte[]> FetchTrustAsync(MilaJourneyDescriptor descriptor, HttpMessageHandler handler, CancellationToken cancellationToken)
     {

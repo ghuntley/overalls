@@ -67,14 +67,15 @@ internal static class JourneyPages
 
     private static string RequestId() => "porsche-" + Guid.NewGuid().ToString("N");
 
-    /// <summary>Submits a mutation, retrying closed busy refusals with a fresh request id.</summary>
-    private static async Task SubmitAsync(ulong handle, string name, Func<string, MilaNativeStatus> operation, CancellationToken cancellationToken)
+    /// <summary>Submits a mutation, retrying closed busy refusals with a fresh request id; returns the admitted request id.</summary>
+    private static async Task<string> SubmitAsync(ulong handle, string name, Func<string, MilaNativeStatus> operation, CancellationToken cancellationToken)
     {
         DateTime deadline = DateTime.UtcNow + StepDeadline;
         while (true)
         {
-            MilaNativeStatus status = operation(RequestId());
-            if (status == MilaNativeStatus.Ok) return;
+            string request = RequestId();
+            MilaNativeStatus status = operation(request);
+            if (status == MilaNativeStatus.Ok) return request;
             string? refusal = RustNative.TrySessionLastRefusal(handle);
             if (refusal is null || !BusyRefusals.Contains(refusal, StringComparer.Ordinal) || DateTime.UtcNow >= deadline)
                 throw new InvalidOperationException($"journey {name} ({status}/{refusal ?? "none"})");
@@ -154,9 +155,14 @@ internal static class JourneyPages
         string resizeName = name + "-r";
         Guid resized = await CreateAsync(handle, resizeName, 1, 512, 2, cancellationToken);
         await ObserveAsync(hook, resized, cancellationToken);
-        await SubmitAsync(handle, "lifecycle resize", request => RustNative.TrySessionMachineResize(handle, resized, 2, 1024, 3, request).Status,
-            cancellationToken);
-        Step("lifecycle resize (requested)");
+        string resize = await SubmitAsync(handle, "lifecycle resize",
+            request => RustNative.TrySessionMachineResize(handle, resized, 2, 1024, 3, request).Status, cancellationToken);
+        // As on Linux: the machine reports the new size, or (a deployment that
+        // pins resizes for the provisioner) the resize receipt was admitted.
+        string resizedCode = await AwaitAsync("lifecycle resize", () =>
+            MachineShow(handle, resized) is { Vcpu: 2, MemoryMib: 1024 } ? "resized"
+            : RequestAdmitted(handle, resize) ? "resize_requested" : null, cancellationToken);
+        Step("lifecycle " + resizedCode);
         await RemoveAsync(handle, hook, resized, cancellationToken);
     }
 
@@ -171,6 +177,43 @@ internal static class JourneyPages
             if (RustNative.TrySessionMachineAction(handle, machine, "rm", RequestId()).Succeeded) return;
             await Task.Delay(TimeSpan.FromSeconds(1), cancellationToken);
         }
+    }
+
+    private static MilaMachineDetail MachineShow(ulong handle, Guid machine)
+    {
+        MilaNativeSessionBytesResult shown = RustNative.TrySessionMachineShow(handle, machine);
+        Program.Require(shown.Succeeded, $"journey machine show ({shown.Status})");
+        return MilaSessionReads.DecodeMachine(shown.Data!, machine);
+    }
+
+    private static bool RequestAdmitted(ulong handle, string request)
+    {
+        MilaNativeSessionBytesResult shown = RustNative.TrySessionRequestShow(handle, request);
+        Program.Require(shown.Succeeded, $"journey request show ({shown.Status})");
+        return MilaSessionReads.RequestAdmitted(shown.Data!);
+    }
+
+    private static IReadOnlyList<MilaShareGrant> ShareShow(ulong handle, Guid machine)
+    {
+        MilaNativeSessionBytesResult shown = RustNative.TrySessionShareShow(handle, machine);
+        Program.Require(shown.Succeeded, $"journey share show ({shown.Status})");
+        return MilaSessionReads.DecodeShares(shown.Data!);
+    }
+
+    /// <summary>Share the seed machine as viewer, read the grant back, remove it and read its absence.</summary>
+    internal static async Task SharingAsync(ulong handle, Guid seed, string principal, CancellationToken cancellationToken)
+    {
+        static bool Granted(IReadOnlyList<MilaShareGrant> grants, string principal) =>
+            grants.Any(grant => string.Equals(grant.Email, principal, StringComparison.OrdinalIgnoreCase) && grant.Role == "viewer");
+        await SubmitAsync(handle, "share add",
+            request => RustNative.TrySessionShareMutation(handle, seed, principal, "viewer", true, request).Status, cancellationToken);
+        await AwaitAsync("share add", () => Granted(ShareShow(handle, seed), principal) ? "granted" : null, cancellationToken);
+        Step("share add (read back)");
+        await SubmitAsync(handle, "share remove",
+            request => RustNative.TrySessionShareMutation(handle, seed, principal, null, false, request).Status, cancellationToken);
+        await AwaitAsync("share remove", () => ShareShow(handle, seed).All(grant =>
+            !string.Equals(grant.Email, principal, StringComparison.OrdinalIgnoreCase)) ? "revoked" : null, cancellationToken);
+        Step("share remove (read back)");
     }
 
     private static MilaWebEndpoint WebShow(ulong handle, Guid machine)
@@ -277,8 +320,12 @@ internal static class JourneyPages
         MilaTerminalStream second = await AttachAsync(session, handle, machine, 132, 40, cancellationToken);
         Program.Require(second.TerminalId == terminalId, "journey guest terminal rejoins the named session");
         await UntilAsync(second, marker + "-42", TimeSpan.FromSeconds(60), "guest terminal replay", cancellationToken);
-        second.Kill();
         Step("guest terminal detach and reattach with replay");
+        Program.Require(second.End(), "journey guest terminal ends the server session");
+        MilaTerminalStream third = await AttachAsync(session, handle, machine, 80, 24, cancellationToken);
+        Program.Require(third.TerminalId != terminalId, "journey guest terminal opens a new session after end");
+        Program.Require(third.End(), "journey guest terminal ends the new session");
+        Step("guest terminal end (server session closed)");
     }
 
     /// <summary>Attaches, retrying only the closed readiness refusals until 180 s.</summary>
