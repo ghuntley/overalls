@@ -310,10 +310,24 @@ Elixir rules (M6) are not on trunk yet.
     the `/bin` tool links and optimised with a temporary 8x16 instance, which
     Namespace removed afterwards.
 
+- **CI, two dispatches of `ci.yml` on the same commit (f712c0e06, base
+  50c80b6c9, so every target was selected), 2026-11-01.** Both build jobs
+  failed at the end on a stale target name from the affected selection
+  (`marshall_cedar-lib`), not on the cache.
+
+  | Run (build job) | Wall time | Build summary |
+  | --- | --- | --- |
+  | 41274553637 (124757700141), first | 10 min 38 s | `Cache hits: 60%`, `Commands: 849 (cached: 507, remote: 13, local: 329)`, `Fallback: 266/342` |
+  | 41274559163 (124813118199), second | 1 min 43 s | `Cache hits: 96%`, `Commands: 849 (cached: 818, remote: 0, local: 31)` |
+
+  - The first run executed actions remotely in CI. 266 of its 342 remote
+    attempts fell back to local while the shared cap had no room for
+    workers.
+  - The second run read back what the first uploaded, so CI writes the
+    cache and later runs hit it.
+
 Remaining gaps:
 - No recorded deployment receipt for the token bundle on the hosts yet.
-- No recorded CI run showing cache hits on a rerun yet. CI never uploaded
-  before the 2026-11-01 upload fix, so earlier CI runs could not show any.
 - No Elixir compile has been measured remotely: Mix actions are `local_only`
   (see Open questions).
 - Namespace offers no bound or idle timeout for workers, and actions wait in
