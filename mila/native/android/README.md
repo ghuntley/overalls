@@ -70,7 +70,9 @@ resize refusal while a pause is unobserved), sharing, thread prompt/answer/plan 
 terminal's closed `terminal_unavailable` refusal on a never-observed machine, live terminal I/O on
 the fixture's guest-backed `seed.terminal_machine_id` (named `terminal new`, attach, echo, resize to
 132x40 with `stty size`, detach and reattach with replay, then `terminal kill` reporting `closed`),
-web, SSH keys and notification-device CRUD. The fixture's
+web, SSH keys and notification-device CRUD, signed-out share completion, and a seed-machine
+`overalls://` link launched through the platform resolver (`am start` with no component) into the
+real `MainActivity` window, with non-canonical links refused. The fixture's
 Bearer-protected `POST <approver.fixture_url><action>` hooks (`observe`, `thread-create`,
 `thread-ready`, `thread-question`, `thread-proposal`) stand in for the absent provisioner and agent
 and are required. It is skipped unless the `milaJourneyDescriptor` instrumentation

@@ -1,8 +1,19 @@
 package dev.overalls.mila.nativeui
 
+import android.content.Context
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.content.pm.ResolveInfo
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.util.Base64
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
+import androidx.test.runner.lifecycle.Stage
+import androidx.test.uiautomator.By
+import androidx.test.uiautomator.UiDevice
+import androidx.test.uiautomator.Until
 import java.security.KeyStore
 import java.security.SecureRandom
 import java.util.UUID
@@ -364,5 +375,131 @@ class MilaJourneyTest {
         assertEquals(MilaLinkDelivery.Applied, deliverExternalIntent(deepLinks, outbound, generation, state.deployment.host))
         assertEquals(MilaRoute.Machine(seed.id), deepLinks.target)
         assertEquals(MilaRouteResolution.Resolved, resolveMilaRoute(deepLinks.target, true, state.listing, null))
+    }
+
+    /** Runs [command] as the shell user, without a shell, and returns its standard output. */
+    private fun shell(command: String): String {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        return ParcelFileDescriptor.AutoCloseInputStream(instrumentation.uiAutomation.executeShellCommand(command)).use {
+            it.readBytes().toString(Charsets.UTF_8)
+        }
+    }
+
+    /** Finishes every Mila activity this process hosts, so each launch starts a fresh shell. */
+    private fun finishMilaActivities() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        instrumentation.runOnMainSync {
+            val monitor = ActivityLifecycleMonitorRegistry.getInstance()
+            listOf(Stage.PRE_ON_CREATE, Stage.CREATED, Stage.STARTED, Stage.RESUMED, Stage.PAUSED, Stage.STOPPED, Stage.RESTARTED)
+                .flatMap { stage -> monitor.getActivitiesInStage(stage) }
+                .filterIsInstance<MainActivity>()
+                .forEach { it.finish() }
+        }
+        instrumentation.waitForIdleSync()
+    }
+
+    /**
+     * Asks the platform which activities handle [link] as a browsable VIEW intent with no component
+     * or package, and requires exactly Mila's [MainActivity].
+     */
+    private fun assertResolvesToMila(context: Context, link: String) {
+        val view = Intent(Intent.ACTION_VIEW, Uri.parse(link)).addCategory(Intent.CATEGORY_BROWSABLE)
+        assertEquals(null, view.component)
+        assertEquals(null, view.`package`)
+        val handlers: List<ResolveInfo> = context.packageManager.queryIntentActivities(view, PackageManager.MATCH_DEFAULT_ONLY)
+        val names = handlers.map { it.activityInfo.packageName + "/" + it.activityInfo.name }
+        assertEquals("system resolver handlers for an overalls link", listOf(context.packageName + "/" + MainActivity::class.java.name), names)
+    }
+
+    /**
+     * Launches [link] through ActivityManager exactly as another app or the browser would: an
+     * implicit VIEW intent carrying only an action and data, resolved by the platform. The
+     * `--activity-clear-task` flag replaces any earlier Mila task so the link starts a fresh shell;
+     * it does not name a component.
+     */
+    private fun launchThroughResolver(context: Context, link: String) {
+        val output = shell("am start -W --activity-clear-task -a android.intent.action.VIEW -d $link")
+        assertTrue("am start reported success: $output", output.lines().any { it.trim() == "Status: ok" })
+        assertTrue(
+            "the platform resolved the link to Mila: $output",
+            output.lines().any { it.trim() == "Activity: ${context.packageName}/.MainActivity" },
+        )
+    }
+
+    /**
+     * Launching a link on the device: the platform resolver, not an explicit component, starts
+     * Mila from an `overalls://<fixture-host>/machines/<seed-id>` VIEW link. The persisted fixture
+     * deployment signs in through the activity's own production `MilaNativeRoot` (the device key
+     * approved in j01; the trust pin persisted by the earlier steps, since the production fetcher
+     * has no route to the fixture's HTTPS port), the link held while signing in completes for that
+     * host, and the window shows the seed machine's detail page: its ID and its listed name and
+     * status, which only the authenticated listing supplies. Non-canonical links for the same
+     * machine resolve to Mila through the same filter but are refused: the signed-in window stays on
+     * the machine list. MilaMainActivityIntentTest covers an explicit-component launch only; j13
+     * covers the controller without an activity.
+     */
+    @Test fun j14_linkLaunchesThroughSystemResolverToSeedMachine() = runBlocking<Unit> {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        val seed = seed(signedIn().listing)
+        // The activity owns its own Rust session; release the journey's before it connects.
+        signIn.close()
+
+        val preferences = context.getSharedPreferences("mila.deployment", Context.MODE_PRIVATE)
+        val saved: Map<String, Any?> = preferences.all.toMap()
+        val device = UiDevice.getInstance(instrumentation)
+        try {
+            preferences.edit().clear().commit()
+            MilaSharedPreferencesDeploymentStore(preferences).write(fixture.deployment)
+            assertEquals(fixture.deployment, MilaSharedPreferencesDeploymentStore(preferences).read())
+            device.wakeUp()
+            shell("wm dismiss-keyguard")
+
+            val canonical = "overalls://${fixture.host}/machines/${seed.id}"
+            assertEquals(MilaRoute.Machine(seed.id), parseMilaRoute(canonical))
+            assertResolvesToMila(context, canonical)
+            launchThroughResolver(context, canonical)
+            assertTrue(
+                "seed machine detail page shows ${seed.id}",
+                device.wait(Until.hasObject(By.pkg(context.packageName).text(seed.id.toString())), 120_000),
+            )
+            assertTrue(
+                "seed machine detail shows the authenticated listing row for ${seed.name}",
+                device.wait(Until.hasObject(By.pkg(context.packageName).textStartsWith("${seed.name} · ")), 30_000),
+            )
+            finishMilaActivities()
+
+            for (refused in listOf(
+                "overalls://${fixture.host}/machines/${seed.id}?command=rm",
+                "overalls://${fixture.host}/machines/${seed.id}/rm",
+            )) {
+                assertEquals(null, parseMilaRoute(refused))
+                assertResolvesToMila(context, refused)
+                launchThroughResolver(context, refused)
+                // The machine list renders listing rows only once the activity has signed in, and a
+                // held link would complete at that same transition.
+                assertTrue(
+                    "signed-in machine list lists ${seed.name} after $refused",
+                    device.wait(Until.hasObject(By.pkg(context.packageName).textStartsWith("${seed.name} · ")), 120_000),
+                )
+                assertFalse(
+                    "non-canonical link $refused must not open the machine detail page",
+                    device.wait(Until.hasObject(By.pkg(context.packageName).text(seed.id.toString())), 5_000),
+                )
+                finishMilaActivities()
+            }
+        } finally {
+            finishMilaActivities()
+            val restore = preferences.edit().clear()
+            for ((key, value) in saved) when (value) {
+                is String -> restore.putString(key, value)
+                is Int -> restore.putInt(key, value)
+                is Long -> restore.putLong(key, value)
+                is Boolean -> restore.putBoolean(key, value)
+                is Float -> restore.putFloat(key, value)
+                else -> Unit
+            }
+            restore.commit()
+        }
     }
 }
