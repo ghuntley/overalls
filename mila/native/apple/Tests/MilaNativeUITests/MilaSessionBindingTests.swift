@@ -106,13 +106,78 @@ final class MilaAdapterWireTests: XCTestCase {
     func testWebShowAcceptsPorscheEnvelopeAndBindsMachine() async throws {
         let session = RecordingSession()
         let machine = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
-        session.webData = Data(#"{"version":1,"status":"succeeded","result":{"machine_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","label":"app","port":3000,"visibility":"private","policy_revision":4,"url":"https://app.web.example.test","route":"overalls://machines/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/web"}}"#.utf8)
-        let adapter = LinkedMilaFFIAdapter(session: session)
+        session.webData = Data(#"{"version":1,"status":"succeeded","result":{"machine_id":"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa","label":"app","port":3000,"visibility":"private","policy_revision":4,"url":"https://app.web.example.test","route":"overalls://overalls.example/machines/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/web"}}"#.utf8)
+        let adapter = LinkedMilaFFIAdapter(session: session, deploymentHost: "overalls.example")
         let endpoint = try await adapter.webEndpoint(machine: machine)
         XCTAssertEqual(endpoint.url.absoluteString, "https://app.web.example.test")
         do { _ = try await adapter.webEndpoint(machine: UUID()); XCTFail("projection is machine-bound") } catch {}
+        do { _ = try await LinkedMilaFFIAdapter(session: session, deploymentHost: "other.example").webEndpoint(machine: machine); XCTFail("route is deployment-bound") }
+        catch { XCTAssertEqual(error as? MilaWebEndpointError, .invalid) }
+        do { _ = try await LinkedMilaFFIAdapter(session: session).webEndpoint(machine: machine); XCTFail("no deployment host, no web endpoint") }
+        catch { XCTAssertEqual(error as? MilaWebEndpointError, .unavailable) }
         session.webData = Data(#"{"version":1,"status":"error","error":"not_found"}"#.utf8)
         do { _ = try await adapter.webEndpointProjection(machine: machine); XCTFail() } catch {}
+    }
+}
+
+/// The SwiftUI public/private control over the real adapter mapping.
+@MainActor final class MilaWebPolicyControllerTests: XCTestCase {
+    private let machine = UUID(uuidString: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")!
+
+    private func shown(_ visibility: String, revision: UInt64, machine: String = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa") -> Data {
+        Data(#"{"version":1,"status":"succeeded","result":{"machine_id":"\#(machine)","label":"app","port":3000,"visibility":"\#(visibility)","policy_revision":\#(revision),"url":null,"route":"overalls://overalls.example/machines/\#(machine)/web"}}"#.utf8)
+    }
+
+    func testPublicThenPrivateSendsWebSetAtTheReadRevisionAndReadsBack() async {
+        let session = RecordingSession()
+        session.webShowReplies = [shown("private", revision: 4), shown("public", revision: 5), shown("private", revision: 6)]
+        let controller = MilaWebPolicyController(adapter: LinkedMilaFFIAdapter(session: session, deploymentHost: "overalls.example"), machine: machine)
+        await controller.load()
+        XCTAssertEqual(controller.state, .loaded)
+        XCTAssertEqual(controller.visibility, .privateAccess)
+        await controller.set(.publicAccess)
+        XCTAssertEqual(controller.state, .loaded)
+        XCTAssertEqual(controller.visibility, .publicAccess)
+        await controller.set(.privateAccess)
+        XCTAssertEqual(controller.state, .loaded)
+        XCTAssertEqual(controller.visibility, .privateAccess)
+        let sets = session.calls.filter { if case .webSet = $0 { return true }; return false }
+        XCTAssertEqual(sets, [.webSet(machine, 3000, true, 4), .webSet(machine, 3000, false, 5)])
+    }
+
+    func testRevisionConflictShowsTheServersValue() async {
+        let session = RecordingSession()
+        session.webShowReplies = [shown("private", revision: 4), shown("private", revision: 9)]
+        session.webSetError = .transport(-11)
+        session.refusal = #"{"version":1,"status":"error","error":"revision_conflict"}"#
+        let controller = MilaWebPolicyController(adapter: LinkedMilaFFIAdapter(session: session, deploymentHost: "overalls.example"), machine: machine)
+        await controller.load()
+        await controller.set(.publicAccess)
+        XCTAssertEqual(controller.state, .failed(.conflict))
+        XCTAssertEqual(controller.projection?.policyRevision, 9, "the control re-reads the server's current revision")
+        XCTAssertEqual(controller.visibility, .privateAccess)
+
+        session.refusal = #"{"version":1,"status":"error","error":"web_not_allowed"}"#
+        await controller.set(.publicAccess)
+        XCTAssertEqual(controller.state, .failed(.unavailable))
+    }
+
+    func testAReadBackThatDidNotMoveIsAConflictAndOtherMachinesAreRefused() async {
+        let session = RecordingSession()
+        session.webShowReplies = [shown("private", revision: 4), shown("private", revision: 4)]
+        let controller = MilaWebPolicyController(adapter: LinkedMilaFFIAdapter(session: session, deploymentHost: "overalls.example"), machine: machine)
+        await controller.load()
+        await controller.set(.publicAccess)
+        XCTAssertEqual(controller.state, .failed(.conflict))
+
+        let other = RecordingSession()
+        other.webData = shown("private", revision: 4, machine: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+        let refused = MilaWebPolicyController(adapter: LinkedMilaFFIAdapter(session: other, deploymentHost: "overalls.example"), machine: machine)
+        await refused.load()
+        XCTAssertEqual(refused.state, .failed(.unavailable))
+        XCTAssertNil(refused.projection)
+        await refused.set(.publicAccess)
+        XCTAssertFalse(other.calls.contains { if case .webSet = $0 { return true }; return false }, "nothing is set without a projection")
     }
 }
 

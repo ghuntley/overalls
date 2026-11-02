@@ -293,21 +293,25 @@ private enum MilaRustFFI {
 public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     private let liveSession: (any MilaSessionClient)?
     private let ptySession: (any MilaPtySession)?
+    /// The host of the deployment this session signed in to. Web routes are
+    /// accepted only for it; an adapter without one opens no web endpoint.
+    private let deploymentHost: String?
 
-    public init() { liveSession = nil; ptySession = nil }
+    public init() { liveSession = nil; ptySession = nil; deploymentHost = nil }
 
     /// Creates an adapter backed by an authenticated Rust session. Trust is pinned deployment data.
     public init(trust: Data, host: String, port: UInt16, signer: MilaDeviceSigner) throws {
         let session = try MilaLiveSession(trust: trust, host: host, port: port, signer: signer)
-        liveSession = session; ptySession = session
+        liveSession = session; ptySession = session; deploymentHost = host
     }
 
     /// Wraps an existing authenticated session (production `MilaLiveSession`, or a
     /// recording client in package tests). The adapter's validation and mapping
-    /// run unchanged above it.
-    public init(session: any MilaSessionClient, pty: (any MilaPtySession)? = nil) {
+    /// run unchanged above it. `deploymentHost` is the host the session signed in to.
+    public init(session: any MilaSessionClient, pty: (any MilaPtySession)? = nil, deploymentHost: String? = nil) {
         liveSession = session
         ptySession = pty ?? (session as? any MilaPtySession)
+        self.deploymentHost = deploymentHost
     }
 
     /// Returns the authenticated PTY transport for a machine's terminal.
@@ -623,9 +627,24 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         } catch { throw MilaFFIError.unavailable }
     }
 
+    /// The app's open-web path: the authenticated projection, accepted only
+    /// with the host-qualified route of the signed-in deployment.
     public func webEndpoint(machine: UUID) async throws -> MilaWebEndpoint {
+        guard let deploymentHost else { throw MilaWebEndpointError.unavailable }
         let projection = try await webEndpointProjection(machine: machine)
-        return try projection.endpoint(for: machine)
+        return try projection.endpoint(for: machine, deploymentHost: deploymentHost)
+    }
+
+    /// `web set` at the projection's optimistic revision. Marshall's
+    /// `revision_conflict` refusal is reported as `.conflict`.
+    public func setWebVisibility(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) async throws {
+        guard let liveSession else { throw MilaWebEndpointError.unavailable }
+        guard port > 0, revision > 0, requestID != UUID.zero else { throw MilaWebEndpointError.invalid }
+        do { try liveSession.webSet(machine: machine, port: port, publicAccess: publicAccess, revision: revision, requestID: requestID) }
+        catch {
+            let refusal = liveSession.lastRefusal().flatMap { try? JSONDecoder().decode(MilaRefusal.self, from: Data($0.utf8)) }
+            throw refusal?.error == "revision_conflict" ? MilaWebEndpointError.conflict : MilaWebEndpointError.unavailable
+        }
     }
 
     public func threadAction(thread: UUID?, command: String, secondary: String? = nil, input: String? = nil, requestID: UUID? = nil) async throws -> Data {
@@ -644,6 +663,12 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
 /// Porsche `--json` reads arrive as `{"version":1,"status":"succeeded","result":T}`.
 /// Decoders MUST accept that envelope (and the bare `T` some Rust projections
 /// emit) and MUST refuse any other status rather than presenting partial data.
+/// A Porsche refusal (`{"version":1,"status":"error","error":"<code>"}`), as
+/// `mila_session_last_refusal` reports it; only the closed code is read.
+struct MilaRefusal: Decodable {
+    let error: String
+}
+
 struct MilaPorscheEnvelope<Value: Decodable>: Decodable {
     let value: Value
     private enum Keys: String, CodingKey { case version, status, result }
@@ -726,6 +751,7 @@ public protocol MilaFFIAdapter: Sendable {
     func submitShare(_ principal: MilaSharePrincipal, role: MilaShareRole?, machine: MilaMachinePresentation, remove: Bool, requestID: UUID) async throws
     func webEndpointProjection(machine: UUID) async throws -> MilaWebEndpointProjection
     func webEndpoint(machine: UUID) async throws -> MilaWebEndpoint
+    func setWebVisibility(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) async throws
     func threadAction(thread: UUID?, command: String, secondary: String?, input: String?, requestID: UUID?) async throws -> Data
     func classifyThreadCommand(_ line: String) throws -> MilaThreadCommandKind
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind
@@ -752,6 +778,10 @@ public extension MilaFFIAdapter {
     func submitShare(_ principal: MilaSharePrincipal, role: MilaShareRole?, machine: MilaMachinePresentation, remove: Bool, requestID: UUID) async throws { _ = principal; _ = role; _ = machine; _ = remove; _ = requestID; throw MilaMachineSharingError.unavailable }
     func webEndpointProjection(machine: UUID) async throws -> MilaWebEndpointProjection { _ = machine; throw MilaFFIError.unavailable }
     func webEndpoint(machine: UUID) async throws -> MilaWebEndpoint { _ = machine; throw MilaFFIError.unavailable }
+    func setWebVisibility(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) async throws {
+        _ = machine; _ = port; _ = publicAccess; _ = revision; _ = requestID
+        throw MilaWebEndpointError.unavailable
+    }
     func threadAction(thread: UUID?, command: String, secondary: String? = nil, input: String? = nil, requestID: UUID? = nil) async throws -> Data { _ = thread; _ = command; _ = secondary; _ = input; _ = requestID; throw MilaFFIError.unavailable }
     func classifyThreadCommand(_ line: String) throws -> MilaThreadCommandKind { _ = line; throw MilaFFIError.unavailable }
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind { _ = line; throw MilaFFIError.unavailable }

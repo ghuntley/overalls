@@ -197,7 +197,7 @@ struct MilaFixtureMachineDetail: Decodable {
         let sessions = MilaDeploymentSessionController(store: env.store, defaults: env.defaults) { value in
             let session = try MilaLiveSession(trust: value.trust, host: value.host, port: value.port, sessionSigner: signer)
             live.current = session
-            return LinkedMilaFFIAdapter(session: session)
+            return LinkedMilaFFIAdapter(session: session, deploymentHost: value.host)
         }
         let model = MilaAppModel(session: sessions, signIn: MilaSignInController(session: sessions, pollInterval: .seconds(1), approvalLifetime: 120))
         model.signIn.signIn(deployment)
@@ -400,6 +400,20 @@ struct MilaFixtureMachineDetail: Decodable {
             case .closed:
                 throw MilaJourneyFailure.step("\(step): stream closed")
             }
+        }
+        throw MilaJourneyFailure.step("\(step): timeout")
+    }
+}
+
+@MainActor extension MilaFixtureJourney {
+    /// Waits until the SwiftUI terminal controller has rendered `wanted`; the
+    /// controller leaving `.attached` or the deadline fails the step.
+    func rendered(_ terminal: MilaTerminalController, contains wanted: String, step: String, seconds: Double = 60) async throws {
+        let deadline = Date().addingTimeInterval(seconds)
+        while Date() < deadline {
+            guard terminal.state == .attached else { throw MilaJourneyFailure.step("\(step): terminal \(terminal.state)") }
+            if String(decoding: terminal.output, as: UTF8.self).contains(wanted) { return }
+            try await Task.sleep(for: .milliseconds(50))
         }
         throw MilaJourneyFailure.step("\(step): timeout")
     }
@@ -657,11 +671,16 @@ private struct MilaJourneyStandInSusan: MilaSusanKeyIssuing {
 
     /// @cc [owner:ghuntley,label:verification] mila-apple-journey-web
     /// Web show through the adapter's `web show` projection, then public and
-    /// back to private through `MilaLiveSession.webSet`, each at the current
-    /// policy revision and read back at a newer one. It runs on a machine this
-    /// test creates, not the seed: the Windows journey sets the seed's web
-    /// policy against the same tunnelled fixture, and two clients racing one
-    /// optimistic revision would refuse each other.
+    /// back to private through the SwiftUI control's `MilaWebPolicyController`
+    /// (which calls `MilaLiveSession.webSet`), each at the current policy
+    /// revision and read back at a newer one, and an open through the app's
+    /// projection path (`webEndpoint`, as `MachineDetailView.openWeb` calls
+    /// it), whose route MUST be accepted as the signed-in deployment's
+    /// host-qualified route. It runs on a machine this test creates, not the
+    /// seed: the Windows journey sets the seed's web policy against the same
+    /// tunnelled fixture, and two clients racing one optimistic revision would
+    /// refuse each other. The fixture sets no ingress zone, so Marshall
+    /// publishes no web address and no page is loaded here.
     func testWebShowAndSetPublicThenPrivateAgainstFixture() async throws {
         let journey = try await MilaFixtureJourney.signIn(try MilaFixtureJourney.descriptor())
         defer { journey.finish() }
@@ -674,19 +693,104 @@ private struct MilaJourneyStandInSusan: MilaSusanKeyIssuing {
         XCTAssertTrue(before.visibility == "private" || before.visibility == "public", "web show visibility \(before.visibility)")
         journeyStep("web show")
 
-        for isPublic in [true, false] {
-            let current = try await adapter.webEndpointProjection(machine: machine)
-            _ = try await journey.submit("web set") { request in
-                try journey.session().webSet(machine: machine, port: before.port, publicAccess: isPublic, revision: current.policyRevision, requestID: request)
+        let policy = MilaWebPolicyController(adapter: adapter, machine: machine)
+        await policy.load()
+        guard policy.state == .loaded, let initial = policy.visibility else { return XCTFail("web policy load: \(policy.state)") }
+        let first: MilaWebVisibility = initial == .publicAccess ? .privateAccess : .publicAccess
+        for wanted in [first, first == .publicAccess ? MilaWebVisibility.privateAccess : .publicAccess] {
+            let current = try XCTUnwrap(policy.projection)
+            _ = try await journey.submit("web set \(wanted.rawValue)") { request in
+                await policy.set(wanted, requestID: request)
+                // A read-back that has not moved yet is settled below; a refusal is retried when busy.
+                if case .failed(let error) = policy.state, error != .conflict { throw error }
             }
-            let wanted = isPublic ? "public" : "private"
-            _ = try await journey.until("web set \(wanted)") { () async throws -> Bool? in
-                let after = try await adapter.webEndpointProjection(machine: machine)
-                return after.visibility == wanted && after.policyRevision > current.policyRevision ? true : nil
+            _ = try await journey.until("web set \(wanted.rawValue)") { () async throws -> Bool? in
+                await policy.load()
+                guard let after = policy.projection else { return nil }
+                return after.visibility == wanted.rawValue && after.policyRevision > current.policyRevision ? true : nil
             }
-            journeyStep("web set \(wanted)")
+            journeyStep("web set \(wanted.rawValue) (SwiftUI control)")
+        }
+
+        let host = journey.descriptor.deployment.host
+        let shown = try await adapter.webEndpointProjection(machine: machine)
+        XCTAssertEqual(shown.route, MilaWebEndpointProjection.route(machine: machine, deploymentHost: host),
+                       "Marshall's web route is the signed-in deployment's host-qualified route")
+        do {
+            let endpoint = try await adapter.webEndpoint(machine: machine)
+            let generation = try XCTUnwrap(journey.model.web.begin(endpoint, sessionActive: true))
+            XCTAssertEqual(journey.model.web.endpoint, endpoint)
+            journey.model.web.end(generation)
+            journeyStep("web open (route accepted; endpoint \(endpoint.url.host ?? "") bound to the web view lifecycle)")
+        } catch MilaWebEndpointError.noAddress {
+            journeyStep("web open (route accepted for \(host); the fixture publishes no web address)")
         }
         await journey.remove(machine)
+    }
+
+    /// @cc [owner:ghuntley,label:verification;terminal] mila-apple-journey-terminal-controller
+    /// The SwiftUI `MilaTerminalController` over the adapter's production
+    /// transport (`LinkedMilaFFIAdapter.terminalTransport`), as
+    /// `MilaTerminalView` builds it, on the fixture's guest-backed terminal
+    /// machine: attach, a shell-computed echo rendered by the controller, an
+    /// idle stretch longer than the session's 15 s read timeout after which the
+    /// controller MUST still be attached and accept input, a resize to 132x40
+    /// read back with `stty size`, and a detach after which the transport
+    /// refuses input. The named server session is left to the fixture (the
+    /// transport does not expose it); the guest-terminal journey proves
+    /// `terminal kill`. The PTY is the fixture's terminal stand-in.
+    func testTerminalControllerEchoIdleResizeAndDetachAgainstFixture() async throws {
+        let descriptor = try MilaFixtureJourney.descriptor()
+        guard let machine = descriptor.seed.terminalMachineID else {
+            throw XCTSkip("the fixture descriptor names no seed.terminal_machine_id")
+        }
+        let journey = try await MilaFixtureJourney.signIn(descriptor)
+        defer { journey.finish() }
+        let adapter = try XCTUnwrap(journey.model.adapter as? LinkedMilaFFIAdapter)
+        let transport = try XCTUnwrap(adapter.terminalTransport(machine: machine))
+        let terminal = MilaTerminalController(transport: transport)
+
+        // Attach, retrying only the closed readiness refusals for 180 s.
+        _ = try await journey.until("terminal controller attach", seconds: 180) { () async throws -> Bool? in
+            await terminal.attach(columns: 100, rows: 30)
+            if terminal.state == .attached { return true }
+            let reason = journey.refusal()
+            guard let reason, MilaFixtureJourney.terminalReadiness.contains(reason) else {
+                throw MilaJourneyFailure.step("terminal controller attach: \(reason ?? "state \(terminal.state)")")
+            }
+            try await Task.sleep(for: .seconds(2))
+            return nil
+        }
+        journeyStep("terminal controller attach")
+
+        let marker = "mila-" + String(UUID().uuidString.lowercased().replacingOccurrences(of: "-", with: "").prefix(12))
+        await terminal.sendInput(Data("echo \(marker)-$((6*7))\r".utf8))
+        try await journey.rendered(terminal, contains: "\(marker)-42", step: "terminal controller echo")
+        journeyStep("terminal controller echo")
+
+        // Longer than MilaLiveSession's 15 s read timeout: an idle PTY is not a failure.
+        try await Task.sleep(for: .seconds(17))
+        XCTAssertEqual(terminal.state, .attached, "the controller stays attached across an idle stretch")
+        await terminal.sendInput(Data("echo \(marker)-idle-$((5+5))\r".utf8))
+        try await journey.rendered(terminal, contains: "\(marker)-idle-10", step: "terminal controller input after idle")
+        journeyStep("terminal controller idle 17 s, then input")
+
+        await terminal.resize(columns: 132, rows: 40)
+        XCTAssertEqual(terminal.state, .attached, "resize was refused")
+        XCTAssertEqual(terminal.columns, 132)
+        XCTAssertEqual(terminal.rows, 40)
+        await terminal.sendInput(Data("stty size\r".utf8))
+        try await journey.rendered(terminal, contains: "40 132", step: "terminal controller resize", seconds: 30)
+        journeyStep("terminal controller resize 132x40")
+
+        await terminal.close()
+        XCTAssertEqual(terminal.state, .detached)
+        XCTAssertTrue(terminal.output.isEmpty, "detach clears the rendered output")
+        do {
+            try await transport.sendInput(Data("x".utf8))
+            XCTFail("a detached transport accepted input")
+        } catch { XCTAssertEqual(error as? MilaTerminalError, .unavailable) }
+        journeyStep("terminal controller detach")
     }
 
     /// @cc [owner:ghuntley,label:verification;terminal] mila-apple-journey-guest-terminal
@@ -699,7 +803,8 @@ private struct MilaJourneyStandInSusan: MilaSusanKeyIssuing {
     /// `terminal new` uses a fresh request ID, so this session is distinct from
     /// the Windows journey's on the same machine. The PTY is the fixture's
     /// terminal stand-in, not a real guest. This drives `MilaLiveSession`
-    /// directly; the SwiftUI `MilaTerminalController` stream is not exercised.
+    /// directly; `mila-apple-journey-terminal-controller` drives the SwiftUI
+    /// `MilaTerminalController` stream.
     func testGuestTerminalEchoResizeReplayAndEndAgainstFixture() async throws {
         let descriptor = try MilaFixtureJourney.descriptor()
         guard let machine = descriptor.seed.terminalMachineID else {

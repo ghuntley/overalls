@@ -45,12 +45,57 @@ final class MilaWebControlsTests: XCTestCase {
         XCTAssertFalse(controller.openAuthenticated(endpoint, sessionActive: true, policyRevision: 0, expectedRevision: 0))
     }
 
+    private func projection(_ id: UUID, route: String, url: String? = "https://console.example.test/") throws -> MilaWebEndpointProjection {
+        var object: [String: Any] = ["machine_id": id.uuidString.lowercased(), "label": "Console", "port": 443, "visibility": "private",
+                                     "policy_revision": 7, "route": route]
+        if let url { object["url"] = url } else { object["url"] = NSNull() }
+        return try JSONDecoder().decode(MilaWebEndpointProjection.self, from: try JSONSerialization.data(withJSONObject: object))
+    }
+
     func testAuthenticatedProjectionIsMachineBoundAndHTTPSOnly() throws {
         let id = UUID(uuidString: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")!
-        let json = "{\"machine_id\":\"\(id.uuidString.lowercased())\",\"label\":\"Console\",\"port\":443,\"visibility\":\"private\",\"policy_revision\":7,\"url\":\"https://console.example.test/\",\"route\":\"overalls://machines/\(id.uuidString.lowercased())/web\"}".data(using: .utf8)!
-        let projection = try JSONDecoder().decode(MilaWebEndpointProjection.self, from: json)
-        XCTAssertEqual(try projection.endpoint(for: id).url.absoluteString, "https://console.example.test/")
-        XCTAssertThrowsError(try projection.endpoint(for: UUID()))
+        let accepted = try projection(id, route: "overalls://overalls.example/machines/\(id.uuidString.lowercased())/web")
+        XCTAssertEqual(try accepted.endpoint(for: id, deploymentHost: "overalls.example").url.absoluteString, "https://console.example.test/")
+        XCTAssertThrowsError(try accepted.endpoint(for: UUID(), deploymentHost: "overalls.example")) { XCTAssertEqual($0 as? MilaWebEndpointError, .invalid) }
+        let insecure = try projection(id, route: "overalls://overalls.example/machines/\(id.uuidString.lowercased())/web", url: "http://console.example.test/")
+        XCTAssertThrowsError(try insecure.endpoint(for: id, deploymentHost: "overalls.example")) { XCTAssertEqual($0 as? MilaWebEndpointError, .invalid) }
+    }
+
+    /// Marshall's route (`Marshall.AppRoutes`, protocol/test/fixtures/porsche_client_results.json)
+    /// is host-qualified; only the signed-in deployment's exact form is accepted.
+    func testProjectionRouteMustBeTheSignedInDeploymentsHostQualifiedRoute() throws {
+        let id = UUID(uuidString: "019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a")!
+        let canonical = "overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web"
+        XCTAssertEqual(MilaWebEndpointProjection.route(machine: id, deploymentHost: "marshall.example.test"), canonical)
+        XCTAssertEqual(MilaWebEndpointProjection.route(machine: id, deploymentHost: "Marshall.Example.Test"), canonical)
+        XCTAssertNil(MilaWebEndpointProjection.route(machine: id, deploymentHost: "marshall.example.test:443"))
+        XCTAssertNil(MilaWebEndpointProjection.route(machine: id, deploymentHost: ""))
+
+        XCTAssertNoThrow(try projection(id, route: canonical).endpoint(for: id, deploymentHost: "marshall.example.test"))
+        XCTAssertNoThrow(try projection(id, route: canonical).endpoint(for: id, deploymentHost: "MARSHALL.example.test"))
+        let refused = [
+            "overalls://machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+            "overalls://other.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+            "overalls://marshall.example.test:8443/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+            "overalls://user@marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+            "overalls://marshall.example.test/machines/019A0F6E-7C1D-7B52-9B1E-4C3A2D1E0F9A/web",
+            "overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web/",
+            "overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web?x=1",
+            "overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web#f",
+            "overalls://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a",
+            "overalls://marshall.example.test/machines/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/web",
+            "https://marshall.example.test/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+            "overalls://marshall.example.test.evil.example/machines/019a0f6e-7c1d-7b52-9b1e-4c3a2d1e0f9a/web",
+        ]
+        for route in refused {
+            XCTAssertThrowsError(try projection(id, route: route).endpoint(for: id, deploymentHost: "marshall.example.test"), route) {
+                XCTAssertEqual($0 as? MilaWebEndpointError, .invalid, route)
+            }
+        }
+        // The route is accepted but the deployment publishes no address (no ingress zone).
+        XCTAssertThrowsError(try projection(id, route: canonical, url: nil).endpoint(for: id, deploymentHost: "marshall.example.test")) {
+            XCTAssertEqual($0 as? MilaWebEndpointError, .noAddress)
+        }
     }
 
     @MainActor func testSessionInvalidationClearsPublishedWebState() throws {

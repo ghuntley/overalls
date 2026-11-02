@@ -92,6 +92,9 @@ public protocol MilaPtySession: AnyObject, Sendable {
     /// and attaches a PTY to it by name.
     func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64
     func terminalPoll(_ terminal: UInt64) throws -> Data
+    /// One bounded PTY read that waits at most `waitMilliseconds` and tells
+    /// data, an idle (still open) channel and a closed channel apart.
+    func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead
     func terminalInput(_ terminal: UInt64, data: Data) throws
     func terminalResize(_ terminal: UInt64, columns: UInt32, rows: UInt32) throws
     func terminalKill(_ terminal: UInt64)
@@ -373,9 +376,16 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
     /// One bounded PTY read that waits at most `waitMilliseconds` (Rust caps it
     /// at 1000) and tells idle from closed. The buffer is the full chunk size:
     /// Rust consumes channel data before it copies.
+    /// The chunk buffer is reused across reads, as in `terminalPoll`, so an
+    /// idle stream polled many times a second does not allocate 1 MiB per read.
     public func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead {
         guard terminal != 0, waitMilliseconds <= 1_000 else { throw MilaSessionError.invalidInput }
-        var buffer = [UInt8](repeating: 0, count: Self.ptyChunkLimit)
+        lock.lock()
+        if ptyBuffer.count != Self.ptyChunkLimit { ptyBuffer = [UInt8](repeating: 0, count: Self.ptyChunkLimit) }
+        var buffer = ptyBuffer
+        ptyBuffer = []
+        lock.unlock()
+        defer { lock.lock(); ptyBuffer = buffer; lock.unlock() }
         var written = 0
         var event: UInt8 = 0
         let status = buffer.withUnsafeMutableBufferPointer { output in

@@ -47,7 +47,7 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         case thread(UUID?, String, String?, String?, UUID?)
         case webShow(UUID)
         case webSet(UUID, UInt16, Bool, UInt64)
-        case ptyAttach(UUID, UInt32, UInt32), ptyPoll(UInt64), ptyInput(UInt64, Data), ptyResize(UInt64, UInt32, UInt32), ptyKill(UInt64)
+        case ptyAttach(UUID, UInt32, UInt32), ptyPoll(UInt64), ptyRead(UInt64, UInt32), ptyInput(UInt64, Data), ptyResize(UInt64, UInt32, UInt32), ptyKill(UInt64)
         case deviceRegister(MilaDevicePlatform, String, String?), deviceList, devicePreferences(UUID, Bool), deviceRemove(UUID)
     }
     private let lock = NSLock()
@@ -89,8 +89,22 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         guard let data = threadResponses[command] else { throw MilaSessionError.transport(-11) }
         return data
     }
-    func webShow(machine: UUID) throws -> Data { record(.webShow(machine)); return webData }
-    func webSet(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) throws { record(.webSet(machine, port, publicAccess, revision)) }
+    /// Successive `web show` replies; the last one repeats. Empty means `webData`.
+    var webShowReplies: [Data] = []
+    /// Thrown by `web set` after it is recorded, with `refusal` as the session's last refusal.
+    var webSetError: MilaSessionError?
+    var refusal: String?
+    func webShow(machine: UUID) throws -> Data {
+        record(.webShow(machine))
+        lock.lock(); defer { lock.unlock() }
+        guard !webShowReplies.isEmpty else { return webData }
+        return webShowReplies.count == 1 ? webShowReplies[0] : webShowReplies.removeFirst()
+    }
+    func webSet(machine: UUID, port: UInt16, publicAccess: Bool, revision: UInt64, requestID: UUID) throws {
+        record(.webSet(machine, port, publicAccess, revision))
+        if let webSetError { throw webSetError }
+    }
+    func lastRefusal() -> String? { refusal }
     /// Porsche's `device register` receipt (protocol/test/fixtures/porsche_device_results.json).
     var deviceReceipt = Data(#"{"version":1,"status":"succeeded","request_id":"porsche-0123456789abcdef0123456789abcdef","operation_id":null,"result":{"id":"5d7a6f0e-2b1c-4e8f-9a3d-6c0b1e2f3a4b","platform":"macos","enabled":true,"state":"active"}}"#.utf8)
     var deviceListing = Data(#"{"version":1,"status":"succeeded","result":{"items":[],"limit":10,"push_enabled":true}}"#.utf8)
@@ -114,6 +128,15 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         record(.ptyPoll(terminal))
         lock.lock(); defer { lock.unlock() }
         return ptyOutput.isEmpty ? Data() : ptyOutput.removeFirst()
+    }
+    /// Scripted output as Rust's bounded read reports it: an empty chunk is an
+    /// idle channel, and an exhausted script stays idle.
+    func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead {
+        record(.ptyRead(terminal, waitMilliseconds))
+        lock.lock(); defer { lock.unlock() }
+        guard !ptyOutput.isEmpty else { return .idle }
+        let chunk = ptyOutput.removeFirst()
+        return chunk.isEmpty ? .idle : .data(chunk)
     }
     func terminalInput(_ terminal: UInt64, data: Data) throws { record(.ptyInput(terminal, data)) }
     func terminalResize(_ terminal: UInt64, columns: UInt32, rows: UInt32) throws { record(.ptyResize(terminal, columns, rows)) }

@@ -19,6 +19,9 @@ public enum MilaWebEndpointError: Error, Equatable, Sendable {
     case invalid
     case unavailable
     case conflict
+    /// The projection is valid but the deployment publishes no web address
+    /// (Marshall has no ingress zone), so there is nothing to open.
+    case noAddress
 }
 
 /// Authenticated projection returned by Rust's `web show --json` command.
@@ -39,12 +42,131 @@ public struct MilaWebEndpointProjection: Codable, Equatable, Sendable {
         case url, route
     }
 
-    public func endpoint(for machine: UUID) throws -> MilaWebEndpoint {
+    /// @cc [owner:ghuntley,label:security;protocol] mila-apple-web-route-host
+    /// Marshall's `web show` route is the host-qualified application route
+    /// `overalls://<host>/machines/<id>/web` for its public host (ADR-0221,
+    /// `Marshall.AppRoutes`). The projection MUST be refused unless its route
+    /// is exactly that form for the requested machine and the signed-in
+    /// deployment's host: no other host, no port, no hostless form, no query,
+    /// fragment or trailing segment. Hosts compare case-insensitively; the
+    /// machine identifier MUST be canonical lowercase.
+    public static func route(machine: UUID, deploymentHost: String) -> String? {
+        guard let host = canonicalHost(deploymentHost) else { return nil }
+        return scheme + host + path(machine)
+    }
+
+    private static let scheme = "overalls://"
+    private static func path(_ machine: UUID) -> String { "/machines/\(machine.uuidString.lowercased())/web" }
+
+    /// A lowercase DNS name of letters, digits, `-` and `.`; nil for anything else.
+    private static func canonicalHost(_ value: String) -> String? {
+        let host = value.lowercased()
+        guard !host.isEmpty, host.utf8.count <= 253, !host.hasPrefix("."), !host.hasSuffix("."),
+              host.unicodeScalars.allSatisfy({ scalar in
+                  (97...122).contains(scalar.value) || (48...57).contains(scalar.value) || scalar.value == 45 || scalar.value == 46
+              }) else { return nil }
+        return host
+    }
+
+    /// True only for `overalls://<deploymentHost>/machines/<machine>/web`.
+    static func routeMatches(_ route: String, machine: UUID, deploymentHost: String) -> Bool {
+        guard route.utf8.count <= 2048, route.hasPrefix(scheme),
+              let expectedHost = canonicalHost(deploymentHost) else { return false }
+        let rest = route.dropFirst(scheme.count)
+        guard let slash = rest.firstIndex(of: "/") else { return false }
+        let host = String(rest[..<slash])
+        // The host is compared case-insensitively but must itself be a plain
+        // DNS name: a port, userinfo or any other character is refused.
+        return canonicalHost(host) == expectedHost && String(rest[slash...]) == path(machine)
+    }
+
+    /// The endpoint to open for `machine` on the signed-in deployment `deploymentHost`.
+    /// Throws `.invalid` when the projection is not this machine's on this
+    /// deployment, and `.noAddress` when it is but no web address is published.
+    public func endpoint(for machine: UUID, deploymentHost: String) throws -> MilaWebEndpoint {
         guard machineID == machine, !label.isEmpty, label.utf8.count <= 256,
               (visibility == "private" || visibility == "public"),
-              route == "overalls://machines/\(machine.uuidString.lowercased())/web",
-              let value = url else { throw MilaWebEndpointError.unavailable }
+              Self.routeMatches(route, machine: machine, deploymentHost: deploymentHost) else { throw MilaWebEndpointError.invalid }
+        guard let value = url else { throw MilaWebEndpointError.noAddress }
         return try MilaWebEndpoint(value)
+    }
+}
+
+/// Who can open a machine's web address (`web set --public|--private`).
+public enum MilaWebVisibility: String, CaseIterable, Identifiable, Sendable {
+    case privateAccess = "private"
+    case publicAccess = "public"
+    public var id: String { rawValue }
+}
+
+public enum MilaWebPolicyState: Equatable, Sendable {
+    case idle
+    case loading
+    case loaded
+    case submitting
+    case failed(MilaWebEndpointError)
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] mila-apple-web-policy-control
+/// The SwiftUI public/private control for one machine. A change MUST be sent
+/// through the adapter's `MilaLiveSession.webSet` at the policy revision of the
+/// projection last read for this machine, keeping its port, under a fresh
+/// request ID. It is reported applied only when a re-read shows the wanted
+/// visibility at a newer revision. A refusal re-reads the projection so the
+/// control shows the server's current value, and `revision_conflict` is
+/// reported as a conflict. A projection for another machine is never shown.
+@MainActor public final class MilaWebPolicyController: ObservableObject {
+    @Published public private(set) var projection: MilaWebEndpointProjection?
+    @Published public private(set) var state: MilaWebPolicyState = .idle
+    public let machine: UUID
+    private let adapter: any MilaFFIAdapter
+
+    public init(adapter: any MilaFFIAdapter, machine: UUID) {
+        self.adapter = adapter
+        self.machine = machine
+    }
+
+    /// The server's current visibility, once a projection has been read.
+    public var visibility: MilaWebVisibility? { projection.flatMap { MilaWebVisibility(rawValue: $0.visibility) } }
+    public var isBusy: Bool { state == .loading || state == .submitting }
+
+    public func load() async {
+        guard !isBusy else { return }
+        state = .loading
+        do {
+            projection = try await read()
+            state = .loaded
+        } catch {
+            projection = nil
+            state = .failed(.unavailable)
+        }
+    }
+
+    public func set(_ wanted: MilaWebVisibility, requestID: UUID = UUID()) async {
+        guard !isBusy, let current = projection, current.policyRevision > 0,
+              current.visibility != wanted.rawValue, requestID != UUID.zero else { return }
+        state = .submitting
+        do {
+            try await adapter.setWebVisibility(machine: machine, port: current.port, publicAccess: wanted == .publicAccess,
+                                               revision: current.policyRevision, requestID: requestID)
+        } catch {
+            projection = (try? await read()) ?? current
+            state = .failed((error as? MilaWebEndpointError) ?? .unavailable)
+            return
+        }
+        do {
+            let after = try await read()
+            projection = after
+            state = after.visibility == wanted.rawValue && after.policyRevision > current.policyRevision ? .loaded : .failed(.conflict)
+        } catch {
+            state = .failed(.unavailable)
+        }
+    }
+
+    private func read() async throws -> MilaWebEndpointProjection {
+        let value = try await adapter.webEndpointProjection(machine: machine)
+        guard value.machineID == machine else { throw MilaWebEndpointError.invalid }
+        return value
     }
 }
 

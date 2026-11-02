@@ -245,11 +245,13 @@ private struct MachineDetailView: View {
     let refresh: () -> Void
     @StateObject private var workflow: MilaMachineWorkflow
     @StateObject private var sharing: MilaMachineSharingController
+    @StateObject private var webPolicy: MilaWebPolicyController
     @State private var showTerminal = false
     @State private var showWeb = false
     @State private var webGeneration: UInt64 = 0
     @State private var webLoading = false
     @State private var webError = false
+    @State private var webNoAddress = false
     @State private var confirmDelete = false
     @State private var sharePrincipal = ""
     @State private var shareRole: MilaShareRole = .viewer
@@ -265,6 +267,7 @@ private struct MachineDetailView: View {
         self.refresh = refresh
         _workflow = StateObject(wrappedValue: MilaMachineWorkflow(adapter: adapter))
         _sharing = StateObject(wrappedValue: MilaMachineSharingController(adapter: adapter))
+        _webPolicy = StateObject(wrappedValue: MilaWebPolicyController(adapter: adapter, machine: machine.id))
     }
 
     var body: some View {
@@ -298,6 +301,20 @@ private struct MachineDetailView: View {
                 Button(MilaStrings.text(.openTerminal)) { showTerminal = true }.disabled(!machine.machine.write)
                 Button(MilaStrings.text(.webOpen)) { openWeb() }.disabled(webLoading || !machine.machine.read)
                 if webError { Text(MilaStrings.text(.webFailed)).font(.caption).foregroundStyle(.secondary) }
+                if webNoAddress { Text(MilaStrings.text(.webNoAddress)).font(.caption).foregroundStyle(.secondary) }
+                Picker(MilaStrings.text(.webVisibility), selection: webVisibilitySelection) {
+                    Text(MilaStrings.text(.webPrivate)).tag(MilaWebVisibility.privateAccess)
+                    Text(MilaStrings.text(.webPublic)).tag(MilaWebVisibility.publicAccess)
+                }
+                .pickerStyle(.segmented)
+                .disabled(!machine.machine.write || webPolicy.visibility == nil || webPolicy.isBusy)
+                if let visibility = webPolicy.visibility {
+                    Text(MilaStrings.text(visibility == .publicAccess ? .webPublicExplain : .webPrivateExplain))
+                        .font(.caption).foregroundStyle(.secondary)
+                }
+                if case .failed(let error) = webPolicy.state {
+                    Text(MilaStrings.text(error == .conflict ? .webConflict : .webFailed)).font(.caption).foregroundStyle(.secondary)
+                }
             }
             Section {
                 TextField(MilaStrings.text(.sharePrincipal), text: $sharePrincipal).autocorrectionDisabled()
@@ -317,6 +334,7 @@ private struct MachineDetailView: View {
             sharing.setSession(signedIn: true, machine: machine)
             workflow.onApplied = { _ in refresh() }
         }
+        .task { if machine.machine.read { await webPolicy.load() } }
         .confirmationDialog(MilaStrings.text(.confirmDelete, ["name": machine.machine.name]), isPresented: $confirmDelete) {
             Button(MilaStrings.text(.actionDelete), role: .destructive) { workflow.submit(.delete, machine: machine) }
             Button(MilaStrings.text(.cancel), role: .cancel) {}
@@ -339,17 +357,28 @@ private struct MachineDetailView: View {
         }
     }
 
+    /// The public/private control's binding: choosing the other value sends
+    /// `web set` at the current revision; the shown value is always the server's.
+    private var webVisibilitySelection: Binding<MilaWebVisibility> {
+        Binding(get: { webPolicy.visibility ?? .privateAccess },
+                set: { wanted in Task { await webPolicy.set(wanted) } })
+    }
+
+    /// Opens the web address through the adapter's projection path, which
+    /// accepts only the signed-in deployment's host-qualified route.
     private func openWeb() {
         webLoading = true
         webError = false
+        webNoAddress = false
         Task {
             defer { webLoading = false }
             do {
-                let projection = try await adapter.webEndpointProjection(machine: machine.id)
-                let endpoint = try projection.endpoint(for: machine.id)
+                let endpoint = try await adapter.webEndpoint(machine: machine.id)
                 guard let generation = web.begin(endpoint, sessionActive: true) else { webError = true; return }
                 webGeneration = generation
                 showWeb = true
+            } catch MilaWebEndpointError.noAddress {
+                webNoAddress = true
             } catch { webError = true }
         }
     }
