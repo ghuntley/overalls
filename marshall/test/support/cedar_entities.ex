@@ -78,6 +78,29 @@ defmodule Marshall.CedarEntities do
     })
   end
 
+  @doc "A Team entity: `owner` is the owner's id, `admins` include the owner."
+  @spec team(String.t(), String.t(), [String.t()], [String.t()]) :: Entity.t()
+  def team(id, owner_id, admins, members) do
+    Entity.new("Team", id, %{
+      "owner" => user(owner_id),
+      "admins" => Enum.map(admins, &user/1),
+      "members" => Enum.map(members, &user/1)
+    })
+  end
+
+  @doc """
+  An Integration entity. A team-owned integration has no user owner; pass an
+  id no principal holds.
+  """
+  @spec integration(String.t(), String.t(), boolean(), [String.t()]) :: Entity.t()
+  def integration(id, owner_id, live?, managers) when is_boolean(live?) do
+    Entity.new("Integration", id, %{
+      "owner" => user(owner_id),
+      "live" => live?,
+      "managers" => Enum.map(managers, &user/1)
+    })
+  end
+
   defp user(id), do: {"User", id}
   defp users(grants, role), do: grants |> Map.get(role, []) |> Enum.map(&user/1)
 end
