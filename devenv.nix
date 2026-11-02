@@ -88,6 +88,8 @@ in
     pkgs.iproute2
     pkgs.nftables
     pkgs.chromium
+    pkgs.podman
+    pkgs.podman-compose
   ];
 
   # https://devenv.sh/languages/
@@ -118,6 +120,9 @@ in
   scripts.buck2.exec = ''
     exec "$DEVENV_ROOT/tools/buck2" "$@"
   '';
+  scripts.docker.exec = ''
+    exec podman "$@"
+  '';
   scripts.affected.exec = ''
     exec "$DEVENV_ROOT/tools/affected" "$@"
   '';
@@ -147,6 +152,14 @@ in
 
   # https://devenv.sh/basics/
   enterShell = ''
+    # Podman provides the Docker CLI and API socket expected by Compose and
+    # other container tooling in the development shell.
+    if [ "${if isLinux then "1" else "0"}" = 1 ]; then
+      export XDG_RUNTIME_DIR="''${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+      export DOCKER_HOST="unix://$XDG_RUNTIME_DIR/podman/podman.sock"
+      mkdir -p "$XDG_RUNTIME_DIR/podman"
+      podman system service --time=0 "$DOCKER_HOST" >/tmp/overalls-podman-service.log 2>&1 &
+    fi
     # Release derivations deliberately build Cedar from vendored inputs offline;
     # the interactive development shell may fetch the pinned crate when its
     # cache is cold so local compilation is reproducible instead of failing on
