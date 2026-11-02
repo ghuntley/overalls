@@ -384,10 +384,11 @@ jobs:
   # The hermetic Marshall+Porsche journey fixture (ADR-0264), built once per
   # run where the Namespace remote cache (ADR-0276) is reachable and pushed to
   # the public overalls Cachix cache. The GitHub-hosted KVM jobs below
-  # (linux-native, android-emulator, journey-fixture-tailnet) have no nsc, so
-  # tools/buck2 there finds no live cache endpoint and compiles the Marshall
-  # and Porsche releases from scratch (run 41335763927); they realise `path`
-  # from Cachix instead. The 4-vCPU profile suffices for a cache-hit build and
+  # (linux-native, android-emulator, journey-fixture-tailnet) realise `path`
+  # from Cachix. Before tools/buck2 looked up the cache endpoints through the
+  # cells' pinned nsc (ADR-0276, 2026-11-02) they had no live endpoint and
+  # compiled the Marshall and Porsche releases from scratch (run
+  # 41335763927); their Buck2 fallback now reads the cache, cache-only. The 4-vCPU profile suffices for a cache-hit build and
   # keeps the shared 64-vCPU cap free for CI. Without the Cachix token (fork
   # pull requests) nothing could be published, so the job builds nothing,
   # `path` stays empty and the consumers build locally.
@@ -577,11 +578,18 @@ jobs:
         timeout-minutes: 40
         env:
           FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
+          # Only the local fallback below runs Buck2. tools/buck2 looks up the
+          # Namespace cache endpoints with the token through the cells' pinned
+          # nsc (ADR-0276), so the fallback reads the cache; cache-only, so a
+          # GitHub-hosted runner never starts Namespace workers.
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+          OVERALLS_BUCK2_REMOTE_EXECUTION: "off"
         run: |
           set -euo pipefail
           # The journey-fixture job's store path, substituted from Cachix. A
-          # local Buck2 build (no remote cache here, so slow) covers a missing
-          # path: fork pull requests, or a failed or skipped publish.
+          # local Buck2 build, reading the Namespace cache where the token is
+          # available, covers a missing path: fork pull requests (no token, so
+          # slow), or a failed or skipped publish.
           if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
             nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
             echo "Realised $FIXTURE_PATH from Cachix"
@@ -590,6 +598,7 @@ jobs:
             out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
             ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
             tools/buck2 kill
+            tools/namespace-token-scan
           fi
           test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
           echo "built=true" >> "$GITHUB_OUTPUT"
@@ -809,6 +818,12 @@ jobs:
         timeout-minutes: 40
         env:
           FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
+          # Only the local fallback below runs Buck2. tools/buck2 looks up the
+          # Namespace cache endpoints with the token through the cells' pinned
+          # nsc (ADR-0276), so the fallback reads the cache; cache-only, so a
+          # GitHub-hosted runner never starts Namespace workers.
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+          OVERALLS_BUCK2_REMOTE_EXECUTION: "off"
         run: |
           set -euo pipefail
           if [ ! -r /dev/kvm ] || [ ! -w /dev/kvm ]; then
@@ -818,8 +833,9 @@ jobs:
           # The VM closure and the Android SDK do not both fit the runner's default free space.
           sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/.ghcup /usr/local/share/boost
           # The journey-fixture job's store path, substituted from Cachix. A
-          # local Buck2 build (no remote cache here, so slow) covers a missing
-          # path: fork pull requests, or a failed or skipped publish.
+          # local Buck2 build, reading the Namespace cache where the token is
+          # available, covers a missing path: fork pull requests (no token, so
+          # slow), or a failed or skipped publish.
           if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
             nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
             echo "Realised $FIXTURE_PATH from Cachix"
@@ -828,6 +844,7 @@ jobs:
             out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
             ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
             tools/buck2 kill
+            tools/namespace-token-scan
           fi
           test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
           echo "built=true" >> "$GITHUB_OUTPUT"
@@ -977,11 +994,18 @@ jobs:
         timeout-minutes: 40
         env:
           FIXTURE_PATH: ${{ needs.journey-fixture.outputs.path }}
+          # Only the local fallback below runs Buck2. tools/buck2 looks up the
+          # Namespace cache endpoints with the token through the cells' pinned
+          # nsc (ADR-0276), so the fallback reads the cache; cache-only, so a
+          # GitHub-hosted runner never starts Namespace workers.
+          NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+          OVERALLS_BUCK2_REMOTE_EXECUTION: "off"
         run: |
           set -euo pipefail
           # The journey-fixture job's store path, substituted from Cachix. A
-          # local Buck2 build (no remote cache here, so slow) covers a missing
-          # path: fork pull requests, or a failed or skipped publish.
+          # local Buck2 build, reading the Namespace cache where the token is
+          # available, covers a missing path: fork pull requests (no token, so
+          # slow), or a failed or skipped publish.
           if [[ "$FIXTURE_PATH" == /nix/store/* ]] &&
             nix-store --realise "$FIXTURE_PATH" --add-root "$RUNNER_TEMP/mila-journey-fixture" > /dev/null; then
             echo "Realised $FIXTURE_PATH from Cachix"
@@ -990,6 +1014,7 @@ jobs:
             out=$(tools/buck2 build //:package-mila-journey-fixture --show-full-simple-output)
             ln -sfn "$(cat "$out")" "$RUNNER_TEMP/mila-journey-fixture"
             tools/buck2 kill
+            tools/namespace-token-scan
           fi
           test -x "$RUNNER_TEMP/mila-journey-fixture/bin/mila-journey-fixture"
       - name: Join the Mila CI tailnet

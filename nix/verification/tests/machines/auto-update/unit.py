@@ -721,6 +721,16 @@ class NamespaceCache(unittest.TestCase):
         self.assertLess(local.index("OVERALLS_BUCK2_REMOTE=off"), local.index(str(wrapper)))
         self.assertEqual(remote[remote.index(str(wrapper)) :], local[local.index(str(wrapper)) :])
 
+    def test_builds_share_action_keys_with_other_clients(self) -> None:
+        # Buck2 puts the isolation directory into every output path, and so
+        # into every action key: only the default `v2` shares cache entries
+        # with CI and developers (contract updater-buck2-default-isolation).
+        command = updater.buck2_command(Path("/checkout/tools/buck2"))
+        isolation = command.index("--isolation-dir")
+        self.assertEqual(command[isolation + 1], "v2")
+        self.assertNotEqual(updater.BUCK2_LEGACY_OUTPUT.name, updater.BUCK2_ISOLATION)
+        self.assertIn("/.buck-nsc.gcroot", updater.BUCK2_PRESERVED)
+
 
 class RemoteCacheFallback(unittest.TestCase):
     def test_enabled_cache_failure_retries_without_cache(self) -> None:

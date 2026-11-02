@@ -50,16 +50,21 @@ while a token is available from NAMESPACE_RBE_TOKEN,
 ~/.config/overalls/namespace-rbe-token.json, and MUST remove it otherwise, in
 --no-nix mode and under OVERALLS_BUCK2_REMOTE=off, so builds without a token
 stay local. It MUST restart the daemon when it switches, so buckd holds the
-token it expands. Where nsc is logged in it MUST take the cache and scheduler
-addresses from `nsc bazel setup -o json`, re-read at most hourly, over the
-committed ones, and MUST leave the include out, so the build runs locally,
-when a credential-free probe of the cache address, bounded at five seconds,
-gets a 404 or no answer (ADR-0276).
+token it expands. It MUST take the cache and scheduler addresses only from
+`nsc bazel setup --token` run with that token (the nsc on PATH, else the
+buckCells' pinned nsc derivation, realised on demand), looked up at most
+hourly and again, at most every five minutes, when the recorded cache
+address fails the probe; no address is committed. It MUST leave the include
+out, so the build runs locally (decision 7), when no address is known or when
+an authenticated REv2 GetCapabilities probe of the cache address, bounded at
+five seconds, does not answer HTTP 200 without a gRPC error (ADR-0276).
 
 @cc [owner:ghuntley,label:security] namespace-token-never-written
 The Namespace token MUST reach Buck2 only through the NAMESPACE_RBE_TOKEN
 environment variable, which tools/namespace.buckconfig names: never argv, the
-generated include, the Nix store or a log. tools/namespace-token-scan MUST
+generated include, the Nix store or a log. tools/buck2 MAY hand it to nsc and
+curl for the endpoint lookup and the cache probe only through pipes (a
+process-substitution file descriptor), never argv or a file on disk. tools/namespace-token-scan MUST
 fail, naming only files, when the token prefix appears in the include,
 buck-out's Buck2 logs, the daemon state under ~/.buck or a given file
 (ADR-0276).

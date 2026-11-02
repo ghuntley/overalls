@@ -72,7 +72,7 @@ with subtest("fixed candidate switches and records verified success"):
     host.succeed("test ! -e /var/lib/overalls-auto-update/checkouts")
     candidate = host.succeed("readlink /var/lib/overalls-auto-update/candidate").strip()
     reported = host.succeed(
-        "cat /var/lib/overalls-auto-update/checkout/buck-out/overalls-update/art/root/*/fleet/hosts/host/__deployment__/store-path"
+        "cat /var/lib/overalls-auto-update/checkout/buck-out/v2/art/root/*/fleet/hosts/host/__deployment__/store-path"
     ).strip()
     assert candidate == reported, (candidate, reported)
     no_buck2_daemon()

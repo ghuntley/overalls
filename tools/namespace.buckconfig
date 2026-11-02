@@ -2,11 +2,10 @@
 # includes this file, through the untracked .buck-remote.buckconfig, only
 # while NAMESPACE_RBE_TOKEN is set; Buck2 expands the variable from the
 # daemon's environment, so the token is never written to a file or argv.
-# Endpoints are bare host:port: Buck2 rejects a grpcs:// scheme.
+# The engine, action cache and CAS addresses are not committed: Namespace
+# rotates them, so tools/buck2 looks them up with the token (`nsc bazel setup
+# --token`) and writes them into the include beside this file. Endpoints are
+# bare host:port: Buck2 rejects a grpcs:// scheme.
 [buck2_re_client]
-  engine_address = reapih-2ps0pgjfsnp5o.iad4.namespaced.app:443
-  action_cache_address = storageh-p94hq2l163e92.iad4.namespaced.app:443
-  cas_address = storageh-p94hq2l163e92.iad4.namespaced.app:443
   tls = true
   http_headers = x-nsc-ingress-auth:Bearer $NAMESPACE_RBE_TOKEN
-

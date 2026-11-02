@@ -18,6 +18,10 @@ let
     exit 1
   '';
   noNix = import ./no-nix.nix { inherit pkgs buck2; };
+  # The pinned Namespace CLI (ADR-0276), as a derivation only: tools/buck2
+  # realises it where no nsc is on PATH, to resolve the cache endpoints. It
+  # stays out of cells_id and of the worker image, which leaves out .drv files.
+  nscDrv = builtins.unsafeDiscardOutputDependency (import ./nsc.nix { inherit pkgs; }).drvPath;
   python = import ./python.nix { inherit pkgs; };
   # The one Rust toolchain (ADR-0273), shared with the Nix builds and devenv.
   rust = (import ../rust-toolchain.nix { inherit pkgs; }).toolchain;
@@ -213,6 +217,8 @@ pkgs.runCommandLocal "overalls-buck-cells" { } (''
   ln -s ${rustCellPath} "$out/rust"
   tar -xzf ${buck2.prelude} -C "$out/prelude" --strip-components=1
   cp ${buckconfig} "$out/toolchains.buckconfig"
+'' + lib.optionalString (fixture == null && hermeticHost) ''
+  echo ${nscDrv} > "$out/nsc.drv"
 '' + lib.optionalString withMix ''
   # [mix] is the last section, so the closure computed at build time joins it.
   chmod u+w "$out/toolchains.buckconfig"

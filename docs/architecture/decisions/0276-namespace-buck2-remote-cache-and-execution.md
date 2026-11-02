@@ -91,6 +91,40 @@ chose on 2026-10-31. Observed facts:
      the cache address without credentials, bounded at five seconds and
      remembered for ten minutes. A 404 or no answer turns the cache off for
      that build, which then runs locally (decision 7).
+
+   Corrected on 2026-11-02 (endpoints and probe; the decision is unchanged):
+   - **Endpoints from the token.** The committed addresses left hosts and
+     GitHub-hosted runners without the cache: Namespace rotates the bearer
+     ingress hosts far more often than it recreates the cluster
+     (`nsc bazel setup` named four storage hosts within hours, while the
+     cache contents persisted), so the Panterloons updater built
+     `panterloons:deployment` with 0% hits every attempt (509 local actions,
+     about 2 h of CPU) and mila-builds' GitHub-hosted jobs did the same (run
+     41335763927). `nsc bazel setup --token <file>`, Namespace's documented
+     non-interactive form, returns the current endpoints for the tenant token
+     with no login. `tools/buck2` now always looks them up that way, with the
+     token handed to nsc on a pipe, at most hourly and again (at most every
+     five minutes) when the recorded address fails the probe. It runs the nsc
+     on `PATH` where there is one, and otherwise the release pinned in
+     `nix/buck/nsc.nix` (registry key `nscLinuxAmd64`), which `buckCells`
+     carries as a derivation only and `tools/buck2` realises on first use, so
+     neither `cells_id` nor the worker image changes. No address is committed
+     any more: without a lookup the build runs locally.
+   - **The probe authenticates.** A credential-free GET cannot tell a live
+     ingress from a dead one. The probe is now an REv2 `GetCapabilities`
+     call carrying the bearer header (through a pipe, never argv); only HTTP
+     200 without a gRPC error counts as live. 404 (a rotated or recreated
+     host), 401 or 403 (a rejected token) and no answer turn the cache off
+     for that build (decision 7).
+   - **Hosts share action keys.** Even against a live endpoint the updater
+     shared no entry with CI or developers: Buck2 writes outputs under
+     `buck-out/<isolation-dir>/`, those paths are in every action key, and
+     the updater used `--isolation-dir overalls-update` while everyone else
+     uses the default `v2`. The updater now uses `v2`; its private `HOME`
+     already keeps its daemon apart (contract
+     `updater-buck2-default-isolation`), and it removes the old
+     `buck-out/overalls-update` once. Decision 2 of ADR-0271 (one fixed
+     checkout and isolation directory) is unchanged.
 5. **What stays local.** As in ADR-0272:
    - `local_only` actions never upload;
    - Nix imports, NixOS assembly, machine tests, test commands and the
@@ -253,14 +287,47 @@ Elixir rules (M6) are not on trunk yet.
   - [runtime.py](../../../nix/domains/system/auto-update/runtime.py) logs
     `update.namespace_cache`, uploads under Namespace and retries with
     `OVERALLS_BUCK2_REMOTE=off`.
+- **Host lookup and isolation, measured on Panterloons, 2026-11-02.** A fresh
+  clone at 5e6fe66f0 (CI run 41361181004 built `panterloons:deployment` there
+  with `Cache hits: 93%`, `Commands: 509 (cached: 475, remote: 0,
+  local: 34)`), built as the updater does: a non-root user, no `nsc` on
+  `PATH`, a copy of the fleet token in `NAMESPACE_RBE_TOKEN`, a private
+  `HOME`, the updater's `.buckconfig.local` (`remote_execution = false`) and
+  `-c overalls.revision=<rev>`, target `//fleet/hosts/panterloons:deployment[drv]`.
+
+  | Build | Wall time | Commands |
+  | --- | --- | --- |
+  | 1. This change, lookup through the pinned nsc, `--isolation-dir overalls-update` | 16 min 52 s | 509: cached 0, remote 0, local 509 |
+  | 2. The same tree and lookup, `--isolation-dir v2` | 2 min 44 s | 509: cached 43, remote 0, local 466 |
+  | 3. The trunk tree (cells as CI built them), old wrapper reading the looked-up endpoints, `v2` | under 2 min | 509: cached 475, remote 0, local 34 |
+  | 4. This change, fresh `buck-out`, no recorded endpoints, `v2` | 1 min 9 s | 509: cached 475, remote 0, local 34 |
+
+  - The lookup realised the pinned nsc into `.buck-nsc.gcroot`, resolved
+    `storageh-p46fu1miao5am`, and the authenticated probe answered 200. The
+    old, rotated `storageh-p94hq2l163e92` answers 404, and a wrong token 401.
+  - The 34 local actions are the `local_only` `nix_store_import` (33) and
+    `nix_assemble_drv` (1) actions.
+  - Rows 1 and 2 differ only in the isolation directory: under
+    `overalls-update` not even the `mix_release`, `go_build` and
+    `lyra_cross` entries CI uploaded were found.
+  - Changing the `buckCells` output (here, adding `nsc.drv`) changed 433 of
+    the 508 action digests, the Rust actions among them, although
+    `cells_id` stayed the same (the `-c overalls.revision` flag changed
+    one). That is the rest of row 2's misses, and row 4 also reads the
+    entries that row 2 uploaded; row 3 is the like-for-like comparison with
+    CI. CI rewarms those entries for everyone after this change lands.
+  - `tools/namespace-token-scan` found no token in the clone's Buck2 files.
 - **CI.** [ci.yml](../../../.github/workflows/ci.yml),
   [nixos-machine-tests.yml](../../../.github/workflows/nixos-machine-tests.yml)
   and the source-bundle, windows-ffi and journey-fixture jobs of
   [mila-builds.yml](../../../.github/workflows/mila-builds.yml) set
-  `NAMESPACE_RBE_TOKEN` from the secret. GitHub-hosted runners have no `nsc`
-  to resolve the live endpoints, so the KVM journey jobs there hold no token:
-  they substitute the journey-fixture job's store path from Cachix and build
-  locally only when it is missing (run 41335763927 had 0% cache hits). The
+  `NAMESPACE_RBE_TOKEN` from the secret. The GitHub-hosted KVM journey jobs
+  substitute the journey-fixture job's store path from Cachix; until
+  2026-11-02 they had no `nsc` to resolve the live endpoints and their local
+  fallback had 0% cache hits (run 41335763927). Their fallback step now holds
+  the token with `OVERALLS_BUCK2_REMOTE_EXECUTION=off`, resolves the
+  endpoints through the pinned nsc and runs `tools/namespace-token-scan`
+  (not yet observed in a run). The
   NativeLink `buck-re` action and its script are removed, and so, on
   2026-11-01, is ci.yml's dangling step that still named the action and the
   `BUCK_RE_*` secrets.
@@ -355,8 +422,16 @@ Remaining gaps:
   (see Open questions).
 - Namespace offers no bound or idle timeout for workers, and actions wait in
   its queue, without falling back, while the 64-vCPU cap is full.
-- Hosts have no `nsc` login, so they rely on the committed endpoints and
-  lose the cache, not the build, when Namespace recreates the cluster.
+- Endpoint lookup depends on Namespace's API and on GitHub for the first
+  fetch of the pinned nsc; when either fails the build runs locally with the
+  last recorded endpoints, or without the cache. The pinned nsc exists only
+  for x86_64-linux cells; aarch64-darwin clients need an nsc on `PATH`.
+- No recorded host update has yet run with the lookup or the `v2`
+  isolation; the evidence is the updater-equivalent build below. The new
+  runtime takes effect on a host only after it deploys this change.
+- The `nix_store_import` and `nix_assemble_drv` actions of a deployment are
+  `local_only` and stay local; the full `:deployment` realisation (about
+  130 GiB of guest images) was not rerun for this measurement.
 - No machine test exercises the Namespace path (see Open questions).
 
 ## Open questions

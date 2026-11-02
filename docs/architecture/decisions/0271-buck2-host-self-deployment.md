@@ -110,7 +110,12 @@ M10 (2026-10-30) implements decision 3.
     executable bits. Before that fix, Susan's dependency source hash forked.
 - **Updater.** In [runtime.py](../../../nix/domains/system/auto-update/runtime.py),
   `Deployment.build` checks out the candidate at the fixed `checkout` path.
-  It then runs the candidate's `tools/buck2 --isolation-dir overalls-update build -c overalls.revision=<rev> //fleet/hosts/<host>:deployment --show-full-output`.
+  It then runs the candidate's `tools/buck2 --isolation-dir v2 build -c overalls.revision=<rev> //fleet/hosts/<host>:deployment --show-full-output`.
+  - Corrected on 2026-11-02: the isolation directory was `overalls-update`
+    until then. Buck2 names it in every output path and so in every action
+    key, which kept hosts from sharing the remote cache with CI and
+    developers ([ADR-0276](0276-namespace-buck2-remote-cache-and-execution.md)).
+    The private `HOME` keeps the daemon apart.
   - It validates the single reported `store-path`, roots that path and
     activates exactly it.
   - If the wrapper is missing or cannot start, the attempt fails closed as

@@ -17,51 +17,87 @@ state=.buck-cells.key
 # tools/namespace.buckconfig reads the bearer token from the daemon's
 # environment, so the token never enters a file, argv or the Nix store. It is
 # included through the untracked .buck-remote.buckconfig only while a token is
-# available; otherwise, or with OVERALLS_BUCK2_REMOTE=off, builds stay local.
+# available and the looked-up cache serves it; otherwise, or with
+# OVERALLS_BUCK2_REMOTE=off, builds stay local (decision 7).
 remote_include=.buck-remote.buckconfig
 # Namespace's cluster endpoints name its scheduler and storage instances, and
-# change whenever Namespace recreates the cluster. Where nsc is logged in,
-# they are re-read at most hourly (`nsc bazel setup` also recreates a missing
-# cluster) into this untracked file; elsewhere the addresses committed in
-# tools/namespace.buckconfig apply, and a stale one only costs the cache.
+# Namespace rotates them often (four storage hosts within hours on
+# 2026-11-02) while the cache contents persist, so no committed address stays
+# valid. They are looked up with the token itself (`nsc bazel setup --token`,
+# Namespace's documented non-interactive form, which also recreates a missing
+# cluster) at most hourly into this untracked file, which keeps the last
+# answer when a lookup fails. The nsc on PATH serves where there is one
+# (Namespace runners, developers); elsewhere (fleet hosts, GitHub-hosted
+# runners) the cells name the pinned one (nix/buck/nsc.nix), realised under
+# .buck-nsc.gcroot on first use.
 remote_endpoints=.buck-remote.endpoints
-# Whether the cache endpoint answers. A recreated cluster leaves the old
-# address answering 404, and Buck2 then retries every action's capability
-# query instead of building, so a dead endpoint turns the cache off for this
-# build. Any other answer (401 without credentials) counts as alive. The
-# result is kept for ten minutes in an untracked file; the probe itself sends
-# no credentials and is bounded at five seconds.
+remote_nsc_root=.buck-nsc.gcroot
+# Whether the cache endpoint serves this token: an REv2 GetCapabilities call
+# with the bearer header, bounded at five seconds, must answer HTTP 200
+# without a gRPC error. A rotated-away or recreated cluster answers 404, a
+# rejected token 401, and an unreachable one nothing; against any of them
+# Buck2 retries every action's capability query instead of building, so the
+# cache is turned off for this build. The token reaches curl through a
+# process-substitution header file, never argv. The answer is kept for ten
+# minutes in an untracked file, as `<host> <ok|dead|denied> <code>`.
 remote_probe_file=.buck-remote.probe
+remote_probe_code=
 remote_alive() {
-  local host=${1%:*} cached code
+  local host=$1 cached state code line status=
+  remote_probe_code=
   if [[ -e "$remote_probe_file" && -z "$(find "$remote_probe_file" -mmin +10 2>/dev/null)" ]]; then
-    read -r cached code < "$remote_probe_file" 2>/dev/null || true
-    if [[ "$cached" == "$host" ]]; then
-      [[ "$code" == ok ]]
+    read -r cached state code < "$remote_probe_file" 2>/dev/null || true
+    if [[ "$cached" == "$host" && -n "$state" ]]; then
+      remote_probe_code=$code
+      [[ "$state" == ok ]]
       return
     fi
   fi
+  local url="https://$host/build.bazel.remote.execution.v2.Capabilities/GetCapabilities"
   if command -v curl >/dev/null; then
-    code=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "https://$host/" 2>/dev/null || true)
+    # -D - writes the response headers and gRPC trailers, then -w the code.
+    code=
+    while IFS= read -r line; do
+      line=${line%$'\r'}
+      if [[ "$line" =~ ^[Gg]rpc-[Ss]tatus:\ *([0-9]+) ]]; then status=${BASH_REMATCH[1]}; fi
+      if [[ "$line" =~ ^code=([0-9]+)$ ]]; then code=${BASH_REMATCH[1]}; fi
+    done < <(printf '\0\0\0\0\0' | curl -s --max-time 5 -o /dev/null -D - -w 'code=%{http_code}\n' \
+      -X POST -H 'content-type: application/grpc' -H 'te: trailers' \
+      -H @<(printf 'x-nsc-ingress-auth: Bearer %s\n' "$NAMESPACE_RBE_TOKEN") \
+      --data-binary @- "$url" 2>/dev/null || true)
   elif command -v python3 >/dev/null; then
-    code=$(python3 -I -c '
-import sys, urllib.error, urllib.request
+    # urllib speaks HTTP/1.1, which Namespace's ingress also answers.
+    local answer
+    answer=$(python3 -I -c '
+import os, sys, urllib.error, urllib.request
+request = urllib.request.Request(sys.argv[1], data=bytes(5), method="POST", headers={
+    "content-type": "application/grpc",
+    "x-nsc-ingress-auth": "Bearer " + os.environ.get("NAMESPACE_RBE_TOKEN", ""),
+})
 try:
-    urllib.request.urlopen("https://" + sys.argv[1] + "/", timeout=5)
-    print(200)
+    with urllib.request.urlopen(request, timeout=5) as response:
+        print(response.status, response.headers.get("grpc-status", ""))
 except urllib.error.HTTPError as error:
-    print(error.code)
+    print(error.code, "")
 except Exception:
-    print("000")
-' "$host" 2>/dev/null || true)
+    print("000", "")
+' "$url" 2>/dev/null || true)
+    read -r code status <<<"$answer"
   else
     return 0
   fi
-  if [[ -z "$code" || "$code" == 000 || "$code" == 404 ]]; then
-    printf '%s dead\n' "$host" > "$remote_probe_file"
-    return 1
+  code=${code:-000}
+  remote_probe_code=$code
+  if [[ "$code" == 200 && ( -z "$status" || "$status" == 0 ) ]]; then
+    printf '%s ok %s\n' "$host" "$code" > "$remote_probe_file"
+    return 0
   fi
-  printf '%s ok\n' "$host" > "$remote_probe_file"
+  if [[ "$code" == 401 || "$code" == 403 ]]; then
+    printf '%s denied %s\n' "$host" "$code" > "$remote_probe_file"
+  else
+    printf '%s dead %s\n' "$host" "$code" > "$remote_probe_file"
+  fi
+  return 1
 }
 # Pure-bash line matching: the host updater runs this script with a fixed
 # PATH that has coreutils and findutils but no sed or awk (ADR-0271).
@@ -76,22 +112,49 @@ first_match() {
   done
   return 0
 }
-remote_resolve() {
-  command -v nsc >/dev/null || return 0
-  if [[ -e "$remote_endpoints" && -z "$(find "$remote_endpoints" -mmin +60 2>/dev/null)" ]]; then
+# The nsc to run: PATH's, else the cells' pinned one, realised on demand.
+remote_nsc() {
+  if command -v nsc >/dev/null; then
+    printf 'nsc\n'
     return 0
   fi
-  local json engine storage
-  # An empty file records a failed lookup (nsc not logged in), so the next
-  # attempt waits an hour too.
-  : > "$remote_endpoints"
-  json=$(timeout 30 nsc bazel setup -o json 2>/dev/null </dev/null) || return 0
-  engine=$(first_match '"scheduler_endpoint": *"grpcs://reapi-([^":]*):[0-9]*"' <<<"$json")
-  storage=$(first_match '"storage_endpoint": *"grpcs://storage-([^":]*):[0-9]*"' <<<"$json")
-  engine=${engine:+reapih-$engine:443}
-  storage=${storage:+storageh-$storage:443}
+  local drv
+  [[ -r .buck-cells/nsc.drv ]] || return 0
+  drv=$(<.buck-cells/nsc.drv)
+  [[ "$drv" == /nix/store/*.drv ]] || return 0
+  nix-store --add-root "$remote_nsc_root" --realise "$drv" >/dev/null 2>&1 </dev/null || return 0
+  [[ -x "$remote_nsc_root/bin/nsc" ]] && printf '%s\n' "$root/$remote_nsc_root/bin/nsc"
+  return 0
+}
+remote_resolved=
+remote_resolve() {
+  if [[ "${1:-}" != force && -e "$remote_endpoints" && -z "$(find "$remote_endpoints" -mmin +60 2>/dev/null)" ]]; then
+    return 0
+  fi
+  local json engine storage nsc
+  # Mark the attempt, keeping the last answer: a failed lookup waits too.
+  touch "$remote_endpoints"
+  remote_resolved=1
+  nsc=$(remote_nsc)
+  [[ -n "$nsc" ]] || return 0
+  # nsc reads the token as {"bearer_token": ...} from a pipe; it must need no
+  # JSON escaping.
+  [[ "$NAMESPACE_RBE_TOKEN" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || return 0
+  json=$(timeout 60 "$nsc" bazel setup --token /dev/fd/3 -o json \
+    3< <(printf '{"bearer_token":"%s"}\n' "$NAMESPACE_RBE_TOKEN") 2>/dev/null </dev/null) || return 0
+  # The token form names the public bearer-token hosts (reapih-, storageh-);
+  # an mTLS login names reapi- and storage-, whose h twins take the header.
+  engine=$(first_match '"scheduler_endpoint": *"grpcs://reapih?-([^":]*):[0-9]*"' <<<"$json")
+  storage=$(first_match '"storage_endpoint": *"grpcs://storageh?-([^":]*):[0-9]*"' <<<"$json")
   if [[ -n "$engine" && -n "$storage" ]]; then
-    printf '%s %s\n' "$engine" "$storage" > "$remote_endpoints"
+    printf 'reapih-%s:443 storageh-%s:443\n' "$engine" "$storage" > "$remote_endpoints"
+  fi
+}
+remote_off() {
+  unset NAMESPACE_RBE_TOKEN
+  if [[ -e "$remote_include" ]]; then
+    remote_restart
+    rm -f "$remote_include"
   fi
 }
 remote_config() {
@@ -106,30 +169,32 @@ remote_config() {
   fi
   if [[ "$1" == on && "${OVERALLS_BUCK2_REMOTE:-on}" != off && -n "${NAMESPACE_RBE_TOKEN:-}" ]]; then
     export NAMESPACE_RBE_TOKEN
-    local wanted='<file:tools/namespace.buckconfig>' engine storage
+    local wanted='<file:tools/namespace.buckconfig>' engine= storage=
     remote_resolve
-    if ! read -r engine storage 2>/dev/null < "$remote_endpoints" || [[ -z "$storage" ]]; then
-      storage=$(first_match '^  cas_address = (.*)$' < tools/namespace.buckconfig)
-    fi
-    if ! remote_alive "$storage" && [[ -s "$remote_endpoints" ]]; then
-      # The cluster may have been recreated within the hour: look it up again.
-      rm -f "$remote_endpoints" "$remote_probe_file"
-      remote_resolve
-      read -r engine storage 2>/dev/null < "$remote_endpoints" || true
-      [[ -n "$storage" ]] || storage=$(first_match '^  cas_address = (.*)$' < tools/namespace.buckconfig)
-    fi
-    if ! remote_alive "$storage"; then
-      echo "tools/buck2: the Namespace cache at $storage does not answer; building locally without it (ADR-0276 decision 7)." >&2
-      unset NAMESPACE_RBE_TOKEN
-      if [[ -e "$remote_include" ]]; then
-        remote_restart
-        rm -f "$remote_include"
+    read -r engine storage 2>/dev/null < "$remote_endpoints" || true
+    if [[ -z "$storage" ]] || ! remote_alive "$storage"; then
+      # Rotated since the last lookup: look again, at most every five minutes.
+      if [[ -z "$remote_resolved" && -n "$(find "$remote_endpoints" -mmin +5 2>/dev/null)" ]]; then
+        remote_resolve force
+        engine= storage=
+        read -r engine storage 2>/dev/null < "$remote_endpoints" || true
       fi
+    fi
+    if [[ -z "$storage" ]]; then
+      echo "tools/buck2: no Namespace cache endpoint (nsc could not look one up); building locally without it (ADR-0276 decision 7)." >&2
+      remote_off
       return 0
     fi
-    if [[ -s "$remote_endpoints" ]]; then
-      wanted+=$'\n[buck2_re_client]\n  engine_address = '"$engine"$'\n  action_cache_address = '"$storage"$'\n  cas_address = '"$storage"
+    if ! remote_alive "$storage"; then
+      if [[ "$remote_probe_code" == 401 || "$remote_probe_code" == 403 ]]; then
+        echo "tools/buck2: the Namespace cache at $storage rejects the token (HTTP $remote_probe_code); building locally without it (ADR-0276 decision 7)." >&2
+      else
+        echo "tools/buck2: the Namespace cache at $storage does not answer (HTTP ${remote_probe_code:-000}); building locally without it (ADR-0276 decision 7)." >&2
+      fi
+      remote_off
+      return 0
     fi
+    wanted+=$'\n[buck2_re_client]\n  engine_address = '"$engine"$'\n  action_cache_address = '"$storage"$'\n  cas_address = '"$storage"
     # The worker image for these cells, when tools/namespace-re-image has
     # recorded one: its digest joins every action's properties, so every
     # client on these cells shares action keys. Remote execution is then the
@@ -158,11 +223,7 @@ remote_config() {
       printf '%s\n' "$wanted" > "$remote_include"
     fi
   else
-    unset NAMESPACE_RBE_TOKEN
-    if [[ -e "$remote_include" ]]; then
-      remote_restart
-      rm -f "$remote_include"
-    fi
+    remote_off
   fi
 }
 # The include is ignored by the file watcher, and the daemon keeps the

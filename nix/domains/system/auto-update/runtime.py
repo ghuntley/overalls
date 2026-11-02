@@ -30,8 +30,22 @@ BUCK2_HOME = STATE / "buck2-home"
 # Buck2 Nix rules root their outputs here, in the root-owned state directory,
 # rather than in the checkout or the invoking user's home.
 BUCK2_GCROOTS = STATE / "gcroots"
-BUCK2_ISOLATION = "overalls-update"
-BUCK2_PRESERVED = ["/buck-out", "/.buck-cells", "/.buck-cells.key", "/.buck-cells.gcroot"]
+# @cc [owner:ghuntley,label:deployment;build] updater-buck2-default-isolation
+# The updater's isolation directory MUST be Buck2's default, `v2`. Buck2 names
+# it in every output path (buck-out/<isolation>/...), and those paths are part
+# of every action key, so any other name shares no Namespace cache entry with
+# CI and developers: under `overalls-update` every host build missed (ADR-0276).
+# The private HOME, not the isolation name, keeps the updater's buckd apart.
+BUCK2_ISOLATION = "v2"
+# buck-out of the earlier `overalls-update` isolation, removed once.
+BUCK2_LEGACY_OUTPUT = CHECKOUT / "buck-out" / "overalls-update"
+BUCK2_PRESERVED = [
+    "/buck-out",
+    "/.buck-cells",
+    "/.buck-cells.key",
+    "/.buck-cells.gcroot",
+    "/.buck-nsc.gcroot",
+]
 # @cc [owner:ghuntley,label:deployment;recovery] updater-remote-cache-read-only
 # The updater's Buck2 configuration MUST always refuse remote execution,
 # whatever the candidate's committed .buckconfig contains (ADR-0271). It
@@ -547,6 +561,7 @@ class Deployment:
         timeout = self.config["buildTimeout"]
         # A daemon started by anyone else could carry another environment.
         self.stop_buck2()
+        shutil.rmtree(BUCK2_LEGACY_OUTPUT, ignore_errors=True)
         try:
             try:
                 # Realises the candidate's pinned cells and starts nothing.

@@ -113,6 +113,11 @@ in
     closure = let kits = import ../../buck/no-nix.nix { inherit pkgs; inherit (pkgs) buck2; };
       in closureOf "buck2-no-nix" [ kits.linux kits.windows ];
   };
+  namespace-cli = {
+    locks = [ "nix/buck/nsc.nix" ];
+    keys = [ "nscLinuxAmd64" ];
+    closure = import ../../buck/nsc.nix { inherit pkgs; };
+  };
   libhegel = {
     locks = [ "nix/verification/hegel/libhegel.nix" "flake.lock" ];
     keys = [ "libhegelSource" "libhegelCargo" ];

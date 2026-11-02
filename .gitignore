@@ -33,6 +33,7 @@ erl_crash.dump
 .buck-remote.buckconfig
 .buck-remote.endpoints
 .buck-remote.probe
+.buck-nsc.gcroot
 buck-out/
 .buckconfig.local
 

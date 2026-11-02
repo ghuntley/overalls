@@ -337,13 +337,17 @@ which have been removed from the repository.
   `.buckconfig` includes optionally, and exports the token for buckd; the
   tracked config expands `$NAMESPACE_RBE_TOKEN` in its `http_headers`.
   Without one, or with `OVERALLS_BUCK2_REMOTE=off`, it removes the include and
-  builds stay local. Switching restarts the daemon. Namespace's addresses
-  name the cluster's instances and change when Namespace recreates it; where
-  `nsc` is logged in, the wrapper re-reads them hourly into the untracked
-  `.buck-remote.endpoints` (delete it to force a re-read), otherwise the
-  committed ones in `tools/namespace.buckconfig` apply. A dead address
-  (404 or no answer to a five-second probe, remembered in
-  `.buck-remote.probe` for ten minutes) turns the cache off for the build
+  builds stay local. Switching restarts the daemon. Namespace rotates its
+  cache and scheduler addresses often, so none is committed: the wrapper
+  looks them up with the token (`nsc bazel setup --token`, token on a pipe)
+  hourly into the untracked `.buck-remote.endpoints` (delete it to force a
+  lookup), and again when the recorded address fails the probe. It runs the
+  `nsc` on `PATH`, else the cells' pinned one (`nix/buck/nsc.nix`, realised
+  into `.buck-nsc.gcroot`), so hosts and GitHub-hosted runners need no login.
+  The probe is an authenticated `GetCapabilities` call bounded at five
+  seconds and remembered in `.buck-remote.probe` for ten minutes; anything
+  but HTTP 200 with `grpc-status: 0` (404 rotated host, 401 rejected token,
+  no answer), or no endpoint at all, turns the cache off for the build
   instead of letting Buck2 retry forever.
 - **Nested daemons.** A test that runs `.buck-cells/bin/buck2` itself sees
   the checkout's include but not the token (test environments do not carry
@@ -365,8 +369,8 @@ which have been removed from the repository.
   `update.remote_cache` `fallback`).
 - **CI.** ci.yml's Buck2 jobs and nixos-machine-tests.yml set
   `NAMESPACE_RBE_TOKEN` from the repository secret; mila-builds.yml sets it
-  only on the hermetic source-bundle job. Forks get no secret and build
-  locally.
+  on its hermetic Namespace jobs and, cache-only, on the GitHub-hosted
+  journey jobs' fixture fallback. Forks get no secret and build locally.
 - **Rotation and revocation.** See `secrets/README.md` (`nsc bazel
   create-token`, `overalls-secrets encrypt fleet-namespace --replace`,
   `nsc token revoke`).
