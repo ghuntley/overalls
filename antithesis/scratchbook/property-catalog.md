@@ -8,7 +8,7 @@ scope_answer: "Repository only (Recommended)"
 
 # Property catalog
 
-This catalog synthesizes 113 source-grounded candidates into 104 canonical properties. The current as-of [assertion scan](existing-assertions.md) records 164 authored callsites and 30 primary catalog messages; the source is moving and no hosted baseline or mutation result is claimed. Source contracts and ADRs state intended behavior to test; a timeout or lost reply is an unproven effect until independently reconciled.
+This catalog synthesizes 113 source-grounded candidates into 107 canonical properties. The current as-of [assertion scan](existing-assertions.md) records 164 authored callsites and 30 primary catalog messages; the source is moving and no hosted baseline or mutation result is claimed. Source contracts and ADRs state intended behavior to test; a timeout or lost reply is an unproven effect until independently reconciled.
 
 Each entry gives one primary SDK assertion with a unique literal message. Evidence files retain source paths, independent oracles, value menus, environment limits, and any supplementary branch or progress assertions. P0/P1 and confidence rate importance and source grounding, not passing execution.
 
@@ -2270,3 +2270,47 @@ These properties compare actual Restic publication and isolated target markers u
 
 - Can a scoped clock fault step the coordinator backward while Restic and TLS S3 remain healthy? `(partial: source exposes independent time samples; no actual clock-step campaign)`
 - Does an actual backward-step capture reach a tag-visible point, or does an earlier check refuse it?
+
+### android-display-stream-generation-and-frame-bounds — Android display stream generation and frame bounds
+
+| | |
+|---|---|
+| **Type** | Safety (`Always` primary) |
+| **Priority / Confidence / Status** | P1 / source-grounded / new; hosted unexecuted |
+| **Property** | Android display data and input frames are bounded, and stale-generation data cannot be decoded or forwarded after a guest/display generation changes. |
+| **Invariant** | `Always` with planned message **"Android display stream rejects stale generations and oversized frames before forwarding"**; accepted frames must match the expected generation and configured byte limit. |
+| **Antithesis Angle** | Race display reconnect/generation replacement with delayed old frames, malformed length prefixes, and payloads at or above the 262,144-byte data limit or 4,096-byte input limit. |
+| **Why It Matters** | A stale frame can expose a prior guest session, while an unchecked length can exhaust relay/browser/guest memory. |
+| **Evidence** | [Source and oracle](properties/android-display-stream-generation-and-frame-bounds.md); `protocol/lib/overalls_protocol/android_display_stream.ex:1-58`, `lilly/test/network/android_display_test.exs:1-26`. |
+
+**Open Questions:**
+
+- Which production relay/guest boundary consumes these protocol frames, and can an independent fixture observe forwarding without trusting the decoder itself? `(partial: codec and target selection are source-backed; end-to-end relay fixture is absent)`
+
+### team-transfer-consent-preserves-single-owner — Team transfer consent preserves a single owner
+
+| **Priority** | P0 (security and authorization integrity) |
+|---|---|
+| **Property** | Concurrent team transfer and account lifecycle operations never leave an active team with zero or multiple owners; only the designated target can accept, terminal transfer states remain immutable, and acceptance atomically swaps owner/admin roles. |
+| **Invariant** | `Always` over committed team membership and transfer rows: exactly one active owner per active team and no terminal-state transition. `Reachable` records a successful accepted transfer; `Sometimes` records progress after a healed concurrent race. Planned literal SDK message: **"Team transfer concurrency preserves exactly one owner and immutable terminal state"**. |
+| **Antithesis Angle** | Race offer/accept/decline/cancel with duplicate requests, membership removal and account retirement; delay or kill between state transition and receipt/event scheduling; independently reconcile PostgreSQL rows, history and audit receipts. |
+| **Why It Matters** | Ownership is authorization for every team-scoped resource. A split-brain owner or ownerless team can grant or strand administrative authority. |
+| **Evidence** | [Source, scenario and oracle](properties/team-transfer-consent-preserves-single-owner.md); `Marshall.Teams.Transfer` and `Marshall.Teams.Coordinator`. |
+| **Open Questions** | `[needs human input]` Retirement semantics for a pending target; `[partial: source tests]` no concurrent transfer/retirement fault schedule or hosted Antithesis oracle. |
+
+### bootstrap-setup-complete-single-owner — Bootstrap setup complete is single-owner and live
+
+| | |
+|---|---|
+| **Type** | Safety plus liveness (`Always` primary, `Sometimes` post-marker liveness) |
+| **Priority / Confidence / Status** | P1 / source-grounded / new; workload unimplemented |
+| **Property** | Every selected profile emits one setup marker only after independent readiness and keeps its bootstrap owner alive without implicit restart. |
+| **Invariant** | `Always` joins marker ordering and cardinality to probe evidence; `Reachable` records successful setup; `Sometimes` requires post-marker owner liveness after a controlled fault. |
+| **Antithesis Angle** | Fault a required endpoint before readiness, signal/restart the owner after readiness, and reconcile markers with process identity and Compose restart events. |
+| **Why It Matters** | Duplicate or premature setup markers can let workloads race an unready SUT; silent owner restart can invalidate all subsequent observations. |
+| **Evidence** | [Source and oracle](properties/bootstrap-setup-complete-single-owner.md); `antithesis/workload/core/bootstrap.py:94-105`. |
+
+**Open Questions:**
+
+- Can the hosted harness observe Compose restart policy and process identity without turning an intentional scenario restart into a duplicate marker? `(partial: hosted process-lifetime witness is unrun)`
+- Which profiles and quiet intervals define post-marker liveness? `(partial: profile-specific intervals are not standardized)`

@@ -9,7 +9,7 @@ scope_answer: "Repository only (Recommended)"
 # Fresh-context research self-review
 
 This review applies every `antithesis-research` self-review criterion to the
-current 104-row scratchbook. It also reads the nine gap briefs, merge map,
+current 107-row scratchbook. It also reads the nine gap briefs, merge map,
 action queue, template roster, per-property evidence and question-resolution
 records as needed. I checked the current [as-of assertion
 inventory](../existing-assertions.md), its source-hashed roster snapshot, and
@@ -31,8 +31,8 @@ not system facts. The retired harness and history were excluded.
   why optional satellites, guest/storage TCG, recorder and native campaigns are
   selected. It separates application concurrency over one PostgreSQL primary
   from database HA and TCG from KVM/Firecracker proof.
-- Catalog, evidence and roster contain exactly 104 unique kebab-case IDs;
-  there are 104 matching evidence files, no orphans, 104 unique planned primary
+- Catalog, evidence and roster contain exactly 107 unique kebab-case IDs;
+  there are 107 matching evidence files, no orphans, 107 unique planned primary
   messages and no unknown relationship slug. Categories, priorities,
   assertion-kind rationale, fault angles, proof boundaries, independent
   witnesses and explicit unexercised status are present. The relationship file
@@ -64,7 +64,7 @@ not system facts. The retired harness and history were excluded.
 ## Current assertion and execution evidence
 
 The [inventory](../existing-assertions.md) records **162 authored SDK
-callsites and 30 of 104 catalog primary literals** in its dated snapshot.
+callsites and 30 of 107 catalog primary literals** in its dated snapshot.
 The companion roster records each source hash; the fresh scanner found no
 duplicate literal or primary-kind mismatch. Other authored messages are
 support, startup or additional checks; source presence does not establish a

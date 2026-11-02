@@ -8,7 +8,7 @@ scope_answer: "Repository only (Recommended)"
 
 # Property evaluation synthesis
 
-The four cold lenses reviewed the initial 75-property catalog against the SUT analysis, deployment topology, assertion scan and selected evidence. Their findings plus one subsequent source-traced topology constraint collapse into nine targeted discovery briefs, 14 catalog edit proposals, nine implementation prerequisites and two genuine policy questions in [the action queue](action-queue.json). The [template roster](template-roster.json) maps every current property ID to a proposed hosted/native proof boundary. These are review outputs and implementation plans: the catalog and evidence now include the completed per-property question investigations and 29 distinct gap properties. The moving shared worktree now has authored checks for a subset of catalog properties; the exact as-of callsites and source hashes are in [the assertion inventory](../existing-assertions.md). No hosted catalog baseline or mutant result exists.
+The four cold lenses reviewed the initial 75-property catalog against the SUT analysis, deployment topology, assertion scan and selected evidence. Their findings plus one subsequent source-traced topology constraint collapse into nine targeted discovery briefs, 14 catalog edit proposals, nine implementation prerequisites and two genuine policy questions in [the action queue](action-queue.json). The [template roster](template-roster.json) maps every current property ID to a proposed hosted/native proof boundary. These are review outputs and implementation plans: the catalog and evidence now include the completed per-property question investigations and 32 distinct gap properties. The moving shared worktree now has authored checks for a subset of catalog properties; the exact as-of callsites and source hashes are in [the assertion inventory](../existing-assertions.md). No hosted catalog baseline or mutant result exists.
 
 The user authorized the **entire repository**, including real hosted services, TCG and native KVM work. A perceived preference for core control paths is resolved by that scope and requires no further prioritization question. Coverage must still carry exact environment limits: TCG boot does not prove Firecracker isolation, and native machine evidence is not a hosted SDK result.
 
@@ -18,7 +18,7 @@ A source trace after the cold reviews tightened the hosted topology: [Lilly’s 
 
 | Category | Count | Disposition |
 | --- | ---: | --- |
-| Gap | 12 | Nine briefs yielded 29 distinct catalog properties; one historical restore reentry candidate remains deferred. |
+| Gap | 12 | Nine briefs yielded 32 distinct catalog properties; one historical restore reentry candidate remains deferred. |
 | Refinement | 20 | Fourteen proposals now appear as catalog, evidence and roster research requirements; implementation is unbuilt. |
 | Bias | 1 | Preserve historical restore activation as a separate policy question. Galileo grant anchoring is also an unresolved product-policy question; build its timing witness meanwhile. |
 
@@ -76,7 +76,7 @@ The nine completed gap briefs cover browser identity and admin authority (`G1`),
 
 ## Template and proof boundary
 
-[template-roster.json](template-roster.json) has exactly one entry for each of the current 104 canonical IDs. Each entry records the primary assertion kind and unique planned literal message, proposed hosted template(s), hosted proof limit, native companion and decisive independent witness. It remains a **proof design** with an as-of authored-source snapshot: a literal in source is not a full property result. `hosted_templates: []` means a current native-only acceptance target, not a silent hosted pass. All 29 gap additions are included. The currently staged `control-core` profile selects only its named Control commands and dependencies; unselected authored modules do not become run evidence. Restage changed commands and freeze the exact manifest before any hosted result can be attributed to a row.
+[template-roster.json](template-roster.json) has exactly one entry for each of the current 107 canonical IDs. Each entry records the primary assertion kind and unique planned literal message, proposed hosted template(s), hosted proof limit, native companion and decisive independent witness. It remains a **proof design** with an as-of authored-source snapshot: a literal in source is not a full property result. `hosted_templates: []` means a current native-only acceptance target, not a silent hosted pass. All 32 gap additions are included. The currently staged `control-core` profile selects only its named Control commands and dependencies; unselected authored modules do not become run evidence. Restage changed commands and freeze the exact manifest before any hosted result can be attributed to a row.
 
 The [deployment topology](../deployment-topology.md) currently describes a Control core and standalone TCG storage router as separate focused configurations. Source tracing requires an additional **integrated real inner-ZFS-backed Lilly host** before accepted placement. The roster uses prospective `integrated-zfs-host`, `integrated-zfs-guest` and `integrated-zfs-satellite` labels to keep those branches unexercised until built. `control` remains a protocol/authority refusal template; `storage` remains a standalone router mechanism. Full NixOS closure/migrator/secret upgrades and two-host ZFS relocation currently belong to `native-kvm` acceptance outside hosted Compose. Guest TCG covers software-emulated boot/bytes only. The proposed `AlwaysOrUnreachable` and `Sometimes` support semantics are explicit in the roster; a test template must fail or report unexercised when its required effect observer is unavailable.
 
@@ -84,7 +84,7 @@ Implementation order follows the independent-oracle boundary: build source-pinne
 
 ## Priority and selection
 
-The gap pass adds 24 P0 rows among 29 additions, yielding 74 P0 rows among 104 properties. P0 denotes potential product impact, not that a template or independent oracle is ready. Start selected campaigns only after their physical prerequisites and real positive controls pass; the 104-row roster records the full claim and any narrower hosted support. In particular, `authoritative-dns-follows-current-placement` needs a native two-Lilly destination-effect witness for its full claim, while hosted `access` can check DNS packets only. `authenticated-create-to-retained-guest-file` requires a healed-restart reread `Reachable` and a designated per-attempt terminal ledger in addition to its safety `Always`.
+The gap pass adds 24 P0 rows among 32 additions, yielding 74 P0 rows among 107 properties. P0 denotes potential product impact, not that a template or independent oracle is ready. Start selected campaigns only after their physical prerequisites and real positive controls pass; the 107-row roster records the full claim and any narrower hosted support. In particular, `authoritative-dns-follows-current-placement` needs a native two-Lilly destination-effect witness for its full claim, while hosted `access` can check DNS packets only. `authenticated-create-to-retained-guest-file` requires a healed-restart reread `Reachable` and a designated per-attempt terminal ledger in addition to its safety `Always`.
 
 ## Remaining uncertainty and policy
 
@@ -101,3 +101,8 @@ The gap pass adds 24 P0 rows among 29 additions, yielding 74 P0 rows among 104 p
 
 - Resolve the two genuine policy questions above while continuing source-grounded fixture and oracle work.
 - Build and execute the selected topology and oracles before interpreting any research assertion as passing verification.
+
+
+## New property disposition
+
+The fresh gap audit added `bootstrap-setup-complete-single-owner`, a process-level join absent from the prior catalog. It covers marker cardinality, probe ordering, and post-marker owner liveness; profile-specific readiness properties remain complementary. Hosted process-lifetime evidence and profile quiet intervals remain open questions.

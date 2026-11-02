@@ -150,3 +150,15 @@ This property requires both outer and inner authority in an enabled Inception en
 These properties compare actual Restic publication and isolated target markers under interruption. [`backup-interrupted-restore-target-unpublished`](properties/backup-interrupted-restore-target-unpublished.md) [`backup-published-manifest-retention-compatible`](properties/backup-published-manifest-retention-compatible.md).
 
 The [historical restore reentry candidate](discovery/gaps/restore-publication/backup-historical-restore-reentry-reconciliation.md) remains deferred until an explicit activation receipt is defined; quarantine safety remains in the catalog.
+
+### Android display transport fencing
+
+This protocol boundary is independent of terminal framing but shares generation fencing and bounded-byte custody with guest lifecycle properties. [`android-display-stream-generation-and-frame-bounds`](properties/android-display-stream-generation-and-frame-bounds.md) should be exercised with delayed old-generation frames and independent forwarding observations.
+
+### Team authorization and account lifecycle
+
+[`team-transfer-consent-preserves-single-owner`](properties/team-transfer-consent-preserves-single-owner.md) connects current Cedar team authority, transfer state-machine fencing, and account retirement. It should be exercised with [`stale-admin-tab-current-mutation-authority`](properties/stale-admin-tab-current-mutation-authority.md) and [`guest-identity-never-transfers-on-email-reuse`](properties/guest-identity-never-transfers-on-email-reuse.md): all three depend on committed identity changes remaining ordered under concurrent stale actors.
+
+### Bootstrap readiness and process ownership
+
+This property is a cross-profile gate joining independent readiness probes to process lifetime. [`bootstrap-setup-complete-single-owner`](properties/bootstrap-setup-complete-single-owner.md) dominates profile-specific setup observations: a workload must not classify later properties as exercised until the single setup marker is ordered after all required probes.
