@@ -19,13 +19,13 @@ msgstr ""
 msgid "%{value1} Reasoning stays with this thread. Switch between Plan and Work as needed."
 msgstr "Penalaran %{value1} tetap bersama thread ini. Beralih antara Plan dan Work sesuai kebutuhan."
 
-#: lib/marshall_web/live/threads_live.ex:2252
+#: lib/marshall_web/live/threads_live.ex:2232
 #, elixir-autogen, elixir-format
 msgid "%{value1} reasoning"
 msgstr "penalaran %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2811
-#: lib/marshall_web/live/threads_live.ex:2814
+#: lib/marshall_web/live/threads_live.ex:2791
+#: lib/marshall_web/live/threads_live.ex:2794
 #, elixir-autogen, elixir-format
 msgid "A context source could not be fully loaded."
 msgstr "Sumber konteks tidak dapat dimuat sepenuhnya."
@@ -45,12 +45,12 @@ msgstr "Skill yang dipilih tidak lagi tersedia. Muat ulang Skills dan pilih sumb
 msgid "A space for your next idea"
 msgstr "Ruang untuk ide berikutnya"
 
-#: lib/marshall_web/live/threads_live.ex:2020
+#: lib/marshall_web/live/threads_live.ex:2000
 #, elixir-autogen, elixir-format
 msgid "Access details are temporarily unavailable. Close sharing and try again shortly."
 msgstr "Detail akses sementara tidak tersedia. Tutup berbagi dan coba lagi sebentar lagi."
 
-#: lib/marshall_web/live/threads_live.ex:1985
+#: lib/marshall_web/live/threads_live.ex:1965
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "Tindakan"
@@ -67,7 +67,7 @@ msgid "Activity"
 msgstr "Aktivitas"
 
 #: lib/marshall_web/live/agent_threads_live.ex:116
-#: lib/marshall_web/live/threads_live.ex:2850
+#: lib/marshall_web/live/threads_live.ex:2830
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "Agen"
@@ -79,7 +79,7 @@ msgstr "CLI agen disetujui selama satu jam. Kembali ke terminal Anda."
 
 #: lib/marshall_web/live/agent_threads_live.ex:117
 #: lib/marshall_web/live/agent_threads_live.ex:141
-#: lib/marshall_web/live/threads_live.ex:2858
+#: lib/marshall_web/live/threads_live.ex:2838
 #, elixir-autogen, elixir-format
 msgid "Agent started working"
 msgstr "Agen mulai bekerja"
@@ -105,7 +105,7 @@ msgstr "Semua utas"
 msgid "All visible"
 msgstr "Semua yang terlihat"
 
-#: lib/marshall_web/live/threads_live.ex:2325
+#: lib/marshall_web/live/threads_live.ex:2305
 #, elixir-autogen, elixir-format
 msgid "An operator can answer these questions."
 msgstr "Operator dapat menjawab pertanyaan ini."
@@ -115,7 +115,7 @@ msgstr "Operator dapat menjawab pertanyaan ini."
 msgid "Answer each question with a choice, your own answer, or both."
 msgstr "Jawab setiap pertanyaan dengan pilihan, jawaban Anda sendiri, atau keduanya."
 
-#: lib/marshall_web/live/threads_live.ex:2277
+#: lib/marshall_web/live/threads_live.ex:2257
 #, elixir-autogen, elixir-format
 msgid "Answer these questions to continue the plan."
 msgstr "Jawab pertanyaan ini untuk melanjutkan rencana."
@@ -145,34 +145,34 @@ msgstr "Setujui CLI agen"
 msgid "Approving…"
 msgstr "Menyetujui…"
 
-#: lib/marshall_web/live/threads_live.ex:1988
+#: lib/marshall_web/live/threads_live.ex:1968
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "Arsipkan"
 
 #: lib/marshall_web/live/threads_live.ex:1690
 #: lib/marshall_web/live/threads_live.ex:1787
-#: lib/marshall_web/live/threads_live.ex:2832
+#: lib/marshall_web/live/threads_live.ex:2812
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "Diarsipkan"
 
-#: lib/marshall_web/live/threads_live.ex:2370
+#: lib/marshall_web/live/threads_live.ex:2350
 #, elixir-autogen, elixir-format
 msgid "Archived thread. The transcript is read-only. Reopen to continue on a new machine."
 msgstr "Utas diarsipkan. Transkrip hanya dapat dibaca. Buka kembali untuk melanjutkan pada mesin baru."
 
-#: lib/marshall_web/live/threads_live.ex:2846
+#: lib/marshall_web/live/threads_live.ex:2826
 #, elixir-autogen, elixir-format
 msgid "Archived · conversation retained"
 msgstr "Diarsipkan · percakapan disimpan"
 
-#: lib/marshall_web/live/threads_live.ex:2831
+#: lib/marshall_web/live/threads_live.ex:2811
 #, elixir-autogen, elixir-format
 msgid "Archiving"
 msgstr "Mengarsipkan"
 
-#: lib/marshall_web/live/threads_live.ex:2202
+#: lib/marshall_web/live/threads_live.ex:2182
 #, elixir-autogen, elixir-format
 msgid "Archiving is in progress. Waiting for the machine to be deleted."
 msgstr "Pengarsipan sedang berlangsung. Menunggu mesin dihapus."
@@ -182,7 +182,7 @@ msgstr "Pengarsipan sedang berlangsung. Menunggu mesin dihapus."
 msgid "Archiving requested. The machine will be deleted before archival completes."
 msgstr "Pengarsipan diminta. Mesin akan dihapus sebelum pengarsipan selesai."
 
-#: lib/marshall_web/live/threads_live.ex:2845
+#: lib/marshall_web/live/threads_live.ex:2825
 #, elixir-autogen, elixir-format
 msgid "Archiving · releasing the machine"
 msgstr "Mengarsipkan · melepaskan mesin"
@@ -194,8 +194,8 @@ msgstr "Mengarsipkan · melepaskan mesin"
 msgid "Back to threads"
 msgstr "Kembali ke utas"
 
-#: lib/marshall_web/live/threads_live.ex:2641
-#: lib/marshall_web/live/threads_live.ex:2690
+#: lib/marshall_web/live/threads_live.ex:2621
+#: lib/marshall_web/live/threads_live.ex:2670
 #, elixir-autogen, elixir-format
 msgid "Branch, tag or commit"
 msgstr "Cabang, tag, atau commit"
@@ -210,7 +210,7 @@ msgstr "Bangun sesuatu, perbaiki bug, jelajahi ide…"
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/threads_live.ex:2055
+#: lib/marshall_web/live/threads_live.ex:2035
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Ubah"
@@ -231,13 +231,13 @@ msgstr "Utas anak dibuat"
 msgid "Choose a valid image and machine size."
 msgstr "Pilih citra dan ukuran mesin yang valid."
 
-#: lib/marshall_web/live/threads_live.ex:2437
-#: lib/marshall_web/live/threads_live.ex:2481
+#: lib/marshall_web/live/threads_live.ex:2417
+#: lib/marshall_web/live/threads_live.ex:2461
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "Tutup"
 
-#: lib/marshall_web/live/threads_live.ex:2237
+#: lib/marshall_web/live/threads_live.ex:2217
 #, elixir-autogen, elixir-format
 msgid "Collaboration mode"
 msgstr "Mode kolaborasi"
@@ -247,26 +247,26 @@ msgstr "Mode kolaborasi"
 msgid "Collaboration mode updated."
 msgstr "Mode kolaborasi diperbarui."
 
-#: lib/marshall_web/live/threads_live.ex:2721
+#: lib/marshall_web/live/threads_live.ex:2701
 #, elixir-autogen, elixir-format
 msgid "Command suggestions"
 msgstr "Saran perintah"
 
 #: lib/marshall_web/live/threads_live.ex:1528
 #: lib/marshall_web/live/threads_live.ex:1922
-#: lib/marshall_web/live/threads_live.ex:2255
-#: lib/marshall_web/live/threads_live.ex:2433
-#: lib/marshall_web/live/threads_live.ex:2454
+#: lib/marshall_web/live/threads_live.ex:2235
+#: lib/marshall_web/live/threads_live.ex:2413
+#: lib/marshall_web/live/threads_live.ex:2434
 #, elixir-autogen, elixir-format
 msgid "Commands"
 msgstr "Perintah"
 
-#: lib/marshall_web/live/threads_live.ex:2625
+#: lib/marshall_web/live/threads_live.ex:2605
 #, elixir-autogen, elixir-format
 msgid "Commit: %{value1}"
 msgstr "Komit: %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2569
+#: lib/marshall_web/live/threads_live.ex:2549
 #: lib/marshall_web/thread_commands.ex:18
 #, elixir-autogen, elixir-format
 msgid "Compact context"
@@ -277,12 +277,12 @@ msgstr "Ringkas konteks"
 msgid "Compaction could not reduce this context. Reduce required instructions or start a focused thread."
 msgstr "Peringkasan tidak dapat mengurangi konteks ini. Kurangi instruksi yang diwajibkan atau mulai utas yang lebih terfokus."
 
-#: lib/marshall_web/live/threads_live.ex:2788
+#: lib/marshall_web/live/threads_live.ex:2768
 #, elixir-autogen, elixir-format
 msgid "Composer help"
 msgstr "Bantuan penulisan"
 
-#: lib/marshall_web/live/threads_live.ex:2535
+#: lib/marshall_web/live/threads_live.ex:2515
 #, elixir-autogen, elixir-format
 msgid "Context bytes"
 msgstr "Byte konteks"
@@ -302,7 +302,7 @@ msgstr "Konteks dipadatkan"
 msgid "Context compaction queued."
 msgstr "Peringkasan konteks diantrekan."
 
-#: lib/marshall_web/live/threads_live.ex:2513
+#: lib/marshall_web/live/threads_live.ex:2493
 #, elixir-autogen, elixir-format
 msgid "Context details are unavailable. The thread may still be preparing its workspace."
 msgstr "Detail konteks tidak tersedia. Utas mungkin masih menyiapkan ruang kerjanya."
@@ -312,7 +312,7 @@ msgstr "Detail konteks tidak tersedia. Utas mungkin masih menyiapkan ruang kerja
 msgid "Context reload queued."
 msgstr "Pemuatan ulang konteks diantrekan."
 
-#: lib/marshall_web/live/threads_live.ex:2223
+#: lib/marshall_web/live/threads_live.ex:2203
 #, elixir-autogen, elixir-format
 msgid "Continue the work…"
 msgstr "Lanjutkan pekerjaan…"
@@ -332,12 +332,12 @@ msgstr "Buat anak"
 msgid "Create thread"
 msgstr "Buat utas"
 
-#: lib/marshall_web/live/threads_live.ex:2888
+#: lib/marshall_web/live/threads_live.ex:2868
 #, elixir-autogen, elixir-format
 msgid "Delegated a task"
 msgstr "Mendelegasikan tugas"
 
-#: lib/marshall_web/live/threads_live.ex:1992
+#: lib/marshall_web/live/threads_live.ex:1972
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Hapus"
@@ -352,12 +352,12 @@ msgstr "Menghapus"
 msgid "Describe a task. Your agent gets a machine and gets to work."
 msgstr "Jelaskan tugas. Agen Anda mendapatkan mesin dan mulai bekerja."
 
-#: lib/marshall_web/live/threads_live.ex:2657
+#: lib/marshall_web/live/threads_live.ex:2637
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "Nonaktifkan"
 
-#: lib/marshall_web/live/threads_live.ex:2598
+#: lib/marshall_web/live/threads_live.ex:2578
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr "Dinonaktifkan"
@@ -367,18 +367,18 @@ msgstr "Dinonaktifkan"
 msgid "Disk (GiB)"
 msgstr "Disk penyimpanan (GiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2658
+#: lib/marshall_web/live/threads_live.ex:2638
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "Aktifkan"
 
 #: lib/marshall_web/live/threads_live.ex:1785
-#: lib/marshall_web/live/threads_live.ex:2830
+#: lib/marshall_web/live/threads_live.ex:2810
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "Gagal"
 
-#: lib/marshall_web/live/threads_live.ex:2444
+#: lib/marshall_web/live/threads_live.ex:2424
 #, elixir-autogen, elixir-format
 msgid "Find a command"
 msgstr "Cari perintah"
@@ -390,7 +390,7 @@ msgid "Find a task…"
 msgstr "Cari tugas…"
 
 #: lib/marshall_web/live/threads_live.ex:1732
-#: lib/marshall_web/live/threads_live.ex:2067
+#: lib/marshall_web/live/threads_live.ex:2047
 #, elixir-autogen, elixir-format
 msgid "First page"
 msgstr "Halaman pertama"
@@ -415,7 +415,7 @@ msgstr "Pekerjaan yang baik dimulai dengan sebuah utas."
 msgid "High"
 msgstr "Tinggi"
 
-#: lib/marshall_web/live/threads_live.ex:2822
+#: lib/marshall_web/live/threads_live.ex:2802
 #, elixir-autogen, elixir-format
 msgid "High gives difficult work more reasoning time."
 msgstr "Tinggi memberikan lebih banyak waktu penalaran untuk pekerjaan sulit."
@@ -425,7 +425,7 @@ msgstr "Tinggi memberikan lebih banyak waktu penalaran untuk pekerjaan sulit."
 msgid "Image"
 msgstr "Citra"
 
-#: lib/marshall_web/live/threads_live.ex:2353
+#: lib/marshall_web/live/threads_live.ex:2333
 #, elixir-autogen, elixir-format
 msgid "Implement plan"
 msgstr "Jalankan rencana"
@@ -440,32 +440,32 @@ msgstr "Pelaksanaan rencana ini sudah dimulai."
 msgid "Implementation queued."
 msgstr "Pelaksanaan diantrekan."
 
-#: lib/marshall_web/live/threads_live.ex:2339
+#: lib/marshall_web/live/threads_live.ex:2319
 #, elixir-autogen, elixir-format
 msgid "Implementation started"
 msgstr "Pelaksanaan dimulai"
 
-#: lib/marshall_web/live/threads_live.ex:2530
+#: lib/marshall_web/live/threads_live.ex:2510
 #, elixir-autogen, elixir-format
 msgid "Input tokens"
 msgstr "Token masukan"
 
-#: lib/marshall_web/live/threads_live.ex:2674
+#: lib/marshall_web/live/threads_live.ex:2654
 #, elixir-autogen, elixir-format
 msgid "Install a skill"
 msgstr "Pasang keterampilan"
 
-#: lib/marshall_web/live/threads_live.ex:2701
+#: lib/marshall_web/live/threads_live.ex:2681
 #, elixir-autogen, elixir-format
 msgid "Install skill"
 msgstr "Pasang keterampilan"
 
-#: lib/marshall_web/live/threads_live.ex:2700
+#: lib/marshall_web/live/threads_live.ex:2680
 #, elixir-autogen, elixir-format
 msgid "Installing…"
 msgstr "Memasang…"
 
-#: lib/marshall_web/live/threads_live.ex:2540
+#: lib/marshall_web/live/threads_live.ex:2520
 #, elixir-autogen, elixir-format
 msgid "Loaded sources"
 msgstr "Sumber dimuat"
@@ -475,12 +475,12 @@ msgstr "Sumber dimuat"
 msgid "Low"
 msgstr "Rendah"
 
-#: lib/marshall_web/live/threads_live.ex:2821
+#: lib/marshall_web/live/threads_live.ex:2801
 #, elixir-autogen, elixir-format
 msgid "Low is for small, well-defined tasks."
 msgstr "Rendah untuk tugas kecil yang terdefinisi dengan baik."
 
-#: lib/marshall_web/live/threads_live.ex:2132
+#: lib/marshall_web/live/threads_live.ex:2112
 #, elixir-autogen, elixir-format
 msgid "Machine generations"
 msgstr "Generasi mesin"
@@ -510,13 +510,13 @@ msgstr "Mesin:"
 msgid "Maintenance finished"
 msgstr "Pemeliharaan selesai"
 
-#: lib/marshall_web/live/threads_live.ex:2617
+#: lib/marshall_web/live/threads_live.ex:2597
 #, elixir-autogen, elixir-format
 msgid "Managed installations"
 msgstr "Pemasangan terkelola"
 
-#: lib/marshall_web/live/threads_live.ex:2604
-#: lib/marshall_web/live/threads_live.ex:2757
+#: lib/marshall_web/live/threads_live.ex:2584
+#: lib/marshall_web/live/threads_live.ex:2737
 #, elixir-autogen, elixir-format
 msgid "Managed skill"
 msgstr "Keterampilan terkelola"
@@ -526,8 +526,8 @@ msgstr "Keterampilan terkelola"
 msgid "Managed skill removed."
 msgstr "Keterampilan terkelola dihapus."
 
-#: lib/marshall_web/live/threads_live.ex:2102
-#: lib/marshall_web/live/threads_live.ex:2911
+#: lib/marshall_web/live/threads_live.ex:2082
+#: lib/marshall_web/live/threads_live.ex:2891
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "Pengelola"
@@ -542,7 +542,7 @@ msgstr "Cocokkan kode permintaan ini dengan terminal Anda sebelum menyetujui:"
 msgid "Medium"
 msgstr "Sedang"
 
-#: lib/marshall_web/live/threads_live.ex:2824
+#: lib/marshall_web/live/threads_live.ex:2804
 #, elixir-autogen, elixir-format
 msgid "Medium is a good starting point for most work."
 msgstr "Sedang merupakan titik awal yang baik untuk sebagian besar pekerjaan."
@@ -552,7 +552,7 @@ msgstr "Sedang merupakan titik awal yang baik untuk sebagian besar pekerjaan."
 msgid "Memory (MiB)"
 msgstr "Memori (MiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2222
+#: lib/marshall_web/live/threads_live.ex:2202
 #, elixir-autogen, elixir-format
 msgid "Message"
 msgstr "Pesan"
@@ -580,7 +580,7 @@ msgid "New thread"
 msgstr "Utas baru"
 
 #: lib/marshall_web/live/threads_live.ex:1739
-#: lib/marshall_web/live/threads_live.ex:2073
+#: lib/marshall_web/live/threads_live.ex:2053
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "Halaman berikutnya"
@@ -590,17 +590,17 @@ msgstr "Halaman berikutnya"
 msgid "No activity matches this filter."
 msgstr "Tidak ada aktivitas yang cocok dengan penyaring ini."
 
-#: lib/marshall_web/live/threads_live.ex:2059
+#: lib/marshall_web/live/threads_live.ex:2039
 #, elixir-autogen, elixir-format
 msgid "No individual thread grants yet."
 msgstr "Belum ada pemberian akses utas individual."
 
-#: lib/marshall_web/live/threads_live.ex:2542
+#: lib/marshall_web/live/threads_live.ex:2522
 #, elixir-autogen, elixir-format
 msgid "No instruction sources collected yet."
 msgstr "Belum ada sumber instruksi yang dikumpulkan."
 
-#: lib/marshall_web/live/threads_live.ex:2743
+#: lib/marshall_web/live/threads_live.ex:2723
 #, elixir-autogen, elixir-format
 msgid "No matching skills. Use /skills to inspect the catalog."
 msgstr "Tidak ada keterampilan yang cocok. Gunakan /skills untuk memeriksa katalog."
@@ -615,23 +615,23 @@ msgstr "Tidak ada utas lebih lama yang tersedia pada halaman ini."
 msgid "No recent threads match your search."
 msgstr "Tidak ada utas terbaru yang cocok dengan pencarian Anda."
 
-#: lib/marshall_web/live/threads_live.ex:2586
+#: lib/marshall_web/live/threads_live.ex:2566
 #, elixir-autogen, elixir-format
 msgid "No skills were discovered in this workspace."
 msgstr "Tidak ada keterampilan yang ditemukan dalam ruang kerja ini."
 
-#: lib/marshall_web/live/threads_live.ex:2528
+#: lib/marshall_web/live/threads_live.ex:2508
 #, elixir-autogen, elixir-format
 msgid "Not collected yet"
 msgstr "Belum dikumpulkan"
 
 #: lib/marshall_web/live/threads_live.ex:1489
-#: lib/marshall_web/live/threads_live.ex:2391
+#: lib/marshall_web/live/threads_live.ex:2371
 #, elixir-autogen, elixir-format
 msgid "Objective"
 msgstr "Tujuan"
 
-#: lib/marshall_web/live/threads_live.ex:2897
+#: lib/marshall_web/live/threads_live.ex:2877
 #, elixir-autogen, elixir-format
 msgid "Older context summarized"
 msgstr "Konteks lebih lama diringkas"
@@ -641,7 +641,7 @@ msgstr "Konteks lebih lama diringkas"
 msgid "One task. One thread."
 msgstr "Satu tugas. Satu utas."
 
-#: lib/marshall_web/live/threads_live.ex:1968
+#: lib/marshall_web/live/threads_live.ex:1948
 #: lib/marshall_web/thread_commands.ex:26
 #, elixir-autogen, elixir-format
 msgid "Open VS Code"
@@ -658,18 +658,13 @@ msgstr "Sumber terbuka"
 msgid "Open terminal"
 msgstr "Buka terminal"
 
-#: lib/marshall_web/live/threads_live.ex:1948
-#, elixir-autogen, elixir-format
-msgid "Open terminal here"
-msgstr "Buka terminal di sini"
-
-#: lib/marshall_web/live/threads_live.ex:2101
-#: lib/marshall_web/live/threads_live.ex:2910
+#: lib/marshall_web/live/threads_live.ex:2081
+#: lib/marshall_web/live/threads_live.ex:2890
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "Pelaksana"
 
-#: lib/marshall_web/live/threads_live.ex:2033
+#: lib/marshall_web/live/threads_live.ex:2013
 #, elixir-autogen, elixir-format
 msgid "Owner · cannot be changed"
 msgstr "Pemilik · tidak dapat diubah"
@@ -685,8 +680,8 @@ msgid "Past 7 days"
 msgstr "7 hari terakhir"
 
 #: lib/marshall_web/live/threads_live.ex:1782
-#: lib/marshall_web/live/threads_live.ex:2791
-#: lib/marshall_web/live/threads_live.ex:2827
+#: lib/marshall_web/live/threads_live.ex:2771
+#: lib/marshall_web/live/threads_live.ex:2807
 #, elixir-autogen, elixir-format
 msgid "Pending"
 msgstr "Tertunda"
@@ -697,7 +692,7 @@ msgid "Pick up where you left off."
 msgstr "Lanjutkan dari tempat Anda berhenti."
 
 #: lib/marshall_web/live/threads_live.ex:1511
-#: lib/marshall_web/live/threads_live.ex:2782
+#: lib/marshall_web/live/threads_live.ex:2762
 #: lib/marshall_web/thread_commands.ex:14
 #, elixir-autogen, elixir-format
 msgid "Plan"
@@ -708,19 +703,19 @@ msgstr "Rencana"
 msgid "Plan proposed"
 msgstr "Rencana diusulkan"
 
-#: lib/marshall_web/live/threads_live.ex:2839
+#: lib/marshall_web/live/threads_live.ex:2819
 #, elixir-autogen, elixir-format
 msgid "Preparing a machine for this task"
 msgstr "Menyiapkan mesin untuk tugas ini"
 
-#: lib/marshall_web/live/threads_live.ex:2172
+#: lib/marshall_web/live/threads_live.ex:2152
 #, elixir-autogen, elixir-format
 msgid "Preparing your workspace"
 msgstr "Menyiapkan ruang kerja Anda"
 
 #: lib/marshall_web/live/agent_threads_live.ex:115
 #: lib/marshall_web/live/agent_threads_live.ex:225
-#: lib/marshall_web/live/threads_live.ex:2849
+#: lib/marshall_web/live/threads_live.ex:2829
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "Instruksi"
@@ -736,18 +731,18 @@ msgstr "Instruksi diantrekan."
 msgid "Prompts wake a stopped machine when you have write access."
 msgstr "Instruksi membangunkan mesin yang berhenti jika Anda memiliki akses tulis."
 
-#: lib/marshall_web/live/threads_live.ex:2336
+#: lib/marshall_web/live/threads_live.ex:2316
 #, elixir-autogen, elixir-format
 msgid "Proposed plan"
 msgstr "Rencana yang diusulkan"
 
 #: lib/marshall_web/live/threads_live.ex:1783
-#: lib/marshall_web/live/threads_live.ex:2828
+#: lib/marshall_web/live/threads_live.ex:2808
 #, elixir-autogen, elixir-format
 msgid "Provisioning"
 msgstr "Penyediaan"
 
-#: lib/marshall_web/live/threads_live.ex:2182
+#: lib/marshall_web/live/threads_live.ex:2162
 #, elixir-autogen, elixir-format
 msgid "Provisioning needs attention."
 msgstr "Penyediaan memerlukan perhatian."
@@ -772,14 +767,14 @@ msgstr "Pertanyaan dibatalkan"
 msgid "Questions requested"
 msgstr "Pertanyaan diminta"
 
-#: lib/marshall_web/live/threads_live.ex:2870
+#: lib/marshall_web/live/threads_live.ex:2850
 #, elixir-autogen, elixir-format
 msgid "Queued: %{tools}"
 msgstr "Diantrekan: %{tools}"
 
 #: lib/marshall_web/live/threads_live.ex:1784
-#: lib/marshall_web/live/threads_live.ex:2792
-#: lib/marshall_web/live/threads_live.ex:2829
+#: lib/marshall_web/live/threads_live.ex:2772
+#: lib/marshall_web/live/threads_live.ex:2809
 #, elixir-autogen, elixir-format
 msgid "Ready"
 msgstr "Siap"
@@ -794,49 +789,49 @@ msgstr "Penalaran"
 msgid "Recent threads"
 msgstr "Utas terbaru"
 
-#: lib/marshall_web/live/threads_live.ex:2092
+#: lib/marshall_web/live/threads_live.ex:2072
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "Email terdaftar"
 
-#: lib/marshall_web/live/threads_live.ex:2563
+#: lib/marshall_web/live/threads_live.ex:2543
 #, elixir-autogen, elixir-format
 msgid "Reload context"
 msgstr "Muat ulang konteks"
 
-#: lib/marshall_web/live/threads_live.ex:2664
-#: lib/marshall_web/live/threads_live.ex:2772
+#: lib/marshall_web/live/threads_live.ex:2644
+#: lib/marshall_web/live/threads_live.ex:2752
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Hapus"
 
-#: lib/marshall_web/live/threads_live.ex:2771
+#: lib/marshall_web/live/threads_live.ex:2751
 #, elixir-autogen, elixir-format
 msgid "Remove %{skill}"
 msgstr "Hapus %{skill}"
 
-#: lib/marshall_web/live/threads_live.ex:2002
+#: lib/marshall_web/live/threads_live.ex:1982
 #, elixir-autogen, elixir-format
 msgid "Reopen"
 msgstr "Buka kembali"
 
-#: lib/marshall_web/live/threads_live.ex:2135
+#: lib/marshall_web/live/threads_live.ex:2115
 #, elixir-autogen, elixir-format
 msgid "Reopened machines keep their earlier transcripts. Select one to read it."
 msgstr "Mesin yang dibuka kembali menyimpan transkrip sebelumnya. Pilih mesin untuk membacanya."
 
-#: lib/marshall_web/live/threads_live.ex:2683
+#: lib/marshall_web/live/threads_live.ex:2663
 #, elixir-autogen, elixir-format
 msgid "Repository URL"
 msgstr "URL repositori"
 
 #: lib/marshall_web/live/agent_threads_live.ex:118
-#: lib/marshall_web/live/threads_live.ex:2859
+#: lib/marshall_web/live/threads_live.ex:2839
 #, elixir-autogen, elixir-format
 msgid "Response received"
 msgstr "Respons diterima"
 
-#: lib/marshall_web/live/threads_live.ex:2192
+#: lib/marshall_web/live/threads_live.ex:2172
 #, elixir-autogen, elixir-format
 msgid "Retry"
 msgstr "Coba lagi"
@@ -846,37 +841,37 @@ msgstr "Coba lagi"
 msgid "Return to the conversation whenever you need."
 msgstr "Kembali ke percakapan kapan pun Anda perlu."
 
-#: lib/marshall_web/live/threads_live.ex:2361
+#: lib/marshall_web/live/threads_live.ex:2341
 #, elixir-autogen, elixir-format
 msgid "Revise"
 msgstr "Revisi"
 
-#: lib/marshall_web/live/threads_live.ex:2689
+#: lib/marshall_web/live/threads_live.ex:2669
 #, elixir-autogen, elixir-format
 msgid "Revision (optional)"
 msgstr "Revisi (opsional)"
 
-#: lib/marshall_web/live/threads_live.ex:2103
+#: lib/marshall_web/live/threads_live.ex:2083
 #, elixir-autogen, elixir-format
 msgid "Revoke thread grant"
 msgstr "Cabut izin utas"
 
-#: lib/marshall_web/live/threads_live.ex:2912
+#: lib/marshall_web/live/threads_live.ex:2892
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Dicabut"
 
-#: lib/marshall_web/live/threads_live.ex:2098
+#: lib/marshall_web/live/threads_live.ex:2078
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Peran"
 
-#: lib/marshall_web/live/threads_live.ex:2110
+#: lib/marshall_web/live/threads_live.ex:2090
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "Simpan akses"
 
-#: lib/marshall_web/live/threads_live.ex:2109
+#: lib/marshall_web/live/threads_live.ex:2089
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Menyimpan…"
@@ -906,7 +901,7 @@ msgstr "Mencari pada halaman utas ini."
 msgid "Select this skill from the workspace catalog when the machine starts."
 msgstr "Pilih keterampilan ini dari katalog ruang kerja saat mesin dimulai."
 
-#: lib/marshall_web/live/threads_live.ex:2264
+#: lib/marshall_web/live/threads_live.ex:2244
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "Kirim"
@@ -917,7 +912,7 @@ msgid "Send prompt"
 msgstr "Kirim instruksi"
 
 #: lib/marshall_web/live/agent_threads_live.ex:233
-#: lib/marshall_web/live/threads_live.ex:2262
+#: lib/marshall_web/live/threads_live.ex:2242
 #, elixir-autogen, elixir-format
 msgid "Sending…"
 msgstr "Mengirim…"
@@ -928,7 +923,7 @@ msgstr "Mengirim…"
 msgid "Share"
 msgstr "Bagikan"
 
-#: lib/marshall_web/live/threads_live.ex:2012
+#: lib/marshall_web/live/threads_live.ex:1992
 #, elixir-autogen, elixir-format
 msgid "Share this thread"
 msgstr "Bagikan utas ini"
@@ -953,7 +948,7 @@ msgstr "Tampilkan"
 msgid "Skill availability updated."
 msgstr "Ketersediaan keterampilan diperbarui."
 
-#: lib/marshall_web/live/threads_live.ex:2694
+#: lib/marshall_web/live/threads_live.ex:2674
 #, elixir-autogen, elixir-format
 msgid "Skill directory"
 msgstr "Direktori keterampilan"
@@ -963,7 +958,7 @@ msgstr "Direktori keterampilan"
 msgid "Skill installation queued."
 msgstr "Pemasangan keterampilan diantrekan."
 
-#: lib/marshall_web/live/threads_live.ex:2740
+#: lib/marshall_web/live/threads_live.ex:2720
 #, elixir-autogen, elixir-format
 msgid "Skill suggestions"
 msgstr "Saran keterampilan"
@@ -974,18 +969,18 @@ msgstr "Saran keterampilan"
 msgid "Skill update queued."
 msgstr "Pembaruan keterampilan diantrekan."
 
-#: lib/marshall_web/live/threads_live.ex:2787
+#: lib/marshall_web/live/threads_live.ex:2767
 #: lib/marshall_web/thread_commands.ex:20
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "Keterampilan"
 
-#: lib/marshall_web/live/threads_live.ex:2574
+#: lib/marshall_web/live/threads_live.ex:2554
 #, elixir-autogen, elixir-format
 msgid "Skills add reusable instructions to a task. Choose the source you intend to use."
 msgstr "Keterampilan menambahkan instruksi yang dapat digunakan ulang ke tugas. Pilih sumber yang ingin Anda gunakan."
 
-#: lib/marshall_web/live/threads_live.ex:2580
+#: lib/marshall_web/live/threads_live.ex:2560
 #, elixir-autogen, elixir-format
 msgid "Skills are unavailable until the workspace context has been collected."
 msgstr "Keterampilan tidak tersedia hingga konteks ruang kerja dikumpulkan."
@@ -995,7 +990,7 @@ msgstr "Keterampilan tidak tersedia hingga konteks ruang kerja dikumpulkan."
 msgid "Standard"
 msgstr "Standar"
 
-#: lib/marshall_web/live/threads_live.ex:2505
+#: lib/marshall_web/live/threads_live.ex:2485
 #, elixir-autogen, elixir-format
 msgid "Start with a space to send slash-looking text literally. Type $ to choose a skill by its exact source."
 msgstr "Awali dengan spasi untuk mengirim teks yang tampak seperti perintah garis miring secara harfiah. Ketik $ untuk memilih keterampilan berdasarkan sumber persisnya."
@@ -1006,17 +1001,17 @@ msgid "Starting…"
 msgstr "Memulai…"
 
 #: lib/marshall_web/live/threads_live.ex:1779
-#: lib/marshall_web/live/threads_live.ex:2520
+#: lib/marshall_web/live/threads_live.ex:2500
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Status keadaan"
 
-#: lib/marshall_web/live/threads_live.ex:2320
+#: lib/marshall_web/live/threads_live.ex:2300
 #, elixir-autogen, elixir-format
 msgid "Submit answers"
 msgstr "Kirim jawaban"
 
-#: lib/marshall_web/live/threads_live.ex:2319
+#: lib/marshall_web/live/threads_live.ex:2299
 #, elixir-autogen, elixir-format
 msgid "Submitting…"
 msgstr "Mengirimkan…"
@@ -1048,7 +1043,7 @@ msgstr "Email tersebut bukan milik akun terdaftar."
 
 #: lib/marshall_web/live/agent_threads_live.ex:123
 #: lib/marshall_web/live/agent_threads_live.ex:145
-#: lib/marshall_web/live/threads_live.ex:2892
+#: lib/marshall_web/live/threads_live.ex:2872
 #, elixir-autogen, elixir-format
 msgid "The agent encountered a problem"
 msgstr "Agen mengalami masalah"
@@ -1094,7 +1089,7 @@ msgstr "Operasi utas tidak dapat diselesaikan."
 msgid "The thread owner's access cannot be changed."
 msgstr "Akses pemilik utas tidak dapat diubah."
 
-#: lib/marshall_web/live/threads_live.ex:2381
+#: lib/marshall_web/live/threads_live.ex:2361
 #, elixir-autogen, elixir-format
 msgid "The transcript is temporarily unavailable. Try again shortly."
 msgstr "Transkrip sementara tidak tersedia. Coba lagi sebentar lagi."
@@ -1169,7 +1164,7 @@ msgstr "Utas ini mungkin telah dihapus atau tautan tidak valid."
 msgid "This tool is not available for the machine profile."
 msgstr "Alat ini tidak tersedia untuk profil mesin."
 
-#: lib/marshall_web/live/threads_live.ex:2013
+#: lib/marshall_web/live/threads_live.ex:1993
 #, elixir-autogen, elixir-format
 msgid "Thread access also applies to its machine. Separate machine grants and team access are managed independently."
 msgstr "Akses utas juga berlaku untuk mesinnya. Izin mesin terpisah dan akses tim dikelola secara independen."
@@ -1179,12 +1174,12 @@ msgstr "Akses utas juga berlaku untuk mesinnya. Izin mesin terpisah dan akses ti
 msgid "Thread access updated."
 msgstr "Akses utas diperbarui."
 
-#: lib/marshall_web/live/threads_live.ex:1984
+#: lib/marshall_web/live/threads_live.ex:1964
 #, elixir-autogen, elixir-format
 msgid "Thread actions"
 msgstr "Tindakan utas"
 
-#: lib/marshall_web/live/threads_live.ex:2786
+#: lib/marshall_web/live/threads_live.ex:2766
 #, elixir-autogen, elixir-format
 msgid "Thread context"
 msgstr "Konteks utas"
@@ -1209,11 +1204,6 @@ msgstr "Utas dibuka kembali; menyediakan mesin baru."
 msgid "Thread temporarily unavailable"
 msgstr "Utas sementara tidak tersedia"
 
-#: lib/marshall_web/live/threads_live.ex:1956
-#, elixir-autogen, elixir-format
-msgid "Thread terminal"
-msgstr "Terminal utas"
-
 #: lib/marshall_web/live/threads_live.ex:1882
 #, elixir-autogen, elixir-format
 msgid "Thread unavailable"
@@ -1221,7 +1211,7 @@ msgstr "Utas tidak tersedia"
 
 #: lib/marshall_web/live/agent_threads_live.ex:132
 #: lib/marshall_web/live/agent_threads_live.ex:149
-#: lib/marshall_web/live/threads_live.ex:2902
+#: lib/marshall_web/live/threads_live.ex:2882
 #, elixir-autogen, elixir-format
 msgid "Thread updated"
 msgstr "Utas diperbarui"
@@ -1251,47 +1241,47 @@ msgstr "Utas sementara tidak tersedia. Coba lagi sebentar lagi."
 msgid "Today"
 msgstr "Hari ini"
 
-#: lib/marshall_web/live/threads_live.ex:2533
+#: lib/marshall_web/live/threads_live.ex:2513
 #, elixir-autogen, elixir-format
 msgid "Token allowance"
 msgstr "Batas token"
 
-#: lib/marshall_web/live/threads_live.ex:2879
+#: lib/marshall_web/live/threads_live.ex:2859
 #, elixir-autogen, elixir-format
 msgid "Tool cancelled"
 msgstr "Alat dibatalkan"
 
-#: lib/marshall_web/live/threads_live.ex:2882
+#: lib/marshall_web/live/threads_live.ex:2862
 #, elixir-autogen, elixir-format
 msgid "Tool completed"
 msgstr "Alat selesai"
 
-#: lib/marshall_web/live/threads_live.ex:2876
+#: lib/marshall_web/live/threads_live.ex:2856
 #, elixir-autogen, elixir-format
 msgid "Tool failed"
 msgstr "Alat gagal"
 
-#: lib/marshall_web/live/threads_live.ex:2885
+#: lib/marshall_web/live/threads_live.ex:2865
 #, elixir-autogen, elixir-format
 msgid "Tool outcome uncertain"
 msgstr "Hasil alat tidak pasti"
 
 #: lib/marshall_web/live/agent_threads_live.ex:120
 #: lib/marshall_web/live/agent_threads_live.ex:148
-#: lib/marshall_web/live/threads_live.ex:2887
+#: lib/marshall_web/live/threads_live.ex:2867
 #, elixir-autogen, elixir-format
 msgid "Tool result received"
 msgstr "Hasil alat diterima"
 
 #: lib/marshall_web/live/agent_threads_live.ex:119
 #: lib/marshall_web/live/agent_threads_live.ex:147
-#: lib/marshall_web/live/threads_live.ex:2869
-#: lib/marshall_web/live/threads_live.ex:2873
+#: lib/marshall_web/live/threads_live.ex:2849
+#: lib/marshall_web/live/threads_live.ex:2853
 #, elixir-autogen, elixir-format
 msgid "Tools queued"
 msgstr "Alat diantrekan"
 
-#: lib/marshall_web/live/threads_live.ex:2153
+#: lib/marshall_web/live/threads_live.ex:2133
 #, elixir-autogen, elixir-format
 msgid "Transcript"
 msgstr "Transkrip"
@@ -1303,7 +1293,7 @@ msgstr "Coba lagi sebentar lagi."
 
 #: lib/marshall_web/live/agent_threads_live.ex:122
 #: lib/marshall_web/live/agent_threads_live.ex:142
-#: lib/marshall_web/live/threads_live.ex:2889
+#: lib/marshall_web/live/threads_live.ex:2869
 #, elixir-autogen, elixir-format
 msgid "Turn complete"
 msgstr "Giliran selesai"
@@ -1313,15 +1303,15 @@ msgstr "Giliran selesai"
 msgid "Ultra"
 msgstr "Sangat tinggi"
 
-#: lib/marshall_web/live/threads_live.ex:2823
+#: lib/marshall_web/live/threads_live.ex:2803
 #, elixir-autogen, elixir-format
 msgid "Ultra is for complex, open-ended work."
 msgstr "Sangat tinggi untuk pekerjaan kompleks yang terbuka."
 
-#: lib/marshall_web/live/threads_live.ex:2793
-#: lib/marshall_web/live/threads_live.ex:2799
-#: lib/marshall_web/live/threads_live.ex:2833
-#: lib/marshall_web/live/threads_live.ex:2913
+#: lib/marshall_web/live/threads_live.ex:2773
+#: lib/marshall_web/live/threads_live.ex:2779
+#: lib/marshall_web/live/threads_live.ex:2813
+#: lib/marshall_web/live/threads_live.ex:2893
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Tidak diketahui"
@@ -1343,12 +1333,12 @@ msgstr "Lepas sematan mesin utas ini sebelum menghapusnya."
 msgid "Untitled thread"
 msgstr "Utas tanpa judul"
 
-#: lib/marshall_web/live/threads_live.ex:2647
+#: lib/marshall_web/live/threads_live.ex:2627
 #, elixir-autogen, elixir-format
 msgid "Update"
 msgstr "Perbarui"
 
-#: lib/marshall_web/live/threads_live.ex:2640
+#: lib/marshall_web/live/threads_live.ex:2620
 #, elixir-autogen, elixir-format
 msgid "Update revision (optional)"
 msgstr "Perbarui revisi (opsional)"
@@ -1358,27 +1348,27 @@ msgstr "Perbarui revisi (opsional)"
 msgid "Updated"
 msgstr "Diperbarui"
 
-#: lib/marshall_web/live/threads_live.ex:2646
+#: lib/marshall_web/live/threads_live.ex:2626
 #, elixir-autogen, elixir-format
 msgid "Updating…"
 msgstr "Memperbarui…"
 
-#: lib/marshall_web/live/threads_live.ex:2486
+#: lib/marshall_web/live/threads_live.ex:2466
 #, elixir-autogen, elixir-format
 msgid "Use Commands or press Ctrl/Cmd+K while writing. Start a message with / to find a command; use Tab to complete it."
 msgstr "Gunakan Perintah atau tekan Ctrl/Cmd+K saat menulis. Awali pesan dengan / untuk mencari perintah; gunakan Tab untuk melengkapinya."
 
-#: lib/marshall_web/live/threads_live.ex:2675
+#: lib/marshall_web/live/threads_live.ex:2655
 #, elixir-autogen, elixir-format
 msgid "Use a public GitHub, GitLab, Codeberg or Bitbucket repository."
 msgstr "Gunakan repositori publik GitHub, GitLab, Codeberg, atau Bitbucket."
 
-#: lib/marshall_web/live/threads_live.ex:2083
+#: lib/marshall_web/live/threads_live.ex:2063
 #, elixir-autogen, elixir-format
 msgid "Use an existing account's email to grant, change or revoke a thread role."
 msgstr "Gunakan email akun yang ada untuk memberi, mengubah, atau mencabut peran utas."
 
-#: lib/marshall_web/live/threads_live.ex:2613
+#: lib/marshall_web/live/threads_live.ex:2593
 #, elixir-autogen, elixir-format
 msgid "Use this skill"
 msgstr "Gunakan keterampilan ini"
@@ -1388,13 +1378,13 @@ msgstr "Gunakan keterampilan ini"
 msgid "View activity"
 msgstr "Lihat aktivitas"
 
-#: lib/marshall_web/live/threads_live.ex:2100
-#: lib/marshall_web/live/threads_live.ex:2909
+#: lib/marshall_web/live/threads_live.ex:2080
+#: lib/marshall_web/live/threads_live.ex:2889
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "Penonton"
 
-#: lib/marshall_web/live/threads_live.ex:2113
+#: lib/marshall_web/live/threads_live.ex:2093
 #, elixir-autogen, elixir-format
 msgid "Viewers read. Operators send prompts. Managers also share and manage the thread."
 msgstr "Penonton membaca. Pelaksana mengirim instruksi. Pengelola juga berbagi dan mengelola utas."
@@ -1405,7 +1395,7 @@ msgstr "Penonton membaca. Pelaksana mengirim instruksi. Pengelola juga berbagi d
 msgid "Wait for the current work or pending questions to finish before changing this setting."
 msgstr "Tunggu pekerjaan saat ini atau pertanyaan tertunda selesai sebelum mengubah pengaturan ini."
 
-#: lib/marshall_web/live/threads_live.ex:2836
+#: lib/marshall_web/live/threads_live.ex:2816
 #, elixir-autogen, elixir-format
 msgid "Waiting for a workspace"
 msgstr "Menunggu ruang kerja"
@@ -1415,22 +1405,22 @@ msgstr "Menunggu ruang kerja"
 msgid "Waiting for machine"
 msgstr "Menunggu mesin"
 
-#: lib/marshall_web/live/threads_live.ex:2398
+#: lib/marshall_web/live/threads_live.ex:2378
 #, elixir-autogen, elixir-format
 msgid "Waiting for the agent's first update."
 msgstr "Menunggu pembaruan pertama agen."
 
-#: lib/marshall_web/live/threads_live.ex:2894
+#: lib/marshall_web/live/threads_live.ex:2874
 #, elixir-autogen, elixir-format
 msgid "Waiting for the machine"
 msgstr "Menunggu mesin"
 
-#: lib/marshall_web/live/threads_live.ex:2895
+#: lib/marshall_web/live/threads_live.ex:2875
 #, elixir-autogen, elixir-format
 msgid "Waiting for your answers"
 msgstr "Menunggu jawaban Anda"
 
-#: lib/marshall_web/live/threads_live.ex:2908
+#: lib/marshall_web/live/threads_live.ex:2888
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "Aplikasi web"
@@ -1441,13 +1431,13 @@ msgid "What are we working on?"
 msgstr "Apa yang akan kita kerjakan?"
 
 #: lib/marshall_web/live/threads_live.ex:1510
-#: lib/marshall_web/live/threads_live.ex:2783
+#: lib/marshall_web/live/threads_live.ex:2763
 #: lib/marshall_web/thread_commands.ex:16
 #, elixir-autogen, elixir-format
 msgid "Work"
 msgstr "Kerja"
 
-#: lib/marshall_web/live/threads_live.ex:2523
+#: lib/marshall_web/live/threads_live.ex:2503
 #, elixir-autogen, elixir-format
 msgid "Working directory"
 msgstr "Direktori kerja"
@@ -1462,7 +1452,7 @@ msgstr "Konteks ruang kerja sedang dikumpulkan. Coba lagi sebentar lagi."
 msgid "Workspace context is unavailable. Reload it when the machine is ready."
 msgstr "Konteks ruang kerja tidak tersedia. Muat ulang saat mesin siap."
 
-#: lib/marshall_web/live/threads_live.ex:2900
+#: lib/marshall_web/live/threads_live.ex:2880
 #, elixir-autogen, elixir-format
 msgid "Workspace context reloaded"
 msgstr "Konteks ruang kerja dimuat ulang"
@@ -1472,12 +1462,12 @@ msgstr "Konteks ruang kerja dimuat ulang"
 msgid "Workspace files changed during collection. Reload context and try again."
 msgstr "Berkas ruang kerja berubah selama pengumpulan. Muat ulang konteks dan coba lagi."
 
-#: lib/marshall_web/live/threads_live.ex:2842
+#: lib/marshall_web/live/threads_live.ex:2822
 #, elixir-autogen, elixir-format
 msgid "Workspace ready · open the conversation"
 msgstr "Ruang kerja siap · buka percakapan"
 
-#: lib/marshall_web/live/threads_live.ex:2844
+#: lib/marshall_web/live/threads_live.ex:2824
 #, elixir-autogen, elixir-format
 msgid "Workspace setup needs attention"
 msgstr "Penyiapan ruang kerja memerlukan perhatian"
@@ -1487,7 +1477,7 @@ msgstr "Penyiapan ruang kerja memerlukan perhatian"
 msgid "Workspace skill"
 msgstr "Keterampilan ruang kerja"
 
-#: lib/marshall_web/live/threads_live.ex:2549
+#: lib/marshall_web/live/threads_live.ex:2529
 #, elixir-autogen, elixir-format
 msgid "Workspace source"
 msgstr "Sumber ruang kerja"
@@ -1503,7 +1493,7 @@ msgstr "Anda dapat membaca utas ini. Minta akses pelaksana atau pengelola untuk 
 msgid "You do not have access to this thread."
 msgstr "Anda tidak memiliki akses ke utas ini."
 
-#: lib/marshall_web/live/threads_live.ex:2164
+#: lib/marshall_web/live/threads_live.ex:2144
 #, elixir-autogen, elixir-format
 msgid "You have read-only access to this thread."
 msgstr "Anda memiliki akses hanya-baca ke utas ini."
@@ -1513,27 +1503,27 @@ msgstr "Anda memiliki akses hanya-baca ke utas ini."
 msgid "Your agent's work runs in a dedicated environment."
 msgstr "Pekerjaan agen Anda berjalan dalam lingkungan khusus."
 
-#: lib/marshall_web/live/threads_live.ex:2312
+#: lib/marshall_web/live/threads_live.ex:2292
 #, elixir-autogen, elixir-format
 msgid "Your answer or additional detail"
 msgstr "Jawaban atau detail tambahan Anda"
 
-#: lib/marshall_web/live/threads_live.ex:2896
+#: lib/marshall_web/live/threads_live.ex:2876
 #, elixir-autogen, elixir-format
 msgid "Your answers were received"
 msgstr "Jawaban Anda diterima"
 
-#: lib/marshall_web/live/threads_live.ex:2274
+#: lib/marshall_web/live/threads_live.ex:2254
 #, elixir-autogen, elixir-format
 msgid "Your input is needed"
 msgstr "Masukan Anda diperlukan"
 
-#: lib/marshall_web/live/threads_live.ex:2174
+#: lib/marshall_web/live/threads_live.ex:2154
 #, elixir-autogen, elixir-format
 msgid "Your machine is starting. The agent will begin with your objective as soon as it is ready."
 msgstr "Mesin Anda sedang dimulai. Agen akan memulai tujuan Anda segera setelah siap."
 
-#: lib/marshall_web/live/threads_live.ex:2186
+#: lib/marshall_web/live/threads_live.ex:2166
 #, elixir-autogen, elixir-format
 msgid "Your objective is saved. Retry to prepare the workspace again."
 msgstr "Tujuan Anda disimpan. Coba lagi untuk menyiapkan ruang kerja kembali."
@@ -1543,12 +1533,12 @@ msgstr "Tujuan Anda disimpan. Coba lagi untuk menyiapkan ruang kerja kembali."
 msgid "Your threads"
 msgstr "Utas Anda"
 
-#: lib/marshall_web/live/threads_live.ex:2498
+#: lib/marshall_web/live/threads_live.ex:2478
 #, elixir-autogen, elixir-format
 msgid "and"
 msgstr "dan"
 
-#: lib/marshall_web/live/threads_live.ex:2499
+#: lib/marshall_web/live/threads_live.ex:2479
 #, elixir-autogen, elixir-format
 msgid "choose a mode and submit the task together. Choosing a mode on a new thread does not create a machine."
 msgstr "pilih mode dan kirim tugas bersamaan. Memilih mode pada utas baru tidak membuat mesin."
@@ -1558,7 +1548,7 @@ msgstr "pilih mode dan kirim tugas bersamaan. Memilih mode pada utas baru tidak 
 msgid "· %{value1} reasoning · %{value2}"
 msgstr "· penalaran %{value1} · %{value2}"
 
-#: lib/marshall_web/live/threads_live.ex:2466
+#: lib/marshall_web/live/threads_live.ex:2446
 #, elixir-autogen, elixir-format
 msgid "↑ ↓ choose · Enter run · Escape close"
 msgstr "↑ ↓ pilih · Enter jalankan · Escape tutup"
@@ -1618,7 +1608,7 @@ msgstr "Buka terminal mesin utas ini"
 msgid "Summarize older context for the next turn"
 msgstr "Ringkas konteks lama untuk giliran berikutnya"
 
-#: lib/marshall_web/live/threads_live.ex:1976
+#: lib/marshall_web/live/threads_live.ex:1956
 #, elixir-autogen, elixir-format
 msgid "Message board"
 msgstr "Papan pesan"

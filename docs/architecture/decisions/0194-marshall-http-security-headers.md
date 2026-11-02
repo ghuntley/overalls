@@ -16,8 +16,7 @@ proxy ([ADR-0038](0038-http01-validation-and-peer-routing.md),
 the browser editor are served by Audi under `*.apps.ghuntley.dev`
 ([ADR-0052](0052-fenced-local-guest-ingress.md)), which is a subdomain of the
 same registrable domain, so every user application is *same-site* with the
-control plane. The thread page embeds `/machines/:id/terminals` in a
-same-origin iframe, the terminal reads and writes the clipboard, passkeys use
+control plane. The terminal page reads and writes the clipboard, passkeys use
 WebAuthn, and the handbook renders Mermaid diagrams.
 
 Observed before this decision:

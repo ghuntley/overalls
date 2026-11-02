@@ -1419,8 +1419,8 @@ defmodule MarshallWeb.ThreadsLive do
   # Thread views MUST keep the objective and authorized transcript primary. Machine
   # settings MUST remain optional disclosure, and pending/failed/archived states
   # MUST explain the available next action without exposing provider diagnostics.
-  # The embedded terminal MUST load lazily through the existing machine route,
-  # preserving that route's current authorization and terminal session checks.
+  # The terminal action MUST use the existing machine route, preserving that
+  # route's current authorization and terminal session checks.
 
   # @cc [owner:ghuntley,label:product] thread-newest-first-reading-order
   # The ready-thread composer MUST precede its transcript in DOM order. Authorized
@@ -1938,26 +1938,6 @@ defmodule MarshallWeb.ThreadsLive do
                             class="console-button ghost"
                           >{dgettext("agents", "Open terminal")} <.glyph name="arrow_up_right" /></.link>
                         </div>
-                        <details
-                          :if={@can_write and @selected.status == :ready and @selected.machine_id}
-                          id="thread-terminal-embed"
-                          class="thread-terminal-embed"
-                          data-thread-terminal
-                        >
-                          <summary class="console-button ghost">
-                            {dgettext("agents", "Open terminal here")}
-                          </summary>
-                          <div class="thread-terminal-frame">
-                            <iframe
-                              id="thread-terminal-frame"
-                              data-thread-terminal-src={
-                                ~p"/machines/#{@selected.machine_id}/terminals"
-                              }
-                              title={dgettext("agents", "Thread terminal")}
-                              loading="lazy"
-                            ></iframe>
-                          </div>
-                        </details>
                         <.link
                           :if={@editor_available}
                           id="thread-vscode"

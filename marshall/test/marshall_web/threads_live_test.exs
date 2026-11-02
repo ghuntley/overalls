@@ -371,8 +371,9 @@ defmodule MarshallWeb.ThreadsLiveTest do
 
   # @cc [owner:ghuntley,label:verification;security] thread-editor-current-capability
   # A ready thread MUST offer the editor only while its bound machine's current
-  # projection permits it. A mounted thread MUST remove the link on refresh when
-  # a stop is requested, even if the thread itself remains ready.
+  # projection permits it and expose terminal access through the bound machine
+  # route. A mounted thread MUST remove the editor link on refresh when a stop
+  # is requested, even if the thread itself remains ready.
   test "editor access follows the bound machine's current eligibility", c do
     alias Marshall.Compute.Ledger
     alias Marshall.EditorFixture
@@ -409,8 +410,12 @@ defmodule MarshallWeb.ThreadsLiveTest do
 
     assert has_element?(
              view,
-             "#thread-terminal-embed iframe[data-thread-terminal-src='/machines/#{fixture.vm.id}/terminals']"
+             "#thread-terminal a[href='/machines/#{fixture.vm.id}/terminals']",
+             "Open terminal"
            )
+
+    refute has_element?(view, "#thread-terminal-embed")
+    refute has_element?(view, "iframe[data-thread-terminal-src]")
 
     Ledger.intent!(fixture.vm, %{
       desired_state: :stopped,

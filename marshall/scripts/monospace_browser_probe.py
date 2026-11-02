@@ -719,7 +719,9 @@ def check_thread_views(page: Page, fixture: Context, artifacts: Path) -> None:
     """@cc [owner:ghuntley,label:verification] thread-browser-lifecycle-coverage
     The probe MUST check list, new, activity and all five fixture lifecycle views
     in both themes at desktop and mobile widths. Archived and unready views MUST
-    expose no prompt, terminal or editor control; ready views MUST expose all three.
+    expose no prompt, terminal or editor control; ready views MUST expose the
+    external terminal route and editor link. The thread detail MUST NOT embed a
+    terminal iframe.
     Ready views MUST also cover slash completion, the command palette, draft and
     focus preservation, IME composition and mobile touch access. Browser checks
     MUST NOT submit prompts or invoke lifecycle mutations.
@@ -786,6 +788,8 @@ def check_thread_views(page: Page, fixture: Context, artifacts: Path) -> None:
                         "href", f"/machines/{fixture['vm_id']}/terminals"
                     )
                     expect(page.locator("#thread-terminal")).to_be_visible()
+                    expect(page.locator("#thread-terminal-embed")).to_have_count(0)
+                    expect(page.locator("iframe[data-thread-terminal-src]")).to_have_count(0)
                     expect(page.locator("#thread-vscode")).to_be_visible()
                     expect(page.locator("#thread-vscode")).to_have_attribute(
                         "href", f"/machines/{fixture['vm_id']}/code"
