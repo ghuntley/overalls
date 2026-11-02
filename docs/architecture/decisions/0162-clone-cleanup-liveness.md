@@ -152,6 +152,21 @@ columns are added to `compute_clone_effects` and four to
 - Native clone matrix, cancellation and restart tests: rerun pending; recorded
   in the [review](../reviews/2026-10-13-clone-cleanup-liveness.md) when they run.
 
+**Correction (2026-11-01).** The native published-clone restart scenario in
+`cloning-fleet` ([Porsche scenario](../../../nix/verification/tests/machines/fleet/scenarios/porsche.py),
+contract `published-clone-native-recovery`) still asserted the superseded
+ADR-0055 retention: both slots held while the source restart had failed, a
+relocation of the published copy refused `transfer_busy`, and a clone of the
+copy failed `source_unavailable` (the busy-slot fold this decision removed).
+Its restart fault never fired until 2026-10-31, so the stale expectation went
+unexercised. Daily run 41321201081 then failed on the slot count because the
+revoke receipts had already released the slots, as decision 2 requires. The
+scenario now waits for both revoke receipts and every slot's release while the
+request is still cleaning with the source unrestored, asserts that relocating
+the unrestored source is refused `clone_in_progress` (`CloneGuard.vm_busy?`),
+and asserts that retry and cleanup keep the first release timestamps. The
+decision and the Marshall implementation are unchanged.
+
 ## Open questions
 
 - Whether the deadline should also complete a request whose destination settled

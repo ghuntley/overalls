@@ -593,9 +593,12 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
 
     # @cc [owner:ghuntley,label:verification;recovery] published-clone-native-recovery
     # A real failed source launch MUST leave a published independent destination
-    # and occupied slots. Transfers from that other VM must remain blocked until
-    # public retry restores the source and completes physical cleanup. Never
-    # synthesize outcomes, clear slots or replace the original clone identity.
+    # and an active cleaning request. Its transfer slots release once both
+    # endpoint revoke receipts are on record (ADR-0162,
+    # clone-stream-slots-require-both-revocations), so the published copy never
+    # blocks other transfers; the unrestored source stays excluded from
+    # relocation until public retry restores it and completes physical cleanup.
+    # Never synthesize outcomes, clear slots or replace the original clone identity.
     published_source: str = vm_id
 
     def recover_published_clone() -> None:
@@ -653,16 +656,32 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
         copy_processes = process_snapshot(copy)
         machine.succeed("test -f /run/clone-restart-fault-fired")
         machine.fail("systemctl is-active lilly-vm-" + placement["placement_id"] + ".service")
-        assert (
-            sql(
-                f"SELECT count(*) FROM compute_transfer_slots WHERE clone_request_id='{identity}' "
-                "AND released_at IS NULL"
+
+        def stream_quiescent_slots_released() -> bool:
+            # Both revoke receipts end the stream; only then may every slot of
+            # this clone (one per distinct endpoint host) carry a release time.
+            return (
+                sql(
+                    "SELECT (SELECT count(*) FROM compute_clone_effects e "
+                    f"WHERE e.clone_request_id='{identity}' AND e.kind='revoke' "
+                    "AND e.completed_at IS NOT NULL)=2 AND (SELECT count(*)="
+                    "CASE WHEN r.source_host_id=r.destination_host_id THEN 1 ELSE 2 END "
+                    "AND bool_and(s.released_at IS NOT NULL) "
+                    "AND count(DISTINCT s.host_id)=count(*) "
+                    "AND bool_and(s.host_id IN (r.source_host_id,r.destination_host_id)) "
+                    "FROM compute_transfer_slots s WHERE s.clone_request_id=r.id) "
+                    f"FROM compute_clone_requests r WHERE r.id='{identity}' "
+                    "AND r.active AND r.phase='cleaning' AND r.source_restored_at IS NULL"
+                )
+                == "t"
             )
-            == "2"
+
+        eventually(stream_quiescent_slots_released, timeout=240)
+        released_slots = sql(
+            "SELECT string_agg(id::text || '@' || released_at::text, ',' ORDER BY id) "
+            f"FROM compute_transfer_slots WHERE clone_request_id='{identity}'"
         )
-        refusal = porsche_receipt(
-            f"relocate porsche-ssh-copy --request-id {uuid.uuid4()} --no-wait"
-        )
+        refusal = porsche_receipt(f"relocate porsche-fleet --request-id {uuid.uuid4()} --no-wait")
         # Only finite refusal labels may enter diagnostics; preserve the exact
         # expected refusal instead of accepting a neighboring admission failure.
         refusal_error = refusal.get("error")
@@ -670,6 +689,7 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
             refusal_error
             if refusal_error
             in (
+                "clone_in_progress",
                 "transfer_busy",
                 "source_unavailable",
                 "workload_not_stable",
@@ -681,25 +701,12 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
                 "forbidden",
                 "request_conflict",
                 "operation_failed",
+                "placement_changed",
             )
             else "redacted"
         )
-        assert refusal_error == "transfer_busy", "Published clone relocation refusal: " + str(
-            refusal_reason
-        )
-        blocked_key = str(uuid.uuid4())
-        porsche_receipt(
-            f"clone porsche-ssh-copy --name blocked-by-restoration --request-id {blocked_key} --no-wait"
-        )
-        eventually(
-            lambda: (
-                sql(
-                    "SELECT count(*) FROM compute_clone_requests "
-                    "WHERE name='blocked-by-restoration' AND phase='failed' "
-                    "AND failure='source_unavailable'"
-                )
-                == "1"
-            )
+        assert refusal_error == "clone_in_progress", (
+            "Unrestored clone source relocation refusal: " + str(refusal_reason)
         )
         assert process_snapshot(copy) == copy_processes
         machine.succeed("rm /run/clone-restart-fault")
@@ -724,12 +731,13 @@ with subtest("Porsche browser keys and native SSH execute real guest lifecycle")
             )
             == "1"
         )
+        # Retry and cleanup replay MUST keep the first release timestamps.
         assert (
             sql(
-                f"SELECT count(*) FROM compute_transfer_slots WHERE clone_request_id='{identity}' "
-                "AND released_at IS NULL"
+                "SELECT string_agg(id::text || '@' || released_at::text, ',' ORDER BY id) "
+                f"FROM compute_transfer_slots WHERE clone_request_id='{identity}'"
             )
-            == "0"
+            == released_slots
         )
         machine.fail("zfs list " + child + "@lilly-b")
         assert process_snapshot(copy) == copy_processes
