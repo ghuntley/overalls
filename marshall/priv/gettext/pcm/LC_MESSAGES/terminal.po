@@ -528,12 +528,6 @@ msgstr "We no fit open di terminal."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "This machine don stop. Start am to open your terminal. We keep your files."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "Image for this machine no support di current browser editor."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

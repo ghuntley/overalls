@@ -2,7 +2,7 @@ defmodule Ziggy.AgentWorkerTest do
   use ExUnit.Case, async: false
   import ExUnit.CaptureLog
 
-  @id "11111111-1111-4111-8111-111111111111"
+  @id "11111111-1111-7111-8111-111111111111"
   @claim "22222222-2222-4222-8222-222222222222"
   @private "synthetic-provider-private-detail"
 
@@ -20,8 +20,14 @@ defmodule Ziggy.AgentWorkerTest do
     def handle_call({:request, "ziggy.admit", body, _}, _, state) do
       send(state.owner, {:admission, body})
 
-      {:reply, {:ok, %{"owner_id" => body["vm_id"], "admitted_at" => 1, "ttl_ms" => 30_000}},
-       state}
+      {:reply,
+       {:ok,
+        %{
+          "request_id" => body["request_id"],
+          "owner_id" => body["vm_id"],
+          "admitted_at" => 1,
+          "ttl_ms" => 30_000
+        }}, state}
     end
 
     def handle_call({:request, "ziggy.agent_result", body, _}, _, state) do
@@ -50,10 +56,39 @@ defmodule Ziggy.AgentWorkerTest do
     def call(conn, options) do
       {:ok, request, conn} = Plug.Conn.read_body(conn)
       send(options.owner, {:provider_call, conn.request_path, Jason.decode!(request)})
+      send(options.owner, {:request_id, Plug.Conn.get_req_header(conn, "x-request-id")})
+      send(options.owner, {:forwarded_headers, conn.req_headers})
 
       conn
       |> Plug.Conn.put_resp_header("content-type", options.content_type)
+      |> Plug.Conn.put_resp_header("x-request-id", "provider-foreign-id")
+      |> Plug.Conn.put_resp_header("request-id", "provider-alias")
       |> Plug.Conn.send_resp(options.status, options.body)
+    end
+  end
+
+  defmodule EvidenceFinch do
+    @type event ::
+            {:status, pos_integer()} | {:headers, [{binary(), binary()}]} | {:data, binary()}
+    @type ending :: :ok | :transport_error
+
+    @spec configure([event()], ending()) :: term()
+    def configure(events, ending), do: Process.put(__MODULE__, {events, ending})
+
+    @spec stream_while(
+            Finch.Request.t(),
+            term(),
+            map(),
+            (event(), map() -> {:cont, map()} | {:halt, map()}),
+            keyword()
+          ) :: {:ok, map()} | {:error, :closed, map()}
+    def stream_while(request, _finch, initial, callback, options) do
+      send(self(), {:provider_headers, request.headers})
+      send(self(), {:provider_options, options})
+      {events, ending} = Process.get(__MODULE__)
+
+      state = Enum.reduce_while(events, initial, fn event, state -> callback.(event, state) end)
+      if ending == :ok, do: {:ok, state}, else: {:error, :closed, state}
     end
   end
 
@@ -112,6 +147,7 @@ defmodule Ziggy.AgentWorkerTest do
     assert :completed = Ziggy.AgentWorker.execute(config, work(request))
     assert_receive {:admission, %{"operation" => "responses"}}
     assert_receive {:provider_call, "/v1/responses", ^request}
+    assert_receive {:request_id, [@id]}
     assert_receive {:delivered, %{"response" => ^response}}
 
     assert [%{"admission" => %{"operation" => "responses"}, "completion" => completion}] =
@@ -198,7 +234,12 @@ defmodule Ziggy.AgentWorkerTest do
   for {code, param, expected} <- [
         {"context_length_exceeded", nil, "context_length_exceeded"},
         {"unsupported_parameter", "compaction_trigger", "unsupported_compaction"},
-        {"unknown_error", nil, "upstream_failed"}
+        {"unknown_error", nil, "upstream_failed"},
+        {"no_accounts", nil, "no_accounts"},
+        {"pool_exhausted", nil, "pool_exhausted"},
+        {"quota_exhausted", nil, "quota_exhausted"},
+        {"server_is_overloaded", nil, "server_is_overloaded"},
+        {"retryable_overload", nil, "upstream_failed"}
       ] do
     test "HTTP #{code} is sanitized before results or diagnostics" do
       body =
@@ -220,6 +261,150 @@ defmodule Ziggy.AgentWorkerTest do
       assert [%{"completion" => %{"tokens" => %{}, "completeness" => "unknown"}}] =
                Ziggy.Spool.pending(Ziggy.Spool)
     end
+  end
+
+  for {label, headers, origin, ending, expected} <- [
+        {"certified local proxy", [{"x-underclass-retry-safe", "pre-output-overload"}],
+         "http://127.0.0.1:8080", :ok, "retryable_overload"},
+        {"certified remote proxy", [{"x-underclass-retry-safe", "pre-output-overload"}],
+         "https://panterloons.lorikeet-bangus.ts.net", :ok, "retryable_overload"},
+        {"missing evidence", [], "http://127.0.0.1:8080", :ok, "server_is_overloaded"},
+        {"duplicate evidence",
+         List.duplicate({"x-underclass-retry-safe", "pre-output-overload"}, 2),
+         "http://127.0.0.1:8080", :ok, "server_is_overloaded"},
+        {"unknown evidence", [{"x-underclass-retry-safe", "true"}], "http://127.0.0.1:8080", :ok,
+         "server_is_overloaded"},
+        {"provider spoof", [{"x-underclass-retry-safe", "pre-output-overload"}],
+         "https://api.openai.com", :ok, "server_is_overloaded"},
+        {"ambiguous transport", [{"x-underclass-retry-safe", "pre-output-overload"}],
+         "http://127.0.0.1:8080", :transport_error, "transport_error"}
+      ] do
+    test "#{label} has closed retry eligibility" do
+      body = "data: {\"type\":\"error\",\"code\":\"server_is_overloaded\"}\n\n"
+
+      config =
+        evidence_configuration(
+          body,
+          unquote(Macro.escape(headers)),
+          unquote(origin),
+          unquote(ending)
+        )
+
+      assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+      assert_receive {:delivered, %{"response" => %{"error" => unquote(expected)}}}
+      assert_receive {:provider_headers, headers}
+      assert Enum.filter(headers, &(elem(&1, 0) == "x-request-id")) == [{"x-request-id", @id}]
+      refute_receive {:provider_headers, _}
+      assert_receive {:provider_options, options}
+      expected_timeout = if unquote(origin) == "https://api.openai.com", do: 30_000, else: 600_000
+      assert options[:receive_timeout] == expected_timeout
+      assert options[:request_timeout] == :infinity
+
+      assert [%{"completion" => completion}] = Ziggy.Spool.pending(Ziggy.Spool)
+      assert {:ok, _} = OverallsProtocol.Inference.completion(Ziggy.Completion.wire(completion))
+      refute Map.has_key?(completion, "retry_safe")
+    end
+  end
+
+  for {label, prefix, suffix} <- [
+        {"partial output",
+         "data: {\"type\":\"response.output_text.delta\",\"delta\":\"private\"}\n\n", ""},
+        {"unknown event", "data: {\"type\":\"unknown\"}\n\n", ""},
+        {"malformed event", "data: invalid\n\n", ""},
+        {"conflicting terminal", "",
+         "data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[]}}\n\n"},
+        {"truncated frame", "", "data: partial"}
+      ] do
+    test "#{label} overrides the proxy evidence" do
+      overload = "data: {\"type\":\"error\",\"code\":\"server_is_overloaded\"}\n\n"
+      config = evidence_configuration(unquote(prefix) <> overload <> unquote(suffix))
+      assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+      assert_receive {:delivered, %{"response" => %{"error" => "server_is_overloaded"}}}
+    end
+  end
+
+  test "UUIDv4 model calls cannot contact admission or upstream" do
+    config = configuration(200, "application/json", "{}")
+    legacy = Map.put(work(request()), "id", "11111111-1111-4111-8111-111111111111")
+    assert :admission_unavailable = Ziggy.AgentWorker.execute(config, legacy)
+    refute_receive {:admission, _}
+    refute_receive {:provider_call, _, _}
+  end
+
+  test "generic HTTP admission owns the UUIDv7 request header through the entire attempt" do
+    response = %{"status" => "completed", "output" => []}
+    config = configuration(200, "application/json", Jason.encode!(response))
+    binding = work(request())["binding"]
+
+    conn =
+      Plug.Test.conn(:post, "http://llm.internal/v1/responses", Jason.encode!(request()))
+      |> Plug.Conn.put_req_header("content-type", "application/json")
+      |> Plug.Conn.put_req_header(
+        "x-overalls-binding",
+        Base.url_encode64(Jason.encode!(binding), padding: false)
+      )
+      |> Plug.Conn.put_req_header("x-request-id", "guest-controlled-id")
+      |> Plug.Conn.put_req_header("x-underclass-retry-safe", "pre-output-overload")
+
+    result = Ziggy.HTTP.call(conn, config)
+    assert result.status == 200
+    assert_receive {:admission, %{"request_id" => id}}
+    assert Ziggy.RequestId.valid?(id)
+    assert_receive {:request_id, [^id]}
+    assert Plug.Conn.get_resp_header(result, "x-request-id") == [id]
+    assert Plug.Conn.get_resp_header(result, "x-ziggy-request-id") == [id]
+    assert Plug.Conn.get_resp_header(result, "request-id") == []
+    assert_receive {:forwarded_headers, headers}
+    refute List.keymember?(headers, "x-underclass-retry-safe", 0)
+    refute inspect(headers) =~ "guest-controlled-id"
+  end
+
+  test "classified provider diagnostics retain the attempt ID and exclude error content" do
+    body = Jason.encode!(%{"error" => %{"type" => "no_accounts", "message" => @private}})
+    config = configuration(503, "application/json", body)
+
+    log =
+      capture_log([metadata: [:event, :request_id, :reason, :status, :duration_ms]], fn ->
+        assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+      end)
+
+    assert log =~ "ziggy.upstream_started"
+    assert log =~ "ziggy.upstream_outcome"
+    assert log =~ "ziggy.agent_provider_outcome"
+    assert log =~ @id
+    assert log =~ "no_accounts"
+    assert log =~ "503"
+    refute log =~ @private
+    refute log =~ "synthetic-test-key"
+  end
+
+  test "collector overflow overrides otherwise certified overload" do
+    overload = "data: {\"type\":\"error\",\"code\":\"server_is_overloaded\"}\n\n"
+    config = evidence_configuration(overload <> String.duplicate("x", 2_097_153))
+    assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+    assert_receive {:delivered, %{"response" => %{"error" => "invalid_response"}}}
+  end
+
+  test "certified overload result delivery retries reuse the exact response and provider attempt" do
+    body = "data: {\"type\":\"error\",\"code\":\"server_is_overloaded\"}\n\n"
+
+    config =
+      evidence_configuration(
+        body,
+        [{"x-underclass-retry-safe", "pre-output-overload"}],
+        "http://127.0.0.1:8080",
+        :ok,
+        2
+      )
+
+    assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+    assert_receive {:delivered, first}
+    assert first["response"] == %{"error" => "retryable_overload"}
+    assert_receive {:delivered, ^first}
+    assert_receive {:delivered, ^first}
+    assert_receive {:provider_headers, _}
+    refute_receive {:provider_headers, _}
+    assert length(Ziggy.Spool.pending(Ziggy.Spool)) == 1
   end
 
   test "incomplete SSE is a closed terminal result with its reported usage" do
@@ -316,6 +501,40 @@ defmodule Ziggy.AgentWorkerTest do
       control: %{client: control},
       credentials: %{openai: "synthetic-test-key"},
       openai_origin: "http://127.0.0.1:#{port}"
+    }
+  end
+
+  @spec evidence_configuration(
+          binary(),
+          [{binary(), binary()}],
+          binary(),
+          EvidenceFinch.ending(),
+          non_neg_integer()
+        ) :: map()
+  defp evidence_configuration(
+         body,
+         evidence \\ [{"x-underclass-retry-safe", "pre-output-overload"}],
+         origin \\ "http://127.0.0.1:8080",
+         ending \\ :ok,
+         failures \\ 0
+       ) do
+    control = start_supervised!({ControlFixture, %{owner: self(), failures: failures}})
+
+    EvidenceFinch.configure(
+      [
+        {:status, 200},
+        {:headers, [{"content-type", "text/event-stream"} | evidence]},
+        {:data, body}
+      ],
+      ending
+    )
+
+    %{
+      host_id: @id,
+      control: %{client: control},
+      credentials: %{openai: "synthetic-test-key"},
+      openai_origin: origin,
+      finch_module: EvidenceFinch
     }
   end
 

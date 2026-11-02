@@ -239,6 +239,6 @@ in
       fi
     '';
   };
-  # Re-authenticate the freshly installed host before publishing tailnet HTTPS.
-  services.underclass.tailscaleServe.enable = lib.mkForce false;
+  # Tailnet publication is selected by the authenticated deployment host.
+  services.underclass.tailscaleServe.enable = lib.mkDefault false;
 }

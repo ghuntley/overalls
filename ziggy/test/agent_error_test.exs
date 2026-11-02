@@ -26,6 +26,23 @@ defmodule Ziggy.AgentErrorTest do
     assert nil == Ziggy.AgentError.terminal(%{"status" => "completed", "error" => nil})
   end
 
+  test "only exact closed pool and overload codes survive sanitization" do
+    for {code, reason} <- [
+          {"no_accounts", :no_accounts},
+          {"pool_exhausted", :pool_exhausted},
+          {"quota_exhausted", :quota_exhausted},
+          {"server_is_overloaded", :server_is_overloaded}
+        ] do
+      assert Ziggy.AgentError.classify(%{"error" => %{"code" => code}}) == reason
+      assert Ziggy.AgentError.classify(%{"error" => %{"type" => code}}) == reason
+      assert Ziggy.AgentError.classify(%{"error" => %{"message" => code}}) == :upstream_failed
+      assert Ziggy.AgentError.classify(code <> "_private") == :upstream_failed
+    end
+
+    assert Ziggy.AgentError.classify(%{"error" => %{"code" => "retryable_overload"}}) ==
+             :upstream_failed
+  end
+
   property "free-form provider errors never become recovery classes or diagnostics" do
     message = draw("message", string(:printable, min_length: 0, max_length: 256))
     assert :upstream_failed = Ziggy.AgentError.classify(%{"error" => %{"message" => message}})

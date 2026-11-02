@@ -116,6 +116,13 @@ defmodule Ziggy.AgentWorker do
             Process.get({__MODULE__, :response_stream})
           )
 
+        Ziggy.Events.emit("ziggy.agent_provider_outcome",
+          request_id: id,
+          reason: provider_reason(response),
+          status: result.status,
+          duration_ms: System.monotonic_time(:millisecond) - started
+        )
+
         completion = %{
           "provider_request_id" => result.provider_request_id,
           "http_status" => result.status,
@@ -152,7 +159,7 @@ defmodule Ziggy.AgentWorker do
          "request" => request
        })
        when is_map(wire) and is_map(request) do
-    with true <- OverallsProtocol.uuid?(id) and OverallsProtocol.uuid?(claim_id),
+    with true <- Ziggy.RequestId.valid?(id) and OverallsProtocol.uuid?(claim_id),
          {:ok, binding} <- OverallsProtocol.PrivateServices.binding(wire),
          true <- binding.host_id == config.host_id,
          true <- Map.has_key?(config.credentials, :openai),
@@ -262,22 +269,26 @@ defmodule Ziggy.AgentWorker do
        when outcome not in [:completed, :upstream_error, :transport_error],
        do: %{"error" => "upstream_failed"}
 
-  defp terminal_response(%{status: status}, _, %Ziggy.AgentStream{} = stream) do
+  defp terminal_response(%{status: status} = result, _, %Ziggy.AgentStream{} = stream) do
     case Ziggy.AgentStream.finish(stream) do
       {:ok, response} when status in 200..299 -> response
       {:ok, _} -> %{"error" => "upstream_failed"}
       {:error, :too_large} -> %{"error" => "invalid_response"}
-      {:error, reason} -> %{"error" => Atom.to_string(reason)}
+      {:error, reason} -> stream_failure(result, stream, reason)
     end
   end
 
-  defp terminal_response(%{status: status}, body, nil) when is_binary(body) do
+  defp terminal_response(%{status: status} = result, body, nil) when is_binary(body) do
     case Jason.decode(body) do
       {:ok, response} when is_map(response) and status in 200..299 ->
         case Ziggy.AgentError.terminal(response) do
           nil -> response
+          _ when result.outcome == :transport_error -> %{"error" => "transport_error"}
           reason -> %{"error" => Atom.to_string(reason)}
         end
+
+      _ when result.outcome == :transport_error ->
+        %{"error" => "transport_error"}
 
       {:ok, response} ->
         %{"error" => response |> Ziggy.AgentError.classify() |> Atom.to_string()}
@@ -286,6 +297,39 @@ defmodule Ziggy.AgentWorker do
         %{"error" => if(status in 200..299, do: "invalid_response", else: "upstream_failed")}
     end
   end
+
+  # @cc [owner:ghuntley,label:recovery] agent-retry-overload-two-independent-proofs
+  # Only a completely received 2xx Responses stream with proxy-owned evidence
+  # and a locally proven terminal overload before output may become
+  # retryable_overload. Transport loss, cancellation and collector failure MUST
+  # remain terminal. A provider-controlled retryable_overload code is not proof.
+  @spec stream_failure(Ziggy.Upstream.result(), Ziggy.AgentStream.t(), Ziggy.AgentStream.error()) ::
+          map()
+  defp stream_failure(%{outcome: :transport_error}, _, _),
+    do: %{"error" => "transport_error"}
+
+  defp stream_failure(
+         %{outcome: :completed, status: status, retry_safe: true},
+         stream,
+         :server_is_overloaded
+       )
+       when status in 200..299 do
+    reason =
+      if Ziggy.AgentStream.overload_before_output?(stream),
+        do: "retryable_overload",
+        else: "server_is_overloaded"
+
+    %{"error" => reason}
+  end
+
+  defp stream_failure(_, _, reason), do: %{"error" => Atom.to_string(reason)}
+
+  @spec provider_reason(map()) :: atom()
+  defp provider_reason(%{"error" => "retryable_overload"}), do: :retryable_overload
+  defp provider_reason(%{"error" => "transport_error"}), do: :transport_error
+  defp provider_reason(%{"error" => "invalid_response"}), do: :invalid_response
+  defp provider_reason(%{"error" => reason}), do: Ziggy.AgentError.classify(reason)
+  defp provider_reason(_), do: :completed
 
   @spec accounting_outcome(atom(), map()) :: atom()
   defp accounting_outcome(:completed, %{"error" => "cancelled"}), do: :cancelled
