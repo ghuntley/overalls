@@ -278,7 +278,8 @@ private enum MilaRustFFI {
         out.pointee = MilaMachineCommandKind(rawValue: Int32(raw.rawValue)) ?? .unknown
         return status
     }
-    static func pushRegistration(_ provider: UInt8, _ environment: UInt8, _ token: UnsafePointer<CChar>, _ app: UnsafePointer<CChar>, _ deployment: UnsafePointer<CChar>, _ endpoint: UnsafePointer<CChar>) -> Int32 {
+    /// `endpoint` is null for APNs and FCM; Rust refuses an endpoint for either.
+    static func pushRegistration(_ provider: UInt8, _ environment: UInt8, _ token: UnsafePointer<CChar>, _ app: UnsafePointer<CChar>, _ deployment: UnsafePointer<CChar>, _ endpoint: UnsafePointer<CChar>?) -> Int32 {
         mila_push_registration_validate(provider, environment, token, app, deployment, endpoint).rawValue
     }
     /// APNs and FCM registrations carry no endpoint, so it crosses as null.
@@ -428,14 +429,18 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
 
     /// Validates push metadata in Rust without exposing or retaining the device token.
     /// The token is borrowed for the call and is never retained by the native layer.
-    public func validatePushRegistration(provider: MilaPushProvider, environment: MilaPushEnvironment, token: String, appID: String, deployment: String, endpoint: String) throws {
+    /// APNs and FCM registrations carry no endpoint: pass nil, which crosses as null.
+    public func validatePushRegistration(provider: MilaPushProvider, environment: MilaPushEnvironment, token: String, appID: String, deployment: String, endpoint: String?) throws {
         try validatePushRegistration(provider: provider.rawValue, environment: environment.rawValue, token: token, appID: appID, deployment: deployment, endpoint: endpoint)
     }
 
     /// Compatibility entry point for callers decoding persisted provider values.
-    public func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws {
+    public func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws {
         guard abiCompatible() else { throw MilaFFIError.incompatibleABI }
-        let status = token.withCString { tokenPtr in appID.withCString { appPtr in deployment.withCString { deploymentPtr in endpoint.withCString { endpointPtr in MilaRustFFI.pushRegistration(provider, environment, tokenPtr, appPtr, deploymentPtr, endpointPtr) } } } }
+        let status = token.withCString { tokenPtr in appID.withCString { appPtr in deployment.withCString { deploymentPtr -> Int32 in
+            guard let endpoint else { return MilaRustFFI.pushRegistration(provider, environment, tokenPtr, appPtr, deploymentPtr, nil) }
+            return endpoint.withCString { endpointPtr in MilaRustFFI.pushRegistration(provider, environment, tokenPtr, appPtr, deploymentPtr, endpointPtr) }
+        } } }
         guard status == 0 else { throw MilaFFIError.unavailable }
     }
 
@@ -725,7 +730,7 @@ public protocol MilaFFIAdapter: Sendable {
     func classifyThreadCommand(_ line: String) throws -> MilaThreadCommandKind
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind
     func classifyWebCommand(_ command: MilaWebCommand) throws -> MilaMachineCommandKind
-    func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws
+    func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws
     func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data
     func notificationDevices() async throws -> [MilaAccountNotificationDevice]
     func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID
@@ -751,7 +756,7 @@ public extension MilaFFIAdapter {
     func classifyThreadCommand(_ line: String) throws -> MilaThreadCommandKind { _ = line; throw MilaFFIError.unavailable }
     func classifyMachineCommand(_ line: String) throws -> MilaMachineCommandKind { _ = line; throw MilaFFIError.unavailable }
     func classifyWebCommand(_ command: MilaWebCommand) throws -> MilaMachineCommandKind { _ = command; throw MilaFFIError.unavailable }
-    func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws { throw MilaFFIError.unavailable }
+    func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws { throw MilaFFIError.unavailable }
     func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data { _ = token; _ = environment; _ = appID; _ = deployment; throw MilaFFIError.unavailable }
     func notificationDevices() async throws -> [MilaAccountNotificationDevice] { throw MilaFFIError.unavailable }
     func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {

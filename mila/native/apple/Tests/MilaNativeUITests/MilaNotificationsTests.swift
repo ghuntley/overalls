@@ -18,11 +18,11 @@ final class MilaNotificationsTests: XCTestCase {
     #endif
 
     private final class Adapter: MilaFFIAdapter, @unchecked Sendable {
-        var calls: [(UInt8, UInt8, String, String, String, String)] = []
+        var calls: [(UInt8, UInt8, String, String, String, String?)] = []
         var error: Error?
 
         func call(_ request: MilaFFIRequest) async throws -> MilaFFIResponse { throw MilaFFIError.unavailable }
-        func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String) throws {
+        func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws {
             calls.append((provider, environment, token, appID, deployment, endpoint))
             if let error { throw error }
         }
@@ -55,11 +55,12 @@ final class MilaNotificationsTests: XCTestCase {
         let store = Store()
         let controller = MilaNotificationController(adapter: adapter, appID: "com.example.mila", deployment: "mila.example.test", store: store)
         let token = String(repeating: "a", count: 64)
-        controller.register(token: token, endpoint: "https://mila.example.test/push", environment: .sandbox)
+        controller.register(token: token, environment: .sandbox)
         XCTAssertEqual(controller.state, .on)
         XCTAssertEqual(adapter.calls.count, 1)
         XCTAssertEqual(adapter.calls[0].0, MilaPushProvider.apple.rawValue)
         XCTAssertEqual(adapter.calls[0].1, MilaPushEnvironment.sandbox.rawValue)
+        XCTAssertNil(adapter.calls[0].5, "APNs registration crosses no endpoint")
         XCTAssertEqual(controller.devices.count, 1)
         XCTAssertEqual(controller.devices[0].enabled, true)
         controller.disable()
@@ -73,11 +74,11 @@ final class MilaNotificationsTests: XCTestCase {
         let adapter = Adapter()
         let store = Store()
         let controller = MilaNotificationController(adapter: adapter, appID: "com.example.mila", deployment: "mila.example.test", store: store)
-        controller.register(token: String(repeating: "a", count: 64), endpoint: "https://mila.example.test/push")
+        controller.register(token: String(repeating: "a", count: 64))
         XCTAssertEqual(controller.state, .on)
         controller.setSessionActive(false)
         XCTAssertTrue(controller.devices.isEmpty)
-        controller.register(token: String(repeating: "b", count: 64), endpoint: "https://mila.example.test/push")
+        controller.register(token: String(repeating: "b", count: 64))
         XCTAssertEqual(controller.state, .failed)
         XCTAssertFalse(controller.removeDevice(id: "com.example.mila"))
         controller.setSessionActive(true)
@@ -85,25 +86,42 @@ final class MilaNotificationsTests: XCTestCase {
     }
 
 
-    func testRegistrationRejectsInvalidTokenAndEndpointBeforeBoundary() {
+    func testRegistrationRejectsInvalidTokenBeforeBoundary() {
         let adapter = Adapter()
         let controller = MilaNotificationController(adapter: adapter, appID: "com.example.mila", deployment: "mila.example.test", store: Store())
-        controller.register(token: String(repeating: "a", count: 31), endpoint: "https://mila.example.test/push")
+        controller.register(token: String(repeating: "a", count: 31))
         XCTAssertEqual(controller.state, .failed)
-        controller.register(token: String(repeating: "a", count: 32), endpoint: "http://mila.example.test/push")
-        XCTAssertEqual(controller.state, .failed)
-        controller.register(token: String(repeating: "a", count: 32), endpoint: "https://user@mila.example.test/push#fragment")
+        controller.register(token: String(repeating: "a", count: 201))
         XCTAssertEqual(controller.state, .failed)
         XCTAssertTrue(adapter.calls.isEmpty)
-        controller.register(token: String(repeating: "a", count: 32), endpoint: "https://bad host.test/push")
-        XCTAssertEqual(controller.state, .failed)
-        XCTAssertTrue(adapter.calls.isEmpty)
+    }
+
+    /// Rust refuses an APNs registration that carries an endpoint, so the
+    /// controller once failed every real registration. Against the linked
+    /// Rust validator an endpoint is refused and the controller's
+    /// endpoint-free registration is accepted.
+    func testAPNsRegistrationPassesTheLinkedRustValidatorWithoutAnEndpoint() throws {
+        let adapter = LinkedMilaFFIAdapter()
+        let token = String(repeating: "ab", count: 32)
+        do {
+            try adapter.validatePushRegistration(provider: .apple, environment: .production, token: token, appID: "dev.overalls.mila",
+                                                 deployment: "mila.example.test", endpoint: nil)
+        } catch MilaFFIError.unavailable, MilaFFIError.incompatibleABI {
+            throw XCTSkip("Rust ABI is not linked in this package test environment")
+        }
+        XCTAssertThrowsError(try adapter.validatePushRegistration(provider: .apple, environment: .production, token: token, appID: "dev.overalls.mila",
+                                                                  deployment: "mila.example.test", endpoint: "https://mila.example.test/push"))
+        let controller = MilaNotificationController(adapter: adapter, appID: "dev.overalls.mila", deployment: "mila.example.test", store: Store())
+        controller.register(token: token)
+        XCTAssertEqual(controller.state, .on)
+        controller.register(deviceToken: Data(repeating: 0xab, count: 32), environment: .sandbox)
+        XCTAssertEqual(controller.state, .on)
     }
 
     func testEmptyTokenFailsBeforeCrossingBoundary() {
         let adapter = Adapter()
         let controller = MilaNotificationController(adapter: adapter, appID: "com.example.mila", deployment: "mila.example.test")
-        controller.register(token: "", endpoint: "https://mila.example.test/push")
+        controller.register(token: "")
         XCTAssertEqual(controller.state, .failed)
         XCTAssertTrue(adapter.calls.isEmpty)
     }
@@ -182,7 +200,7 @@ final class MilaNotificationsTests: XCTestCase {
         let adapter = Adapter()
         adapter.error = MilaFFIError.unavailable
         let controller = MilaNotificationController(adapter: adapter, appID: "com.example.mila", deployment: "mila.example.test")
-        controller.register(token: String(repeating: "b", count: 64), endpoint: "https://mila.example.test/push")
+        controller.register(token: String(repeating: "b", count: 64))
         XCTAssertEqual(controller.state, .failed)
     }
 }

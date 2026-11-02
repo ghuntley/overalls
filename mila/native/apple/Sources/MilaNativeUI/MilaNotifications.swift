@@ -139,33 +139,25 @@ public final class MilaAppleNotificationService: NSObject, UNUserNotificationCen
     public func refreshDevices() { guard sessionActive else { devices = []; return }; devices = store.list() }
     @discardableResult public func removeDevice(id: String) -> Bool { guard sessionActive else { return false }; let ok = store.remove(id: id); refreshDevices(); return ok }
     /// @cc [owner:ghuntley,label:security] mila-apple-push-token-boundary
-    /// Registration MUST require an active session, a 32–200 byte token and an
-    /// HTTPS endpoint without credentials or fragment; any refusal or validator
-    /// failure MUST leave the state failed and MUST NOT store a device record.
-    public func register(token: String, endpoint: String, environment: MilaPushEnvironment = .production) {
-        guard sessionActive,
-              (32...200).contains(token.utf8.count),
-              let url = URL(string: endpoint),
-              url.scheme?.lowercased() == "https",
-              let host = url.host,
-              host.utf8.count <= 253,
-              !host.isEmpty,
-              !host.unicodeScalars.contains(where: { $0.properties.isWhitespace || $0.value < 0x20 || $0.value == 0x7f }),
-              url.user == nil,
-              url.fragment == nil
-        else { state = .failed; return }
+    /// Registration MUST require an active session and a 32–200 byte token, and
+    /// MUST cross to the Rust validator with no endpoint: APNs has a fixed
+    /// origin and Rust refuses an APNs registration that carries one. Any
+    /// refusal or validator failure MUST leave the state failed and MUST NOT
+    /// store a device record.
+    public func register(token: String, environment: MilaPushEnvironment = .production) {
+        guard sessionActive, (32...200).contains(token.utf8.count) else { state = .failed; return }
         state = .registering
-        do { try adapter.validatePushRegistration(provider: MilaPushProvider.apple.rawValue, environment: environment.rawValue, token: token, appID: appID, deployment: deployment, endpoint: endpoint); _ = store.upsert(MilaNotificationDevice(id: appID, deployment: deployment, enabled: true)); refreshDevices(); state = .on } catch { state = .failed }
+        do { try adapter.validatePushRegistration(provider: MilaPushProvider.apple.rawValue, environment: environment.rawValue, token: token, appID: appID, deployment: deployment, endpoint: nil); _ = store.upsert(MilaNotificationDevice(id: appID, deployment: deployment, enabled: true)); refreshDevices(); state = .on } catch { state = .failed }
     }
 
     /// Handles the token callback from APNs without exposing token bytes to UI
     /// state. The token is converted and immediately passed to the validator.
-    public func register(deviceToken: Data, endpoint: String, environment: MilaPushEnvironment = .production) {
+    public func register(deviceToken: Data, environment: MilaPushEnvironment = .production) {
         #if canImport(UserNotifications)
         guard let token = MilaAppleNotificationService.tokenString(from: deviceToken) else { state = .failed; return }
-        register(token: token, endpoint: endpoint, environment: environment)
+        register(token: token, environment: environment)
         #else
-        _ = deviceToken; _ = endpoint; _ = environment; state = .failed
+        _ = deviceToken; _ = environment; state = .failed
         #endif
     }
     public func disable() { guard sessionActive else { state = .off; return }; _ = store.upsert(MilaNotificationDevice(id: appID, deployment: deployment, enabled: false)); refreshDevices(); state = .off }

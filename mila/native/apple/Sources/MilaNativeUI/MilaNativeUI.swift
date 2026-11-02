@@ -12,16 +12,27 @@ import Combine
     public let machines = MilaMachinesController()
     public let threads = MilaThreadsController()
     public let web = MilaWebViewLifecycle()
+    /// APNs registration for the signed-in deployment (ADR-0278).
+    public let push: MilaApplePushCoordinator
     private var boundGeneration: UInt64?
     private var observation: AnyCancellable?
 
-    public init(session: MilaDeploymentSessionController, signIn: MilaSignInController? = nil) {
+    public init(session: MilaDeploymentSessionController, signIn: MilaSignInController? = nil, push: MilaApplePushCoordinator? = nil) {
         self.session = session
         self.signIn = signIn ?? MilaSignInController(session: session)
+        self.push = push ?? MilaApplePushCoordinator()
         observation = self.signIn.$phase.sink { [weak self] phase in
             // `@Published` emits before the stored value changes.
             MainActor.assumeIsolated { self?.phaseChanged(phase) }
         }
+        self.push.bind(target: { [weak self] in self?.pushTarget() },
+                       isCurrent: { [weak self] generation in self?.pushTarget()?.generation == generation })
+    }
+
+    /// The approved generation's adapter and deployment host, if signed in.
+    private func pushTarget() -> MilaApplePushCoordinator.Target? {
+        guard let generation = boundGeneration, let adapter, let host = session.selectedDeployment?.host else { return nil }
+        return MilaApplePushCoordinator.Target(adapter: adapter, deployment: host, generation: generation)
     }
 
     /// The authenticated adapter, only while the approved generation is current.
@@ -36,6 +47,7 @@ import Combine
         machines.bind(adapter)
         threads.bind(adapter)
         web.invalidate()
+        push.reset()
         if adapter != nil { Task { await machines.refresh() } }
     }
 }
@@ -463,8 +475,6 @@ private struct SettingsView: View {
     @AppStorage("mila.appearance") private var appearance = "system"
     @AppStorage(MilaStrings.localeOverrideKey) private var locale = ""
     @AppStorage("mila.appLockEnabled") private var appLockEnabled = false
-    @State private var notificationToken = ""
-    @State private var notificationEndpoint = ""
     @State private var notificationStatus = ""
     @State private var notificationsEnabled = false
     @State private var notificationDevices: [MilaNotificationDevice] = []
@@ -545,22 +555,15 @@ private struct SettingsView: View {
             }
             Section(MilaStrings.text(.notificationsTitle)) {
                 Text(MilaStrings.text(.notificationsExplain)).font(.caption)
-                SecureField("Device token", text: $notificationToken)
-                    .textContentType(.oneTimeCode)
-                TextField(MilaStrings.text(.pushEndpointHint), text: $notificationEndpoint)
-                    .textContentType(.URL)
-                    .autocorrectionDisabled()
                 HStack {
                     Button(notificationsEnabled ? MilaStrings.text(.notificationsTurnOff) : MilaStrings.text(.notificationsTurnOn)) {
                         if notificationsEnabled {
                             notificationsEnabled = false
                             notificationStatus = MilaStrings.text(.notificationsTurnOff)
                         } else {
-                            let controller = MilaNotificationController(adapter: model.adapter ?? UnavailableMilaFFIAdapter(), appID: "com.overalls.mila", deployment: "current")
-                            controller.register(token: notificationToken, endpoint: notificationEndpoint)
-                            notificationsEnabled = controller.state == .on
-                            notificationStatus = notificationsEnabled ? MilaStrings.text(.notificationsTurnOn) : MilaStrings.text(.notificationsFailed)
-                            notificationToken = ""
+                            // APNs answers through the application delegate; the
+                            // coordinator registers the token and publishes its state.
+                            notificationStatus = model.push.enable() ? "" : MilaStrings.text(.notificationsFailed)
                         }
                     }
                     Text(notificationsEnabled ? "[on]" : "[off]").font(.caption)
@@ -599,6 +602,13 @@ private struct SettingsView: View {
             }
         }
         .navigationTitle(MilaStrings.text(.settings))
+        .onReceive(model.push.$state) { state in
+            switch state {
+            case .on: notificationsEnabled = true; notificationStatus = MilaStrings.text(.notificationsTurnOn)
+            case .failed: notificationsEnabled = false; notificationStatus = MilaStrings.text(.notificationsFailed)
+            case .off, .registering: break
+            }
+        }
         .onAppear {
             notificationDevices = signIn.isSignedIn ? MilaUserDefaultsNotificationStore().list() : []
             // Defaults may contain values written by an older build. Normalize
@@ -665,6 +675,12 @@ public struct MilaSSHKeysView: View {
 }
 
 @MainActor public struct MilaNativeApp: App {
+    // Receives the APNs device token (`didRegisterForRemoteNotificationsWithDeviceToken`).
+    #if os(iOS)
+    @UIApplicationDelegateAdaptor(MilaAppleAppDelegate.self) private var appDelegate
+    #elseif os(macOS)
+    @NSApplicationDelegateAdaptor(MilaAppleAppDelegate.self) private var appDelegate
+    #endif
     public init() {}
     public init(adapter: any MilaFFIAdapter) { _ = adapter }
     public var body: some Scene { WindowGroup { MilaNativeRootView() } }
