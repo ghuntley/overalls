@@ -10,6 +10,11 @@ defmodule Marshall.Authorization.Record do
   (`resource.attr.contains(principal)`) or `:truthy` (a Boolean attribute).
   It returns an Ash expression over the resource, or `:unsupported`, which makes
   the whole filter fail closed.
+
+  `members/2` is optional. Given several `{attribute, use}` membership uses
+  (`:equals` or `:member`) that one residual disjunction tests, it returns a
+  single expression admitting exactly the rows their disjunction admits, so
+  SQL reads each membership source once; `:unsupported` keeps them separate.
   """
 
   @type use :: :equals | :member | :truthy
@@ -21,4 +26,9 @@ defmodule Marshall.Authorization.Record do
   @callback read_action() :: atom()
   @callback filter(attribute :: String.t(), use(), principal_id :: String.t()) ::
               Ash.Expr.t() | boolean() | :unsupported
+
+  @callback members([{attribute :: String.t(), use()}], principal_id :: String.t()) ::
+              Ash.Expr.t() | boolean() | :unsupported
+
+  @optional_callbacks members: 2
 end

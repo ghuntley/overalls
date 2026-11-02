@@ -22,6 +22,13 @@ defmodule Marshall.Artifacts.Grant do
       reference :artifact, on_delete: :delete
     end
 
+    custom_indexes do
+      # Artifact lists start from the caller's current user grants (ADR-0268).
+      index [:user_id, :artifact_id],
+        where: "archived_at IS NULL AND user_id IS NOT NULL",
+        name: "artifact_grants_user_index"
+    end
+
     check_constraints do
       check_constraint :role, "artifact_grant_subject",
         check:

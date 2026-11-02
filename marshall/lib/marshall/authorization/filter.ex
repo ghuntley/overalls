@@ -17,6 +17,16 @@ defmodule Marshall.Authorization.Filter do
   @typep principal :: %{type: String.t(), id: String.t(), attributes: map()}
   @typep template :: [{:permit | :forbid, [term()]}]
 
+  # The translated residual before lowering to Ash: constants, resource
+  # attribute uses and connectives. Lowering merges membership disjuncts.
+  @typep attribute_use :: :equals | :member | :truthy
+  @typep ir ::
+           boolean()
+           | {:attribute, String.t(), attribute_use()}
+           | {:and, ir(), ir()}
+           | {:or, ir(), ir()}
+           | {:not, ir()}
+
   # @cc [owner:ghuntley,label:security;performance] cedar-filter-fail-closed
   # A read filter MUST admit a row only when the translated residual of the
   # current policy set admits it for the current principal. Unknown residual
@@ -114,7 +124,10 @@ defmodule Marshall.Authorization.Filter do
       end)
     end
 
-    conjoin(any.(permits), negate(any.(forbids)))
+    permits
+    |> any.()
+    |> conjoin(negate(any.(forbids)))
+    |> lower(principal, record)
   end
 
   defp conditions(conditions, principal, record) do
@@ -216,28 +229,103 @@ defmodule Marshall.Authorization.Filter do
 
   defp value(_, _), do: throw({:unsupported, :value})
 
+  # Every attribute is checked when met, so an unsupported one fails the
+  # filter closed even where constant folding later drops it.
   defp attribute(record, attr, use, principal_id) do
+    _ = record_filter(record, attr, use, principal_id)
+    {:attribute, attr, use}
+  end
+
+  defp qualify(type), do: "Marshall::" <> type
+
+  # Constant-folding connectives over the intermediate form.
+  @spec conjoin(ir(), ir()) :: ir()
+  defp conjoin(false, _), do: false
+  defp conjoin(_, false), do: false
+  defp conjoin(true, other), do: other
+  defp conjoin(other, true), do: other
+  defp conjoin(a, b), do: {:and, a, b}
+
+  @spec disjoin(ir(), ir()) :: ir()
+  defp disjoin(true, _), do: true
+  defp disjoin(_, true), do: true
+  defp disjoin(false, other), do: other
+  defp disjoin(other, false), do: other
+  defp disjoin(a, b), do: {:or, a, b}
+
+  @spec negate(ir()) :: ir()
+  defp negate(bool) when is_boolean(bool), do: not bool
+  defp negate(other), do: {:not, other}
+
+  # @cc [owner:ghuntley,label:security;performance] cedar-filter-membership-merge
+  # Lowering MAY replace several principal-membership disjuncts of one OR with
+  # the record's `members/2` expression, which MUST admit exactly the rows
+  # their disjunction admits. Merging only regroups an OR, so it never changes
+  # which rows a filter admits; it lets SQL read each grant table once.
+  @spec lower(ir(), principal(), module()) :: result()
+  defp lower(bool, _principal, _record) when is_boolean(bool), do: bool
+
+  defp lower({:attribute, attr, use}, principal, record),
+    do: record_filter(record, attr, use, principal.id)
+
+  defp lower({:and, a, b}, principal, record),
+    do: ash_and(lower(a, principal, record), lower(b, principal, record))
+
+  defp lower({:not, a}, principal, record), do: ash_not(lower(a, principal, record))
+
+  defp lower({:or, _, _} = ir, principal, record) do
+    {members, others} = ir |> disjuncts() |> Enum.split_with(&membership?/1)
+
+    (merge(members, principal, record) ++ Enum.map(others, &lower(&1, principal, record)))
+    |> Enum.reduce(false, &ash_or(&2, &1))
+  end
+
+  @spec disjuncts(ir()) :: [ir()]
+  defp disjuncts({:or, a, b}), do: disjuncts(a) ++ disjuncts(b)
+  defp disjuncts(other), do: [other]
+
+  defp membership?({:attribute, _attr, use}), do: use in [:member, :equals]
+  defp membership?(_), do: false
+
+  @spec merge([ir()], principal(), module()) :: [result()]
+  defp merge(members, principal, record) do
+    uses = members |> Enum.map(fn {:attribute, attr, use} -> {attr, use} end) |> Enum.uniq()
+
+    merged =
+      if length(uses) > 1 and Code.ensure_loaded?(record) and
+           function_exported?(record, :members, 2),
+         do: record.members(uses, principal.id),
+         else: :unsupported
+
+    case merged do
+      :unsupported ->
+        Enum.map(uses, fn {attr, use} -> record_filter(record, attr, use, principal.id) end)
+
+      expression ->
+        [expression]
+    end
+  end
+
+  defp record_filter(record, attr, use, principal_id) do
     case record.filter(attr, use, principal_id) do
       :unsupported -> throw({:unsupported, :record_attribute})
       expression -> expression
     end
   end
 
-  defp qualify(type), do: "Marshall::" <> type
+  # Constant-folding Ash connectives over `true | false | Ash expression`.
+  defp ash_and(false, _), do: false
+  defp ash_and(_, false), do: false
+  defp ash_and(true, other), do: other
+  defp ash_and(other, true), do: other
+  defp ash_and(a, b), do: Ash.Query.BooleanExpression.new(:and, a, b)
 
-  # Constant-folding connectives over `true | false | Ash expression`.
-  defp conjoin(false, _), do: false
-  defp conjoin(_, false), do: false
-  defp conjoin(true, other), do: other
-  defp conjoin(other, true), do: other
-  defp conjoin(a, b), do: Ash.Query.BooleanExpression.new(:and, a, b)
+  defp ash_or(true, _), do: true
+  defp ash_or(_, true), do: true
+  defp ash_or(false, other), do: other
+  defp ash_or(other, false), do: other
+  defp ash_or(a, b), do: Ash.Query.BooleanExpression.new(:or, a, b)
 
-  defp disjoin(true, _), do: true
-  defp disjoin(_, true), do: true
-  defp disjoin(false, other), do: other
-  defp disjoin(other, false), do: other
-  defp disjoin(a, b), do: Ash.Query.BooleanExpression.new(:or, a, b)
-
-  defp negate(bool) when is_boolean(bool), do: not bool
-  defp negate(other), do: Ash.Query.Not.new(other)
+  defp ash_not(bool) when is_boolean(bool), do: not bool
+  defp ash_not(other), do: Ash.Query.Not.new(other)
 end
