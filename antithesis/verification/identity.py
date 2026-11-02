@@ -55,6 +55,7 @@ SOURCE_DIRS = (
     "antithesis/verification/selections",
 )
 SOURCE_FILES = (
+    ".dockerignore",
     "flake.nix",
     "flake.lock",
     "antithesis/Dockerfile",
