@@ -291,7 +291,7 @@ defmodule MarshallWeb.WorkspaceComponents do
               {dgettext("terminal", "Open VS Code")} <.glyph name="arrow_up_right" />
             </.link>
             <button
-              :if={@editor_control not in [:available, :hidden]}
+              :if={@editor_control in [:unavailable, :not_running]}
               id="open-vscode-disabled"
               type="button"
               disabled
@@ -349,14 +349,9 @@ defmodule MarshallWeb.WorkspaceComponents do
               </Layouts.action>
             </div>
           </div>
-          <%= if @editor_control not in [:available, :hidden] do %>
+          <%= if @editor_control in [:unavailable, :not_running] do %>
             <p id="vscode-unavailable" class="machine-editor-notice muted">
               <%= case @editor_control do %>
-                <% :unsupported_image -> %>
-                  {dgettext(
-                    "terminal",
-                    "This machine's image does not support the current browser editor."
-                  )}
                 <% :not_running -> %>
                   {dgettext("terminal", "VS Code requires a running machine.")}
                 <% _ -> %>
@@ -479,7 +474,7 @@ defmodule MarshallWeb.WorkspaceComponents do
       aria-label={dgettext("terminal", "Open VS Code for %{value1}", value1: @vm.name)}
     >{dgettext("terminal", "Open VS Code")}{if @variant == :link, do: " ↗"}</.link>
     <button
-      :if={@editor_control not in [:available, :hidden]}
+      :if={@editor_control in [:unavailable, :not_running]}
       id={"#{@id_prefix}-#{@vm.id}-vscode-disabled"}
       type="button"
       disabled
@@ -487,7 +482,7 @@ defmodule MarshallWeb.WorkspaceComponents do
       class={if @variant == :button, do: "console-button", else: "machine-editor-link"}
     >{dgettext("terminal", "Open VS Code")}</button>
     <p
-      :if={@editor_control not in [:available, :hidden]}
+      :if={@editor_control in [:unavailable, :not_running]}
       id={"#{@id_prefix}-#{@vm.id}-vscode-reason"}
       class="machine-editor-notice muted"
       role="status"
@@ -499,8 +494,10 @@ defmodule MarshallWeb.WorkspaceComponents do
 
   # @cc [owner:ghuntley,label:security;product] machine-editor-projection
   # Shared editor actions MUST use the finite projected eligibility state and
-  # MUST render links only for available controls. Disabled reasons are
-  # presentation feedback; they MUST NOT authorize or imply a launch grant.
+  # MUST render links only for available controls. Unsupported images MUST
+  # hide the editor action entirely; other unavailable states may show a
+  # disabled action with explanatory text. Disabled reasons are presentation
+  # feedback; they MUST NOT authorize or imply a launch grant.
   @spec editor_control(map()) ::
           :available | :unsupported_image | :unavailable | :not_running | :hidden
   def editor_control(
@@ -516,7 +513,7 @@ defmodule MarshallWeb.WorkspaceComponents do
       not OverallsProtocol.ProfilePolicy.allows?(profile, :editor) -> :hidden
       profile == :customer and not Map.get(vm, :owner, false) -> :hidden
       not capability?(vm, :editor) -> :hidden
-      Map.get(vm, :editor_image_status) == :unsupported_image -> :unsupported_image
+      Map.get(vm, :editor_image_status) == :unsupported_image -> :hidden
       Map.get(vm, :editor_image_status) != :available -> :unavailable
       desired != :running or observed != :running -> :not_running
       true -> :available
@@ -526,9 +523,6 @@ defmodule MarshallWeb.WorkspaceComponents do
   def editor_control(_), do: :hidden
 
   @spec editor_unavailable_message(atom()) :: String.t()
-  def editor_unavailable_message(:unsupported_image),
-    do: dgettext("terminal", "This machine's image does not support the current browser editor.")
-
   def editor_unavailable_message(:not_running),
     do: dgettext("terminal", "VS Code requires a running machine.")
 
