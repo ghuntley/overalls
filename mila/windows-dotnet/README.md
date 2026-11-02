@@ -78,6 +78,12 @@ entries and makes Sign in fetch trust from that host only (a loopback listener
 on port 443 accepts the `localhost` fetch and never answers, so nothing is
 pinned). It prints the session, window station and input desktop it ran on;
 it needs an interactive desktop and so runs only in the windows-native job.
+If the client exits before showing a window, the journey reports its exit
+code, its standard output and error (until the first window is activated
+`App` writes an exception that ends startup there as type, HRESULT, message
+and stack), the build layout beside the executable (`.pri`, `.xbf`, WinUI
+and native DLLs, locale catalog) and recent Application Error, .NET Runtime
+and Windows Error Reporting entries from the Application event log.
 
 `Interop/SignInCoordinator.cs` drives `MilaSignInFlow` with the Rust session:
 it connects through `mila_session_connect`, polls `mila_session_whoami` on the

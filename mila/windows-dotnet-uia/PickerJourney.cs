@@ -243,13 +243,21 @@ internal sealed class DeploymentStoreSeed : IDisposable
 }
 
 /// <summary>The launched client process and its top-level UI Automation window.</summary>
+/// <remarks>
+/// The client's standard output and error are captured (the app names a
+/// startup failure there) and echoed when the journey ends. When the client
+/// exits before showing a window, the failure also carries the build layout
+/// and recent Application event log crash entries for it.
+/// </remarks>
 internal sealed class LaunchedClient : IDisposable
 {
     private readonly Process _process;
+    private readonly ClientOutput _output;
 
-    private LaunchedClient(Process process, AutomationElement window)
+    private LaunchedClient(Process process, ClientOutput output, AutomationElement window)
     {
         _process = process;
+        _output = output;
         Window = window;
     }
 
@@ -258,11 +266,24 @@ internal sealed class LaunchedClient : IDisposable
     internal static LaunchedClient Start(string app, DesktopFacts facts)
     {
         if (!File.Exists(app)) throw new UiaCheckFailed($"the built client is missing: {app}");
-        Process process = Process.Start(new ProcessStartInfo(app)
+        string directory = Path.GetDirectoryName(app)!;
+        Console.Error.WriteLine($"client layout: {Layout(directory)}");
+        Process process = new()
         {
-            UseShellExecute = false,
-            WorkingDirectory = Path.GetDirectoryName(app)!,
-        }) ?? throw new UiaCheckFailed($"could not start {app}");
+            StartInfo = new ProcessStartInfo(app)
+            {
+                UseShellExecute = false,
+                WorkingDirectory = directory,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+            },
+        };
+        ClientOutput output = new();
+        process.OutputDataReceived += (_, line) => output.Add(line.Data);
+        process.ErrorDataReceived += (_, line) => output.Add(line.Data);
+        if (!process.Start()) throw new UiaCheckFailed($"could not start {app}");
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
         Condition condition = new AndCondition(
             new PropertyCondition(AutomationElement.ProcessIdProperty, process.Id),
             new PropertyCondition(AutomationElement.ControlTypeProperty, ControlType.Window));
@@ -270,14 +291,67 @@ internal sealed class LaunchedClient : IDisposable
         while (clock.Elapsed < TimeSpan.FromSeconds(90))
         {
             if (process.HasExited)
-                throw new UiaCheckFailed($"the client exited with code {process.ExitCode} before showing a window ({facts})");
+            {
+                // Lets the output pipes drain and the crash reach the event log.
+                process.WaitForExit();
+                Thread.Sleep(3000);
+                throw new UiaCheckFailed(
+                    $"the client exited with code {process.ExitCode} (0x{process.ExitCode:X8}) before showing a window ({facts})\n" +
+                    $"client output:\n{output.Text()}\n" +
+                    $"Application event log:\n{CrashEvents()}");
+            }
             if (AutomationElement.RootElement.FindFirst(TreeScope.Children, condition) is { } window)
-                return new LaunchedClient(process, window);
+                return new LaunchedClient(process, output, window);
             Thread.Sleep(500);
         }
         process.Kill(entireProcessTree: true);
         throw new UiaCheckFailed(
-            $"no top-level window of the client (pid {process.Id}) reached the UI Automation tree within 90 s ({facts})");
+            $"no top-level window of the client (pid {process.Id}) reached the UI Automation tree within 90 s ({facts})\n" +
+            $"client output:\n{output.Text()}");
+    }
+
+    /// <summary>Whether the files an unpackaged WinUI launch reads sit beside the executable.</summary>
+    private static string Layout(string directory)
+    {
+        string[] names = ["Mila.Windows.pri", "resources.pri", "Microsoft.UI.Xaml.dll", "Microsoft.WindowsAppRuntime.dll",
+            "mila_native.dll", Path.Combine("Resources", "locales", "en.json")];
+        IEnumerable<string> present = names.Select(name => $"{name}={File.Exists(Path.Combine(directory, name))}");
+        int xbf = Directory.EnumerateFiles(directory, "*.xbf", SearchOption.AllDirectories).Count();
+        int pri = Directory.EnumerateFiles(directory, "*.pri", SearchOption.TopDirectoryOnly).Count();
+        return $"{string.Join(' ', present)} xbf={xbf} pri={pri} dir={directory}";
+    }
+
+    /// <summary>Application Error, .NET Runtime and WER entries from the last ten minutes, newest first.</summary>
+    private static string CrashEvents()
+    {
+        const string query = "*[System[Provider[@Name='Application Error' or @Name='.NET Runtime' or " +
+            "@Name='Windows Error Reporting'] and TimeCreated[timediff(@SystemTime) <= 600000]]]";
+        ProcessStartInfo start = new("wevtutil.exe")
+        {
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+        foreach (string argument in new[] { "qe", "Application", "/rd:true", "/c:6", "/f:text", $"/q:{query}" })
+            start.ArgumentList.Add(argument);
+        try
+        {
+            using Process wevtutil = Process.Start(start) ?? throw new InvalidOperationException("wevtutil did not start");
+            Task<string> text = wevtutil.StandardOutput.ReadToEndAsync();
+            Task<string> errors = wevtutil.StandardError.ReadToEndAsync();
+            if (!wevtutil.WaitForExit(20_000))
+            {
+                wevtutil.Kill();
+                return "<wevtutil timed out>";
+            }
+            string events = text.GetAwaiter().GetResult() + errors.GetAwaiter().GetResult();
+            if (events.Length == 0) return "<no matching entries>";
+            return events.Length <= 12_000 ? events : events[..12_000] + "\n<truncated>";
+        }
+        catch (Exception error) when (error is InvalidOperationException or System.ComponentModel.Win32Exception)
+        {
+            return $"<wevtutil unavailable: {error.Message}>";
+        }
     }
 
     public void Dispose()
@@ -287,6 +361,27 @@ internal sealed class LaunchedClient : IDisposable
             _process.Kill(entireProcessTree: true);
             _process.WaitForExit(10_000);
         }
+        string text = _output.Text();
+        if (text.Length > 0) Console.Error.WriteLine($"client output:\n{text}");
         _process.Dispose();
+    }
+}
+
+/// <summary>The client's captured output lines, bounded.</summary>
+internal sealed class ClientOutput
+{
+    private const int MaximumLines = 400;
+    private readonly List<string> _lines = [];
+
+    internal void Add(string? line)
+    {
+        if (line is null) return;
+        lock (_lines)
+            if (_lines.Count < MaximumLines) _lines.Add(line);
+    }
+
+    internal string Text()
+    {
+        lock (_lines) return string.Join('\n', _lines);
     }
 }
