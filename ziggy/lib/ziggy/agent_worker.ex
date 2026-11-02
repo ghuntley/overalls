@@ -324,11 +324,17 @@ defmodule Ziggy.AgentWorker do
 
   defp stream_failure(_, _, reason), do: %{"error" => Atom.to_string(reason)}
 
+  # @cc [owner:ghuntley,label:logging] agent-provider-null-error-is-success
+  # A successful response with no error or a null error MUST emit completed.
+  # Closed terminal error strings MUST retain their rejection classification.
   @spec provider_reason(map()) :: atom()
   defp provider_reason(%{"error" => "retryable_overload"}), do: :retryable_overload
   defp provider_reason(%{"error" => "transport_error"}), do: :transport_error
   defp provider_reason(%{"error" => "invalid_response"}), do: :invalid_response
-  defp provider_reason(%{"error" => reason}), do: Ziggy.AgentError.classify(reason)
+
+  defp provider_reason(%{"error" => reason}) when is_binary(reason),
+    do: Ziggy.AgentError.classify(reason)
+
   defp provider_reason(_), do: :completed
 
   @spec accounting_outcome(atom(), map()) :: atom()

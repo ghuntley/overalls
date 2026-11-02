@@ -378,6 +378,39 @@ defmodule Ziggy.AgentWorkerTest do
     refute log =~ "synthetic-test-key"
   end
 
+  for content_type <- ["application/json", "text/event-stream"] do
+    test "#{content_type} completed response with null error emits a completed provider outcome" do
+      response = %{
+        "status" => "completed",
+        "error" => nil,
+        "output" => [
+          %{
+            "type" => "message",
+            "role" => "assistant",
+            "content" => [%{"type" => "output_text", "text" => @private}]
+          }
+        ]
+      }
+
+      body =
+        if unquote(content_type) == "text/event-stream" do
+          "data: " <>
+            Jason.encode!(%{"type" => "response.completed", "response" => response}) <> "\n\n"
+        else
+          Jason.encode!(response)
+        end
+
+      config = configuration(200, unquote(content_type), body)
+
+      log =
+        capture_log([metadata: [:event, :request_id, :reason, :status]], fn ->
+          assert :completed = Ziggy.AgentWorker.execute(config, work(request()))
+        end)
+
+      assert log =~ ~r/ziggy\.agent_provider_outcome.*completed/
+    end
+  end
+
   test "collector overflow overrides otherwise certified overload" do
     overload = "data: {\"type\":\"error\",\"code\":\"server_is_overloaded\"}\n\n"
     config = evidence_configuration(overload <> String.duplicate("x", 2_097_153))
