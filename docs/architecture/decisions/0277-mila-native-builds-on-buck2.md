@@ -47,7 +47,8 @@ ADR-0227's decisions 1-5 therefore describe a build that no longer exists.
    - Windows: the FFI DLL is the hermetic, reproducible Linux cross-build
      `//mila:windows-ffi-gnu` (since 2026-11-01, ADR-0269 M9), which the
      Windows runner imports through `//mila:windows-ffi-published` for
-     `//mila:windows-dotnet` and `//mila:windows-smoke`;
+     `//mila:windows-dotnet`, `//mila:windows-smoke` and the UI Automation
+     journey `//mila:windows-uia`;
      `//mila:windows-ffi-msvc` is only a local fallback.
 2. The shared Rust workspace builds with the single rust-overlay toolchain
    ([ADR-0273](0273-single-rust-workspace-and-toolchain.md)). SSH host

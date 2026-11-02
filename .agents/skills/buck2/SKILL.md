@@ -220,7 +220,9 @@ Gradle and .NET need SDKs that Nix does not supply, so these are
   - Apple (macOS): `apple-ffi`, `apple-ffi-clippy`, `apple-swift-test`,
     `{macos,ios}-{dev,release}` (wrapping `mila/native/mila-build`).
   - Android (Linux or macOS): `android-debug`, `android-release`, `android-ffi-clippy`.
-  - Windows: `windows-ffi-published`, `windows-dotnet`, `windows-smoke`, and
+  - Windows: `windows-ffi-published`, `windows-dotnet`, `windows-smoke`,
+    `windows-uia` (UI Automation over the built WinUI client; needs the
+    runner's interactive desktop), and
     the local fallback `windows-ffi-msvc`, `windows-ffi-msvc-clippy`.
   - Hermetic, on Linux: `windows-ffi-gnu` cross-builds the shipped FFI DLL
     for `x86_64-pc-windows-gnu` with cargo-zigbuild and the `rust//` cell's

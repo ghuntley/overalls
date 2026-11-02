@@ -65,8 +65,19 @@ share for it cannot complete against the new one.
 deployment controls (rows, selected row, Forget, host and port entries, status
 message, sign-in target) and returns a typed view; `MainWindow` only forwards
 the controls' events and assigns that view. The smoke and the fixture journey
-drive the same controller. The XAML `ListView` binding itself has no UI
-automation in CI.
+drive the same controller. `//mila:windows-uia` (`../windows-dotnet-uia`)
+drives the XAML controls themselves through UI Automation (the managed
+`System.Windows.Automation` client of the Windows Desktop framework, so no
+NuGet package): it seeds the per-user `deployment.json`, launches the built
+`Mila.Windows.exe`, finds the controls by their `AutomationProperties.AutomationId`
+(`MilaDeploymentList`, `MilaDeploymentHost`, `MilaDeploymentPort`,
+`MilaDeploymentSignIn`, `MilaDeploymentForget`), and requires that the
+`ListView` displays the stored hosts, that Forget on a selected row removes it
+from the list and the store, and that selecting a row fills the host and port
+entries and makes Sign in fetch trust from that host only (a loopback listener
+on port 443 accepts the `localhost` fetch and never answers, so nothing is
+pinned). It prints the session, window station and input desktop it ran on;
+it needs an interactive desktop and so runs only in the windows-native job.
 
 `Interop/SignInCoordinator.cs` drives `MilaSignInFlow` with the Rust session:
 it connects through `mila_session_connect`, polls `mila_session_whoami` on the

@@ -24,3 +24,10 @@ channel only to Susan and the push key to Porsche only through Rust stdin
 (`Interop/WindowsPushRegistration.cs`), and share completion is navigation
 only (`Interop/ExternalActivation.cs`). The in-source `mila-windows-*` notes
 state each obligation; `windows-dotnet-smoke` exercises them hermetically.
+
+@cc [owner:ghuntley,label:verification] native-windows-picker-automation-ids
+The WinUI deployment controls in `MainWindow.xaml` MUST keep the
+`AutomationProperties.AutomationId` values `MilaDeploymentList`,
+`MilaDeploymentHost`, `MilaDeploymentPort`, `MilaDeploymentAdd`,
+`MilaDeploymentSignIn`, `MilaDeploymentForget` and `MilaStatus`; the UI
+Automation journey in `../windows-dotnet-uia` finds the controls only by them.

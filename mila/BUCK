@@ -43,6 +43,8 @@ _BUILD_OUTPUTS = [
     "windows-dotnet/obj/**",
     "windows-dotnet-smoke/bin/**",
     "windows-dotnet-smoke/obj/**",
+    "windows-dotnet-uia/bin/**",
+    "windows-dotnet-uia/obj/**",
 ]
 
 # The FFI crate and the Mila crates it links, with the root workspace
@@ -51,7 +53,7 @@ _FFI_SRCS = glob(["rust/**"], exclude = _BUILD_OUTPUTS) + ["//:workspace_files"]
 _LOCALIZATION = glob(["localization/**"], exclude = _BUILD_OUTPUTS)
 _APPLE = glob(["native/apple/**", "native/mila-build"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
 _ANDROID = glob(["native/android/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + _FFI_SRCS
-_WINDOWS = glob(["windows-dotnet/**", "windows-dotnet-smoke/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + [
+_WINDOWS = glob(["windows-dotnet/**", "windows-dotnet-smoke/**", "windows-dotnet-uia/**"], exclude = _BUILD_OUTPUTS) + _LOCALIZATION + [
     "//protocol:test_fixtures",
 ]
 
@@ -260,6 +262,24 @@ mila_platform(
     steps = [
         {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet-smoke"},
         {"argv": ["dotnet", "run", "--project", ".", "--configuration", "Release", "-p:MilaNativeDll=$MILA_WINDOWS_DIR/win-x64/mila_native.dll"], "cwd": "mila/windows-dotnet-smoke"},
+    ],
+    path_env = {"MILA_WINDOWS_DIR": ":windows-dotnet"},
+    require = ["dotnet"],
+    srcs = _WINDOWS,
+    check = True,
+)
+
+# UI Automation over the built WinUI client: launches Mila.Windows.exe on the
+# runner's desktop and drives the deployment picker's ListView, Forget and
+# sign-in controls by AutomationId (mila/windows-dotnet-uia). It needs an
+# interactive desktop and the loopback port 443, so it runs only in the
+# windows-native job.
+mila_platform(
+    name = "windows-uia",
+    os = "windows",
+    steps = [
+        {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet-uia"},
+        {"argv": ["dotnet", "run", "--project", ".", "--configuration", "Release", "--no-restore", "--", "--app", "$MILA_WINDOWS_DIR/win-x64/Mila.Windows.exe"], "cwd": "mila/windows-dotnet-uia"},
     ],
     path_env = {"MILA_WINDOWS_DIR": ":windows-dotnet"},
     require = ["dotnet"],

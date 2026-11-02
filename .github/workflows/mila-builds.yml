@@ -328,6 +328,16 @@ jobs:
         shell: bash
         run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-smoke
 
+      # UI Automation over the built WinUI client's deployment picker: the
+      # ListView shows the seeded store, Forget updates it, and the selection
+      # drives the sign-in target (mila/windows-dotnet-uia). It runs before
+      # the fixture journey so its seeded store and its loopback port 443
+      # listener never meet the journey's state; it prints the desktop it ran on.
+      - name: Drive the WinUI deployment picker through UI Automation
+        shell: bash
+        timeout-minutes: 15
+        run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-uia
+
       # Journey mode drives the staged Rust session against the hermetic
       # Marshall+Porsche fixture through its descriptor (version 1: deployment
       # host/ports, inline CA, approver hook, seed). It is gated until the

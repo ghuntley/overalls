@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- UI Automation journey over the built WinUI client (mila/windows-dotnet).
+       UseWPF only references the Windows Desktop framework's managed UI
+       Automation client (System.Windows.Automation); no WPF UI is created and
+       no NuGet package is added. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- NuGet pins (ADR-0269): restore only what packages.lock.json records. Run
+         `dotnet restore -p:RestoreLockedMode=false -p:EnableWindowsTargeting=true`
+         to refresh it after changing a PackageReference. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+  </PropertyGroup>
+</Project>
