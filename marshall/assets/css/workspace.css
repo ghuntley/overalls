@@ -997,6 +997,50 @@ button.machine-editor-link,
   color: var(--text-color-alt);
   margin-bottom: var(--line-height);
 }
+.thread-tool-events {
+  display: grid;
+  gap: var(--line-height);
+}
+.thread-tool-card {
+  margin: 0;
+  border-color: var(--background-color-alt);
+  color: var(--text-color);
+}
+.thread-tool-card[data-tone="danger"] {
+  border-style: double;
+  border-width: calc(var(--border-thickness) * 3);
+  padding: calc(var(--line-height) - var(--border-thickness) * 3) calc(1ch - var(--border-thickness) * 3);
+}
+.thread-tool-summary {
+  display: grid;
+  grid-template-columns: max-content minmax(12ch, max-content) minmax(0, 1fr);
+  align-items: start;
+  gap: 0 2ch;
+}
+.thread-tool-name,
+.thread-tool-summary-text {
+  overflow-wrap: anywhere;
+}
+.thread-tool-summary-text {
+  color: var(--text-color-alt);
+}
+.thread-tool-details {
+  padding-top: var(--line-height);
+}
+.thread-tool-output {
+  margin: 0 0 var(--line-height);
+}
+.thread-tool-output h3 {
+  margin: 0 0 var(--line-height);
+  font-size: 1rem;
+  line-height: var(--line-height);
+  text-transform: none;
+}
+.thread-tool-output pre {
+  margin: 0;
+  padding: calc(var(--line-height) - var(--border-thickness)) 1ch;
+  border-inline-start: var(--border-thickness) solid var(--background-color-alt);
+}
 .thread-event-label {
   margin: 0;
 }
@@ -1241,6 +1285,15 @@ button.machine-editor-link,
   }
   .thread-message[data-kind="prompt"] {
     padding: var(--line-height) 1ch;
+  }
+  .thread-tool-summary {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .thread-tool-summary .status-label,
+  .thread-tool-name,
+  .thread-tool-summary-text {
+    margin-bottom: var(--line-height);
   }
   .threads-index .thread-navigation-item {
     grid-template-columns: minmax(0, 1fr);

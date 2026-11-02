@@ -369,6 +369,118 @@ defmodule MarshallWeb.ThreadsLiveTest do
            ]
   end
 
+  test "tool events render safe expandable details for every outcome", c do
+    alias Marshall.Compute.Ledger
+
+    [root] = Ledger.read!(Marshall.Agents.Root, vm_id: c.vm.id)
+    [agent_thread] = Ledger.read!(Marshall.Agents.Thread, root_id: root.id)
+    thread = create_thread(c.owner, "Inspect tool details", c.vm.idempotency_key)
+
+    bound =
+      Marshall.ThreadStateFixture.ready!(thread, %{
+        machine_id: c.vm.id,
+        agent_root_id: root.id,
+        agent_thread_id: agent_thread.id
+      })
+
+    Marshall.Threads.Generation.sync!(bound)
+
+    secret = "sk-" <> String.duplicate("a", 24)
+
+    calls = [
+      %{
+        "call_id" => "read-call",
+        "tool" => "read_file",
+        "arguments" => %{"path" => "/workspace/README.md"}
+      },
+      %{
+        "call_id" => "failed-call",
+        "tool" => "exec_command",
+        "arguments" => %{"cmd" => "printf #{secret}", "workdir" => "/workspace"}
+      },
+      %{
+        "call_id" => "cancelled-call",
+        "tool" => "web_search",
+        "arguments" => %{}
+      },
+      %{
+        "call_id" => "uncertain-call",
+        "tool" => "thread",
+        "arguments" => %{}
+      },
+      %{
+        "call_id" => "pending-call",
+        "tool" => "pending_review",
+        "arguments" => %{"path" => "/workspace/notes.txt"}
+      }
+    ]
+
+    events = [
+      {:tool_queued, %{"calls" => calls}},
+      {
+        :tool_result,
+        %{
+          "call_id" => "read-call",
+          "result" => %{
+            "status" => "completed",
+            "contents" => "A safe file result."
+          }
+        }
+      },
+      {
+        :tool_result,
+        %{
+          "call_id" => "failed-call",
+          "result" => %{
+            "status" => "failed",
+            "reason" => "executor_failed",
+            "stderr" => "secret output #{secret}"
+          }
+        }
+      },
+      {
+        :tool_result,
+        %{
+          "call_id" => "cancelled-call",
+          "result" => %{"status" => "cancelled"}
+        }
+      },
+      {
+        :tool_result,
+        %{
+          "call_id" => "uncertain-call",
+          "result" => %{"status" => "uncertain"}
+        }
+      }
+    ]
+
+    Enum.with_index(events, agent_thread.next_event_sequence)
+    |> Enum.each(fn {{kind, body}, sequence} ->
+      Ledger.create!(Marshall.Agents.Event, :append, %{
+        thread_id: agent_thread.id,
+        sequence: sequence,
+        kind: kind,
+        body: body
+      })
+    end)
+
+    {:ok, view, _html} = live(signed_in(c.conn, c.owner), ~p"/threads/#{thread.id}")
+
+    assert has_element?(view, "#thread-transcript details.thread-tool-card", "Tool completed")
+    assert has_element?(view, "details[data-tool='read_file'] dd", "/workspace/README.md")
+    assert has_element?(view, "details[data-tool='read_file'] pre", "A safe file result.")
+    assert has_element?(view, "details[data-tool='exec_command']", "Tool failed")
+    assert has_element?(view, "details[data-tool='exec_command'] dd", "/workspace")
+    assert has_element?(view, "details[data-tool='exec_command'] pre", "[REDACTED:openai-key]")
+    assert has_element?(view, "details[data-tool='web_search']", "Tool cancelled")
+    assert has_element?(view, "details[data-tool='thread']", "Tool outcome uncertain")
+    assert has_element?(view, "details[data-tool='pending_review']", "Tools queued")
+    assert has_element?(view, "details[data-tool='thread'][open]")
+    refute has_element?(view, "details[data-tool='read_file'][open]")
+    refute has_element?(view, "#thread-transcript", "printf #{secret}")
+    refute has_element?(view, "#thread-transcript", secret)
+  end
+
   # @cc [owner:ghuntley,label:verification;security] thread-editor-current-capability
   # A ready thread MUST offer the editor only while its bound machine's current
   # projection permits it and expose terminal access through the bound machine

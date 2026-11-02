@@ -182,13 +182,15 @@ defmodule Marshall.MonospaceBrowserFixture do
 
     thread = Ledger.update!(thread, :set_title, %{title: title})
 
+    thread = Ledger.update!(thread, :record_admitted_machine, %{machine_id: vm.id})
+
     thread =
-      Ledger.update!(thread, :bind_machine, %{
-        machine_id: vm.id,
+      Ledger.update!(thread, :bind_agent, %{
         agent_root_id: root.id,
-        agent_thread_id: agent_thread.id,
-        status: :ready
+        agent_thread_id: agent_thread.id
       })
+
+    thread = Ledger.update!(thread, :mark_ready, %{})
 
     events = [
       {:prompt,
@@ -209,6 +211,11 @@ defmodule Marshall.MonospaceBrowserFixture do
              "call_id" => "fixture-read",
              "tool" => "read_file",
              "arguments" => %{"path" => "/workspace/lib/deployment.ex"}
+           },
+           %{
+             "call_id" => "fixture-pending",
+             "tool" => "pending_review",
+             "arguments" => %{"path" => "/workspace/notes.txt"}
            }
          ]
        }},
@@ -270,7 +277,9 @@ defmodule Marshall.MonospaceBrowserFixture do
     if status == :archived do
       :ok = Ledger.archive!(vm, :archive)
 
-      Ledger.update!(thread, :mark_archived, %{status: :archived, archived_at: DateTime.utc_now()})
+      thread
+      |> Ledger.update!(:mark_deleting, %{})
+      |> Ledger.update!(:mark_archived, %{})
     else
       thread
     end
@@ -298,10 +307,10 @@ defmodule Marshall.MonospaceBrowserFixture do
         thread
 
       :provisioning ->
-        Ledger.update!(thread, :bind_machine, %{status: :provisioning})
+        Ledger.update!(thread, :begin_provisioning, %{})
 
       :failed ->
-        Ledger.update!(thread, :mark_failed, %{status: :failed, failure_reason: :provision_failed})
+        Ledger.update!(thread, :mark_failed, %{failure_reason: :provision_failed})
     end
   end
 
