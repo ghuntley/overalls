@@ -31,7 +31,11 @@
 # commands with "OS file watch limit reached". Hosts use the same watcher
 # (ADR-0271). It re-crawls the sources per command (~1.3 s warm here); a
 # single checkout may set `notify` in .buckconfig.local.
-  file_watcher = fs_hash_crawler
+  # Antithesis stages Nix closures in antithesis/build. Those closures contain
+  # literal backslashes in example filenames; fs_hash_crawler interprets the
+  # escaped names as paths and refuses to start. notify accepts the valid Unix
+  # names while the Antithesis BUCK glob excludes generated outputs.
+  file_watcher = notify
   digest_algorithms = SHA256
 # Local results upload to the remote cache whenever one is configured
 # (ADR-0276): tools/buck2 configures Namespace only while a token is present,
@@ -46,7 +50,7 @@
 # closure, and globbing it would copy buck2 and the prelude into every
 # assembled tree. .buckconfig.local holds per-checkout overrides. The mila/
 # entries are the in-tree outputs of the non_hermetic platform builds (M9).
-  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .buck-remote.buckconfig, .buck-remote.endpoints, .buck-remote.probe, .buck-nsc.gcroot, .devenv, .direnv, buck-out, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical, mila/build, mila/native/apple/.build, mila/native/apple/App/.build, mila/native/apple/Sources/MilaNativeUI/Resources/*.json, mila/native/android/.gradle, mila/native/android/.kotlin, mila/native/android/build, mila/native/android/app/build, mila/native/android/local.properties, mila/windows-dotnet/bin, mila/windows-dotnet/obj, mila/windows-dotnet-smoke/bin, mila/windows-dotnet-smoke/obj
+  ignore = .git, .buck-cells, .buck-cells.key, .buck-cells.gcroot, .buckconfig.local, .buck-remote.buckconfig, .buck-remote.endpoints, .buck-remote.probe, .buck-nsc.gcroot, .devenv, .direnv, buck-out, antithesis/build, antithesis/build/**, antithesis/runtime, antithesis/runtime/**, **/.devenv, **/result, **/node_modules, **/target, **/_build*, **/deps, **/.elixir_ls, **/.lexical, mila/build, mila/native/apple/.build, mila/native/apple/App/.build, mila/native/apple/Sources/MilaNativeUI/Resources/*.json, mila/native/android/.gradle, mila/native/android/.kotlin, mila/native/android/build, mila/native/android/app/build, mila/native/android/local.properties, mila/windows-dotnet/bin, mila/windows-dotnet/obj, mila/windows-dotnet-smoke/bin, mila/windows-dotnet-smoke/obj
 
 <file:.buck-cells/toolchains.buckconfig>
 

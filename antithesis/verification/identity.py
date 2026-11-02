@@ -7,8 +7,10 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import stat
 import subprocess
+import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -231,9 +233,40 @@ BUCK2_TIMEOUT = 3600
 
 
 def buck2_output(root: Path, target: str) -> str:
-    """The text of the single output file `tools/buck2 build` reports for target."""
-    args = [str(root / "tools/buck2"), "build", "--show-full-output", target]
+    """The text of the single output file `tools/buck2 build` reports for target.
+
+    Staged Nix closures are deliberately kept outside Buck2's source tree while
+    the query runs.  They are runtime evidence, not source inputs, and may
+    contain valid literal backslash filenames that Buck2's notify watcher tries
+    to relativize as source paths.  Restore the contexts before returning so the
+    caller can compare the exact staged tree.
+    """
+    # Staged Nix closures can contain literal backslashes in example
+    # filenames.  Use Buck2's notify watcher while validating a staged
+    # context; its fs-hash crawler rejects those names during a rescan.
+    args = [
+        str(root / "tools/buck2"),
+        "build",
+        "-c",
+        "buck2.file_watcher=notify",
+        "--show-full-output",
+        target,
+    ]
+    contexts = root / "antithesis/build/contexts"
+    quarantine: Path | None = None
     try:
+        if contexts.is_dir():
+            quarantine = Path(tempfile.mkdtemp(prefix="overalls-antithesis-contexts-")) / "contexts"
+            shutil.move(str(contexts), str(quarantine))
+            # Drop pending watcher events for the generated closure before the
+            # fresh Buck2 invocation scans the repository.
+            subprocess.run(
+                [str(root / "tools/buck2"), "kill"],
+                check=False,
+                capture_output=True,
+                timeout=30,
+                cwd=root,
+            )
         result = subprocess.run(
             args, check=True, capture_output=True, timeout=BUCK2_TIMEOUT, cwd=root
         )
@@ -242,6 +275,10 @@ def buck2_output(root: Path, target: str) -> str:
         raise EvidenceError(f"required Buck2 build failed: {target}: {exc}") from exc
     except UnicodeDecodeError as exc:
         raise EvidenceError(f"Buck2 returned non-UTF-8 output: {target}") from exc
+    finally:
+        if quarantine is not None and quarantine.exists():
+            contexts.parent.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(quarantine), str(contexts))
     fields = listing[-1].split(" ", 1) if listing else []
     if len(fields) != 2 or fields[0].removeprefix("root") != target:
         raise EvidenceError(f"Buck2 reported no output for {target}")

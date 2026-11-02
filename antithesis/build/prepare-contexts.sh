@@ -23,7 +23,12 @@ for stage in "$@"; do
   # Buck2 builds the context (ADR-0269); its output file names the store path.
   # verification/identity.py checks staged contexts against the same target.
   target="//:package-antithesis-${stage}-context"
-  listing=$(tools/buck2 build --show-full-output "$target")
+  # Nix closures can contain literal backslashes in example filenames.  The
+  # default fs-hash crawler rejects those names while rescanning the checkout
+  # after the first context is staged; notify accepts them and the explicit
+  # source glob in antithesis/BUCK still keeps generated contexts out of Nix
+  # assembly inputs.
+  listing=$(tools/buck2 build -c buck2.file_watcher=notify --show-full-output "$target")
   mapfile -t outputs < "$(awk 'END { print $2 }' <<< "$listing")"
   if [ "${#outputs[@]}" -ne 1 ] || [ ! -d "${outputs[0]}/rootfs" ]; then
     echo "missing Nix context output for $stage" >&2
