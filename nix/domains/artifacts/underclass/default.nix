@@ -1,12 +1,12 @@
 { lib, rustPlatform, fetchFromGitHub, makeWrapper }:
 rustPlatform.buildRustPackage rec {
   pname = "underclass";
-  version = "0.1.0-0e85963";
+  version = "0.1.0-3295cb5";
 
   src = fetchFromGitHub {
     owner = "ghuntley";
     repo = "underclass";
-    rev = "0e85963ef7c950c637ae3a7f9e11c6873798cf15";
+    rev = "3295cb52dc0b8ab17442112ee0a645f76f1bea45";
     hash = (import ../pins.nix).underclassSource;
   };
 

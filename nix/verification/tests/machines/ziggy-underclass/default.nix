@@ -62,6 +62,14 @@ in pkgs.testers.runNixOSTest {
           sslCertificate = "${tls}/server.pem";
           sslCertificateKey = "${tls}/server.key";
           locations."/" = { proxyPass = "http://127.0.0.1:8081"; extraConfig = "proxy_buffering off;"; };
+          locations."= /responses" = {
+            proxyPass = "http://127.0.0.1:8081";
+            extraConfig = ''
+              proxy_buffering off;
+              proxy_hide_header Content-Type;
+              add_header Content-Type application/json always;
+            '';
+          };
         };
         "panterloons.lorikeet-bangus.ts.net" = {
           onlySSL = true;
@@ -151,6 +159,8 @@ in pkgs.testers.runNixOSTest {
   # Real NixOS units MUST use verified remote HTTPS and the Underclass proxy key,
   # correlate a completed agent stream, reject administrative credentials, and
   # recover a fresh request after outage without replaying the previous request.
+  # Underclass MUST normalize successful SSE that the provider mislabels as JSON
+  # so Ziggy completes the original model call without another provider attempt.
   # Decoded fixture records MUST have validated string-keyed object shapes.
   testScript = ''
     import base64
@@ -202,7 +212,26 @@ in pkgs.testers.runNixOSTest {
             assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H " + shlex.quote("Authorization: Bearer " + key) + " https://panterloons.lorikeet-bangus.ts.net/v1/models").strip() == "401"
         assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H 'Authorization: Bearer synthetic-proxy-key' https://panterloons.lorikeet-bangus.ts.net/admin/api/state").strip() == "401"
 
-    with subtest("startup model call completes across verified HTTPS with one v7 identity"):
+    with subtest("provider sends a completed SSE body mislabeled as JSON"):
+        pool.succeed(
+            "curl --noproxy '*' --silent --show-error --fail --max-time 10 "
+            "--dump-header /tmp/provider-headers --output /tmp/provider-body "
+            "-H 'Content-Type: application/json' --data '{\"stream\":true}' "
+            "https://provider.test:8443/responses"
+        )
+        provider_content_types: list[str] = [
+            line.split(":", 1)[1].strip().lower()
+            for line in pool.succeed("cat /tmp/provider-headers").splitlines()
+            if line.lower().startswith("content-type:")
+        ]
+        assert provider_content_types == ["application/json"]
+        provider_body: str = pool.succeed("cat /tmp/provider-body")
+        assert provider_body.startswith("event: response.completed\n")
+        assert "synthetic agent reply" in provider_body
+        provider_calls_before_agent: int = int(pool.succeed("cat /run/underclass-fixture/calls"))
+        assert provider_calls_before_agent == 1
+
+    with subtest("startup model call completes mislabeled SSE across HTTPS with one v7 identity"):
         machine.succeed("printf gpt-6-sol > /run/ziggy-fixture/agent-model; touch /run/ziggy-fixture/agent-ready")
         machine.wait_until_succeeds("test -s /run/ziggy-fixture/agent-results.jsonl")
         result = json_object(machine.succeed("head -1 /run/ziggy-fixture/agent-results.jsonl"))
@@ -210,7 +239,7 @@ in pkgs.testers.runNixOSTest {
         assert isinstance(call_id, str) and uuid.UUID(call_id).version == 7
         assert "synthetic agent reply" in json.dumps(result["response"])
         pool.succeed("journalctl -u underclass.service --no-pager | grep -F " + shlex.quote(call_id))
-        assert pool.succeed("cat /run/underclass-fixture/calls").strip() == "1"
+        assert int(pool.succeed("cat /run/underclass-fixture/calls")) == provider_calls_before_agent + 1
 
     with subtest("outage cannot replay inference and restoration admits a fresh request"):
         host: str = "11111111-1111-4111-8111-111111111111"
@@ -222,7 +251,7 @@ in pkgs.testers.runNixOSTest {
         pool.succeed("systemctl start nginx.service")
         machine.succeed(curl + headers + " --data-binary " + body + " http://llm.internal/v1/responses | grep -F 'synthetic agent reply'")
         machine.wait_until_succeeds("test $(wc -l < /run/ziggy-fixture/completions.jsonl) -eq 3")
-        assert pool.succeed("cat /run/underclass-fixture/calls").strip() == "2"
+        assert int(pool.succeed("cat /run/underclass-fixture/calls")) == provider_calls_before_agent + 2
         records = [json_object(line) for line in machine.succeed("cat /run/ziggy-fixture/admissions.jsonl").splitlines()]
         ids: list[str] = []
         for record in records:
