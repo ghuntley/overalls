@@ -1,7 +1,7 @@
 ---
-sut_path: /home/ghuntley/src/overalls-antithesis-reset
-commit: c835eb1017d24a001215c319373fa4204d64269b
-updated: 2026-10-13
+sut_path: /home/ghuntley/src/overalls
+commit: 09db83a490ac8f3623aef1cb8d628fed79c297cc
+updated: 2026-11-02
 external_references: []
 scope_answer: "Repository only (Recommended)"
 ---
@@ -40,7 +40,7 @@ not system facts. The retired harness and history were excluded.
 - All required top-level Markdown artifacts checked start with `sut_path`,
   full commit, date and `external_references: []` provenance. The stored scope
   answer is `Repository only (Recommended)` and the pinned source commit is
-  `c835eb1017d24a001215c319373fa4204d64269b`.
+  `09db83a490ac8f3623aef1cb8d628fed79c297cc`.
 - The catalog has a corresponding Open Questions block for every property.
   Tagged `(partial: ...)` / `(needs human input)` rows have an Investigation
   Log in their evidence files; untagged questions remain leads. The two

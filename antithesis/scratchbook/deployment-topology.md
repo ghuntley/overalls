@@ -1,7 +1,7 @@
 ---
-sut_path: /home/ghuntley/src/overalls-antithesis-reset
-commit: c835eb1017d24a001215c319373fa4204d64269b
-updated: 2026-10-13
+sut_path: /home/ghuntley/src/overalls
+commit: 09db83a490ac8f3623aef1cb8d628fed79c297cc
+updated: 2026-11-02
 external_references: []
 scope_answer: "Repository only (Recommended)"
 research_started_at_commit: 9fe1e493b2090d44bacd16089049cd12b316d58a
