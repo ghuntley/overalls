@@ -24,7 +24,23 @@ overalls_mix_project(
     release_srcs = [":release_srcs"],
     test_srcs = [":test_srcs"],
     antithesis_srcs = ["//antithesis:sdk"],
-    # One shard passed mix_test's 45 min bound on loaded developer hosts
-    # (load 30-60), as galileo's did.
-    test_shards = 4,
+    # Shard-2 passed mix_test's bound on loaded developer hosts (load
+    # 60-130): invalid_boot_property_test boots a fresh BEAM per case and
+    # dominated it, and hashing stacked the property and history files with
+    # it. They are weighted (estimated seconds; refresh from
+    # --slowest-modules) so the boot property gets a shard of its own, and the
+    # bound matches Marshall's for real-time properties on a loaded host.
+    test_shards = 6,
+    test_shard_weights = {
+        "brady/test/brady/invalid_boot_property_test.exs": 2400,
+        "brady/test/brady/archive_policy_history_test.exs": 300,
+        "brady/test/brady/archive_property_test.exs": 300,
+        "brady/test/brady/cache_history_test.exs": 300,
+        "brady/test/brady/chunked_boundary_history_test.exs": 300,
+        "brady/test/brady/chunked_store_property_test.exs": 300,
+        "brady/test/brady/pressure_history_test.exs": 300,
+        "brady/test/brady/proxy_chunked_history_test.exs": 300,
+        "brady/test/brady/removal_history_test.exs": 300,
+    },
+    test_timeout_minutes = 90,
 )
