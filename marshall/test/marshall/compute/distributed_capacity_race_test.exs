@@ -84,9 +84,20 @@ defmodule Marshall.Compute.DistributedCapacityRaceTest do
   # All tasks MUST finish or terminate before acquisition returns or fails.
   # OTP's concurrent dependency startup MUST start the complete declared DAG,
   # preserving dependency ordering and the existing 30s application RPC bound.
-  @spec start_peers() :: [pid()]
-  defp start_peers do
+
+  # @cc [owner:ghuntley,label:verification;concurrency] capacity-race-peer-explicit-cookie
+  # Overlapping peer boots MUST NOT read or create `$HOME/.erlang.cookie`: each
+  # peer MUST receive the sample's random cookie with `-setcookie`. A missing,
+  # unwritable or concurrently created cookie file MUST NOT fail a boot.
+  @spec start_peers([{charlist(), charlist()}]) :: [pid()]
+  defp start_peers(env \\ []) do
     suffix = System.unique_integer([:positive])
+
+    # Without -setcookie a distributed node reads $HOME/.erlang.cookie and,
+    # when it is missing, creates it read-only. Mix test shards start with an
+    # empty HOME, so three overlapping first boots raced on that file and the
+    # losers halted with exit status 1 (eacces).
+    cookie = String.to_charlist(Base.url_encode64(:crypto.strong_rand_bytes(18), padding: false))
 
     {peers, boots} =
       Enum.reduce([:capacity_race_1, :capacity_race_2, :capacity_race_3], {[], []}, fn name,
@@ -100,7 +111,17 @@ defmodule Marshall.Compute.DistributedCapacityRaceTest do
             case :peer.start_link(%{
                    name: String.to_atom("#{name}_#{suffix}"),
                    connection: :standard_io,
-                   args: [~c"+S", ~c"2:2", ~c"+SDcpu", ~c"1", ~c"+SDio", ~c"1"],
+                   args: [
+                     ~c"+S",
+                     ~c"2:2",
+                     ~c"+SDcpu",
+                     ~c"1",
+                     ~c"+SDio",
+                     ~c"1",
+                     ~c"-setcookie",
+                     cookie
+                   ],
+                   env: env,
                    wait_boot: {self(), tag}
                  }) do
               {:ok, pid} -> {:ok, pid}
@@ -342,6 +363,31 @@ defmodule Marshall.Compute.DistributedCapacityRaceTest do
     test_cases: 100 do
     batches = draw("batches", schedule_gen())
     measure_stage(:generated_history, fn -> unboxed(fn -> run_sample(batches) end) end)
+  end
+
+  # A HOME with no cookie file reproduces the first sample of a fresh Mix test
+  # shard. A missing directory makes every cookie-file creation fail, so this
+  # check is deterministic, unlike the eacces race it guards against.
+  test "overlapping peer boots never depend on a cookie file" do
+    home =
+      Path.join(System.tmp_dir!(), "capacity-race-no-home-#{System.unique_integer([:positive])}")
+
+    refute File.exists?(home)
+
+    peers = start_peers([{~c"HOME", String.to_charlist(home)}])
+
+    try do
+      assert length(peers) == 3
+
+      nodes = Enum.map(peers, &:peer.call(&1, :erlang, :node, []))
+      assert length(Enum.uniq(nodes)) == 3
+      refute :nonode@nohost in nodes
+    after
+      Enum.each(peers, &stop_peer_if_alive/1)
+      disarm_timeout_cleanup()
+    end
+
+    refute File.exists?(home)
   end
 
   # @cc [owner:ghuntley,label:verification;concurrency] capacity-error-wrapper-regression
