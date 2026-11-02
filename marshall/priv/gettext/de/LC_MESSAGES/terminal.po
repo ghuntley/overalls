@@ -547,13 +547,6 @@ msgstr ""
 "Diese Maschine ist angehalten. Starten Sie sie, um Ihr Terminal zu öffnen. "
 "Ihre Dateien bleiben erhalten."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr ""
-"Das Image dieser Maschine unterstützt den aktuellen Browsereditor nicht."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

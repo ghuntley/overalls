@@ -528,12 +528,6 @@ msgstr "터미널을 열 수 없습니다."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "이 기계는 정지되어 있습니다. 터미널을 열려면 시작하세요. 귀하의 파일은 유지됩니다."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "이 머신의 이미지는 현재 브라우저 편집기를 지원하지 않습니다."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

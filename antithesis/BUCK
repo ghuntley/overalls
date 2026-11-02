@@ -9,7 +9,16 @@ load("@root//buck:nix.bzl", "nix_owned")
 # assembling another context.
 antithesis_sources = native.glob(
     ["**", "**/.*", "**/.*/**"],
-    exclude = ["BUCK", "BUCK.v2", "build", "build/**", "runtime", "runtime/**"],
+    exclude = [
+        "BUCK",
+        "BUCK.v2",
+        "build/contexts/**",
+        "build/selected-test/**",
+        "build/.context-*",
+        "build/.context-*/**",
+        "runtime",
+        "runtime/**",
+    ],
 )
 nix_owned(srcs = antithesis_sources)
 

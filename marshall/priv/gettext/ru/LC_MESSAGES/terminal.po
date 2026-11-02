@@ -541,12 +541,6 @@ msgid "This machine is stopped. Start it to open your terminal. Your files are r
 msgstr ""
 "Машина остановлена. Запустите её для открытия терминала. Файлы сохранены."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "Образ машины не поддерживает текущий редактор браузера."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

@@ -33,7 +33,7 @@ These properties exercise the control, credentials, and leases boundaries and th
 
 | | |
 |---|---|
-| **Type** | Safety plus liveness (`Always` primary) |
+| **Type** | Safety (`Always` primary) |
 | **Priority / Confidence / Status** | P0 / high / researched; primary unimplemented |
 | **Property** | accepted Audi leases cannot outlive request-start TTL or change full binding on renewal; late replies expire. |
 | **Invariant** | `Always` at grant installation and use; `Reachable` for a refused late reply. Delay response across expiry/revocation. Planned literal SDK message: **"Audi authority never extends beyond request-start TTL or changes its binding"**. |
@@ -53,7 +53,7 @@ These properties exercise the control, credentials, and leases boundaries and th
 
 | | |
 |---|---|
-| **Type** | Safety plus liveness (`Always` primary, `Sometimes` post-marker liveness) |
+| **Type** | Safety (`Always` primary) |
 | **Priority / Confidence / Status** | P0 / high / authored primary; hosted unexecuted; scope partial |
 | **Property** | upgrade plus service-matched hello must precede any dispatch or scoped hint. |
 | **Invariant** | `Always` on connection/effect ledger; `Reachable` for refused first application request. Planned literal SDK message: **"Control domain effects require the authenticated service hello"**. |
@@ -2304,10 +2304,10 @@ These properties compare actual Restic publication and isolated target markers u
 
 | | |
 |---|---|
-| **Type** | Safety (`Always` primary) |
+| **Type** | Safety plus liveness (`Always` primary, `Sometimes` post-marker liveness) |
 | **Priority / Confidence / Status** | P1 / source-grounded / new; workload unimplemented |
 | **Property** | Every selected profile emits one setup marker only after independent readiness and keeps its bootstrap owner alive without implicit restart. |
-| **Invariant** | `Always` joins marker ordering and cardinality to probe evidence; `Reachable` records successful setup; `Sometimes` requires post-marker owner liveness after a controlled fault. Planned literal SDK message: **"Overalls bootstrap observed Control connection and independent oracle"**. |
+| **Invariant** | `Always` joins marker ordering and cardinality to probe evidence; `Reachable` records successful setup; `Sometimes` requires post-marker owner liveness after a controlled fault. Planned literal SDK message: **"Bootstrap setup marker follows independent readiness and retains one live owner"**. |
 | **Antithesis Angle** | Fault a required endpoint before readiness, signal/restart the owner after readiness, and reconcile markers with process identity and Compose restart events. |
 | **Why It Matters** | Duplicate or premature setup markers can let workloads race an unready SUT; silent owner restart can invalidate all subsequent observations. |
 | **Evidence** | [Source and oracle](properties/bootstrap-setup-complete-single-owner.md); `antithesis/workload/core/bootstrap.py:94-105`. |

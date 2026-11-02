@@ -7,10 +7,9 @@ import hashlib
 import json
 import os
 import re
-import shutil
 import stat
 import subprocess
-import tempfile
+import tarfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -145,6 +144,7 @@ class CopyInput:
     source: str
     destination: str
     chmod: int | None
+    archive: bool = False
 
 
 def sha256(data: bytes) -> str:
@@ -233,40 +233,9 @@ BUCK2_TIMEOUT = 3600
 
 
 def buck2_output(root: Path, target: str) -> str:
-    """The text of the single output file `tools/buck2 build` reports for target.
-
-    Staged Nix closures are deliberately kept outside Buck2's source tree while
-    the query runs.  They are runtime evidence, not source inputs, and may
-    contain valid literal backslash filenames that Buck2's notify watcher tries
-    to relativize as source paths.  Restore the contexts before returning so the
-    caller can compare the exact staged tree.
-    """
-    # Staged Nix closures can contain literal backslashes in example
-    # filenames.  Use Buck2's notify watcher while validating a staged
-    # context; its fs-hash crawler rejects those names during a rescan.
-    args = [
-        str(root / "tools/buck2"),
-        "build",
-        "-c",
-        "buck2.file_watcher=notify",
-        "--show-full-output",
-        target,
-    ]
-    contexts = root / "antithesis/build/contexts"
-    quarantine: Path | None = None
+    """The text of the single output file `tools/buck2 build` reports for target."""
+    args = [str(root / "tools/buck2"), "build", "--show-full-output", target]
     try:
-        if contexts.is_dir():
-            quarantine = Path(tempfile.mkdtemp(prefix="overalls-antithesis-contexts-")) / "contexts"
-            shutil.move(str(contexts), str(quarantine))
-            # Drop pending watcher events for the generated closure before the
-            # fresh Buck2 invocation scans the repository.
-            subprocess.run(
-                [str(root / "tools/buck2"), "kill"],
-                check=False,
-                capture_output=True,
-                timeout=30,
-                cwd=root,
-            )
         result = subprocess.run(
             args, check=True, capture_output=True, timeout=BUCK2_TIMEOUT, cwd=root
         )
@@ -275,10 +244,6 @@ def buck2_output(root: Path, target: str) -> str:
         raise EvidenceError(f"required Buck2 build failed: {target}: {exc}") from exc
     except UnicodeDecodeError as exc:
         raise EvidenceError(f"Buck2 returned non-UTF-8 output: {target}") from exc
-    finally:
-        if quarantine is not None and quarantine.exists():
-            contexts.parent.mkdir(parents=True, exist_ok=True)
-            shutil.move(str(quarantine), str(contexts))
     fields = listing[-1].split(" ", 1) if listing else []
     if len(fields) != 2 or fields[0].removeprefix("root") != target:
         raise EvidenceError(f"Buck2 reported no output for {target}")
@@ -313,15 +278,99 @@ def verify_current_context(
     return output, deriver, compare_context_trees(staged, expected, stage, output)
 
 
+def _archive_members(archive: tarfile.TarFile) -> dict[str, tarfile.TarInfo]:
+    members: dict[str, tarfile.TarInfo] = {}
+    for member in archive:
+        if member.uid != 0 or member.gid != 0:
+            raise EvidenceError(f"non-root ownership in rootfs archive: {member.name}")
+        path = Path(member.name)
+        if path.is_absolute() or ".." in path.parts:
+            raise EvidenceError(f"unsafe rootfs archive path: {member.name}")
+        name = path.as_posix()
+        if name in members:
+            raise EvidenceError(f"duplicate rootfs archive path: {name}")
+        if not (member.isfile() or member.isdir() or member.issym()):
+            raise EvidenceError(f"unsupported rootfs archive member: {name}")
+        members[name] = member
+    if "." not in members or not members["."].isdir():
+        raise EvidenceError("rootfs archive lacks its root directory")
+    for name in members:
+        for parent in Path(name).parents:
+            ancestor = members.get(parent.as_posix())
+            if ancestor is not None and not ancestor.isdir():
+                raise EvidenceError(f"rootfs archive path traverses a non-directory: {name}")
+    return members
+
+
+def archive_records(archive_path: Path, prefix: str = "rootfs") -> list[dict[str, Json]]:
+    """@cc [owner:ghuntley,label:verification] rootfs-archive-exact-lineage
+    Rootfs archives MUST expose exactly one relative path per regular file,
+    directory or symlink, retaining modes, targets and regular-file bytes.
+    Every member MUST have UID and GID zero, matching Docker COPY's root
+    ownership and the archive writer's explicit ownership normalization.
+    Absolute paths, traversal, duplicate paths, hardlinks, special files and
+    children below non-directory members MUST prevent an identity freeze.
+    """
+    records: list[dict[str, Json]] = []
+    try:
+        with tarfile.open(archive_path, mode="r:") as archive:
+            for name, member in sorted(_archive_members(archive).items()):
+                record: dict[str, Json] = {
+                    "path": prefix if name == "." else prefix + "/" + name,
+                    "mode": stat.S_IMODE(member.mode),
+                }
+                if member.isdir():
+                    record["kind"] = "directory"
+                elif member.issym():
+                    record.update({"kind": "symlink", "target": member.linkname})
+                else:
+                    content = archive.extractfile(member)
+                    if content is None:
+                        raise EvidenceError(f"unreadable rootfs archive member: {name}")
+                    digest = hashlib.sha256()
+                    with content:
+                        while chunk := content.read(1024 * 1024):
+                            digest.update(chunk)
+                    record.update(
+                        {"kind": "file", "bytes": member.size, "sha256": digest.hexdigest()}
+                    )
+                records.append(record)
+    except (OSError, tarfile.TarError) as exc:
+        raise EvidenceError(f"unreadable rootfs archive: {archive_path}: {exc}") from exc
+    return sorted(records, key=lambda record: Path(string(field(record, "path"), "archive path")))
+
+
+def archive_bytes(archive_path: Path, name: str) -> bytes:
+    try:
+        with tarfile.open(archive_path, mode="r:") as archive:
+            member = _archive_members(archive).get(name)
+            if member is None or not member.isfile():
+                raise EvidenceError(f"rootfs archive lacks regular file: {name}")
+            content = archive.extractfile(member)
+            if content is None:
+                raise EvidenceError(f"unreadable rootfs archive member: {name}")
+            with content:
+                return content.read()
+    except (OSError, tarfile.TarError) as exc:
+        raise EvidenceError(f"unreadable rootfs archive: {archive_path}: {exc}") from exc
+
+
 def compare_context_trees(
     staged: Path, expected: Path, stage: str, expected_output: str
 ) -> list[dict[str, Json]]:
     bases = ("identity.json", "closure-store-paths.txt", "rootfs")
     expected_files = walk_inputs(expected, bases, frozenset())
-    staged_files = walk_inputs(staged, bases, frozenset())
+    staged_files = sorted(
+        walk_inputs(staged, bases[:2], frozenset()) + archive_records(staged / "rootfs.tar"),
+        key=lambda record: Path(string(field(record, "path"), "context path")),
+    )
     stamp_name = "rootfs/opt/overalls/context-output.txt"
-    stamp = staged / stamp_name
-    if not stamp.is_file() or stamp.read_bytes() != (expected_output + "\n").encode():
+    stamp = (expected_output + "\n").encode()
+    if (
+        not (staged / "context-output.txt").is_file()
+        or (staged / "context-output.txt").read_bytes() != stamp
+        or archive_bytes(staged / "rootfs.tar", "opt/overalls/context-output.txt") != stamp
+    ):
         raise EvidenceError(f"staged Nix context has no current output stamp: {stage}")
     if [item for item in staged_files if item["path"] != stamp_name] != expected_files:
         raise EvidenceError(f"staged Nix context differs from current built output: {stage}")
@@ -411,7 +460,7 @@ def verify_image_contexts(
     Every inspected stage image MUST carry the exact identity, closure list and
     staged Nix output path from its current, checked context. Missing or stale
     embedded provenance MUST prevent an identity freeze. This verifies build
-    provenance under Docker COPY semantics, not every in-image Nix byte.
+    provenance under Docker ADD/COPY semantics, not every in-image Nix byte.
     """
     if engine not in {"podman", "docker"}:
         raise EvidenceError("engine must be podman or docker")
@@ -426,7 +475,7 @@ def verify_image_contexts(
         for source_name, image_path in (
             ("identity.json", "/opt/overalls/image-identity.json"),
             ("closure-store-paths.txt", "/opt/overalls/closure-store-paths.txt"),
-            ("rootfs/opt/overalls/context-output.txt", "/opt/overalls/context-output.txt"),
+            ("context-output.txt", "/opt/overalls/context-output.txt"),
         ):
             expected = (staged / source_name).read_bytes()
             if source_name.endswith("context-output.txt") and expected != (output + "\n").encode():
@@ -452,7 +501,7 @@ def verify_image_contexts(
 
 
 def docker_copies(root: Path) -> dict[str, list[CopyInput]]:
-    """Parse the deliberately small Dockerfile COPY subset; refuse new syntax."""
+    """Parse local COPY and the exact rootfs archive ADD; refuse new syntax."""
     stages: dict[str, list[CopyInput]] = {}
     current: str | None = None
     for raw in (root / "antithesis/Dockerfile").read_text(encoding="utf-8").splitlines():
@@ -464,8 +513,14 @@ def docker_copies(root: Path) -> dict[str, list[CopyInput]]:
             current = match.group(1)
             stages[current] = []
         elif line.startswith(("COPY ", "ADD ")):
-            if current is None or line.startswith("ADD "):
+            if current is None:
                 raise EvidenceError("unsupported Dockerfile source instruction")
+            if line.startswith("ADD "):
+                source = f"antithesis/build/contexts/{current}/rootfs.tar"
+                if line != f"ADD {source} /" or stages[current]:
+                    raise EvidenceError(f"unsupported Dockerfile ADD in {current}")
+                stages[current].append(CopyInput(source, "/", None, archive=True))
+                continue
             match = re.fullmatch(r"COPY (?:--chmod=(0[0-7]{3,4}) )?(\S+) (\S+)", line)
             if match is None:
                 raise EvidenceError(f"unsupported Dockerfile COPY in {current}")
@@ -486,7 +541,7 @@ def docker_copies(root: Path) -> dict[str, list[CopyInput]]:
 
 def _under_copy_destination(path: str, copied: CopyInput) -> bool:
     destination = copied.destination.rstrip("/") or "/"
-    if copied.source.endswith("/"):
+    if copied.source.endswith("/") or copied.archive:
         return path == destination or path.startswith(destination + "/")
     return path == destination
 
@@ -552,18 +607,23 @@ def verify_image_copy(
     prune_runtime_filesystems: bool = False,
 ) -> None:
     source = root / copied.source
-    directory = copied.source.endswith("/")
-    if directory != source.is_dir() or (not source.exists() and not source.is_symlink()):
+    directory = copied.source.endswith("/") or copied.archive
+    wrong_shape = not source.is_file() if copied.archive else directory != source.is_dir()
+    if wrong_shape or (not source.exists() and not source.is_symlink()):
         raise EvidenceError(f"Dockerfile COPY source missing or shape changed: {copied.source}")
     if directory and not copied.destination.endswith("/"):
         raise EvidenceError(f"unsupported Dockerfile directory destination: {copied.destination}")
     if not directory and copied.destination.endswith("/"):
         raise EvidenceError(f"unsupported Dockerfile file destination: {copied.destination}")
-    records = walk_inputs(
-        root,
-        (copied.source,),
-        frozenset() if prune_runtime_filesystems else SKIP_PARTS,
-        exclude_results=not prune_runtime_filesystems,
+    records = (
+        archive_records(source, copied.source)
+        if copied.archive
+        else walk_inputs(
+            root,
+            (copied.source,),
+            frozenset() if prune_runtime_filesystems else SKIP_PARTS,
+            exclude_results=not prune_runtime_filesystems,
+        )
     )
     expected_tree: dict[str, tuple[str, str, str]] = {}
     expected_hashes: dict[str, str] = {}
@@ -664,13 +724,13 @@ def verify_image_copies(
     root: Path, engine: str, stages: list[str], image_data: dict[str, Json]
 ) -> None:
     """@cc [owner:ghuntley,label:verification] direct-docker-copy-lineage
-    Every selected stage MUST copy the current checked Nix rootfs. The final
+    Every selected stage MUST unpack the current checked Nix rootfs archive. The final
     image's rootfs-owned paths MUST match that source exactly after accounting
     for later COPY destinations, their absent default-mode ancestor directories,
     and runtime pseudo-filesystems. An absent source ancestor MUST be a 0755
     directory with no link target. Every other Dockerfile COPY source MUST match
     the inspected image's path listing, modes, link targets and file bytes.
-    Unsupported COPY syntax MUST fail closed.
+    Unsupported ADD or COPY syntax MUST fail closed.
     """
     if engine not in {"podman", "docker"}:
         raise EvidenceError("engine must be podman or docker")
@@ -678,7 +738,7 @@ def verify_image_copies(
     for stage in stages:
         stage_copies = copies.get(stage)
         if not stage_copies or stage_copies[0] != CopyInput(
-            f"antithesis/build/contexts/{stage}/rootfs/", "/", None
+            f"antithesis/build/contexts/{stage}/rootfs.tar", "/", None, archive=True
         ):
             raise EvidenceError(f"selected Dockerfile stage lacks checked Nix rootfs: {stage}")
         image = obj(field(image_data, stage), f"{stage} image")
@@ -814,10 +874,14 @@ def verify_catalog_link(root: Path) -> None:
     workload process registers that root's catalog. A missing path, a real
     directory or a link with another target MUST prevent an identity freeze.
     """
-    link = root / "antithesis/build/contexts/workload/rootfs" / IMAGE_CATALOG_LINK.lstrip("/")
-    if not link.is_symlink():
+    records = archive_records(root / "antithesis/build/contexts/workload/rootfs.tar")
+    link = next(
+        (record for record in records if field(record, "path") == "rootfs" + IMAGE_CATALOG_LINK),
+        None,
+    )
+    if link is None or field(link, "kind") != "symlink":
         raise EvidenceError("staged workload rootfs lacks the single-root catalog link")
-    if os.readlink(link) != IMAGE_CATALOG_ROOT:
+    if field(link, "target") != IMAGE_CATALOG_ROOT:
         raise EvidenceError("staged workload catalog link targets an unexpected tree")
 
 

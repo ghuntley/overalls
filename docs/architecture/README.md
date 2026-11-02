@@ -1,5 +1,10 @@
 # Architecture
 
+[ADR-0280](decisions/0280-remote-underclass-and-safe-agent-retries.md) routes
+Dungarees inference through Panterloons Underclass with proxy-only credentials,
+UUIDv7 correlation and bounded fresh attempts for certified pre-output overloads.
+PostgreSQL authority, local monitor custody and uncertain-result no-replay remain.
+
 [ADR-0265](decisions/0265-rust-code-quality.md) gives every Rust crate one
 canonical lint policy enforced by clippy gates and a drift checker, keeps
 `lib.rs` files as module indexes, and makes Hegel the only Rust property engine.

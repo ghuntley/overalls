@@ -204,10 +204,20 @@ defmodule Marshall.Agents.Loop do
         :schedule
 
       %{status: :failed} = call ->
-        if Compaction.failure_reason(call.response) in [
-             :context_limit_exceeded,
-             :native_compaction_unavailable
-           ], do: :schedule, else: :provider_failed
+        cond do
+          Compaction.failure_reason(call.response) in [
+            :context_limit_exceeded,
+            :native_compaction_unavailable
+          ] ->
+            :schedule
+
+          true ->
+            case ModelCalls.provider_retry(calls, Ledger.now()) do
+              :ready -> :schedule
+              :wait -> :wait
+              _ -> :provider_failed
+            end
+        end
 
       %{status: :completed} ->
         commands =
@@ -416,8 +426,17 @@ defmodule Marshall.Agents.Loop do
         :ok
 
       {:error, reason}
-      when reason in [:already_queued, :waiting_for_tools, :waiting_for_answers, :stale_turn] ->
+      when reason in [
+             :already_queued,
+             :waiting_for_tools,
+             :waiting_for_answers,
+             :stale_turn,
+             :retry_waiting
+           ] ->
         :ok
+
+      {:error, :provider_failed} ->
+        TurnCoordinator.finish(turn_id, :failed, :provider_failed)
 
       {:error, :machine_unavailable} ->
         TurnCoordinator.finish(turn_id, :failed, :machine_unavailable)

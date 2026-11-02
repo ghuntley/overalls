@@ -21,8 +21,10 @@ repository_sources = native.glob(
     exclude = [
         "BUCK",
         "BUCK.v2",
-        "antithesis/build",
-        "antithesis/build/**",
+        "antithesis/build/contexts/**",
+        "antithesis/build/selected-test/**",
+        "antithesis/build/.context-*",
+        "antithesis/build/.context-*/**",
         "antithesis/runtime",
         "antithesis/runtime/**",
     ],

@@ -6,6 +6,8 @@ set -euo pipefail
 # Refreshing one stage MUST preserve every other staged context.
 # Each staged rootfs MUST embed its exact Nix output path for image identity
 # verification, without changing the copied Nix tree's directory modes.
+# The rootfs MUST remain a tar archive in the checkout, so closure filenames
+# cannot enter Buck2's source crawler.
 repository=$(git rev-parse --show-toplevel)
 cd "$repository"
 
@@ -23,12 +25,7 @@ for stage in "$@"; do
   # Buck2 builds the context (ADR-0269); its output file names the store path.
   # verification/identity.py checks staged contexts against the same target.
   target="//:package-antithesis-${stage}-context"
-  # Nix closures can contain literal backslashes in example filenames.  The
-  # default fs-hash crawler rejects those names while rescanning the checkout
-  # after the first context is staged; notify accepts them and the explicit
-  # source glob in antithesis/BUCK still keeps generated contexts out of Nix
-  # assembly inputs.
-  listing=$(tools/buck2 build -c buck2.file_watcher=notify --show-full-output "$target")
+  listing=$(tools/buck2 build --show-full-output "$target")
   mapfile -t outputs < "$(awk 'END { print $2 }' <<< "$listing")"
   if [ "${#outputs[@]}" -ne 1 ] || [ ! -d "${outputs[0]}/rootfs" ]; then
     echo "missing Nix context output for $stage" >&2
@@ -36,12 +33,15 @@ for stage in "$@"; do
   fi
 
   staged=$(mktemp -d "antithesis/build/.context-${stage}.XXXXXX")
-  cp -a --no-preserve=ownership "${outputs[0]}/." "$staged/"
-  identity_dir="$staged/rootfs/opt/overalls"
-  identity_mode=$(stat -c %a "$identity_dir")
-  chmod u+w "$identity_dir"
-  printf '%s\n' "${outputs[0]}" > "$identity_dir/context-output.txt"
-  chmod "$identity_mode" "$identity_dir"
+  cp --preserve=mode "${outputs[0]}/identity.json" "${outputs[0]}/closure-store-paths.txt" "$staged/"
+  # ADD unpacks the archive in Docker. Hardlinks are written as independent
+  # regular files so every member has one unambiguous identity record.
+  tar --sort=name --hard-dereference --numeric-owner --owner=0 --group=0 \
+    -cf "$staged/rootfs.tar" -C "${outputs[0]}/rootfs" .
+  printf '%s\n' "${outputs[0]}" > "$staged/context-output.txt"
+  tar --numeric-owner --owner=0 --group=0 --mode=0644 \
+    -rf "$staged/rootfs.tar" -C "$staged" \
+    --transform='s,^context-output.txt$,./opt/overalls/context-output.txt,' context-output.txt
   if [ -d "antithesis/build/contexts/$stage" ]; then
     find "antithesis/build/contexts/$stage" -type d -exec chmod u+w {} +
     rm -rf "antithesis/build/contexts/$stage"

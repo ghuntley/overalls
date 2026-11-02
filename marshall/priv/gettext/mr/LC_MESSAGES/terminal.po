@@ -532,12 +532,6 @@ msgstr "टर्मिनल उघडता आले नाही."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "हे मशीन थांबले आहे. टर्मिनलसाठी सुरू करा. फाइल्स राखल्या आहेत."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "या मशीनची प्रतिमा सध्याचा ब्राउझर संपादक समर्थित करत नाही."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

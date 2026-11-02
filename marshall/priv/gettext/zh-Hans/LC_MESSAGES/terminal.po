@@ -528,12 +528,6 @@ msgstr "无法打开终端。"
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "此机器已停止。启动后即可打开终端。文件会保留。"
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "此机器镜像不支持当前浏览器编辑器。"
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

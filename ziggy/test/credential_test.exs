@@ -30,6 +30,8 @@ defmodule Ziggy.CredentialTest do
         {"authorization", "guest"},
         {"host", "evil.example"},
         {"x-api-key", "guest"},
+        {"x-request-id", "guest"},
+        {"x-underclass-retry-safe", "pre-output-overload"},
         {"anthropic-beta", "synthetic-beta"},
         {"x-forwarded-for", "127.0.0.1"}
       ])
@@ -39,5 +41,7 @@ defmodule Ziggy.CredentialTest do
     refute List.keymember?(headers, "authorization", 0)
     refute List.keymember?(headers, "host", 0)
     refute List.keymember?(headers, "x-forwarded-for", 0)
+    refute List.keymember?(headers, "x-request-id", 0)
+    refute List.keymember?(headers, "x-underclass-retry-safe", 0)
   end
 end
