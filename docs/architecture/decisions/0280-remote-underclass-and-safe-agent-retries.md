@@ -95,15 +95,17 @@ and independent retry proof. The
 [model coordinator](../../../marshall/lib/marshall/agents/model_calls.ex) and
 [loop](../../../marshall/lib/marshall/agents/loop.ex) retain durable attempts.
 The [machine fixture](../../../nix/verification/tests/machines/ziggy-underclass/default.nix)
-uses real packages over local test TLS on two nodes; actual Tailscale certificate,
-ACL and live-provider acceptance remain separate. Execution evidence is recorded
-in the [implementation review](../reviews/2026-11-02-agent-startup-inference.md).
+uses real packages over local test TLS on two nodes. The
+[implementation review](../reviews/2026-11-02-agent-startup-inference.md) records
+the separate production Tailscale TLS/authentication probe and completed repair
+on the original VM, with one UUIDv7 across all three services.
 Historical ADR-0100 and ADR-0102 verification gaps are not implicitly closed.
 
 ## Open questions
 
-None for the accepted behavior. Production deployment and live-provider
-acceptance remain to record; executed test evidence is linked above.
+None for the accepted behavior. The scoped production repair and live-provider
+acceptance are recorded above; inherited verification gaps keep the broader
+implementation partial.
 
 ## Related decisions
 

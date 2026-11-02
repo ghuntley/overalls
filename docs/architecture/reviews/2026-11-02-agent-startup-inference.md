@@ -99,11 +99,11 @@ four cases in three UI test files now require the unsupported action and notice
 to be absent, while preserving the direct-launch authorization denial. No production editor
 behavior or live translation changed.
 
-An authorized read-only operator probe confirmed the original transcript still
-contains only prompt, turn-start and turn-failed events. The machine remains
-running on Dungarees with execution epoch 1 and its original placement. The
-repair will submit through the normal thread action with a fresh stable key;
-the uncertain original model call and failed turn remain retained.
+Before deployment, an authorized read-only operator probe confirmed the original
+transcript contained only prompt, turn-start and turn-failed events. The machine
+remained running on Dungarees with execution epoch 1 and its original placement.
+Repairs use the normal thread action with fresh stable keys; the uncertain
+original model call and failed turn remain retained.
 
 ## Live-provider acceptance and response-header correction
 
@@ -134,8 +134,7 @@ classification to the outgoing response header, including held overload replay.
 It preserves the existing SSE contract, retry proofs and non-stream/error paths;
 it introduces no new architecture decision. The two-node regression now makes
 the provider advertise JSON for its real SSE body so this mismatch cannot hide
-behind a well-formed fixture. Follow-up execution and live recovery remain to
-record.
+behind a well-formed fixture.
 
 Underclass follow-up
 [`3295cb52dc0b8ab17442112ee0a645f76f1bea45`](https://github.com/ghuntley/underclass/commit/3295cb52dc0b8ab17442112ee0a645f76f1bea45)
@@ -148,9 +147,54 @@ The pin tool fetched and verified the new source hash and reconfirmed the
 unchanged Cargo hash. An IPv6 fetch timeout was resolved only inside the
 isolated build network namespace; host networking was not changed.
 
-With this final pin, the two-node mislabeled-SSE regression passed, including
-its composed Python type/lint checks and one-attempt startup completion. The
-Underclass SLO machine test also passed (batch
-`b7b26902-702b-478e-aed2-47b687e1b0c4`). Service lifecycle and agent-fleet
-reruns are still in progress at this commit; final acceptance is recorded after
-their completion and deployment.
+With this final pin, all four machine targets passed with no failures or skips
+(batch `b7b26902-702b-478e-aed2-47b687e1b0c4`, completed 10:32:16 UTC).
+The two-node mislabeled-SSE regression ran in fresh VMs, including its composed
+Python type/lint checks and one-attempt startup completion. The Underclass SLO
+and service tests also ran in fresh VMs; service verification exercised two
+Hegel properties with ten cases each, including thirty-step availability
+histories with restarts and reboots. The agent-fleet target reused its unchanged,
+previously executed passing closure; the Underclass pin does not enter that
+fixture's closure.
+
+The normal follow-up commit hook passed all eleven selected checks, including
+52 shared governance tests. Nine small checks stalled in the remote execution
+queue; retrying the normal hook with remote execution disabled preserved every
+gate and reused the passing local tests. Commit
+`15bf34d531e9cae3e6ad982a521cdcd80d542438` was pushed after both exact-revision
+host bundles built. Both hosts then activated that revision and reported healthy.
+The running Underclass executable identifies upstream `3295cb5`.
+
+## Recovered thread and final correlation
+
+The strengthened Dungarees-to-Panterloons probe required the media type as well
+as HTTP 200, verified TLS, matching UUIDv7 and completed assistant output. It
+passed with `text/event-stream` under request
+`01a19bdd-570f-7f7f-8203-4ecbda61be46` in 7.8 seconds.
+
+The guarded public thread action then submitted turn
+`01a19bdd-94bc-7b6e-86e2-3a8351ac474d` with a new stable repair key. Guard reads
+and submission shared a serializable transaction; both earlier failed turns
+and their receipts remain intact. Model call
+`01a19bdd-a4fc-79b0-98b8-5908a59e9a61` completed at 10:46:04 UTC. The authorized
+transcript API used by ThreadsLive returned the assistant joke, and the turn
+was completed. The original machine, Dungarees host, placement and execution
+epoch 1 were unchanged. Both update timers were restored and both hosts remained
+healthy.
+
+The same UUIDv7 appears in Marshall admission/completion, Ziggy upstream and
+accounting events, and Underclass request/stream completion. This trace also
+exposed a diagnostic-only edge: a successful Responses object contains
+`error: null`, which the newly added provider-outcome classifier mislabeled
+`upstream_failed`. Inference and accounting completed correctly. The correction
+restricts closed-error classification to actual string errors and adds public
+worker regressions for completed JSON and SSE responses with null errors.
+
+The focused worker shard passed 68 tests with the corrected JSON log assertions,
+the other current Ziggy shards passed 14, 40 and 29 tests, and the static Ziggy
+check including Dialyzer passed. An earlier aggregate attempt recorded 66/68
+because its first assertions searched for text logs; a second attempt was
+interrupted by a diagnostic `buck kill` command. Those stale records are not
+used as passing evidence. The authoritative focused rerun passed all 68 tests.
+The correction is ready for its normal commit hook and ordered deployment; the
+already-repaired thread does not need another turn.
