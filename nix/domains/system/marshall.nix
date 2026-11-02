@@ -319,6 +319,25 @@ in
     services.overallsCrashDumpRetention.directories = lib.mkIf cfg.crashDumps.enable (map (name: "/var/lib/marshall-${name}-crash-dumps") (builtins.attrNames cfg.instances));
     systemd.coredump.settings.Coredump = lib.mkIf cfg.crashDumps.enable { Storage = "none"; ProcessSizeMax = 0; };
     assertions = [
+      # @cc [owner:ghuntley,label:reliability] marshall-credential-bundle-ordering
+      # Every credential Marshall loads from a declared SOPS bundle's output
+      # directory MUST name that bundle's unit in secretUnits, so the service
+      # starts after the file exists. Otherwise a cold boot starts Marshall
+      # before the bundle and systemd fails it at CREDENTIALS (2026-11-02).
+      (let
+        bundles = config.services.overallsSecrets.bundles or {};
+        files = [ cfg.environmentFile cfg.serperKeyFile cfg.sshHostCa.keyFile
+          cfg.integrations.github.clientSecretFile cfg.publicHostFile cfg.defaultImageIdFile ]
+          ++ lib.concatMap (instance: [ instance.certificateFile instance.keyFile instance.terminalPeerCAFile ])
+            (builtins.attrValues cfg.instances);
+        bundleOf = file: let m = builtins.match "/run/overalls-secrets/([^/]+)/.*" (toString file); in
+          if file == null || m == null then null else builtins.head m;
+        unordered = lib.filter (b: b != null && bundles ? ${b} && !(lib.elem "overalls-secrets-${b}.service" cfg.secretUnits))
+          (lib.unique (map bundleOf files));
+      in {
+        assertion = unordered == [];
+        message = "Marshall loads credentials from SOPS bundles not listed in secretUnits: ${lib.concatStringsSep ", " unordered}";
+      })
       { assertion = (cfg.integrations.github.clientId == null) == (cfg.integrations.github.clientSecretFile == null) &&
           (cfg.integrations.github.clientId == null) == (cfg.integrations.github.redirectUri == null);
         message = "Marshall GitHub OAuth clientId, clientSecretFile and redirectUri must be configured together."; }

@@ -171,6 +171,7 @@ in
       "overalls-secrets-marshall.service"
       "overalls-secrets-ssh-host-ca.service"
       "overalls-secrets-backend-tls.service"
+      "overalls-secrets-github-oauth.service"
       "overalls-database-password.service"
       # The wildcard issuer's Audi DNS replica addresses (ADR-0233).
       addresses.unit
