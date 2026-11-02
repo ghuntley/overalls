@@ -12,6 +12,9 @@ import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry
 import androidx.test.runner.lifecycle.Stage
 import androidx.test.uiautomator.By
+import androidx.test.uiautomator.BySelector
+import androidx.test.uiautomator.Direction
+import androidx.test.uiautomator.UiObject2
 import androidx.test.uiautomator.UiDevice
 import androidx.test.uiautomator.Until
 import java.security.KeyStore
@@ -26,6 +29,7 @@ import org.junit.AfterClass
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -427,6 +431,31 @@ class MilaJourneyTest {
     }
 
     /**
+     * One pass over the whole Mila window: returns [selector]'s object if it is on screen, or after
+     * scrolling the shell from its top to its bottom, as a user would on a small screen. Compose
+     * leaves content outside the viewport out of the accessibility tree, so an unscrolled search
+     * cannot see a page below the fold.
+     */
+    private fun UiDevice.scanMila(packageName: String, selector: BySelector): UiObject2? {
+        findObject(selector)?.let { return it }
+        val scroller = findObject(By.pkg(packageName).scrollable(true)) ?: return null
+        var steps = 0
+        while (steps < 50 && scroller.scroll(Direction.UP, 1.0f)) steps += 1
+        findObject(selector)?.let { return it }
+        return scroller.scrollUntil(Direction.DOWN, Until.findObject(selector))
+    }
+
+    /** Repeats [scanMila] until [selector] is found or [timeoutMs] passes. */
+    private fun UiDevice.awaitInMila(packageName: String, selector: BySelector, timeoutMs: Long): UiObject2? {
+        val deadline = System.currentTimeMillis() + timeoutMs
+        while (true) {
+            scanMila(packageName, selector)?.let { return it }
+            if (System.currentTimeMillis() >= deadline) return null
+            Thread.sleep(1_000)
+        }
+    }
+
+    /**
      * Launching a link on the device: the platform resolver, not an explicit component, starts
      * Mila from an `overalls://<fixture-host>/machines/<seed-id>` VIEW link. The persisted fixture
      * deployment signs in through the activity's own production `MilaNativeRoot` (the device key
@@ -459,13 +488,12 @@ class MilaJourneyTest {
             assertEquals(MilaRoute.Machine(seed.id), parseMilaRoute(canonical))
             assertResolvesToMila(context, canonical)
             launchThroughResolver(context, canonical)
-            assertTrue(
-                "seed machine detail page shows ${seed.id}",
-                device.wait(Until.hasObject(By.pkg(context.packageName).text(seed.id.toString())), 120_000),
-            )
-            assertTrue(
+            val idText = By.pkg(context.packageName).text(seed.id.toString())
+            val seedRow = By.pkg(context.packageName).textStartsWith("${seed.name} · ")
+            assertNotNull("seed machine detail page shows ${seed.id}", device.awaitInMila(context.packageName, idText, 120_000))
+            assertNotNull(
                 "seed machine detail shows the authenticated listing row for ${seed.name}",
-                device.wait(Until.hasObject(By.pkg(context.packageName).textStartsWith("${seed.name} · ")), 30_000),
+                device.awaitInMila(context.packageName, seedRow, 30_000),
             )
             finishMilaActivities()
 
@@ -478,13 +506,15 @@ class MilaJourneyTest {
                 launchThroughResolver(context, refused)
                 // The machine list renders listing rows only once the activity has signed in, and a
                 // held link would complete at that same transition.
-                assertTrue(
+                assertNotNull(
                     "signed-in machine list lists ${seed.name} after $refused",
-                    device.wait(Until.hasObject(By.pkg(context.packageName).textStartsWith("${seed.name} · ")), 120_000),
+                    device.awaitInMila(context.packageName, seedRow, 120_000),
                 )
-                assertFalse(
+                // Give a wrongly accepted link time to navigate, then search the whole window.
+                Thread.sleep(5_000)
+                assertNull(
                     "non-canonical link $refused must not open the machine detail page",
-                    device.wait(Until.hasObject(By.pkg(context.packageName).text(seed.id.toString())), 5_000),
+                    device.scanMila(context.packageName, idText),
                 )
                 finishMilaActivities()
             }

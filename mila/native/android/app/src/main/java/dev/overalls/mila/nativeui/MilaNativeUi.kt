@@ -1,6 +1,8 @@
 package dev.overalls.mila.nativeui
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.width
@@ -173,7 +175,10 @@ fun MilaNativeRoot(
             else -> Unit
         }
     }
-    Column(modifier = Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // The shell scrolls vertically: on a small screen (the 320x640 emulator profile) the routed
+    // page, such as a deep-linked machine's detail, sits below the deployment picker and would
+    // otherwise be laid out off-screen, unreachable by the user and absent from accessibility.
+    Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(MilaStrings.text(MilaMessage.AppName), style = MaterialTheme.typography.headlineSmall)
         MilaDeploymentPicker(
             deployments = deploymentEntries,
