@@ -6,6 +6,14 @@ internal readonly record struct MilaWebEndpoint(Guid MachineId, ushort Port, boo
 
 internal static class MilaWebEndpointDecoder
 {
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security] windows-web-endpoint-origin-input
+    /// A web endpoint URL MUST be an HTTPS URL with a canonical ASCII DNS host,
+    /// no credentials or fragment, and an explicit port only when it matches
+    /// the authenticated endpoint port. This validation runs before assigning
+    /// the URL to WebView2, because navigation fencing cannot protect the
+    /// initial navigation if the decoded origin is already unsafe.
+    /// </summary>
     internal static MilaWebEndpoint Decode(ReadOnlySpan<byte> bytes, Guid expectedMachine)
     {
         if (bytes.Length is 0 or > 64 * 1024) throw new InvalidDataException("web response bounds");
@@ -22,10 +30,28 @@ internal static class MilaWebEndpointDecoder
         Uri? url = null;
         if (root.TryGetProperty("url", out JsonElement urlValue) && urlValue.ValueKind != JsonValueKind.Null)
         {
-            if (!Uri.TryCreate(urlValue.GetString(), UriKind.Absolute, out Uri? parsed) || parsed.Scheme != Uri.UriSchemeHttps)
+            string? rawUrl = urlValue.GetString();
+            if (rawUrl is null or { Length: > 2048 } ||
+                !Uri.TryCreate(rawUrl, UriKind.Absolute, out Uri? parsed) ||
+                parsed.Scheme != Uri.UriSchemeHttps ||
+                !string.IsNullOrEmpty(parsed.UserInfo) ||
+                !string.IsNullOrEmpty(parsed.Fragment) ||
+                !CanonicalDnsHost(parsed.Host) ||
+                (parsed.Port != -1 && parsed.Port != port))
                 throw new InvalidDataException("web URL");
             url = parsed;
         }
         return new(machine, (ushort)port, visibility == "public", revision, url);
+    }
+
+    private static bool CanonicalDnsHost(string host)
+    {
+        if (host.Length is 0 or > 253) return false;
+        string[] labels = host.Split('.', StringSplitOptions.None);
+        return labels.All(label => label.Length is > 0 and <= 63 &&
+            label[0] != '-' && label[^1] != '-' &&
+            label.All(character => (character is >= 'a' and <= 'z') ||
+                (character is >= 'A' and <= 'Z') ||
+                (character is >= '0' and <= '9') || character == '-'));
     }
 }

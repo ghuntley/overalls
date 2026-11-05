@@ -112,6 +112,17 @@ internal static class Program
         bool badWeb = false;
         try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"http://web.example.test\"}}"), machineId); } catch (InvalidDataException) { badWeb = true; }
         Require(badWeb, "insecure web endpoint refusal");
+        foreach (string unsafeUrl in [
+            "https://user:pass@web.example.test/",
+            "https://web..example.test/",
+            "https://web.example.test:8443/",
+            "https://web.example.test/#fragment"])
+        {
+            bool refused = false;
+            try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"{unsafeUrl}\"}}"), machineId); }
+            catch (InvalidDataException) { refused = true; }
+            Require(refused, $"unsafe web endpoint refusal: {unsafeUrl}");
+        }
         MilaWebEndpoint enveloped = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"version\":1,\"status\":\"succeeded\",\"result\":{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"private\",\"policy_revision\":5,\"url\":null}}}}"), machineId);
         Require(enveloped is { Port: 8080, IsPublic: false, Revision: 5 }, "web endpoint reads Porsche's succeeded envelope");
         bool failedEnvelope = false;
