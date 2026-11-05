@@ -223,6 +223,11 @@ export const ThreadComposer = {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "k" && inComposer) {
         event.preventDefault(); openPalette(this, target); return;
       }
+      if (event.ctrlKey && event.key === "Enter" && inComposer) {
+        event.preventDefault();
+        target.form?.requestSubmit();
+        return;
+      }
       const buttons = choices(this);
       if (event.key === "Escape") {
         if (inPalette) { event.preventDefault(); closePalette(this); }
