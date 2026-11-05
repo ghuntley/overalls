@@ -212,4 +212,6 @@ Scopes the push row of the gate defined with
 [ADR-0225](0225-marshall-notifications-domain.md). Platforms:
 [ADR-0235](0235-mila-desktop-clients.md),
 [ADR-0249](0249-mila-rust-core-native-clients.md). Credential placement:
-[ADR-0231](0231-hetzner-cloud-hosts-and-susan-placement.md).
+[ADR-0231](0231-hetzner-cloud-hosts-and-susan-placement.md). The Apple
+metadata boundary is reviewed in the [2026-11-05 Apple boundary
+follow-up](../reviews/2026-11-05-mila-apple-boundary-follow-up.md).

@@ -227,8 +227,10 @@ Remaining gaps:
 ## Open questions
 
 The 2026-11-02 [native parity implementation review](../reviews/2026-11-02-mila-native-parity-implementation.md)
-adds evidence for live Windows UI command paths, bounded lock interaction,
-named terminal detachment and Linux persisted notification presentation.
+and its [2026-11-05 Apple boundary follow-up](../reviews/2026-11-05-mila-apple-boundary-follow-up.md)
+add evidence for live Windows UI command paths, bounded lock interaction,
+named terminal detachment, Linux persisted notification presentation and
+deployment-bound Apple admission.
 Linux managed smoke check exercises portable production FFI paths while preserving
 Windows-only CNG/DPAPI and WinUI acceptance. This decision stays partial.
 
