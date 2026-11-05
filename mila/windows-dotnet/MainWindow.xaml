@@ -1,9 +1,21 @@
 <Window x:Class="Mila.Windows.MainWindow" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
   <NavigationView x:Name="Navigation" IsBackEnabled="False" SelectionChanged="OnNavigationChanged">
     <NavigationView.MenuItems>
-      <NavigationViewItem Content="Machines" Tag="machines" Icon="&#xE7F4;" />
-      <NavigationViewItem Content="Threads" Tag="threads" Icon="&#xE8BD;" />
-      <NavigationViewItem Content="Settings" Tag="settings" Icon="&#xE713;" />
+      <NavigationViewItem Content="Machines" Tag="machines">
+        <NavigationViewItem.Icon>
+          <SymbolIcon Symbol="AllApps" />
+        </NavigationViewItem.Icon>
+      </NavigationViewItem>
+      <NavigationViewItem Content="Threads" Tag="threads">
+        <NavigationViewItem.Icon>
+          <SymbolIcon Symbol="Library" />
+        </NavigationViewItem.Icon>
+      </NavigationViewItem>
+      <NavigationViewItem Content="Settings" Tag="settings">
+        <NavigationViewItem.Icon>
+          <SymbolIcon Symbol="Setting" />
+        </NavigationViewItem.Icon>
+      </NavigationViewItem>
     </NavigationView.MenuItems>
     <Grid Padding="24">
       <StackPanel x:Name="InteractionRoot" Spacing="12">

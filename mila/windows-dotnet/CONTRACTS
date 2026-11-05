@@ -31,3 +31,9 @@ The WinUI deployment controls in `MainWindow.xaml` MUST keep the
 `MilaDeploymentHost`, `MilaDeploymentPort`, `MilaDeploymentAdd`,
 `MilaDeploymentSignIn`, `MilaDeploymentForget` and `MilaStatus`; the UI
 Automation journey in `../windows-dotnet-uia` finds the controls only by them.
+
+@cc [owner:ghuntley,label:reliability] native-windows-navigation-icons
+Navigation items in `MainWindow.xaml` MUST use typed `SymbolIcon` elements for
+their icons. They MUST NOT rely on text-to-`IconElement` conversion, because
+that conversion can turn private-use glyphs into `?` and fail the first-window
+XAML load before UI Automation can reach the deployment picker.
