@@ -16,32 +16,58 @@ internal static class MilaWebEndpointDecoder
     /// </summary>
     internal static MilaWebEndpoint Decode(ReadOnlySpan<byte> bytes, Guid expectedMachine)
     {
-        if (bytes.Length is 0 or > 64 * 1024) throw new InvalidDataException("web response bounds");
-        using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
-        JsonElement root = MilaPorscheEnvelope.Result(document.RootElement);
-        if (!root.TryGetProperty("machine_id", out JsonElement idValue) ||
-            !Guid.TryParseExact(idValue.GetString(), "D", out Guid machine) || machine != expectedMachine)
-            throw new InvalidDataException("web machine mismatch");
-        int port = root.GetProperty("port").GetInt32();
-        ulong revision = root.GetProperty("policy_revision").GetUInt64();
-        if (port is < 1 or > 65535 || revision == 0) throw new InvalidDataException("web policy bounds");
-        string visibility = root.GetProperty("visibility").GetString() ?? string.Empty;
-        if (visibility is not ("public" or "private")) throw new InvalidDataException("web visibility");
-        Uri? url = null;
-        if (root.TryGetProperty("url", out JsonElement urlValue) && urlValue.ValueKind != JsonValueKind.Null)
+        try
         {
-            string? rawUrl = urlValue.GetString();
-            if (rawUrl is null or { Length: > 2048 } ||
-                !Uri.TryCreate(rawUrl, UriKind.Absolute, out Uri? parsed) ||
-                parsed.Scheme != Uri.UriSchemeHttps ||
-                !string.IsNullOrEmpty(parsed.UserInfo) ||
-                !string.IsNullOrEmpty(parsed.Fragment) ||
-                !CanonicalDnsHost(parsed.Host) ||
-                (parsed.Port != -1 && parsed.Port != port))
-                throw new InvalidDataException("web URL");
-            url = parsed;
+            return DecodeCore(bytes, expectedMachine);
         }
-        return new(machine, (ushort)port, visibility == "public", revision, url);
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or FormatException or OverflowException)
+        {
+            throw new InvalidDataException("web response", error);
+        }
+    }
+
+    private static MilaWebEndpoint DecodeCore(ReadOnlySpan<byte> bytes, Guid expectedMachine)
+    {
+        try
+        {
+            if (bytes.Length is 0 or > 64 * 1024) throw new InvalidDataException("web response bounds");
+            using JsonDocument document = JsonDocument.Parse(bytes.ToArray());
+            JsonElement root = MilaPorscheEnvelope.Result(document.RootElement);
+            if (!root.TryGetProperty("machine_id", out JsonElement idValue) ||
+                !Guid.TryParseExact(idValue.GetString(), "D", out Guid machine) || machine != expectedMachine)
+                throw new InvalidDataException("web machine mismatch");
+            int port = root.GetProperty("port").GetInt32();
+            ulong revision = root.GetProperty("policy_revision").GetUInt64();
+            if (port is < 1 or > 65535 || revision == 0) throw new InvalidDataException("web policy bounds");
+            string visibility = root.GetProperty("visibility").GetString() ?? string.Empty;
+            if (visibility is not ("public" or "private")) throw new InvalidDataException("web visibility");
+            Uri? url = null;
+            if (root.TryGetProperty("url", out JsonElement urlValue) && urlValue.ValueKind != JsonValueKind.Null)
+            {
+                if (urlValue.ValueKind != JsonValueKind.String)
+                    throw new InvalidDataException("web URL");
+                string? rawUrl = urlValue.GetString();
+                if (rawUrl is null or { Length: > 2048 } ||
+                    !Uri.TryCreate(rawUrl, UriKind.Absolute, out Uri? parsed) ||
+                    parsed.Scheme != Uri.UriSchemeHttps ||
+                    !string.IsNullOrEmpty(parsed.UserInfo) ||
+                    !string.IsNullOrEmpty(parsed.Fragment) ||
+                    !CanonicalDnsHost(parsed.Host) ||
+                    (parsed.Port != -1 && parsed.Port != port))
+                    throw new InvalidDataException("web URL");
+                url = parsed;
+            }
+            return new(machine, (ushort)port, visibility == "public", revision, url);
+        }
+        catch (InvalidDataException) { throw; }
+        catch (Exception error) when (error is JsonException or InvalidOperationException or KeyNotFoundException or FormatException or OverflowException)
+        {
+            throw new InvalidDataException("invalid web response", error);
+        }
     }
 
     private static bool CanonicalDnsHost(string host)
