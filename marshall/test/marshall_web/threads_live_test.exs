@@ -451,6 +451,13 @@ defmodule MarshallWeb.ThreadsLiveTest do
           "call_id" => "uncertain-call",
           "result" => %{"status" => "uncertain"}
         }
+      },
+      {
+        :tool_result,
+        %{
+          "call_id" => "unknown-call",
+          "result" => %{"status" => "completed", "stdout" => "legacy result"}
+        }
       }
     ]
 
@@ -474,6 +481,7 @@ defmodule MarshallWeb.ThreadsLiveTest do
     assert has_element?(view, "details[data-tool='exec_command'] pre", "[REDACTED:openai-key]")
     assert has_element?(view, "details[data-tool='web_search']", "Tool cancelled")
     assert has_element?(view, "details[data-tool='thread']", "Tool outcome uncertain")
+    assert has_element?(view, "details[data-tool='Unknown']", "Tool completed")
     assert has_element?(view, "details[data-tool='pending_review']", "Tools queued")
     assert has_element?(view, "details[data-tool='thread'][open]")
     refute has_element?(view, "details[data-tool='read_file'][open]")

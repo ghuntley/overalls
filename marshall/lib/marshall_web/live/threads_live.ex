@@ -3027,15 +3027,23 @@ defmodule MarshallWeb.ThreadsLive do
          open
        )
        when is_binary(call_id) and is_map(result) do
-    call = Map.get(call_index, call_id, %{tool: nil, metadata: []})
+    call =
+      Map.get(call_index, call_id, %{
+        tool: nil,
+        metadata: [],
+        command: nil,
+        arguments: nil,
+        command_preview: nil
+      })
+
     tool_status = tool_status(Map.get(result, "status"))
 
     card =
       tool_card(
         tool_status.state,
         tool_status.tone,
-        call.tool,
-        call.metadata,
+        Map.get(call, :tool),
+        Map.get(call, :metadata, []),
         output_sections(result),
         open,
         call
