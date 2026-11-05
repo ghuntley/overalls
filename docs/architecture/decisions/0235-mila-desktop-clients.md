@@ -229,8 +229,6 @@ Remaining gaps:
 The 2026-11-02 [native parity implementation review](../reviews/2026-11-02-mila-native-parity-implementation.md)
 adds evidence for live Windows UI command paths, bounded lock interaction,
 named terminal detachment and Linux persisted notification presentation.
-Windows MSIX/AppInstance activation and native unsigned packaging are implemented;
-their native execution and signed/provider-delivery acceptance remain open. A
 Linux managed smoke check exercises portable production FFI paths while preserving
 Windows-only CNG/DPAPI and WinUI acceptance. This decision stays partial.
 
