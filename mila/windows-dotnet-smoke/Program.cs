@@ -127,13 +127,13 @@ internal static class Program
         try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":42}}"), machineId); }
         catch (InvalidDataException) { nonStringUrl = true; }
         Require(nonStringUrl, "non-string web endpoint URL refusal");
-        foreach (string malformed in new[] {
+        foreach (string malformedJson in new[] {
             $"{{\"machine_id\":42,\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4}}",
             $"{{\"machine_id\":\"{machineId:D}\",\"port\":\"8080\",\"visibility\":\"public\",\"policy_revision\":4}}",
             $"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":42,\"policy_revision\":4}}" })
         {
             bool malformedRefused = false;
-            try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes(malformed), machineId); }
+            try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes(malformedJson), machineId); }
             catch (InvalidDataException) { malformedRefused = true; }
             Require(malformedRefused, "malformed web endpoint scalar refusal");
         }
