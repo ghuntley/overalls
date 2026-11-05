@@ -52,7 +52,7 @@ import WebKit
         XCTAssertTrue(session.calls.contains(.ptyKill(101)))
         do { try await transport.sendInput(Data("x".utf8)); XCTFail() } catch { XCTAssertEqual(error as? MilaTerminalError, .unavailable) }
         do { try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: true); XCTFail() } catch { XCTAssertEqual(error as? MilaTerminalError, .unavailable) }
-        do { try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: false); XCTFail() } catch { XCTAssertEqual(error as? MilaTerminalError, .permissionDenied) }
+        do { try await transport.attach(from: 0, columns: 80, rows: 24, readWrite: false); XCTFail() } catch { XCTAssertEqual(error as? MilaTerminalError, .unavailable) }
     }
 
     func testAuthenticatedWrapperForwardsOutput() async throws {

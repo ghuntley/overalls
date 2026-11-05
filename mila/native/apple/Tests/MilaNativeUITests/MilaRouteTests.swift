@@ -3,7 +3,7 @@ import XCTest
 
 final class MilaRouteTests: XCTestCase {
     func testParsesSupportedRoutes() {
-        let machineID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
+        let machineID = UUID(uuidString: "abcdefab-cdef-4abc-8def-abcdefabcdef")!
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/machines"), .machines)
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/machines/\(machineID.uuidString.lowercased())"), .machine(id: machineID))
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/threads"), .threads)

@@ -116,7 +116,7 @@ internal static class Program
             "https://user:pass@web.example.test/",
             "https://web..example.test/",
             "https://web.example.test:8443/",
-            "https://web.example.test/#fragment"])
+            "https://web.example.test/#fragment" })
         {
             bool unsafeRefused = false;
             try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"{unsafeUrl}\"}}"), machineId); }
@@ -130,7 +130,7 @@ internal static class Program
         foreach (string malformed in new[] {
             $"{{\"machine_id\":42,\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4}}",
             $"{{\"machine_id\":\"{machineId:D}\",\"port\":\"8080\",\"visibility\":\"public\",\"policy_revision\":4}}",
-            $"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":42,\"policy_revision\":4}}"])
+            $"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":42,\"policy_revision\":4}}" })
         {
             bool malformedRefused = false;
             try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes(malformed), machineId); }

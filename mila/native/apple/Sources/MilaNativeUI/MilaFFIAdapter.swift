@@ -30,11 +30,14 @@ public enum MilaRouteParser {
               value.hasPrefix("overalls://"), let url = URL(string: value), url.scheme == "overalls",
               url.user == nil, url.port == nil, url.fragment == nil, url.query == nil,
               !value.contains("%") else { return nil }
-        let authority = value.dropFirst("overalls://".count).split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
+        let authorityAndPath = value.dropFirst("overalls://".count)
+        let authority = authorityAndPath.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
+        guard let pathStart = authorityAndPath.firstIndex(of: "/") else { return nil }
+        let rawPath = String(authorityAndPath[pathStart...])
         guard let host = url.host, !host.isEmpty, host.utf8.count <= 253,
               authority == Optional(host),
               MilaHostValidation.validHost(host),
-              url.path != "/", !url.path.hasSuffix("/"), !url.path.contains("//") else { return nil }
+              rawPath != "/", !rawPath.hasSuffix("/"), !rawPath.contains("//") else { return nil }
         let parts = url.pathComponents.filter { $0 != "/" }
         guard let page = parts.first else { return nil }
         let tail = Array(parts.dropFirst())
