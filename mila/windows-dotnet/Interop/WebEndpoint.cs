@@ -57,7 +57,7 @@ internal static class MilaWebEndpointDecoder
                     !string.IsNullOrEmpty(parsed.UserInfo) ||
                     !string.IsNullOrEmpty(parsed.Fragment) ||
                     !CanonicalDnsHost(parsed.Host) ||
-                    (parsed.Port != -1 && parsed.Port != port))
+                    !ExplicitPortMatchesEndpoint(rawUrl, parsed, port))
                     throw new InvalidDataException("web URL");
                 url = parsed;
             }
@@ -79,5 +79,15 @@ internal static class MilaWebEndpointDecoder
             label.All(character => (character is >= 'a' and <= 'z') ||
                 (character is >= 'A' and <= 'Z') ||
                 (character is >= '0' and <= '9') || character == '-'));
+    }
+
+    private static bool ExplicitPortMatchesEndpoint(string rawUrl, Uri parsed, int expectedPort)
+    {
+        int authorityStart = Uri.UriSchemeHttps.Length + Uri.SchemeDelimiter.Length;
+        int authorityEnd = rawUrl.IndexOfAny(['/','?', '#'], authorityStart);
+        if (authorityEnd < 0) authorityEnd = rawUrl.Length;
+        string authority = rawUrl[authorityStart..authorityEnd];
+        if (authority == parsed.Host) return true;
+        return authority == $"{parsed.Host}:{expectedPort}" && parsed.Port == expectedPort;
     }
 }
