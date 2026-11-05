@@ -2407,7 +2407,11 @@ defmodule MarshallWeb.ThreadsLive do
                         >
                           {dgettext("agents", "Waiting for the agent's first update.")}
                         </p>
-                        <div id="thread-transcript" phx-update="stream">
+                        <div
+                          id="thread-transcript"
+                          phx-update="stream"
+                          phx-hook="ThreadTranscript"
+                        >
                           <article
                             :for={{dom_id, event} <- @streams.events}
                             id={dom_id}

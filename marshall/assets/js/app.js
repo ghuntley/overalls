@@ -10,6 +10,7 @@ import "./appearance.js";
 import {installLocaleReload} from "./localization.js";
 import {captureRepositoryLaunch, RepositoryLaunchComplete} from "./repository_launch.js";
 import {initBrowserExtensionPresence} from "./browser_extension_presence.js";
+import {ThreadTranscript} from "./thread_transcript.js";
 // If you want to use Phoenix channels, run `mix help phx.gen.channel`
 // to get started and then uncomment the line below.
 // import "./user_socket.js"
@@ -86,6 +87,7 @@ const liveSocket = new LiveSocket("/live", Socket, {
     RepositoryLaunchComplete,
     ThreadComposer,
     ArtifactFrame,
+    ThreadTranscript,
   },
 });
 // Show progress bar on live navigation and form submits
