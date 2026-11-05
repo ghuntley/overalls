@@ -11,19 +11,6 @@ defmodule MarshallWeb.ThreadsLive do
   @type socket :: Phoenix.LiveView.Socket.t()
   @type user :: Marshall.Accounts.User.t()
   @type thread :: Threads.Thread.t()
-  @type tool_output :: %{kind: String.t(), text: String.t(), truncated: boolean()}
-  @type tool_card :: %{
-          tool: String.t(),
-          state: String.t(),
-          tone: String.t(),
-          status_label: String.t(),
-          summary: String.t(),
-          metadata: [{String.t(), String.t()}],
-          outputs: [tool_output()],
-          open: boolean()
-        }
-
-  @tool_text_limit 8_192
 
   @impl true
   @spec mount(map(), map(), socket()) :: {:ok, socket()}
@@ -42,7 +29,7 @@ defmodule MarshallWeb.ThreadsLive do
         generation_current: true,
         events_empty: true,
         events_available: true,
-        tool_presentations: %{},
+        events_context: nil,
         generation_query_error: nil,
         catalog: %{images: []},
         form: to_form(default_form(), as: :thread),
@@ -884,7 +871,6 @@ defmodule MarshallWeb.ThreadsLive do
       editor_available: false,
       events_empty: true,
       events_available: false,
-      tool_presentations: %{},
       controls_available: false,
       work_busy: false,
       pending_question: nil,
@@ -975,11 +961,11 @@ defmodule MarshallWeb.ThreadsLive do
          else: {[], true}
 
     catalog = catalog(actor)
-    tool_presentations = tool_presentations(events)
 
-    socket
-    |> assign(
-      threads_empty: all_threads == [] and is_nil(socket.assigns[:thread_cursor]),
+    socket =
+      socket
+      |> assign(
+        threads_empty: all_threads == [] and is_nil(socket.assigns[:thread_cursor]),
       thread_page_empty: all_threads == [] and not is_nil(socket.assigns[:thread_cursor]),
       thread_matches_empty: visible_threads == [],
       threads_available: threads_available,
@@ -995,18 +981,29 @@ defmodule MarshallWeb.ThreadsLive do
       editor_available: generation_current and thread_editor_available?(selected, actor),
       events_empty: events == [],
       events_available: events_available,
-      tool_presentations: tool_presentations,
       catalog: catalog,
       detail_error: detail_error,
       activity_team_options: activity_team_options(all_threads)
     )
     |> stream(:threads, visible_threads, reset: true)
     |> stream(:activity_threads, activity_threads, reset: true)
-    |> stream(:events, Enum.reverse(events), reset: true)
     |> maybe_seed_defaults(catalog)
     |> refresh_grants()
     |> refresh_controls()
     |> refresh_dialog()
+
+    event_context =
+      if selected && selected_generation,
+        do: {selected.id, selected_generation.ordinal},
+        else: nil
+
+    if socket.assigns.events_context == event_context do
+      Enum.reduce(Enum.reverse(events), socket, &stream_insert(&2, :events, &1))
+    else
+      socket
+      |> assign(events_context: event_context)
+      |> stream(:events, Enum.reverse(events), reset: true)
+    end
   end
 
   # @cc [owner:ghuntley,label:security] thread-grant-refresh-fails-closed
@@ -1436,8 +1433,8 @@ defmodule MarshallWeb.ThreadsLive do
   # Thread views MUST keep the objective and authorized transcript primary. Machine
   # settings MUST remain optional disclosure, and pending/failed/archived states
   # MUST explain the available next action without exposing provider diagnostics.
-  # The terminal action MUST use the existing machine route, preserving that
-  # route's current authorization and terminal session checks.
+  # The embedded terminal MUST load lazily through the existing machine route,
+  # preserving that route's current authorization and terminal session checks.
 
   # @cc [owner:ghuntley,label:product] thread-newest-first-reading-order
   # The ready-thread composer MUST precede its transcript in DOM order. Authorized
@@ -1955,6 +1952,26 @@ defmodule MarshallWeb.ThreadsLive do
                             class="console-button ghost"
                           >{dgettext("agents", "Open terminal")} <.glyph name="arrow_up_right" /></.link>
                         </div>
+                        <details
+                          :if={@can_write and @selected.status == :ready and @selected.machine_id}
+                          id="thread-terminal-embed"
+                          class="thread-terminal-embed"
+                          data-thread-terminal
+                        >
+                          <summary class="console-button ghost">
+                            {dgettext("agents", "Open terminal here")}
+                          </summary>
+                          <div class="thread-terminal-frame">
+                            <iframe
+                              id="thread-terminal-frame"
+                              data-thread-terminal-src={
+                                ~p"/machines/#{@selected.machine_id}/terminals"
+                              }
+                              title={dgettext("agents", "Thread terminal")}
+                              loading="lazy"
+                            ></iframe>
+                          </div>
+                        </details>
                         <.link
                           :if={@editor_available}
                           id="thread-vscode"
@@ -2408,14 +2425,7 @@ defmodule MarshallWeb.ThreadsLive do
                               <p class="thread-message-role">{event_role(event.kind)}</p>
                               <pre>{event_text(event)}</pre>
                             <% else %>
-                              <%= case Map.get(@tool_presentations, event.id) do %>
-                                <% cards when is_list(cards) and cards != [] -> %>
-                                  <div class="thread-tool-events">
-                                    <.tool_event_card :for={card <- cards} card={card} />
-                                  </div>
-                                <% _ -> %>
-                                  <p class="thread-event-label">{event_text(event)}</p>
-                              <% end %>
+                              <p class="thread-event-label">{event_text(event)}</p>
                             <% end %>
                           </article>
                         </div>
@@ -2712,9 +2722,9 @@ defmodule MarshallWeb.ThreadsLive do
     """
   end
 
-  attr(:skills, :list, required: true)
-  attr(:query, :string, default: nil)
-  attr(:selected_skills, :list, required: true)
+  attr :skills, :list, required: true
+  attr :query, :string, default: nil
+  attr :selected_skills, :list, required: true
 
   @spec composer_suggestions(map()) :: Phoenix.LiveView.Rendered.t()
   defp composer_suggestions(assigns) do
@@ -2852,301 +2862,6 @@ defmodule MarshallWeb.ThreadsLive do
   @spec event_role(atom()) :: String.t()
   defp event_role(:prompt), do: dgettext("agents", "Prompt")
   defp event_role(:assistant), do: dgettext("agents", "Agent")
-
-  attr(:card, :map, required: true)
-
-  @spec tool_event_card(map()) :: Phoenix.LiveView.Rendered.t()
-  defp tool_event_card(assigns) do
-    ~H"""
-    <details
-      class="thread-tool-card"
-      data-tool={@card.tool}
-      data-state={@card.state}
-      data-tone={@card.tone}
-      open={@card.open}
-    >
-      <summary class="thread-tool-summary">
-        <span class="status-label" data-tone={@card.tone}>{@card.status_label}</span>
-        <strong class="thread-tool-name">{@card.tool}</strong>
-        <span class="thread-tool-summary-text">{@card.summary}</span>
-      </summary>
-      <div class="thread-tool-details">
-        <.kv :if={@card.metadata != []}>
-          <:item :for={{label, value} <- @card.metadata} title={label}>{value}</:item>
-        </.kv>
-        <section :for={output <- @card.outputs} class="thread-tool-output">
-          <h3><code>{output.kind}</code></h3>
-          <pre>{output.text}<%= if output.truncated, do: "…" %></pre>
-        </section>
-      </div>
-    </details>
-    """
-  end
-
-  # @cc [owner:ghuntley,label:security;product] thread-tool-detail-redaction
-  # Tool detail cards MUST render only allowlisted event fields after redaction
-  # and bounded truncation; raw arguments, identifiers and unrestricted output
-  # MUST remain outside the authorized transcript presentation.
-  @spec tool_presentations([Marshall.Agents.Event.t()]) :: %{
-          optional(String.t()) => [tool_card()]
-        }
-  defp tool_presentations(events) do
-    call_index = tool_call_index(events)
-    completed_call_ids = tool_result_call_ids(events)
-
-    latest_result_id =
-      events
-      |> Enum.filter(&(&1.kind == :tool_result))
-      |> List.last()
-      |> case do
-        %{id: id} -> id
-        _ -> nil
-      end
-
-    Enum.reduce(events, %{}, fn
-      %{id: id, kind: :tool_queued, body: body}, presentations ->
-        case queued_tool_cards(body, completed_call_ids) do
-          [] -> presentations
-          cards -> Map.put(presentations, id, cards)
-        end
-
-      %{id: id, kind: :tool_result, body: body}, presentations ->
-        Map.put(presentations, id, [tool_result_card(body, call_index, id == latest_result_id)])
-
-      _event, presentations ->
-        presentations
-    end)
-  end
-
-  @spec tool_result_call_ids([Marshall.Agents.Event.t()]) :: MapSet.t(String.t())
-  defp tool_result_call_ids(events) do
-    Enum.reduce(events, MapSet.new(), fn
-      %{kind: :tool_result, body: %{"call_id" => call_id}}, ids when is_binary(call_id) ->
-        MapSet.put(ids, call_id)
-
-      _event, ids ->
-        ids
-    end)
-  end
-
-  @spec tool_call_index([Marshall.Agents.Event.t()]) :: %{
-          optional(String.t()) => %{tool: String.t(), metadata: [{String.t(), String.t()}]}
-        }
-  defp tool_call_index(events) do
-    Enum.reduce(events, %{}, fn
-      %{kind: :tool_queued, body: %{"calls" => calls}}, index when is_list(calls) ->
-        Enum.reduce(calls, index, fn
-          %{"call_id" => call_id, "tool" => tool, "arguments" => arguments}, index
-          when is_binary(call_id) and is_binary(tool) and is_map(arguments) ->
-            Map.put(index, call_id, %{
-              tool: String.slice(tool, 0, 80),
-              metadata: tool_metadata(arguments)
-            })
-
-          _call, index ->
-            index
-        end)
-
-      _event, index ->
-        index
-    end)
-  end
-
-  @spec queued_tool_cards(map(), MapSet.t(String.t())) :: [tool_card()]
-  defp queued_tool_cards(%{"calls" => calls}, completed_call_ids) when is_list(calls) do
-    cards =
-      Enum.flat_map(calls, fn
-        %{"call_id" => call_id, "tool" => tool, "arguments" => arguments}
-        when is_binary(call_id) and is_binary(tool) and is_map(arguments) ->
-          if MapSet.member?(completed_call_ids, call_id) do
-            []
-          else
-            [
-              tool_card(
-                "queued",
-                "pending",
-                String.slice(tool, 0, 80),
-                tool_metadata(arguments),
-                [],
-                false
-              )
-            ]
-          end
-
-        _call ->
-          []
-      end)
-
-    cards
-  end
-
-  defp queued_tool_cards(_body, _completed_call_ids), do: []
-
-  @spec tool_result_card(map(), map(), boolean()) :: tool_card()
-  defp tool_result_card(
-         %{"call_id" => call_id, "result" => result},
-         call_index,
-         open
-       )
-       when is_binary(call_id) and is_map(result) do
-    call = Map.get(call_index, call_id, %{tool: nil, metadata: []})
-    tool_status = tool_status(Map.get(result, "status"))
-
-    tool_card(
-      tool_status.state,
-      tool_status.tone,
-      call.tool,
-      call.metadata,
-      output_sections(result),
-      open
-    )
-  end
-
-  defp tool_result_card(_body, _call_index, open),
-    do: tool_card("unknown", "muted", nil, [], [], open)
-
-  @spec tool_card(
-          String.t(),
-          String.t(),
-          String.t() | nil,
-          [{String.t(), String.t()}],
-          [tool_output()],
-          boolean()
-        ) :: tool_card()
-  defp tool_card(state, tone, tool, metadata, outputs, open) do
-    status = tool_status(state)
-
-    %{
-      tool: tool || dgettext("agents", "Unknown"),
-      state: status.state,
-      tone: tone,
-      status_label: status.status_label,
-      summary: status.summary,
-      metadata: [{dgettext("agents", "Status"), status.summary} | metadata],
-      outputs: outputs,
-      open: open
-    }
-  end
-
-  @spec tool_status(String.t() | nil) :: %{
-          state: String.t(),
-          tone: String.t(),
-          status_label: String.t(),
-          summary: String.t()
-        }
-  defp tool_status("queued"),
-    do: %{
-      state: "queued",
-      tone: "pending",
-      status_label: dgettext("agents", "Tools queued"),
-      summary: dgettext("agents", "Tools queued")
-    }
-
-  defp tool_status("completed"),
-    do: %{
-      state: "completed",
-      tone: "success",
-      status_label: dgettext("agents", "Tool completed"),
-      summary: dgettext("agents", "Tool completed")
-    }
-
-  defp tool_status("failed"),
-    do: %{
-      state: "failed",
-      tone: "danger",
-      status_label: dgettext("agents", "Tool failed"),
-      summary: dgettext("agents", "Tool failed")
-    }
-
-  defp tool_status("cancelled"),
-    do: %{
-      state: "cancelled",
-      tone: "muted",
-      status_label: dgettext("agents", "Tool cancelled"),
-      summary: dgettext("agents", "Tool cancelled")
-    }
-
-  defp tool_status("uncertain"),
-    do: %{
-      state: "uncertain",
-      tone: "warning",
-      status_label: dgettext("agents", "Tool outcome uncertain"),
-      summary: dgettext("agents", "Tool outcome uncertain")
-    }
-
-  defp tool_status("claimed"),
-    do: %{
-      state: "claimed",
-      tone: "pending",
-      status_label: dgettext("agents", "Tool result received"),
-      summary: dgettext("agents", "Tool result received")
-    }
-
-  defp tool_status("started"), do: tool_status("claimed")
-
-  defp tool_status(_status),
-    do: %{
-      state: "unknown",
-      tone: "muted",
-      status_label: dgettext("agents", "Unknown"),
-      summary: dgettext("agents", "Tool result received")
-    }
-
-  @spec tool_metadata(map()) :: [{String.t(), String.t()}]
-  defp tool_metadata(arguments) do
-    [
-      metadata_value(dgettext("agents", "Working directory"), Map.get(arguments, "workdir")),
-      metadata_value(dgettext("agents", "Workspace source"), Map.get(arguments, "path"))
-    ]
-    |> Enum.reject(&is_nil/1)
-  end
-
-  @spec metadata_value(String.t(), term()) :: {String.t(), String.t()} | nil
-  defp metadata_value(_label, value) when value in [nil, ""], do: nil
-
-  defp metadata_value(label, value) when is_binary(value) do
-    {text, truncated} = safe_text(value)
-    {label, if(truncated, do: text <> "…", else: text)}
-  end
-
-  defp metadata_value(label, value) when is_integer(value),
-    do: {label, Integer.to_string(value)}
-
-  defp metadata_value(_label, _value), do: nil
-
-  @spec output_sections(map()) :: [tool_output()]
-  defp output_sections(result) do
-    [
-      "contents",
-      "stdout",
-      "stderr",
-      "text",
-      "exit_code",
-      "reason"
-    ]
-    |> Enum.flat_map(fn key ->
-      case Map.get(result, key) do
-        value when is_binary(value) and value != "" ->
-          {text, truncated} = safe_text(value)
-          [%{kind: key, text: text, truncated: truncated}]
-
-        value when is_integer(value) ->
-          [%{kind: key, text: Integer.to_string(value), truncated: false}]
-
-        _ ->
-          []
-      end
-    end)
-  end
-
-  @spec safe_text(String.t()) :: {String.t(), boolean()}
-  defp safe_text(value) do
-    redacted = Marshall.Redaction.Scanner.redact(value).value
-
-    if byte_size(redacted) > @tool_text_limit,
-      do: {String.slice(redacted, 0, @tool_text_limit), true},
-      else: {redacted, false}
-  end
 
   @spec event_text(Marshall.Agents.Event.t()) :: String.t()
   defp event_text(%{kind: :prompt, body: body}), do: Map.get(body, "prompt", "")
