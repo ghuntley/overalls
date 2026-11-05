@@ -112,30 +112,30 @@ internal static class Program
         bool badWeb = false;
         try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"http://web.example.test\"}}"), machineId); } catch (InvalidDataException) { badWeb = true; }
         Require(badWeb, "insecure web endpoint refusal");
-        foreach (string unsafeUrl in [
+        foreach (string unsafeUrl in new[] {
             "https://user:pass@web.example.test/",
             "https://web..example.test/",
             "https://web.example.test:8443/",
             "https://web.example.test/#fragment"])
         {
-            bool refused = false;
+            bool unsafeRefused = false;
             try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":\"{unsafeUrl}\"}}"), machineId); }
-            catch (InvalidDataException) { refused = true; }
-            Require(refused, $"unsafe web endpoint refusal: {unsafeUrl}");
+            catch (InvalidDataException) { unsafeRefused = true; }
+            Require(unsafeRefused, $"unsafe web endpoint refusal: {unsafeUrl}");
         }
         bool nonStringUrl = false;
         try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4,\"url\":42}}"), machineId); }
         catch (InvalidDataException) { nonStringUrl = true; }
         Require(nonStringUrl, "non-string web endpoint URL refusal");
-        foreach (string malformed in [
+        foreach (string malformed in new[] {
             $"{{\"machine_id\":42,\"port\":8080,\"visibility\":\"public\",\"policy_revision\":4}}",
             $"{{\"machine_id\":\"{machineId:D}\",\"port\":\"8080\",\"visibility\":\"public\",\"policy_revision\":4}}",
             $"{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":42,\"policy_revision\":4}}"])
         {
-            bool refused = false;
+            bool malformedRefused = false;
             try { _ = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes(malformed), machineId); }
-            catch (InvalidDataException) { refused = true; }
-            Require(refused, "malformed web endpoint scalar refusal");
+            catch (InvalidDataException) { malformedRefused = true; }
+            Require(malformedRefused, "malformed web endpoint scalar refusal");
         }
         MilaWebEndpoint enveloped = MilaWebEndpointDecoder.Decode(Encoding.UTF8.GetBytes($"{{\"version\":1,\"status\":\"succeeded\",\"result\":{{\"machine_id\":\"{machineId:D}\",\"port\":8080,\"visibility\":\"private\",\"policy_revision\":5,\"url\":null}}}}"), machineId);
         Require(enveloped is { Port: 8080, IsPublic: false, Revision: 5 }, "web endpoint reads Porsche's succeeded envelope");

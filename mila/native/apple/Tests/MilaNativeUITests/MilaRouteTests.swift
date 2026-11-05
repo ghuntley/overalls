@@ -18,7 +18,7 @@ final class MilaRouteTests: XCTestCase {
     }
 
     func testRejectsRoutesContainingSensitiveOrAmbiguousComponents() {
-        let machineID = "11111111-1111-1111-1111-111111111111"
+        let machineID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
         let invalid = [
             "https://machines",
             "overalls://overalls.example/machines/\(machineID)?token=secret",

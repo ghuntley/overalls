@@ -869,7 +869,7 @@ public sealed partial class MainWindow : Window
     private void ApplyLockState()
     {
         bool locked = _appLock.IsLocked;
-        InteractionRoot.IsEnabled = !locked;
+        InteractionRoot.IsHitTestVisible = !locked;
         Navigation.IsPaneToggleButtonVisible = !locked;
         LockButton.Content = locked ? S("unlock", "Unlock") : S("lockTitle", "Lock app");
         LockStatus.Text = locked ? S("lockedTitle", "Mila is locked") : S("ready", "Ready");
