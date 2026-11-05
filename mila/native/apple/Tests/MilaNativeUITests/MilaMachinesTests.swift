@@ -3,6 +3,46 @@ import XCTest
 
 /// Machine list/detail binding over `LinkedMilaFFIAdapter` and a recording session.
 @MainActor final class MilaMachinesControllerTests: XCTestCase {
+    private func machineRows(_ count: Int) -> [String] {
+        (0..<count).map { MilaListingFixture.row(UUID(), name: "machine-\($0)", state: "running", bits: 0b1010110) }
+    }
+
+    func testListingAccepts257And500MachinesAndRefuses501() throws {
+        let rows = machineRows(501)
+        for count in [257, 500] {
+            let snapshot = try MilaListingFixture.snapshot(MilaListingFixture.listing(Array(rows.prefix(count))))
+            XCTAssertEqual(snapshot.machines.count, count)
+            XCTAssertEqual(snapshot.metadata.machineCount, UInt32(count))
+        }
+        XCTAssertThrowsError(try MilaListingFixture.snapshot(MilaListingFixture.listing(rows)))
+    }
+
+    func testPaginationContinuesBeyond256AndPreservesAll500Rows() async throws {
+        let rows = machineRows(500)
+        let session = RecordingSession()
+        session.listing = MilaListingFixture.listing(Array(rows.prefix(256)), hasMore: true)
+        session.moreListing = MilaListingFixture.listing(Array(rows.prefix(257)), hasMore: true)
+        let controller = MilaMachinesController()
+        controller.bind(LinkedMilaFFIAdapter(session: session))
+        await controller.refresh()
+        XCTAssertEqual(controller.machines.count, 256)
+        XCTAssertTrue(controller.hasMore)
+        let selected = try XCTUnwrap(controller.machines.first?.id)
+        controller.select(selected)
+
+        await controller.loadMore()
+        XCTAssertEqual(controller.machines.count, 257)
+        XCTAssertTrue(controller.hasMore)
+        session.moreListing = MilaListingFixture.listing(rows)
+        await controller.loadMore()
+        XCTAssertEqual(controller.machines.count, 500)
+        XCTAssertEqual(Set(controller.machines.map(\.id)).count, 500)
+        XCTAssertEqual(controller.machines.last?.machine.name, "machine-499")
+        XCTAssertFalse(controller.hasMore)
+        XCTAssertEqual(controller.detail?.id, selected)
+        XCTAssertEqual(session.calls, [.refresh, .readMore, .readMore])
+    }
+
     func testListingProjectsRustPolicyBits() throws {
         let snapshot = try MilaListingFixture.snapshot(MilaListingFixture.allPages)
         XCTAssertEqual(snapshot.machines.map(\.machine.name), ["alpha", "beta", "gamma"])

@@ -87,14 +87,19 @@ pub(super) fn main(mut arguments: impl Iterator<Item = std::ffi::OsString>) -> g
     code
 }
 
-/// Points every per-user path the window uses at the private work directory
-/// and writes the fixture CA and connection profile. Runs before GTK or any
-/// thread starts, so changing the process environment is sound.
+// Points every per-user path the window uses at the private work directory
+// and writes the fixture CA and connection profile. Runs before GTK or any
+// thread starts, so changing the process environment is sound.
+/// @cc [owner:ghuntley,label:verification;security] gtk-journey-private-xdg
+/// The fixture window MUST use private config, data and cache directories
+/// beneath its work directory, including deployment snapshots, and MUST NOT
+/// read or overwrite the operator's corresponding Mila files.
 fn prepare_environment(descriptor: &JourneyDescriptor, workdir: &Path) -> Option<PathBuf> {
     use std::os::unix::fs::DirBuilderExt;
     let config = workdir.join("config");
     let data = workdir.join("data");
-    for directory in [&config, &data, &config.join("mila")] {
+    let cache = workdir.join("cache");
+    for directory in [&config, &data, &cache, &config.join("mila")] {
         std::fs::DirBuilder::new()
             .mode(0o700)
             .create(directory)
@@ -109,6 +114,7 @@ fn prepare_environment(descriptor: &JourneyDescriptor, workdir: &Path) -> Option
     }
     std::env::set_var("XDG_CONFIG_HOME", &config);
     std::env::set_var("XDG_DATA_HOME", &data);
+    std::env::set_var("XDG_CACHE_HOME", &cache);
     let ca_path = workdir.join("fixture-ca.pem");
     write_private(&ca_path, descriptor.tls.ca_pem.as_bytes()).ok()?;
     write_private(
@@ -345,6 +351,24 @@ fn labels_in(state: &NativeState, on: Page, name: &str) -> Vec<String> {
     texts
 }
 
+/// The web policy controls become usable only after the page loads the
+/// authenticated endpoint; their labels alone are present before a read.
+fn web_policy_ready(state: &NativeState) -> bool {
+    let Some(root) = section(state, Page::Machines, pages::MACHINE_WEB) else {
+        return false;
+    };
+    let labels = [strings::text(M::WebPublic), strings::text(M::WebPrivate)];
+    let controls: Vec<Button> = widgets::<Button>(&root)
+        .into_iter()
+        .filter(|button| {
+            button
+                .label()
+                .is_some_and(|label| labels.iter().any(|expected| label == expected.as_str()))
+        })
+        .collect();
+    controls.len() == 2 && controls.iter().all(WidgetExt::is_sensitive)
+}
+
 /// Runs a check on the window's bound session.
 fn live_check(state: &NativeState, check: impl FnOnce(&mut LiveSession) -> Check) -> Check {
     match state.with_live(|live| Ok(check(live))) {
@@ -516,17 +540,20 @@ fn page_steps() -> VecDeque<PageStep> {
         "gtk_web_show",
         |state, _, _| press(state, Page::Machines, pages::MACHINE_WEB, M::Refresh),
         |state, work| {
-            let shown = labels_in(state, Page::Machines, pages::MACHINE_WEB);
-            let visible = [M::WebPublic, M::WebPrivate]
-                .iter()
-                .any(|message| shown.contains(&strings::text(*message)));
+            if !web_policy_ready(state) {
+                return if status_text(state) == strings::text(M::WebFailed) {
+                    Check::Fail("read_refused")
+                } else {
+                    Check::Wait
+                };
+            }
             let seed = work.seed();
             match state.with_live(|live| web_endpoint(live, &seed)) {
-                Some(Ok(endpoint)) if visible => {
+                Some(Ok(endpoint)) => {
                     work.revision = endpoint.policy_revision;
                     Check::Pass("loaded")
                 }
-                Some(Ok(_) | Err(SessionError::Busy)) => Check::Wait,
+                Some(Err(SessionError::Busy)) => Check::Wait,
                 _ => Check::Fail("read_refused"),
             }
         },
@@ -535,17 +562,32 @@ fn page_steps() -> VecDeque<PageStep> {
         ("gtk_web_public", M::WebPublic, true),
         ("gtk_web_private", M::WebPrivate, false),
     ] {
+        let submitted = Cell::new(false);
         steps.push_back(step(
             name,
-            move |state, work, _| {
-                let seed = work.seed();
-                if let Some(Ok(endpoint)) = state.with_live(|live| web_endpoint(live, &seed)) {
-                    work.revision = endpoint.policy_revision;
-                }
-                press(state, Page::Machines, pages::MACHINE_WEB, M::Refresh)?;
-                press(state, Page::Machines, pages::MACHINE_WEB, message)
-            },
+            |state, _, _| press(state, Page::Machines, pages::MACHINE_WEB, M::Refresh),
             move |state, work| {
+                if !submitted.get() {
+                    if !web_policy_ready(state) {
+                        return if status_text(state) == strings::text(M::WebFailed) {
+                            Check::Fail("read_refused")
+                        } else {
+                            Check::Wait
+                        };
+                    }
+                    let seed = work.seed();
+                    match state.with_live(|live| web_endpoint(live, &seed)) {
+                        Some(Ok(endpoint)) => work.revision = endpoint.policy_revision,
+                        Some(Err(SessionError::Busy)) => return Check::Wait,
+                        _ => return Check::Fail("read_refused"),
+                    }
+                    if let Err(code) = press(state, Page::Machines, pages::MACHINE_WEB, message) {
+                        return Check::Fail(code);
+                    }
+                    // The read may be retried; the policy action is pressed
+                    // exactly once, then only its backend effect is polled.
+                    submitted.set(true);
+                }
                 let revision = work.revision;
                 live_check(state, |live| {
                     check_web(live, &work.context, public, revision)
@@ -1707,13 +1749,18 @@ impl Script {
                 if phase == SignInPhase::SignedIn && state.session.borrow().is_authenticated() {
                     // The new session reads the deployment's listing.
                     let seed = self.work.seed();
-                    let listed = state
-                        .with_live(LiveSession::refresh)
-                        .and_then(Result::ok)
-                        .is_some_and(|bytes| {
-                            project_snapshot(&bytes)
-                                .is_ok_and(|rows| rows.iter().any(|row| row.id == seed))
-                        });
+                    let listed = match state.with_live(LiveSession::refresh) {
+                        Some(Err(SessionError::Busy)) => {
+                            if started.elapsed() <= SIGN_IN_DEADLINE {
+                                return Some(Stage::AwaitSwitched(switch, started, before));
+                            }
+                            self.report.record(switch.name, false, "listing_timeout");
+                            return Some(next);
+                        }
+                        Some(Ok(bytes)) => project_snapshot(&bytes)
+                            .is_ok_and(|rows| rows.iter().any(|row| row.id == seed)),
+                        _ => false,
+                    };
                     let code = match (target.as_deref() == Some(host.as_str()), listed) {
                         _ if switch.host_bound() => "host_binding_bypassed",
                         (false, _) => "wrong_deployment",

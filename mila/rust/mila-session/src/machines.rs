@@ -1,7 +1,43 @@
 use crate::{ApplicationSession, SessionError};
 use mila_model::Identifier;
+use std::fmt::Write;
 
 impl ApplicationSession {
+    /// Queue an independent full-disk copy of one machine. The request id is
+    /// allocated by the caller and is the only identity used to resolve an
+    /// uncertain submission with `request show`.
+    pub async fn machine_clone(
+        &mut self,
+        machine: &str,
+        name: Option<&str>,
+        request_id: &str,
+    ) -> Result<(), SessionError> {
+        let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
+        if let Some(name) = name {
+            if !(1..=128).contains(&name.len())
+                || !name
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+            {
+                return Err(SessionError::MutationRefused);
+            }
+        }
+        let mut line = format!("clone {machine}");
+        if let Some(name) = name {
+            line.push_str(" --name=");
+            line.push_str(name);
+        }
+        let _ = write!(line, " --json --no-wait --request-id={request_id}");
+        let output = self.exec(&line, &[]).await?;
+        if output.exit_status == 0 {
+            Ok(())
+        } else {
+            Err(SessionError::MutationRefused)
+        }
+    }
+
     /// Execute one authenticated machine mutation on this connection. The command is
     /// constructed from closed vocabulary values and a validated request id; callers
     /// cannot inject shell text or reuse an untyped operation.
@@ -51,7 +87,9 @@ impl ApplicationSession {
         {
             return Err(SessionError::MutationRefused);
         }
-        let line = format!("new --name={name} --cpu={cpu} --memory={memory} --disk={disk} --no-wait --json --request-id={request_id}");
+        let line = format!(
+            "new --name={name} --cpu={cpu} --memory={memory} --disk={disk} --no-wait --json --request-id={request_id}"
+        );
         let output = self.exec(&line, &[]).await?;
         if output.exit_status == 0 {
             Ok(())

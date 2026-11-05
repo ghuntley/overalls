@@ -1,13 +1,12 @@
-# Mila Android native UI scaffold
+# Mila Android native client
 
-This is an isolated Jetpack Compose application for the native Mila presentation seam. It is the production Android client. The adapter exposes a narrow, typed JNI seam for the
-Rust `mila-ffi` library; host packaging supplies the ABI-compatible native library and may inject a
-test binding implementing `MilaRustBindings`.
+This is the production Jetpack Compose client over the shared Rust core. The
+adapter exposes a narrow, typed JNI seam for `mila-ffi`; packaging supplies the
+ABI-compatible native library, and tests may inject `MilaRustBindings`.
 
 The project metadata targets Android API 36, uses Java 17, Android Gradle Plugin 9.1.0, and Kotlin
 2.4.0 with the Kotlin Compose compiler plugin. The Compose dependency BOM is pinned in
-`app/build.gradle.kts`; update it together with the rest of the native dependency lock when the
-host build adopts this scaffold.
+`app/build.gradle.kts`; update it together with the native dependency lock.
 
 `MilaFfiPayload` owns a defensive copy of every byte array. The default linked adapter loads `mila_ffi` lazily and reports unavailable when the host has not
 packaged it. Use `LinkedMilaFfiAdapter` in production packaging; keep the unavailable adapter only for tests. Keep
@@ -24,7 +23,7 @@ a translated resource is unavailable.
 On a machine with Android SDK API 36, JDK 17, and Gradle 9:
 
 ```sh
-gradle --project-dir mila/native/android :app:assembleDebug
+tools/buck2 build -c overalls.non_hermetic=true //mila:android-debug
 ```
 
 CI builds the APKs through Buck2 (ADR-0269):
@@ -53,6 +52,45 @@ matrix is open; the artifact is installable for QA and provides repeatable
 build evidence.
 
 ## Instrumentation and the hermetic journey
+
+To test an already booted disposable emulator locally, set its exact serial and a fresh run
+identity for every invocation:
+
+```sh
+tools/buck2 test -c overalls.non_hermetic=true \
+  -c mila.android_serial=emulator-5580 \
+  -c mila.android_test_run=local-20261105-1 //mila:android-device-test
+```
+
+The target builds the APKs through `:android-debug`, requires `ro.kernel.qemu=1`, uninstalls both
+test packages, and runs the packaged instrumentation suite with the fixture journey excluded.
+The app-lock tests change and restore the emulator's PIN; physical devices are refused. The
+bounded JSON report records the serial, API, run identity, both APK SHA-256 digests, test counts
+and sanitized failing test identities. It includes no raw test streams or device logs. Build
+`'//mila:android-device-test[out]'` with the same configuration to retrieve that report. A new
+`mila.android_test_run` value is required for fresh execution rather than a previous local result.
+The SDK must be in the Buck2 daemon's environment; `adb` resolves from `ANDROID_HOME/platform-tools`
+or its `PATH`. This target never starts or stops an emulator.
+
+For the authenticated journey, boot the declared fixture through
+`tools/buck2 run //mila:journey-fixture` and keep its descriptor and launcher
+output private. Then use a separate fresh run identity:
+
+```sh
+tools/buck2 build -c overalls.non_hermetic=true \
+  -c mila.android_serial=emulator-5580 \
+  -c mila.android_test_run=local-journey-1 \
+  -c mila.android_journey_descriptor=/private/fixture/descriptor.json \
+  '//mila:android-journey-device-test[out]'
+```
+
+This target requires the bounded owner-only descriptor, reverses its loopback
+ports without replacing conflicting mappings, and invokes the ordered journey
+once. All 14 tests must pass with no skips. It removes only the reverse mappings
+it created and emits the same bounded report without descriptor contents or
+device logs. It never retries the mutating suite after failure or timeout.
+Local API 35 execution passes all 12 packaged tests and all 14 journey tests;
+see the [implementation review](../../../docs/architecture/reviews/2026-11-02-mila-native-parity-implementation.md).
 
 The instrumentation suite runs on the API 35 emulator in the Linux `android-emulator` CI job
 through [`scripts/run-instrumentation.sh`](scripts/run-instrumentation.sh), which installs the
@@ -88,8 +126,8 @@ argument carries the base64 fixture descriptor (version 1):
 }
 ```
 
-CI substitutes the fixture from the `overalls` Cachix cache and builds it only when the flake exposes
-`packages.<system>.mila-journey-fixture`, boots it after the APK is assembled, then `adb reverse`s its unprivileged ports so the emulator
+CI substitutes the fixture from the `overalls` Cachix cache, with a local
+`//:package-mila-journey-fixture` Buck2 build as fallback, boots it after the APK is assembled, then `adb reverse`s its unprivileged ports so the emulator
 dials `deployment.host` exactly as written. `localhost` deployments are accepted only while an
 instrumentation test sets `MilaInstrumentationLoopback.allowed`; production input still requires a
 dotted DNS name. FCM delivery and server-side device registration need a real push token and are

@@ -80,9 +80,9 @@ to native clients.
   Swift tests, Android unit tests, Windows smoke tests and the hermetic
   journey fixture ([ADR-0264](0264-hermetic-mila-journey-fixture.md)).
 - dartssh2 rebases and Dart engine pins are no longer maintenance work.
-- Until the Windows compatibility job is retired, one release job fetches
-  Flutter from the network on a Windows runner, outside the pin registry
-  ([ADR-0267](0267-single-dependency-pin-registry.md)).
+- The former Windows compatibility job fetched Flutter from the network on a
+  Windows runner, outside the pin registry
+  ([ADR-0267](0267-single-dependency-pin-registry.md)); that job is now retired.
 
 ## Invariants and verification
 
@@ -105,16 +105,34 @@ to native clients.
 - `mila-release.yml` builds the release artifacts through Buck2 and checks
   that they contain no Flutter. Its unsigned Android and Apple builds run
   without a tag.
+- The 2026-11-05 [native parity review](../reviews/2026-11-02-mila-native-parity-implementation.md)
+  records local Android SDK/JVM and portable managed FFI execution. The
+  `//mila:android-device-test` target requires an explicitly selected disposable
+  emulator and a fresh run identity; its bounded report binds the APK digests,
+  API level and serial without publishing device logs. Runner unit/type checks
+  have separate Buck2 targets. The Linux package starts a live Broadway display
+  and requires the GTK widget test in both feature configurations.
+- `//mila:android-journey-device-test` passes all 14 ordered fixture tests on
+  API 35 with no skips. `//mila:linux-journey` passes all 40 headless fixture
+  steps, and the real GTK window passes all 39 steps from the Buck2-built
+  journey package. Both Linux journey run targets use a separate opt-in package with a
+  pinned Broadway server, leaving fixture drivers and the GTK journey feature
+  out of the normal release. The Linux CI job builds and runs these targets;
+  this local execution does not claim a new CI receipt.
+- Decision 4 describes the former transition: the Windows Flutter job has
+  since been retired with the Flutter client. `mila-builds.yml` now packages
+  the native Windows client as unsigned ZIP/MSIX artifacts. This is build and
+  packaging implementation, separately from signed release acceptance.
 
 Gaps:
 
 - The signed release path has not run; this is tracked in ADR-0269.
-- The Windows Flutter compatibility job (decision 4) remains.
+- Signed native Windows installation and activation remain release evidence.
 
 ## Open questions
 
-When the native Windows client replaces the Flutter Windows build, and so
-when decision 4's job is deleted.
+None for the retired Flutter compatibility job; signed native release
+acceptance remains open.
 
 ## Related decisions
 

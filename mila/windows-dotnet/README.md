@@ -30,9 +30,12 @@ single hand-written header `mila/rust/mila-ffi/include/mila_ffi.h`, which
 discriminants; `RustNative.cs` must match it. The native library must be copied beside the executable as
 `mila_native.dll` by the Windows source-bundle build.
 
-The boundary currently exposes only a status and version. Device keys,
-signatures, tokens, command arguments and terminal bytes must remain in the
-existing typed Mila transport and must not be added as untyped FFI payloads.
+The boundary exposes typed route, trust, snapshot, machine/thread command,
+session, terminal and watch operations. Rust owns protocol validation,
+transport and authority; the managed layer receives bounded records and byte
+buffers only. Device private keys, signatures, push tokens and command
+arguments remain behind their typed adapters and are never exposed as an
+untyped FFI payload.
 
 ## Verification in this repository
 
@@ -112,10 +115,11 @@ App SDK channel (`MILA_WNS_REMOTE_ID` names the Entra application), managed and
 Rust channel-shape checks, the Rust-encoded Susan body posted to
 `https://notifications.overalls.dev/api/push/v1/keys`, then
 `mila_session_device_register`, where Rust validates Susan's reply and sends
-the push key to Porsche on stdin. Windows X25519 poke-key custody is not yet
-implemented, so the app reports notifications as unavailable before obtaining
-a channel. WNS delivery, Susan issuance and poke decryption cannot be verified
-hermetically; the smoke covers the exchange with fakes for WNS and Susan.
+the push key to Porsche on stdin. `Interop/PokeKeyStore.cs` implements
+deployment-scoped X25519 custody with CNG, user-scope DPAPI sealing, protected
+owner-only ACLs, and fail-closed tamper and binding checks. WNS delivery, Susan
+issuance and poke decryption cannot be verified hermetically; the smoke covers
+the exchange with fakes for WNS and Susan.
 
 ## Share completion
 

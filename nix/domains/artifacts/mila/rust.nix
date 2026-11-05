@@ -33,15 +33,20 @@ in
   # @cc [owner:ghuntley,label:build] mila-rust-source-build
   # The Mila Rust workspace MUST compile every tracked workspace member from
   # the root workspace Cargo.lock without reading build output or ambient sources.
+
+  # @cc [owner:ghuntley,label:build;verification] mila-rust-native-artifact
+  # The package MUST contain the production libmila_ffi.so from the target
+  # platform's release directory; host build-script artifacts cannot substitute it.
   package = workspace.rustPlatform.buildRustPackage (common // {
     pname = "mila-rust";
     doCheck = false;
     installPhase = ''
+      release=target/${pkgs.stdenv.hostPlatform.rust.rustcTarget}/release
+      test -f "$release/libmila_ffi.so"
       mkdir -p "$out/lib/mila-rust"
-      cp -a target/release/. "$out/lib/mila-rust/"
+      cp -a "$release/." "$out/lib/mila-rust/"
       # The headless journey driver (ADR-0264) links the production C FFI.
-      journey=$(find target -type f -path '*/release/mila-journey' | head -n 1)
-      install -Dm755 "$journey" "$out/bin/mila-journey"
+      install -Dm755 "$release/mila-journey" "$out/bin/mila-journey"
     '';
     meta.description = "Mila's Rust workspace libraries";
   });

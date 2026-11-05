@@ -6,6 +6,7 @@ let
   root = ../../../../mila;
   version = "0.1.0";
   nativeLinux = import ./native-linux.nix { inherit pkgs lib; };
+  linuxJourneys = import ./native-linux.nix { inherit pkgs lib; journey = true; };
   rust = import ./rust.nix { inherit pkgs; };
   sourceBundle = import ./source-bundle.nix { inherit pkgs version root; };
   windowsSourceBundle = import ./windows-source-bundle.nix { inherit pkgs version root; };
@@ -18,6 +19,7 @@ let
   '';
 in {
   linuxNative = nativeLinux;
+  inherit linuxJourneys;
   linuxRelease = linuxRelease;
   linuxDev = nativeLinux;
   sourceBundle = sourceBundle;

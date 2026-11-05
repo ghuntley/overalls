@@ -4,6 +4,9 @@
 //! Keep that absence explicit at the native boundary so the UI cannot claim
 //! registration succeeded or retain a misleading enabled state.
 
+use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
+
 /// Why notification delivery is unavailable on this platform.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum NotificationUnavailable {
@@ -29,7 +32,87 @@ pub struct NotificationState {
     devices: Vec<String>,
 }
 
+#[derive(Deserialize, Serialize)]
+struct PersistedNotificationState {
+    enabled: bool,
+    devices: Vec<String>,
+}
+
 impl NotificationState {
+    fn persistence_path() -> Option<PathBuf> {
+        if let Some(path) = std::env::var_os("MILA_NOTIFICATION_PATH") {
+            return Some(PathBuf::from(path));
+        }
+        let root = std::env::var_os("XDG_CONFIG_HOME")
+            .map(PathBuf::from)
+            .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".config")))?;
+        Some(root.join("mila").join("notifications.json"))
+    }
+
+    pub fn load_persisted() -> Self {
+        let mut state = Self::desktop();
+        let Some(path) = Self::persistence_path() else {
+            return state;
+        };
+        let Ok(bytes) = std::fs::read(&path) else {
+            return state;
+        };
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let Ok(metadata) = std::fs::metadata(&path) else {
+                return state;
+            };
+            if metadata.permissions().mode() & 0o077 != 0 {
+                return state;
+            }
+        }
+        let Ok(saved) = serde_json::from_slice::<PersistedNotificationState>(&bytes) else {
+            return state;
+        };
+        let Ok(devices) = serde_json::to_vec(&saved.devices) else {
+            return Self::desktop();
+        };
+        if state.load_devices(&devices).is_err() {
+            return Self::desktop();
+        }
+        if saved.enabled {
+            let _ = state.enable();
+        }
+        state
+    }
+
+    pub fn persist(&self) -> bool {
+        let Some(path) = Self::persistence_path() else {
+            return false;
+        };
+        let Some(parent) = path.parent() else {
+            return false;
+        };
+        if std::fs::create_dir_all(parent).is_err() {
+            return false;
+        }
+        let saved = PersistedNotificationState {
+            enabled: self.enabled,
+            devices: self.devices.clone(),
+        };
+        let Ok(bytes) = serde_json::to_vec(&saved) else {
+            return false;
+        };
+        let temporary = path.with_extension("json.tmp");
+        if std::fs::write(&temporary, bytes).is_err() {
+            return false;
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            if std::fs::set_permissions(&temporary, std::fs::Permissions::from_mode(0o600)).is_err()
+            {
+                return false;
+            }
+        }
+        std::fs::rename(temporary, path).is_ok()
+    }
     /// Constructs the Linux capability from the platform profile.
     pub const fn linux() -> Self {
         Self {

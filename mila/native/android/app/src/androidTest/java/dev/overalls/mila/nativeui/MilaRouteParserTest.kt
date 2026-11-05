@@ -17,6 +17,10 @@ class MilaRouteParserTest {
         assertEquals(MilaRoute.Machine(UUID.fromString(id)), parseMilaRoute("overalls://overalls.example/machines/$id"))
         assertNull(parseMilaRoute("overalls://overalls.example/machines/$id?debug=true"))
         assertNull(parseMilaRoute("overalls://overalls.example/machines/%2F$id"))
+        assertNull(parseMilaRoute("overalls://overalls.example:443/machines/$id"))
+        assertNull(parseMilaRoute("overalls://Overalls.example/machines/$id"))
+        assertNull(parseMilaRoute("overalls://overalls.example/machines/123E4567-E89B-12D3-A456-426614174000"))
+        assertNull(parseMilaRoute("overalls://overalls.example/machines/$id\u0001"))
     }
 
     @Test

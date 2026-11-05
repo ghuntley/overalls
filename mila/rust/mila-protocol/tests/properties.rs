@@ -206,12 +206,21 @@ fn generated_valid_commands_round_trip(tc: TestCase) {
     tc.assume(!first.starts_with("--"));
     let line = match tc.draw(gs::integers::<u8>().max_value(5)) {
         0 => format!("pause --json -- {}", single_quote(&first)),
-        1 => format!(
-            "share add --json {} {} {}",
-            single_quote(&first),
-            single_quote(&free()),
-            tc.draw(gs::sampled_from(vec!["viewer", "editor", "admin"]))
-        ),
+        1 => {
+            // `lex` intentionally does not retain quote metadata, so a quoted
+            // argument that is exactly `--` would become the option separator
+            // on the parser side. Keep generated free-form principals outside
+            // that reserved token; production validation already refuses the
+            // ambiguous form.
+            let principal = free();
+            tc.assume(principal != "--" && !principal.starts_with("--"));
+            format!(
+                "share add --json {} {} {}",
+                single_quote(&first),
+                single_quote(&principal),
+                tc.draw(gs::sampled_from(vec!["viewer", "editor", "admin"]))
+            )
+        }
         2 => format!(
             "thread read --json {} {}",
             id(),

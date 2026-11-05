@@ -2,6 +2,7 @@ package dev.overalls.mila.nativeui
 
 import java.util.UUID
 import java.net.URI
+import java.util.Locale
 
 sealed interface MilaRoute {
     data object Machines : MilaRoute
@@ -11,15 +12,27 @@ sealed interface MilaRoute {
     data object Settings : MilaRoute
 }
 
-/** Parses only navigation routes; query strings and command-like paths are rejected. */
+/**
+ * Parses only navigation routes; query strings and command-like paths are rejected.
+ *
+ * @cc [owner:ghuntley,label:security;navigation] mila-android-route-boundary
+ * A route entering Android intent handling MUST match the bounded canonical
+ * `overalls://<lowercase DNS host>/<navigation path>` form: no controls,
+ * query/fragment, userinfo, port, percent encoding, or non-canonical UUIDs may
+ * cross into navigation.
+ */
 fun parseMilaRoute(value: String): MilaRoute? {
+    if (value.length > 2_048 || value.toByteArray(Charsets.UTF_8).size > 2_048 ||
+        value.any { it.isISOControl() || it == ' ' }) return null
     val uri = runCatching { URI(value) }.getOrNull() ?: return null
-    if (uri.scheme != "overalls" || uri.rawQuery != null || uri.rawFragment != null || uri.rawAuthority?.contains('@') == true) return null
+    if (uri.scheme != "overalls" || uri.rawQuery != null || uri.rawFragment != null ||
+        uri.port != -1 || uri.rawAuthority?.contains('@') == true) return null
+    val host = uri.host ?: return null
+    if (uri.rawAuthority != host || !validRouteHost(host)) return null
     val path = uri.rawPath ?: return null
-    if (path.isNotEmpty() && path != "/" && path.contains("//")) return null
+    if (path.isEmpty() || path == "/" || path.endsWith('/') || path.contains("//")) return null
     val parts = path.trim('/').takeIf { it.isNotEmpty() }?.split('/') ?: emptyList()
     if (parts.any { it.contains('%') }) return null
-    uri.host ?: return null
     val page = parts.firstOrNull() ?: return null
     val tail = parts.drop(1)
     return when {
@@ -32,7 +45,18 @@ fun parseMilaRoute(value: String): MilaRoute? {
     }
 }
 
-private fun String.toUuid(): UUID? = runCatching { UUID.fromString(this) }.getOrNull()
+private fun validRouteHost(host: String): Boolean {
+    if (host.isEmpty() || host.length > 253 || host != host.lowercase(Locale.ROOT)) return false
+    return host.split('.').all { label ->
+        label.isNotEmpty() && label.length <= 63 &&
+            label.first() != '-' && label.last() != '-' &&
+            label.all { it in 'a'..'z' || it in '0'..'9' || it == '-' }
+    }
+}
+
+private fun String.toUuid(): UUID? = runCatching {
+    UUID.fromString(this).takeIf { it.toString() == this }
+}.getOrNull()
 
 /** The operation names exported by the generated Rust FFI binding. */
 @JvmInline
@@ -76,7 +100,29 @@ sealed interface MilaFfiResult {
  * The Android UI MUST exchange only typed `MilaFfiRequest` and `MilaFfiResponse` values with Rust;
  * raw pointers, credentials, and terminal bytes MUST NOT appear in this interface.
  */
+enum class MilaWatchHint(val tag: Int) {
+    Unknown(0), Watching(1), Heartbeat(2), Machine(3), TerminalSession(4), Thread(5), Resync(6), Session(7);
+    companion object { fun fromTag(tag: Int): MilaWatchHint? = entries.firstOrNull { it.tag == tag } }
+}
+sealed interface MilaWatchRead {
+    data class Hint(val kind: MilaWatchHint) : MilaWatchRead
+    data object Idle : MilaWatchRead
+    data object Closed : MilaWatchRead
+    data object AuthorityLost : MilaWatchRead
+    data object TransportLost : MilaWatchRead
+}
+
 interface MilaFfiAdapter {
+    fun watchOpen(machineIds: List<UUID>, threadIds: List<UUID>): Result<Long> = Result.failure(IllegalStateException("watch unavailable"))
+    fun watchRead(handle: Long, waitMilliseconds: Int): Result<MilaWatchRead> = Result.failure(IllegalStateException("watch unavailable"))
+    fun watchReconnect(handle: Long): Result<Long> = Result.failure(IllegalStateException("watch unavailable"))
+    fun watchClose(handle: Long): Result<Unit> = Result.success(Unit)
+
+    /** Only Rust exports complete validated snapshots; a partial listing refuses. */
+    fun snapshotData(): Result<ByteArray> = Result.failure(IllegalStateException("snapshot unavailable"))
+    fun notificationDevices(): Result<ByteArray> = Result.failure(IllegalStateException("session unavailable"))
+    fun notificationDeviceRemove(device: String): Result<Unit> = Result.failure(IllegalStateException("session unavailable"))
+    fun notificationDevicePreferences(device: String, enabled: Boolean): Result<Unit> = Result.failure(IllegalStateException("session unavailable"))
     suspend fun call(request: MilaFfiRequest): MilaFfiResult
     /** Rust validates provider metadata while borrowing the token for this call only. */
     fun validatePushRegistration(token: String, appId: String, deployment: String, endpoint: String?): Result<Unit> =
@@ -86,6 +132,7 @@ interface MilaFfiAdapter {
     /** Executes a Rust-classified action for an authenticated machine session. */
     suspend fun machineResize(machineId: UUID, cpu: Int, memoryMiB: Int, diskGiB: Int): Result<Unit> = Result.failure(IllegalStateException("machine resize unavailable"))
     /** Creates a machine through the authenticated session; unauthenticated adapters refuse. */
+    suspend fun machineClone(machineId: UUID, name: String, requestId: String): Result<Unit> = Result.failure(IllegalStateException("clone unavailable"))
     suspend fun machineCreate(request: MilaMachineCreateRequest): Result<Unit> = Result.failure(IllegalStateException("machine create unavailable"))
     /** Adds ([role] non-null) or removes ([role] null) one principal through the authenticated session. */
     suspend fun machineShare(machineId: UUID, principal: MilaSharePrincipal, role: MilaShareRole?): Result<Unit> = Result.failure(IllegalStateException("machine sharing unavailable"))
@@ -154,6 +201,9 @@ interface MilaFfiAdapter {
     /** Polls bounded output bytes from the Rust-owned PTY. */
     fun terminalPoll(handle: Long, maxBytes: Int = 64 * 1024): Result<ByteArray> =
         Result.failure(IllegalStateException("terminal output unavailable"))
+    /** Bounded event read encoded as one event byte followed by display bytes. */
+    fun terminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int = 64 * 1024): Result<ByteArray> =
+        terminalPoll(handle, maxBytes).map { bytes -> byteArrayOf(0) + bytes }
     /** Writes input bytes to the Rust-owned PTY. */
     fun terminalInputBytes(handle: Long, bytes: ByteArray): Result<Unit> =
         terminalInput(bytes.size, true)
@@ -165,6 +215,7 @@ interface MilaFfiAdapter {
     fun terminalNew(machineId: UUID): Result<MilaTerminalSessionRef> = Result.failure(IllegalStateException("terminal unavailable"))
     /** Attaches a PTY to [session]; returns the PTY handle. */
     fun terminalAttach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Result<Long> = Result.failure(IllegalStateException("terminal unavailable"))
+    fun terminalFrame(handle: Long): Result<MilaTerminalFrame> = Result.failure(IllegalStateException("terminal unavailable"))
     /** `terminal kill`: true when the server reports the session closed. */
     fun terminalEnd(session: MilaTerminalSessionRef): Result<Boolean> = Result.failure(IllegalStateException("terminal unavailable"))
 }
@@ -199,6 +250,7 @@ object UnavailableMilaFfiAdapter : MilaFfiAdapter {
 /** Narrow JNI surface implemented by the host application's Rust `mila-ffi` library. */
 interface MilaRustBindings {
     fun abiVersion(): Int
+    fun snapshotSavedAt(snapshot: ByteArray, host: String, port: Int): Long? = null
     fun canonicalRoute(value: String): String?
     /** Returns the closed machine-action bit mask, or null for invalid input. */
     fun machineActions(snapshot: ByteArray, host: String, port: Int?, index: Int): Int?
@@ -215,6 +267,7 @@ interface MilaRustBindings {
     fun reconcileTrust(pinned: ByteArray?, fetched: ByteArray?, host: String, now: Long): ByteArray? = null
     fun sessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int = -12
     fun sessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = -12
+    fun sessionMachineClone(handle: Long, machine: String, name: String, requestId: String): Int = -12
     fun sessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = -12
     /** A null [role] selects removal; Rust validates the closed role set and principal bounds. */
     fun sessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int = -12
@@ -226,7 +279,11 @@ interface MilaRustBindings {
     /** Authenticated Porsche notification-device CRUD. Tokens never cross this boundary. */
     fun sessionDeviceList(handle: Long): ByteArray? = null
     fun sessionDeviceRemove(handle: Long, device: String): Int = -12
+    fun sessionDeviceRemoveWithRequest(handle: Long, device: String, requestId: String): Int =
+        sessionDeviceRemove(handle, device)
     fun sessionDevicePreferences(handle: Long, device: String, enabled: Boolean): Int = -12
+    fun sessionDevicePreferencesWithRequest(handle: Long, device: String, enabled: Boolean, requestId: String): Int =
+        sessionDevicePreferences(handle, device, enabled)
     /** Opens a PTY through the authenticated session; terminal bytes stay outside this ABI. */
     fun sessionTerminalAttach(handle: Long, from: Long, columns: Int, rows: Int, readWrite: Boolean): Int = -12
     /** Validates a bounded PTY input write against the authenticated session. */
@@ -238,18 +295,27 @@ interface MilaRustBindings {
     fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = null
     /** Attaches a PTY to one named terminal session of one machine; 0 on refusal. */
     fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = 0
+    fun sessionTerminalScreen(handle: Long): ByteArray? = null
     /** `terminal kill` for one named session; returns its JSON receipt, or null on refusal. */
     fun sessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray? = null
     /** Registers this device with Susan's key-issuance reply; returns Porsche's JSON receipt. */
     fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = null
+    /** Registers with a caller-owned request id for at-most-once resolution. */
+    fun sessionDeviceRegisterWithRequest(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, requestId: String, now: Long): ByteArray? =
+        sessionDeviceRegister(handle, platform, susanReply, encPubkey, label, now)
     /** `{"error": <closed code or null>}` for the session's last Porsche refusal. */
     fun sessionLastRefusal(handle: Long): ByteArray? = null
     fun sessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray? = null
+    fun sessionTerminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int): ByteArray? = sessionTerminalPoll(handle, maxBytes)
     fun sessionTerminalInputBytes(handle: Long, bytes: ByteArray): Int = -12
     fun sessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int = -12
     fun sessionTerminalClose(handle: Long): Int = -12
     /** Revokes one opaque key id using a caller-supplied at-most-once request id. */
     fun sessionSshKeyRevoke(handle: Long, key: String, requestId: String): Int = -12
+    fun sessionWatchOpen(handle: Long, filters: ByteArray): Long = 0
+    fun sessionWatchRead(handle: Long, waitMilliseconds: Int): ByteArray? = null
+    fun sessionWatchReconnect(handle: Long): Long = 0
+    fun sessionWatchClose(handle: Long): Int = -12
     fun sessionClose(handle: Long): Int = -12
     fun pushRegistrationValidate(provider: Int, environment: Int, token: String, appId: String, deployment: String, endpoint: String?): Int = -12
     /** Returns the closed Rust thread-command tag, or -1 for an unknown command. */
@@ -270,6 +336,11 @@ internal object MilaRustFfi : MilaRustBindings {
     override fun abiVersion(): Int {
         check(loaded) { "mila_ffi is unavailable" }
         return nativeAbiVersion()
+    }
+
+    override fun snapshotSavedAt(snapshot: ByteArray, host: String, port: Int): Long? {
+        check(loaded) { "mila_ffi is unavailable" }
+        return nativeSnapshotSavedAt(snapshot, host, port).takeIf { it >= 0 }
     }
 
     override fun canonicalRoute(value: String): String? {
@@ -297,6 +368,7 @@ internal object MilaRustFfi : MilaRustBindings {
     }
     override fun sessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int = nativeSessionMachineAction(handle, machine, action, requestId)
     override fun sessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = nativeSessionMachineResize(handle, machine, cpu, memory, disk, requestId)
+    override fun sessionMachineClone(handle: Long, machine: String, name: String, requestId: String): Int = nativeSessionMachineClone(handle, machine, name, requestId)
     override fun sessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int = nativeSessionMachineCreate(handle, name, cpu, memory, disk, requestId)
     override fun sessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int = nativeSessionShareMutation(handle, machine, email, role, add, requestId)
     override fun sessionWebShow(handle: Long, machine: String): ByteArray? = nativeSessionWebShow(handle, machine)
@@ -305,8 +377,14 @@ internal object MilaRustFfi : MilaRustBindings {
     override fun sessionSshKeys(handle: Long): ByteArray? = nativeSessionSshKeys(handle)
     override fun sessionDeviceList(handle: Long): ByteArray? = nativeSessionDeviceList(handle)
     override fun sessionDeviceRemove(handle: Long, device: String): Int = nativeSessionDeviceRemove(handle, device)
+    override fun sessionDeviceRemoveWithRequest(handle: Long, device: String, requestId: String): Int = nativeSessionDeviceRemoveWithRequest(handle, device, requestId)
     override fun sessionDevicePreferences(handle: Long, device: String, enabled: Boolean): Int = nativeSessionDevicePreferences(handle, device, enabled)
+    override fun sessionDevicePreferencesWithRequest(handle: Long, device: String, enabled: Boolean, requestId: String): Int = nativeSessionDevicePreferencesWithRequest(handle, device, enabled, requestId)
     override fun sessionSshKeyRevoke(handle: Long, key: String, requestId: String): Int = nativeSessionSshKeyRevoke(handle, key, requestId)
+    override fun sessionWatchOpen(handle: Long, filters: ByteArray): Long = nativeSessionWatchOpen(handle, filters)
+    override fun sessionWatchRead(handle: Long, waitMilliseconds: Int): ByteArray? = nativeSessionWatchRead(handle, waitMilliseconds)
+    override fun sessionWatchReconnect(handle: Long): Long = nativeSessionWatchReconnect(handle)
+    override fun sessionWatchClose(handle: Long): Int = nativeSessionWatchClose(handle)
     override fun sessionClose(handle: Long): Int = nativeSessionClose(handle)
     override fun pushRegistrationValidate(provider: Int, environment: Int, token: String, appId: String, deployment: String, endpoint: String?): Int =
         nativePushRegistrationValidate(provider, environment, token, appId, deployment, endpoint)
@@ -330,15 +408,19 @@ internal object MilaRustFfi : MilaRustBindings {
     override fun sessionTerminalOpen(handle: Long, columns: Int, rows: Int): Long = nativeSessionTerminalOpen(handle, columns, rows)
     override fun sessionTerminalNew(handle: Long, machine: String, requestId: String): ByteArray? = nativeSessionTerminalNew(handle, machine, requestId)
     override fun sessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long = nativeSessionTerminalAttachSession(handle, machine, terminal, columns, rows)
+    override fun sessionTerminalScreen(handle: Long): ByteArray? = nativeSessionTerminalScreen(handle)
     override fun sessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray? = nativeSessionTerminalEnd(handle, machine, terminal, requestId)
     override fun sessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray? = nativeSessionDeviceRegister(handle, platform, susanReply, encPubkey, label, now)
+    override fun sessionDeviceRegisterWithRequest(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, requestId: String, now: Long): ByteArray? = nativeSessionDeviceRegisterWithRequest(handle, platform, susanReply, encPubkey, label, requestId, now)
     override fun sessionLastRefusal(handle: Long): ByteArray? = nativeSessionLastRefusal(handle)
     override fun sessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray? = nativeSessionTerminalPoll(handle, maxBytes)
+    override fun sessionTerminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int): ByteArray? = nativeSessionTerminalReadWithin(handle, waitMilliseconds, maxBytes)
     override fun sessionTerminalInputBytes(handle: Long, bytes: ByteArray): Int = nativeSessionTerminalInputBytes(handle, bytes)
     override fun sessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int = nativeSessionTerminalResizeHandle(handle, columns, rows)
     override fun sessionTerminalClose(handle: Long): Int = nativeSessionTerminalClose(handle)
 
     @JvmStatic
+    external fun nativeSnapshotSavedAt(snapshot: ByteArray, host: String, port: Int): Long
     external fun nativeAbiVersion(): Int
 
     @JvmStatic
@@ -355,8 +437,12 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic
     external fun nativeSessionRead(handle: Long, more: Boolean): Int
     @JvmStatic external fun nativeSessionWhoami(handle: Long): ByteArray?
+    @JvmStatic external fun nativeSessionTerminalScreen(handle: Long): ByteArray?
+    @JvmStatic external fun nativeSessionTerminalState(handle: Long): ByteArray?
+    @JvmStatic external fun nativeSessionTerminalAttachOptions(handle: Long, machine: String, terminal: String, columns: Int, rows: Int, cursor: Long, hasCursor: Boolean, readOnly: Boolean): Long
     @JvmStatic external fun nativeSessionMachineAction(handle: Long, machine: String, action: String, requestId: String): Int
     @JvmStatic external fun nativeSessionMachineResize(handle: Long, machine: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int
+    @JvmStatic external fun nativeSessionMachineClone(handle: Long, machine: String, name: String, requestId: String): Int
     @JvmStatic external fun nativeSessionMachineCreate(handle: Long, name: String, cpu: Int, memory: Int, disk: Int, requestId: String): Int
     @JvmStatic external fun nativeSessionShareMutation(handle: Long, machine: String, email: String, role: String?, add: Boolean, requestId: String): Int
     @JvmStatic external fun nativeSessionWebShow(handle: Long, machine: String): ByteArray?
@@ -365,7 +451,9 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionSshKeys(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionDeviceList(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionDeviceRemove(handle: Long, device: String): Int
+    @JvmStatic external fun nativeSessionDeviceRemoveWithRequest(handle: Long, device: String, requestId: String): Int
     @JvmStatic external fun nativeSessionDevicePreferences(handle: Long, device: String, enabled: Boolean): Int
+    @JvmStatic external fun nativeSessionDevicePreferencesWithRequest(handle: Long, device: String, enabled: Boolean, requestId: String): Int
     @JvmStatic external fun nativeSessionSshKeyRevoke(handle: Long, key: String, requestId: String): Int
     @JvmStatic external fun nativePushRegistrationValidate(provider: Int, environment: Int, token: String, appId: String, deployment: String, endpoint: String?): Int
     @JvmStatic
@@ -374,6 +462,10 @@ internal object MilaRustFfi : MilaRustBindings {
     external fun nativeSessionSnapshot(handle: Long): ByteArray?
     @JvmStatic
     external fun nativeSessionClose(handle: Long): Int
+    @JvmStatic external fun nativeSessionWatchOpen(handle: Long, filters: ByteArray): Long
+    @JvmStatic external fun nativeSessionWatchRead(handle: Long, waitMilliseconds: Int): ByteArray?
+    @JvmStatic external fun nativeSessionWatchReconnect(handle: Long): Long
+    @JvmStatic external fun nativeSessionWatchClose(handle: Long): Int
     @JvmStatic
     external fun nativeThreadCommandKind(value: String): Int
     @JvmStatic
@@ -389,8 +481,10 @@ internal object MilaRustFfi : MilaRustBindings {
     @JvmStatic external fun nativeSessionTerminalAttachSession(handle: Long, machine: String, terminal: String, columns: Int, rows: Int): Long
     @JvmStatic external fun nativeSessionTerminalEnd(handle: Long, machine: String, terminal: String, requestId: String): ByteArray?
     @JvmStatic external fun nativeSessionDeviceRegister(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, now: Long): ByteArray?
+    @JvmStatic external fun nativeSessionDeviceRegisterWithRequest(handle: Long, platform: Int, susanReply: String, encPubkey: String, label: String?, requestId: String, now: Long): ByteArray?
     @JvmStatic external fun nativeSessionLastRefusal(handle: Long): ByteArray?
     @JvmStatic external fun nativeSessionTerminalPoll(handle: Long, maxBytes: Int): ByteArray?
+    @JvmStatic external fun nativeSessionTerminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int): ByteArray?
     @JvmStatic external fun nativeSessionTerminalInputBytes(handle: Long, input: ByteArray): Int
     @JvmStatic external fun nativeSessionTerminalResizeHandle(handle: Long, columns: Int, rows: Int): Int
     @JvmStatic external fun nativeSessionTerminalClose(handle: Long): Int
@@ -401,6 +495,10 @@ internal val MILA_REQUEST_ID: Regex = Regex("^porsche-[0-9a-f]{32}$")
 
 /** Mints one fresh request id per user submission; callers never reuse it across submissions. */
 internal fun milaRequestId(): String = "porsche-" + UUID.randomUUID().toString().replace("-", "")
+
+/** Porsche device mutations accept only the canonical lowercase UUID identity. */
+private fun isCanonicalIdentifier(value: String): Boolean =
+    value.length == 36 && runCatching { UUID.fromString(value).toString() == value && value != UUID(0L, 0L).toString() }.getOrDefault(false)
 
 /** Opaque, one-shot authority for a live Rust session. */
 /**
@@ -416,6 +514,25 @@ class MilaSessionHandle internal constructor(
     private var closed = false
     @Synchronized fun readMachines(more: Boolean = false): Int { check(!closed); return bindings.sessionRead(nativeHandle, more) }
     @Synchronized fun listing(): ByteArray { check(!closed); return bindings.sessionListing(nativeHandle) ?: error("listing unavailable") }
+    /**
+     * @cc [owner:ghuntley,label:security;recovery] android-complete-machine-listing
+     * A successful fresh machine read MUST follow Rust's accumulated continuation on the same
+     * session until complete, within 500 pages and 500 machines. Failed pages and session
+     * replacement MUST refuse the whole result before it is published or used for a snapshot.
+     */
+    @Synchronized fun readCompleteListing(stillCurrent: () -> Boolean = { true }): ByteArray {
+        check(!closed)
+        repeat(MILA_MAX_MACHINES) { page ->
+            check(stillCurrent()) { "session replaced during machine read" }
+            check(readMachines(more = page != 0) == 0) { "machine read refused" }
+            check(stillCurrent()) { "session replaced during machine read" }
+            val encoded = listing()
+            val decoded = MilaSessionListing.decode(encoded)
+            check(stillCurrent()) { "session replaced during machine read" }
+            if (!decoded.hasMore) return encoded
+        }
+        error("machine pagination exceeds bound")
+    }
     @Synchronized fun whoami(): ByteArray {
         check(!closed)
         return bindings.sessionWhoami(nativeHandle) ?: error("whoami unavailable")
@@ -429,8 +546,21 @@ class MilaSessionHandle internal constructor(
         if (status != 0) error("machine action rejected")
     }
     @Synchronized fun machineResize(machine: UUID, cpu: Int, memoryMiB: Int, diskGiB: Int, requestId: String): Result<Unit> = runCatching {
-        check(!closed); require(cpu in 1..256); require(memoryMiB in 256..1_048_576); require(diskGiB in 1..65_536); require(requestId.matches(Regex("^porsche-[0-9a-f]{32}$")))
+        check(!closed); require(cpu in 1..256); require(memoryMiB in 256..4_194_304); require(diskGiB in 1..500); require(requestId.matches(Regex("^porsche-[0-9a-f]{32}$")))
         check(bindings.sessionMachineResize(nativeHandle, machine.toString(), cpu, memoryMiB, diskGiB, requestId) == 0)
+    }
+    /**
+     * @cc [owner:ghuntley,label:security;recovery] android-session-handle-fencing
+     * A closed handle MUST refuse clone submission locally, and the name/request
+     * identity MUST satisfy the same bounds as the Rust ABI before dispatch.
+     */
+    @Synchronized fun machineClone(machine: UUID, name: String, requestId: String): Result<Unit> = runCatching {
+        check(!closed)
+        require(name.isNotEmpty() && name.length <= 128 && name.all {
+            it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it == '-' || it == '_'
+        })
+        require(requestId.matches(MILA_REQUEST_ID))
+        check(bindings.sessionMachineClone(nativeHandle, machine.toString(), name, requestId) == 0) { "clone rejected" }
     }
     @Synchronized fun machineCreate(request: MilaMachineCreateRequest, requestId: String): Result<Unit> = runCatching {
         check(!closed); require(requestId.matches(MILA_REQUEST_ID))
@@ -508,6 +638,11 @@ class MilaSessionHandle internal constructor(
         bindings.sessionTerminalAttachSession(nativeHandle, session.machine.toString(), session.id, columns, rows).takeIf { it > 0 }
             ?: error("terminal attach rejected")
     }
+    @Synchronized fun terminalFrame(handle: Long): Result<MilaTerminalFrame> = runCatching {
+        check(!closed); require(handle > 0)
+        val bytes = bindings.sessionTerminalScreen(handle) ?: error("terminal screen unavailable")
+        MilaTerminalFrame.decode(bytes)
+    }
     @Synchronized fun terminalEnd(session: MilaTerminalSessionRef, requestId: String): Result<Boolean> = runCatching {
         check(!closed); require(requestId.matches(MILA_REQUEST_ID))
         val receipt = bindings.sessionTerminalEnd(nativeHandle, session.machine.toString(), session.id, requestId) ?: error("terminal kill refused")
@@ -518,10 +653,13 @@ class MilaSessionHandle internal constructor(
     @Synchronized fun terminalOpenSession(machine: UUID, columns: Int, rows: Int, requestId: String): Result<Long> =
         terminalNew(machine, requestId).mapCatching { terminalAttach(it, columns, rows).getOrThrow() }
     /** Registers this device; the Susan reply carries the push key and never enters UI state. */
-    @Synchronized fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String?, now: Long): Result<ByteArray> = runCatching {
+    @Synchronized fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String?, now: Long, requestId: String): Result<ByteArray> = runCatching {
         check(!closed); require(susanReply.length <= 4096 && encPubkey.length <= 64 && (label == null || label.length <= 256))
-        bindings.sessionDeviceRegister(nativeHandle, 1, susanReply, encPubkey, label, now) ?: error("device registration refused")
+        require(requestId.matches(MILA_REQUEST_ID))
+        bindings.sessionDeviceRegisterWithRequest(nativeHandle, 1, susanReply, encPubkey, label, requestId, now) ?: error("device registration refused")
     }
+    @Synchronized fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String?, now: Long): Result<ByteArray> =
+        notificationDeviceRegister(susanReply, encPubkey, label, now, milaRequestId())
     /** Closed refusal code from Porsche's last error envelope, or null. Never carries payloads. */
     @Synchronized fun lastRefusal(): String? = runCatching {
         check(!closed)
@@ -531,6 +669,17 @@ class MilaSessionHandle internal constructor(
     @Synchronized fun terminalPoll(handle: Long, maxBytes: Int): Result<ByteArray> = runCatching {
         check(!closed); require(handle > 0); require(maxBytes in 1..(64 * 1024))
         bindings.sessionTerminalPoll(handle, maxBytes) ?: error("terminal poll rejected")
+    }
+    /**
+     * @cc [owner:ghuntley,label:security;reliability] android-terminal-read-bound
+     * The caller's maximum byte limit MUST reach the native binding unchanged;
+     * a read may never allocate or return beyond that requested limit.
+     */
+    @Synchronized fun terminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int): Result<ByteArray> = runCatching {
+        check(!closed); require(handle > 0); require(waitMilliseconds in 0..1_000); require(maxBytes in 1..(1 shl 20))
+        val result = bindings.sessionTerminalReadWithin(handle, waitMilliseconds, maxBytes) ?: error("terminal read rejected")
+        require(result.isNotEmpty())
+        result
     }
     @Synchronized fun terminalInputBytes(handle: Long, bytes: ByteArray): Result<Unit> = runCatching {
         check(!closed); require(handle > 0); require(bytes.size <= 1 shl 20)
@@ -552,20 +701,60 @@ class MilaSessionHandle internal constructor(
         check(!closed)
         bindings.sessionDeviceList(nativeHandle) ?: error("notification devices unavailable")
     }
-    @Synchronized fun notificationDeviceRemove(device: String): Result<Unit> = runCatching {
-        check(!closed); require(device.matches(Regex("^[A-Za-z0-9._:-]{1,128}$")))
-        check(bindings.sessionDeviceRemove(nativeHandle, device) == 0)
+    /**
+     * @cc [owner:ghuntley,label:security;protocol] android-device-id-bound
+     * Notification device mutations MUST use the canonical lowercase UUID returned by Porsche;
+     * arbitrary display identifiers MUST be refused before crossing the native ABI.
+     */
+    @Synchronized fun notificationDeviceRemove(device: String, requestId: String): Result<Unit> = runCatching {
+        check(!closed); require(isCanonicalIdentifier(device))
+        require(requestId.matches(MILA_REQUEST_ID))
+        check(bindings.sessionDeviceRemoveWithRequest(nativeHandle, device, requestId) == 0)
     }
-    @Synchronized fun notificationDevicePreferences(device: String, enabled: Boolean): Result<Unit> = runCatching {
-        check(!closed); require(device.matches(Regex("^[A-Za-z0-9._:-]{1,128}$")))
-        check(bindings.sessionDevicePreferences(nativeHandle, device, enabled) == 0)
+    @Synchronized fun notificationDeviceRemove(device: String): Result<Unit> =
+        notificationDeviceRemove(device, milaRequestId())
+    @Synchronized fun notificationDevicePreferences(device: String, enabled: Boolean, requestId: String): Result<Unit> = runCatching {
+        check(!closed); require(isCanonicalIdentifier(device))
+        require(requestId.matches(MILA_REQUEST_ID))
+        check(bindings.sessionDevicePreferencesWithRequest(nativeHandle, device, enabled, requestId) == 0)
     }
+    @Synchronized fun notificationDevicePreferences(device: String, enabled: Boolean): Result<Unit> =
+        notificationDevicePreferences(device, enabled, milaRequestId())
     /** Revokes one opaque key identity exactly once on this session. */
     @Synchronized fun sshKeyRevoke(key: String, requestId: String): Result<Unit> = runCatching {
         check(!closed)
         require(key.isNotBlank())
         require(requestId.matches(Regex("^porsche-[0-9a-f]{32}$")))
         check(bindings.sessionSshKeyRevoke(nativeHandle, key, requestId) == 0)
+    }
+    /** Up to 64 filters are sharded by Rust over the one SSH connection. */
+    @Synchronized fun watchOpen(machineIds: List<UUID>, threadIds: List<UUID>): Result<Long> = runCatching {
+        check(!closed)
+        val machines = machineIds.distinct().sortedBy(UUID::toString)
+        val threads = threadIds.distinct().sortedBy(UUID::toString)
+        require(machines.size + threads.size <= 64)
+        fun ids(values: List<UUID>): String = values.joinToString(",", "[", "]") { "\"$it\"" }
+        val filters = "{\"machines\":${ids(machines)},\"threads\":${ids(threads)}}".toByteArray(Charsets.UTF_8)
+        bindings.sessionWatchOpen(nativeHandle, filters).also { check(it != 0L) }
+    }
+    @Synchronized fun watchRead(handle: Long, waitMilliseconds: Int): Result<MilaWatchRead> = runCatching {
+        check(!closed); require(waitMilliseconds in 0..1000)
+        val bytes = bindings.sessionWatchRead(handle, waitMilliseconds) ?: error("watch unavailable")
+        require(bytes.size == 2)
+        when (bytes[0].toInt()) {
+            0 -> MilaWatchRead.Hint(MilaWatchHint.fromTag(bytes[1].toInt()) ?: error("invalid watch hint"))
+            1 -> MilaWatchRead.Idle
+            2 -> MilaWatchRead.Closed
+            3 -> MilaWatchRead.AuthorityLost
+            4 -> MilaWatchRead.TransportLost
+            else -> error("invalid watch state")
+        }
+    }
+    @Synchronized fun watchReconnect(handle: Long): Result<Long> = runCatching {
+        check(!closed); bindings.sessionWatchReconnect(handle).also { check(it != 0L) }
+    }
+    @Synchronized fun watchClose(handle: Long): Result<Unit> = runCatching {
+        check(!closed); check(bindings.sessionWatchClose(handle) == 0)
     }
     @Synchronized override fun close() { if (!closed) { bindings.sessionClose(nativeHandle); closed = true } }
 }
@@ -576,12 +765,55 @@ class LinkedMilaFfiAdapter(
 ) : MilaFfiAdapter, MilaSessionConnector {
     @Volatile private var authenticatedSession: MilaSessionHandle? = null
     @Volatile private var authenticatedFingerprint: String? = null
+    /**
+     * @cc [owner:ghuntley,label:protocol;recovery] android-mutation-request-ledger
+     * Every authenticated Android mutation MUST retain its request id after an uncertain failure,
+     * reuse it for an identical retry, and discard it only after a successful outcome or session
+     * replacement; a retry MUST never submit a fresh identity for the same operation. A late
+     * outcome from a replaced session MUST NOT clear the new session's request identity.
+     */
+    private val pendingMutationIds = mutableMapOf<String, String>()
+
+    private fun <T> submitMutation(session: MilaSessionHandle, key: String, submit: (String) -> Result<T>): Result<T> {
+        val requestId = synchronized(pendingMutationIds) {
+            if (authenticatedSession !== session) return Result.failure(IllegalStateException("session replaced before mutation"))
+            pendingMutationIds.getOrPut(key, ::milaRequestId)
+        }
+        val result = submit(requestId)
+        if (result.isSuccess) synchronized(pendingMutationIds) {
+            if (pendingMutationIds[key] == requestId) pendingMutationIds.remove(key)
+        }
+        return result
+    }
 
     /** Binds the adapter to the already certificate-authenticated session. */
-    override fun bindSession(session: MilaSessionHandle?) {
-        authenticatedSession?.close()
-        authenticatedSession = session
-        if (session == null) authenticatedFingerprint = null
+    override fun watchOpen(machineIds: List<UUID>, threadIds: List<UUID>): Result<Long> =
+        authenticatedValue { it.watchOpen(machineIds, threadIds) }
+    override fun watchRead(handle: Long, waitMilliseconds: Int): Result<MilaWatchRead> =
+        authenticatedValue { it.watchRead(handle, waitMilliseconds) }
+    override fun watchReconnect(handle: Long): Result<Long> =
+        authenticatedValue { it.watchReconnect(handle) }
+    override fun watchClose(handle: Long): Result<Unit> =
+        authenticatedValue { it.watchClose(handle) }
+    override fun snapshotData(): Result<ByteArray> = runCatching {
+        (authenticatedSession ?: error("session unavailable")).snapshot()
+    }
+
+    /**
+     * @cc [owner:ghuntley,label:security;recovery] android-linked-session-replacement
+     * Replacing a binding MUST publish the new authority before waiting for the previous session
+     * to close, so in-flight paginated reads can refuse their stale results. Rebinding the same
+     * session MUST preserve that live session rather than closing it.
+     */
+    @Synchronized override fun bindSession(session: MilaSessionHandle?) {
+        val previous = authenticatedSession
+        if (previous === session && session != null) return
+        synchronized(pendingMutationIds) {
+            authenticatedSession = session
+            if (session == null) authenticatedFingerprint = null
+            pendingMutationIds.clear()
+        }
+        previous?.close()
     }
 
     override fun connect(deployment: MilaDeployment, config: MilaSessionConnectConfig, signer: MilaDeviceKey): MilaSessionHandle? =
@@ -590,20 +822,27 @@ class LinkedMilaFfiAdapter(
 
     override suspend fun machineResize(machineId: UUID, cpu: Int, memoryMiB: Int, diskGiB: Int): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        return session.machineResize(machineId, cpu, memoryMiB, diskGiB, "porsche-" + UUID.randomUUID().toString().replace("-", ""))
+        val key = "machine-resize|$machineId|$cpu|$memoryMiB|$diskGiB"
+        return submitMutation(session, key) { session.machineResize(machineId, cpu, memoryMiB, diskGiB, it) }
+    }
+    override suspend fun machineClone(machineId: UUID, name: String, requestId: String): Result<Unit> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        return session.machineClone(machineId, name, requestId)
     }
     override suspend fun machineCreate(request: MilaMachineCreateRequest): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        return session.machineCreate(request, milaRequestId())
+        val key = "machine-create|${request.name}|${request.cpu}|${request.memoryMiB}|${request.diskGiB}"
+        return submitMutation(session, key) { session.machineCreate(request, it) }
     }
     override suspend fun machineShare(machineId: UUID, principal: MilaSharePrincipal, role: MilaShareRole?): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        return session.shareMutation(machineId, principal, role, milaRequestId())
+        val key = "machine-share|$machineId|${principal.value}|${role?.wire ?: "remove"}"
+        return submitMutation(session, key) { session.shareMutation(machineId, principal, role, it) }
     }
     override suspend fun machineAction(machineId: UUID, command: MilaMachineCommand): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        val requestId = "porsche-" + java.util.UUID.randomUUID().toString().replace("-", "")
-        return session.machineAction(machineId, command, requestId)
+        val key = "machine-action|$machineId|${command.tag}"
+        return submitMutation(session, key) { session.machineAction(machineId, command, it) }
     }
     override suspend fun webShow(machineId: UUID): Result<String> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
@@ -611,18 +850,36 @@ class LinkedMilaFfiAdapter(
     }
     override suspend fun webSet(machineId: UUID, port: Int, public: Boolean, revision: Long): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        return session.webSet(machineId, port, public, revision, "porsche-" + UUID.randomUUID().toString().replace("-", ""))
+        val key = "web-set|$machineId|$port|$public|$revision"
+        return submitMutation(session, key) { session.webSet(machineId, port, public, revision, it) }
     }
+
+    override suspend fun threadAction(threadId: UUID, command: MilaThreadCommand): Result<Unit> =
+        threadAction(threadId, command, null, null)
+
+    override suspend fun threadAction(threadId: UUID, command: MilaThreadCommand, input: String?): Result<Unit> =
+        threadAction(threadId, command, input, null)
+
+    /**
+     * @cc [owner:ghuntley,label:security;protocol] android-linked-thread-dispatch
+     * Every thread-action overload MUST dispatch through the current authenticated session;
+     * a missing session or Rust refusal MUST NOT be reported as an applied operation.
+     */
     override suspend fun threadAction(threadId: UUID, command: MilaThreadCommand, input: String?, secondary: UUID?): Result<Unit> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
-        val payload = session.threadAction(threadId, command, secondary = secondary, input = input, requestId = if (command == MilaThreadCommand.Prompt || command == MilaThreadCommand.Answer || command == MilaThreadCommand.PlanApprove || command == MilaThreadCommand.PlanRevise) "porsche-" + UUID.randomUUID().toString().replace("-", "") else null)
-        return payload.map { Unit }
+        val mutating = command !in setOf(MilaThreadCommand.List, MilaThreadCommand.Show, MilaThreadCommand.Turns)
+        val key = "thread|$threadId|${command.tag}|${secondary ?: ""}|${input ?: ""}"
+        return if (mutating) submitMutation(session, key) { requestId ->
+            session.threadAction(threadId, command, secondary = secondary, input = input, requestId = requestId).map { Unit }
+        } else session.threadAction(threadId, command, secondary = secondary, input = input).map { Unit }
     }
     override suspend fun refreshListing(): Result<MilaSessionListing> {
         val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
         return runCatching {
-            check(session.readMachines() == 0) { "machine refresh refused" }
-            MilaSessionListing.decode(session.listing())
+            val encoded = session.readCompleteListing { authenticatedSession === session }
+            val listing = MilaSessionListing.decode(encoded)
+            check(authenticatedSession === session) { "session replaced during refresh" }
+            listing
         }
     }
     override suspend fun threadShow(threadId: UUID): Result<ByteArray> {
@@ -638,12 +895,18 @@ class LinkedMilaFfiAdapter(
         MilaSessionSshKeyStore(it, authenticatedFingerprint)
     }
 
-    fun notificationDevices(): Result<ByteArray> = authenticatedSession?.notificationDevices()
+    override fun notificationDevices(): Result<ByteArray> = authenticatedSession?.notificationDevices()
         ?: Result.failure(IllegalStateException("session unavailable"))
-    fun notificationDeviceRemove(device: String): Result<Unit> = authenticatedSession?.notificationDeviceRemove(device)
-        ?: Result.failure(IllegalStateException("session unavailable"))
-    fun notificationDevicePreferences(device: String, enabled: Boolean): Result<Unit> = authenticatedSession?.notificationDevicePreferences(device, enabled)
-        ?: Result.failure(IllegalStateException("session unavailable"))
+    override fun notificationDeviceRemove(device: String): Result<Unit> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        val key = "device-remove|$device"
+        return submitMutation(session, key) { session.notificationDeviceRemove(device, it) }
+    }
+    override fun notificationDevicePreferences(device: String, enabled: Boolean): Result<Unit> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("session unavailable"))
+        val key = "device-prefs|$device|$enabled"
+        return submitMutation(session, key) { session.notificationDevicePreferences(device, enabled, it) }
+    }
 
     override fun validatePushRegistration(token: String, appId: String, deployment: String, endpoint: String?): Result<Unit> = runCatching {
         check(authenticatedSession != null) { "authenticated session unavailable" }
@@ -651,10 +914,24 @@ class LinkedMilaFfiAdapter(
         check(bindings.pushRegistrationValidate(1, 1, token, appId, deployment, endpoint) == 0)
     }
 
+    /**
+     * @cc [owner:ghuntley,label:security;protocol] android-linked-call-dispatch
+     * Generic calls MUST never echo input as success. Only an empty refresh request may return
+     * the listing from a successful Rust read on the still-current authenticated session;
+     * bootstrap and mutations MUST use their dedicated typed session APIs.
+     */
     override suspend fun call(request: MilaFfiRequest): MilaFfiResult {
         return try {
-            if (bindings.abiVersion() != 1) MilaFfiResult.Failure(MilaFfiError.IncompatibleAbi)
-            else MilaFfiResult.Success(MilaFfiResponse(request.payload))
+            if (bindings.abiVersion() != 1) return MilaFfiResult.Failure(MilaFfiError.IncompatibleAbi)
+            if (request.operation != MilaFfiOperation.Refresh || request.payload.copyBytes().isNotEmpty()) {
+                return MilaFfiResult.Failure(MilaFfiError.Unavailable)
+            }
+            val session = authenticatedSession ?: return MilaFfiResult.Failure(MilaFfiError.Unavailable)
+            val listing = runCatching {
+                session.readCompleteListing { authenticatedSession === session }
+            }.getOrElse { return MilaFfiResult.Failure(MilaFfiError.Unavailable) }
+            check(authenticatedSession === session) { "session replaced during refresh" }
+            MilaFfiResult.Success(MilaFfiResponse(MilaFfiPayload(listing)))
         } catch (_: UnsatisfiedLinkError) {
             MilaFfiResult.Failure(MilaFfiError.Unavailable)
         } catch (_: IllegalStateException) {
@@ -680,34 +957,38 @@ class LinkedMilaFfiAdapter(
             ?: throw IllegalArgumentException("unknown machine command")
     }
 
-    override fun terminalAttach(from: Long, columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalAttach(from, columns, rows, readWrite) }
-    override fun terminalInput(length: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalInput(length, readWrite) }
-    override fun terminalResize(columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalResize(columns, rows, readWrite) }
+    override fun terminalAttach(from: Long, columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { it.terminalAttach(from, columns, rows, readWrite) }
+    override fun terminalInput(length: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { it.terminalInput(length, readWrite) }
+    override fun terminalResize(columns: Int, rows: Int, readWrite: Boolean): Result<Unit> = authenticatedTerminal { it.terminalResize(columns, rows, readWrite) }
     // Real Porsche refuses the unnamed attach; terminals must name a machine and session.
     override fun terminalOpen(columns: Int, rows: Int, readWrite: Boolean): Result<Long> =
         Result.failure(IllegalStateException("terminal requires a machine"))
     override fun terminalOpen(machineId: UUID, columns: Int, rows: Int): Result<Long> =
-        authenticatedValue { authenticatedSession!!.terminalOpenSession(machineId, columns, rows, milaRequestId()) }
+        authenticatedValue { it.terminalOpenSession(machineId, columns, rows, milaRequestId()) }
     override fun terminalNew(machineId: UUID): Result<MilaTerminalSessionRef> =
-        authenticatedValue { authenticatedSession!!.terminalNew(machineId, milaRequestId()) }
+        authenticatedValue { it.terminalNew(machineId, milaRequestId()) }
     override fun terminalAttach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Result<Long> =
-        authenticatedValue { authenticatedSession!!.terminalAttach(session, columns, rows) }
+        authenticatedValue { it.terminalAttach(session, columns, rows) }
     override fun terminalEnd(session: MilaTerminalSessionRef): Result<Boolean> =
-        authenticatedValue { authenticatedSession!!.terminalEnd(session, milaRequestId()) }
-    fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String? = null): Result<ByteArray> =
-        authenticatedSession?.notificationDeviceRegister(susanReply, encPubkey, label, System.currentTimeMillis() / 1000)
+        authenticatedValue { it.terminalEnd(session, milaRequestId()) }
+    fun notificationDeviceRegister(susanReply: String, encPubkey: String, label: String? = null, requestId: String = milaRequestId()): Result<ByteArray> =
+        authenticatedSession?.notificationDeviceRegister(susanReply, encPubkey, label, System.currentTimeMillis() / 1000, requestId)
             ?: Result.failure(IllegalStateException("session unavailable"))
     /** Closed refusal code for diagnostics; never includes request payloads. */
     fun lastRefusal(): String? = authenticatedSession?.lastRefusal()
-    override fun terminalPoll(handle: Long, maxBytes: Int): Result<ByteArray> = authenticatedValue { authenticatedSession!!.terminalPoll(handle, maxBytes) }
-    override fun terminalInputBytes(handle: Long, bytes: ByteArray): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalInputBytes(handle, bytes) }
-    override fun terminalResizeHandle(handle: Long, columns: Int, rows: Int): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalResizeHandle(handle, columns, rows) }
-    override fun terminalClose(handle: Long): Result<Unit> = authenticatedTerminal { authenticatedSession!!.terminalClose(handle) }
+    override fun terminalPoll(handle: Long, maxBytes: Int): Result<ByteArray> = authenticatedValue { it.terminalPoll(handle, maxBytes) }
+    override fun terminalFrame(handle: Long): Result<MilaTerminalFrame> = authenticatedValue { it.terminalFrame(handle) }
+    override fun terminalReadWithin(handle: Long, waitMilliseconds: Int, maxBytes: Int): Result<ByteArray> =
+        authenticatedValue { it.terminalReadWithin(handle, waitMilliseconds, maxBytes) }
+    override fun terminalInputBytes(handle: Long, bytes: ByteArray): Result<Unit> = authenticatedTerminal { it.terminalInputBytes(handle, bytes) }
+    override fun terminalResizeHandle(handle: Long, columns: Int, rows: Int): Result<Unit> = authenticatedTerminal { it.terminalResizeHandle(handle, columns, rows) }
+    override fun terminalClose(handle: Long): Result<Unit> = authenticatedTerminal { it.terminalClose(handle) }
 
-    private fun authenticatedTerminal(operation: () -> Result<Unit>): Result<Unit> =
-        if (authenticatedSession == null) Result.failure(IllegalStateException("authenticated session unavailable")) else operation()
-    private fun <T> authenticatedValue(operation: () -> Result<T>): Result<T> =
-        if (authenticatedSession == null) Result.failure(IllegalStateException("authenticated session unavailable")) else operation()
+    private fun authenticatedTerminal(operation: (MilaSessionHandle) -> Result<Unit>): Result<Unit> = authenticatedValue(operation)
+    private fun <T> authenticatedValue(operation: (MilaSessionHandle) -> Result<T>): Result<T> {
+        val session = authenticatedSession ?: return Result.failure(IllegalStateException("authenticated session unavailable"))
+        return operation(session)
+    }
 
     private fun status(value: Int): Result<Unit> = if (value == 0) Result.success(Unit) else Result.failure(IllegalArgumentException("terminal operation rejected"))
 }

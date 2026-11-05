@@ -10,6 +10,8 @@ mod pty;
 mod signer;
 mod signin;
 mod trust;
+mod watch;
+pub use watch::{WatchHint, WatchSubscription};
 
 use crate::adapter::RuntimeError;
 use std::collections::HashSet;

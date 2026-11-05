@@ -5,9 +5,9 @@ final class MilaRouteTests: XCTestCase {
     func testParsesSupportedRoutes() {
         let machineID = UUID(uuidString: "11111111-1111-1111-1111-111111111111")!
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/machines"), .machines)
-        XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/machines/\(machineID.uuidString)"), .machine(id: machineID))
+        XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/machines/\(machineID.uuidString.lowercased())"), .machine(id: machineID))
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/threads"), .threads)
-        XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/threads/\(machineID.uuidString)"), .thread(id: machineID))
+        XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/threads/\(machineID.uuidString.lowercased())"), .thread(id: machineID))
         XCTAssertEqual(MilaRouteParser.parse("overalls://overalls.example/settings"), .settings)
     }
 
@@ -28,6 +28,9 @@ final class MilaRouteTests: XCTestCase {
             "overalls://overalls.example/machines/%2F\(machineID)",
             "overalls://user@machines",
             "overalls://overalls.example:8443/machines",
+            "overalls://Overalls.example/machines",
+            "overalls://overalls.example/machines/\(machineID.uuidString.uppercased())",
+            "overalls://overalls.example/machines/",
         ]
         for value in invalid {
             XCTAssertNil(MilaRouteParser.parse(value), "unexpectedly accepted \(value)")

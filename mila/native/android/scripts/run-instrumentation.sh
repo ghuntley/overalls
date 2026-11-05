@@ -13,6 +13,17 @@
 #    against it with the descriptor as the base64 `milaJourneyDescriptor` instrumentation argument.
 set -euo pipefail
 
+# The opt-in local Buck2 target runs only packaged tests on the caller's explicit disposable
+# emulator. Its bounded runner emits a typed report and never dumps device or terminal logs.
+if [ -n "${MILA_ANDROID_DEVICE_REPORT:-}" ]; then
+  script_dir="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+  exec python3 "$script_dir/packaged_instrumentation.py" \
+    --serial "${MILA_ANDROID_SERIAL:?set mila.android_serial explicitly}" \
+    --run-id "${MILA_ANDROID_TEST_RUN:?set a fresh mila.android_test_run explicitly}" \
+    --apk-dir "${MILA_ANDROID_APK_DIR:?MILA_ANDROID_APK_DIR must name the APK artifact}" \
+    --report "$MILA_ANDROID_DEVICE_REPORT"
+fi
+
 # A packaged-suite failure still lets the journey run, so one CI run reports both; the script
 # fails at the end if either did.
 # On failure, print the crash and main log buffers and any native tombstones. The approver bearer

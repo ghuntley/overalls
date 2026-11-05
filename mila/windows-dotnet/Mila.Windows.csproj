@@ -43,6 +43,13 @@
     <Copy SourceFiles="@(MilaLocaleFiles)" DestinationFolder="$(TargetDir)Resources\locales\%(RecursiveDir)" />
   </Target>
 
+  <Target Name="PublishMilaAssets" AfterTargets="Publish">
+    <Error Condition="'$(MilaNativeDll)' == '' Or !Exists('$(MilaNativeDll)')" Text="Publish requires MilaNativeDll" />
+    <Copy SourceFiles="$(MilaNativeDll)" DestinationFiles="$(PublishDir)mila_native.dll" />
+    <ItemGroup><MilaPublishedLocales Include="$(IntermediateOutputPath)mila-locales\**\*.json" /></ItemGroup>
+    <Copy SourceFiles="@(MilaPublishedLocales)" DestinationFolder="$(PublishDir)Resources\locales\%(RecursiveDir)" />
+  </Target>
+
   <Target Name="StageMilaNative" AfterTargets="Build" Condition="'$(MilaNativeDll)' != ''">
     <Error Condition="!Exists('$(MilaNativeDll)')" Text="MilaNativeDll does not exist: $(MilaNativeDll)" />
     <Copy SourceFiles="$(MilaNativeDll)" DestinationFiles="$(TargetDir)mila_native.dll" />

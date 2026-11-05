@@ -3,10 +3,12 @@
 mod session_bridge;
 mod terminal;
 mod validation;
+mod watch;
 
 pub use session_bridge::*;
 pub use terminal::*;
 pub use validation::*;
+pub use watch::*;
 
 use crate::session;
 

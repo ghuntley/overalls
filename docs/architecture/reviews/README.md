@@ -1,5 +1,7 @@
 # Architecture reviews
 
+- [Mila native parity implementation (2026-11-02)](2026-11-02-mila-native-parity-implementation.md): typed clone/thread/device APIs, authenticated notification controls, bounded terminal reads and ANSI/SIXEL frames, durable snapshots, reconnecting watches, macOS development-key custody and unsigned Windows packaging; native host, signing and production acceptance evidence remains open under ADR-0220/0222/0223/0235/0249/0264/0277/0278.
+
 - [Startup inference recovery (2026-11-02)](2026-11-02-agent-startup-inference.md): remote Panterloons inference, UUIDv7 correlation, and durable bounded retries after certified pre-output overloads; ADR-0280.
 
 - [Control request concurrency (2026-10-30)](2026-10-30-control-request-concurrency.md): ADR-0275 bounds each Lilly control socket to two running requests with a FIFO queue and deadline after hint-triggered bursts exhausted Marshall's pool in run 41126173301, and reports pool checkout timeouts and longest waits; fleet machine-test acceptance remains open.

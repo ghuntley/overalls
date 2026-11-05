@@ -8,7 +8,7 @@
 
 use super::{strings, NativeState};
 use gtk::prelude::*;
-use gtk::{gdk, glib, Align, Box, Button, Entry, Label, ListBox, Orientation, TextView};
+use gtk::{gdk, glib, Align, Box, Button, Entry, Fixed, Label, ListBox, Orientation, TextView};
 use mila_native_linux::deep_link::{present, LinkNotice, Page};
 use mila_native_linux::route::{
     share_inbound, share_route, ActivationBatch, MachinePage, NavigationDecision, Target,
@@ -225,6 +225,7 @@ pub(super) fn build_deployments(
             };
             match state.update_deployments(|list| Ok(list.forget(&host))) {
                 Ok(outcome) => {
+                    state.forget_snapshot(&host);
                     if outcome.was_selected {
                         state.drop_authority();
                         deployment.set_text("");
@@ -307,13 +308,120 @@ fn key_for(key: gdk::Key, modifiers: gdk::ModifierType) -> Option<TerminalKey> {
     })
 }
 
+/// @cc [owner:ghuntley,label:security;terminal] linux-terminal-image-display-only
+/// Terminal images MUST be constructed only from the bounded RGB pixels in the
+/// Rust screen projection. Their GTK placement MUST remain inert and MUST NOT
+/// load a file, URL or executable resource.
+fn display_terminal(view: &TextView, image_layer: &Fixed, surface: &GtkTerminal) {
+    let buffer = view.buffer();
+    let Some(frame) = surface.frame() else {
+        buffer.set_text(&surface.text());
+        while let Some(child) = image_layer.first_child() {
+            image_layer.remove(&child);
+        }
+        return;
+    };
+    let table = buffer.tag_table();
+    let mut old = Vec::new();
+    table.foreach(|tag| old.push(tag.clone()));
+    for tag in old {
+        table.remove(&tag);
+    }
+    buffer.set_text("");
+    for (index, line) in frame.lines.iter().enumerate() {
+        if index != 0 {
+            buffer.insert(&mut buffer.end_iter(), "\n");
+        }
+        for span in line {
+            let style = span.style;
+            let tag = gtk::TextTag::builder()
+                .weight(if style.bold { 700 } else { 400 })
+                .style(if style.italic {
+                    gtk::pango::Style::Italic
+                } else {
+                    gtk::pango::Style::Normal
+                })
+                .underline(if style.underline {
+                    gtk::pango::Underline::Single
+                } else {
+                    gtk::pango::Underline::None
+                })
+                .build();
+            let color = |rgb: u32| {
+                gdk::RGBA::new(
+                    f32::from(((rgb >> 16) & 255) as u8) / 255.0,
+                    f32::from(((rgb >> 8) & 255) as u8) / 255.0,
+                    f32::from((rgb & 255) as u8) / 255.0,
+                    1.0,
+                )
+            };
+            let (foreground, background) = if style.inverse {
+                (
+                    Some(style.background.unwrap_or(0x00_10_10_10)),
+                    Some(style.foreground.unwrap_or(0x00_d0_d0_d0)),
+                )
+            } else {
+                (style.foreground, style.background)
+            };
+            if let Some(rgb) = foreground {
+                tag.set_foreground_rgba(Some(&color(rgb)));
+            }
+            if let Some(rgb) = background {
+                tag.set_background_rgba(Some(&color(rgb)));
+            }
+            table.add(&tag);
+            buffer.insert_with_tags(&mut buffer.end_iter(), &span.text, &[&tag]);
+        }
+    }
+    while let Some(child) = image_layer.first_child() {
+        image_layer.remove(&child);
+    }
+    image_layer.set_size_request(
+        i32::from(frame.columns).saturating_mul(8),
+        i32::from(frame.rows).saturating_mul(16),
+    );
+    for image in &frame.images {
+        if image.width == 0
+            || image.height == 0
+            || image.width > 1024
+            || image.height > 1024
+            || image.pixels.len() != usize::from(image.width) * usize::from(image.height)
+            || image.pixels.iter().any(|pixel| *pixel > 0x00_ff_ff_ff)
+        {
+            continue;
+        }
+        let mut pixels = Vec::with_capacity(image.pixels.len() * 4);
+        for pixel in &image.pixels {
+            pixels.extend_from_slice(&[
+                u8::try_from((pixel >> 16) & 0xff).unwrap_or_default(),
+                u8::try_from((pixel >> 8) & 0xff).unwrap_or_default(),
+                u8::try_from(*pixel & 0xff).unwrap_or_default(),
+                u8::MAX,
+            ]);
+        }
+        let bytes = glib::Bytes::from_owned(pixels);
+        let texture = gdk::MemoryTexture::new(
+            i32::from(image.width),
+            i32::from(image.height),
+            gdk::MemoryFormat::R8g8b8a8,
+            &bytes,
+            usize::from(image.width) * 4,
+        );
+        let picture = gtk::Picture::for_paintable(&texture);
+        picture.set_can_shrink(false);
+        picture.set_size_request(i32::from(image.width), i32::from(image.height));
+        image_layer.put(&picture, f64::from(image.x), f64::from(image.y));
+    }
+}
+
 /// Installs the frame timer once; it removes itself when the surface stops.
-fn start_polling(state: &NativeState, view: &TextView, status: &Label) {
+fn start_polling(state: &NativeState, view: &TextView, image_layer: &Fixed, status: &Label) {
     if state.terminal_polling.replace(true) {
         return;
     }
     let state = state.clone();
     let view = view.clone();
+    let image_layer = image_layer.clone();
     let status = status.clone();
     glib::timeout_add_local(TERMINAL_FRAME, move || {
         let outcome = state
@@ -323,7 +431,7 @@ fn start_polling(state: &NativeState, view: &TextView, status: &Label) {
             .map_or(TickOutcome::Detached, TerminalSurface::tick);
         if outcome == TickOutcome::Updated {
             if let Some(surface) = state.terminal.borrow().as_ref() {
-                view.buffer().set_text(&surface.text());
+                display_terminal(&view, &image_layer, surface);
             }
         }
         match outcome {
@@ -389,8 +497,15 @@ pub(super) fn build_terminal(
         .focusable(true)
         .wrap_mode(gtk::WrapMode::None)
         .build();
+    let overlay = gtk::Overlay::new();
+    overlay.set_child(Some(&view));
+    let image_layer = Fixed::new();
+    image_layer.set_hexpand(true);
+    image_layer.set_vexpand(true);
+    image_layer.set_can_target(false);
+    overlay.add_overlay(&image_layer);
     let scroller = gtk::ScrolledWindow::builder()
-        .child(&view)
+        .child(&overlay)
         .min_content_height(320)
         .vexpand(true)
         .build();
@@ -427,6 +542,7 @@ pub(super) fn build_terminal(
         let columns = columns.clone();
         let rows = rows.clone();
         let view = view.clone();
+        let image_layer = image_layer.clone();
         let status = status.clone();
         attach.connect_clicked(move |_| {
             let Some((width, height)) = parse_dimensions(&columns, &rows) else {
@@ -494,9 +610,12 @@ pub(super) fn build_terminal(
             match result {
                 Ok(_) => {
                     view.buffer().set_text("");
+                    while let Some(child) = image_layer.first_child() {
+                        image_layer.remove(&child);
+                    }
                     status.set_label(&strings::text(strings::Message::TerminalLive));
                     view.grab_focus();
-                    start_polling(&state, &view, &status);
+                    start_polling(&state, &view, &image_layer, &status);
                 }
                 Err(error) => {
                     // A closed server refusal (for example no guest to attach
@@ -540,6 +659,7 @@ pub(super) fn build_terminal(
     {
         let state = state.clone();
         let view = view.clone();
+        let image_layer = image_layer.clone();
         let status = status.clone();
         reconnect.connect_clicked(move |_| {
             let result = state
@@ -551,7 +671,7 @@ pub(super) fn build_terminal(
             match result {
                 Ok(_) => {
                     status.set_label(&strings::text(strings::Message::TerminalLive));
-                    start_polling(&state, &view, &status);
+                    start_polling(&state, &view, &image_layer, &status);
                 }
                 Err(error) => status.set_label(&strings::text(terminal_error(error))),
             }
@@ -587,6 +707,7 @@ pub(super) fn build_terminal(
     {
         let state = state.clone();
         let view = view.clone();
+        let image_layer = image_layer.clone();
         let status = status.clone();
         detach.connect_clicked(move |_| {
             let result = state
@@ -599,6 +720,9 @@ pub(super) fn build_terminal(
                     None => Ok(()),
                 });
             view.buffer().set_text("");
+            while let Some(child) = image_layer.first_child() {
+                image_layer.remove(&child);
+            }
             status.set_label(&match result {
                 Ok(()) => String::new(),
                 Err(error) => strings::text(terminal_error(error)),
@@ -633,6 +757,7 @@ pub(super) fn build_terminal(
     {
         let state = state.clone();
         let view = view.clone();
+        let image_layer = image_layer.clone();
         let status = status.clone();
         let confirm_bar = confirm_bar.clone();
         confirm_button.connect_clicked(move |_| {
@@ -651,6 +776,9 @@ pub(super) fn build_terminal(
                 live.terminal_end(&machine, &session, request)
             });
             view.buffer().set_text("");
+            while let Some(child) = image_layer.first_child() {
+                image_layer.remove(&child);
+            }
             status.set_label(&strings::text(match result {
                 Some(Ok(true)) => strings::Message::TerminalEnded,
                 Some(Ok(false)) => strings::Message::RequestRefused,

@@ -17,31 +17,50 @@ public enum MilaRoute: Hashable, Sendable {
 }
 
 public enum MilaRouteParser {
+    ///
+    /// @cc [owner:ghuntley,label:security;navigation] mila-apple-route-boundary
+    /// A route entering Apple activation handling MUST match the bounded
+    /// canonical `overalls://<lowercase DNS host>/<navigation path>` form: no
+    /// controls, query/fragment, userinfo, port, percent encoding, or
+    /// non-canonical UUIDs may cross into navigation.
     public static func parse(_ value: String) -> MilaRoute? {
         let bytes = value.utf8
         guard !value.isEmpty, bytes.count <= 2048,
               !value.unicodeScalars.contains(where: { $0.value < 0x20 || $0.value == 0x7f }),
-              let url = URL(string: value), url.scheme == "overalls",
+              value.hasPrefix("overalls://"), let url = URL(string: value), url.scheme == "overalls",
               url.user == nil, url.port == nil, url.fragment == nil, url.query == nil,
               !value.contains("%") else { return nil }
+        let authority = value.dropFirst("overalls://".count).split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
         guard let host = url.host, !host.isEmpty, host.utf8.count <= 253,
-              !host.unicodeScalars.contains(where: { $0.value < 0x21 || $0.value == 0x7f }) else { return nil }
+              authority == Optional(host),
+              validHost(host),
+              url.path != "/", !url.path.hasSuffix("/"), !url.path.contains("//") else { return nil }
         let parts = url.pathComponents.filter { $0 != "/" }
         guard let page = parts.first else { return nil }
         let tail = Array(parts.dropFirst())
-        switch page.lowercased() {
+        switch page {
         case "machines":
             guard let id = tail.first else { return tail.isEmpty ? .machines : nil }
-            guard tail.count == 1, let uuid = UUID(uuidString: id) else { return nil }
+            guard tail.count == 1, let uuid = UUID(uuidString: id), uuid.uuidString.lowercased() == id else { return nil }
             return .machine(id: uuid)
         case "threads":
             guard let id = tail.first else { return tail.isEmpty ? .threads : nil }
-            guard tail.count == 1, let uuid = UUID(uuidString: id) else { return nil }
+            guard tail.count == 1, let uuid = UUID(uuidString: id), uuid.uuidString.lowercased() == id else { return nil }
             return .thread(id: uuid)
         case "settings":
             return tail.isEmpty ? .settings : nil
         default:
             return nil
+        }
+    }
+
+    private static func validHost(_ host: String) -> Bool {
+        guard host == host.lowercased(), host.utf8.count <= 253 else { return false }
+        return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
+            label.count <= 63 && !label.isEmpty && !label.hasPrefix("-") && !label.hasSuffix("-") &&
+                label.unicodeScalars.allSatisfy { scalar in
+                    (97...122).contains(scalar.value) || (48...57).contains(scalar.value) || scalar.value == 45
+                }
         }
     }
 }
@@ -288,21 +307,50 @@ private enum MilaRustFFI {
     }
 }
 
+/// Retains caller-owned identities while a device mutation has an uncertain
+/// result. A definite success clears the key; sign-out clears the whole ledger.
+private final class MilaNotificationMutationLedger: @unchecked Sendable {
+    private let lock = NSLock()
+    private var pending: [String: UUID] = [:]
+
+    func request(for key: String) -> UUID {
+        lock.lock(); defer { lock.unlock() }
+        if let value = pending[key] { return value }
+        let value = UUID()
+        pending[key] = value
+        return value
+    }
+
+    func settle(_ key: String, succeeded: Bool) {
+        guard succeeded else { return }
+        lock.lock(); pending.removeValue(forKey: key); lock.unlock()
+    }
+
+    func clear() {
+        lock.lock(); pending.removeAll(); lock.unlock()
+    }
+}
+
 /// Adapter for the stable C ABI exported by `mila-ffi`.
 /// The host must link the Rust library; no Rust-owned memory is retained by this value.
 public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     private let liveSession: (any MilaSessionClient)?
     private let ptySession: (any MilaPtySession)?
+    private let notificationMutationLedger: MilaNotificationMutationLedger
     /// The host of the deployment this session signed in to. Web routes are
     /// accepted only for it; an adapter without one opens no web endpoint.
     private let deploymentHost: String?
 
-    public init() { liveSession = nil; ptySession = nil; deploymentHost = nil }
+    public init() {
+        liveSession = nil; ptySession = nil; deploymentHost = nil
+        notificationMutationLedger = MilaNotificationMutationLedger()
+    }
 
     /// Creates an adapter backed by an authenticated Rust session. Trust is pinned deployment data.
     public init(trust: Data, host: String, port: UInt16, signer: MilaDeviceSigner) throws {
         let session = try MilaLiveSession(trust: trust, host: host, port: port, signer: signer)
         liveSession = session; ptySession = session; deploymentHost = host
+        notificationMutationLedger = MilaNotificationMutationLedger()
     }
 
     /// Wraps an existing authenticated session (production `MilaLiveSession`, or a
@@ -312,6 +360,7 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         liveSession = session
         ptySession = pty ?? (session as? any MilaPtySession)
         self.deploymentHost = deploymentHost
+        notificationMutationLedger = MilaNotificationMutationLedger()
     }
 
     /// Returns the authenticated PTY transport for a machine's terminal.
@@ -322,7 +371,7 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     }
 
     /// Closes the authenticated Rust session. Later calls fail as stale.
-    public func close() { liveSession?.close() }
+    public func close() { notificationMutationLedger.clear(); liveSession?.close() }
 
     public func call(_ request: MilaFFIRequest) async throws -> MilaFFIResponse {
         guard abiCompatible() else { throw MilaFFIError.incompatibleABI }
@@ -475,22 +524,44 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         return try Self.decodeNotificationDevices(data)
     }
 
-    public func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {
+    public func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID = UUID()) async throws -> UUID {
         guard let liveSession else { throw MilaFFIError.unavailable }
         let receipt: Data
-        do { receipt = try liveSession.notificationDeviceRegister(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now) }
+        do { receipt = try liveSession.notificationDeviceRegister(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now, requestID: requestID) }
         catch { throw MilaFFIError.unavailable }
         do { return try MilaPorscheEnvelope<MilaDeviceReceipt>.decode(receipt).id } catch { throw MilaFFIError.unavailable }
     }
 
-    public func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws {
+    public func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool, requestID: UUID) async throws {
         guard let liveSession else { throw MilaFFIError.unavailable }
-        do { try liveSession.notificationDevicePreferences(id: id, enabled: enabled) } catch { throw MilaFFIError.unavailable }
+        do { try liveSession.notificationDevicePreferences(id: id, enabled: enabled, requestID: requestID) } catch { throw MilaFFIError.unavailable }
+    }
+
+    public func removeNotificationDevice(_ id: UUID, requestID: UUID) async throws {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        do { try liveSession.notificationDeviceRemove(id: id, requestID: requestID) } catch { throw MilaFFIError.unavailable }
+    }
+
+    public func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws {
+        let key = "device-prefs|\(id.uuidString.lowercased())|\(enabled)"
+        let requestID = notificationMutationLedger.request(for: key)
+        do {
+            try await setNotificationDeviceEnabled(id, enabled: enabled, requestID: requestID)
+            notificationMutationLedger.settle(key, succeeded: true)
+        } catch {
+            throw error
+        }
     }
 
     public func removeNotificationDevice(_ id: UUID) async throws {
-        guard let liveSession else { throw MilaFFIError.unavailable }
-        do { try liveSession.notificationDeviceRemove(id: id) } catch { throw MilaFFIError.unavailable }
+        let key = "device-remove|\(id.uuidString.lowercased())"
+        let requestID = notificationMutationLedger.request(for: key)
+        do {
+            try await removeNotificationDevice(id, requestID: requestID)
+            notificationMutationLedger.settle(key, succeeded: true)
+        } catch {
+            throw error
+        }
     }
 
     public func lastRefusal() -> String? { liveSession?.lastRefusal() }
@@ -522,6 +593,38 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
             return MilaMachinePresentation(machine: machine, actions: try machineActions(data, host: host, port: port, index: UInt32(index)))
         }
         return MilaValidatedSnapshot(machines: projected, metadata: metadata)
+    }
+
+    /// A cached projection carries no current read, write or lifecycle authority.
+    public func projectOfflineSnapshot(_ data: Data, host: String, port: UInt16) throws -> MilaValidatedSnapshot {
+        let metadata = try validateSnapshot(data, host: host, port: port)
+        let machines = try decodeSnapshot(data, host: host, port: port).map { row in
+            try validateMachineDisplay(row)
+            let cached = MilaSnapshotMachine(id: row.id, name: row.name, desiredState: row.desiredState,
+                observedState: row.observedState, pinned: row.pinned, owner: row.owner,
+                read: false, write: false, manage: false, actionBits: nil)
+            return MilaMachinePresentation(machine: cached, actions: MilaMachineActions(bits: 0))
+        }
+        return MilaValidatedSnapshot(machines: machines, metadata: metadata)
+    }
+
+    public func watchOpen(machines: [UUID], threads: [UUID]) async throws -> UInt64 {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        return try await Task.detached { try liveSession.watchOpen(machines: machines, threads: threads) }.value
+    }
+    public func watchRead(_ handle: UInt64) async throws -> MilaWatchRead {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        return try await Task.detached { try liveSession.watchRead(handle) }.value
+    }
+    public func watchReconnect(_ handle: UInt64) async throws -> UInt64 {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        return try await Task.detached { try liveSession.watchReconnect(handle) }.value
+    }
+    public func watchClose(_ handle: UInt64) { liveSession?.watchClose(handle) }
+
+    public func snapshotData(savedAt: UInt64) async throws -> Data {
+        guard let liveSession else { throw MilaFFIError.unavailable }
+        return try liveSession.snapshot(savedAt: savedAt)
     }
 
     public func listSSHKeys() async throws -> [MilaSSHKey] {
@@ -557,12 +660,13 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
         catch { throw MilaFFIError.unavailable }
     }
 
-    /// Projects the Rust live listing (`{"machines":[...],"has_more":bool}` with
-    /// per-row `action_bits`) into presentation records.
+    /// @cc [owner:ghuntley,label:protocol] apple-machine-listing-row-bound
+    /// The live listing projection MUST accept up to Rust's 500 accumulated
+    /// machine rows and MUST refuse larger listings before projecting records.
     static func projectListing(_ data: Data) throws -> MilaValidatedSnapshot {
         let decoder = JSONDecoder()
         let envelope = try decoder.decode(MilaSnapshotEnvelope.self, from: data)
-        guard envelope.machines.count <= 256 else { throw MilaFFIError.outputTooSmall }
+        guard envelope.machines.count <= 500 else { throw MilaFFIError.outputTooSmall }
         let metadata = MilaSnapshotMetadata(machineCount: UInt32(envelope.machines.count), savedAt: 0, hasMore: envelope.hasMore)
         let machines = try envelope.machines.enumerated().map { index, machine in
             _ = index
@@ -602,13 +706,25 @@ public struct LinkedMilaFFIAdapter: MilaFFIAdapter, Sendable {
     }
 
     public func resize(machine: MilaMachinePresentation, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws {
-        guard requestID != UUID.zero, machine.machine.write, (1...256).contains(cpu), (256...4_194_304).contains(memory), (1...16_777_216).contains(disk), let liveSession else { throw MilaFFIError.unavailable }
+        guard requestID != UUID.zero, machine.machine.write, (1...256).contains(cpu), (256...4_194_304).contains(memory), (1...500).contains(disk), let liveSession else { throw MilaFFIError.unavailable }
         do { try liveSession.machineResize(machine: machine.id, cpu: cpu, memory: memory, disk: disk, requestID: requestID) }
         catch { throw MilaFFIError.unavailable }
     }
 
+    public func cloneMachine(machine: UUID, name: String, requestID: UUID) async throws {
+        guard requestID != UUID.zero, let liveSession else { throw MilaFFIError.unavailable }
+        try liveSession.machineClone(machine: machine, name: name, requestID: requestID)
+    }
+
     public func createMachine(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws {
-        guard requestID != UUID.zero, let liveSession, !name.isEmpty, name.utf8.count <= 128, cpu > 0, memory > 0, disk > 0 else { throw MilaFFIError.unavailable }
+        guard requestID != UUID.zero, let liveSession,
+              (1...128).contains(name.utf8.count),
+              name.utf8.allSatisfy({ byte in
+                  (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) ||
+                  (byte >= 48 && byte <= 57) || byte == 45 || byte == 95
+              }),
+              (1...256).contains(cpu), (256...4_194_304).contains(memory),
+              (1...500).contains(disk) else { throw MilaFFIError.unavailable }
         do { try liveSession.machineCreate(name: name, cpu: cpu, memory: memory, disk: disk, requestID: requestID) }
         catch { throw MilaFFIError.unavailable }
     }
@@ -740,6 +856,11 @@ public protocol MilaFFIAdapter: Sendable {
     func call(_ request: MilaFFIRequest) async throws -> MilaFFIResponse
     func refreshSnapshot() async throws -> MilaValidatedSnapshot
     func loadMoreSnapshot() async throws -> MilaValidatedSnapshot
+    func snapshotData(savedAt: UInt64) async throws -> Data
+    func watchOpen(machines: [UUID], threads: [UUID]) async throws -> UInt64
+    func watchRead(_ handle: UInt64) async throws -> MilaWatchRead
+    func watchReconnect(_ handle: UInt64) async throws -> UInt64
+    func watchClose(_ handle: UInt64)
     /// Ends the authenticated session owned by this adapter, if any.
     func close()
     func checkApproval() async throws -> Data
@@ -747,6 +868,7 @@ public protocol MilaFFIAdapter: Sendable {
     func revokeSSHKey(_ key: MilaSSHKey, requestID: UUID) async throws
     func submit(_ action: MilaMachineAction, machine: MilaMachinePresentation, requestID: UUID) async throws
     func resize(machine: MilaMachinePresentation, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws
+    func cloneMachine(machine: UUID, name: String, requestID: UUID) async throws
     func createMachine(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws
     func submitShare(_ principal: MilaSharePrincipal, role: MilaShareRole?, machine: MilaMachinePresentation, remove: Bool, requestID: UUID) async throws
     func webEndpointProjection(machine: UUID) async throws -> MilaWebEndpointProjection
@@ -759,21 +881,30 @@ public protocol MilaFFIAdapter: Sendable {
     func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws
     func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data
     func notificationDevices() async throws -> [MilaAccountNotificationDevice]
-    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID
+    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID) async throws -> UUID
     func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws
     func removeNotificationDevice(_ id: UUID) async throws
+    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool, requestID: UUID) async throws
+    func removeNotificationDevice(_ id: UUID, requestID: UUID) async throws
     func lastRefusal() -> String?
 }
 
 public extension MilaFFIAdapter {
+    func watchOpen(machines: [UUID], threads: [UUID]) async throws -> UInt64 { _ = machines; _ = threads; throw MilaFFIError.unavailable }
+    func watchRead(_ handle: UInt64) async throws -> MilaWatchRead { _ = handle; throw MilaFFIError.unavailable }
+    func watchReconnect(_ handle: UInt64) async throws -> UInt64 { _ = handle; throw MilaFFIError.unavailable }
+    func watchClose(_ handle: UInt64) { _ = handle }
+
     func checkApproval() async throws -> Data { throw MilaFFIError.unavailable }
     func listSSHKeys() async throws -> [MilaSSHKey] { throw MilaFFIError.unavailable }
     func revokeSSHKey(_ key: MilaSSHKey, requestID: UUID) async throws { _ = key; _ = requestID; throw MilaFFIError.unavailable }
     func refreshSnapshot() async throws -> MilaValidatedSnapshot { throw MilaFFIError.unavailable }
     func loadMoreSnapshot() async throws -> MilaValidatedSnapshot { throw MilaFFIError.unavailable }
+    func snapshotData(savedAt: UInt64) async throws -> Data { _ = savedAt; throw MilaFFIError.unavailable }
     func close() {}
     func submit(_ action: MilaMachineAction, machine: MilaMachinePresentation, requestID: UUID) async throws { throw MilaFFIError.unavailable }
     func resize(machine: MilaMachinePresentation, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws { throw MilaFFIError.unavailable }
+    func cloneMachine(machine: UUID, name: String, requestID: UUID) async throws { throw MilaFFIError.unavailable }
     func createMachine(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) async throws { throw MilaFFIError.unavailable }
     func submitShare(_ principal: MilaSharePrincipal, role: MilaShareRole?, machine: MilaMachinePresentation, remove: Bool, requestID: UUID) async throws { _ = principal; _ = role; _ = machine; _ = remove; _ = requestID; throw MilaMachineSharingError.unavailable }
     func webEndpointProjection(machine: UUID) async throws -> MilaWebEndpointProjection { _ = machine; throw MilaFFIError.unavailable }
@@ -789,11 +920,16 @@ public extension MilaFFIAdapter {
     func validatePushRegistration(provider: UInt8, environment: UInt8, token: String, appID: String, deployment: String, endpoint: String?) throws { throw MilaFFIError.unavailable }
     func encodePushKeyRequest(token: String, environment: MilaPushEnvironment, appID: String, deployment: String) throws -> Data { _ = token; _ = environment; _ = appID; _ = deployment; throw MilaFFIError.unavailable }
     func notificationDevices() async throws -> [MilaAccountNotificationDevice] { throw MilaFFIError.unavailable }
-    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {
-        _ = platform; _ = susanReply; _ = encryptionPublicKey; _ = label; _ = now; throw MilaFFIError.unavailable
+    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID) async throws -> UUID {
+        _ = platform; _ = susanReply; _ = encryptionPublicKey; _ = label; _ = now; _ = requestID; throw MilaFFIError.unavailable
     }
-    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws { _ = id; _ = enabled; throw MilaFFIError.unavailable }
-    func removeNotificationDevice(_ id: UUID) async throws { _ = id; throw MilaFFIError.unavailable }
+    func registerNotificationDevice(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) async throws -> UUID {
+        try await registerNotificationDevice(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now, requestID: UUID())
+    }
+    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool, requestID: UUID) async throws { _ = id; _ = enabled; _ = requestID; throw MilaFFIError.unavailable }
+    func removeNotificationDevice(_ id: UUID, requestID: UUID) async throws { _ = id; _ = requestID; throw MilaFFIError.unavailable }
+    func setNotificationDeviceEnabled(_ id: UUID, enabled: Bool) async throws { try await setNotificationDeviceEnabled(id, enabled: enabled, requestID: UUID()) }
+    func removeNotificationDevice(_ id: UUID) async throws { try await removeNotificationDevice(id, requestID: UUID()) }
     func lastRefusal() -> String? { nil }
 }
 

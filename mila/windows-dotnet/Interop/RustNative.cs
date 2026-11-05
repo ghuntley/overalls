@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Collections.Concurrent;
 
 namespace Mila.Windows.Interop;
 
@@ -21,14 +22,14 @@ internal static class MilaRouteParser
 {
     internal static MilaRoute? Parse(string value)
     {
-        if (value.Length is 0 or > 4096 || value.Any(char.IsControl) || value.Contains(' ') ||
+        if (value.Length is 0 or > 2048 || value.Any(char.IsControl) || value.Contains(' ') ||
             !value.StartsWith("overalls://", StringComparison.Ordinal) ||
             !Uri.TryCreate(value, UriKind.Absolute, out Uri? uri) || uri.Scheme != "overalls" ||
             !string.IsNullOrEmpty(uri.Query) || !string.IsNullOrEmpty(uri.Fragment) ||
             !string.IsNullOrEmpty(uri.UserInfo) || uri.Port != -1) return null;
         string authority = value["overalls://".Length..].Split('/', 2)[0];
         string host = uri.Host;
-        if (host.Length == 0 || host != host.ToLowerInvariant() || host.Contains('%')) return null;
+        if (!IsCanonicalHost(host) || host.Contains('%')) return null;
         if (authority != host) return null;
         string remainder = value["overalls://".Length..];
         int slash = remainder.IndexOf('/');
@@ -52,6 +53,12 @@ internal static class MilaRouteParser
             _ => null,
         };
     }
+
+    private static bool IsCanonicalHost(string host) =>
+        host.Length is > 0 and <= 253 && host == host.ToLowerInvariant() &&
+        host.Split('.').All(label => label.Length is > 0 and <= 63 &&
+            label[0] != '-' && label[^1] != '-' &&
+            label.All(character => character is >= 'a' and <= 'z' or >= '0' and <= '9' or '-'));
 }
 
 /// <summary>
@@ -195,6 +202,8 @@ internal readonly record struct MilaNativePokeResult(MilaNativeStatus Status)
 /// </summary>
 internal static partial class RustNative
 {
+    private static readonly ConcurrentDictionary<string, string> PendingDeviceRequests = new(StringComparer.Ordinal);
+
     [UnmanagedFunctionPointer(CallingConvention.Cdecl)]
     internal delegate int MilaSignCallback(nuint context, IntPtr message, nuint messageLength, IntPtr signature);
 
@@ -461,6 +470,28 @@ internal static partial class RustNative
         finally { Marshal.FreeCoTaskMem(machine); Marshal.FreeCoTaskMem(operation); Marshal.FreeCoTaskMem(request); }
     }
 
+    /// <summary>
+    /// Submits a clone once with the caller-owned request identity. The managed
+    /// boundary applies the same closed machine-name grammar as Rust before
+    /// allocating native buffers.
+    /// </summary>
+    /// @cc [owner:ghuntley,label:protocol] windows-clone-input-bound
+    /// A clone name MUST contain one to 128 ASCII letters, digits, '-' or '_',
+    /// and the request id MUST be canonical before crossing the native ABI.
+    internal static MilaNativeSessionActionResult TrySessionMachineClone(ulong handle, Guid machine, string name, string requestId)
+    {
+        if (handle == 0 || machine == Guid.Empty || string.IsNullOrEmpty(name) || name.Length > 128 ||
+            !name.All(character => char.IsAsciiLetterOrDigit(character) || character is '-' or '_') ||
+            !IsCanonicalRequestId(requestId)) return new(MilaNativeStatus.InvalidRequest);
+        IntPtr machinePtr = Marshal.StringToCoTaskMemUTF8(machine.ToString("D"));
+        IntPtr namePtr = Marshal.StringToCoTaskMemUTF8(name), requestPtr = Marshal.StringToCoTaskMemUTF8(requestId);
+        try { return new((MilaNativeStatus)SessionMachineCloneNative(handle, machinePtr, 36, namePtr, (nuint)Encoding.UTF8.GetByteCount(name), requestPtr, (nuint)Encoding.UTF8.GetByteCount(requestId))); }
+        catch (DllNotFoundException) { return new(MilaNativeStatus.Unavailable); }
+        catch (EntryPointNotFoundException) { return new(MilaNativeStatus.Unavailable); }
+        catch (BadImageFormatException) { return new(MilaNativeStatus.Unavailable); }
+        finally { Marshal.FreeCoTaskMem(machinePtr); Marshal.FreeCoTaskMem(namePtr); Marshal.FreeCoTaskMem(requestPtr); }
+    }
+
     internal static MilaNativeSessionActionResult TrySessionMachineCreate(ulong handle, string name, uint cpu, ulong memory, ulong disk, string requestId)
     {
         if (handle == 0 || string.IsNullOrWhiteSpace(name) || name.Length > 128 || !name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_') ||
@@ -478,7 +509,7 @@ internal static partial class RustNative
         // the ABI so a signed-in UI cannot accidentally mutate an unspecified
         // resource when selection state is stale.
         if (handle == 0 || machineId == Guid.Empty || cpu is < 1 or > 256 || memory is < 256 or > 4_194_304 ||
-            disk is < 1 or > 16_777_216 || !IsCanonicalRequestId(requestId))
+            disk is < 1 or > 500 || !IsCanonicalRequestId(requestId))
             return new(MilaNativeStatus.InvalidRequest);
         string machine = machineId.ToString("D");
         IntPtr machinePtr = Marshal.StringToCoTaskMemUTF8(machine);
@@ -557,29 +588,60 @@ internal static partial class RustNative
 
     internal static MilaNativeSessionActionResult TrySessionDeviceRemove(ulong handle, string deviceId)
     {
-        if (handle == 0 || string.IsNullOrWhiteSpace(deviceId) || deviceId.Length > 128) return new(MilaNativeStatus.InvalidRequest);
+        string key = $"{handle}|remove|{deviceId}";
+        string request = PendingDeviceRequests.GetOrAdd(key, _ => "porsche-" + Guid.NewGuid().ToString("N"));
+        MilaNativeSessionActionResult result = TrySessionDeviceRemove(handle, deviceId, request);
+        if (result.Succeeded) PendingDeviceRequests.TryRemove(key, out _);
+        return result;
+    }
+
+    /// @cc [owner:ghuntley,label:security;protocol] windows-device-id-bound
+    /// Notification device identifiers MUST be canonical lowercase UUIDs before crossing the
+    /// native ABI; Rust's device commands reject any other representation.
+    internal static MilaNativeSessionActionResult TrySessionDeviceRemove(ulong handle, string deviceId, string requestId)
+    {
+        if (handle == 0 || !IsCanonicalIdentifier(deviceId) || !IsCanonicalRequestId(requestId)) return new(MilaNativeStatus.InvalidRequest);
         IntPtr id = Marshal.StringToCoTaskMemUTF8(deviceId);
-        try { return new((MilaNativeStatus)SessionDeviceRemoveNative(handle, id, (nuint)Encoding.UTF8.GetByteCount(deviceId))); }
+        IntPtr request = Marshal.StringToCoTaskMemUTF8(requestId);
+        try { return new((MilaNativeStatus)SessionDeviceRemoveWithRequestNative(handle, id, (nuint)Encoding.UTF8.GetByteCount(deviceId), request, (nuint)Encoding.UTF8.GetByteCount(requestId))); }
         catch (DllNotFoundException) { return new(MilaNativeStatus.Unavailable); }
         catch (EntryPointNotFoundException) { return new(MilaNativeStatus.Unavailable); }
-        finally { Marshal.FreeCoTaskMem(id); }
+        finally { Marshal.FreeCoTaskMem(id); Marshal.FreeCoTaskMem(request); }
     }
 
     internal static MilaNativeSessionActionResult TrySessionDevicePreferences(ulong handle, string deviceId, bool enabled)
     {
-        if (handle == 0 || string.IsNullOrWhiteSpace(deviceId) || deviceId.Length > 128) return new(MilaNativeStatus.InvalidRequest);
+        string key = $"{handle}|prefs|{deviceId}|{enabled}";
+        string request = PendingDeviceRequests.GetOrAdd(key, _ => "porsche-" + Guid.NewGuid().ToString("N"));
+        MilaNativeSessionActionResult result = TrySessionDevicePreferences(handle, deviceId, enabled, request);
+        if (result.Succeeded) PendingDeviceRequests.TryRemove(key, out _);
+        return result;
+    }
+
+    internal static MilaNativeSessionActionResult TrySessionDevicePreferences(ulong handle, string deviceId, bool enabled, string requestId)
+    {
+        if (handle == 0 || !IsCanonicalIdentifier(deviceId) || !IsCanonicalRequestId(requestId)) return new(MilaNativeStatus.InvalidRequest);
         IntPtr id = Marshal.StringToCoTaskMemUTF8(deviceId);
-        try { return new((MilaNativeStatus)SessionDevicePreferencesNative(handle, id, (nuint)Encoding.UTF8.GetByteCount(deviceId), enabled ? (byte)1 : (byte)0)); }
+        IntPtr request = Marshal.StringToCoTaskMemUTF8(requestId);
+        try { return new((MilaNativeStatus)SessionDevicePreferencesWithRequestNative(handle, id, (nuint)Encoding.UTF8.GetByteCount(deviceId), enabled ? (byte)1 : (byte)0, request, (nuint)Encoding.UTF8.GetByteCount(requestId))); }
         catch (DllNotFoundException) { return new(MilaNativeStatus.Unavailable); }
         catch (EntryPointNotFoundException) { return new(MilaNativeStatus.Unavailable); }
-        finally { Marshal.FreeCoTaskMem(id); }
+        finally { Marshal.FreeCoTaskMem(id); Marshal.FreeCoTaskMem(request); }
     }
 
     /// <summary>Copies the bounded machine listing from an authenticated Rust session.</summary>
     internal static MilaNativeSessionBytesResult TrySessionListing(ulong handle)
     {
         if (handle == 0) return new(MilaNativeStatus.InvalidRequest, null);
-        return TrySessionBytes((bytes, capacity, written) => SessionListingNative(handle, bytes, capacity, written));
+        return TrySessionProjectionBytesOnce((bytes, capacity, written) => SessionListingNative(handle, bytes, capacity, written),
+            MilaSessionListing.MaxBytes);
+    }
+
+    /// <summary>Exports only a complete, validated machine listing for offline use.</summary>
+    internal static MilaNativeSessionBytesResult TrySessionSnapshot(ulong handle, ulong savedAt)
+    {
+        if (handle == 0) return new(MilaNativeStatus.InvalidRequest, null);
+        return TrySessionProjectionBytesOnce((bytes, capacity, written) => SessionSnapshotNative(handle, savedAt, bytes, capacity, written), 1 << 20);
     }
 
     /// <summary>Executes one authenticated, bounded thread operation in Rust.</summary>
@@ -641,6 +703,10 @@ internal static partial class RustNative
         value is { Length: 40 } && value.StartsWith("porsche-", StringComparison.Ordinal) &&
         value[8..].All(character => character is >= '0' and <= '9' or >= 'a' and <= 'f');
 
+    private static bool IsCanonicalIdentifier(string? value) =>
+        value is { Length: 36 } && Guid.TryParseExact(value, "D", out Guid parsed) &&
+        parsed != Guid.Empty && parsed.ToString("D") == value;
+
     private static MilaNativeSessionBytesResult TrySessionBytes(
         Func<IntPtr, nuint, IntPtr, MilaNativeStatus> call)
     {
@@ -674,7 +740,16 @@ internal static partial class RustNative
     internal static MilaNativeStatus TrySessionClose(ulong handle)
     {
         if (handle == 0) return MilaNativeStatus.InvalidRequest;
-        try { return (MilaNativeStatus)SessionCloseNative(handle); }
+        try
+        {
+            MilaNativeStatus status = (MilaNativeStatus)SessionCloseNative(handle);
+            if (status != MilaNativeStatus.Transport && status != MilaNativeStatus.Internal && status != MilaNativeStatus.Busy)
+            {
+                foreach (string key in PendingDeviceRequests.Keys.Where(key => key.StartsWith($"{handle}|", StringComparison.Ordinal)))
+                    PendingDeviceRequests.TryRemove(key, out _);
+            }
+            return status;
+        }
         catch (DllNotFoundException) { return MilaNativeStatus.Unavailable; }
         catch (EntryPointNotFoundException) { return MilaNativeStatus.Unavailable; }
         catch (BadImageFormatException) { return MilaNativeStatus.Unavailable; }
@@ -833,6 +908,10 @@ internal static partial class RustNative
     private static partial int SessionMachineActionNative(ulong handle, IntPtr machine, nuint machineLength,
         IntPtr action, nuint actionLength, IntPtr requestId, nuint requestIdLength);
 
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_machine_clone")]
+    private static partial int SessionMachineCloneNative(ulong handle, IntPtr machine, nuint machineLength,
+        IntPtr name, nuint nameLength, IntPtr requestId, nuint requestIdLength);
+
     [LibraryImport(LibraryName, EntryPoint = "mila_session_machine_create")]
     private static partial int SessionMachineCreateNative(ulong handle, IntPtr name, nuint nameLength, uint cpu, ulong memory, ulong disk, IntPtr requestId, nuint requestIdLength);
 
@@ -861,8 +940,18 @@ internal static partial class RustNative
     private static partial MilaNativeStatus SessionDevicesNative(ulong handle, IntPtr output, nuint capacity, IntPtr written);
     [LibraryImport(LibraryName, EntryPoint = "mila_session_device_rm")]
     private static partial MilaNativeStatus SessionDeviceRemoveNative(ulong handle, IntPtr device, nuint length);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_device_rm_with_request")]
+    private static partial MilaNativeStatus SessionDeviceRemoveWithRequestNative(ulong handle, IntPtr device, nuint length, IntPtr request, nuint requestLength);
     [LibraryImport(LibraryName, EntryPoint = "mila_session_device_prefs")]
     private static partial MilaNativeStatus SessionDevicePreferencesNative(ulong handle, IntPtr device, nuint length, byte enabled);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_device_prefs_with_request")]
+    private static partial MilaNativeStatus SessionDevicePreferencesWithRequestNative(ulong handle, IntPtr device, nuint length, byte enabled, IntPtr request, nuint requestLength);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_snapshot")]
+    private static partial MilaNativeStatus SessionSnapshotNative(
+        ulong handle, ulong savedAt, IntPtr output, nuint capacity, IntPtr written);
 
     [LibraryImport(LibraryName, EntryPoint = "mila_session_listing")]
     private static partial MilaNativeStatus SessionListingNative(

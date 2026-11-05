@@ -51,10 +51,13 @@ struct NativeState {
     browser: Rc<dyn ApprovalBrowser>,
     clock: Instant,
     sign_in_pumping: Rc<Cell<bool>>,
+    watch: Rc<RefCell<Option<mila_native_linux::session::WatchSubscription>>>,
     sign_in_render: RenderSlot,
     session: Rc<RefCell<SessionBinding>>,
     machine_listing: Rc<RefCell<Option<Vec<mila_native_linux::machine_view::MachineRow>>>>,
     deployment_store: Option<DeploymentStore>,
+    snapshots: Option<Rc<mila_native_linux::snapshots::SnapshotCache>>,
+    snapshot_generation: Rc<Cell<u64>>,
     terminal: Rc<RefCell<Option<views::GtkTerminal>>>,
     terminal_polling: Rc<Cell<bool>>,
     ssh_keys: Rc<RefCell<SshKeysView>>,
@@ -89,10 +92,13 @@ impl NativeState {
             browser,
             clock: Instant::now(),
             sign_in_pumping: Rc::new(Cell::new(false)),
+            watch: Rc::new(RefCell::new(None)),
             sign_in_render: Rc::new(RefCell::new(None)),
             session: Rc::new(RefCell::new(SessionBinding::default())),
             machine_listing: Rc::new(RefCell::new(None)),
             deployment_store: DeploymentStore::from_environment(),
+            snapshots: mila_native_linux::snapshots::SnapshotCache::from_environment().map(Rc::new),
+            snapshot_generation: Rc::new(Cell::new(0)),
             terminal: Rc::new(RefCell::new(None)),
             terminal_polling: Rc::new(Cell::new(false)),
             ssh_keys: Rc::new(RefCell::new(SshKeysView::default())),
@@ -163,6 +169,65 @@ impl NativeState {
             .map_or(Ok(DeploymentList::default()), DeploymentStore::load)
     }
 
+    fn snapshot_target(&self) -> Option<(String, u16)> {
+        let selected = self.deployment_list().ok()?.selected()?.clone();
+        let profiles = ConnectionProfiles::default_path()
+            .map_or_else(
+                || Ok(ConnectionProfiles::default()),
+                |path| ConnectionProfiles::load(&path),
+            )
+            .ok()?;
+        let target = profiles.resolve(&selected).ok()?;
+        Some((target.host().to_owned(), target.ssh_port()))
+    }
+
+    fn bind_snapshots(&self) {
+        if let Some(cache) = &self.snapshots {
+            let target = self.snapshot_target();
+            self.snapshot_generation
+                .set(cache.bind(target.as_ref().map(|(host, port)| (host.as_str(), *port))));
+        }
+    }
+
+    fn offline_machine_rows(&self) -> Option<Vec<mila_native_linux::machine_view::MachineRow>> {
+        let (host, port) = self.snapshot_target()?;
+        self.snapshots.as_ref()?.load(&host, port).ok().flatten()
+    }
+
+    fn save_machine_snapshot(&self, live: &LiveSession) {
+        let Some((host, port)) = self.snapshot_target() else {
+            return;
+        };
+        let Some(cache) = &self.snapshots else {
+            return;
+        };
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()
+            .and_then(|time| u64::try_from(time.as_millis()).ok())
+            .unwrap_or(0);
+        if let Ok(bytes) = live.snapshot(now) {
+            let _ = cache.save(&bytes, &host, port, self.snapshot_generation.get());
+        }
+    }
+
+    fn forget_snapshot(&self, authority: &str) {
+        let Ok(deployment) = mila_native_linux::deployments::DeploymentHost::parse(authority)
+        else {
+            return;
+        };
+        let profiles = ConnectionProfiles::default_path().map_or_else(
+            || Ok(ConnectionProfiles::default()),
+            |path| ConnectionProfiles::load(&path),
+        );
+        if let (Some(cache), Ok(target)) = (
+            &self.snapshots,
+            profiles.and_then(|profiles| profiles.resolve(&deployment)),
+        ) {
+            let _ = cache.forget(target.host(), target.ssh_port());
+        }
+    }
+
     fn update_deployments<R>(
         &self,
         change: impl FnOnce(&mut DeploymentList) -> Result<R, DeploymentError>,
@@ -190,6 +255,8 @@ impl NativeState {
     /// Releases the bound session and everything projected from it, without
     /// ending the sign-in generation (a reconnect may follow).
     fn release_session(&self) {
+        self.watch.borrow_mut().take();
+        self.bind_snapshots();
         if let Some(surface) = self.terminal.borrow_mut().as_mut() {
             surface.sign_out();
         }
@@ -282,6 +349,8 @@ impl NativeState {
         for event in events {
             match event {
                 DriverEvent::Established { session, .. } => {
+                    self.bind_snapshots();
+                    *self.watch.borrow_mut() = session.subscribe().ok();
                     self.session.borrow_mut().bind(session);
                     {
                         let mut keys = self.ssh_keys.borrow_mut();
@@ -295,6 +364,23 @@ impl NativeState {
                 }
                 DriverEvent::Lost => self.release_session(),
             }
+        }
+        let hint = self
+            .watch
+            .borrow()
+            .as_ref()
+            .and_then(mila_native_linux::session::WatchSubscription::poll);
+        match hint {
+            Some(mila_native_linux::session::WatchHint::Refresh) => {
+                for render in self.rerender.borrow().iter() {
+                    render();
+                }
+            }
+            Some(
+                mila_native_linux::session::WatchHint::AuthorityLost
+                | mila_native_linux::session::WatchHint::TransportLost,
+            ) => self.session_lost(),
+            None => {}
         }
         let after = {
             let flow = self.driver.borrow();
@@ -521,7 +607,7 @@ impl NativeState {
         settings_page.append(&lock_button);
         // Linux can show local desktop notifications through the desktop
         // environment, while Susan push registration remains unavailable.
-        let notification_state = Rc::new(RefCell::new(NotificationState::desktop()));
+        let notification_state = Rc::new(RefCell::new(NotificationState::load_persisted()));
         let notification_button =
             Button::with_label(&strings::text(strings::Message::NotificationsTitle));
         let notification_status = content.clone();
@@ -529,7 +615,11 @@ impl NativeState {
         notification_button.connect_clicked(move |_| {
             let mut state = notification_state_for_action.borrow_mut();
             match state.enable() {
-                Ok(()) => notification_status.set_label("Notifications enabled."),
+                Ok(()) => {
+                    let _ = state.persist();
+                    notification_status
+                        .set_label(&strings::text(strings::Message::NotificationAccepted));
+                }
                 Err(_) => notification_status
                     .set_label(&strings::text(strings::Message::NotificationsExplain)),
             }
@@ -539,6 +629,9 @@ impl NativeState {
             .placeholder_text(strings::text(strings::Message::NotificationDeviceId))
             .hexpand(true)
             .build();
+        let notification_rows = Label::new(None);
+        notification_rows.set_xalign(0.0);
+        notification_rows.set_widget_name("mila-notification-rows");
         let notification_actions = Box::new(Orientation::Horizontal, 8);
         for (message, operation) in [
             (strings::Message::NotificationRefresh, "list"),
@@ -550,17 +643,49 @@ impl NativeState {
             let status = content.clone();
             let state = self.clone();
             let device_id = notification_id.clone();
+            let local_state = notification_state.clone();
+            let rows = notification_rows.clone();
             button.connect_clicked(move |_| {
                 let device = device_id.text().trim().to_owned();
-                let result = state.with_live(|live| match operation {
-                    "list" => live.device_list().and_then(|bytes| {
-                        decode_notification_devices(&bytes)
-                            .map(|_| ())
-                            .map_err(|_| SessionError::InvalidInput)
-                    }),
-                    "remove" => live.device_remove(&device),
-                    "enable" => live.device_preference(&device, true),
-                    "disable" => live.device_preference(&device, false),
+                if operation == "list" {
+                    let result = state.with_live(|live| {
+                        live.device_list().and_then(|bytes| {
+                            let devices = decode_notification_devices(&bytes)
+                                .map_err(|_| SessionError::InvalidInput)?;
+                            let ids = devices
+                                .iter()
+                                .map(|item| item.id.clone())
+                                .collect::<Vec<_>>();
+                            let encoded =
+                                serde_json::to_vec(&ids).map_err(|_| SessionError::InvalidInput)?;
+                            let mut local = local_state.borrow_mut();
+                            local
+                                .load_devices(&encoded)
+                                .map_err(|_| SessionError::InvalidInput)?;
+                            let _ = local.persist();
+                            let rendered = local.devices().join(", ");
+                            let rendered = if rendered.is_empty() {
+                                strings::text(strings::Message::NotificationRejected)
+                            } else {
+                                rendered
+                            };
+                            rows.set_label(&rendered);
+                            status
+                                .set_label(&strings::text(strings::Message::NotificationAccepted));
+                            Ok(())
+                        })
+                    });
+                    if result.is_none() {
+                        status
+                            .set_label(&strings::text(strings::Message::NotificationRequireSignIn));
+                    }
+                    return;
+                }
+                let key = format!("notification-device|{operation}|{device}");
+                let result = state.mutate(&key, |live, request| match operation {
+                    "remove" => live.device_remove(&device, request),
+                    "enable" => live.device_preference(&device, true, request),
+                    "disable" => live.device_preference(&device, false, request),
                     _ => Err(SessionError::InvalidInput),
                 });
                 let Some(result) = result else {
@@ -573,12 +698,16 @@ impl NativeState {
                     strings::text(strings::Message::NotificationRejected)
                 };
                 status.set_label(&message);
+                if result.is_ok() {
+                    let _ = local_state.borrow().persist();
+                }
             });
             notification_actions.append(&button);
         }
         let notification_devices = Box::new(Orientation::Vertical, 6);
         notification_devices.set_widget_name(pages::NOTIFICATION_DEVICES);
         notification_devices.append(&notification_id);
+        notification_devices.append(&notification_rows);
         notification_devices.append(&notification_actions);
         settings_page.append(&notification_devices);
         let machine_id = pages::build_machines(self, &machines_page, &content);
@@ -995,6 +1124,7 @@ mod gtk_tests {
             strings::text(strings::Message::DeploymentForgotten)
         );
         sign_in_page_runs_the_live_driver(&directory);
+        pages::web_refresh_read_regressions();
         let _ = std::fs::remove_dir_all(&directory);
     }
 

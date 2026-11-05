@@ -7,6 +7,7 @@ mod lock;
 mod machine;
 mod mutation;
 mod push;
+mod screen;
 mod snapshot;
 mod terminal;
 
@@ -20,6 +21,7 @@ pub use push::{
     PokeEnvelope, ProviderToken, PushEnvironment, PushProvider, PushRegistration,
     PushRegistrationReply, PushRegistrationRequest,
 };
+pub use screen::*;
 pub use snapshot::{load_snapshot, save_snapshot_if_newer, MachineSnapshot, SnapshotStore};
 pub use terminal::*;
 

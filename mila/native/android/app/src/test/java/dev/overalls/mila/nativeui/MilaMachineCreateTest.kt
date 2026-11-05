@@ -60,10 +60,12 @@ class MilaMachineCreateTest {
     }
 
     @Test fun resizeBoundsMirrorSessionHandle() {
-        assertTrue(MilaMachineResizeRequest.parse(id, "1", "256", "65536").isSuccess)
+        assertTrue(MilaMachineResizeRequest.parse(id, "1", "256", "500").isSuccess)
+        assertTrue(MilaMachineResizeRequest.parse(id, "1", "4194304", "500").isSuccess)
         assertTrue(MilaMachineResizeRequest.parse(id, "1", "2", "3").isFailure)
         assertTrue(MilaMachineResizeRequest.parse(id, "1", "", "3").isFailure)
-        assertTrue(MilaMachineResizeRequest.parse(id, "1", "256", "65537").isFailure)
+        assertTrue(MilaMachineResizeRequest.parse(id, "1", "256", "501").isFailure)
+        assertTrue(MilaMachineResizeRequest.parse(id, "1", "4194305", "500").isFailure)
         assertTrue(MilaMachineResizeRequest.parse(UUID(0L, 0L), "1", "256", "1").isFailure)
     }
 

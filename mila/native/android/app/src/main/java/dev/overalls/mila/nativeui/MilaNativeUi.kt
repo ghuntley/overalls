@@ -1,12 +1,16 @@
 package dev.overalls.mila.nativeui
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.absoluteOffset
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -23,10 +27,12 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import java.util.Locale
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.delay
@@ -113,14 +119,38 @@ fun MilaNativeRoot(
     val threadDetail = remember(sessionAdapter) { MilaThreadDetailController(sessionAdapter) }
     val machineForm = remember(sessionAdapter) { MilaMachineFormController(sessionAdapter) }
     var signInState by remember { mutableStateOf<MilaSignInState>(MilaSignInState.SignedOut) }
+    // Rebinding can finish before Compose observes Connecting, so a Boolean alone cannot
+    // identify the lifetime of the terminal's authenticated controller and display buffers.
+    var terminalSessionGeneration by remember { mutableStateOf(0L) }
+    val snapshots = remember(context) { MilaSnapshotStore(java.io.File(context.filesDir, "snapshots")) }
+    var snapshotGeneration by remember { mutableStateOf(snapshots.bind(selectedDeployment)) }
+    var offlineSnapshot by remember { mutableStateOf<Pair<MilaDeployment, MilaSessionListing>?>(null) }
+    LaunchedEffect(selectedDeployment) {
+        snapshotGeneration = snapshots.bind(selectedDeployment)
+        offlineSnapshot = selectedDeployment?.let { selected ->
+            runCatching { snapshots.load(selected) }.getOrNull()?.let { selected to it.copy(hasMore = false) }
+        }
+    }
+
     // A listing re-read on the same authenticated session after a mutation. It is discarded on
     // every sign-in transition so a previous session's machines never stay actionable.
     var refreshedListing by remember { mutableStateOf<MilaSessionListing?>(null) }
     LaunchedEffect(signInState) {
         refreshedListing = null
+        snapshotGeneration = snapshots.bind(selectedDeployment)
         when (val current = signInState) {
-            is MilaSignInState.SignedIn -> onAuthenticatedRoute?.invoke(current.deployment)
-            else -> onSessionEnded?.invoke()
+            is MilaSignInState.SignedIn -> {
+                onAuthenticatedRoute?.invoke(current.deployment)
+                sessionAdapter.snapshotData().onSuccess { bytes ->
+                    runCatching { snapshots.save(bytes, current.deployment, snapshotGeneration) }
+                }
+            }
+            else -> {
+                onSessionEnded?.invoke()
+                offlineSnapshot = selectedDeployment?.let { selected ->
+                    runCatching { snapshots.load(selected) }.getOrNull()?.let { selected to it.copy(hasMore = false) }
+                }
+            }
         }
     }
     var threadListing by remember { mutableStateOf<MilaThreadListing?>(null) }
@@ -128,6 +158,7 @@ fun MilaNativeRoot(
     // machine/thread data from the previous host from remaining actionable while the user edits
     // or switches deployments.
     fun resetSessionForDeploymentChange() {
+        terminalSessionGeneration += 1
         signIn.close()
         signInState = MilaSignInState.SignedOut
         threadListing = null
@@ -139,13 +170,22 @@ fun MilaNativeRoot(
         val current = signInState
         if (current is MilaSignInState.SignedIn) {
             // Authenticated refresh re-reads through the bound Rust session only.
-            sessionAdapter.refreshListing().onSuccess { fresh -> if (signInState === current) refreshedListing = fresh }
+            val generation = snapshotGeneration
+            sessionAdapter.refreshListing().onSuccess { fresh ->
+                if (signInState === current) {
+                    refreshedListing = fresh
+                    sessionAdapter.snapshotData().onSuccess { bytes ->
+                        runCatching { snapshots.save(bytes, current.deployment, generation) }
+                    }
+                }
+            }
             return@launch
         }
         connection = MilaSessionConnection.Refreshing
         connection = MilaSessionRefresher.refresh(sessionAdapter)
     } }
     fun reconnect(selected: MilaDeployment) { scope.launch {
+        terminalSessionGeneration += 1
         signInState = MilaSignInState.Connecting(selected)
         sessionMaterialProvider.resolve(selected).fold(
             onSuccess = { material ->
@@ -162,7 +202,41 @@ fun MilaNativeRoot(
         is MilaSessionConnection.Failed -> MilaStrings.text(MilaMessage.RuntimeUnavailable)
     }
     val signedIn = signInState is MilaSignInState.SignedIn
-    val listing = (signInState as? MilaSignInState.SignedIn)?.let { refreshedListing ?: it.listing } ?: (connection as? MilaSessionConnection.Connected)?.listing
+    val offlineListing = offlineSnapshot?.takeIf { it.first == selectedDeployment }?.second
+    val listing = (signInState as? MilaSignInState.SignedIn)?.let { refreshedListing ?: it.listing }
+        ?: offlineListing ?: (connection as? MilaSessionConnection.Connected)?.listing
+    val listingStatus = if (!signedIn && offlineListing != null) MilaStrings.text(MilaMessage.MachinesOffline) else status
+    val watchSession = signInState as? MilaSignInState.SignedIn
+    val watchFilters = MilaWatchFilters.groups(if (signedIn) listing?.machines?.map { it.id }.orEmpty() else emptyList(), threadListing?.threads?.map { it.id }.orEmpty())
+    LaunchedEffect(watchSession, watchFilters) {
+        val current = watchSession ?: return@LaunchedEffect
+        kotlinx.coroutines.coroutineScope {
+            watchFilters.forEach { filters -> launch {
+                runMilaWatch(sessionAdapter, filters, onHint = {
+                    if (signInState === current) {
+                        val generation = snapshotGeneration
+                        sessionAdapter.refreshListing().onSuccess { fresh ->
+                            if (signInState === current) {
+                                refreshedListing = fresh
+                                sessionAdapter.snapshotData().onSuccess { bytes -> runCatching { snapshots.save(bytes, current.deployment, generation) } }
+                            }
+                        }
+                        val threads = sessionAdapter.threadListing().getOrNull()
+                        if (signInState === current && threads != null) threadListing = threads
+                    }
+                }, onAuthorityLost = {
+                    if (signInState === current) {
+                        terminalSessionGeneration += 1
+                        signIn.signOut()
+                        signInState = MilaSignInState.SignedOut
+                        threadListing = null
+                        connection = MilaSessionConnection.Idle
+                        route = MilaRoute.Machines
+                    }
+                })
+            } }
+        }
+    }
     machineDetail.setSession(signedIn, listing)
     threadDetail.setSession(signedIn, threadListing)
     machineForm.setSession(signedIn, (signInState as? MilaSignInState.SignedIn)?.let { listing })
@@ -175,9 +249,6 @@ fun MilaNativeRoot(
             else -> Unit
         }
     }
-    // The shell scrolls vertically: on a small screen (the 320x640 emulator profile) the routed
-    // page, such as a deep-linked machine's detail, sits below the deployment picker and would
-    // otherwise be laid out off-screen, unreachable by the user and absent from accessibility.
     Column(modifier = Modifier.verticalScroll(rememberScrollState()).padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(MilaStrings.text(MilaMessage.AppName), style = MaterialTheme.typography.headlineSmall)
         MilaDeploymentPicker(
@@ -215,6 +286,7 @@ fun MilaNativeRoot(
             onForget = { forgotten ->
                 if (deployment.remove(forgotten.host, forgotten.port)) {
                     deploymentStore.remove(forgotten)
+                    runCatching { snapshots.forget(forgotten) }
                     deploymentEntries = deployment.deployments
                     selectedDeployment = deployment.selected
                     hostInput = selectedDeployment?.label.orEmpty()
@@ -227,6 +299,7 @@ fun MilaNativeRoot(
             Button({
                 selectedDeployment?.let { selected ->
                     scope.launch {
+                        terminalSessionGeneration += 1
                         signInState = MilaSignInState.Connecting(selected)
                         sessionMaterialProvider.resolve(selected).fold(
                             onSuccess = { material ->
@@ -241,6 +314,7 @@ fun MilaNativeRoot(
                 }
             }, enabled = selectedDeployment != null) { Text(MilaStrings.text(MilaMessage.SignIn)) }
             Button({
+                terminalSessionGeneration += 1
                 signIn.signOut()
                 signInState = MilaSignInState.SignedOut
                 threadListing = null
@@ -276,8 +350,8 @@ fun MilaNativeRoot(
             Text(MilaStrings.text(MilaMessage.MachineNotFound), style = MaterialTheme.typography.bodyMedium)
         }
         when (val selected = route) {
-            MilaRoute.Machines -> MachineList(sessionAdapter, machineForm, status, listing, signedIn, ::refresh) { route = MilaRoute.Machine(it.id); machineDetail.select(it.id) }
-            is MilaRoute.Machine -> if (resolution != MilaRouteResolution.NotFound) MachineDetail(machineDetail, machineForm, selected.id, sessionAdapter, signedIn, listing, ::refresh)
+            MilaRoute.Machines -> MachineList(sessionAdapter, machineForm, listingStatus, listing, signedIn, ::refresh) { route = MilaRoute.Machine(it.id); machineDetail.select(it.id) }
+            is MilaRoute.Machine -> if (resolution != MilaRouteResolution.NotFound) MachineDetail(machineDetail, machineForm, selected.id, sessionAdapter, signedIn, listing, terminalSessionGeneration, ::refresh)
             MilaRoute.Threads -> ThreadList(sessionAdapter, signInState is MilaSignInState.SignedIn, threadListing, onRefresh = {
                 scope.launch { threadListing = sessionAdapter.threadListing().getOrNull() }
             }) { route = MilaRoute.Thread(it); threadDetail.select(it) }
@@ -290,6 +364,7 @@ fun MilaNativeRoot(
     LaunchedEffect(signIn) {
         val saved = selectedDeployment
         if (saved != null) {
+            terminalSessionGeneration += 1
             sessionMaterialProvider.resolve(saved).onSuccess { material ->
                 signIn.signIn(saved, material.config, material.signer)
                 signInState = signIn.state
@@ -440,22 +515,45 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
-@Composable private fun TerminalControls(adapter: MilaFfiAdapter, machineId: java.util.UUID, signedIn: Boolean) {
+/**
+ * @cc [owner:ghuntley,label:terminal] android-terminal-image-pixel-placement
+ * Rust image coordinates and dimensions MUST remain physical pixels at every
+ * display density; terminal coordinates MUST remain left-origin in RTL layouts.
+ */
+/**
+ * @cc [owner:ghuntley,label:security;terminal] android-terminal-display-generation
+ * The terminal controller and display buffers MUST follow the authenticated session generation,
+ * including replacements whose intermediate signed-out state is not rendered. Opening and
+ * reconnecting MUST clear old output, and every poll MUST project the controller's current frame.
+ */
+@Composable private fun TerminalControls(adapter: MilaFfiAdapter, machineId: java.util.UUID, signedIn: Boolean, sessionGeneration: Long) {
     val scope = rememberCoroutineScope()
-    val controller = remember(adapter, machineId) { MilaTerminalSessionController(adapter) }
+    val controller = remember(adapter, machineId, sessionGeneration) { MilaTerminalSessionController(adapter) }
     var state by remember(controller) { mutableStateOf(controller.state) }
-    var input by remember { mutableStateOf("") }
-    var output by remember { mutableStateOf("") }
+    var input by remember(controller) { mutableStateOf("") }
+    var output by remember(controller) { mutableStateOf("") }
+    var terminalFrame by remember(controller) { mutableStateOf<MilaTerminalFrame?>(null) }
     val renderer = remember(controller) { MilaTerminalRenderer() }
-    LaunchedEffect(signedIn) { controller.setSession(signedIn); state = controller.state }
-    LaunchedEffect(state) {
+    fun clearProjection() { renderer.clear(); output = ""; terminalFrame = null }
+    LaunchedEffect(controller, signedIn) {
+        clearProjection()
+        input = ""
+        controller.setSession(signedIn)
+        state = controller.state
+    }
+    LaunchedEffect(controller, state) {
         val live = state as? MilaTerminalSessionState.Live ?: return@LaunchedEffect
         while (controller.state == live) {
-            controller.poll()?.let { bytes -> renderer.append(bytes); output = renderer.text() }
+            val bytes = controller.poll()
+            terminalFrame = controller.frame
+            bytes?.let { chunk ->
+                if (terminalFrame == null) { renderer.append(chunk); output = renderer.text() }
+            }
+            state = controller.state
             delay(100)
         }
     }
-    DisposableEffect(controller) { onDispose { controller.detach() } }
+    DisposableEffect(controller) { onDispose { controller.setSession(false) } }
     fun run(step: suspend MilaTerminalSessionController.() -> Boolean) {
         scope.launch { controller.step(); state = controller.state }
     }
@@ -463,10 +561,10 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(MilaStrings.text(MilaMessage.Terminal), style = MaterialTheme.typography.titleMedium)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button({ renderer.clear(); output = ""; run { open(machineId, 80, 24) } }, enabled = signedIn && state !is MilaTerminalSessionState.Attaching) {
+            Button({ clearProjection(); run { open(machineId, 80, 24) } }, enabled = signedIn && state !is MilaTerminalSessionState.Attaching) {
                 Text(MilaStrings.text(MilaMessage.TerminalNew))
             }
-            Button({ run { reattach(80, 24) } }, enabled = state is MilaTerminalSessionState.Detached || (state as? MilaTerminalSessionState.Failed)?.session != null) {
+            Button({ clearProjection(); run { reattach(80, 24) } }, enabled = state is MilaTerminalSessionState.Detached || (state as? MilaTerminalSessionState.Failed)?.session != null) {
                 Text(MilaStrings.text(MilaMessage.TerminalReconnect))
             }
             Button({ val bytes = input.toByteArray(Charsets.UTF_8); run { send(bytes).also { if (it) input = "" } } }, enabled = live && input.isNotEmpty()) {
@@ -476,7 +574,23 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
             Button({ run { kill() } }, enabled = live || state is MilaTerminalSessionState.Detached) { Text(MilaStrings.text(MilaMessage.TerminalClose)) }
         }
         OutlinedTextField(value = input, onValueChange = { if (boundedTerminalInput(it)) input = it }, label = { Text(MilaStrings.text(MilaMessage.Input)) }, enabled = live)
-        Text(output, style = MaterialTheme.typography.bodySmall)
+        val images = terminalFrame?.images.orEmpty()
+        val density = LocalDensity.current
+        androidx.compose.foundation.layout.Box(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            androidx.compose.foundation.layout.Box(contentAlignment = androidx.compose.ui.AbsoluteAlignment.TopLeft, modifier = with(density) {
+                Modifier.sizeIn(minWidth = (images.maxOfOrNull { it.x + it.width } ?: 0).toDp(),
+                    minHeight = (images.maxOfOrNull { it.y + it.height } ?: 0).toDp())
+            }) {
+                Text(terminalFrame?.annotated() ?: androidx.compose.ui.text.AnnotatedString(output), style = MaterialTheme.typography.bodySmall.copy(fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace))
+                images.forEach { image ->
+                    val bitmap = remember(image) { image.bitmap() }
+                    Image(bitmap, contentDescription = null, modifier = with(density) {
+                        Modifier.absoluteOffset { IntOffset(image.x, image.y) }
+                            .size(image.width.toDp(), image.height.toDp())
+                    }, contentScale = androidx.compose.ui.layout.ContentScale.None)
+                }
+            }
+        }
         Text(
             when (val current = state) {
                 MilaTerminalSessionState.SignedOut -> MilaStrings.text(MilaMessage.TerminalSignedOut)
@@ -496,19 +610,24 @@ private fun MilaSshKeysPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
     }
 }
 
+/**
+ * @cc [owner:ghuntley,label:security] android-machine-actions-authenticated
+ * Machine action controls MUST be disabled while signed out or showing an
+ * offline snapshot; cached rows never grant mutation authority.
+ */
 @Composable private fun MachineList(adapter: MilaFfiAdapter, form: MilaMachineFormController, status: String, listing: MilaSessionListing?, signedIn: Boolean, onCreated: () -> Unit, onSelect: (MilaMachineRow) -> Unit) {
     var classified by remember { mutableStateOf<MilaMachineCommand?>(null) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         Text(status, style = MaterialTheme.typography.bodyMedium)
         listing?.machines?.forEach { machine ->
-            Button({ onSelect(machine) }) { Text("${machine.name} · ${machine.status}", style = MaterialTheme.typography.bodyMedium) }
+            Button({ onSelect(machine) }, enabled = signedIn) { Text("${machine.name} · ${machine.status}", style = MaterialTheme.typography.bodyMedium) }
         }
         if (signedIn) MachineCreateControls(form, onCreated)
         Text(MilaStrings.text(MilaMessage.MachineActions), style = MaterialTheme.typography.titleMedium)
         machineCommandChoices.chunked(3).forEach { row ->
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 row.forEach { choice ->
-                    Button({ classified = adapter.machineCommandKind(choice.command).getOrNull() }) {
+                    Button({ classified = adapter.machineCommandKind(choice.command).getOrNull() }, enabled = signedIn) {
                         Text(choice.label)
                     }
                 }
@@ -567,9 +686,13 @@ internal fun machineFormStatus(state: MilaMachineFormState, kind: MilaMachineFor
     is MilaMachineFormState.Failed -> if (state.kind == kind) MilaStrings.text(MilaMessage.RequestRefused) else null
 }
 
-@Composable private fun MachineDetail(controller: MilaMachineDetailController, form: MilaMachineFormController, id: java.util.UUID, adapter: MilaFfiAdapter, signedIn: Boolean, listing: MilaSessionListing?, onResized: () -> Unit) {
+@Composable private fun MachineDetail(controller: MilaMachineDetailController, form: MilaMachineFormController, id: java.util.UUID, adapter: MilaFfiAdapter, signedIn: Boolean, listing: MilaSessionListing?, terminalSessionGeneration: Long, onResized: () -> Unit) {
     val scope = rememberCoroutineScope()
     var state by remember { mutableStateOf(controller.state) }
+    var cloneName by remember(id) { mutableStateOf("") }
+    var cloneBusy by remember(id) { mutableStateOf(false) }
+    var cloneStatus by remember(id) { mutableStateOf("") }
+    val cloneRequest = remember(id, cloneName) { milaRequestId() }
     var resizeCpu by remember { mutableStateOf("2") }
     var resizeMemory by remember { mutableStateOf("1024") }
     var resizeDisk by remember { mutableStateOf("20") }
@@ -607,9 +730,20 @@ internal fun machineFormStatus(state: MilaMachineFormState, kind: MilaMachineFor
             }) { Text(MilaStrings.text(MilaMessage.Resize)) }
             machineFormStatus(resizeState, MilaMachineFormKind.Resize)?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
         }
+        OutlinedTextField(cloneName, { cloneName = it.take(128) }, label = { Text(MilaStrings.text(MilaMessage.MachineName)) }, enabled = !cloneBusy)
+        Button(enabled = signedIn && machine != null && !cloneBusy && cloneName.isNotBlank(), onClick = {
+            cloneBusy = true
+            scope.launch {
+                val result = adapter.machineClone(id, cloneName.trim(), cloneRequest)
+                cloneStatus = MilaStrings.text(if (result.isSuccess) MilaMessage.RequestSucceeded else MilaMessage.RequestRefused)
+                cloneBusy = false
+                if (result.isSuccess) onResized()
+            }
+        }) { Text(MilaStrings.text(MilaMessage.MachineClone)) }
+        Text(cloneStatus)
         MachineSharingControls(adapter, machine, signedIn, listing)
         if (machine != null) MilaWebControls(adapter, machine, signedIn)
-        if (machine != null && signedIn) TerminalControls(adapter, machine.id, signedIn)
+        if (machine != null && signedIn) TerminalControls(adapter, machine.id, signedIn, terminalSessionGeneration)
         Text(
             when (val current = controller.state) {
                 MilaMachineMutationState.SignedOut -> MilaStrings.text(MilaMessage.RuntimeUnavailable)
@@ -745,12 +879,12 @@ private fun controllerSelect(controller: MilaMachineDetailController, command: S
 
 @Composable
 private fun MilaNotificationsPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
-    val context = LocalContext.current
-    val store = remember { MilaPreferencesNotificationStore(context.getSharedPreferences("mila.notifications", 0)) }
-    val controller = remember(store) { MilaAuthenticatedNotificationController(adapter, store, "mila", "selected") }
+    val controller = remember(adapter) { MilaServerNotificationController(adapter) }
+    val scope = rememberCoroutineScope()
     var devices by remember(controller) { mutableStateOf(controller.devices) }
     LaunchedEffect(signedIn) {
-        if (signedIn) controller.signIn() else controller.signOut()
+        controller.setSession(signedIn)
+        if (signedIn) controller.refresh()
         devices = controller.devices
     }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -763,10 +897,10 @@ private fun MilaNotificationsPanel(adapter: MilaFfiAdapter, signedIn: Boolean) {
             devices.forEach { device ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(device.id, modifier = Modifier.width(160.dp))
-                    Button(onClick = { controller.setEnabled(device.id, !device.enabled); devices = controller.devices }) {
+                    Button(onClick = { scope.launch { controller.setEnabled(device.id, !device.enabled); devices = controller.devices } }) {
                         Text("${MilaStrings.text(MilaMessage.NotificationEnabled)}: ${device.enabled}")
                     }
-                    Button(onClick = { controller.remove(device.id); devices = controller.devices }) {
+                    Button(onClick = { scope.launch { controller.remove(device.id); devices = controller.devices } }) {
                         Text(MilaStrings.text(MilaMessage.NotificationRemove))
                     }
                 }

@@ -1,5 +1,77 @@
 namespace Mila.Windows.Interop;
 
+internal sealed class MilaTerminalSpan
+{
+    [System.Text.Json.Serialization.JsonPropertyName("text")] public required string Text { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("foreground")] public required uint? Foreground { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("background")] public required uint? Background { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("bold")] public required bool Bold { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("italic")] public required bool Italic { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("underline")] public required bool Underline { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("inverse")] public required bool Inverse { get; init; }
+}
+
+/// <summary>Validated opaque RGB pixels from the bounded Rust SIXEL projection.</summary>
+internal sealed class MilaTerminalImage
+{
+    [System.Text.Json.Serialization.JsonPropertyName("x")] public required ushort X { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("y")] public required ushort Y { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("width")] public required ushort Width { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("height")] public required ushort Height { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("pixels")] public required List<uint> Pixels { get; init; }
+}
+
+/// <summary>Bounded display spans from Rust; raw terminal controls never reach WinUI.</summary>
+internal sealed class MilaTerminalFrame
+{
+    [System.Text.Json.Serialization.JsonPropertyName("version")] public required byte Version { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("columns")] public required ushort Columns { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("rows")] public required ushort Rows { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("cursor_column")] public required ushort CursorColumn { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("cursor_row")] public required ushort CursorRow { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("lines")] public required List<List<MilaTerminalSpan>> Lines { get; init; }
+    [System.Text.Json.Serialization.JsonPropertyName("images")] public required List<MilaTerminalImage> Images { get; init; }
+    [System.Text.Json.Serialization.JsonIgnore] internal string Text => string.Join("\n", Lines.Select(line => string.Concat(line.Select(span => span.Text))));
+
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;terminal] windows-terminal-frame-bounds
+    /// Decode only a 16 MiB projection containing at most 1,048,576 opaque RGB
+    /// pixels in total. Null image entries, invalid extents and out-of-range
+    /// colours MUST be refused before the frame reaches WinUI.
+    /// </summary>
+    internal static MilaTerminalFrame? Decode(byte[] bytes)
+    {
+        if (bytes.Length > 16 << 20) return null;
+        try
+        {
+            MilaTerminalFrame? frame = System.Text.Json.JsonSerializer.Deserialize<MilaTerminalFrame>(bytes,
+                new System.Text.Json.JsonSerializerOptions { UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow });
+            if (frame is null || frame.Version != 1 || frame.Columns is 0 or > 4096 || frame.Rows is 0 or > 512 ||
+                frame.CursorColumn >= frame.Columns || frame.CursorRow >= frame.Rows || frame.Lines is null || frame.Lines.Count > frame.Rows) return null;
+            int count = 0;
+            foreach (List<MilaTerminalSpan> line in frame.Lines)
+            {
+                if (line is null) return null;
+                int columns = 0;
+                foreach (MilaTerminalSpan span in line)
+                {
+                    if (span is null || span.Text is null || span.Text.Any(char.IsControl) || span.Foreground > 0xffffff || span.Background > 0xffffff) return null;
+                    columns += span.Text.EnumerateRunes().Count();
+                }
+                if (columns > frame.Columns) return null;
+                count += columns;
+            }
+            return count <= 16_384 && frame.Images is not null && frame.Images.Count <= 8 &&
+                frame.Images.All(image => image is not null && image.Pixels is not null && image.Width > 0 && image.Height > 0 &&
+                    image.Width <= 1024 && image.Height <= 1024 &&
+                    image.Pixels.Count == (long)image.Width * image.Height && image.Pixels.Count <= 1_048_576 &&
+                    image.Pixels.All(pixel => pixel <= 0xffffff)) &&
+                frame.Images.Sum(image => image.Pixels.Count) <= 1_048_576 ? frame : null;
+        }
+        catch (System.Text.Json.JsonException) { return null; }
+    }
+}
+
 /// <summary>Bounded, generation-fenced terminal lifecycle state.</summary>
 internal sealed class MilaTerminalSession
 {
@@ -13,11 +85,13 @@ internal sealed class MilaTerminalSession
     private readonly System.Text.StringBuilder _output = new();
 
     internal string Output => _output.ToString();
+    internal MilaTerminalFrame? Frame { get; private set; }
     internal long BeginAttach(long generation, bool readWrite)
     {
         _generation = generation;
         _readWrite = readWrite;
         _output.Clear();
+        Frame = null;
         State = readWrite ? MilaTerminalState.Attaching : MilaTerminalState.ReadOnly;
         return generation;
     }
@@ -68,6 +142,16 @@ internal sealed class MilaTerminalSession
     /// bytes into this class; callers must decode and sanitize in Rust first.
     internal bool AppendReceived(long generation, ReadOnlySpan<char> text) =>
         Append(generation, text);
+
+    internal bool ApplyFrame(long generation, MilaTerminalFrame frame)
+    {
+        if (generation != _generation || State is not (MilaTerminalState.Attaching or MilaTerminalState.Live or MilaTerminalState.ReadOnly)) return false;
+        Frame = frame;
+        _output.Clear();
+        _output.Append(frame.Text);
+        State = _readWrite ? MilaTerminalState.Live : MilaTerminalState.ReadOnly;
+        return true;
+    }
     internal bool Resize(long generation, ushort columns, ushort rows)
     {
         if (generation != _generation || !_readWrite || columns is 0 or > 4096 || rows is 0 or > 512 ||
@@ -95,7 +179,8 @@ internal sealed class MilaTerminalSession
     {
         if (_terminalHandle != 0) RustNative.TrySessionTerminalKill(_terminalHandle);
         _terminalHandle = 0;
-        _generation++; _readWrite = false; State = MilaTerminalState.SignedOut; _output.Clear();
+        _sessionHandle = 0;
+        _generation++; _readWrite = false; State = MilaTerminalState.SignedOut; _output.Clear(); Frame = null;
     }
 }
 

@@ -6,7 +6,7 @@
       <NavigationViewItem Content="Settings" Tag="settings" Icon="&#xE713;" />
     </NavigationView.MenuItems>
     <Grid Padding="24">
-      <StackPanel Spacing="12">
+      <StackPanel x:Name="InteractionRoot" Spacing="12">
         <TextBlock x:Name="PageTitle" FontSize="28" />
         <TextBlock x:Name="PageBody" TextWrapping="Wrap" />
         <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="MilaStatus" Opacity="0.7" />
@@ -44,6 +44,7 @@
             <Button x:Name="MachineList" Click="ClassifyMachineList" />
             <Button x:Name="MachineShow" Click="ClassifyMachineShow" />
             <Button x:Name="MachineNew" Click="ClassifyMachineNew" />
+            <Button x:Name="MachineClone" Content="Clone" Click="CloneMachine" IsEnabled="False" />
             <Button x:Name="MachineResize" Click="ClassifyMachineResize" />
             <Button x:Name="MachineStart" Click="ClassifyMachineStart" />
             <Button x:Name="MachineStop" Click="ClassifyMachineStop" />
@@ -54,6 +55,12 @@
             <TextBox x:Name="ResizeCpu" Width="80" InputScope="Number" />
             <TextBox x:Name="ResizeMemory" Width="110" InputScope="Number" />
             <TextBox x:Name="ResizeDisk" Width="110" InputScope="Number" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="CreateName" Width="220" />
+            <TextBox x:Name="CreateCpu" Width="80" InputScope="Number" />
+            <TextBox x:Name="CreateMemory" Width="110" InputScope="Number" />
+            <TextBox x:Name="CreateDisk" Width="110" InputScope="Number" />
           </StackPanel>
           <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="MachineDelete" Click="ClassifyMachineDelete" />
@@ -92,7 +99,6 @@
         </StackPanel>
         <StackPanel Orientation="Horizontal" Spacing="8">
           <Button x:Name="Refresh" Click="CheckNativeBridge" />
-          <Button x:Name="LockButton" Click="LockApp" />
         </StackPanel>
         <StackPanel Spacing="6">
           <TextBlock x:Name="SshKeysTitle" />
@@ -107,12 +113,23 @@
         <StackPanel Spacing="6">
           <TextBlock x:Name="TerminalTitle" />
           <StackPanel Orientation="Horizontal" Spacing="8">
+            <TextBox x:Name="TerminalSessionId" Width="260" />
+            <NumberBox x:Name="TerminalColumns" Value="80" Minimum="1" Maximum="4096" Width="100" />
+            <NumberBox x:Name="TerminalRowsCount" Value="24" Minimum="1" Maximum="512" Width="100" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
             <Button x:Name="TerminalAttach" Click="ValidateTerminalAttach" />
+            <Button x:Name="TerminalDetach" Click="DetachTerminal" />
             <Button x:Name="TerminalResize" Click="ValidateTerminalResize" />
             <Button x:Name="TerminalInput" Click="ValidateTerminalInput" />
             <Button x:Name="TerminalKill" Click="KillTerminal" />
           </StackPanel>
-          <TextBox x:Name="TerminalOutput" IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" FontFamily="Consolas" />
+          <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto" MaxHeight="640" Background="#181818">
+            <Grid x:Name="TerminalSurface" MinHeight="80">
+              <RichTextBlock x:Name="TerminalOutput" Foreground="#EBEBEB" IsTextSelectionEnabled="True" TextWrapping="NoWrap" MinHeight="80" FontFamily="Consolas" FlowDirection="LeftToRight" />
+              <Canvas x:Name="TerminalImages" IsHitTestVisible="False" />
+            </Grid>
+          </ScrollViewer>
           <TextBox x:Name="TerminalInputText" PlaceholderText="Input (max 64 KiB)" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="52" />
           <TextBlock x:Name="TerminalStatus" Opacity="0.7" />
         </StackPanel>
@@ -136,6 +153,7 @@
         </StackPanel>
         <WebView2 x:Name="WebBrowser" Visibility="Collapsed" MinHeight="360" />
       </StackPanel>
+      <Button x:Name="LockButton" Click="LockApp" HorizontalAlignment="Right" VerticalAlignment="Top" />
     </Grid>
   </NavigationView>
 </Window>

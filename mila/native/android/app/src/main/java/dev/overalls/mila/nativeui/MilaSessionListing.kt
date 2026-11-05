@@ -2,6 +2,8 @@ package dev.overalls.mila.nativeui
 
 import java.util.UUID
 
+internal const val MILA_MAX_MACHINES = 500
+
 data class MilaMachineRow(val id: UUID, val name: String, val status: String)
 data class MilaSessionListing(val machines: List<MilaMachineRow>, val hasMore: Boolean) {
     companion object {
@@ -21,14 +23,16 @@ data class MilaSessionListing(val machines: List<MilaMachineRow>, val hasMore: B
          * @cc [owner:ghuntley,label:protocol] android-listing-json-decode
          * Android MUST decode the Rust session listing as JSON (object key order is not part of
          * the contract; serde_json emits sorted keys) and refuse malformed or oversized rows.
-         * A row's status is its observed state, else its desired state.
+         * All of Rust's at most 500 machines MUST remain reachable without truncation, and a
+         * continuation flag MUST be Boolean when present. A row's status is its observed state,
+         * else its desired state.
          */
         fun decode(bytes: ByteArray): MilaSessionListing {
             require(bytes.size <= 8 * 1024 * 1024) { "listing exceeds bound" }
             val root = org.json.JSONObject(bytes.toString(Charsets.UTF_8))
             val rows = root.optJSONArray("machines") ?: throw IllegalArgumentException("machines missing")
-            require(rows.length() <= 10_000) { "too many machines" }
-            val machines = (0 until minOf(rows.length(), 257)).map { index ->
+            require(rows.length() <= MILA_MAX_MACHINES) { "too many machines" }
+            val machines = (0 until rows.length()).map { index ->
                 val row = rows.optJSONObject(index) ?: throw IllegalArgumentException("invalid machine row")
                 fun field(name: String): String? = row.opt(name)?.takeIf { it is String } as String?
                 val id = runCatching { UUID.fromString(field("id") ?: throw IllegalArgumentException("invalid machine id")) }
@@ -38,8 +42,9 @@ data class MilaSessionListing(val machines: List<MilaMachineRow>, val hasMore: B
                 val status = boundedDisplay(field("observed_state") ?: field("desired_state") ?: field("status") ?: "unknown", "unknown")
                 MilaMachineRow(id, name, status)
             }
-            val truncated = rows.length() > 256
-            return MilaSessionListing(machines.take(256), root.optBoolean("has_more", false) || truncated)
+            val continuation = root.opt("has_more")
+            require(continuation == null || continuation is Boolean) { "invalid continuation flag" }
+            return MilaSessionListing(machines, continuation as? Boolean ?: false)
         }
     }
 }

@@ -5,6 +5,21 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class MilaDeepLinksTest {
+    @Test fun routesRejectNonCanonicalAuthorityAndPathForms() {
+        val id = "11111111-1111-4111-8111-111111111111"
+        assertEquals(MilaRoute.Machine(UUID.fromString(id)), parseMilaRoute("overalls://mila.example/machines/$id"))
+        listOf(
+            "overalls://Mila.example/machines/$id",
+            "overalls://mila.example:443/machines/$id",
+            "overalls://user@mila.example/machines/$id",
+            "overalls://mila.example/machines/$id/",
+            "overalls://mila.example/machines/%2F$id",
+            "overalls://mila.example/machines/$id?command=rm",
+            "overalls://mila.example/machines/$id#fragment",
+            "overalls://mila.example/machines/11111111-1111-4111-8111-11111111111",
+        ).forEach { value -> assertNull("unexpectedly accepted $value", parseMilaRoute(value)) }
+    }
+
     @Test fun acceptsMachineTargetAndRejectsStaleGeneration() {
         val id = UUID.randomUUID()
         val controller = MilaDeepLinkController()

@@ -1,6 +1,7 @@
 package dev.overalls.mila.nativeui
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class MilaSessionListingTest {
@@ -23,11 +24,30 @@ class MilaSessionListingTest {
         assertEquals("build", listing.machines.single().name)
         assertEquals(true, listing.hasMore)
     }
-    @Test fun capsMachineProjectionAndMarksMore() {
-        val rows = (1..257).joinToString(",") { i -> "{\"id\":\"00000000-0000-0000-0000-${i.toString().padStart(12, '0')}\",\"name\":\"m$i\",\"status\":\"running\"}" }
-        val listing = MilaSessionListing.decode("{\"machines\":[$rows]}".toByteArray())
-        assertEquals(256, listing.machines.size)
-        assertEquals(true, listing.hasMore)
+    @Test fun retainsAllFiveHundredValidatedMachines() {
+        val listing = MilaSessionListing.decode(machineListingProjection(500, hasMore = false))
+        assertEquals(500, listing.machines.size)
+        assertEquals("m500", listing.machines.last().name)
+        assertEquals(false, listing.hasMore)
+    }
+    @Test fun refusesMoreThanFiveHundredMachines() {
+        assertThrows(IllegalArgumentException::class.java) {
+            MilaSessionListing.decode(machineListingProjection(501, hasMore = false))
+        }
+    }
+    @Test fun completeSnapshotsNeedNoContinuationField() {
+        val snapshot = org.json.JSONObject(machineListingProjection(500, false).toString(Charsets.UTF_8))
+        snapshot.remove("has_more")
+        val listing = MilaSessionListing.decode(snapshot.toString().toByteArray())
+        assertEquals(500, listing.machines.size)
+        assertEquals(false, listing.hasMore)
+    }
+    @Test fun refusesCoercedContinuationFlags() {
+        for (value in listOf("\"true\"", "1", "null", "{}", "[]")) {
+            assertThrows(IllegalArgumentException::class.java) {
+                MilaSessionListing.decode("{\"machines\":[],\"has_more\":$value}".toByteArray())
+            }
+        }
     }
     @Test(expected = IllegalArgumentException::class) fun rejectsMalformedRows() {
         MilaSessionListing.decode("{\"machines\":[{\"id\":\"bad\"}]}".toByteArray())

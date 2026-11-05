@@ -50,6 +50,7 @@ fn command_known(command: &str) -> bool {
             | "pin"
             | "unpin"
             | "new"
+            | "clone"
             | "resize"
             | "share add"
             | "share remove"
@@ -102,6 +103,7 @@ pub(crate) fn allowed_option(command: &str, key: &str) -> bool {
                 | "no-wait"
                 | "request-id"
         ),
+        "clone" => matches!(key, "name" | "request-id" | "no-wait" | "timeout"),
         "resize" => matches!(
             key,
             "cpu" | "memory" | "disk" | "timeout" | "no-wait" | "request-id"
@@ -183,8 +185,8 @@ pub(crate) fn validate_command(
         | "device register" => (0, 0),
         "device rm" | "device prefs" | "share show" => (1, 1),
         "terminal attach" => (2, 2),
-        "show" | "start" | "resize" | "request show" | "ssh-key remove" | "thread show"
-        | "thread turns" | "terminal ls" | "terminal new" | "web show" => (1, 1),
+        "show" | "start" | "resize" | "clone" | "request show" | "ssh-key remove"
+        | "thread show" | "thread turns" | "terminal ls" | "terminal new" | "web show" => (1, 1),
         "pause" | "resume" | "unpause" | "stop" | "rm" | "pin" | "unpin" => (1, 1),
         "new" => (0, 0),
         "share add" => (3, 3),
@@ -230,11 +232,15 @@ pub(crate) fn validate_command(
     if command == "share add" && arguments.get(2).is_some_and(|role| role == "owner") {
         return Err(ProtocolError::InvalidCommand);
     }
-    if command == "show"
+    if matches!(command, "show" | "clone")
         && arguments.first().is_some_and(|value| {
-            !value.bytes().all(|byte| {
-                byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_.".contains(&byte)
-            })
+            if command == "clone" {
+                Identifier::parse(value).is_err()
+            } else {
+                !value.bytes().all(|byte| {
+                    byte.is_ascii_lowercase() || byte.is_ascii_digit() || b"-_.".contains(&byte)
+                })
+            }
         })
     {
         return Err(ProtocolError::InvalidCommand);
@@ -296,6 +302,15 @@ pub(crate) fn validate_command(
     }
     if command == "web set" && options.is_empty() {
         return Err(ProtocolError::InvalidCommand);
+    }
+    if let Some(OptionValue::String(name)) = options.get("name") {
+        if !(1..=128).contains(&name.len())
+            || !name
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        {
+            return Err(ProtocolError::InvalidCommand);
+        }
     }
     if options.contains_key("public") && options.contains_key("private") {
         return Err(ProtocolError::InvalidCommand);
@@ -406,6 +421,7 @@ pub(crate) fn mutation(command: &str) -> bool {
     matches!(
         command,
         "new"
+            | "clone"
             | "start"
             | "pause"
             | "resume"

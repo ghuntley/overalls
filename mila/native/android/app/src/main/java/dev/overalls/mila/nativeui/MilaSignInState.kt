@@ -15,8 +15,9 @@ class MilaSignInController(private val adapter: MilaFfiAdapter, private val stor
  private var pendingSession: MilaSessionHandle? = null
 
  /**
-  * Establishes the real certificate-authenticated Rust session. Trust bytes and the signer
-  * remain in the native boundary; the controller only publishes the validated listing.
+  * @cc [owner:ghuntley,label:security;recovery] android-signin-fresh-listing
+  * Sign-in and approval completion MUST publish SignedIn only after Rust accepts a fresh
+  * machine read; a failed read MUST close the session without consuming its cached listing.
   */
  suspend fun signIn(deployment: MilaDeployment, config: MilaSessionConnectConfig, signer: MilaDeviceKey) {
   store?.write(deployment)
@@ -54,8 +55,7 @@ class MilaSignInController(private val adapter: MilaFfiAdapter, private val stor
    MilaWhoami.Approved -> Unit
   }
   val listing = runCatching {
-   session.readMachines()
-   MilaSessionListing.decode(session.listing())
+   MilaSessionListing.decode(session.readCompleteListing())
   }.getOrNull()
   if (listing == null) {
    session.close()
@@ -87,8 +87,7 @@ class MilaSignInController(private val adapter: MilaFfiAdapter, private val stor
   return when (whoami) {
    MilaWhoami.Approved -> {
     val listing = runCatching {
-     session.readMachines()
-     MilaSessionListing.decode(session.listing())
+     MilaSessionListing.decode(session.readCompleteListing())
     }.getOrNull()
     if (listing == null) {
      session.close()

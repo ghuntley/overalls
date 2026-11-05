@@ -11,7 +11,7 @@ use super::strings::{self, Message as M};
 use super::views::{self, clear_list, heading, ConfirmBar, Pending};
 use super::NativeState;
 use gtk::prelude::*;
-use gtk::{gio, Align, Box, Button, DropDown, Entry, Label, ListBox, Orientation};
+use gtk::{gio, glib, Align, Box, Button, DropDown, Entry, Label, ListBox, Orientation};
 use mila_native_linux::adapter::{
     browser_endpoint_url, decode_share_listing, decode_web_endpoint, format_machine_action,
     WebEndpoint,
@@ -21,8 +21,158 @@ use mila_native_linux::porsche_results::{
     decode_machine_detail, decode_thread_detail, decode_thread_events, decode_thread_rows,
     ThreadDetail,
 };
-use mila_native_linux::session::{LiveSession, SessionError};
-use std::{cell::RefCell, rc::Rc};
+use mila_native_linux::session::{LiveSession, SessionError, SignInPhase};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Duration,
+};
+
+const WEB_READ_INTERVAL: Duration = Duration::from_millis(100);
+const WEB_READ_ATTEMPTS: u8 = 50;
+const WEB_READ_DEADLINE: Duration = Duration::from_secs(5);
+
+/// @cc [owner:ghuntley,label:security;reliability] linux-web-read-retry
+/// A busy endpoint read MUST retry within a bounded window only while its
+/// approved driver generation, bound session identity and selected machine
+/// remain current. Cancellation MUST happen before the next read. Mutations
+/// MUST NOT enter this retry path.
+fn retry_busy_web_read(
+    current: impl Fn() -> bool + 'static,
+    mut read: impl FnMut() -> Result<(), SessionError> + 'static,
+    exhausted: impl Fn() + 'static,
+) {
+    let mut attempts = 0_u8;
+    let deadline = std::time::Instant::now() + WEB_READ_DEADLINE;
+    let mut poll = move || {
+        if !current() {
+            return glib::ControlFlow::Break;
+        }
+        if attempts > 0 && std::time::Instant::now() >= deadline {
+            exhausted();
+            return glib::ControlFlow::Break;
+        }
+        attempts += 1;
+        match read() {
+            Err(SessionError::Busy) if attempts < WEB_READ_ATTEMPTS => glib::ControlFlow::Continue,
+            Err(SessionError::Busy) => {
+                exhausted();
+                glib::ControlFlow::Break
+            }
+            _ => glib::ControlFlow::Break,
+        }
+    };
+    if poll() == glib::ControlFlow::Continue {
+        glib::timeout_add_local(WEB_READ_INTERVAL, poll);
+    }
+}
+
+/// Runs on the single GTK test thread so timer ownership matches production.
+#[cfg(test)]
+pub(super) fn web_refresh_read_regressions() {
+    fn until(done: impl Fn() -> bool, limit: Duration) {
+        let deadline = std::time::Instant::now() + limit;
+        let context = glib::MainContext::default();
+        while !done() && std::time::Instant::now() < deadline {
+            while context.pending() {
+                context.iteration(false);
+            }
+            std::thread::sleep(Duration::from_millis(1));
+        }
+        assert!(done(), "web read timer did not settle within its bound");
+    }
+
+    let calls = Rc::new(Cell::new(0_u8));
+    let completed = Rc::new(Cell::new(false));
+    retry_busy_web_read(
+        || true,
+        {
+            let calls = calls.clone();
+            let completed = completed.clone();
+            move || {
+                calls.set(calls.get() + 1);
+                if calls.get() == 1 {
+                    Err(SessionError::Busy)
+                } else {
+                    completed.set(true);
+                    Ok(())
+                }
+            }
+        },
+        || panic!("a completed read must not exhaust its retry budget"),
+    );
+    assert_eq!(calls.get(), 1);
+    until(|| completed.get(), Duration::from_secs(2));
+    assert_eq!(calls.get(), 2);
+
+    // Each component of the authority/target fence can change while the
+    // first read is busy. No later callback may run its read in that case.
+    for component in 0..4 {
+        let identity = Rc::new(Cell::new([1_u64; 4]));
+        let expected = identity.get();
+        let calls = Rc::new(Cell::new(0_u8));
+        let cancelled = Rc::new(Cell::new(false));
+        retry_busy_web_read(
+            {
+                let identity = identity.clone();
+                let cancelled = cancelled.clone();
+                move || {
+                    let current = identity.get() == expected;
+                    cancelled.set(!current);
+                    current
+                }
+            },
+            {
+                let calls = calls.clone();
+                move || {
+                    calls.set(calls.get() + 1);
+                    Err(SessionError::Busy)
+                }
+            },
+            || panic!("a cancelled read must not exhaust its retry budget"),
+        );
+        let mut changed = identity.get();
+        changed[component] += 1;
+        identity.set(changed);
+        until(|| cancelled.get(), Duration::from_secs(2));
+        assert_eq!(calls.get(), 1);
+    }
+
+    let refused_calls = Rc::new(Cell::new(0_u8));
+    retry_busy_web_read(
+        || true,
+        {
+            let refused_calls = refused_calls.clone();
+            move || {
+                refused_calls.set(refused_calls.get() + 1);
+                Err(SessionError::Transport)
+            }
+        },
+        || panic!("a definitive read failure must not be retried"),
+    );
+    assert_eq!(refused_calls.get(), 1);
+
+    let bounded_calls = Rc::new(Cell::new(0_u8));
+    let exhausted = Rc::new(Cell::new(false));
+    retry_busy_web_read(
+        || true,
+        {
+            let bounded_calls = bounded_calls.clone();
+            move || {
+                bounded_calls.set(bounded_calls.get() + 1);
+                Err(SessionError::Busy)
+            }
+        },
+        {
+            let exhausted = exhausted.clone();
+            move || exhausted.set(true)
+        },
+    );
+    until(|| exhausted.get(), Duration::from_secs(8));
+    assert!((1..=WEB_READ_ATTEMPTS).contains(&bounded_calls.get()));
+    assert_eq!(refused_calls.get(), 1);
+    assert_eq!(calls.get(), 2);
+}
 
 /// Widget names the GTK journey uses to find a section's controls.
 pub(super) const MACHINE_LIST: &str = "mila-machine-list";
@@ -207,25 +357,15 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
     list_section.append(&list_status);
     list_section.append(&list);
     list_section.append(&id);
-    {
-        let state = state.clone();
+    let render_rows: Rc<dyn Fn(Vec<mila_native_linux::machine_view::MachineRow>, bool)> = {
         let list = list.clone();
         let list_status = list_status.clone();
         let id = id.clone();
-        refresh.connect_clicked(move |_| {
+        Rc::new(move |rows, offline| {
             clear_list(&list);
-            let rows = state.with_live(|live| {
-                let bytes = live.refresh()?;
-                let rows = project_snapshot(&bytes).map_err(|_| SessionError::InvalidInput)?;
-                *state.machine_listing.borrow_mut() = Some(rows.clone());
-                Ok(rows)
-            });
-            let rows = match rows {
-                None => return list_status.set_label(&strings::text(M::SignInRequired)),
-                Some(Err(_)) => return list_status.set_label(&strings::text(M::MachinesFailed)),
-                Some(Ok(rows)) => rows,
-            };
-            list_status.set_label(&if rows.is_empty() {
+            list_status.set_label(&if offline {
+                strings::text(M::MachinesOffline)
+            } else if rows.is_empty() {
                 strings::text(M::MachinesEmpty)
             } else {
                 String::new()
@@ -233,6 +373,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             for row in rows {
                 let line_box = Box::new(Orientation::Horizontal, 8);
                 let select = Button::with_label(&row.name);
+                select.set_sensitive(!offline);
                 let observed = row.observed_state.as_deref().unwrap_or("unavailable");
                 let state_label = Label::new(Some(&strings::text(if observed == "unavailable" {
                     M::StateUnavailable
@@ -249,7 +390,45 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                 select.connect_clicked(move |_| id.set_text(&machine));
                 list.append(&line_box);
             }
+        })
+    };
+    {
+        let state = state.clone();
+        let list_status = list_status.clone();
+        let render_rows = render_rows.clone();
+        refresh.connect_clicked(move |_| {
+            let rows = state.with_live(|live| {
+                let bytes = live.refresh()?;
+                let rows = project_snapshot(&bytes).map_err(|_| SessionError::InvalidInput)?;
+                state.save_machine_snapshot(live);
+                *state.machine_listing.borrow_mut() = Some(rows.clone());
+                Ok(rows)
+            });
+            match rows {
+                Some(Ok(rows)) => render_rows(rows, false),
+                other => {
+                    if let Some(rows) = state.offline_machine_rows() {
+                        render_rows(rows, true);
+                    } else {
+                        render_rows(Vec::new(), false);
+                        list_status.set_label(&strings::text(if other.is_none() {
+                            M::SignInRequired
+                        } else {
+                            M::MachinesFailed
+                        }));
+                    }
+                }
+            }
         });
+    }
+    {
+        let state = state.clone();
+        let refresh = refresh.clone();
+        let render: Rc<dyn Fn()> = Rc::new(move || {
+            refresh.emit_clicked();
+        });
+        state.rerender.borrow_mut().push(render.clone());
+        render();
     }
 
     // Detail and lifecycle.
@@ -379,6 +558,24 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
         size.append(widget);
     }
     let size_actions = Box::new(Orientation::Horizontal, 8);
+    let clone = Button::with_label(&strings::text(M::ActionClone));
+    {
+        let state = state.clone();
+        let status = status.clone();
+        let id = id.clone();
+        let name = name.clone();
+        clone.connect_clicked(move |_| {
+            let Some(machine) = machine_id(&id) else {
+                return status.set_label(&strings::text(M::MachineFieldInvalid));
+            };
+            let name = name.text().trim().to_owned();
+            let result = state.mutate(&format!("clone:{machine}:{name}"), |live, request| {
+                live.machine_clone(&machine, &name, request)
+            });
+            status.set_label(&strings::text(outcome_message(result.as_ref())));
+        });
+    }
+    size_actions.append(&clone);
     let create = Button::with_label(&strings::text(M::ActionCreate));
     {
         let state = state.clone();
@@ -577,45 +774,166 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
     let port = entry(M::WebPort, 5);
     let web_actions = Box::new(Orientation::Horizontal, 8);
     let endpoint: Rc<RefCell<Option<WebEndpoint>>> = Rc::new(RefCell::new(None));
-    let load_web: Rc<dyn Fn() -> bool> = {
+    let policy_buttons = Rc::new([
+        Button::with_label(&strings::text(M::WebPublic)),
+        Button::with_label(&strings::text(M::WebPrivate)),
+    ]);
+    let read_epoch = Rc::new(Cell::new(0_u64));
+    let invalidate_web: Rc<dyn Fn()> = {
+        let endpoint = endpoint.clone();
+        let policy_buttons = policy_buttons.clone();
+        let read_epoch = read_epoch.clone();
+        let visibility_value = visibility_value.clone();
+        let port_value = port_value.clone();
+        let address_value = address_value.clone();
+        let port = port.clone();
+        Rc::new(move || {
+            read_epoch.set(read_epoch.get().saturating_add(1));
+            endpoint.borrow_mut().take();
+            for button in policy_buttons.iter() {
+                button.set_sensitive(false);
+            }
+            visibility_value.set_label("");
+            port_value.set_label("");
+            address_value.set_label("");
+            port.set_text("");
+        })
+    };
+    invalidate_web();
+    {
+        let invalidate_web = invalidate_web.clone();
+        id.connect_changed(move |_| invalidate_web());
+    }
+    {
+        let current_state = state.clone();
+        let invalidate_web = invalidate_web.clone();
+        let authority = Cell::new(None);
+        state.rerender.borrow_mut().push(Rc::new(move || {
+            let current = current_state
+                .session
+                .borrow()
+                .session()
+                .and_then(LiveSession::probe)
+                .map(|probe| (current_state.driver.borrow().flow().generation, probe));
+            // Ordinary watch refreshes do not revoke a loaded endpoint.
+            if authority.replace(current) != current {
+                invalidate_web();
+            }
+        }));
+    }
+    let load_web: Rc<dyn Fn()> = {
         let state = state.clone();
         let id = id.clone();
         let status = status.clone();
         let endpoint = endpoint.clone();
         let port = port.clone();
+        let policy_buttons = policy_buttons.clone();
+        let read_epoch = read_epoch.clone();
+        let invalidate_web = invalidate_web.clone();
         Rc::new(move || {
-            endpoint.borrow_mut().take();
+            invalidate_web();
             let Some(machine) = machine_id(&id) else {
                 status.set_label(&strings::text(M::MachineFieldInvalid));
-                return false;
+                return;
             };
-            let loaded = state.with_live(|live| {
-                let bytes = live.web_show(&machine)?;
-                decode_web_endpoint(&bytes).map_err(|_| SessionError::InvalidInput)
-            });
-            match loaded {
-                None => status.set_label(&strings::text(M::SignInRequired)),
-                Some(Err(_)) => status.set_label(&strings::text(M::WebFailed)),
-                Some(Ok(loaded)) => {
-                    visibility_value.set_label(&strings::text(if loaded.visibility == "public" {
-                        M::WebPublic
-                    } else {
-                        M::WebPrivate
-                    }));
-                    port_value.set_label(&loaded.port.to_string());
-                    port.set_text(&loaded.port.to_string());
-                    address_value.set_label(&loaded.url.clone().unwrap_or_else(|| {
-                        strings::text(if loaded.visibility == "public" {
-                            M::WebNoAddress
-                        } else {
-                            M::WebPrivateExplain
-                        })
-                    }));
-                    *endpoint.borrow_mut() = Some(loaded);
-                    return true;
+            let Some(probe) = state
+                .session
+                .borrow()
+                .session()
+                .and_then(LiveSession::probe)
+            else {
+                return status.set_label(&strings::text(M::SignInRequired));
+            };
+            let generation = {
+                let driver = state.driver.borrow();
+                if driver.flow().phase != SignInPhase::SignedIn {
+                    return status.set_label(&strings::text(M::SignInRequired));
                 }
+                driver.flow().generation
+            };
+            let epoch = read_epoch.get();
+            // Exhaustion of the local epoch is fail-closed: no new callback
+            // may share an identity with a previous refresh.
+            if epoch == u64::MAX {
+                return status.set_label(&strings::text(M::WebFailed));
             }
-            false
+            let current = {
+                let state = state.clone();
+                let id = id.clone();
+                let machine = machine.clone();
+                let read_epoch = read_epoch.clone();
+                move || {
+                    read_epoch.get() == epoch
+                        && machine_id(&id).as_deref() == Some(machine.as_str())
+                        && state.driver.borrow().flow().generation == generation
+                        && state.driver.borrow().flow().phase == SignInPhase::SignedIn
+                        && state
+                            .session
+                            .borrow()
+                            .session()
+                            .and_then(LiveSession::probe)
+                            == Some(probe)
+                }
+            };
+            let read = {
+                let state = state.clone();
+                let status = status.clone();
+                let endpoint = endpoint.clone();
+                let port = port.clone();
+                let policy_buttons = policy_buttons.clone();
+                let visibility_value = visibility_value.clone();
+                let port_value = port_value.clone();
+                let address_value = address_value.clone();
+                move || {
+                    let loaded = state.with_live(|live| {
+                        let bytes = live.web_show(&machine)?;
+                        let loaded =
+                            decode_web_endpoint(&bytes).map_err(|_| SessionError::InvalidInput)?;
+                        if loaded.machine_id != machine {
+                            return Err(SessionError::InvalidInput);
+                        }
+                        Ok(loaded)
+                    });
+                    match loaded {
+                        None => status.set_label(&strings::text(M::SignInRequired)),
+                        Some(Err(SessionError::Busy)) => {
+                            status.set_label(&strings::text(M::RequestWaiting));
+                            return Err(SessionError::Busy);
+                        }
+                        Some(Err(_)) => status.set_label(&strings::text(M::WebFailed)),
+                        Some(Ok(loaded)) => {
+                            visibility_value.set_label(&strings::text(
+                                if loaded.visibility == "public" {
+                                    M::WebPublic
+                                } else {
+                                    M::WebPrivate
+                                },
+                            ));
+                            port_value.set_label(&loaded.port.to_string());
+                            port.set_text(&loaded.port.to_string());
+                            address_value.set_label(&loaded.url.clone().unwrap_or_else(|| {
+                                strings::text(if loaded.visibility == "public" {
+                                    M::WebNoAddress
+                                } else {
+                                    M::WebPrivateExplain
+                                })
+                            }));
+                            *endpoint.borrow_mut() = Some(loaded);
+                            for button in policy_buttons.iter() {
+                                button.set_sensitive(true);
+                            }
+                            if status.text() == strings::text(M::RequestWaiting) {
+                                status.set_label(&strings::text(M::RequestSucceeded));
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+            };
+            let status = status.clone();
+            retry_busy_web_read(current, read, move || {
+                status.set_label(&strings::text(M::WebFailed));
+            });
         })
     };
     {
@@ -624,8 +942,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
             load_web();
         });
     }
-    for (message, public) in [(M::WebPublic, true), (M::WebPrivate, false)] {
-        let button = Button::with_label(&strings::text(message));
+    for (button, public) in policy_buttons.iter().zip([true, false]) {
         let state = state.clone();
         let status = status.clone();
         let endpoint = endpoint.clone();
@@ -662,7 +979,7 @@ pub(super) fn build_machines(state: &NativeState, page: &Box, status: &Label) ->
                 outcome_message(result.as_ref())
             }));
         });
-        web_actions.append(&button);
+        web_actions.append(button);
     }
     let web_open = Button::with_label(&strings::text(M::WebOpen));
     {

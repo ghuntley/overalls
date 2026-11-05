@@ -1,12 +1,15 @@
 use crate::{ApplicationSession, SessionError};
 use mila_model::Identifier;
-use mila_transport::ssh::PtySession;
+use mila_transport::ssh::{PtySession, TerminalAttachOptions};
 
 impl ApplicationSession {
     /// Opens a bounded interactive terminal on this authenticated deployment.
     /// The returned channel remains owned by the caller while the underlying
     /// certificate-pinned session is borrowed by the transport.
     pub async fn open_pty(&self, columns: u32, rows: u32) -> Result<PtySession, SessionError> {
+        if !self.authority {
+            return Err(mila_transport::ssh::SshError::Authentication.into());
+        }
         Ok(PtySession::open(&self.ssh, columns, rows).await?)
     }
 
@@ -18,14 +21,38 @@ impl ApplicationSession {
         columns: u32,
         rows: u32,
     ) -> Result<PtySession, SessionError> {
+        self.attach_terminal_with_options(
+            machine,
+            terminal,
+            columns,
+            rows,
+            TerminalAttachOptions::default(),
+        )
+        .await
+    }
+
+    /// Attaches with a replay cursor and a user read-only restriction. The
+    /// returned transport has consumed Porsche's bounded attachment header.
+    pub async fn attach_terminal_with_options(
+        &self,
+        machine: &str,
+        terminal: &str,
+        columns: u32,
+        rows: u32,
+        options: TerminalAttachOptions,
+    ) -> Result<PtySession, SessionError> {
+        if !self.authority {
+            return Err(mila_transport::ssh::SshError::Authentication.into());
+        }
         let machine = Identifier::parse(machine).map_err(|_| SessionError::InvalidListing)?;
         let terminal = Identifier::parse(terminal).map_err(|_| SessionError::MutationRefused)?;
-        Ok(PtySession::attach(
+        Ok(PtySession::attach_with_options(
             &self.ssh,
             &machine.to_string(),
             &terminal.to_string(),
             columns,
             rows,
+            options,
         )
         .await?)
     }

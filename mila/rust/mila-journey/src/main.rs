@@ -817,25 +817,35 @@ impl Driver {
             }
             "device-rm" => {
                 let id = arg(0)?;
+                let request = request_id();
                 // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("device rm", unsafe {
-                    ffi::mila_session_device_rm(session.0, id.as_ptr(), id.len())
+                    ffi::mila_session_device_rm_with_request(
+                        session.0,
+                        id.as_ptr(),
+                        id.len(),
+                        request.as_ptr(),
+                        request.len(),
+                    )
                 })?;
-                Ok(json!({"step": step}))
+                Ok(json!({"step": step, "request_id": request}))
             }
             "device-prefs" => {
                 let id = arg(0)?;
                 let enabled = arg(1)? == "true";
+                let request = request_id();
                 // SAFETY: each pointer/length pair borrows a live local string for the call.
                 status("device prefs", unsafe {
-                    ffi::mila_session_device_prefs(
+                    ffi::mila_session_device_prefs_with_request(
                         session.0,
                         id.as_ptr(),
                         id.len(),
                         u8::from(enabled),
+                        request.as_ptr(),
+                        request.len(),
                     )
                 })?;
-                Ok(json!({"step": step, "enabled": enabled}))
+                Ok(json!({"step": step, "enabled": enabled, "request_id": request}))
             }
             "terminal" => Self::terminal(session, arg(0)?),
             _ => fail("arguments", "unknown step"),

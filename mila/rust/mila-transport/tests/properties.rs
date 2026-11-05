@@ -246,6 +246,24 @@ fn watch_lines_are_total_capped_and_exact(tc: TestCase) {
     assert_eq!(decode_watch_line(&line), expected);
 }
 
+#[test]
+fn session_watch_hints_without_status_remain_authority_neutral() {
+    let id = uuid::Uuid::from_u128(9);
+    let line = serde_json::to_vec(&json!({"version": 1, "event": "session", "id": id})).unwrap();
+    assert_eq!(decode_watch_line(&line), Ok(WatchEvent::SessionChanged(id)));
+    let pending = serde_json::to_vec(
+        &json!({"version": 1, "event": "session", "id": id, "status": "pending"}),
+    )
+    .unwrap();
+    assert_eq!(
+        decode_watch_line(&pending),
+        Ok(WatchEvent::Session {
+            id,
+            authenticated: false
+        })
+    );
+}
+
 #[derive(Clone, Copy, Debug)]
 enum PtyStep {
     Output(usize),

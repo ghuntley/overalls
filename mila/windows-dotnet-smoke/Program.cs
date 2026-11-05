@@ -34,7 +34,13 @@ internal static class Program
             // CNG device custody and DPAPI poke-key custody exist only on Windows.
             DeviceKeySmoke.Run();
             PokeKeySmoke.Run();
+            SnapshotSmoke.Run();
         }
+        WatchSmoke.Run();
+        TerminalFrameSmoke.Run();
+        TerminalGenerationSmoke.Run();
+        MachineListingSmoke.Run();
+        ThreadGenerationSmoke.Run();
         SessionLifecycleSmoke.Run();
         SignInFlowSmoke.Run();
         WindowsNotificationsSmoke.Run();
@@ -88,6 +94,9 @@ internal static class Program
         MilaNativeSessionActionResult invalidResize = RustNative.TrySessionMachineResize(
             0, machineId, 2, 2048, 20_480, "porsche-0123456789abcdef0123456789abcdef");
         Require(invalidResize.Status == MilaNativeStatus.InvalidRequest, "missing authenticated resize refusal");
+        MilaNativeSessionActionResult oversizedResize = RustNative.TrySessionMachineResize(
+            1, machineId, 2, 2048, 501, "porsche-0123456789abcdef0123456789abcdef");
+        Require(oversizedResize.Status == MilaNativeStatus.InvalidRequest, "oversized resize refusal");
         MilaNativeSessionBytesResult invalidWeb = RustNative.TrySessionWebShow(0, machineId);
         Require(invalidWeb.Status == MilaNativeStatus.InvalidRequest && invalidWeb.Data is null, "missing authenticated web listing refusal");
         MilaNativeSessionActionResult invalidWebSet = RustNative.TrySessionWebSet(
@@ -290,7 +299,7 @@ internal static class Program
         Require(machines is { Kind: MilaRouteKind.Machines, Host: "mgmt.example.test" }, "machines activation route");
         MilaRoute? machine = MilaRouteParser.Parse("overalls://mgmt.example.test/machines/0d9cc041-9db2-4e4c-b28b-1e41d7f472c1");
         Require(machine is { Kind: MilaRouteKind.Machine } && machine.Value.Id.HasValue, "machine activation route");
-        foreach (string invalid in new[] { "https://mgmt.example.test/machines", "overalls://MGMT.example.test/machines", "overalls://mgmt.example.test/machines?x=1", "overalls://mgmt.example.test/unknown", "overalls://mgmt.example.test/machines/new" })
+        foreach (string invalid in new[] { "https://mgmt.example.test/machines", "overalls://MGMT.example.test/machines", "overalls://-mgmt.example.test/machines", "overalls://mgmt.example.test:443/machines", "overalls://mgmt.example.test/machines?x=1", "overalls://mgmt.example.test/unknown", "overalls://mgmt.example.test/machines/new", "overalls://mgmt.example.test/machines/" + new string('a', 2010) })
             Require(MilaRouteParser.Parse(invalid) is null, "invalid activation route refusal");
     }
 

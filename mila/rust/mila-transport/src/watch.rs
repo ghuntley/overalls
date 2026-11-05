@@ -64,6 +64,8 @@ pub enum WatchEvent {
         id: uuid::Uuid,
         authenticated: bool,
     },
+    /// An identifier-only hint; authority must be read, never inferred from it.
+    SessionChanged(uuid::Uuid),
     Unknown,
 }
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Error)]
@@ -116,9 +118,17 @@ pub fn decode_watch_line(line: &[u8]) -> Result<WatchEvent, WatchFormat> {
         "terminal_session" => WatchEvent::TerminalSessionsChanged(id("machine_id")?),
         "thread" => WatchEvent::ThreadChanged(id("id")?),
         "resync" => WatchEvent::Resync,
-        "session" => WatchEvent::Session {
-            id: id("id")?,
-            authenticated: o.get("status").and_then(|v| v.as_str()) == Some("authenticated"),
+        "session" => match o.get("status").and_then(|v| v.as_str()) {
+            None => WatchEvent::SessionChanged(id("id")?),
+            Some("authenticated") => WatchEvent::Session {
+                id: id("id")?,
+                authenticated: true,
+            },
+            Some("pending") => WatchEvent::Session {
+                id: id("id")?,
+                authenticated: false,
+            },
+            Some(_) => return Err(WatchFormat("status")),
         },
         _ => WatchEvent::Unknown,
     })

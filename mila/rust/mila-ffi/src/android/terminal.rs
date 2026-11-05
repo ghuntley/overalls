@@ -1,6 +1,6 @@
 //! JNI terminal bridge: named sessions, PTY handles and scalar validation.
 
-use super::{jni_session_bytes, jni_string_bytes};
+use super::{jni_session_bytes, jni_session_bytes_bounded, jni_string_bytes};
 use crate::session;
 use crate::{
     mila_terminal_attach_validate, mila_terminal_input_validate, mila_terminal_resize_validate,
@@ -120,6 +120,82 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     }
 }
 
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalScreen(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    terminal: jni::sys::jlong,
+) -> jni::sys::jbyteArray {
+    if terminal <= 0 {
+        return std::ptr::null_mut();
+    }
+    // SAFETY: the helper supplies live output storage; the handle remains authority-fenced.
+    jni_session_bytes_bounded(&mut env, 16 << 20, |out, capacity, written| unsafe {
+        session::mila_session_terminal_screen(terminal.cast_unsigned(), out, capacity, written)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalState(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    terminal: jni::sys::jlong,
+) -> jni::sys::jbyteArray {
+    if terminal <= 0 {
+        return std::ptr::null_mut();
+    }
+    // SAFETY: the helper supplies live output storage; the handle remains authority-fenced.
+    jni_session_bytes_bounded(&mut env, 512, |out, capacity, written| unsafe {
+        session::mila_session_terminal_state(terminal.cast_unsigned(), out, capacity, written)
+    })
+}
+
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalAttachOptions(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    terminal: jni::objects::JString<'_>,
+    columns: jni::sys::jint,
+    rows: jni::sys::jint,
+    cursor: jni::sys::jlong,
+    has_cursor: jni::sys::jboolean,
+    read_only: jni::sys::jboolean,
+) -> jni::sys::jlong {
+    if handle <= 0 || columns <= 0 || rows <= 0 || cursor < 0 {
+        return 0;
+    }
+    let (Some(machine), Some(terminal)) = (
+        jni_string_bytes(&mut env, &machine),
+        jni_string_bytes(&mut env, &terminal),
+    ) else {
+        return 0;
+    };
+    let mut out = 0_u64;
+    // SAFETY: ids are live Rust slices; out is a writable local.
+    let status = unsafe {
+        session::mila_session_terminal_attach_with_options(
+            handle.cast_unsigned(),
+            machine.as_ptr(),
+            machine.len(),
+            terminal.as_ptr(),
+            terminal.len(),
+            columns.cast_unsigned(),
+            rows.cast_unsigned(),
+            cursor.cast_unsigned(),
+            has_cursor,
+            read_only,
+            &raw mut out,
+        )
+    };
+    if status == session::SessionStatus::Ok {
+        out.cast_signed()
+    } else {
+        0
+    }
+}
+
 fn terminal_status(status: MilaFfiStatus) -> jni::sys::jint {
     status as jni::sys::jint
 }
@@ -182,6 +258,48 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         return std::ptr::null_mut();
     }
     match env.byte_array_from_slice(&output[..written]) {
+        Ok(array) => array.into_raw(),
+        Err(_) => std::ptr::null_mut(),
+    }
+}
+
+/// Read one bounded PTY event with a short timeout. The first returned byte is
+/// the `TerminalReadEvent` code (0=data, 1=idle, 2=closed), followed by output.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionTerminalReadWithin(
+    env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    terminal: jni::sys::jlong,
+    wait_ms: jni::sys::jint,
+    capacity: jni::sys::jint,
+) -> jni::sys::jbyteArray {
+    if terminal <= 0 || !(0..=1_000).contains(&wait_ms) || !(1..=1_048_576).contains(&capacity) {
+        return std::ptr::null_mut();
+    }
+    let Ok(capacity) = usize::try_from(capacity) else {
+        return std::ptr::null_mut();
+    };
+    let mut output = vec![0_u8; capacity];
+    let mut written = 0_usize;
+    let mut event = session::TerminalReadEvent::Idle;
+    // SAFETY: output is a live 1 MiB buffer; written and event are writable locals.
+    let status = unsafe {
+        session::mila_session_terminal_read_within(
+            terminal.cast_unsigned(),
+            wait_ms.cast_unsigned(),
+            output.as_mut_ptr(),
+            output.len(),
+            &raw mut written,
+            &raw mut event,
+        )
+    };
+    if status != session::SessionStatus::Ok || written > output.len() {
+        return std::ptr::null_mut();
+    }
+    let mut result = Vec::with_capacity(written + 1);
+    result.push(event as u8);
+    result.extend_from_slice(&output[..written]);
+    match env.byte_array_from_slice(&result) {
         Ok(array) => array.into_raw(),
         Err(_) => std::ptr::null_mut(),
     }

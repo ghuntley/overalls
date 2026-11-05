@@ -9,6 +9,10 @@ internal interface IMilaTerminalTransport
     MilaNativeTerminalOpen Open(ulong sessionHandle, Guid machineId);
     (MilaNativeStatus Status, ulong? Handle) Attach(ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows);
     MilaNativeTerminalRead Read(ulong terminalHandle);
+    MilaNativeTerminalStateResult State(ulong terminalHandle);
+    MilaTerminalFrame? Screen(ulong terminalHandle) => null;
+    (MilaNativeStatus Status, ulong? Handle) AttachWithOptions(ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows, bool readOnly)
+        => Attach(sessionHandle, machineId, terminalId, columns, rows);
     MilaNativeStatus Kill(ulong terminalHandle);
     /// <summary>Closes the named server terminal session (`terminal kill`); true when the server reports it closed.</summary>
     bool End(ulong sessionHandle, Guid machineId, string terminalId);
@@ -23,6 +27,10 @@ internal sealed class MilaRustTerminalTransport : IMilaTerminalTransport
         ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows)
         => RustNative.TrySessionTerminalAttachSession(sessionHandle, machineId, terminalId, columns, rows);
     public MilaNativeTerminalRead Read(ulong terminalHandle) => RustNative.TrySessionTerminalRead(terminalHandle);
+    public MilaNativeTerminalStateResult State(ulong terminalHandle) => RustNative.TrySessionTerminalState(terminalHandle);
+    public MilaTerminalFrame? Screen(ulong terminalHandle) => RustNative.TrySessionTerminalFrame(terminalHandle);
+    public (MilaNativeStatus Status, ulong? Handle) AttachWithOptions(ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows, bool readOnly)
+        => RustNative.TrySessionTerminalAttachSession(sessionHandle, machineId, terminalId, columns, rows, readOnly);
     public MilaNativeStatus Kill(ulong terminalHandle) => RustNative.TrySessionTerminalKill(terminalHandle);
     public bool End(ulong sessionHandle, Guid machineId, string terminalId)
     {
@@ -59,9 +67,9 @@ internal enum MilaTerminalPoll
 /// </summary>
 /// <remarks>
 /// @cc [owner:ghuntley,label:reliability;security] mila-windows-terminal-reconnect
-/// A lost transport MUST NOT be confused with an idle or closed PTY: only a
-/// transport failure reconnects, a clean close or revoked handle ends the
-/// stream, and kill or sign-out MUST prevent any further attach. Each reattach
+/// An established PTY's lost transport MUST NOT be confused with idle or
+/// clean EOF: only a validated transport outcome reconnects, a clean close or
+/// revoked handle ends the stream, and kill or sign-out MUST prevent any further attach. Each reattach
 /// MUST use the live authenticated session handle, start a new generation that
 /// discards prior output (replay reset) and refuses frames of older generations,
 /// and the attempt count MUST be bounded and reset only by received output.
@@ -75,16 +83,18 @@ internal sealed class MilaTerminalStream
     private readonly IMilaTerminalTransport _transport;
     private readonly Func<ulong?> _sessionHandle;
     private readonly int _maxReconnects;
+    private readonly object _gate = new();
     private readonly Decoder _decoder = new UTF8Encoding(false, false).GetDecoder();
+    private readonly HashSet<ulong> _reading = [];
+    private readonly HashSet<ulong> _retired = [];
     private long _generation;
+    private ulong _boundSession;
     private int _attempts;
     private bool _readWrite;
     private ushort _columns = 80;
     private ushort _rows = 24;
     private Guid _machine;
     private string? _terminalId;
-    // The last session attached on each machine, so reopening the terminal page
-    // rejoins it (as the Linux client does) instead of opening a new one.
     private readonly Dictionary<Guid, string> _rejoin = [];
 
     internal MilaTerminalStream(IMilaTerminalTransport transport, Func<ulong?> sessionHandle, int maxReconnects = DefaultMaxReconnects)
@@ -95,167 +105,389 @@ internal sealed class MilaTerminalStream
     }
 
     internal MilaTerminalSession Session { get; } = new();
-    internal long Generation => _generation;
-    internal int ReconnectAttempts => _attempts;
+    internal long Generation { get { lock (_gate) return _generation; } }
+    internal int ReconnectAttempts { get { lock (_gate) return _attempts; } }
+    internal string? TerminalId { get { lock (_gate) return _terminalId; } }
 
-    /// <summary>The named server terminal session currently attached or being rejoined.</summary>
-    internal string? TerminalId => _terminalId;
-
-    /// <summary>Attaches a fresh stream to a new server terminal session on one machine; any previous PTY is killed first.</summary>
     internal bool Attach(Guid machineId, bool readWrite, ushort columns, ushort rows) =>
-        AttachNamed(machineId, null, readWrite, columns, rows);
+        AttachNamed(machineId, null, readWrite, columns, rows, out _);
 
-    /// <summary>
-    /// Attaches a fresh stream to the named server terminal session (a detached
-    /// viewport rejoining it, as the Linux client does); the server replays its
-    /// earlier output. A refused attach clears the name, so a retry opens a new one.
-    /// </summary>
     internal bool AttachSession(Guid machineId, string terminalId, bool readWrite, ushort columns, ushort rows) =>
-        !string.IsNullOrEmpty(terminalId) && AttachNamed(machineId, terminalId, readWrite, columns, rows);
+        !string.IsNullOrEmpty(terminalId) && AttachNamed(machineId, terminalId, readWrite, columns, rows, out _);
 
-    /// <summary>
-    /// The terminal page's attach: rejoins this machine's previous session by
-    /// name, and opens a new one only when there is no saved name or the rejoin
-    /// is refused (the session is gone). A lost transport keeps the name and is
-    /// left to the bounded reconnect, so it never opens a second session.
-    /// </summary>
+    /// <summary>Rejoins a saved session only on its original authenticated parent.</summary>
     internal bool Open(Guid machineId, bool readWrite, ushort columns, ushort rows)
     {
-        if (_rejoin.TryGetValue(machineId, out string? saved))
+        string? saved;
+        ulong? parent;
+        lock (_gate)
         {
-            if (AttachSession(machineId, saved, readWrite, columns, rows)) return true;
-            if (_terminalId is not null) return false;
-            _rejoin.Remove(machineId);
+            parent = _sessionHandle();
+            if (parent is not > 0) return false;
+            saved = parent == _boundSession && _rejoin.TryGetValue(machineId, out string? name) ? name : null;
         }
-        return Attach(machineId, readWrite, columns, rows);
+        if (saved is null) return AttachNamed(machineId, null, readWrite, columns, rows, out _, expectedSession: parent);
+        if (AttachNamed(machineId, saved, readWrite, columns, rows, out long generation, expectedSession: parent)) return true;
+        lock (_gate)
+        {
+            if (_generation != generation || _terminalId is not null || _sessionHandle() != parent) return false;
+        }
+        return AttachNamed(machineId, null, readWrite, columns, rows, out _, generation, parent);
     }
 
-    private bool AttachNamed(Guid machineId, string? terminalId, bool readWrite, ushort columns, ushort rows)
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;reliability] windows-terminal-reserved-generation
+    /// Attach MUST reserve its generation before opening a server session or PTY.
+    /// Kill, sign-out, replacement attach or parent-session replacement MUST fence
+    /// late completion; a successful obsolete PTY MUST be closed without changing
+    /// the current terminal, output, session name or reconnect state.
+    /// </summary>
+    private bool AttachNamed(Guid machineId, string? terminalId, bool readWrite, ushort columns, ushort rows,
+        out long generation, long? expectedGeneration = null, ulong? expectedSession = null)
     {
-        KillNative();
-        Session.Kill(_generation);
-        if (machineId == Guid.Empty) return false;
-        // `terminal new` derives its session from the request id, so each call
-        // without a name opens a new server session; rejoining needs the name.
-        _terminalId = terminalId;
-        _machine = machineId;
-        _attempts = 0;
-        _readWrite = readWrite;
-        _columns = columns;
-        _rows = rows;
-        return AttachGeneration();
+        ulong previous;
+        lock (_gate)
+        {
+            generation = _generation;
+            ulong? parent = _sessionHandle();
+            if (machineId == Guid.Empty || columns is 0 or > 4096 || rows is 0 or > 512 ||
+                parent is not > 0 || (expectedGeneration is { } expected && expected != _generation) ||
+                (expectedSession is { } expectedParent && parent != expectedParent)) return false;
+            previous = TakeNative();
+            if (_boundSession != parent.Value) _rejoin.Clear();
+            _boundSession = parent.Value;
+            _terminalId = terminalId;
+            _machine = machineId;
+            _attempts = 0;
+            _readWrite = readWrite;
+            _columns = columns;
+            _rows = rows;
+            generation = checked(++_generation);
+            _decoder.Reset();
+            Session.BeginAuthenticatedAttach(_boundSession, generation, _readWrite);
+        }
+        Close(previous);
+        return AttachGeneration(generation);
     }
 
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;reliability] windows-terminal-read-handoff
+    /// At most one native read/state/frame operation may own a terminal handle. A
+    /// handle retired during that bounded operation MUST close once in its
+    /// finally path, after the operation releases the native handle lock.
+    /// </summary>
     internal MilaTerminalPoll Poll()
     {
-        ulong terminal = Session.NativeTerminalHandle;
-        if (Session.State == MilaTerminalState.Reconnecting) return TryReattach();
-        if (terminal == 0 || !Session.Reconnect(_generation)) return MilaTerminalPoll.Detached;
-        MilaNativeTerminalRead read = _transport.Read(terminal);
-        if (read.Status == MilaNativeStatus.Transport)
+        ulong terminal;
+        long generation;
+        bool reconnect;
+        lock (_gate)
         {
-            KillNative();
-            Session.BeginReconnect(_generation);
-            return TryReattach();
+            generation = _generation;
+            terminal = Session.NativeTerminalHandle;
+            reconnect = Session.State == MilaTerminalState.Reconnecting;
+            if (!reconnect && (terminal == 0 || !Session.Reconnect(generation))) return MilaTerminalPoll.Detached;
+            if (!reconnect && !_reading.Add(terminal)) return MilaTerminalPoll.Idle;
         }
-        if (read.Status == MilaNativeStatus.InvalidHandle || (read.Succeeded && read.Event == MilaTerminalReadEvent.Closed))
+        if (reconnect) return TryReattach(generation);
+        try
         {
-            Session.ClearNativeTerminal();
-            Session.ReceiveEof(_generation);
-            return MilaTerminalPoll.Ended;
+            if (!CurrentParent(generation)) return MilaTerminalPoll.SignedOut;
+            return PollRead(generation, terminal);
+        }
+        finally
+        {
+            bool close;
+            lock (_gate)
+            {
+                _reading.Remove(terminal);
+                close = _retired.Remove(terminal);
+            }
+            if (close) _transport.Kill(terminal);
+        }
+    }
+
+    private MilaTerminalPoll PollRead(long generation, ulong terminal)
+    {
+        MilaNativeTerminalRead read = _transport.Read(terminal);
+        if (!CurrentParent(generation)) return MilaTerminalPoll.Detached;
+        bool lost = read.Status == MilaNativeStatus.Transport;
+        bool ended = read.Status == MilaNativeStatus.InvalidHandle ||
+            (read.Succeeded && read.Event == MilaTerminalReadEvent.Closed);
+        MilaTerminalOutcome? outcome = null;
+        if (read.Succeeded && read.Event == MilaTerminalReadEvent.Closed)
+        {
+            MilaNativeTerminalStateResult state = _transport.State(terminal);
+            if (!CurrentParent(generation)) return MilaTerminalPoll.Detached;
+            if (state.Status == MilaNativeStatus.Busy) return MilaTerminalPoll.Idle;
+            if (state.Succeeded && state.State is { Closed: true } closed)
+            {
+                outcome = closed.Outcome;
+                lost = outcome == MilaTerminalOutcome.Transport;
+                ended = !lost;
+            }
+        }
+        lock (_gate)
+        {
+            if (!Current(generation, terminal)) return MilaTerminalPoll.Detached;
+            if (lost || ended)
+            {
+                Session.ClearNativeTerminal();
+                if (outcome == MilaTerminalOutcome.Authority) SignOutLocked();
+                else
+                {
+                    if (outcome == MilaTerminalOutcome.Refused) ForgetTerminal();
+                    if (lost) Session.BeginReconnect(generation); else Session.ReceiveEof(generation);
+                }
+            }
+        }
+        if (lost || ended)
+        {
+            Close(terminal);
+            if (outcome == MilaTerminalOutcome.Authority) return MilaTerminalPoll.SignedOut;
+            return lost ? TryReattach(generation) : MilaTerminalPoll.Ended;
         }
         if (!read.Succeeded || read.Event == MilaTerminalReadEvent.Idle || read.Data is not { Length: > 0 } bytes)
             return MilaTerminalPoll.Idle;
-        char[] text = new char[_decoder.GetCharCount(bytes, flush: false)];
-        _decoder.GetChars(bytes, text, flush: false);
-        if (!Session.AppendReceived(_generation, text)) return MilaTerminalPoll.Idle;
-        _attempts = 0;
-        return MilaTerminalPoll.Output;
+        MilaTerminalFrame? frame = _transport.Screen(terminal);
+        if (!CurrentParent(generation)) return MilaTerminalPoll.Detached;
+        lock (_gate)
+        {
+            if (!Current(generation, terminal)) return MilaTerminalPoll.Detached;
+            if (frame is not null)
+            {
+                if (!Session.ApplyFrame(generation, frame)) return MilaTerminalPoll.Idle;
+            }
+            else
+            {
+                if (_transport is MilaRustTerminalTransport) return MilaTerminalPoll.Idle;
+                char[] text = new char[_decoder.GetCharCount(bytes, flush: false)];
+                _decoder.GetChars(bytes, text, flush: false);
+                if (!Session.AppendReceived(generation, text)) return MilaTerminalPoll.Idle;
+            }
+            _attempts = 0;
+            return MilaTerminalPoll.Output;
+        }
     }
 
     internal void Kill()
     {
-        KillNative();
-        Session.Kill(_generation);
+        ulong terminal;
+        lock (_gate)
+        {
+            terminal = TakeNative();
+            Session.Kill(_generation);
+            _generation = checked(_generation + 1);
+        }
+        Close(terminal);
     }
 
-    /// <summary>
-    /// Detaches like <see cref="Kill"/> and then closes the named server session,
-    /// so a later attach opens a new one. True only when the server reports it closed.
-    /// </summary>
     internal bool End()
     {
-        string? terminalId = _terminalId;
-        Guid machine = _machine;
-        Kill();
-        _terminalId = null;
-        _rejoin.Remove(machine);
-        return terminalId is not null && machine != Guid.Empty && _sessionHandle() is { } handle && handle != 0 &&
-            _transport.End(handle, machine, terminalId);
+        string? terminalId;
+        Guid machine;
+        ulong parent;
+        ulong terminal;
+        lock (_gate)
+        {
+            terminalId = _terminalId;
+            machine = _machine;
+            parent = _boundSession;
+            terminal = TakeNative();
+            Session.Kill(_generation);
+            _generation = checked(_generation + 1);
+            _terminalId = null;
+            _rejoin.Remove(machine);
+        }
+        Close(terminal);
+        return terminalId is not null && machine != Guid.Empty && parent != 0 && _sessionHandle() == parent &&
+            _transport.End(parent, machine, terminalId);
     }
 
     internal void SignOut()
     {
-        KillNative();
+        ulong terminal;
+        lock (_gate) terminal = SignOutLocked();
+        Close(terminal);
+    }
+
+    private ulong SignOutLocked()
+    {
+        ulong terminal = TakeNative();
         _rejoin.Clear();
+        _terminalId = null;
+        _boundSession = 0;
+        _decoder.Reset();
         Session.SignOut();
         _generation = checked(_generation + 1);
+        return terminal;
     }
 
-    private MilaTerminalPoll TryReattach()
+    private bool CurrentParent(long generation)
     {
-        if (_sessionHandle() is not { } handle || handle == 0)
+        ulong close = 0;
+        bool current;
+        lock (_gate)
         {
-            SignOut();
-            return MilaTerminalPoll.SignedOut;
+            current = generation == _generation && _boundSession != 0 && _sessionHandle() == _boundSession;
+            if (!current && generation == _generation) close = SignOutLocked();
         }
-        if (_attempts >= _maxReconnects)
-        {
-            Session.ReceiveEof(_generation);
-            return MilaTerminalPoll.Exhausted;
-        }
-        _attempts++;
-        return AttachGeneration() ? MilaTerminalPoll.Reconnected : MilaTerminalPoll.Reconnecting;
+        Close(close);
+        return current;
     }
 
-    private bool AttachGeneration()
+    private bool Current(long generation, ulong terminal) =>
+        generation == _generation && _boundSession != 0 && _sessionHandle() == _boundSession &&
+        Session.NativeTerminalHandle == terminal;
+
+    private MilaTerminalPoll TryReattach(long expectedGeneration)
     {
-        if (_sessionHandle() is not { } handle || handle == 0) return false;
-        long generation = checked(_generation + 1);
-        if (_terminalId is null)
+        if (!CurrentParent(expectedGeneration)) return MilaTerminalPoll.SignedOut;
+        long generation;
+        lock (_gate)
         {
-            MilaNativeTerminalOpen opened = _transport.Open(handle, _machine);
-            if (!opened.Succeeded)
+            if (_generation != expectedGeneration || Session.State != MilaTerminalState.Reconnecting) return MilaTerminalPoll.Detached;
+            if (_attempts >= _maxReconnects)
             {
-                if (Session.State != MilaTerminalState.Reconnecting) Session.BeginReconnect(_generation);
-                return false;
+                Session.ReceiveEof(_generation);
+                return MilaTerminalPoll.Exhausted;
             }
-            _terminalId = opened.SessionId;
+            _attempts++;
+            generation = checked(++_generation);
+            _decoder.Reset();
+            Session.BeginAuthenticatedAttach(_boundSession, generation, _readWrite);
         }
-        (MilaNativeStatus status, ulong? terminal) = _transport.Attach(handle, _machine, _terminalId!, _columns, _rows);
-        if (status != MilaNativeStatus.Ok || terminal is not > 0)
+        if (AttachGeneration(generation)) return MilaTerminalPoll.Reconnected;
+        lock (_gate)
         {
-            // A refused (not lost) attach means the named session is gone; the next attempt opens a new one.
-            if (status != MilaNativeStatus.Transport) _terminalId = null;
-            // Keep the reconnecting state so a later poll retries within the bound.
-            if (Session.State != MilaTerminalState.Reconnecting) Session.BeginReconnect(_generation);
-            return false;
+            if (Session.State == MilaTerminalState.SignedOut) return MilaTerminalPoll.SignedOut;
+            if (_generation != generation) return MilaTerminalPoll.Detached;
+            return Session.State == MilaTerminalState.Reconnecting ? MilaTerminalPoll.Reconnecting : MilaTerminalPoll.Ended;
         }
-        _generation = generation;
-        _decoder.Reset();
-        _rejoin[_machine] = _terminalId!;
-        if (Session.BeginAuthenticatedAttach(handle, generation, _readWrite) == 0 || !Session.SetNativeTerminal(terminal.Value))
-        {
-            _transport.Kill(terminal.Value);
-            return false;
-        }
-        return true;
     }
 
-    private void KillNative()
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;reliability] windows-terminal-native-attach-outcome
+    /// A successful native attach handle MUST remain unpublished until its
+    /// validated state confirms an open PTY. Only an authenticated refused
+    /// outcome may discard its session name and permit terminal new; transport
+    /// loss retries that same name, authority loss stops automatic attach, and
+    /// malformed state or generic InvalidRequest MUST NOT imply refusal.
+    /// </summary>
+    private bool AttachGeneration(long generation)
+    {
+        if (!CurrentParent(generation)) return false;
+        ulong parent;
+        Guid machine;
+        string? terminalId;
+        bool readOnly;
+        ushort columns;
+        ushort rows;
+        lock (_gate)
+        {
+            if (_generation != generation || _sessionHandle() != _boundSession) return false;
+            parent = _boundSession;
+            machine = _machine;
+            terminalId = _terminalId;
+            readOnly = !_readWrite;
+            columns = _columns;
+            rows = _rows;
+        }
+        if (terminalId is null)
+        {
+            MilaNativeTerminalOpen opened = _transport.Open(parent, machine);
+            if (!CurrentParent(generation)) return false;
+            lock (_gate)
+            {
+                if (_generation != generation || _sessionHandle() != parent) return false;
+                if (!opened.Succeeded)
+                {
+                    // An uncertain terminal-new mutation must not be issued again by a reconnect poll.
+                    Session.ReceiveEof(generation);
+                    return false;
+                }
+                terminalId = opened.SessionId;
+                _terminalId = terminalId;
+                _rejoin[machine] = terminalId!;
+            }
+        }
+        (MilaNativeStatus status, ulong? terminal) = _transport.AttachWithOptions(parent, machine, terminalId!, columns, rows, readOnly);
+        MilaNativeTerminalStateResult state = status == MilaNativeStatus.Ok && terminal is > 0
+            ? _transport.State(terminal.Value) : new(status, null);
+        if (!CurrentParent(generation))
+        {
+            if (terminal is > 0) Close(terminal.Value);
+            return false;
+        }
+        bool accepted = false;
+        lock (_gate)
+        {
+            if (_generation == generation && _sessionHandle() == parent && _boundSession == parent)
+            {
+                if (status == MilaNativeStatus.Ok && terminal is > 0)
+                {
+                    if (state.Succeeded && state.State is { Closed: false } attached)
+                    {
+                        Session.BeginAuthenticatedAttach(parent, generation, _readWrite && !attached.ReadOnly);
+                        accepted = Session.SetNativeTerminal(terminal.Value);
+                        if (accepted) _rejoin[machine] = terminalId!;
+                    }
+                    else if (state.Succeeded && state.State is { Closed: true } closed)
+                    {
+                        switch (closed.Outcome)
+                        {
+                            case MilaTerminalOutcome.Refused:
+                                ForgetTerminal();
+                                Session.BeginReconnect(generation);
+                                break;
+                            case MilaTerminalOutcome.Transport:
+                                Session.BeginReconnect(generation);
+                                break;
+                            case MilaTerminalOutcome.Authority:
+                                SignOutLocked();
+                                break;
+                            default:
+                                Session.ReceiveEof(generation);
+                                break;
+                        }
+                    }
+                    else if (state.Status == MilaNativeStatus.Busy) Session.BeginReconnect(generation);
+                    else Session.ReceiveEof(generation);
+                }
+                else
+                {
+                    // Only a validated native refusal establishes that a named session is gone.
+                    if (status is MilaNativeStatus.Transport or MilaNativeStatus.Busy) Session.BeginReconnect(generation);
+                    else Session.ReceiveEof(generation);
+                }
+            }
+        }
+        if (!accepted && terminal is > 0) Close(terminal.Value);
+        return accepted;
+    }
+
+    private void ForgetTerminal()
+    {
+        _terminalId = null;
+        _rejoin.Remove(_machine);
+    }
+
+    private ulong TakeNative()
     {
         ulong terminal = Session.NativeTerminalHandle;
         Session.ClearNativeTerminal();
-        if (terminal != 0) _transport.Kill(terminal);
+        return terminal;
+    }
+
+    private void Close(ulong terminal)
+    {
+        if (terminal == 0) return;
+        lock (_gate)
+        {
+            // Native close may report Busy while a bounded read owns its handle.
+            // The admitted read releases and closes a retired handle in finally.
+            if (_reading.Contains(terminal)) { _retired.Add(terminal); return; }
+        }
+        _transport.Kill(terminal);
     }
 }

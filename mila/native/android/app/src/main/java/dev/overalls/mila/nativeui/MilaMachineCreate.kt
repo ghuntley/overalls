@@ -45,8 +45,8 @@ data class MilaMachineResizeRequest(val machineId: UUID, val cpu: Int, val memor
     }
 
     companion object {
-        internal val RESIZE_MEMORY = 256..1_048_576
-        internal val RESIZE_DISK = 1..65_536
+        internal val RESIZE_MEMORY = 256..4_194_304
+        internal val RESIZE_DISK = 1..500
 
         fun parse(machineId: UUID, cpu: String, memory: String, disk: String): Result<MilaMachineResizeRequest> {
             val cores = cpu.toIntOrNull()?.takeIf { it in MilaMachineCreateRequest.CPU } ?: return Result.failure(MilaMachineFieldException(MilaMachineField.Cpu))

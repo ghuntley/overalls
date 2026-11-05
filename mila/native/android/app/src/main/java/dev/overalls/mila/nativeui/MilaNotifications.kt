@@ -5,6 +5,10 @@ import android.app.NotificationManager
 import android.content.Context
 import android.content.SharedPreferences
 import android.os.Build
+import java.util.UUID
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 /** Provider-issued registration identifier. The value is opaque and never persisted as a token. */
 @JvmInline
@@ -47,6 +51,63 @@ class MilaAndroidNotificationOs(context: Context) : MilaNotificationOs {
 }
 
 data class MilaNotificationDevice(val id: String, val enabled: Boolean)
+
+/**
+ * @cc [owner:ghuntley,label:security;protocol] android-server-notification-devices
+ * Account device rows MUST come from the current authenticated Porsche session. Preference and
+ * removal actions MUST target a listed canonical UUID, and a result from an ended generation
+ * MUST NOT replace the current projection. Provider tokens are never part of this projection.
+ */
+class MilaServerNotificationController(private val adapter: MilaFfiAdapter) {
+    var devices: List<MilaNotificationDevice> = emptyList()
+        private set
+    private var generation: Long = 0
+    private var active = false
+
+    fun setSession(signedIn: Boolean) {
+        generation += 1
+        active = signedIn
+        devices = emptyList()
+    }
+
+    suspend fun refresh(): Boolean {
+        if (!active) return false
+        val bound = generation
+        val rows = withContext(Dispatchers.IO) {
+            adapter.notificationDevices().mapCatching(::decode)
+        }.getOrNull() ?: return false
+        if (!active || generation != bound) return false
+        devices = rows
+        return true
+    }
+
+    suspend fun setEnabled(id: String, enabled: Boolean): Boolean = mutate(id) { adapter.notificationDevicePreferences(id, enabled) }
+    suspend fun remove(id: String): Boolean = mutate(id) { adapter.notificationDeviceRemove(id) }
+
+    private suspend fun mutate(id: String, action: () -> Result<Unit>): Boolean {
+        if (!active || devices.none { it.id == id }) return false
+        val bound = generation
+        if (withContext(Dispatchers.IO) { action() }.isFailure || !active || generation != bound) return false
+        return refresh()
+    }
+
+    companion object {
+        internal fun decode(bytes: ByteArray): List<MilaNotificationDevice> {
+            require(bytes.size in 1..(256 * 1024))
+            val envelope = JSONObject(bytes.toString(Charsets.UTF_8))
+            require(envelope.getInt("version") == 1 && envelope.getString("status") == "succeeded")
+            val rows = envelope.getJSONObject("result").getJSONArray("items")
+            require(rows.length() <= 128)
+            val ids = mutableSetOf<String>()
+            return (0 until rows.length()).map { index ->
+                val row = rows.getJSONObject(index)
+                val id = row.getString("id")
+                require(UUID.fromString(id).toString() == id && ids.add(id))
+                MilaNotificationDevice(id, row.getBoolean("enabled"))
+            }
+        }
+    }
+}
 interface MilaNotificationStore { fun list(): List<MilaNotificationDevice>; fun setEnabled(id: String, enabled: Boolean): Boolean; fun remove(id: String): Boolean }
 fun interface MilaNotificationRegistrationValidator { fun validate(id: MilaNotificationProviderId): Boolean }
 interface MilaNotificationRegistrationStore : MilaNotificationStore {

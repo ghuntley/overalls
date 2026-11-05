@@ -235,6 +235,11 @@ public struct MilaApplePushRegistration: Sendable {
 
     public func register(adapter: any MilaFFIAdapter, deployment: String, deviceToken: Data,
                          environment: MilaPushEnvironment = .production, label: String? = nil) async -> MilaPushRegistrationOutcome {
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        // Ad-hoc macOS development builds have no APNs entitlement and must
+        // never send an injected token to Susan or the Rust device API.
+        return .deploymentRefused
+        #else
         guard await authorization.requestAuthorization() else { return .notAuthorized }
         // APNs tokens are opaque bytes; Rust accepts 32...200 lowercase hex characters.
         guard (16...100).contains(deviceToken.count) else { return .invalidToken }
@@ -257,7 +262,8 @@ public struct MilaApplePushRegistration: Sendable {
         }
         do {
             return .registered(try await adapter.registerNotificationDevice(platform: platform, susanReply: reply.body,
-                                                                            encryptionPublicKey: encryptionKey, label: label, now: clock()))
+                                                                            encryptionPublicKey: encryptionKey, label: label, now: clock(), requestID: UUID()))
         } catch { return .deploymentRefused }
+        #endif
     }
 }

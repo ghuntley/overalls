@@ -16,7 +16,7 @@ internal sealed record MilaMachineRow(
 internal sealed record MilaSessionListing(IReadOnlyList<MilaMachineRow> Machines, bool HasMore)
 {
     internal const int MaxBytes = 8 * 1024 * 1024;
-    internal const int MaxMachines = 10_000;
+    internal const int MaxMachines = 500;
 
     internal static MilaSessionListing Decode(ReadOnlySpan<byte> bytes)
     {
@@ -38,7 +38,13 @@ internal sealed record MilaSessionListing(IReadOnlyList<MilaMachineRow> Machines
             machines.Add(new(id, name, desired, observed,
                 ReadBool(row, "pinned"), ReadBool(row, "read"), ReadBool(row, "write"), ReadBool(row, "manage")));
         }
-        bool hasMore = root.TryGetProperty("has_more", out JsonElement more) && more.ValueKind == JsonValueKind.True;
+        bool hasMore = false;
+        if (root.TryGetProperty("has_more", out JsonElement more))
+        {
+            if (more.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+                throw new InvalidDataException("invalid listing continuation");
+            hasMore = more.GetBoolean();
+        }
         return new(machines, hasMore);
     }
 
@@ -46,4 +52,45 @@ internal sealed record MilaSessionListing(IReadOnlyList<MilaMachineRow> Machines
         row.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.String ? value.GetString() : null;
     private static bool ReadBool(JsonElement row, string name) =>
         row.TryGetProperty(name, out JsonElement value) && value.ValueKind == JsonValueKind.True;
+}
+
+internal sealed record MilaMachineRefreshResult(
+    MilaNativeStatus Status, MilaSessionListing? Listing, byte[]? Snapshot);
+
+/// <summary>
+/// @cc [owner:ghuntley,label:protocol;security] mila-windows-complete-machine-refresh
+/// A refresh MUST advance authenticated continuation on the same Rust session,
+/// within 500 reads. A failed read MUST NOT publish a cached Rust listing or
+/// create a snapshot; snapshots MUST follow only a complete successful listing.
+/// </summary>
+internal sealed class MilaMachineListingReader(
+    Func<bool, MilaNativeStatus> read,
+    Func<MilaNativeSessionBytesResult> listing,
+    Func<ulong, MilaNativeSessionBytesResult> snapshot)
+{
+    internal static MilaMachineRefreshResult Refresh(ulong handle, ulong savedAt) =>
+        new MilaMachineListingReader(
+            more => RustNative.TrySessionReadMachines(handle, more),
+            () => RustNative.TrySessionListing(handle),
+            time => RustNative.TrySessionSnapshot(handle, time)).Refresh(savedAt);
+
+    internal MilaMachineRefreshResult Refresh(ulong savedAt)
+    {
+        for (int page = 0; page < MilaSessionListing.MaxMachines; page++)
+        {
+            MilaNativeStatus status = read(page != 0);
+            if (status != MilaNativeStatus.Ok) return new(status, null, null);
+            MilaNativeSessionBytesResult result = listing();
+            if (!result.Succeeded || result.Data is not { } bytes)
+                return new(result.Status == MilaNativeStatus.Ok ? MilaNativeStatus.Internal : result.Status, null, null);
+            MilaSessionListing decoded;
+            try { decoded = MilaSessionListing.Decode(bytes); }
+            catch (Exception error) when (error is InvalidDataException or JsonException)
+            { return new(MilaNativeStatus.InvalidRequest, null, null); }
+            if (decoded.HasMore) continue;
+            MilaNativeSessionBytesResult cached = snapshot(savedAt);
+            return new(MilaNativeStatus.Ok, decoded, cached.Succeeded ? cached.Data : null);
+        }
+        return new(MilaNativeStatus.InvalidRequest, null, null);
+    }
 }

@@ -375,7 +375,7 @@ internal static class JourneyPages
         Program.Require(listed.Succeeded, $"journey thread ls ({listed.Status})");
         MilaThreadListing listing = MilaThreadListing.Decode(listed.Data!);
         MilaThreadController threads = new();
-        threads.SetSession(true, listing);
+        threads.SetSession(true, listing, handle);
         Program.Require(threads.Select(thread), "journey created thread is listed");
         Step("threads list");
 

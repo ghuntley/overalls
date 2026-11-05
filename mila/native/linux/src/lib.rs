@@ -13,6 +13,7 @@ pub mod porsche_results;
 pub mod route;
 pub mod session;
 pub mod signin_driver;
+pub mod snapshots;
 pub mod ssh_keys_view;
 pub mod terminal;
 pub mod terminal_surface;

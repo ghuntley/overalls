@@ -58,7 +58,7 @@ class MainActivity : FragmentActivity() {
             override fun onAuthenticationError(errorCode: Int, errString: CharSequence) { lockController.pendingAttempt()?.let { lockController.finishUnlock(it, false) }; lockState.value = lockController.state }
         })
         setContent {
-            MilaTheme {
+            MilaTheme(settings = persisted) {
                 val state = lockState.value ?: lockController.state
                 if (state.obscured) Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text(MilaStrings.text(MilaMessage.LockTitle), style = MaterialTheme.typography.headlineSmall)

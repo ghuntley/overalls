@@ -60,7 +60,9 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
     /// Removes a persisted deployment and fences any session that was using it.
     @discardableResult public func remove(_ id: UUID) -> Bool {
         guard store.list().contains(where: { $0.id == id }) else { return false }
+        let removed = store.list().first { $0.id == id }
         let selected = selectedDeployment?.id == id
+        if let removed { try? MilaSnapshotStore().forget(host: removed.host, port: removed.port) }
         store.remove(id)
         lock.lock()
         var ended: (any MilaFFIAdapter)?

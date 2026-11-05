@@ -274,3 +274,34 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeMachine
         -1
     }
 }
+
+/// Reuses the closed Rust snapshot decoder for Android persistence, including
+/// empty listings (which cannot be validated by looking up a row's actions).
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSnapshotSavedAt(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    bytes: jni::objects::JByteArray<'_>,
+    host: jni::objects::JString<'_>,
+    port: jni::sys::jint,
+) -> jni::sys::jlong {
+    let Ok(port) = u16::try_from(port) else {
+        return -1;
+    };
+    if port == 0 {
+        return -1;
+    }
+    let Ok(bytes) = env.convert_byte_array(bytes) else {
+        return -1;
+    };
+    let Ok(host) = env.get_string(&host) else {
+        return -1;
+    };
+    let Ok(host) = host.to_str() else {
+        return -1;
+    };
+    mila_runtime::MachineSnapshot::decode(&bytes, host, Some(port))
+        .ok()
+        .and_then(|snapshot| i64::try_from(snapshot.saved_at).ok())
+        .unwrap_or(-1)
+}

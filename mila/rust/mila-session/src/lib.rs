@@ -16,6 +16,7 @@ mod shares;
 mod ssh_keys;
 mod terminal;
 mod threads;
+mod watch;
 mod web;
 
 pub use error::SessionError;
@@ -29,6 +30,7 @@ pub struct ApplicationSession {
     listing: Option<MachineListing>,
     seen_cursors: HashSet<Identifier>,
     last_refusal: std::sync::Mutex<Option<String>>,
+    authority: bool,
 }
 
 impl std::fmt::Debug for ApplicationSession {
@@ -107,6 +109,9 @@ fn validate_ssh_keys(bytes: &[u8]) -> Result<(), SessionError> {
 impl ApplicationSession {
     /// Submit one command once and remember a closed refusal code, if any.
     async fn exec(&self, line: &str, stdin: &[u8]) -> Result<ExecOutput, SshError> {
+        if !self.authority {
+            return Err(SshError::Authentication);
+        }
         let output = self.ssh.exec(line, stdin).await?;
         let code = (output.exit_status != 0)
             .then(|| refusal_code(&output.stdout))
@@ -156,11 +161,19 @@ impl ApplicationSession {
             listing: None,
             seen_cursors: HashSet::new(),
             last_refusal: std::sync::Mutex::new(None),
+            authority: true,
         })
     }
 
     pub async fn close(self) -> Result<(), SessionError> {
         Ok(self.ssh.close().await?)
+    }
+
+    /// A revoked watch fences cached authority until a new authenticated session.
+    pub fn invalidate_authority(&mut self) {
+        self.authority = false;
+        self.listing = None;
+        self.seen_cursors.clear();
     }
 }
 

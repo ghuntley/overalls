@@ -7,12 +7,17 @@ mod error;
 mod grammar;
 mod lex;
 mod reply;
+mod terminal;
 
 pub use command::{Command, OptionValue, PayloadKind};
 pub use error::ProtocolError;
 pub use grammar::{device_public_key_valid, parse_platform};
 pub use mila_model::{MilaPage, WorkspaceSource};
 pub use reply::{decode_reply, Receipt, ReceiptStatus, Reply};
+pub use terminal::{
+    decode_attach_header, AttachError, AttachHeader, AttachMode, AttachOutcome,
+    MAX_ATTACH_HEADER_BYTES, MAX_TERMINAL_CURSOR,
+};
 
 /// Maximum command-line bytes accepted by Porsche.
 pub const MAX_COMMAND_BYTES: usize = 8_192;

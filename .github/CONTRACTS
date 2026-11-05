@@ -54,3 +54,14 @@ temporary directory, or the Apple identity reaches an action command or
 environment. Signing material MUST live only in owner-only $RUNNER_TEMP files
 removed by an always() step, and passwords MUST NOT appear in argv
 (ADR-0235, ADR-0269 M9).
+
+@cc [owner:ghuntley,label:build;verification] mila-linux-native-buck-entrypoints
+mila-builds.yml's linux-native job MUST build and verify its Rust and GTK
+packages through Buck2. Authenticated headless and GTK journeys MUST run the
+declared Buck2 targets over the separate opt-in journey package; normal Linux
+releases MUST NOT contain fixture drivers or enable gtk-journey.
+
+@cc [owner:ghuntley,label:security;verification] mila-linux-fixture-diagnostics
+mila-builds.yml's linux-native job MUST NOT print the fixture launcher log or
+descriptor. Its failure diagnostics MUST remain closed startup outcomes and
+sanitized journey reports because the launcher log contains the approver bearer.

@@ -1,6 +1,10 @@
+#![allow(
+    clippy::unwrap_used,
+    reason = "The scripted SSH fixture uses fixed valid protocol bytes; production decoders remain fallible."
+)]
 use base64::{engine::general_purpose::STANDARD, Engine};
 use mila_transport::{
-    ssh::{DeviceSigner, PtyChunk, PtySession, SshError, SshSession},
+    ssh::{DeviceSigner, PtyChunk, PtySession, SshError, SshSession, TerminalAttachOptions},
     TrustDocument,
 };
 use russh::{
@@ -81,8 +85,34 @@ impl server::Handler for Handler {
         session: &mut server::Session,
     ) -> impl Future<Output = Result<(), Self::Error>> + Send {
         std::future::ready((|| {
-            if data == b"terminal attach --json" {
+            if data.starts_with(b"terminal attach ") {
                 session.channel_success(channel)?;
+                let line = std::str::from_utf8(data).unwrap();
+                let parsed = mila_protocol::Command::parse(line).unwrap();
+                let id = parsed.arguments.last().unwrap();
+                let suffix = id.rsplit('-').next().unwrap();
+                let header = if suffix == "000000000002" {
+                    "{\"attached\":true,\"from\":0,\"mode\":\"admin\",\"replay_bytes\":0,\"version\":1}\n"
+                } else if suffix == "000000000003" {
+                    "{\"attached\":false,\"error\":\"forbidden\",\"version\":1}\n"
+                } else if suffix == "000000000004" {
+                    "{\"attached\":true,\"from\":4096,\"mode\":\"ro\",\"replay_bytes\":0,\"version\":1}\n"
+                } else {
+                    "{\"attached\":true,\"from\":4096,\"mode\":\"rw\",\"replay_bytes\":7,\"version\":1}\n"
+                };
+                // Header fragments must be assembled separately from PTY bytes.
+                session.extended_data(channel, 1, header.as_bytes()[..10].to_vec())?;
+                session.extended_data(channel, 1, header.as_bytes()[10..].to_vec())?;
+                if suffix == "000000000003" {
+                    session.exit_status_request(channel, 1)?;
+                    session.close(channel)?;
+                    return Ok(());
+                }
+                if suffix == "000000000005" {
+                    session.exit_status_request(channel, 3)?;
+                    session.close(channel)?;
+                    return Ok(());
+                }
                 session.data(channel, b"ready\r\n".to_vec())?;
                 return Ok(());
             }
@@ -285,7 +315,16 @@ async fn pty_read_within_distinguishes_idle_from_close() {
     let session = SshSession::connect(trust, port, &public, signer, Duration::from_secs(5))
         .await
         .unwrap();
-    let mut pty = PtySession::open(&session, 80, 24).await.unwrap();
+    let mut pty = PtySession::attach(
+        &session,
+        "11111111-1111-4111-8111-111111111111",
+        "00000000-0000-4000-8000-000000000001",
+        80,
+        24,
+    )
+    .await
+    .unwrap();
+    assert_eq!(pty.cursor(), 4096);
     // Channel bookkeeping messages surface as `Idle`; the first data chunk
     // must still arrive intact.
     let mut first = PtyChunk::Idle;
@@ -296,6 +335,7 @@ async fn pty_read_within_distinguishes_idle_from_close() {
         }
     }
     assert_eq!(first, PtyChunk::Data(b"ready\r\n".to_vec()));
+    assert_eq!(pty.cursor(), 4103);
     assert_eq!(
         pty.read_within(Duration::from_millis(20)).await.unwrap(),
         PtyChunk::Idle
@@ -309,11 +349,92 @@ async fn pty_read_within_distinguishes_idle_from_close() {
         }
     }
     assert!(closed, "channel close must be reported");
+    assert_eq!(pty.outcome(), Some(mila_protocol::AttachOutcome::Closed));
     assert_eq!(
         pty.read_within(Duration::ZERO).await.unwrap(),
         PtyChunk::Closed
     );
     assert!(matches!(pty.write(b"x").await, Err(SshError::Bounds)));
+    session.close().await.unwrap();
+    task.abort();
+}
+
+#[tokio::test]
+async fn terminal_header_refusal_cursor_and_read_only_are_enforced() {
+    let (trust, port, _auth, task) = endpoint("localhost", false, false).await;
+    let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
+    let session = SshSession::connect(trust, port, &public, signer, Duration::from_secs(5))
+        .await
+        .unwrap();
+    let machine = "11111111-1111-4111-8111-111111111111";
+    assert!(matches!(
+        PtySession::attach(
+            &session,
+            machine,
+            "00000000-0000-4000-8000-000000000002",
+            80,
+            24
+        )
+        .await,
+        Err(SshError::AttachHeader)
+    ));
+    let mut refused = PtySession::attach(
+        &session,
+        machine,
+        "00000000-0000-4000-8000-000000000003",
+        80,
+        24,
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        refused.outcome(),
+        Some(mila_protocol::AttachOutcome::Refused)
+    );
+    assert_eq!(
+        refused.read_within(Duration::ZERO).await.unwrap(),
+        PtyChunk::Closed
+    );
+    for (terminal, read_only) in [
+        ("00000000-0000-4000-8000-000000000004", false),
+        ("00000000-0000-4000-8000-000000000001", true),
+    ] {
+        let mut pty = PtySession::attach_with_options(
+            &session,
+            machine,
+            terminal,
+            80,
+            24,
+            TerminalAttachOptions {
+                cursor: Some(4096),
+                read_only,
+            },
+        )
+        .await
+        .unwrap();
+        assert!(pty.read_only());
+        assert!(matches!(pty.write(b"x").await, Err(SshError::ReadOnly)));
+        assert!(matches!(pty.resize(90, 30).await, Err(SshError::ReadOnly)));
+        pty.close().await.unwrap();
+    }
+    let mut authority = PtySession::attach(
+        &session,
+        machine,
+        "00000000-0000-4000-8000-000000000005",
+        80,
+        24,
+    )
+    .await
+    .unwrap();
+    for _ in 0..16 {
+        if authority.read_within(Duration::from_secs(1)).await.unwrap() == PtyChunk::Closed {
+            break;
+        }
+    }
+    assert_eq!(
+        authority.outcome(),
+        Some(mila_protocol::AttachOutcome::Authority)
+    );
     session.close().await.unwrap();
     task.abort();
 }

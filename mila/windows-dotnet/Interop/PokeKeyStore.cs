@@ -123,7 +123,7 @@ internal sealed class MilaWindowsPokeKeyStore : IMilaPokeKeySource
         return $"D:P(A;{inherit};FA;;;{user})(A;{inherit};FA;;;SY)";
     }
 
-    private static void EnsureOwnerOnlyDirectory(string path)
+    internal static void EnsureOwnerOnlyDirectory(string path)
     {
         if (!Directory.Exists(path))
         {

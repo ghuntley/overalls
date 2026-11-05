@@ -27,6 +27,36 @@ impl ApplicationSession {
         enc_pubkey: &str,
         label: Option<&str>,
     ) -> Result<Vec<u8>, SessionError> {
+        self.device_register_command(platform, push_key, enc_pubkey, label, None)
+            .await
+    }
+
+    /// @cc [owner:ghuntley,label:protocol;security] mila-session-device-register-request
+    /// Registration MUST carry the caller's canonical request id and send the
+    /// push key only on stdin. An uncertain result MUST be resolved with
+    /// `request_show` using that same id, never by submitting registration again.
+    pub async fn device_register_with_request(
+        &mut self,
+        platform: mila_model::DevicePlatform,
+        push_key: &str,
+        enc_pubkey: &str,
+        label: Option<&str>,
+        request_id: &str,
+    ) -> Result<Vec<u8>, SessionError> {
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionError::MutationRefused)?;
+        self.device_register_command(platform, push_key, enc_pubkey, label, Some(&request_id))
+            .await
+    }
+
+    async fn device_register_command(
+        &mut self,
+        platform: mila_model::DevicePlatform,
+        push_key: &str,
+        enc_pubkey: &str,
+        label: Option<&str>,
+        request_id: Option<&mila_model::RequestId>,
+    ) -> Result<Vec<u8>, SessionError> {
         if !(16..=700).contains(&push_key.len())
             || !push_key
                 .bytes()
@@ -55,6 +85,12 @@ impl ApplicationSession {
             );
         }
         options.insert("json".to_owned(), mila_protocol::OptionValue::Bool(true));
+        if let Some(request_id) = request_id {
+            options.insert(
+                "request-id".to_owned(),
+                mila_protocol::OptionValue::String(request_id.to_string()),
+            );
+        }
         let line = mila_protocol::Command {
             command: "device register".into(),
             arguments: Vec::new(),

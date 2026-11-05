@@ -4,6 +4,7 @@ mod cert;
 mod session;
 mod trust;
 mod watch;
+mod watch_channel;
 
 pub use cert::{
     parse_host_certificate_blob, parse_host_certificate_line, verify_host_certificate,
@@ -15,6 +16,7 @@ pub use watch::{
     decode_watch_line, RequestRefusal, TerminalAttachRequest, WatchEvent, WatchFormat,
     WatchRequest, MAX_WATCH_LINE_BYTES,
 };
+pub use watch_channel::{WatchRead, WatchSession, WATCH_HEARTBEAT_TIMEOUT};
 
 pub mod ssh;
 

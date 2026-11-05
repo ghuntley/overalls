@@ -64,6 +64,7 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
     var threadResponses: [String: Data] = [:]
     var webData = Data()
     var failMutations = false
+    var deviceMutationRequests: [(String, UUID)] = []
     var ptyOutput: [Data] = []
     var nextTerminal: UInt64 = 100
 
@@ -113,8 +114,12 @@ final class RecordingSession: MilaSessionClient, MilaPtySession, @unchecked Send
         record(.deviceRegister(platform, encryptionPublicKey, label)); if failMutations { throw MilaSessionError.invalidInput }
         return deviceReceipt
     }
-    func notificationDevicePreferences(id: UUID, enabled: Bool) throws { record(.devicePreferences(id, enabled)); if failMutations { throw MilaSessionError.invalidInput } }
-    func notificationDeviceRemove(id: UUID) throws { record(.deviceRemove(id)); if failMutations { throw MilaSessionError.invalidInput } }
+    func notificationDevicePreferences(id: UUID, enabled: Bool, requestID: UUID) throws {
+        deviceMutationRequests.append(("prefs", requestID)); record(.devicePreferences(id, enabled)); if failMutations { throw MilaSessionError.invalidInput }
+    }
+    func notificationDeviceRemove(id: UUID, requestID: UUID) throws {
+        deviceMutationRequests.append(("remove", requestID)); record(.deviceRemove(id)); if failMutations { throw MilaSessionError.invalidInput }
+    }
     func close() { record(.close); lock.lock(); authenticated = false; lock.unlock() }
 
     func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64 {

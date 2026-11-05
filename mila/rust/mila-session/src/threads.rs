@@ -2,6 +2,10 @@ use crate::{ApplicationSession, SessionError};
 use mila_model::Identifier;
 
 impl ApplicationSession {
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one closed command dispatch table mirrors Porsche's thread catalog"
+    )]
     /// Execute one closed-vocabulary thread operation. Response JSON is bounded and
     /// parsed before crossing a native boundary; stdin is accepted only for commands
     /// whose protocol grammar requires it.
@@ -16,9 +20,15 @@ impl ApplicationSession {
         let thread_id = thread
             .map(|v| Identifier::parse(v).map_err(|_| SessionError::InvalidThreadAction))
             .transpose()?;
-        let arg = secondary
-            .map(|v| Identifier::parse(v).map_err(|_| SessionError::InvalidThreadAction))
-            .transpose()?;
+        let arg: Option<String> = match (command, secondary) {
+            ("thread read" | "thread mode", Some(value)) => Some(value.to_owned()),
+            (_, Some(value)) => Some(
+                Identifier::parse(value)
+                    .map_err(|_| SessionError::InvalidThreadAction)?
+                    .to_string(),
+            ),
+            (_, None) => None,
+        };
         #[expect(
             clippy::expect_used,
             reason = "every arm that unwraps thread_id or arg is guarded by its is_some() check"
@@ -75,8 +85,43 @@ impl ApplicationSession {
                     .as_bytes()
                     .to_vec(),
             ),
+            "thread mode"
+                if thread_id.is_some()
+                    && matches!(arg.as_deref(), Some("plan" | "work"))
+                    && input.is_none() =>
+            {
+                (
+                    format!(
+                        "thread mode {} {} --json",
+                        thread_id.as_ref().expect("checked"),
+                        arg.as_deref().expect("checked")
+                    ),
+                    Vec::new(),
+                )
+            }
+            "thread read"
+                if thread_id.is_some()
+                    && arg.as_deref().is_some_and(|value| {
+                        !value.is_empty()
+                            && (value.len() == 1 || !value.starts_with('0'))
+                            && value.parse::<u64>().is_ok_and(|sequence| sequence > 0)
+                    })
+                    && input.is_none() =>
+            {
+                (
+                    format!(
+                        "thread read {} {} --json",
+                        thread_id.as_ref().expect("checked"),
+                        arg.as_deref().expect("checked")
+                    ),
+                    Vec::new(),
+                )
+            }
             _ => return Err(SessionError::InvalidThreadAction),
         };
+        if matches!(command, "thread mode" | "thread read") && request_id.is_none() {
+            return Err(SessionError::MutationRefused);
+        }
         if stdin.is_empty()
             && matches!(
                 command,

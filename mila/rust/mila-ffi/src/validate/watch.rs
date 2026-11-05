@@ -60,7 +60,7 @@ pub unsafe extern "C" fn mila_watch_event_kind(
         WatchEvent::TerminalSessionsChanged(_) => MilaWatchEventKind::TerminalSessionsChanged,
         WatchEvent::ThreadChanged(_) => MilaWatchEventKind::ThreadChanged,
         WatchEvent::Resync => MilaWatchEventKind::Resync,
-        WatchEvent::Session { .. } => MilaWatchEventKind::Session,
+        WatchEvent::Session { .. } | WatchEvent::SessionChanged(_) => MilaWatchEventKind::Session,
     };
     // SAFETY: caller guarantees writable storage for one event tag.
     unsafe { *out_kind = kind };

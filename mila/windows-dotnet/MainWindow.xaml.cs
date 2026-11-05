@@ -19,6 +19,10 @@ public sealed partial class MainWindow : Window
     private MilaMachineRow? _selectedMachine;
     private readonly MilaAppLockController _appLock = new(new MilaWindowsHelloBroker());
     private readonly MilaSessionConnection _session = new();
+    private readonly MilaWatchStream _watch = new();
+    private long _watchGeneration;
+    private bool _watchRefreshPending;
+    private string _watchFilterKey = "";
     private readonly MilaTerminalStream _terminalStream;
     private MilaTerminalSession _terminal => _terminalStream.Session;
     private long _terminalGeneration => _terminalStream.Generation;
@@ -28,6 +32,12 @@ public sealed partial class MainWindow : Window
     private bool _webNavigationBound;
     private long _webGeneration;
     private long _machineGeneration;
+    private long _threadReadGeneration;
+    private readonly SemaphoreSlim _machineReadGate = new(1, 1);
+    private readonly MilaSnapshotStore _snapshots = new();
+    private MilaDeployment? _snapshotDeployment;
+    private long _snapshotGeneration;
+    private bool _showingOffline;
     private readonly MilaSignInFlow _signIn = new();
     private readonly MilaSignInCoordinator _coordinator;
     private readonly MilaDeploymentPicker _picker;
@@ -56,6 +66,8 @@ public sealed partial class MainWindow : Window
         Closed += (_, _) =>
         {
             _closed = true;
+            _watchGeneration++;
+            _watch.Dispose();
             _terminalStream.SignOut();
             _coordinator.SignOut();
             _session.Dispose();
@@ -66,8 +78,7 @@ public sealed partial class MainWindow : Window
             if (args.WindowActivationState == WindowActivationState.Deactivated)
             {
                 _appLock.OnDeactivated();
-                LockButton.Content = S("unlock", "Unlock");
-                LockStatus.Text = S("lockedTitle", "Mila is locked");
+                ApplyLockState();
             }
         };
         ApplyStrings();
@@ -88,6 +99,12 @@ public sealed partial class MainWindow : Window
         if (view.HostText is { } host) DeploymentHost.Text = host;
         if (view.PortText is { } port) DeploymentPort.Text = port;
         if (view.Status is { } status) StatusText.Text = status.Render(S);
+        if (_snapshotDeployment != view.Selected)
+        {
+            _snapshotDeployment = view.Selected;
+            _snapshotGeneration = _snapshots.Bind(view.Selected);
+            ShowOfflineMachines();
+        }
     }
     private void OnDeploymentSelected(object sender, SelectionChangedEventArgs args)
     {
@@ -99,11 +116,20 @@ public sealed partial class MainWindow : Window
         ShowDeployments(_deployments.Add(DeploymentHost.Text, DeploymentPort.Text, select: true, out _));
     private void ForgetDeploymentClicked(object sender, RoutedEventArgs args)
     {
-        if (_deployments.Forget(DeploymentRows.SelectedItem as MilaDeployment) is { } view) ShowDeployments(view);
+        MilaDeployment? forgotten = DeploymentRows.SelectedItem as MilaDeployment;
+        if (_deployments.Forget(forgotten) is { } view)
+        {
+            if (forgotten is not null) { try { _snapshots.Forget(forgotten); } catch (Exception error) when (SnapshotUnavailable(error)) { } }
+            ShowDeployments(view);
+        }
     }
     /// <summary>Tears down every authenticated surface of the active deployment.</summary>
     private void SignOutActiveDeployment()
     {
+        _watchGeneration++;
+        _watchFilterKey = "";
+        _watch.Stop();
+        _snapshotGeneration = _snapshots.Bind(_picker.State.Selected);
         _coordinator.SignOut();
         _signInTarget = null;
         _deviceKey?.Dispose();
@@ -113,12 +139,15 @@ public sealed partial class MainWindow : Window
         _selectedMachine = null;
         MachineRows.ItemsSource = Array.Empty<MilaMachineRow>();
         _threadController.SetSession(false, null);
+        ThreadPrompt.IsEnabled = ThreadAnswer.IsEnabled = ThreadApprove.IsEnabled = ThreadRevise.IsEnabled = false;
         _machineMutation.SetSession(false);
         UpdateMachineMutationAvailability();
         _notificationController.SetSession(false);
         _notificationsEnabled = false;
         _webGeneration++;
         _machineGeneration++;
+        _threadReadGeneration++;
+        ThreadRows.ItemsSource = Array.Empty<MilaThreadRow>();
         _webUrl = null;
         _webRevision = 0;
         WebBrowser.Source = null;
@@ -126,9 +155,10 @@ public sealed partial class MainWindow : Window
         WebStatus.Text = S("webNoAddress", "No web address");
         _terminalPollTimer?.Stop();
         _terminalStream.SignOut();
-        TerminalOutput.Text = string.Empty;
+        MilaTerminalView.Render(TerminalOutput, TerminalImages, null, string.Empty);
         TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.SignedOut).Render(S);
         ShowSignInState(_signIn.State);
+        ShowOfflineMachines();
     }
     private void ShowSignInState(MilaSignInState state)
     {
@@ -233,6 +263,10 @@ public sealed partial class MainWindow : Window
         MachineShareRemove.Content = S("sharingRemove", "Share remove"); MachineWebShow.Content = S("webOpen", "Web show");
         MachineWebSet.Content = S("webSave", "Web set");
         CreateMachineButton.Content = S("actionCreate", "Create machine");
+        CreateName.PlaceholderText = S("machineName", "Name");
+        CreateCpu.PlaceholderText = S("kvCpu", "CPU");
+        CreateMemory.PlaceholderText = S("memoryFieldMib", "Memory (MiB)");
+        CreateDisk.PlaceholderText = S("diskFieldGib", "Disk (GiB)");
         ShareAdd.Content = S("sharingAdd", "Share add");
         ShareRemove.Content = S("sharingRemove", "Share remove");
         SshKeysTitle.Text = S("sshKeysTitle", "SSH keys");
@@ -259,9 +293,12 @@ public sealed partial class MainWindow : Window
         _ = RefreshLockAvailabilityAsync();
         TerminalTitle.Text = S("tabTerminals", "Terminal");
         TerminalAttach.Content = S("terminalAttach", "Attach");
+        TerminalDetach.Content = S("terminalDetach", "Detach");
+        TerminalSessionId.PlaceholderText = S("terminalSessionHint", "Terminal session");
         TerminalResize.Content = S("terminalModeControl", "Resize");
         TerminalInput.Content = S("terminalPaste", "Send input");
         TerminalKill.Content = S("terminalKill", "Kill");
+        MachineClone.Content = S("actionClone", "Clone");
         NotificationsButton.Content = S("notificationsTurnOn", "Turn notifications on");
         NotificationsStatus.Text = S("pushStateOff", "Notifications off");
         RefreshNotifications.Content = S("refresh", "Refresh");
@@ -271,7 +308,11 @@ public sealed partial class MainWindow : Window
         WebSet.Content = S("webSave", "Save web settings");
         WebStatus.Text = S("webNoAddress", "No web address");
     }
-    private async void RefreshSshKeysClicked(object sender, RoutedEventArgs args) => await RefreshSshKeyListAsync();
+    private async void RefreshSshKeysClicked(object sender, RoutedEventArgs args)
+    {
+        if (RejectLocked()) return;
+        await RefreshSshKeyListAsync();
+    }
 
     private async Task RefreshSshKeyListAsync(CancellationToken cancellationToken = default)
     {
@@ -326,6 +367,7 @@ public sealed partial class MainWindow : Window
 
     private async void RevokeSelectedSshKey(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (SshKeyRows.SelectedItem is not MilaSshKey key || key.IsCurrentDevice) return;
         RevokeSshKey.IsEnabled = false;
         await _sshKeys.RevokeAsync(key);
@@ -335,25 +377,50 @@ public sealed partial class MainWindow : Window
             : string.Format(S("sshKeysLoaded", "{0} approved keys."), _sshKeys.Keys.Count);
         RevokeSshKey.IsEnabled = false;
     }
-    private void ShareMachine(object sender, RoutedEventArgs args) => ClassifyMachine($"share add {SampleMachine} user viewer");
-    private void UnshareMachine(object sender, RoutedEventArgs args) => ClassifyMachine($"share remove {SampleMachine} user");
+    private void ShareMachine(object sender, RoutedEventArgs args) => SubmitShare(true);
+    private void UnshareMachine(object sender, RoutedEventArgs args) => SubmitShare(false);
+    private (ulong Handle, Guid Machine, string Name, string Request)? _cloneIntent;
+    /// <summary>
+    /// @cc [owner:ghuntley,label:protocol] windows-clone-stable-intent
+    /// Repeated clicks for an unresolved clone reuse its request id; only a changed intent gets another.
+    /// </summary>
+    private async void CloneMachine(object sender, RoutedEventArgs args)
+    {
+        if (RejectLocked() || _selectedMachine is not { } machine || _session.Handle is not { } handle) return;
+        string name = CreateName.Text.Trim();
+        if (_cloneIntent is not { } intent || intent.Handle != handle || intent.Machine != machine.Id || intent.Name != name)
+            _cloneIntent = (handle, machine.Id, name, "porsche-" + Guid.NewGuid().ToString("N"));
+        string request = _cloneIntent.Value.Request;
+        MachineClone.IsEnabled = false;
+        MilaNativeSessionActionResult result = await Task.Run(() => RustNative.TrySessionMachineClone(handle, machine.Id, name, request));
+        if (_session.Handle != handle) return;
+        MachineCommandStatus.Text = result.Succeeded ? S("requestWaiting", "Waiting for the request to finish…") : S("requestRefused", "The deployment refused the request.");
+        UpdateMachineMutationAvailability();
+    }
+
     private void CreateMachine(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } handle || handle == 0)
         {
             MachineCommandStatus.Text = S("signInFirst", "Sign in first");
             return;
         }
-        MilaMachineCommandKind? kind = RustNative.TryClassifyMachineCommand("new");
-        if (kind != MilaMachineCommandKind.New) { MachineCommandStatus.Text = S("requestRefused", "Create request refused"); return; }
+        string name = CreateName.Text.Trim();
+        if (name.Length is < 1 or > 128 || !name.All(c => char.IsAsciiLetterOrDigit(c) || c is '-' or '_') ||
+            !uint.TryParse(CreateCpu.Text, out uint cpu) || !ulong.TryParse(CreateMemory.Text, out ulong memory) ||
+            !ulong.TryParse(CreateDisk.Text, out ulong disk) || cpu is < 1 or > 256 ||
+            memory is < 256 or > 4_194_304 || disk is < 1 or > 500)
+        { MachineCommandStatus.Text = S("machineFieldInvalid", "Check this value."); return; }
         MilaNativeSessionActionResult result = RustNative.TrySessionMachineCreate(
-            handle, "mila-machine", 1, 256, 1, "porsche-" + Guid.NewGuid().ToString("N"));
+            handle, name, cpu, memory, disk, "porsche-" + Guid.NewGuid().ToString("N"));
         MachineCommandStatus.Text = result.Succeeded
             ? S("requestWaiting", "Create request submitted")
             : S("requestRefused", "Create request refused");
     }
     private async void OpenWebControl(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         long generation = _webGeneration;
         if (_selectedMachine is not { } machine || _session.Handle is not { } handle)
         {
@@ -440,6 +507,7 @@ public sealed partial class MainWindow : Window
     }
     private async void SetWebControl(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_selectedMachine is not { } machine || _session.Handle is not { } handle)
         {
             WebStatus.Text = S("signInFirst", "Sign in first");
@@ -473,6 +541,7 @@ public sealed partial class MainWindow : Window
     }
     private async void ToggleNotifications(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } handle || handle == 0 || _activeHost is not { } host)
         {
             _notificationController.SetSession(false);
@@ -507,10 +576,12 @@ public sealed partial class MainWindow : Window
     }
     private async void RefreshNotificationsClicked(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         await RefreshNotificationDevicesAsync();
     }
     private async void RemoveNotificationClicked(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (NotificationRows.SelectedItem is not MilaWindowsNotificationDevice device) return;
         RemoveNotification.IsEnabled = false;
         await _notificationDevices.RemoveAsync(device);
@@ -555,8 +626,12 @@ public sealed partial class MainWindow : Window
             !await new MilaLauncherApprovalBrowser().OpenAsync(approval, CancellationToken.None))
             StatusText.Text = MilaPresentation.SignIn(_signIn.State with { Phase = MilaSignInPhase.Expired }, null).Render(S);
     }
+    /// @cc [owner:ghuntley,label:reliability] windows-terminal-initial-retry-poll
+    /// A terminal entering Reconnecting after an initial attach MUST start the
+    /// bounded polling loop; a failed terminal-new mutation MUST NOT start it.
     private void ValidateTerminalAttach(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } sessionHandle || sessionHandle == 0)
         {
             TerminalStatus.Text = MilaPresentation.Terminal(MilaTerminalPoll.SignedOut).Render(S);
@@ -567,38 +642,54 @@ public sealed partial class MainWindow : Window
             TerminalStatus.Text = S("terminalRefused", "Terminal refused");
             return;
         }
-        bool attached = RustNative.TryValidateTerminalAttach(0, 80, 24, true).IsValid &&
-            _terminalStream.Open(machine.Id, machine.CanWrite, 80, 24);
-        TerminalOutput.Text = string.Empty;
+        if (!TryTerminalDimensions(out ushort columns, out ushort rows))
+        { TerminalStatus.Text = S("terminalInvalid", "Mila could not attach to this terminal session."); return; }
+        string terminalId = TerminalSessionId.Text.Trim();
+        bool attached = terminalId.Length == 0
+            ? _terminalStream.Open(machine.Id, machine.CanWrite, columns, rows)
+            : _terminalStream.AttachSession(machine.Id, terminalId, machine.CanWrite, columns, rows);
+        if (attached) TerminalSessionId.Text = _terminalStream.TerminalId ?? string.Empty;
+        MilaTerminalView.Render(TerminalOutput, TerminalImages, null, string.Empty);
         TerminalStatus.Text = attached ? S("terminalAttaching", "attaching") : S("terminalRefused", "Terminal refused");
-        if (attached) _terminalPollTimer?.Start();
+        if (attached || _terminal.State == MilaTerminalState.Reconnecting) _terminalPollTimer?.Start();
     }
     private void PollTerminalOutput()
     {
         if (_closed) { _terminalPollTimer?.Stop(); return; }
         MilaTerminalPoll poll = _terminalStream.Poll();
-        if (poll == MilaTerminalPoll.Output || poll == MilaTerminalPoll.Reconnected) TerminalOutput.Text = _terminal.Output;
+        if (poll == MilaTerminalPoll.Output || poll == MilaTerminalPoll.Reconnected) MilaTerminalView.Render(TerminalOutput, TerminalImages, _terminal.Frame, _terminal.Output);
         if (poll != MilaTerminalPoll.Idle && poll != MilaTerminalPoll.Output)
             TerminalStatus.Text = MilaPresentation.Terminal(poll).Render(S);
         if (poll is MilaTerminalPoll.Ended or MilaTerminalPoll.Exhausted or MilaTerminalPoll.SignedOut or MilaTerminalPoll.Detached)
             _terminalPollTimer?.Stop();
         if (poll == MilaTerminalPoll.SignedOut || poll == MilaTerminalPoll.Exhausted) ReportSessionTransportLoss();
     }
+    private void DetachTerminal(object sender, RoutedEventArgs args)
+    {
+        if (RejectLocked()) return;
+        _terminalPollTimer?.Stop();
+        _terminalStream.Kill();
+        TerminalStatus.Text = S("terminalDetach", "Detach");
+    }
     private void ValidateTerminalResize(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } sessionHandle || sessionHandle == 0 ||
             !_terminal.Reconnect(_terminalGeneration))
         {
             TerminalStatus.Text = S("signInFirst", "Sign in first");
             return;
         }
-        MilaNativeTerminalResult result = RustNative.TryValidateTerminalResize(80, 24, true);
-        MilaNativeStatus native = result.IsValid ? RustNative.TrySessionTerminalResize(_terminal.NativeTerminalHandle, 80, 24) : result.Status;
-        TerminalStatus.Text = result.IsValid && native == MilaNativeStatus.Ok && _terminal.Resize(_terminalGeneration, 80, 24)
+        if (!TryTerminalDimensions(out ushort columns, out ushort rows))
+        { TerminalStatus.Text = S("terminalInvalid", "Mila could not attach to this terminal session."); return; }
+        MilaNativeTerminalResult result = RustNative.TryValidateTerminalResize(columns, rows, true);
+        MilaNativeStatus native = result.IsValid ? RustNative.TrySessionTerminalResize(_terminal.NativeTerminalHandle, columns, rows) : result.Status;
+        TerminalStatus.Text = result.IsValid && native == MilaNativeStatus.Ok && _terminal.Resize(_terminalGeneration, columns, rows)
             ? S("terminalLive", "Terminal live") : S("terminalInvalid", "Invalid terminal dimensions");
     }
     private void ValidateTerminalInput(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } sessionHandle || sessionHandle == 0 ||
             !_terminal.Reconnect(_terminalGeneration))
         {
@@ -614,6 +705,7 @@ public sealed partial class MainWindow : Window
     }
     private void KillTerminal(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         // Kill is valid while an authenticated attach is still negotiating or
         // reconnecting; it also stops any further reconnect attempt. It ends the
         // named server session (`terminal kill`), not just the local PTY, on the
@@ -644,6 +736,8 @@ public sealed partial class MainWindow : Window
         {
             _activeHost = null;
             _machineMutation.SetSession(false);
+            _snapshotGeneration = _snapshots.Bind(_picker.State.Selected);
+            ShowOfflineMachines();
             UpdateMachineMutationAvailability();
         }
     }
@@ -692,6 +786,7 @@ public sealed partial class MainWindow : Window
         ShowSignInState(state);
         if (state.Phase != MilaSignInPhase.SignedIn || _session.Handle is not { } handle || _signInTarget?.Host != host) return;
         _activeHost = host;
+        StartWatch(handle);
         _notificationController.SetSession(true);
         _machineMutation.SetSession(true, handle);
         UpdateMachineMutationAvailability();
@@ -701,6 +796,45 @@ public sealed partial class MainWindow : Window
         await RefreshNotificationDevicesAsync();
         RefreshMachines();
     }
+    /// @cc [owner:ghuntley,label:reliability] windows-ui-watch-complete-window
+    /// The UI MUST pass every displayed identity within the 500-machine and
+    /// 256-thread windows to the watch worker, retaining session fencing.
+    private void StartWatch(ulong handle)
+    {
+        // MilaWatchStream shards the displayed windows into native-sized subscriptions.
+        Guid[] machines = (MachineRows.ItemsSource as IEnumerable<MilaMachineRow> ?? Array.Empty<MilaMachineRow>()).Select(row => row.Id).Distinct().Order().Take(500).ToArray();
+        Guid[] threads = (ThreadRows.ItemsSource as IEnumerable<MilaThreadRow> ?? Array.Empty<MilaThreadRow>()).Select(row => row.Id).Distinct().Order().Take(256).ToArray();
+        string key = handle + ":" + string.Join(",", machines) + ":" + string.Join(",", threads);
+        if (_watchFilterKey == key) return;
+        _watchFilterKey = key;
+        long generation = ++_watchGeneration;
+        _watch.Start(handle, machines, threads, hint => DispatcherQueue.TryEnqueue(() =>
+        {
+            if (_closed || generation != _watchGeneration || _session.Handle != handle) return;
+            if (hint == MilaWatchHint.AuthorityLost) { SignOutActiveDeployment(); return; }
+            if (hint == MilaWatchHint.TransportLost)
+            {
+                _watchFilterKey = "";
+                _watch.Stop();
+                ReportSessionTransportLoss();
+                if (_signInTarget is { } target && _signIn.State.Phase == MilaSignInPhase.Disconnected)
+                    _ = CompleteSignInAsync(_coordinator.ReconnectAsync(target), target.Host);
+                return;
+            }
+            if (_watchRefreshPending) return;
+            _watchRefreshPending = true;
+            _ = RefreshFromWatchAsync(generation);
+        }));
+    }
+    private async Task RefreshFromWatchAsync(long generation)
+    {
+        await Task.Delay(200);
+        _watchRefreshPending = false;
+        if (_closed || generation != _watchGeneration || RejectLocked()) return;
+        RefreshMachines();
+        RefreshThreads();
+    }
+
     private async Task RefreshLockAvailabilityAsync()
     {
         await _appLock.RefreshAvailabilityAsync();
@@ -711,11 +845,7 @@ public sealed partial class MainWindow : Window
     {
         _appLock.Lock();
         if (!_appLock.IsLocked) return;
-        Navigation.IsHitTestVisible = false;
-        LockButton.Content = S("unlock", "Unlock");
-        LockStatus.Text = S("lockedTitle", "Mila is locked") + " — " + S("lockReason", "Unlock Mila");
-        LockButton.Click -= LockApp;
-        LockButton.Click += UnlockApp;
+        ApplyLockState();
     }
     private async void UnlockApp(object sender, RoutedEventArgs args)
     {
@@ -727,11 +857,37 @@ public sealed partial class MainWindow : Window
             LockStatus.Text = S("lockReason", "Unlock Mila");
             return;
         }
-        Navigation.IsHitTestVisible = true;
-        LockButton.Content = S("lockTitle", "Lock app");
-        LockStatus.Text = S("ready", "Ready");
+        ApplyLockState();
+    }
+
+    private bool RejectLocked()
+    {
+        if (!_appLock.IsLocked) return false;
+        LockStatus.Text = S("lockReason", "Unlock Mila");
+        return true;
+    }
+    private void ApplyLockState()
+    {
+        bool locked = _appLock.IsLocked;
+        InteractionRoot.IsEnabled = !locked;
+        Navigation.IsPaneToggleButtonVisible = !locked;
+        LockButton.Content = locked ? S("unlock", "Unlock") : S("lockTitle", "Lock app");
+        LockStatus.Text = locked ? S("lockedTitle", "Mila is locked") : S("ready", "Ready");
+        LockButton.Click -= LockApp;
         LockButton.Click -= UnlockApp;
-        LockButton.Click += LockApp;
+        if (locked) LockButton.Click += UnlockApp;
+        else LockButton.Click += LockApp;
+    }
+    private bool TryTerminalDimensions(out ushort columns, out ushort rows)
+    {
+        columns = rows = 0;
+        double columnValue = TerminalColumns.Value, rowValue = TerminalRowsCount.Value;
+        if (!double.IsFinite(columnValue) || !double.IsFinite(rowValue) ||
+            columnValue != Math.Truncate(columnValue) || rowValue != Math.Truncate(rowValue) ||
+            columnValue is < 1 or > 4096 || rowValue is < 1 or > 4096) return false;
+        columns = (ushort)columnValue;
+        rows = (ushort)rowValue;
+        return true;
     }
     private void LoadSettings()
     {
@@ -748,6 +904,7 @@ public sealed partial class MainWindow : Window
 
     private void SaveSettingsClicked(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         string locale = LocalePicker.SelectedItem?.ToString() ?? "en";
         try
         {
@@ -793,36 +950,65 @@ public sealed partial class MainWindow : Window
         RefreshMachines();
     }
 
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;reliability] mila-windows-machine-refresh-generation
+    /// Machine refreshes MUST serialize complete pagination and publish rows or
+    /// snapshots only for the current machine generation and session handle.
+    /// </summary>
     private async void RefreshMachines()
     {
+        if (RejectLocked()) return;
         long generation = ++_machineGeneration;
         _selectedMachine = null;
         _machineMutation.SetSession(_session.Handle is { } handle, _session.Handle ?? 0);
         UpdateMachineMutationAvailability();
         MachineRows.ItemsSource = Array.Empty<MilaMachineRow>();
         if (_activeHost is not { } host || _session.Handle is not { } sessionHandle)
-            return;
-        (MilaNativeStatus read, MilaNativeSessionBytesResult result) = await Task.Run(() =>
+        { ShowOfflineMachines(); return; }
+        long cacheGeneration = _snapshotGeneration;
+        MilaDeployment? deployment = _picker.State.Selected;
+        MilaMachineRefreshResult result;
+        await _machineReadGate.WaitAsync();
+        try
         {
-            // Listing copies the Rust-held page; refresh it first over the session.
-            MilaNativeStatus status = RustNative.TrySessionReadMachines(sessionHandle, more: false);
-            return (status, RustNative.TrySessionListing(sessionHandle));
-        });
+            if (generation != _machineGeneration || _session.Handle != sessionHandle) return;
+            result = await Task.Run(() => MilaMachineListingReader.Refresh(
+                sessionHandle, (ulong)DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()));
+        }
+        finally { _machineReadGate.Release(); }
         if (generation != _machineGeneration || _session.Handle != sessionHandle || _activeHost is null)
             return;
-        if (read == MilaNativeStatus.Transport) { ReportSessionTransportLoss(); return; }
-        if (result.Succeeded && result.Data is { } bytes)
+        if (result.Status == MilaNativeStatus.Transport) { ReportSessionTransportLoss(); return; }
+        if (result.Status == MilaNativeStatus.Ok && result.Listing is { } listing)
         {
-            try
-            {
-                MilaSessionListing listing = RustNative.DecodeSessionListing(bytes);
-                MachineRows.ItemsSource = listing.Machines;
-                StatusText.Text = $"{S("machinesSavedAt", "Machines for")} {host}: {listing.Machines.Count}";
-                return;
-            }
-            catch (InvalidDataException) { }
+            MachineRows.ItemsSource = listing.Machines;
+            StartWatch(sessionHandle);
+            MachineRows.IsEnabled = true;
+            _showingOffline = false;
+            if (deployment is not null && result.Snapshot is { } cached)
+            { try { _snapshots.Save(cached, deployment, cacheGeneration); } catch (Exception error) when (SnapshotUnavailable(error)) { } }
+            StatusText.Text = $"{S("machinesSavedAt", "Machines for")} {host}: {listing.Machines.Count}";
+            return;
         }
-        StatusText.Text = S("requestFailed", "Unable to load machines.");
+        if (!ShowOfflineMachines()) StatusText.Text = S("requestFailed", "Unable to load machines.");
+    }
+    private static bool SnapshotUnavailable(Exception error) => error is IOException or UnauthorizedAccessException or CryptographicException or ArgumentException or PlatformNotSupportedException;
+    private bool ShowOfflineMachines()
+    {
+        _showingOffline = false;
+        if (_picker.State.Selected is not { } deployment) return false;
+        try
+        {
+            if (_snapshots.Load(deployment) is not { } listing) return false;
+            _showingOffline = true;
+            _selectedMachine = null;
+            MachineRows.IsEnabled = false;
+            MachineRows.ItemsSource = listing.Machines;
+            StatusText.Text = S("machinesOffline", "Offline. Showing the last known list.");
+            UpdateMachineMutationAvailability();
+            return true;
+        }
+        catch (Exception error) when (SnapshotUnavailable(error)) { return false; }
     }
     private void OnMachineSelected(object sender, SelectionChangedEventArgs args)
     {
@@ -835,7 +1021,8 @@ public sealed partial class MainWindow : Window
 
     private void UpdateMachineMutationAvailability()
     {
-        bool enabled = _session.Handle is not null && _selectedMachine is not null;
+        bool enabled = !_showingOffline && _session.Handle is not null && _selectedMachine is not null;
+        MachineClone.IsEnabled = enabled;
         MachineResize.IsEnabled = enabled;
         MachineStart.IsEnabled = enabled;
         MachineStop.IsEnabled = enabled;
@@ -850,6 +1037,7 @@ public sealed partial class MainWindow : Window
 
     private async void RefreshThreads()
     {
+        long generation = ++_threadReadGeneration;
         if (_activeHost is null)
         {
             _threadController.SetSession(false, null);
@@ -865,6 +1053,7 @@ public sealed partial class MainWindow : Window
             return;
         }
         MilaNativeSessionBytesResult result = await Task.Run(() => RustNative.TrySessionThreadAction(handle, null, "thread ls", null, null, null));
+        if (generation != _threadReadGeneration || _session.Handle != handle || _activeHost is null) return;
         if (!result.Succeeded || result.Data is not { } bytes)
         {
             _threadController.SetSession(false, null);
@@ -875,8 +1064,10 @@ public sealed partial class MainWindow : Window
         try
         {
             MilaThreadListing listing = MilaThreadListing.Decode(bytes);
-            _threadController.SetSession(true, listing);
+            _threadController.SetSession(true, listing, handle);
+            ThreadPrompt.IsEnabled = ThreadAnswer.IsEnabled = ThreadApprove.IsEnabled = ThreadRevise.IsEnabled = true;
             ThreadRows.ItemsSource = listing.Threads;
+            StartWatch(handle);
             ThreadDetail.Text = listing.Threads.Count == 0 ? S("threadsEmpty", "No threads") : string.Format(S("threadsLoaded", "{0} threads."), listing.Threads.Count);
         }
         catch (InvalidDataException)
@@ -899,25 +1090,29 @@ public sealed partial class MainWindow : Window
     private void SubmitThreadRevise(object sender, RoutedEventArgs args) => SubmitThread(MilaThreadAction.PlanRevise);
     private async void SubmitThread(MilaThreadAction action)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } handle)
         {
             ThreadCommandStatus.Text = S("signInFirst", "Sign in first");
             return;
         }
         ThreadPrompt.IsEnabled = ThreadAnswer.IsEnabled = ThreadApprove.IsEnabled = ThreadRevise.IsEnabled = false;
+        long threadGeneration = _threadController.Generation;
         try
         {
             string? input = string.IsNullOrWhiteSpace(ThreadInput.Text) ? null : ThreadInput.Text.Trim();
             string? secondary = action is MilaThreadAction.PlanApprove or MilaThreadAction.PlanRevise
                 ? _threadController.State.Thread?.PlanId?.ToString("D") : null;
             string? payload = action is MilaThreadAction.Prompt or MilaThreadAction.Answer or MilaThreadAction.PlanRevise ? input : null;
-            bool applied = await Task.Run(() => _threadController.SubmitLive(handle, action, secondary, payload));
+            bool applied = await Task.Run(() => _threadController.SubmitLive(handle, action, secondary, payload, threadGeneration));
+            if (_session.Handle != handle || _activeHost is null || _threadController.Generation != threadGeneration) return;
             ThreadCommandStatus.Text = applied ? S("requestSucceeded", "Request submitted") : S("requestFailed", "Request refused");
             if (applied) ThreadInput.Text = string.Empty;
         }
         finally
         {
-            ThreadPrompt.IsEnabled = ThreadAnswer.IsEnabled = ThreadApprove.IsEnabled = ThreadRevise.IsEnabled = true;
+            if (_session.Handle == handle && _activeHost is not null)
+                ThreadPrompt.IsEnabled = ThreadAnswer.IsEnabled = ThreadApprove.IsEnabled = ThreadRevise.IsEnabled = true;
         }
     }
 
@@ -926,12 +1121,19 @@ public sealed partial class MainWindow : Window
     private void ClassifyThreadTurns(object sender, RoutedEventArgs args) => SubmitThread(MilaThreadAction.Turns);
     private void ClassifyThreadRead(object sender, RoutedEventArgs args) => SubmitThread(MilaThreadAction.Read);
 
-    private void ClassifyMachineList(object sender, RoutedEventArgs args) => ClassifyMachine("ls");
-    private const string SampleMachine = "00000000-0000-0000-0000-000000000000";
-    private void ClassifyMachineShow(object sender, RoutedEventArgs args) => ClassifyMachine("show demo");
-    private void ClassifyMachineNew(object sender, RoutedEventArgs args) => ClassifyMachine("new");
+    private void ClassifyMachineList(object sender, RoutedEventArgs args) => RefreshMachines();
+    private void ClassifyMachineShow(object sender, RoutedEventArgs args)
+    {
+        if (RejectLocked()) return;
+        if (_session.Handle is not { } handle || _selectedMachine is not { } machine)
+        { MachineCommandStatus.Text = S("machineNotSelected", "Select a machine first."); return; }
+        MilaNativeSessionBytesResult result = RustNative.TrySessionMachineShow(handle, machine.Id);
+        MachineCommandStatus.Text = result.Succeeded ? S("requestSucceeded", "Machine details loaded") : S("requestFailed", "Unable to load machine details");
+    }
+    private void ClassifyMachineNew(object sender, RoutedEventArgs args) => CreateMachine(sender, args);
     private void ClassifyMachineResize(object sender, RoutedEventArgs args)
     {
+        if (RejectLocked()) return;
         if (_selectedMachine is not { } machine)
         {
             MachineCommandStatus.Text = S("machineNotSelected", "Select a machine first.");
@@ -939,7 +1141,7 @@ public sealed partial class MainWindow : Window
         }
         if (!uint.TryParse(ResizeCpu.Text, out uint cpu) || !ulong.TryParse(ResizeMemory.Text, out ulong memory) ||
             !ulong.TryParse(ResizeDisk.Text, out ulong disk) || cpu is < 1 or > 256 || memory is < 256 or > 4_194_304 ||
-            disk is < 1 or > 16_777_216)
+            disk is < 1 or > 500)
         {
             MachineCommandStatus.Text = S("resizeInvalid", "Enter valid CPU, memory and disk sizes.");
             return;
@@ -959,6 +1161,7 @@ public sealed partial class MainWindow : Window
     private void ClassifyMachineShareRemove(object sender, RoutedEventArgs args) => SubmitShare(false);
     private void SubmitShare(bool add)
     {
+        if (RejectLocked()) return;
         if (_session.Handle is not { } handle || _selectedMachine is not { } machine)
         { MachineCommandStatus.Text = S("signInFirst", "Sign in first"); return; }
         string email = ShareEmail.Text.Trim();
@@ -967,30 +1170,12 @@ public sealed partial class MainWindow : Window
         MilaNativeSessionActionResult result = RustNative.TrySessionShareMutation(handle, machine.Id, email, add ? "viewer" : null, add, "porsche-" + Guid.NewGuid().ToString("N"));
         MachineCommandStatus.Text = result.Succeeded ? S("requestSucceeded", "Request submitted") : S("requestFailed", "Request refused");
     }
-    private void ClassifyMachineWebShow(object sender, RoutedEventArgs args) => ClassifyMachine($"web show {SampleMachine}");
-    private void ClassifyMachineWebSet(object sender, RoutedEventArgs args) => ClassifyMachine($"web set {SampleMachine} --port=8080");
-
-    private void ClassifyMachine(string command)
-    {
-        MilaMachineCommandKind? kind = RustNative.TryClassifyMachineCommand(command);
-        if (kind is not { } value)
-        {
-            MachineCommandStatus.Text = $"{command}: unavailable or requires arguments";
-            return;
-        }
-        if (_activeHost is null)
-        {
-            MachineCommandStatus.Text = $"{command}: {value} — {S("signInFirst", "Sign in first")}";
-            return;
-        }
-        MilaNativeCommandResult formatted = RustNative.TryFormatMachineCommand(command.Split(' ')[0], Guid.Parse(SampleMachine), null);
-        MachineCommandStatus.Text = formatted.Status == MilaNativeStatus.Ok
-            ? $"{command}: {value} — {S("requestWaiting", "Request formatted by Rust")}" 
-            : $"{command}: {S("requestRefused", "Request refused")}";
-    }
+    private void ClassifyMachineWebShow(object sender, RoutedEventArgs args) => OpenWebControl(sender, args);
+    private void ClassifyMachineWebSet(object sender, RoutedEventArgs args) => SetWebControl(sender, args);
 
     private void SubmitMachineMutation(string action)
     {
+        if (RejectLocked()) return;
         if (_selectedMachine is null)
         {
             MachineCommandStatus.Text = S("machineNotSelected", "Select a machine first.");

@@ -4,6 +4,13 @@ use super::{
     copy_output, valid_request_id, validate_session_identifier, LiveSession, SessionError,
 };
 
+fn valid_machine_name(name: &str) -> bool {
+    (1..=128).contains(&name.len())
+        && name
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
 impl LiveSession {
     /// Read the authenticated account SSH-key inventory. The FFI layer keeps
     /// the response bounded; callers must decode it with `decode_ssh_keys`.
@@ -80,6 +87,35 @@ impl LiveSession {
             .ok_or_else(|| status.into())
     }
 
+    /// @cc [owner:ghuntley,label:protocol] linux-clone-ledger-identity
+    /// Clone only through the authenticated session with the ledger's stable request id.
+    pub fn machine_clone(
+        &mut self,
+        machine: &str,
+        name: &str,
+        request_id: &str,
+    ) -> Result<(), SessionError> {
+        validate_session_identifier(machine)?;
+        if !valid_machine_name(name) || !valid_request_id(request_id) {
+            return Err(SessionError::InvalidInput);
+        }
+        // SAFETY: all buffers borrow their matching live slices for this call.
+        let status = unsafe {
+            mila_ffi::session::mila_session_machine_clone(
+                self.handle()?,
+                machine.as_ptr(),
+                machine.len(),
+                name.as_ptr(),
+                name.len(),
+                request_id.as_ptr(),
+                request_id.len(),
+            )
+        };
+        (status == mila_ffi::session::SessionStatus::Ok)
+            .then_some(())
+            .ok_or_else(|| status.into())
+    }
+
     /// Create a machine using the authenticated Porsche session.
     pub fn machine_create(
         &mut self,
@@ -89,14 +125,10 @@ impl LiveSession {
         disk: u64,
         request_id: &str,
     ) -> Result<(), SessionError> {
-        if name.is_empty()
-            || name.len() > 128
-            || name
-                .bytes()
-                .any(|b| b.is_ascii_control() || b.is_ascii_whitespace())
+        if !valid_machine_name(name)
             || !(1..=256).contains(&cpu)
-            || !(128..=4_194_304).contains(&memory)
-            || !(1..=16_777_216).contains(&disk)
+            || !(256..=4_194_304).contains(&memory)
+            || !(1..=500).contains(&disk)
             || !valid_request_id(request_id)
         {
             return Err(SessionError::InvalidInput);
@@ -131,8 +163,8 @@ impl LiveSession {
     ) -> Result<(), SessionError> {
         validate_session_identifier(machine_id)?;
         if !(1..=256).contains(&cpu)
-            || !(128..=4_194_304).contains(&memory)
-            || !(1..=16_777_216).contains(&disk)
+            || !(256..=4_194_304).contains(&memory)
+            || !(1..=500).contains(&disk)
             || !valid_request_id(request_id)
         {
             return Err(SessionError::InvalidInput);
@@ -438,16 +470,21 @@ impl LiveSession {
         })
     }
 
-    pub fn device_remove(&mut self, device_id: &str) -> Result<(), SessionError> {
+    pub fn device_remove(&mut self, device_id: &str, request_id: &str) -> Result<(), SessionError> {
         validate_session_identifier(device_id)?;
+        if !valid_request_id(request_id) {
+            return Err(SessionError::InvalidInput);
+        }
         let handle = self.handle()?;
         // SAFETY: every pointer/length pair borrows a live Rust slice for this
         // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
-            mila_ffi::session::mila_session_device_rm(
+            mila_ffi::session::mila_session_device_rm_with_request(
                 handle,
                 device_id.as_bytes().as_ptr(),
                 device_id.len(),
+                request_id.as_bytes().as_ptr(),
+                request_id.len(),
             )
         };
         (status == mila_ffi::session::SessionStatus::Ok)
@@ -459,17 +496,23 @@ impl LiveSession {
         &mut self,
         device_id: &str,
         enabled: bool,
+        request_id: &str,
     ) -> Result<(), SessionError> {
         validate_session_identifier(device_id)?;
+        if !valid_request_id(request_id) {
+            return Err(SessionError::InvalidInput);
+        }
         let handle = self.handle()?;
         // SAFETY: every pointer/length pair borrows a live Rust slice for this
         // synchronous call, and the C ABI copies its inputs without retaining them.
         let status = unsafe {
-            mila_ffi::session::mila_session_device_prefs(
+            mila_ffi::session::mila_session_device_prefs_with_request(
                 handle,
                 device_id.as_bytes().as_ptr(),
                 device_id.len(),
                 u8::from(enabled),
+                request_id.as_bytes().as_ptr(),
+                request_id.len(),
             )
         };
         (status == mila_ffi::session::SessionStatus::Ok)

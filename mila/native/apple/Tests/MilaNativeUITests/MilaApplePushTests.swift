@@ -122,6 +122,28 @@ final class MilaApplePushTests: XCTestCase {
         return Data(base64Encoded: value)
     }
 
+    func testAdHocMacOSSoftwareKeyBuildNeverRequestsAPNs() async {
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        let requests = RequestCounter()
+        let relay = MilaApplePushTokenRelay { requests.value += 1 }
+        let coordinator = MilaApplePushCoordinator(relay: relay)
+        XCTAssertFalse(coordinator.enable())
+        XCTAssertEqual(requests.value, 0)
+
+        let (adapter, session) = recordingAdapter()
+        let registration = MilaApplePushRegistration(authorization: FixedAuthorization(granted: true),
+                                                     keys: MilaKeychainPokeKeyStore(keychain: MemoryKeychain()),
+                                                     susan: Self.stubbedSusan(), platform: .macos)
+        let outcome = await registration.register(adapter: adapter, deployment: Self.deployment,
+                                                  deviceToken: Data(repeating: 0xab, count: 32))
+        XCTAssertEqual(outcome, .deploymentRefused)
+        XCTAssertTrue(MilaSusanStubProtocol.seen.isEmpty)
+        XCTAssertTrue(session.calls.isEmpty)
+        #else
+        XCTAssertFalse(MilaDeviceSigner.allowsSoftwareKeys)
+        #endif
+    }
+
     private static func issueError(_ client: MilaSusanHTTPSClient, _ body: Data) async -> MilaSusanClientError? {
         do { _ = try await client.issue(body); return nil } catch { return error as? MilaSusanClientError }
     }
@@ -254,6 +276,112 @@ final class MilaApplePushTests: XCTestCase {
     }
 
     // MARK: APNs token wiring
+
+    private final class TargetBinding {
+        var current: MilaApplePushCoordinator.Target?
+    }
+
+    private actor DelayedFirstAuthorization: MilaNotificationAuthorizing {
+        private var calls = 0
+        private var pending: CheckedContinuation<Bool, Never>?
+        private var completed: Bool?
+        func requestAuthorization() async -> Bool {
+            calls += 1
+            if calls > 1 { return true }
+            if let completed { return completed }
+            return await withCheckedContinuation { pending = $0 }
+        }
+        func waitUntilPending() async -> Bool {
+            let deadline = ContinuousClock.now.advanced(by: .seconds(2))
+            while pending == nil && ContinuousClock.now < deadline { await Task.yield() }
+            return pending != nil
+        }
+        func complete(_ granted: Bool) { completed = granted; pending?.resume(returning: granted); pending = nil }
+    }
+
+    private func bind(_ coordinator: MilaApplePushCoordinator, to binding: TargetBinding) {
+        coordinator.bind(target: { binding.current }, isCurrent: { binding.current?.generation == $0 })
+    }
+
+    func testResetDropsPendingTokenAndFailureAfterDeploymentSwitch() async {
+        MilaSusanStubProtocol.reset(.init(status: 201, headers: Self.json, body: Self.susanKey))
+        let (first, firstSession) = recordingAdapter()
+        let (second, secondSession) = recordingAdapter()
+        let keychain = MemoryKeychain()
+        let (coordinator, relay) = coordinator(granted: true, keychain: keychain, adapter: first, requests: {})
+        let binding = TargetBinding()
+        binding.current = .init(adapter: first, deployment: Self.deployment, generation: 1)
+        bind(coordinator, to: binding)
+        XCTAssertTrue(coordinator.enable())
+        binding.current = .init(adapter: second, deployment: "other.example.test", generation: 2)
+        coordinator.reset()
+
+        XCTAssertNil(relay.deliver(deviceToken: Data(repeating: 0xab, count: 32)))
+        relay.failed()
+        XCTAssertEqual(coordinator.state, .off)
+        XCTAssertNil(coordinator.outcome)
+        XCTAssertTrue(firstSession.calls.isEmpty)
+        XCTAssertTrue(secondSession.calls.isEmpty)
+        XCTAssertTrue(keychain.calls.isEmpty)
+        XCTAssertTrue(MilaSusanStubProtocol.seen.isEmpty)
+    }
+
+    func testTokenCannotResolveANewerTargetThanTheEnableRequest() async {
+        MilaSusanStubProtocol.reset(.init(status: 201, headers: Self.json, body: Self.susanKey))
+        let (first, firstSession) = recordingAdapter()
+        let (second, secondSession) = recordingAdapter()
+        let keychain = MemoryKeychain()
+        let (coordinator, relay) = coordinator(granted: true, keychain: keychain, adapter: first, requests: {})
+        let binding = TargetBinding()
+        binding.current = .init(adapter: first, deployment: Self.deployment, generation: 1)
+        bind(coordinator, to: binding)
+        XCTAssertTrue(coordinator.enable())
+        // Even before the app's reset runs, a callback must retain the target
+        // captured by enable rather than looking up this newer deployment.
+        binding.current = .init(adapter: second, deployment: "other.example.test", generation: 2)
+        await relay.deliver(deviceToken: Data(repeating: 0xab, count: 32))?.value
+        XCTAssertTrue(firstSession.calls.isEmpty)
+        XCTAssertTrue(secondSession.calls.isEmpty)
+        XCTAssertTrue(keychain.calls.isEmpty)
+        XCTAssertTrue(MilaSusanStubProtocol.seen.isEmpty)
+        coordinator.reset()
+    }
+
+    func testLateRegistrationCannotClearANewerSuccessfulOutcome() async throws {
+        MilaSusanStubProtocol.reset(.init(status: 201, headers: Self.json, body: Self.susanKey))
+        let authorization = DelayedFirstAuthorization()
+        let keychain = MemoryKeychain()
+        let registration = MilaApplePushRegistration(authorization: authorization,
+            keys: MilaKeychainPokeKeyStore(keychain: keychain), susan: Self.stubbedSusan(), platform: .macos, clock: { 1_000 })
+        let relay = MilaApplePushTokenRelay(requestToken: {})
+        let coordinator = MilaApplePushCoordinator(registration: registration, environment: .sandbox, relay: relay)
+        let (first, firstSession) = recordingAdapter()
+        let (second, secondSession) = recordingAdapter()
+        let binding = TargetBinding()
+        binding.current = .init(adapter: first, deployment: Self.deployment, generation: 1)
+        bind(coordinator, to: binding)
+        XCTAssertTrue(coordinator.enable())
+        let earlier = try XCTUnwrap(relay.deliver(deviceToken: Data(repeating: 0xab, count: 32)))
+        let started = await authorization.waitUntilPending()
+        XCTAssertTrue(started, "authorization did not start before the deadline")
+        guard started else { await authorization.complete(false); await earlier.value; return }
+
+        coordinator.reset()
+        binding.current = .init(adapter: second, deployment: "other.example.test", generation: 2)
+        XCTAssertTrue(coordinator.enable())
+        await relay.deliver(deviceToken: Data(repeating: 0xcd, count: 32))?.value
+        let registered = MilaPushRegistrationOutcome.registered(try XCTUnwrap(Self.receiptID))
+        XCTAssertEqual(coordinator.state, .on)
+        XCTAssertEqual(coordinator.outcome, registered)
+
+        await authorization.complete(false)
+        await earlier.value
+        XCTAssertEqual(coordinator.state, .on)
+        XCTAssertEqual(coordinator.outcome, registered)
+        XCTAssertTrue(firstSession.calls.isEmpty)
+        XCTAssertEqual(Self.registerCalls(secondSession), 1)
+        XCTAssertEqual(MilaSusanStubProtocol.seen.count, 1)
+    }
 
     private func coordinator(granted: Bool, keychain: MemoryKeychain, adapter: any MilaFFIAdapter,
                              requests: @escaping @MainActor () -> Void) -> (MilaApplePushCoordinator, MilaApplePushTokenRelay) {

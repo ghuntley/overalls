@@ -322,6 +322,7 @@ internal static class LifecycleSmoke
     {
         internal Queue<(MilaNativeStatus, ulong?)> Attaches { get; } = new();
         internal Queue<MilaNativeTerminalRead> Reads { get; } = new();
+        internal Dictionary<ulong, MilaNativeTerminalState> States { get; } = [];
         internal List<ulong> Killed { get; } = [];
         internal List<ulong> AttachedSessions { get; } = [];
         internal List<string> AttachedTerminals { get; } = [];
@@ -341,8 +342,20 @@ internal static class LifecycleSmoke
             AttachedTerminals.Add(terminalId);
             return Attaches.Count > 0 ? Attaches.Dequeue() : (MilaNativeStatus.Transport, null);
         }
-        public MilaNativeTerminalRead Read(ulong terminalHandle) =>
-            Reads.Count > 0 ? Reads.Dequeue() : new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Idle, null);
+        public MilaNativeTerminalRead Read(ulong terminalHandle)
+        {
+            MilaNativeTerminalRead read = Reads.Count > 0 ? Reads.Dequeue() : new(MilaNativeStatus.Ok, MilaTerminalReadEvent.Idle, null);
+            if (read.Succeeded && read.Event == MilaTerminalReadEvent.Closed)
+                States[terminalHandle] = new(0, false, true, MilaTerminalOutcome.Closed);
+            return read;
+        }
+        public MilaNativeTerminalStateResult State(ulong terminalHandle) =>
+            new(MilaNativeStatus.Ok, States.GetValueOrDefault(terminalHandle, new(0, false, false, null)));
+        internal void RefuseAttach(ulong terminalHandle)
+        {
+            Attaches.Enqueue((MilaNativeStatus.Ok, terminalHandle));
+            States[terminalHandle] = new(0, true, true, MilaTerminalOutcome.Refused);
+        }
         public MilaNativeStatus Kill(ulong terminalHandle) { Killed.Add(terminalHandle); return MilaNativeStatus.Ok; }
         internal List<string> Ended { get; } = [];
         internal bool EndReply { get; set; } = true;
@@ -400,7 +413,7 @@ internal static class LifecycleSmoke
         Program.Require(!new MilaTerminalStream(transport, () => 7).AttachSession(Machine, "", true, 80, 24) && transport.OpenCount == 1,
             "rejoin requires a session name");
         MilaTerminalStream refused = new(transport, () => 7);
-        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        transport.RefuseAttach(91);
         Program.Require(!refused.AttachSession(Machine, named, true, 80, 24) && refused.TerminalId is null && transport.OpenCount == 1,
             "a refused rejoin forgets the gone session");
         TerminalPageOpen();
@@ -420,7 +433,7 @@ internal static class LifecycleSmoke
         Program.Require(page.Open(Machine, true, 80, 24) && page.TerminalId == saved && transport.OpenCount == 1 &&
             transport.AttachedTerminals[^1] == saved, "reopening rejoins the saved session without terminal new");
         page.Kill();
-        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        transport.RefuseAttach(92);
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 33));
         Program.Require(page.Open(Machine, true, 80, 24) && transport.OpenCount == 2 && page.TerminalId != saved &&
             transport.AttachedTerminals[^2] == saved, "a refused rejoin falls back to a new session");
@@ -504,6 +517,8 @@ internal static class LifecycleSmoke
         session = null;
         Program.Require(stream.Poll() == MilaTerminalPoll.SignedOut && stream.Session.State == MilaTerminalState.SignedOut,
             "signed-out session refuses reconnect");
+        // Parent fencing refuses the read itself, so the scripted loss was not consumed.
+        transport.Reads.Clear();
         // A refused `terminal new` (for example terminal_unavailable) never attaches.
         session = 7;
         transport.Opens.Enqueue(new(MilaNativeStatus.InvalidRequest, null));
@@ -515,7 +530,7 @@ internal static class LifecycleSmoke
         stream.Attach(Machine, true, 80, 24);
         string gone = stream.TerminalId!;
         transport.Reads.Enqueue(Lost);
-        transport.Attaches.Enqueue((MilaNativeStatus.InvalidRequest, null));
+        transport.RefuseAttach(93);
         transport.Attaches.Enqueue((MilaNativeStatus.Ok, 18));
         int opens = transport.OpenCount;
         Program.Require(stream.Poll() == MilaTerminalPoll.Reconnecting && stream.TerminalId is null, "refused attach drops session id");

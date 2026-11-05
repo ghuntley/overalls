@@ -11,6 +11,11 @@
          to refresh it after changing a PackageReference. -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <RestoreLockedMode Condition="'$(RestoreLockedMode)' == ''">true</RestoreLockedMode>
+    <!-- The Linux host check consumes Buck2's assembled production package.
+         The file contains its store path; no ambient native build is accepted. -->
+    <MilaNativeDll Condition="'$(MilaNativeDll)' == '' And '$(MilaNativePackageFile)' != ''">$([System.IO.File]::ReadAllText('$(MilaNativePackageFile)').Trim())/lib/mila-rust/libmila_ffi.so</MilaNativeDll>
+    <MilaNativeFileName>mila_native.dll</MilaNativeFileName>
+    <MilaNativeFileName Condition="$([MSBuild]::IsOSPlatform('Linux'))">libmila_native.so</MilaNativeFileName>
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../windows-dotnet/Interop/SettingsStore.cs" Link="Interop/SettingsStore.cs" />
@@ -19,9 +24,11 @@
     <Compile Include="../windows-dotnet/Interop/WindowsNotifications.cs" Link="Interop/WindowsNotifications.cs" />
     <Compile Include="../windows-dotnet/Interop/TrustStore.cs" Link="Interop/TrustStore.cs" />
     <Compile Include="../windows-dotnet/Interop/WindowsHello.cs" Link="Interop/WindowsHello.cs" />
+    <Compile Include="../windows-dotnet/Interop/WatchStream.cs" Link="Interop/WatchStream.cs" />
     <Compile Include="../windows-dotnet/Interop/RustNative.cs" Link="Interop/RustNative.cs" />
     <Compile Include="../windows-dotnet/Interop/DeviceKey.cs" Link="Interop/DeviceKey.cs" />
     <Compile Include="../windows-dotnet/Interop/DeploymentStore.cs" Link="Interop/DeploymentStore.cs" />
+    <Compile Include="../windows-dotnet/Interop/SnapshotStore.cs" Link="Interop/SnapshotStore.cs" />
     <Compile Include="../windows-dotnet/Interop/SessionListing.cs" Link="Interop/SessionListing.cs" />
     <Compile Include="../windows-dotnet/Interop/ThreadListing.cs" Link="Interop/ThreadListing.cs" />
     <Compile Include="../windows-dotnet/Interop/SshKeys.cs" Link="Interop/SshKeys.cs" />
@@ -48,7 +55,7 @@
     <None Include="../../protocol/test/fixtures/porsche_client_results.json" Link="fixtures/porsche_client_results.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
   <Target Name="StageMilaNative" AfterTargets="Build">
-    <Error Condition="'$(MilaNativeDll)' == '' Or !Exists('$(MilaNativeDll)')" Text="Supply MilaNativeDll pointing to the staged production mila_native.dll." />
-    <Copy SourceFiles="$(MilaNativeDll)" DestinationFiles="$(TargetDir)mila_native.dll" />
+    <Error Condition="'$(MilaNativeDll)' == '' Or !Exists('$(MilaNativeDll)')" Text="Supply MilaNativeDll pointing to the staged production Mila native library." />
+    <Copy SourceFiles="$(MilaNativeDll)" DestinationFiles="$(TargetDir)$(MilaNativeFileName)" />
   </Target>
 </Project>

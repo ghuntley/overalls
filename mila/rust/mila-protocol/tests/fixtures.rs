@@ -91,6 +91,18 @@ fn command_fixture_agreement() {
     }
 }
 
+#[test]
+fn clone_command_is_accepted_and_mutating() {
+    let line = "clone 00000000-0000-0000-0000-000000000001 --name=copy-one --json --no-wait --request-id=porsche-0123456789abcdef0123456789abcdef";
+    let command = Command::parse(line).expect("clone command");
+    assert_eq!(command.command, "clone");
+    assert!(command.is_mutation());
+    assert_eq!(
+        command.format().expect("canonical clone"),
+        "clone 00000000-0000-0000-0000-000000000001 --json --name=copy-one --no-wait --request-id=porsche-0123456789abcdef0123456789abcdef"
+    );
+}
+
 /// @cc [owner:ghuntley,label:verification;protocol] mila-protocol-route-roundtrip
 /// Every accepted shared route MUST survive parse/format and every sampled refused
 /// route MUST remain refused, preserving the Elixir and legacy language fixture contract.

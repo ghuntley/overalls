@@ -24,6 +24,7 @@ pub struct TerminalRenderer {
     lines: Vec<String>,
     cursor_column: usize,
     rendered_chars: usize,
+    frame: Option<mila_runtime::TerminalFrame>,
 }
 
 impl TerminalRenderer {
@@ -37,6 +38,7 @@ impl TerminalRenderer {
             lines: vec![String::new()],
             cursor_column: 0,
             rendered_chars: 0,
+            frame: None,
         })
     }
 
@@ -54,6 +56,46 @@ impl TerminalRenderer {
 
     pub const fn cursor_column(&self) -> usize {
         self.cursor_column
+    }
+
+    /// The transport's display-only VT projection, with no raw control bytes.
+    pub fn frame(&self) -> Option<&mila_runtime::TerminalFrame> {
+        self.frame.as_ref()
+    }
+
+    pub fn apply_frame(&mut self, frame: mila_runtime::TerminalFrame) -> Result<(), RenderError> {
+        if frame.version != 1
+            || frame.columns == 0
+            || frame.rows == 0
+            || frame.lines.len() > usize::from(frame.rows)
+            || frame
+                .lines
+                .iter()
+                .flatten()
+                .any(|span| span.text.chars().any(char::is_control))
+        {
+            return Err(RenderError::UnsupportedControl);
+        }
+        let count = frame
+            .lines
+            .iter()
+            .flatten()
+            .map(|span| span.text.chars().count())
+            .sum::<usize>();
+        if count > MAX_RENDERED_CHARS {
+            return Err(RenderError::ChunkTooLarge);
+        }
+        self.lines = frame
+            .lines
+            .iter()
+            .map(|line| line.iter().map(|span| span.text.as_str()).collect())
+            .collect();
+        self.columns = frame.columns;
+        self.rows = frame.rows;
+        self.cursor_column = usize::from(frame.cursor_column);
+        self.rendered_chars = count;
+        self.frame = Some(frame);
+        Ok(())
     }
 
     /// Appends decoded display text while preserving a bounded viewport.
@@ -191,6 +233,7 @@ pub struct PtyAttachRequest {
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum PtyRead {
     Text(String),
+    Screen(mila_runtime::TerminalFrame),
     Idle,
     Eof,
 }
@@ -316,6 +359,12 @@ impl<A: SessionAuthority, T: PtyTransport> AuthenticatedPty<A, T> {
             return Err(PtyError::InvalidRequest);
         }
         match self.transport.read_output(generation)? {
+            PtyRead::Screen(frame) => {
+                self.renderer
+                    .apply_frame(frame.clone())
+                    .map_err(|_| PtyError::Render)?;
+                Ok(PtyRead::Screen(frame))
+            }
             PtyRead::Eof => {
                 // A clean host EOF is terminal state. Fence input and resize
                 // immediately, even when the backend cannot perform a second

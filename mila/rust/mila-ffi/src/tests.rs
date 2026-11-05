@@ -91,12 +91,14 @@ fn projects_thread_command_catalog_without_payloads() {
 }
 
 #[test]
-#[expect(
-    clippy::single_element_loop,
-    reason = "a catalogue table with one row today; further rows are added to the same loop"
-)]
 fn projects_machine_management_catalog_without_payloads() {
-    for (line, expected) in [("ls", MilaMachineCommandKind::List)] {
+    for (line, expected) in [
+        ("ls", MilaMachineCommandKind::List),
+        (
+            "clone 00000000-0000-0000-0000-000000000001 --json --request-id=porsche-0123456789abcdef0123456789abcdef",
+            MilaMachineCommandKind::Clone,
+        ),
+    ] {
         let line = std::ffi::CString::new(line).unwrap();
         let mut kind = MilaMachineCommandKind::Unknown;
         assert_eq!(

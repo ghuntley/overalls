@@ -10,12 +10,15 @@ exchange before user authentication. There MUST be no trust-on-first-use, no
 unsigned fallback, and a changed CA, host or zone MUST be refused (ADR-0228).
 
 @cc [owner:ghuntley,label:security] mila-device-key-custody
-Each deployment MUST get its own P-256 device key. iOS, Android, macOS and
-Windows private keys MUST stay in the Secure Enclave, Android Keystore or a
-non-exportable CNG key (the TPM's Platform Crypto Provider, or the software
-key storage provider where there is no TPM) and never cross the platform
-channel; the Linux test key MUST be owner-only and a readable key file MUST be
-refused. Keys, signatures and tokens MUST NOT be logged.
+Each deployment MUST get its own P-256 device key. iOS, Android and signed
+macOS private keys MUST stay in the Secure Enclave or Android Keystore, and
+Windows keys MUST stay in a non-exportable CNG provider (the TPM's Platform
+Crypto Provider, or the software key storage provider where there is no TPM).
+Only the explicitly compiled `MILA_SOFTWARE_KEYS` macOS development build may
+use an owner-only software key; release and iOS builds MUST refuse software
+custody. Private keys never cross the platform channel; the Linux test key
+MUST be owner-only and a readable key file MUST be refused. Keys, signatures
+and tokens MUST NOT be logged.
 
 @cc [owner:ghuntley,label:architecture] mila-pure-core
 `native Rust core` and `native transport` MUST NOT import retired client.
@@ -29,3 +32,9 @@ signed-out deployment MUST NOT open a deployment page (ADR-0221).
 @cc [owner:ghuntley,label:protocol] mila-mutation-once
 A mutation MUST be submitted at most once with its client request id; any
 uncertainty MUST be resolved by polling `request show`, never by resubmitting.
+
+@cc [owner:ghuntley,label:protocol;security] mila-vm-shape-bounds
+Every native machine create and resize boundary MUST accept only the shared VM
+shape limits: CPU 1..=256, memory 256..=4,194,304 MiB, and disk 1..=500 GiB.
+Values outside these ranges MUST be rejected before crossing the platform FFI
+boundary.

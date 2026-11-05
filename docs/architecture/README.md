@@ -16,17 +16,22 @@ restored guests are charged to their VM cgroup like cold-booted ones.
 
 [ADR-0264](decisions/0264-hermetic-mila-journey-fixture.md) verifies Mila's Rust
 core against source-built Marshall and Porsche in a hermetic NixOS fixture. It
-proves admission, authorization and ledger effects, but not guest execution,
-the PTY, push delivery or device biometrics.
+proves admission, authorization and ledger effects. Native journeys also
+exercise the fixture's real-PTY stand-in; provisioned guest execution, guest PTY
+acceptance, push delivery and device biometrics remain separate.
 
 [ADR-0249](decisions/0249-mila-rust-core-native-clients.md) moves Mila toward
 thin native clients over Rust. The separate `mila-session` crate composes pure
 runtime projections with certificate-pinned SSH machine reads and pagination;
-native adapter integration and full Flutter replacement remain partial, as
-recorded in the [session review](reviews/2026-10-21-mila-native-session.md).
+native adapters now consume typed lifecycle commands, complete offline snapshots,
+bounded terminal frames and watch subscriptions. Platform release acceptance
+remains partial, as recorded in the
+[native parity review](reviews/2026-11-02-mila-native-parity-implementation.md).
 [ADR-0277](decisions/0277-mila-native-builds-on-buck2.md) supersedes ADR-0227's
 Flutter toolchain and dartssh2 overlay: Mila builds only through Buck2 targets on
-Nix-pinned toolchains, and one transitional Windows Flutter release job remains.
+Nix-pinned toolchains. The Windows Flutter job is retired; the native Windows
+ZIP/MSIX artifacts remain unsigned pending release acceptance. Android has an
+explicit-emulator test target, and Linux package tests require a live GTK display.
 
 [ADR-0263](decisions/0263-retire-hldd.md) retires the authenticated HLDD handbook,
 its review receipts and all HLDD gates, superseding ADR-0250. ADRs, architecture
@@ -38,8 +43,9 @@ It replaces only ADR-0161's exclusive-typeface clause; current packaged script
 rendering remains a separate acceptance obligation.
 
 [ADR-0220](decisions/0220-mila-client-over-porsche-ssh.md) through
-[ADR-0228](decisions/0228-strict-host-certificates-in-mila.md) add Mila, the
-Flutter client for iOS and Android (Linux for testing), which works only through
+[ADR-0228](decisions/0228-strict-host-certificates-in-mila.md) originally added
+Mila as a Flutter client for iOS and Android (Linux for testing), now replaced by
+ADR-0249's native clients. Mila works only through
 one Porsche SSH connection with per-deployment P-256 device keys and strict host
 certificates. They also add canonical `overalls://` routes, the Porsche client
 commands, terminal attach over a Marshall gateway stream, the Susan push relay at

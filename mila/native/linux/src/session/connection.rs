@@ -71,12 +71,16 @@ impl LiveSession {
     }
 
     pub fn refresh(&mut self) -> Result<Vec<u8>, SessionError> {
+        read_complete_machines(self.handle()?)
+    }
+
+    /// Exports only a complete listing using the shared snapshot schema.
+    pub fn snapshot(&self, saved_at: u64) -> Result<Vec<u8>, SessionError> {
         let handle = self.handle()?;
-        let status = mila_ffi::session::mila_session_read_machines(handle, 0);
-        if status != mila_ffi::session::SessionStatus::Ok {
-            return Err(status.into());
-        }
-        self.listing()
+        // SAFETY: copy_output owns the bounded output buffer and writable length.
+        copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_snapshot(handle, saved_at, out, capacity, written)
+        })
     }
 
     pub fn listing(&self) -> Result<Vec<u8>, SessionError> {
@@ -159,6 +163,47 @@ impl LiveSession {
                 .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit() || byte == b'_'))
         .then(|| code.to_owned())
     }
+}
+
+pub(super) fn read_complete_machines(handle: u64) -> Result<Vec<u8>, SessionError> {
+    complete_machine_pages(|more| {
+        let status = mila_ffi::session::mila_session_read_machines(handle, u8::from(more));
+        if status != mila_ffi::session::SessionStatus::Ok {
+            return Err(status.into());
+        }
+        // SAFETY: copy_output owns the output buffer and writable length for this call.
+        copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_listing(handle, out, capacity, written)
+        })
+    })
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] linux-complete-machine-read
+/// A refresh MUST follow authenticated continuation pages until the Rust listing
+/// is complete, within its 500-machine and 500-page limits. A failed or malformed
+/// page MUST fail the refresh instead of publishing an incomplete live listing.
+pub(super) fn complete_machine_pages(
+    mut read: impl FnMut(bool) -> Result<Vec<u8>, SessionError>,
+) -> Result<Vec<u8>, SessionError> {
+    #[derive(serde::Deserialize)]
+    struct Page {
+        machines: Vec<serde::de::IgnoredAny>,
+        has_more: bool,
+    }
+    for page_index in 0..mila_runtime::MAX_SNAPSHOT_MACHINES {
+        let bytes = read(page_index != 0)?;
+        if bytes.len() > super::MAX_LISTING_BYTES {
+            return Err(SessionError::InvalidInput);
+        }
+        let page: Page = serde_json::from_slice(&bytes).map_err(|_| SessionError::InvalidInput)?;
+        if page.machines.len() > mila_runtime::MAX_SNAPSHOT_MACHINES {
+            return Err(SessionError::InvalidInput);
+        }
+        if !page.has_more {
+            return Ok(bytes);
+        }
+    }
+    Err(SessionError::InvalidInput)
 }
 
 /// @cc [owner:ghuntley,label:security;reliability] linux-session-probe-identity-only

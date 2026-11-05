@@ -44,17 +44,27 @@ input, or a profile for another team or bundle identifier, is refused. An
 `unsigned` build needs only `MILA_VERSION` and reads no signing input;
 `mila-release.yml` builds it on runs without a `mila-v*` tag.
 
-Ad-hoc builds have no keychain entitlements, so `MilaDeviceSigner` cannot
-create a Secure Enclave key and sign-in is unavailable. Signing in needs a
-team-signed build with a provisioning profile.
+An ad-hoc macOS `dev` build compiles the `MILA_SOFTWARE_KEYS` development
+condition. It stores one owner-only, deployment-scoped software P-256 key in
+`Application Support/Mila/dev-software-keys` and disables push registration; release,
+`unsigned`, and all iOS builds never compile that condition. A team-signed
+macOS build with a provisioning profile uses the Secure Enclave instead.
+Setting `MILA_APPLE_IDENTITY` for macOS development requires
+`MILA_APPLE_TEAM` and `MILA_APPLE_PROFILE_RUNNER`; an incomplete signed build is
+refused before compilation.
+Software key filenames use a digest of the canonical deployment hostname;
+unsafe permissions, symlinks, hard links and malformed files are refused.
+The Secure Enclave key namespace remains unchanged across development builds.
 
 ## Tests
 
 ```sh
-cargo build --manifest-path mila/rust/mila-ffi/Cargo.toml -p mila-ffi --release
-MILA_FFI_LIB_DIR=$PWD/target/release swift test --package-path mila/native/apple
+tools/buck2 build -c overalls.non_hermetic=true //mila:apple-swift-test
+tools/buck2 build -c overalls.non_hermetic=true //mila:apple-software-keys-test
 ```
 
-Inside `devenv shell`, run `swift` with
-`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; `mila-build` sets
-this itself.
+These targets require macOS and Xcode. The software-key target runs the enabled
+DEBUG custody and push-refusal tests separately and verifies that a non-DEBUG
+compile refuses the development condition. Inside `devenv shell`, set
+`DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`; `mila-build` sets this
+itself.

@@ -73,6 +73,26 @@ import WebKit
 
 /// Wire decoding of Rust session outputs reached through the adapter.
 final class MilaAdapterWireTests: XCTestCase {
+    func testNotificationMutationRetryReusesCallerIdentityUntilSuccess() async throws {
+        let session = RecordingSession()
+        session.failMutations = true
+        let adapter = LinkedMilaFFIAdapter(session: session)
+        let device = UUID(uuidString: "55555555-5555-4555-8555-555555555555")!
+
+        do { try await adapter.removeNotificationDevice(device); XCTFail("first removal should be refused") } catch {}
+        do { try await adapter.removeNotificationDevice(device); XCTFail("retry should still be refused") } catch {}
+        XCTAssertEqual(session.deviceMutationRequests.map(\.1).count, 2)
+        XCTAssertEqual(session.deviceMutationRequests[0].1, session.deviceMutationRequests[1].1)
+
+        session.failMutations = false
+        try await adapter.removeNotificationDevice(device)
+        XCTAssertEqual(session.deviceMutationRequests.count, 3)
+        XCTAssertEqual(session.deviceMutationRequests[1].1, session.deviceMutationRequests[2].1)
+        try await adapter.removeNotificationDevice(device)
+        XCTAssertEqual(session.deviceMutationRequests.count, 4)
+        XCTAssertNotEqual(session.deviceMutationRequests[2].1, session.deviceMutationRequests[3].1)
+    }
+
     func testSSHKeysAcceptPorscheEnvelopeAndRevokeByOpaqueIdentity() async throws {
         let session = RecordingSession()
         session.sshKeyData = Data(#"{"version":1,"status":"succeeded","result":{"keys":[{"id":"55555555-5555-4555-8555-555555555555","label":"laptop","algorithm":"ecdsa-sha2-nistp256","fingerprint":"SHA256:abc","inserted_at":"2026-10-01T00:00:00Z"}]}}"#.utf8)
@@ -229,6 +249,12 @@ final class MilaLiveSessionRustLinkTests: XCTestCase {
         XCTAssertThrowsError(try session.terminalRead(1, waitMilliseconds: 1_001)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.terminalRead(0, waitMilliseconds: 10)) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.machineResize(machine: UUID(), cpu: 0, memory: 2048, disk: 20, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineResize(machine: UUID(), cpu: 2, memory: 2048, disk: 501, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineResize(machine: UUID(), cpu: 2, memory: 4_194_305, disk: 500, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineCreate(name: "builder", cpu: 2, memory: 2048, disk: 501, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineCreate(name: "builder name", cpu: 2, memory: 2048, disk: 20, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineClone(machine: UUID(), name: "bad name", requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
+        XCTAssertThrowsError(try session.machineClone(machine: UUID(), name: String(repeating: "a", count: 129), requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertThrowsError(try session.webSet(machine: UUID(), port: 0, publicAccess: true, revision: 1, requestID: UUID())) { XCTAssertEqual($0 as? MilaSessionError, .invalidInput) }
         XCTAssertEqual(milaRequestID(UUID(uuidString: "AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA")!), "porsche-aaaaaaaaaaaa4aaa8aaaaaaaaaaaaaaa")
     }

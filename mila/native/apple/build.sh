@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Build the native Mila app for iOS or macOS (ADR-0235).
 #
-#   dev      macOS: Mila.app signed with MILA_APPLE_IDENTITY when set, otherwise
-#            ad hoc. iOS: an ad-hoc signed iOS-simulator Mila.app.
+#   dev      macOS: Mila.app signed with MILA_APPLE_IDENTITY and a provisioning
+#            profile when set, otherwise ad hoc (with owner-only software keys). iOS: an
+#            ad-hoc signed iOS-simulator Mila.app.
 #   release  macOS: Developer ID signed Mila.app in a notarized, stapled DMG.
 #            iOS: a device IPA. Both are signed with the provisioning profile
 #            named by MILA_APPLE_PROFILE_RUNNER.
@@ -10,7 +11,7 @@
 #            unsigned Mila-<version>-unsigned.dmg. iOS: an ad-hoc signed device
 #            Mila-<version>-unsigned.ipa. It reads no signing input; CI builds
 #            it when no signing material is available. Neither installs as a
-#            signed release: ad-hoc builds cannot sign in (see README).
+#            signed release; unsigned release builds do not enable software keys.
 #
 # A release refuses any missing signing input rather than substituting one, and
 # verifies every signature as its final step. Output goes to
@@ -46,6 +47,13 @@ version=${MILA_VERSION:-0.0.0}
 if [[ "$mode" == release ]]; then
   require MILA_APPLE_TEAM MILA_APPLE_IDENTITY MILA_APPLE_PROFILE_RUNNER MILA_VERSION
   [[ "$platform" == ios ]] || require MILA_NOTARY_PROFILE
+fi
+# @cc [owner:ghuntley,label:security;build] apple-development-custody-selection
+# A macOS dev build with a signing identity MUST require its provisioning
+# profile and use hardware custody. Only an ad-hoc macOS dev build may enable
+# MILA_SOFTWARE_KEYS; release and iOS builds MUST never receive that define.
+if [[ "$platform" == macos && "$mode" == dev && -n "${MILA_APPLE_IDENTITY:-}" ]]; then
+  require MILA_APPLE_TEAM MILA_APPLE_PROFILE_RUNNER
 fi
 if [[ "$mode" != dev ]]; then
   require MILA_VERSION
@@ -103,6 +111,13 @@ swift_config=debug
 [[ "$mode" != dev ]] && swift_config=release
 swift_args=(--package-path "$package_dir/App" --scratch-path "$package_dir/App/.build/$platform-$mode"
   --configuration "$swift_config" --triple "$swift_triple" --sdk "$(xcrun --sdk "$sdk" --show-sdk-path)")
+# Software custody is a compile-time option restricted to macOS dev builds
+# without profile entitlements. Profile-backed builds retain Secure Enclave
+# custody. Swift also rejects this define unless both macOS and DEBUG hold,
+# so passing it to a release or iOS compiler cannot bypass the build policy.
+if [[ "$platform" == macos && "$mode" == dev && -z "${MILA_APPLE_IDENTITY:-}" ]]; then
+  swift_args+=(-Xswiftc -DMILA_SOFTWARE_KEYS)
+fi
 xcrun swift build "${swift_args[@]}"
 bin=$(xcrun swift build "${swift_args[@]}" --show-bin-path)
 
@@ -167,14 +182,11 @@ if [[ "$mode" == release ]]; then
   sign_args=(--sign "$MILA_APPLE_IDENTITY" --entitlements "$out/entitlements.plist" --timestamp)
   [[ "$platform" == macos ]] && sign_args+=(--options runtime)
 elif [[ "$mode" == dev && "$platform" == macos && -n "${MILA_APPLE_IDENTITY:-}" ]]; then
-  sign_args=(--sign "$MILA_APPLE_IDENTITY")
-  if [[ -n "${MILA_APPLE_PROFILE_RUNNER:-}" ]]; then
-    require MILA_APPLE_TEAM
-    use_profile
-    sign_args+=(--entitlements "$out/entitlements.plist")
-  fi
+  use_profile
+  sign_args=(--sign "$MILA_APPLE_IDENTITY" --entitlements "$out/entitlements.plist")
 else
-  # Ad hoc: no Secure Enclave keys or push, so sign-in is unavailable.
+  # Ad hoc: macOS dev uses owner-only software keys with push disabled;
+  # release-configuration and iOS builds retain the Secure Enclave requirement.
   sign_args=(--sign -)
 fi
 codesign --force ${keychain_args[@]+"${keychain_args[@]}"} "${sign_args[@]}" "$app"

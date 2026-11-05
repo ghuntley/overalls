@@ -39,13 +39,23 @@ sealed interface MilaTerminalSessionState {
  * step requires the authenticated session, and signing out detaches the PTY without killing
  * the server session. Terminal bytes pass through and are never retained beyond the caller.
  */
+/**
+ * @cc [owner:ghuntley,label:security;terminal] android-terminal-session-generation
+ * Session changes and fresh attachments MUST clear the previous frame and invalidate pending
+ * terminal operations. Late completions MUST NOT restore a previous attachment, frame, output,
+ * or state; a late successful attach MUST close only its PTY without killing its server session.
+ */
 class MilaTerminalSessionController(private val adapter: MilaFfiAdapter) {
+    var frame: MilaTerminalFrame? = null
+        private set
     var state: MilaTerminalSessionState = MilaTerminalSessionState.SignedOut
         private set
     private var authenticated = false
+    private var generation = 0L
 
     fun setSession(signedIn: Boolean) {
         if (signedIn == authenticated) return
+        advanceGeneration(clearFrame = true)
         authenticated = signedIn
         if (!signedIn) (state as? MilaTerminalSessionState.Live)?.let { adapter.terminalClose(it.handle) }
         state = if (signedIn) MilaTerminalSessionState.Idle else MilaTerminalSessionState.SignedOut
@@ -55,9 +65,12 @@ class MilaTerminalSessionController(private val adapter: MilaFfiAdapter) {
     suspend fun open(machine: UUID, columns: Int, rows: Int): Boolean {
         if (!authenticated) return signedOut(null)
         detachLive()
+        val operation = advanceGeneration(clearFrame = true)
         state = MilaTerminalSessionState.Attaching
-        val session = io { adapter.terminalNew(machine) }.getOrElse { return fail(null) }
-        return attach(session, columns, rows)
+        val result = io { adapter.terminalNew(machine) }
+        if (!isCurrent(operation)) return false
+        val session = result.getOrElse { return fail(null) }
+        return attach(session, columns, rows, operation)
     }
 
     /** Reattaches a PTY to the detached (or failed) session; the server replays its output. */
@@ -69,26 +82,50 @@ class MilaTerminalSessionController(private val adapter: MilaFfiAdapter) {
             else -> return false
         }
         if (!authenticated) return signedOut(session)
+        val operation = advanceGeneration(clearFrame = true)
         state = MilaTerminalSessionState.Attaching
-        return attach(session, columns, rows)
+        return attach(session, columns, rows, operation)
     }
 
-    /** Reads one bounded output chunk; null when no output is available yet. */
+    /** Reads one bounded event; null means transport loss or idle/closed with no bytes. */
     suspend fun poll(maxBytes: Int = 64 * 1024): ByteArray? {
         val live = state as? MilaTerminalSessionState.Live ?: return null
-        return io { adapter.terminalPoll(live.handle, maxBytes) }.getOrNull()?.takeIf { it.isNotEmpty() }
+        val operation = generation
+        val result = io { adapter.terminalReadWithin(live.handle, 0, maxBytes) }
+        if (!isCurrent(operation, live.handle)) return null
+        val encoded = result.getOrNull() ?: run {
+            state = MilaTerminalSessionState.Failed(live.session, MilaTerminalFailure.Refused)
+            return null
+        }
+        if (encoded.isEmpty()) return null
+        return when (encoded[0].toInt()) {
+            0 -> {
+                val nextFrame = io { adapter.terminalFrame(live.handle) }.getOrNull()
+                if (!isCurrent(operation, live.handle)) return null
+                frame = nextFrame
+                encoded.copyOfRange(1, encoded.size).takeIf { it.isNotEmpty() }
+            }
+            1 -> null
+            2 -> { state = MilaTerminalSessionState.Detached(live.session); null }
+            else -> { state = MilaTerminalSessionState.Failed(live.session, MilaTerminalFailure.Invalid); null }
+        }
     }
 
     suspend fun send(bytes: ByteArray): Boolean {
         val live = state as? MilaTerminalSessionState.Live ?: return false
         if (bytes.isEmpty() || bytes.size > 64 * 1024) return false
-        return io { adapter.terminalInputBytes(live.handle, bytes) }.isSuccess
+        val operation = generation
+        val result = io { adapter.terminalInputBytes(live.handle, bytes) }
+        return isCurrent(operation, live.handle) && result.isSuccess
     }
 
     suspend fun resize(columns: Int, rows: Int): Boolean {
         val live = state as? MilaTerminalSessionState.Live ?: return false
         if (columns !in 1..4096 || rows !in 1..512) return false
-        return io { adapter.terminalResizeHandle(live.handle, columns, rows) }.fold(
+        val operation = generation
+        val result = io { adapter.terminalResizeHandle(live.handle, columns, rows) }
+        if (!isCurrent(operation, live.handle)) return false
+        return result.fold(
             { state = live.copy(columns = columns, rows = rows); true },
             { false },
         )
@@ -97,6 +134,7 @@ class MilaTerminalSessionController(private val adapter: MilaFfiAdapter) {
     /** Closes the PTY only; the named session keeps running on the server. */
     fun detach(): Boolean {
         val live = state as? MilaTerminalSessionState.Live ?: return false
+        advanceGeneration(clearFrame = false)
         adapter.terminalClose(live.handle)
         state = MilaTerminalSessionState.Detached(live.session)
         return true
@@ -111,17 +149,38 @@ class MilaTerminalSessionController(private val adapter: MilaFfiAdapter) {
             else -> return false
         }
         if (!authenticated) return signedOut(session)
-        return io { adapter.terminalEnd(session) }.fold(
+        val operation = advanceGeneration(clearFrame = false)
+        val result = io { adapter.terminalEnd(session) }
+        if (!isCurrent(operation)) return false
+        return result.fold(
             { closed -> if (closed) { state = MilaTerminalSessionState.Ended(session); true } else fail(session) },
             { fail(session) },
         )
     }
 
-    private suspend fun attach(session: MilaTerminalSessionRef, columns: Int, rows: Int): Boolean =
-        io { adapter.terminalAttach(session, columns, rows) }.fold(
+    private suspend fun attach(session: MilaTerminalSessionRef, columns: Int, rows: Int, operation: Long): Boolean {
+        if (!isCurrent(operation)) return false
+        val result = io { adapter.terminalAttach(session, columns, rows) }
+        if (!isCurrent(operation)) {
+            result.getOrNull()?.let { adapter.terminalClose(it) }
+            return false
+        }
+        return result.fold(
             { handle -> state = MilaTerminalSessionState.Live(session, handle, columns, rows); true },
             { fail(session) },
         )
+    }
+
+    private fun advanceGeneration(clearFrame: Boolean): Long {
+        generation += 1
+        if (clearFrame) frame = null
+        return generation
+    }
+
+    private fun isCurrent(operation: Long): Boolean = authenticated && operation == generation
+
+    private fun isCurrent(operation: Long, handle: Long): Boolean =
+        isCurrent(operation) && (state as? MilaTerminalSessionState.Live)?.handle == handle
 
     private fun detachLive() {
         (state as? MilaTerminalSessionState.Live)?.let {

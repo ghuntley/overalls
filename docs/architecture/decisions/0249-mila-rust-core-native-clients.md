@@ -68,8 +68,11 @@ The initial workspace and adapters are in [`mila/rust`](../../../mila/rust) (sin
 [`mila/native/android`](../../../mila/native/android),
 [`mila/native/linux`](../../../mila/native/linux) and
 [`mila/windows-dotnet`](../../../mila/windows-dotnet). The Rust workspace,
-Hegel fixtures and Nix checks pass on Linux. Transport, secure-storage,
-feature-complete screens, native-host builds and Flutter removal remain open.
+Hegel fixtures and Nix checks pass on Linux. Native feature screens,
+deployment-bound snapshots and generation-scoped watch consumers are now wired
+through the shared FFI; transport edge cases, release secure-storage evidence,
+native-host acceptance and release evidence remain open. Flutter was removed in
+`af4ad42e0`; its historical evidence is distinguished from current native evidence.
 
 [`mila-session`](../../../mila/rust/mila-session/src/listing.rs) composes the pure
 runtime with the certificate-pinned SSH transport for validated machine reads.
@@ -80,22 +83,25 @@ out of the pure runtime. Local TCP SSH tests in
 certificate negotiation and channels with scripted server results; Hegel tests in
 [`properties.rs`](../../../mila/rust/mila-session/tests/properties.rs) check decoder
 identity and permission handling. Browser approval, native signer/FFI orchestration,
-watch, mutations and real Porsche integration remain open for this layer; see the
-[session review](../reviews/2026-10-21-mila-native-session.md).
+watch and authenticated mutations are now covered by native controllers and the
+ADR-0264 fixture journeys against source-built Porsche; production deployment and platform release
+acceptance remain separately scoped in the [session review](../reviews/2026-10-21-mila-native-session.md).
 
 The terminal attachment reducer is ported from Dart in
 [`terminal.rs`](../../../mila/rust/mila-runtime/src/terminal.rs), with private
 state, current-generation headers, replay reset accounting, closed outcomes,
 retry exhaustion and server/user permission gates. Hegel action sequences in
 [`terminal.rs`](../../../mila/rust/mila-runtime/tests/terminal.rs) exercise the
-pure reducer; native PTY transport and renderer integration remain unverified.
+pure reducer. Linux and Android fixture journeys exercise the native PTY path;
+the current Apple/Windows changes, native image rendering and provisioned-guest
+acceptance retain their separate execution gaps.
 
 The [release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
-records that Linux/Android release outputs and source-bundle consumers still
-depend on Flutter. Shared catalogs now live outside the Flutter tree, but this
-does not establish gettext conversion or native release acceptance. The native
-release replacement is authorized implementation work under this decision;
-platform journeys and release artifacts still require execution evidence.
+recorded Linux/Android release outputs and source-bundle consumers depending on
+Flutter at that time. Flutter has since been removed and the shared catalogs
+live outside its former tree. The native release replacement is authorized
+implementation work under this decision; current platform journey and release
+acceptance evidence is distinguished below from that historical review.
 
 The Android client binds machine creation and sharing to the authenticated
 Rust session through dedicated JNI entry points
@@ -208,9 +214,10 @@ fixture. The `mila-journey` machine test drives the Rust core's C ABI through
 Porsche against source-built Marshall and asserts each effect in the ledger.
 That covers enrollment with browser approval, reconnect, forget, listing,
 lifecycle admission, sharing, threads, web policy, SSH keys and notification
-devices. `nix run .#mila-journey-fixture` exposes the same backend for platform
-journeys. The terminal PTY path, checkpoint restore and the macOS/Windows
-tunnel remain open there.
+devices. `tools/buck2 run //mila:journey-fixture` exposes the same backend for
+platform journeys. The fixture's real-PTY stand-in passes the local Linux and
+Android journeys; provisioned-guest terminal, checkpoint restore and platform
+tunnel acceptance retain their separate evidence boundaries.
 
 ## Open questions
 
@@ -226,7 +233,30 @@ remain implementation work under ADR-0235.
 [ADR-0264](0264-hermetic-mila-journey-fixture.md).
 
 The native Apple [device signer](../../../mila/native/apple/Sources/MilaNativeUI/MilaDeviceSigner.swift)
-ports deployment-scoped Secure Enclave custody without a software fallback.
+ports deployment-scoped Secure Enclave custody for iOS and signed macOS builds.
+Only an explicitly compiled macOS DEBUG `MILA_SOFTWARE_KEYS` build uses the
+separate owner-only [development key store](../../../mila/native/apple/Sources/MilaNativeUI/MilaSoftwareDeviceKeyStore.swift)
+and refuses APNs registration, as allowed by ADR-0235.
 [Swift tests](../../../mila/native/apple/Tests/MilaNativeUITests/MilaDeviceSignerTests.swift)
 cover hostname boundaries and signature conversion; signed-device execution,
 callback integration and release entitlement verification remain open.
+
+The 2026-11-02 [native parity implementation review](../reviews/2026-11-02-mila-native-parity-implementation.md)
+records current typed clone/thread/device-registration interfaces, authenticated
+notification CRUD, bounded Apple/Android terminal reads, deployment-bound
+snapshots, generation-scoped watch invalidation and Windows/Linux host
+corrections. The follow-up records bounded terminal frames, native renderers,
+complete machine pagination, push/watch lifecycle fencing, and production FFI
+packaging. Android SDK assembly/JVM checks and Linux managed smoke now execute
+through [`mila/BUCK`](../../../mila/BUCK). Apple watch refreshes and Windows
+terminal operations retain their original session across suspended calls;
+bounded regressions cover deployment replacement and stale results. The Linux
+package requires a live headless display for both GTK feature test runs.
+The explicit Android fixture target passes all 14 ordered tests on API 35;
+the Linux headless and real GTK window journeys pass all 40 and 39 fixture steps
+respectively. GTK Busy reads use bounded, authority-fenced recovery; fixture
+config, data and snapshot caches stay private to the journey work directory. Windows
+validates native terminal outcomes and uses separately bounded, one-call frame,
+listing and snapshot projections; its portable smoke passes against production
+FFI. Apple/Windows host acceptance, image-rendering journeys and release
+execution remain open; implementation stays partial.

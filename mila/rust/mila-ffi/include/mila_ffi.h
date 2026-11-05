@@ -19,6 +19,13 @@ extern "C" {
 #define MILA_TERMINAL_READ_DATA 0
 #define MILA_TERMINAL_READ_IDLE 1
 #define MILA_TERMINAL_READ_CLOSED 2
+/* Watch buffers hold only validated identifiers and closed event fields. */
+#define MILA_WATCH_READ_CAPACITY 8192
+#define MILA_WATCH_READ_EVENT 0
+#define MILA_WATCH_READ_IDLE 1
+#define MILA_WATCH_READ_CLOSED 2
+#define MILA_WATCH_READ_AUTHORITY_LOST 3
+#define MILA_WATCH_READ_TRANSPORT_LOST 4
 
 typedef enum MilaFfiStatus {
   MILA_FFI_OK = 0,
@@ -48,6 +55,8 @@ typedef struct MilaSnapshotSummary {
 
 MilaFfiStatus mila_session_command_format(const char *action, const char *machine_id, const char *request_id, MilaRouteOutput output);
 int32_t mila_session_machine_action(uint64_t handle, const uint8_t *machine, size_t machine_len, const uint8_t *action, size_t action_len, const uint8_t *request_id, size_t request_id_len);
+int32_t mila_session_machine_clone(uint64_t handle, const uint8_t *machine, size_t machine_len,
+    const uint8_t *name, size_t name_len, const uint8_t *request_id, size_t request_id_len);
 int32_t mila_session_machine_resize(uint64_t handle, const uint8_t *machine, size_t machine_len, uint32_t cpu, uint64_t memory, uint64_t disk, const uint8_t *request_id, size_t request_id_len);
 int32_t mila_session_machine_create(uint64_t handle, const uint8_t *name, size_t name_len, uint32_t cpu, uint64_t memory, uint64_t disk, const uint8_t *request_id, size_t request_id_len);
 MilaFfiStatus mila_snapshot_machine_actions(const uint8_t *bytes, size_t length, const char *host, uint16_t port, uint8_t has_port, uint32_t index, MilaMachineActions *out_actions);
@@ -118,6 +127,19 @@ int32_t mila_session_listing(uint64_t handle, uint8_t *output, size_t capacity,
 int32_t mila_session_whoami(uint64_t handle, uint8_t *output, size_t capacity,
                              size_t *written);
 int32_t mila_session_close(uint64_t handle);
+/* Live read-only watch on the parent's existing authenticated connection.
+ * filters is exactly {"machines":[UUID],"threads":[UUID]}, 64 combined.
+ * Read refuses waits >1000ms or capacity <MILA_WATCH_READ_CAPACITY before
+ * consuming anything; *event is MILA_WATCH_READ_*. Authority loss fences the
+ * parent and all children. Native code must discard cached authority.
+ * Reconnect retries only watch, replaces the old handle and emits resync
+ * before hints. It never reconnects or resubmits a mutation. */
+int32_t mila_session_watch_open(uint64_t session_handle, const uint8_t *filters,
+    size_t length, uint64_t *out_handle);
+int32_t mila_session_watch_read_within(uint64_t watch_handle, uint32_t wait_ms,
+    uint8_t *output, size_t capacity, size_t *written, uint8_t *event);
+int32_t mila_session_watch_reconnect(uint64_t watch_handle, uint64_t *out_handle);
+int32_t mila_session_watch_close(uint64_t watch_handle);
 /* Authenticated PTY lifecycle. Buffers are caller-owned and bounded by Rust. */
 MilaFfiStatus mila_session_terminal_attach(uint64_t session_handle, uint32_t columns,
                                            uint32_t rows, uint64_t *out_terminal_handle);
@@ -137,6 +159,19 @@ int32_t mila_session_terminal_new(uint64_t handle, const uint8_t *machine, size_
 int32_t mila_session_terminal_attach_session(uint64_t session_handle, const uint8_t *machine,
     size_t machine_len, const uint8_t *terminal, size_t terminal_len, uint32_t columns,
     uint32_t rows, uint64_t *out_terminal_handle);
+/* Cursor is absent when has_cursor=0 (cursor must then be zero). Both flags are
+ * 0 or 1. Read-only suppresses input/resize even if the server grants rw. */
+int32_t mila_session_terminal_attach_with_options(uint64_t session_handle, const uint8_t *machine,
+    size_t machine_len, const uint8_t *terminal, size_t terminal_len, uint32_t columns,
+    uint32_t rows, uint64_t cursor, uint8_t has_cursor, uint8_t read_only,
+    uint64_t *out_terminal_handle);
+/* Payload-free version-1 JSON: cursor, read_only, closed and outcome. */
+int32_t mila_session_terminal_state(uint64_t terminal_handle, uint8_t *output,
+    size_t capacity, size_t *written);
+/* Display-only version-1 JSON frame with bounded styled spans. No PTY bytes
+ * are consumed by this read. Output-too-small reports the required capacity. */
+int32_t mila_session_terminal_screen(uint64_t terminal_handle, uint8_t *output,
+    size_t capacity, size_t *written);
 
 /* Encodes a push-key registration request; token bytes are never returned. */
 MilaFfiStatus mila_push_key_request_encode(uint8_t provider, uint8_t environment,
@@ -164,7 +199,16 @@ int32_t mila_session_device_register(uint64_t handle, uint8_t platform,
     const uint8_t *susan_reply, size_t susan_reply_len, const uint8_t *enc_pubkey,
     size_t enc_pubkey_len, const uint8_t *label, size_t label_len, uint64_t now,
     uint8_t *output, size_t capacity, size_t *written);
+int32_t mila_session_device_register_with_request(uint64_t handle, uint8_t platform,
+    const uint8_t *susan_reply, size_t susan_reply_len, const uint8_t *enc_pubkey,
+    size_t enc_pubkey_len, const uint8_t *label, size_t label_len,
+    const uint8_t *request_id, size_t request_id_len, uint64_t now,
+    uint8_t *output, size_t capacity, size_t *written);
 int32_t mila_session_device_rm(uint64_t handle, const uint8_t *device, size_t device_len);
+int32_t mila_session_device_prefs_with_request(uint64_t handle, const uint8_t *device,
+    size_t device_len, uint8_t enabled, const uint8_t *request_id, size_t request_id_len);
+int32_t mila_session_device_rm_with_request(uint64_t handle, const uint8_t *device,
+    size_t device_len, const uint8_t *request_id, size_t request_id_len);
 /* The bounded JSON reason of the session's most recent refusal. */
 int32_t mila_session_last_refusal(uint64_t handle, uint8_t *output, size_t capacity,
     size_t *written);
@@ -181,7 +225,7 @@ int32_t mila_session_terminal_read_within(uint64_t terminal_handle, uint32_t wai
 
 typedef enum MilaThreadCommandKind { MILA_THREAD_UNKNOWN = 0, MILA_THREAD_LIST = 1, MILA_THREAD_SHOW = 2, MILA_THREAD_TURNS = 3, MILA_THREAD_PROMPT = 4, MILA_THREAD_ANSWER = 5, MILA_THREAD_PLAN_APPROVE = 6, MILA_THREAD_PLAN_REVISE = 7, MILA_THREAD_MODE = 8, MILA_THREAD_READ = 9 } MilaThreadCommandKind;
 MilaFfiStatus mila_thread_command_kind(const char *line, MilaThreadCommandKind *out_kind);
-typedef enum MilaMachineCommandKind { MILA_MACHINE_UNKNOWN = 0, MILA_MACHINE_LIST = 1, MILA_MACHINE_SHOW = 2, MILA_MACHINE_NEW = 3, MILA_MACHINE_RESIZE = 4, MILA_MACHINE_START = 5, MILA_MACHINE_STOP = 6, MILA_MACHINE_PAUSE = 7, MILA_MACHINE_RESUME = 8, MILA_MACHINE_DELETE = 9, MILA_MACHINE_SHARE_ADD = 10, MILA_MACHINE_SHARE_REMOVE = 11, MILA_MACHINE_WEB_SHOW = 12, MILA_MACHINE_WEB_SET = 13 } MilaMachineCommandKind;
+typedef enum MilaMachineCommandKind { MILA_MACHINE_UNKNOWN = 0, MILA_MACHINE_LIST = 1, MILA_MACHINE_SHOW = 2, MILA_MACHINE_NEW = 3, MILA_MACHINE_RESIZE = 4, MILA_MACHINE_START = 5, MILA_MACHINE_STOP = 6, MILA_MACHINE_PAUSE = 7, MILA_MACHINE_RESUME = 8, MILA_MACHINE_DELETE = 9, MILA_MACHINE_SHARE_ADD = 10, MILA_MACHINE_SHARE_REMOVE = 11, MILA_MACHINE_WEB_SHOW = 12, MILA_MACHINE_WEB_SET = 13, MILA_MACHINE_CLONE = 14 } MilaMachineCommandKind;
 MilaFfiStatus mila_machine_command_kind(const char *line, MilaMachineCommandKind *out_kind);
 
 #ifdef __cplusplus

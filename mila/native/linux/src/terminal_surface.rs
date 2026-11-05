@@ -114,7 +114,7 @@ impl<A: SessionAuthority, T: PtyTransport> TerminalSurface<A, T> {
         let mut updated = false;
         for _ in 0..MAX_READS_PER_TICK {
             match self.pty.read_output(generation) {
-                Ok(PtyRead::Text(_)) => updated = true,
+                Ok(PtyRead::Text(_) | PtyRead::Screen(_)) => updated = true,
                 Ok(PtyRead::Idle) => break,
                 Ok(PtyRead::Eof) => {
                     self.live = None;
@@ -180,6 +180,10 @@ impl<A: SessionAuthority, T: PtyTransport> TerminalSurface<A, T> {
     /// The bounded viewport text shown by the GTK view.
     pub fn text(&self) -> String {
         self.pty.renderer().lines().join("\n")
+    }
+
+    pub fn frame(&self) -> Option<&mila_runtime::TerminalFrame> {
+        self.pty.renderer().frame()
     }
 
     pub fn transport_mut(&mut self) -> &mut T {

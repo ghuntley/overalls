@@ -9,9 +9,11 @@ public enum MilaSessionError: Error, Equatable, Sendable {
     case unavailable
 }
 
-/// Device-key custody used only while `mila_session_connect` runs. Production
-/// uses `MilaDeviceSigner` (Secure Enclave); the protocol exists so the package
-/// tests can drive a disposable fixture deployment without production fallback.
+/// Device-key custody used only while `mila_session_connect` runs. Profile-backed
+/// production builds use `MilaDeviceSigner` with Secure Enclave custody; the
+/// explicitly compiled ad-hoc macOS development build uses its owner-only
+/// software-key policy. The protocol lets package tests drive a disposable
+/// fixture deployment without crossing the production FFI boundary.
 public protocol MilaSessionSigner: AnyObject {
     var openSSHPublicKey: String { get }
     /// Returns the 64-byte big-endian r||s P-256 signature of SHA-256(message).
@@ -29,11 +31,17 @@ public protocol MilaSessionClient: AnyObject, Sendable {
     var isAuthenticated: Bool { get }
     func refresh() throws -> Data
     func readMore() throws -> Data
+    func snapshot(savedAt: UInt64) throws -> Data
+    func watchOpen(machines: [UUID], threads: [UUID]) throws -> UInt64
+    func watchRead(_ handle: UInt64) throws -> MilaWatchRead
+    func watchReconnect(_ handle: UInt64) throws -> UInt64
+    func watchClose(_ handle: UInt64)
     func whoami() throws -> Data
     func sshKeys() throws -> Data
     func revokeSSHKey(id: UUID, requestID: UUID) throws
     func machineAction(machine: UUID, action: String, requestID: UUID) throws
     func machineResize(machine: UUID, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) throws
+    func machineClone(machine: UUID, name: String, requestID: UUID) throws
     func machineCreate(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) throws
     func shareMutation(machine: UUID, email: String, role: String?, add: Bool, requestID: UUID) throws
     func threadAction(thread: UUID?, command: String, secondary: String?, input: String?, requestID: UUID?) throws -> Data
@@ -44,10 +52,11 @@ public protocol MilaSessionClient: AnyObject, Sendable {
     /// `device register`: Rust validates Susan's key-issuance reply and sends its
     /// push key to Porsche on stdin only. Returns Porsche's bounded receipt.
     func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data
+    func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID) throws -> Data
     /// `device prefs ID --enabled=…` for one caller-owned device.
-    func notificationDevicePreferences(id: UUID, enabled: Bool) throws
+    func notificationDevicePreferences(id: UUID, enabled: Bool, requestID: UUID) throws
     /// `device rm ID` for one caller-owned device.
-    func notificationDeviceRemove(id: UUID) throws
+    func notificationDeviceRemove(id: UUID, requestID: UUID) throws
     /// The bounded JSON reason of the session's most recent refusal, if any.
     func lastRefusal() -> String?
     func close()
@@ -55,13 +64,30 @@ public protocol MilaSessionClient: AnyObject, Sendable {
 
 /// Sessions that predate the notification-device operations refuse them.
 public extension MilaSessionClient {
+    func watchOpen(machines: [UUID], threads: [UUID]) throws -> UInt64 { _ = machines; _ = threads; throw MilaSessionError.unavailable }
+    func watchRead(_ handle: UInt64) throws -> MilaWatchRead { _ = handle; throw MilaSessionError.unavailable }
+    func watchReconnect(_ handle: UInt64) throws -> UInt64 { _ = handle; throw MilaSessionError.unavailable }
+    func watchClose(_ handle: UInt64) { _ = handle }
+
+    func machineClone(machine: UUID, name: String, requestID: UUID) throws { throw MilaSessionError.unavailable }
+    func snapshot(savedAt: UInt64) throws -> Data { _ = savedAt; throw MilaSessionError.unavailable }
     func notificationDevices() throws -> Data { throw MilaSessionError.unavailable }
     func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
         _ = platform; _ = susanReply; _ = encryptionPublicKey; _ = label; _ = now
         throw MilaSessionError.unavailable
     }
-    func notificationDevicePreferences(id: UUID, enabled: Bool) throws { _ = id; _ = enabled; throw MilaSessionError.unavailable }
-    func notificationDeviceRemove(id: UUID) throws { _ = id; throw MilaSessionError.unavailable }
+    func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID) throws -> Data {
+        _ = requestID
+        return try notificationDeviceRegister(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now)
+    }
+    func notificationDevicePreferences(id: UUID, enabled: Bool, requestID: UUID) throws { _ = id; _ = enabled; _ = requestID; throw MilaSessionError.unavailable }
+    func notificationDeviceRemove(id: UUID, requestID: UUID) throws { _ = id; _ = requestID; throw MilaSessionError.unavailable }
+    func notificationDevicePreferences(id: UUID, enabled: Bool) throws {
+        try notificationDevicePreferences(id: id, enabled: enabled, requestID: UUID())
+    }
+    func notificationDeviceRemove(id: UUID) throws {
+        try notificationDeviceRemove(id: id, requestID: UUID())
+    }
     func lastRefusal() -> String? { nil }
 }
 
@@ -92,12 +118,20 @@ public protocol MilaPtySession: AnyObject, Sendable {
     /// and attaches a PTY to it by name.
     func terminalAttach(machine: UUID, columns: UInt32, rows: UInt32) throws -> UInt64
     func terminalPoll(_ terminal: UInt64) throws -> Data
-    /// One bounded PTY read that waits at most `waitMilliseconds` and tells
-    /// data, an idle (still open) channel and a closed channel apart.
     func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead
     func terminalInput(_ terminal: UInt64, data: Data) throws
     func terminalResize(_ terminal: UInt64, columns: UInt32, rows: UInt32) throws
     func terminalKill(_ terminal: UInt64)
+    func terminalFrame(_ terminal: UInt64) throws -> MilaTerminalFrame?
+}
+
+public extension MilaPtySession {
+    func terminalFrame(_ terminal: UInt64) throws -> MilaTerminalFrame? { nil }
+    func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead {
+        _ = waitMilliseconds
+        let data = try terminalPoll(terminal)
+        return data.isEmpty ? .idle : .data(data)
+    }
 }
 
 /// Canonical Porsche request identity: `porsche-` plus 32 lowercase hex digits.
@@ -158,6 +192,12 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
         return handle != 0
     }
 
+    /// Rust refuses incomplete listings; persisted JSON is the existing closed schema.
+    public func snapshot(savedAt: UInt64) throws -> Data {
+        let current = try validHandle()
+        return try Self.readOnce(limit: 1 << 20) { mila_session_snapshot(current, savedAt, $0, $1, $2) }
+    }
+
     public func refresh() throws -> Data {
         let current = try validHandle()
         let status = mila_session_read_machines(current, 0)
@@ -201,7 +241,7 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
 
     public func machineResize(machine: UUID, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) throws {
         let current = try validHandle()
-        guard (1...256).contains(cpu), (256...4_194_304).contains(memory), (1...16_777_216).contains(disk) else { throw MilaSessionError.invalidInput }
+        guard (1...256).contains(cpu), (256...4_194_304).contains(memory), (1...500).contains(disk) else { throw MilaSessionError.invalidInput }
         let machineBytes = Array(machine.uuidString.lowercased().utf8)
         let requestBytes = Array(milaRequestID(requestID).utf8)
         let status = machineBytes.withUnsafeBufferPointer { m in requestBytes.withUnsafeBufferPointer { r in
@@ -210,8 +250,39 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
         guard status == 0 else { throw Self.error(status) }
     }
 
+    /// @cc [owner:ghuntley,label:protocol] apple-clone-mutation-once
+    /// Submit one caller-owned request id through the authenticated Rust session.
+    /// The optional machine name MUST be one to 128 ASCII letters, digits, `-`, or `_`;
+    /// invalid names are refused before crossing the native ABI.
+    public func machineClone(machine: UUID, name: String, requestID: UUID) throws {
+        let current = try validHandle()
+        guard (1...128).contains(name.utf8.count),
+              name.utf8.allSatisfy({ byte in
+                  (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) ||
+                  (byte >= 48 && byte <= 57) || byte == 45 || byte == 95
+              }) else {
+            throw MilaSessionError.invalidInput
+        }
+        let machineBytes = Array(machine.uuidString.lowercased().utf8)
+        let nameBytes = Array(name.utf8)
+        let requestBytes = Array(milaRequestID(requestID).utf8)
+        let status = machineBytes.withUnsafeBufferPointer { m in nameBytes.withUnsafeBufferPointer { n in requestBytes.withUnsafeBufferPointer { r in
+            mila_session_machine_clone(current, m.baseAddress, m.count, n.baseAddress, n.count, r.baseAddress, r.count)
+        }}}
+        guard status == 0 else { throw Self.error(status) }
+    }
+
     public func machineCreate(name: String, cpu: UInt32, memory: UInt64, disk: UInt64, requestID: UUID) throws {
         let current = try validHandle()
+        guard (1...128).contains(name.utf8.count),
+              name.utf8.allSatisfy({ byte in
+                  (byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) ||
+                  (byte >= 48 && byte <= 57) || byte == 45 || byte == 95
+              }),
+              (1...256).contains(cpu), (256...4_194_304).contains(memory),
+              (1...500).contains(disk), requestID != UUID.zero else {
+            throw MilaSessionError.invalidInput
+        }
         let nameBytes = Array(name.utf8)
         let requestBytes = Array(milaRequestID(requestID).utf8)
         let status = nameBytes.withUnsafeBufferPointer { n in requestBytes.withUnsafeBufferPointer { r in
@@ -281,37 +352,54 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
     /// Susan's reply carries the push key; it is borrowed for the call and never
     /// retained here. Rust refuses an unknown member, an expired key or a
     /// malformed X25519 public key before any channel opens.
-    public func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
+    public func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64, requestID: UUID) throws -> Data {
         let current = try validHandle()
         guard !susanReply.isEmpty, susanReply.count <= 4096, encryptionPublicKey.utf8.count == 43,
-              (label?.utf8.count ?? 0) <= 64 else { throw MilaSessionError.invalidInput }
+              requestID != UUID.zero, (label?.utf8.count ?? 0) <= 64 else { throw MilaSessionError.invalidInput }
         let reply = [UInt8](susanReply)
         let key = Array(encryptionPublicKey.utf8)
         let labelBytes = Array((label ?? "").utf8)
+        let requestBytes = Array(milaRequestID(requestID).utf8)
         return try Self.readOnce(limit: Self.commandLimit) { output, capacity, written in
-            reply.withUnsafeBufferPointer { r in key.withUnsafeBufferPointer { k in labelBytes.withUnsafeBufferPointer { l in
-                mila_session_device_register(current, platform.rawValue, r.baseAddress, r.count, k.baseAddress, k.count,
-                                             l.baseAddress, l.count, now, output, capacity, written)
-            }}}
+            reply.withUnsafeBufferPointer { r in key.withUnsafeBufferPointer { k in labelBytes.withUnsafeBufferPointer { l in requestBytes.withUnsafeBufferPointer { q in
+                mila_session_device_register_with_request(current, platform.rawValue, r.baseAddress, r.count, k.baseAddress, k.count,
+                                             l.baseAddress, l.count, q.baseAddress, q.count, now, output, capacity, written)
+            }}}}
         }
     }
 
-    public func notificationDevicePreferences(id: UUID, enabled: Bool) throws {
+    public func notificationDeviceRegister(platform: MilaDevicePlatform, susanReply: Data, encryptionPublicKey: String, label: String?, now: UInt64) throws -> Data {
+        try notificationDeviceRegister(platform: platform, susanReply: susanReply, encryptionPublicKey: encryptionPublicKey, label: label, now: now, requestID: UUID())
+    }
+
+    public func notificationDevicePreferences(id: UUID, enabled: Bool, requestID: UUID) throws {
         let current = try validHandle()
+        guard requestID != UUID.zero else { throw MilaSessionError.invalidInput }
         let device = Array(id.uuidString.lowercased().utf8)
-        let status = device.withUnsafeBufferPointer { d in
-            mila_session_device_prefs(current, d.baseAddress, d.count, enabled ? 1 : 0)
-        }
+        let request = Array(milaRequestID(requestID).utf8)
+        let status = device.withUnsafeBufferPointer { d in request.withUnsafeBufferPointer { r in
+            mila_session_device_prefs_with_request(current, d.baseAddress, d.count, enabled ? 1 : 0, r.baseAddress, r.count)
+        }}
+        guard status == 0 else { throw Self.error(status) }
+    }
+
+    public func notificationDevicePreferences(id: UUID, enabled: Bool) throws {
+        try notificationDevicePreferences(id: id, enabled: enabled, requestID: UUID())
+    }
+
+    public func notificationDeviceRemove(id: UUID, requestID: UUID) throws {
+        let current = try validHandle()
+        guard requestID != UUID.zero else { throw MilaSessionError.invalidInput }
+        let device = Array(id.uuidString.lowercased().utf8)
+        let request = Array(milaRequestID(requestID).utf8)
+        let status = device.withUnsafeBufferPointer { d in request.withUnsafeBufferPointer { r in
+            mila_session_device_rm_with_request(current, d.baseAddress, d.count, r.baseAddress, r.count)
+        }}
         guard status == 0 else { throw Self.error(status) }
     }
 
     public func notificationDeviceRemove(id: UUID) throws {
-        let current = try validHandle()
-        let device = Array(id.uuidString.lowercased().utf8)
-        let status = device.withUnsafeBufferPointer { d in
-            mila_session_device_rm(current, d.baseAddress, d.count)
-        }
-        guard status == 0 else { throw Self.error(status) }
+        try notificationDeviceRemove(id: id, requestID: UUID())
     }
 
     public func lastRefusal() -> String? {
@@ -360,32 +448,31 @@ public final class MilaLiveSession: MilaSessionClient, MilaPtySession, @unchecke
     }
 
     /// Attaches a PTY owned by this session to one named terminal session.
-    public func terminalAttach(machine: UUID, session: UUID, columns: UInt32, rows: UInt32) throws -> UInt64 {
+    public func terminalAttach(machine: UUID, session: UUID, columns: UInt32, rows: UInt32, cursor: UInt64? = nil, readOnly: Bool = false) throws -> UInt64 {
         let current = try validHandle()
         guard (1...4096).contains(columns), (1...512).contains(rows) else { throw MilaSessionError.invalidInput }
         let machineBytes = Array(machine.uuidString.lowercased().utf8)
         let terminalBytes = Array(session.uuidString.lowercased().utf8)
         var terminal: UInt64 = 0
         let status = machineBytes.withUnsafeBufferPointer { m in terminalBytes.withUnsafeBufferPointer { t in
-            mila_session_terminal_attach_session(current, m.baseAddress, m.count, t.baseAddress, t.count, columns, rows, &terminal)
+            mila_session_terminal_attach_with_options(current, m.baseAddress, m.count, t.baseAddress, t.count, columns, rows, cursor ?? 0, cursor == nil ? 0 : 1, readOnly ? 1 : 0, &terminal)
         }}
         guard status == 0, terminal != 0 else { throw Self.error(status) }
         return terminal
     }
 
+    public func terminalFrame(_ terminal: UInt64) throws -> MilaTerminalFrame? {
+        _ = try validHandle()
+        let data = try Self.readOnce(limit: 16 << 20) { mila_session_terminal_screen(terminal, $0, $1, $2) }
+        return try MilaTerminalFrame.decode(data)
+    }
+
     /// One bounded PTY read that waits at most `waitMilliseconds` (Rust caps it
     /// at 1000) and tells idle from closed. The buffer is the full chunk size:
     /// Rust consumes channel data before it copies.
-    /// The chunk buffer is reused across reads, as in `terminalPoll`, so an
-    /// idle stream polled many times a second does not allocate 1 MiB per read.
     public func terminalRead(_ terminal: UInt64, waitMilliseconds: UInt32) throws -> MilaTerminalRead {
         guard terminal != 0, waitMilliseconds <= 1_000 else { throw MilaSessionError.invalidInput }
-        lock.lock()
-        if ptyBuffer.count != Self.ptyChunkLimit { ptyBuffer = [UInt8](repeating: 0, count: Self.ptyChunkLimit) }
-        var buffer = ptyBuffer
-        ptyBuffer = []
-        lock.unlock()
-        defer { lock.lock(); ptyBuffer = buffer; lock.unlock() }
+        var buffer = [UInt8](repeating: 0, count: Self.ptyChunkLimit)
         var written = 0
         var event: UInt8 = 0
         let status = buffer.withUnsafeMutableBufferPointer { output in
@@ -567,4 +654,46 @@ struct MilaTerminalEndReceipt: Decodable {
 private final class MilaSignerBox {
     let signer: any MilaSessionSigner
     init(_ signer: any MilaSessionSigner) { self.signer = signer }
+}
+
+public extension MilaLiveSession {
+    func watchOpen(machines: [UUID], threads: [UUID]) throws -> UInt64 {
+        guard machines.count + threads.count <= 64 else { throw MilaSessionError.invalidInput }
+        struct Filters: Encodable { let machines: [String]; let threads: [String] }
+        let filters = try JSONEncoder().encode(Filters(machines: machines.map { $0.uuidString.lowercased() }, threads: threads.map { $0.uuidString.lowercased() }))
+        let session = try validHandle()
+        var watch: UInt64 = 0
+        let status = filters.withUnsafeBytes { bytes in
+            mila_session_watch_open(session, bytes.bindMemory(to: UInt8.self).baseAddress, filters.count, &watch)
+        }
+        guard status == 0, watch != 0 else { throw Self.error(status) }
+        return watch
+    }
+
+    func watchRead(_ handle: UInt64) throws -> MilaWatchRead {
+        var bytes = [UInt8](repeating: 0, count: 8192)
+        var written = 0
+        var event: UInt8 = 0
+        let status = bytes.withUnsafeMutableBufferPointer { buffer in
+            mila_session_watch_read_within(handle, 250, buffer.baseAddress, buffer.count, &written, &event)
+        }
+        guard status == 0, written <= bytes.count else { throw Self.error(status) }
+        switch event {
+        case 0: return try MilaWatchRead.decode(Data(bytes.prefix(written)))
+        case 1: return .idle
+        case 2: return .closed
+        case 3: return .authorityLost
+        case 4: return .transportLost
+        default: throw MilaSessionError.invalidInput
+        }
+    }
+
+    func watchReconnect(_ handle: UInt64) throws -> UInt64 {
+        var next: UInt64 = 0
+        let status = mila_session_watch_reconnect(handle, &next)
+        guard status == 0, next != 0 else { throw Self.error(status) }
+        return next
+    }
+
+    func watchClose(_ handle: UInt64) { _ = mila_session_watch_close(handle) }
 }

@@ -153,7 +153,7 @@ jobs:
           targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
       - name: Install cargo-ndk
         run: cargo install cargo-ndk --locked --version 4.1.2
-      - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
+      - uses: gradle/actions/setup-gradle@f29f5a9d7b09a7c6b29859002d29d24e1674c884 # v5.0.1
         with:
           gradle-version: '9.3.1'
       # tools/buck2 builds buckCells.aarch64-darwin, as in the apple job.

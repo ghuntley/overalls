@@ -47,59 +47,92 @@ internal enum MilaThreadAction { Show, Turns, Read, Prompt, Answer, PlanApprove,
 internal enum MilaThreadActionStateKind { SignedOut, Empty, Ready, Submitting, Applied, Failed }
 internal sealed record MilaThreadActionState(MilaThreadActionStateKind Kind, MilaThreadRow? Thread, MilaThreadAction? Action, string? Error);
 
-/// <summary>Maintains authenticated thread selection and routes every action through Rust's command catalogue.</summary>
-internal sealed class MilaThreadController
+internal delegate MilaNativeSessionBytesResult MilaThreadCommandSubmit(
+    ulong handle, Guid? thread, string command, string? secondary, string? input, string? requestId);
+
+/// <summary>
+/// @cc [owner:ghuntley,label:security;reliability] mila-windows-thread-result-generation
+/// A thread result MUST update only the authenticated session and selected-thread
+/// generation that submitted it; signing out or replacing a selection MUST fence
+/// in-flight completion, including replacement by another authenticated session.
+/// </summary>
+internal sealed class MilaThreadController(MilaThreadCommandSubmit? submit = null)
 {
-    internal MilaThreadActionState State { get; private set; } = new(MilaThreadActionStateKind.SignedOut, null, null, null);
+    private readonly object _gate = new();
+    private readonly MilaThreadCommandSubmit _submit = submit ?? RustNative.TrySessionThreadAction;
+    private long _generation;
+    private MilaThreadActionState _state = new(MilaThreadActionStateKind.SignedOut, null, null, null);
+    internal MilaThreadActionState State { get { lock (_gate) return _state; } }
+    internal long Generation { get { lock (_gate) return _generation; } }
     private MilaThreadListing? _listing;
     private bool _authenticated;
+    private ulong _handle;
 
-    internal void SetSession(bool authenticated, MilaThreadListing? listing)
+    internal void SetSession(bool authenticated, MilaThreadListing? listing, ulong handle = 0)
     {
-        _authenticated = authenticated && listing is not null;
-        _listing = _authenticated ? listing : null;
-        State = _authenticated ? new(MilaThreadActionStateKind.Empty, null, null, null) : new(MilaThreadActionStateKind.SignedOut, null, null, null);
+        lock (_gate)
+        {
+            _generation++;
+            _authenticated = authenticated && listing is not null;
+            _handle = _authenticated ? handle : 0;
+            _listing = _authenticated ? listing : null;
+            _state = _authenticated ? new(MilaThreadActionStateKind.Empty, null, null, null) : new(MilaThreadActionStateKind.SignedOut, null, null, null);
+        }
     }
 
     internal bool Select(Guid id)
     {
-        MilaThreadRow? thread = _listing?.Threads.FirstOrDefault(item => item.Id == id);
-        if (thread is null) return false;
-        State = new(MilaThreadActionStateKind.Ready, thread, null, null);
-        return true;
+        lock (_gate)
+        {
+            MilaThreadRow? thread = _listing?.Threads.FirstOrDefault(item => item.Id == id);
+            if (thread is null) return false;
+            _generation++;
+            _state = new(MilaThreadActionStateKind.Ready, thread, null, null);
+            return true;
+        }
     }
 
     internal bool Submit(MilaThreadAction action)
     {
-        if (!_authenticated || State.Thread is null) { State = new(MilaThreadActionStateKind.SignedOut, null, null, null); return false; }
-        string command = action switch
+        lock (_gate)
         {
-            MilaThreadAction.Show => "thread show",
-            MilaThreadAction.Turns => "thread turns",
-            MilaThreadAction.Read => "thread read",
-            MilaThreadAction.Prompt => "thread prompt",
-            MilaThreadAction.Answer => "thread answer",
-            MilaThreadAction.PlanApprove => "thread plan approve",
-            MilaThreadAction.PlanRevise => "thread plan revise",
-            _ => throw new ArgumentOutOfRangeException(nameof(action)),
-        };
-        MilaNativeThreadCommandResult result = RustNative.TryClassifyThreadCommand(command);
-        if (result.Status != MilaNativeStatus.Ok || result.Kind is null)
-        {
-            State = new(MilaThreadActionStateKind.Failed, State.Thread, action, result.Status.ToString());
-            return false;
+            if (!_authenticated || _state.Thread is null) { _state = new(MilaThreadActionStateKind.SignedOut, null, null, null); return false; }
+            string command = action switch
+            {
+                MilaThreadAction.Show => "thread show",
+                MilaThreadAction.Turns => "thread turns",
+                MilaThreadAction.Read => "thread read",
+                MilaThreadAction.Prompt => "thread prompt",
+                MilaThreadAction.Answer => "thread answer",
+                MilaThreadAction.PlanApprove => "thread plan approve",
+                MilaThreadAction.PlanRevise => "thread plan revise",
+                _ => throw new ArgumentOutOfRangeException(nameof(action)),
+            };
+            MilaNativeThreadCommandResult result = RustNative.TryClassifyThreadCommand(command);
+            if (result.Status != MilaNativeStatus.Ok || result.Kind is null)
+            {
+                _state = new(MilaThreadActionStateKind.Failed, _state.Thread, action, result.Status.ToString());
+                return false;
+            }
+            _state = new(MilaThreadActionStateKind.Applied, _state.Thread, action, null);
+            return true;
         }
-        State = new(MilaThreadActionStateKind.Applied, State.Thread, action, null);
-        return true;
     }
 
     /// <summary>Dispatches the selected action through the authenticated Rust session.</summary>
-    internal bool SubmitLive(ulong handle, MilaThreadAction action, string? secondary = null, string? input = null)
+    internal bool SubmitLive(ulong handle, MilaThreadAction action, string? secondary = null, string? input = null,
+        long? expectedGeneration = null)
     {
-        if (!_authenticated || handle == 0 || State.Thread is null)
+        long generation;
+        MilaThreadRow thread;
+        lock (_gate)
         {
-            State = new(MilaThreadActionStateKind.SignedOut, null, action, null);
-            return false;
+            if (!_authenticated || handle == 0 || _handle != handle || _state.Thread is not { } selected ||
+                (expectedGeneration is { } expected && expected != _generation) ||
+                _state.Kind == MilaThreadActionStateKind.Submitting) return false;
+            generation = _generation;
+            thread = selected;
+            _state = new(MilaThreadActionStateKind.Submitting, thread, action, null);
         }
         string command = action switch
         {
@@ -111,11 +144,14 @@ internal sealed class MilaThreadController
         string? request = action is MilaThreadAction.Prompt or MilaThreadAction.Answer or
             MilaThreadAction.PlanApprove or MilaThreadAction.PlanRevise
             ? "porsche-" + Guid.NewGuid().ToString("N") : null;
-        MilaNativeSessionBytesResult result = RustNative.TrySessionThreadAction(
-            handle, State.Thread.Id, command, secondary, input, request);
-        State = result.Succeeded
-            ? new(MilaThreadActionStateKind.Applied, State.Thread, action, null)
-            : new(MilaThreadActionStateKind.Failed, State.Thread, action, result.Status.ToString());
-        return result.Succeeded;
+        MilaNativeSessionBytesResult result = _submit(handle, thread.Id, command, secondary, input, request);
+        lock (_gate)
+        {
+            if (!_authenticated || generation != _generation) return false;
+            _state = result.Succeeded
+                ? new(MilaThreadActionStateKind.Applied, thread, action, null)
+                : new(MilaThreadActionStateKind.Failed, thread, action, result.Status.ToString());
+            return result.Succeeded;
+        }
     }
 }

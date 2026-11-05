@@ -8,63 +8,7 @@ pub enum AttachPhase {
     Waiting,
     Ended,
 }
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AttachOutcome {
-    Closed,
-    Refused,
-    Invalid,
-    Authority,
-    Transport,
-}
-impl AttachOutcome {
-    pub const fn from_status(status: Option<i32>) -> Self {
-        match status {
-            Some(0) => Self::Closed,
-            Some(1) => Self::Refused,
-            Some(2) => Self::Invalid,
-            Some(3) => Self::Authority,
-            _ => Self::Transport,
-        }
-    }
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AttachMode {
-    ReadWrite,
-    ReadOnly,
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AttachError {
-    InvalidCommand,
-    AttachRequiresPty,
-    ApprovalRequired,
-    Unauthorized,
-    AuthorityCredential,
-    Forbidden,
-    NotFound,
-    TerminalUnavailable,
-    Conflict,
-    TemporarilyUnavailable,
-    TransportError,
-}
-impl AttachError {
-    pub const fn outcome(self) -> AttachOutcome {
-        match self {
-            Self::InvalidCommand | Self::AttachRequiresPty => AttachOutcome::Invalid,
-            Self::ApprovalRequired | Self::Unauthorized | Self::AuthorityCredential => {
-                AttachOutcome::Authority
-            }
-            Self::Forbidden | Self::NotFound | Self::TerminalUnavailable | Self::Conflict => {
-                AttachOutcome::Refused
-            }
-            Self::TemporarilyUnavailable | Self::TransportError => AttachOutcome::Transport,
-        }
-    }
-}
-#[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum AttachHeader {
-    Attached { from: u64, mode: AttachMode },
-    Refused(AttachError),
-}
+pub use mila_protocol::{AttachError, AttachHeader, AttachMode, AttachOutcome};
 pub const MAXIMUM_ATTACH_ATTEMPTS: u32 = 8;
 
 /// @cc [owner:ghuntley,label:security] mila-runtime-terminal-state

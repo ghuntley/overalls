@@ -32,6 +32,17 @@ internal readonly record struct MilaNativeTerminalOpen(MilaNativeStatus Status, 
     internal bool Succeeded => Status == MilaNativeStatus.Ok && SessionId is not null;
 }
 
+/// <summary>Closed outcomes authenticated by the Rust terminal transport.</summary>
+internal enum MilaTerminalOutcome { Closed, Refused, Invalid, Authority, Transport }
+
+/// <summary>Validated payload-free state of one native terminal handle.</summary>
+internal readonly record struct MilaNativeTerminalState(ulong Cursor, bool ReadOnly, bool Closed, MilaTerminalOutcome? Outcome);
+
+internal readonly record struct MilaNativeTerminalStateResult(MilaNativeStatus Status, MilaNativeTerminalState? State)
+{
+    internal bool Succeeded => Status == MilaNativeStatus.Ok && State is not null;
+}
+
 /// <summary>Push platforms accepted by Porsche's closed `device register` grammar.</summary>
 internal enum MilaDevicePlatform : byte { Ios = 0, Android = 1, Macos = 2, Windows = 3 }
 
@@ -42,7 +53,7 @@ internal enum MilaDevicePlatform : byte { Ios = 0, Android = 1, Macos = 2, Windo
 /// </summary>
 internal static partial class RustNative
 {
-    private const int TerminalReadCapacity = 65_536;
+    private const int TerminalReadCapacity = 1 << 20;
 
     /// <summary>Returns the bounded `whoami --json` envelope from the authenticated session.</summary>
     internal static MilaNativeSessionBytesResult TrySessionWhoami(ulong handle)
@@ -75,7 +86,7 @@ internal static partial class RustNative
         {
             Marshal.WriteIntPtr(written, IntPtr.Zero);
             MilaNativeStatus status = SessionTerminalReadNative(
-                terminalHandle, output, (nuint)TerminalReadCapacity, written, out byte kind);
+                terminalHandle, 0, output, (nuint)TerminalReadCapacity, written, out byte kind);
             nuint count = (nuint)Marshal.ReadIntPtr(written);
             if (status != MilaNativeStatus.Ok || count > (nuint)TerminalReadCapacity ||
                 !Enum.IsDefined((MilaTerminalReadEvent)kind))
@@ -90,6 +101,61 @@ internal static partial class RustNative
         catch (EntryPointNotFoundException) { return new(MilaNativeStatus.Unavailable, MilaTerminalReadEvent.Idle, null); }
         catch (BadImageFormatException) { return new(MilaNativeStatus.Unavailable, MilaTerminalReadEvent.Idle, null); }
         finally { Marshal.FreeHGlobal(output); Marshal.FreeHGlobal(written); }
+    }
+
+    internal static MilaTerminalFrame? TrySessionTerminalFrame(ulong terminalHandle)
+    {
+        if (terminalHandle == 0) return null;
+        MilaNativeSessionBytesResult result = TrySessionProjectionBytesOnce((output, capacity, written) =>
+            SessionTerminalScreenNative(terminalHandle, output, capacity, written), 16 << 20);
+        return result.Succeeded && result.Data is { } bytes ? MilaTerminalFrame.Decode(bytes) : null;
+    }
+
+    internal static MilaNativeTerminalStateResult TrySessionTerminalState(ulong terminalHandle)
+    {
+        if (terminalHandle == 0) return new(MilaNativeStatus.InvalidRequest, null);
+        MilaNativeSessionBytesResult result = TrySessionProjectionBytesOnce((output, capacity, written) =>
+            SessionTerminalStateNative(terminalHandle, output, capacity, written), 1024);
+        if (!result.Succeeded || result.Data is not { } bytes) return new(result.Status, null);
+        return DecodeTerminalState(bytes) is { } state
+            ? new(MilaNativeStatus.Ok, state) : new(MilaNativeStatus.InvalidRequest, null);
+    }
+
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;protocol] windows-terminal-state-boundary
+    /// Native terminal state MUST match the bounded version-1 schema, with a
+    /// signed-range cursor and exactly one known outcome only when closed.
+    /// Malformed state MUST NOT establish a refused session or authorize a
+    /// replacement terminal-new mutation.
+    /// </summary>
+    internal static MilaNativeTerminalState? DecodeTerminalState(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.Length is 0 or > 1024) return null;
+        try
+        {
+            using System.Text.Json.JsonDocument document = System.Text.Json.JsonDocument.Parse(bytes.ToArray());
+            System.Text.Json.JsonElement root = document.RootElement;
+            if (root.ValueKind != System.Text.Json.JsonValueKind.Object || root.EnumerateObject().Count() != 5 ||
+                !root.TryGetProperty("version", out System.Text.Json.JsonElement version) ||
+                version.ValueKind != System.Text.Json.JsonValueKind.Number || !version.TryGetByte(out byte number) || number != 1 ||
+                !root.TryGetProperty("cursor", out System.Text.Json.JsonElement cursor) ||
+                cursor.ValueKind != System.Text.Json.JsonValueKind.Number || !cursor.TryGetUInt64(out ulong position) || position > long.MaxValue ||
+                !root.TryGetProperty("read_only", out System.Text.Json.JsonElement readOnly) ||
+                readOnly.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False) ||
+                !root.TryGetProperty("closed", out System.Text.Json.JsonElement closed) ||
+                closed.ValueKind is not (System.Text.Json.JsonValueKind.True or System.Text.Json.JsonValueKind.False) ||
+                !root.TryGetProperty("outcome", out System.Text.Json.JsonElement outcome)) return null;
+            MilaTerminalOutcome? classification = outcome.ValueKind == System.Text.Json.JsonValueKind.String
+                ? outcome.GetString() switch
+                {
+                    "closed" => MilaTerminalOutcome.Closed, "refused" => MilaTerminalOutcome.Refused,
+                    "invalid" => MilaTerminalOutcome.Invalid, "authority" => MilaTerminalOutcome.Authority,
+                    "transport" => MilaTerminalOutcome.Transport, _ => null,
+                } : null;
+            if (closed.GetBoolean() ? classification is null : outcome.ValueKind != System.Text.Json.JsonValueKind.Null) return null;
+            return new(position, readOnly.GetBoolean(), closed.GetBoolean(), classification);
+        }
+        catch (System.Text.Json.JsonException) { return null; }
     }
 
     /// <summary>
@@ -214,7 +280,7 @@ internal static partial class RustNative
 
     /// <summary>Attaches a bounded PTY to one named server terminal session.</summary>
     internal static (MilaNativeStatus Status, ulong? Handle) TrySessionTerminalAttachSession(
-        ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows)
+        ulong sessionHandle, Guid machineId, string terminalId, ushort columns, ushort rows, bool readOnly = false)
     {
         if (sessionHandle == 0 || machineId == Guid.Empty || columns is 0 or > 4096 || rows is 0 or > 512 ||
             !Guid.TryParseExact(terminalId, "D", out Guid terminal) || terminal == Guid.Empty)
@@ -227,7 +293,7 @@ internal static partial class RustNative
         {
             MilaNativeStatus status = SessionTerminalAttachSessionNative(
                 sessionHandle, machinePin.AddrOfPinnedObject(), (nuint)machine.Length,
-                sessionPin.AddrOfPinnedObject(), (nuint)session.Length, columns, rows, out ulong handle);
+                sessionPin.AddrOfPinnedObject(), (nuint)session.Length, columns, rows, 0, 0, readOnly ? (byte)1 : (byte)0, out ulong handle);
             return status == MilaNativeStatus.Ok && handle > 0 ? (status, handle) : (status, null);
         }
         catch (DllNotFoundException) { return (MilaNativeStatus.Unavailable, null); }
@@ -328,9 +394,23 @@ internal static partial class RustNative
     /// device registration.
     /// </summary>
     internal static MilaNativeSessionBytesResult TrySessionBytesOnce(
-        Func<IntPtr, nuint, IntPtr, MilaNativeStatus> call, int capacity)
+        Func<IntPtr, nuint, IntPtr, MilaNativeStatus> call, int capacity) =>
+        TryBoundedSessionBytesOnce(call, capacity, 256 * 1024);
+
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;reliability] windows-native-projection-buffer
+    /// Read-only native projections MUST use one bounded copy with at most
+    /// 16 MiB of output. Their larger display buffers MUST NOT widen the
+    /// 256 KiB command/mutation helper or repeat a native call for size probing.
+    /// </summary>
+    internal static MilaNativeSessionBytesResult TrySessionProjectionBytesOnce(
+        Func<IntPtr, nuint, IntPtr, MilaNativeStatus> call, int capacity) =>
+        TryBoundedSessionBytesOnce(call, capacity, 16 << 20);
+
+    private static MilaNativeSessionBytesResult TryBoundedSessionBytesOnce(
+        Func<IntPtr, nuint, IntPtr, MilaNativeStatus> call, int capacity, int maximum)
     {
-        if (capacity is <= 0 or > 256 * 1024) return new(MilaNativeStatus.InvalidRequest, null);
+        if (capacity <= 0 || capacity > maximum) return new(MilaNativeStatus.InvalidRequest, null);
         IntPtr output = Marshal.AllocHGlobal(capacity);
         IntPtr written = Marshal.AllocHGlobal(nuint.Size);
         try
@@ -338,7 +418,8 @@ internal static partial class RustNative
             Marshal.WriteIntPtr(written, IntPtr.Zero);
             MilaNativeStatus status = call(output, (nuint)capacity, written);
             nuint size = (nuint)Marshal.ReadIntPtr(written);
-            if (status != MilaNativeStatus.Ok || size > (nuint)capacity) return new(status, null);
+            if (status != MilaNativeStatus.Ok || size > (nuint)capacity)
+                return new(status == MilaNativeStatus.Ok ? MilaNativeStatus.InvalidRequest : status, null);
             byte[] bytes = new byte[checked((int)size)];
             Marshal.Copy(output, bytes, 0, bytes.Length);
             return new(status, bytes);
@@ -360,10 +441,16 @@ internal static partial class RustNative
         ulong handle, IntPtr machine, nuint machineLength, IntPtr requestId, nuint requestIdLength,
         IntPtr output, nuint capacity, IntPtr written);
 
-    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_attach_session")]
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_attach_with_options")]
     private static partial MilaNativeStatus SessionTerminalAttachSessionNative(
         ulong sessionHandle, IntPtr machine, nuint machineLength, IntPtr terminal, nuint terminalLength,
-        uint columns, uint rows, out ulong terminalHandle);
+        uint columns, uint rows, ulong cursor, byte hasCursor, byte readOnly, out ulong terminalHandle);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_screen")]
+    private static partial MilaNativeStatus SessionTerminalScreenNative(ulong terminalHandle, IntPtr output, nuint capacity, IntPtr written);
+
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_state")]
+    private static partial MilaNativeStatus SessionTerminalStateNative(ulong terminalHandle, IntPtr output, nuint capacity, IntPtr written);
 
     [LibraryImport(LibraryName, EntryPoint = "mila_session_machine_show")]
     private static partial MilaNativeStatus SessionMachineShowNative(
@@ -385,9 +472,9 @@ internal static partial class RustNative
     [LibraryImport(LibraryName, EntryPoint = "mila_session_last_refusal")]
     private static partial MilaNativeStatus SessionLastRefusalNative(ulong handle, IntPtr output, nuint capacity, IntPtr written);
 
-    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_read")]
+    [LibraryImport(LibraryName, EntryPoint = "mila_session_terminal_read_within")]
     private static partial MilaNativeStatus SessionTerminalReadNative(
-        ulong terminalHandle, IntPtr output, nuint capacity, IntPtr written, out byte readEvent);
+        ulong terminalHandle, uint waitMs, IntPtr output, nuint capacity, IntPtr written, out byte readEvent);
 
     [LibraryImport(LibraryName, EntryPoint = "mila_push_key_request_encode")]
     private static partial MilaNativeStatus PushKeyRequestNative(

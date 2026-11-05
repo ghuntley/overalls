@@ -9,7 +9,7 @@ final class MilaDeepLinkRouterTests: XCTestCase {
 
     func testGenerationFencesAuthenticatedLinks() {
         var router = MilaDeepLinkRouter()
-        router.setSession(signedIn: true)
+        router.setSession(signedIn: true, deploymentHost: "fleet.example")
         let decision = router.decide("overalls://fleet.example/settings")
         guard case .open(_, let generation) = decision else { return XCTFail("expected open") }
         XCTAssertTrue(router.accepts(decision, generation: generation))
@@ -19,7 +19,7 @@ final class MilaDeepLinkRouterTests: XCTestCase {
 
     func testSignedOutDecisionCannotBeAcceptedAfterSessionReset() {
         var router = MilaDeepLinkRouter()
-        router.setSession(signedIn: true)
+        router.setSession(signedIn: true, deploymentHost: "fleet.example")
         let authenticated = router.decide("overalls://fleet.example/machines")
         guard case .open(_, let generation) = authenticated else { return XCTFail("expected open") }
         router.setSession(signedIn: false)
@@ -29,9 +29,15 @@ final class MilaDeepLinkRouterTests: XCTestCase {
         XCTAssertFalse(router.accepts(authenticated, generation: generation))
     }
 
+    func testAnotherDeploymentCannotNavigateAuthenticatedSession() {
+        var router = MilaDeepLinkRouter()
+        router.setSession(signedIn: true, deploymentHost: "fleet.example")
+        XCTAssertEqual(router.decide("overalls://other.example/settings"), .unknown)
+    }
+
     func testMalformedLinksAreUnknown() {
         var router = MilaDeepLinkRouter()
-        router.setSession(signedIn: true)
+        router.setSession(signedIn: true, deploymentHost: "fleet.example")
         XCTAssertEqual(router.decide("overalls://fleet.example/settings?command=delete"), .unknown)
     }
 }

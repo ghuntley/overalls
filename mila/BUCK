@@ -1,3 +1,4 @@
+load("@root//buck:checks.bzl", "script_check")
 load("@root//buck:mila.bzl", "mila_platform", "mila_windows_dll_check", "mila_windows_ffi")
 load("@root//buck:nix.bzl", "nix_owned", "nix_store_run")
 
@@ -11,6 +12,30 @@ nix_store_run(
     name = "journey-fixture",
     package = "//:package-mila-journey-fixture",
     program = "bin/mila-journey-fixture",
+    visibility = ["PUBLIC"],
+)
+
+# Both drivers are fixture-only outputs; the normal native release omits them.
+#   tools/buck2 run //mila:linux-journey -- --descriptor <private-path>
+#   tools/buck2 run //mila:linux-gtk-journey -- --gtk-journey <private-path>
+nix_store_run(
+    name = "linux-journey",
+    package = "//:package-tool-mila-linux-journeys",
+    program = "bin/mila-linux-journey",
+    visibility = ["PUBLIC"],
+)
+
+nix_store_run(
+    name = "linux-gtk-journey",
+    package = "//:package-tool-mila-linux-journeys",
+    program = "bin/mila",
+    visibility = ["PUBLIC"],
+)
+
+nix_store_run(
+    name = "linux-broadway",
+    package = "//:package-tool-mila-linux-journeys",
+    program = "bin/mila-broadwayd",
     visibility = ["PUBLIC"],
 )
 
@@ -128,6 +153,21 @@ mila_platform(
     check = True,
 )
 
+# The software-key development branch has different custody and push policy;
+# build it independently and prove its compilation condition is refused in release.
+mila_platform(
+    name = "apple-software-keys-test",
+    os = "macos",
+    steps = [
+        {"argv": ["python3", "mila/localization/generate_catalogs.py", "--source", "mila/localization/catalogs", "--output", "mila/native/apple/Sources/MilaNativeUI/Resources"], "cwd": "."},
+        {"argv": ["bash", "mila/native/apple/software-keys-test.sh"], "cwd": "."},
+    ],
+    path_env = {"MILA_FFI_LIB_DIR": ":apple-ffi"},
+    require = ["bash", "xcrun", "python3"],
+    srcs = _APPLE,
+    check = True,
+)
+
 # The dev apps (`mila-build <platform> dev`). Each builds its own FFI slice
 # with cargo; outputs land in mila/build/<platform>-dev as before.
 [mila_platform(
@@ -187,6 +227,66 @@ mila_platform(
     outputs = {"app-release-unsigned.apk": "mila/native/android/app/build/outputs/apk/release/app-release-unsigned.apk"},
     require = ["gradle", "java", "cargo", "cargo-ndk"],
     srcs = _ANDROID,
+)
+
+# Explicit serial + fresh run identity avoid arbitrary devices and stale local test evidence.
+# A disposable, already booted emulator is required; this target never launches one.
+mila_platform(
+    name = "android-device-test",
+    os = ["linux", "macos"],
+    steps = [{"argv": ["bash", "mila/native/android/scripts/run-instrumentation.sh"], "cwd": "."}],
+    path_env = {"MILA_ANDROID_APK_DIR": ":android-debug"},
+    env = {
+        "MILA_ANDROID_SERIAL": read_config("mila", "android_serial", ""),
+        "MILA_ANDROID_TEST_RUN": read_config("mila", "android_test_run", ""),
+        "MILA_ANDROID_DEVICE_REPORT": "mila/native/android/build/device-test/report.json",
+    },
+    outputs = {"report.json": "mila/native/android/build/device-test/report.json"},
+    require = ["bash", "python3"],
+    srcs = _ANDROID,
+    check = True,
+    labels = ["device_test"],
+)
+
+# The descriptor path is configuration; descriptor bytes and credentials never enter Buck2.
+# A fresh run identity is mandatory because this ordered journey submits mutations once.
+mila_platform(
+    name = "android-journey-device-test",
+    os = ["linux", "macos"],
+    steps = [{"argv": [
+        "python3",
+        "mila/native/android/scripts/packaged_instrumentation.py",
+        "--serial", read_config("mila", "android_serial", ""),
+        "--run-id", read_config("mila", "android_test_run", ""),
+        "--apk-dir", "$MILA_ANDROID_APK_DIR",
+        "--report", "mila/native/android/build/journey-device-test/report.json",
+        "--journey-descriptor", read_config("mila", "android_journey_descriptor", ""),
+    ], "cwd": "."}],
+    path_env = {"MILA_ANDROID_APK_DIR": ":android-debug"},
+    outputs = {"report.json": "mila/native/android/build/journey-device-test/report.json"},
+    require = ["python3"],
+    srcs = _ANDROID,
+    check = True,
+    labels = ["device_test", "journey"],
+)
+
+_ANDROID_DEVICE_RUNNER = [
+    "native/android/scripts/packaged_instrumentation.py",
+    "native/android/scripts/test_packaged_instrumentation.py",
+]
+
+script_check(
+    name = "android-device-runner-test",
+    cmd = ["$(exe toolchains//:python)", "-B", "-I", "mila/native/android/scripts/test_packaged_instrumentation.py"],
+    srcs = _ANDROID_DEVICE_RUNNER,
+    labels = ["check"],
+)
+
+script_check(
+    name = "android-device-runner-types",
+    cmd = ["$(exe toolchains//:ty)", "check"] + ["mila/" + source for source in _ANDROID_DEVICE_RUNNER],
+    srcs = _ANDROID_DEVICE_RUNNER + ["//:workspace_files"],
+    labels = ["check"],
 )
 
 # The library only: the test targets' dev-dependencies are host tools.
@@ -255,6 +355,21 @@ mila_platform(
     srcs = _WINDOWS,
 )
 
+# Unsigned artifacts for native CI acceptance; publishing/signing are separate.
+mila_platform(
+    name = "windows-release",
+    os = "windows",
+    steps = [
+        {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet"},
+        {"argv": ["dotnet", "publish", "--configuration", "Release", "--no-restore", "-p:MilaNativeDll=$MILA_FFI_DIR/mila_ffi.dll", "-o", "../build/windows-publish"], "cwd": "mila/windows-dotnet"},
+        {"argv": ["pwsh", "-NoProfile", "-File", "mila/windows-dotnet/package-release.ps1", "-PublishDirectory", "mila/build/windows-publish", "-OutputDirectory", "mila/build/windows-release"], "cwd": "."},
+    ],
+    path_env = {"MILA_FFI_DIR": ":windows-ffi-" + _WINDOWS_FFI},
+    outputs = {"release": "mila/build/windows-release"},
+    require = ["dotnet", "python", "pwsh"],
+    srcs = _WINDOWS,
+)
+
 # The production .NET interop calling the staged Rust DLL.
 mila_platform(
     name = "windows-smoke",
@@ -264,6 +379,21 @@ mila_platform(
         {"argv": ["dotnet", "run", "--project", ".", "--configuration", "Release", "-p:MilaNativeDll=$MILA_WINDOWS_DIR/win-x64/mila_native.dll"], "cwd": "mila/windows-dotnet-smoke"},
     ],
     path_env = {"MILA_WINDOWS_DIR": ":windows-dotnet"},
+    require = ["dotnet"],
+    srcs = _WINDOWS,
+    check = True,
+)
+
+# Managed adapter and ABI coverage on Linux. CNG, DPAPI, WinUI, Windows
+# activation and provider delivery still require their Windows-native checks.
+mila_platform(
+    name = "linux-managed-smoke",
+    os = "linux",
+    steps = [
+        {"argv": ["dotnet", "restore", "--locked-mode"], "cwd": "mila/windows-dotnet-smoke"},
+        {"argv": ["dotnet", "run", "--project", ".", "--configuration", "Release", "--no-restore", "-p:MilaNativePackageFile=$MILA_FFI_PACKAGE"], "cwd": "mila/windows-dotnet-smoke"},
+    ],
+    path_env = {"MILA_FFI_PACKAGE": "//:package-tool-mila-rust"},
     require = ["dotnet"],
     srcs = _WINDOWS,
     check = True,

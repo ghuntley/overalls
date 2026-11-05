@@ -88,13 +88,18 @@ class MilaSessionSshKeyStore(
     private val session: MilaSessionHandle,
     private val currentFingerprint: String? = null,
 ) : MilaSshKeyStore {
+    private val pendingRevocations = mutableMapOf<String, String>()
+
     override fun list(): List<MilaSshKey> = session.sshKeys()
         .map { decode(it, currentFingerprint) }
         .getOrElse { emptyList() }
 
-    override fun revoke(fingerprint: String): Boolean = session
-        .sshKeyRevoke(fingerprint, requestId())
-        .isSuccess
+    override fun revoke(fingerprint: String): Boolean {
+        val request = pendingRevocations.getOrPut(fingerprint) { requestId() }
+        val result = session.sshKeyRevoke(fingerprint, request)
+        if (result.isSuccess) pendingRevocations.remove(fingerprint)
+        return result.isSuccess
+    }
 
     private companion object {
         fun requestId(): String = "porsche-" + UUID.randomUUID().toString().replace("-", "")

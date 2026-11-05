@@ -1,3 +1,60 @@
+// See the `linux-complete-machine-read` contract.
+#[test]
+fn complete_machine_read_follows_pages_and_refuses_failed_continuation() {
+    use super::connection::complete_machine_pages;
+    let first = br#"{"machines":[{}],"has_more":true}"#;
+    let complete = br#"{"machines":[{},{}],"has_more":false}"#;
+    let mut calls = Vec::new();
+    let result = complete_machine_pages(|more| {
+        calls.push(more);
+        Ok(if more {
+            complete.to_vec()
+        } else {
+            first.to_vec()
+        })
+    });
+    assert_eq!(result, Ok(complete.to_vec()));
+    assert_eq!(calls, vec![false, true]);
+    let result = complete_machine_pages(|more| {
+        if more {
+            Err(SessionError::Transport)
+        } else {
+            Ok(first.to_vec())
+        }
+    });
+    assert_eq!(result, Err(SessionError::Transport));
+}
+
+#[test]
+fn complete_machine_read_refuses_invalid_or_unbounded_pages() {
+    use super::connection::complete_machine_pages;
+    for bytes in [
+        br#"{"machines":[]}"#.as_slice(),
+        br#"{"machines":[],"has_more":"false"}"#.as_slice(),
+        br#"{"machines":{},"has_more":false}"#.as_slice(),
+    ] {
+        assert_eq!(
+            complete_machine_pages(|_| Ok(bytes.to_vec())),
+            Err(SessionError::InvalidInput)
+        );
+    }
+    let oversized = format!(
+        r#"{{"machines":[{}],"has_more":false}}"#,
+        vec!["{}"; 501].join(",")
+    );
+    assert_eq!(
+        complete_machine_pages(|_| Ok(oversized.as_bytes().to_vec())),
+        Err(SessionError::InvalidInput)
+    );
+    let mut calls = 0;
+    let result = complete_machine_pages(|_| {
+        calls += 1;
+        Ok(br#"{"machines":[],"has_more":true}"#.to_vec())
+    });
+    assert_eq!(result, Err(SessionError::InvalidInput));
+    assert_eq!(calls, 500);
+}
+
 // See the `linux-session-terminal-end` contract.
 #[test]
 fn terminal_end_requires_marshall_to_close_that_exact_session() {
@@ -325,11 +382,15 @@ fn notification_device_controls_require_authenticated_session() {
     };
     assert_eq!(session.device_list(), Err(SessionError::StaleHandle));
     assert_eq!(
-        session.device_remove("bad device"),
+        session.device_remove("bad device", "porsche-00000000000000000000000000000000"),
         Err(SessionError::InvalidInput)
     );
     assert_eq!(
-        session.device_preference("device-id", false),
+        session.device_preference(
+            "device-id",
+            false,
+            "porsche-00000000000000000000000000000000"
+        ),
         Err(SessionError::StaleHandle)
     );
 }
@@ -383,6 +444,47 @@ fn machine_create_rejects_unsafe_display_names_before_authentication() {
     );
     assert_eq!(
         session.machine_create("Builder East", 2, 1024, 10, request),
+        Err(SessionError::InvalidInput)
+    );
+    assert_eq!(
+        session.machine_create("Builder.East", 2, 1024, 10, request),
+        Err(SessionError::InvalidInput)
+    );
+}
+
+#[test]
+fn machine_shape_bounds_match_shared_vm_disk_policy_before_authentication() {
+    let mut session = LiveSession {
+        handle: None,
+        terminal: None,
+        submitted_mutations: HashSet::new(),
+        read_buffer: Vec::new(),
+    };
+    let request = "porsche-00000000000000000000000000000000";
+    let machine = "01234567-89ab-cdef-0123-456789abcdef";
+
+    assert_eq!(
+        session.machine_create("builder", 2, 256, 500, request),
+        Err(SessionError::StaleHandle)
+    );
+    assert_eq!(
+        session.machine_create("builder", 2, 256, 501, request),
+        Err(SessionError::InvalidInput)
+    );
+    assert_eq!(
+        session.machine_create("builder", 2, 255, 500, request),
+        Err(SessionError::InvalidInput)
+    );
+    assert_eq!(
+        session.machine_resize(machine, 2, 4_194_304, 500, request),
+        Err(SessionError::StaleHandle)
+    );
+    assert_eq!(
+        session.machine_resize(machine, 2, 4_194_304, 501, request),
+        Err(SessionError::InvalidInput)
+    );
+    assert_eq!(
+        session.machine_resize(machine, 2, 255, 500, request),
         Err(SessionError::InvalidInput)
     );
 }

@@ -367,6 +367,62 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     })
 }
 
+/// @cc [owner:ghuntley,label:security;protocol] jni-session-device-register-request
+/// Android registration MUST carry a caller-owned canonical request id so an
+/// uncertain result can be resolved with `request show` instead of submitting
+/// the Susan push key twice.
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceRegisterWithRequest(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    platform: jni::sys::jint,
+    susan_reply: jni::objects::JString<'_>,
+    enc_pubkey: jni::objects::JString<'_>,
+    label: jni::objects::JString<'_>,
+    request_id: jni::objects::JString<'_>,
+    now: jni::sys::jlong,
+) -> jni::sys::jbyteArray {
+    if !(0..=3).contains(&platform) || now < 0 {
+        return std::ptr::null_mut();
+    }
+    let Ok(platform) = u8::try_from(platform) else {
+        return std::ptr::null_mut();
+    };
+    let (Some(reply), Some(enc), Some(request)) = (
+        jni_string_bytes(&mut env, &susan_reply),
+        jni_string_bytes(&mut env, &enc_pubkey),
+        jni_string_bytes(&mut env, &request_id),
+    ) else {
+        return std::ptr::null_mut();
+    };
+    let label = jni_string_bytes(&mut env, &label).unwrap_or_default();
+    // SAFETY: every pointer comes from a live Rust Vec passed with its length;
+    // the C ABI validates all values and the output helper owns its JNI copy.
+    jni_session_bytes(&mut env, |out, capacity, written| unsafe {
+        session::mila_session_device_register_with_request(
+            handle.cast_unsigned(),
+            platform,
+            reply.as_ptr(),
+            reply.len(),
+            enc.as_ptr(),
+            enc.len(),
+            if label.is_empty() {
+                std::ptr::null()
+            } else {
+                label.as_ptr()
+            },
+            label.len(),
+            request.as_ptr(),
+            request.len(),
+            now.cast_unsigned(),
+            out,
+            capacity,
+            written,
+        )
+    })
+}
+
 /// Closed refusal code recorded by the session's last Porsche error envelope.
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionLastRefusal(
@@ -568,7 +624,14 @@ fn session_copy(env: &mut jni::JNIEnv<'_>, handle: u64, snapshot: bool) -> jni::
         if snapshot {
             // SAFETY: `out`, `capacity` and `written` describe the helper's live
             // buffer and length slot.
-            unsafe { session::mila_session_snapshot(handle, 0, out, capacity, written) }
+            unsafe {
+                let saved_at = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .ok()
+                    .and_then(|duration| u64::try_from(duration.as_millis()).ok())
+                    .unwrap_or(0);
+                session::mila_session_snapshot(handle, saved_at, out, capacity, written)
+            }
         } else {
             // SAFETY: `out`, `capacity` and `written` describe the helper's live
             // buffer and length slot.
@@ -622,6 +685,34 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
             as jni::sys::jint
     }
 }
+
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDeviceRemoveWithRequest(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    device: jni::objects::JString<'_>,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    let value = match env.get_string(&device) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -2,
+    };
+    let request = match env.get_string(&request_id) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -2,
+    };
+    // SAFETY: both vectors remain live for the synchronous C ABI call.
+    unsafe {
+        session::mila_session_device_rm_with_request(
+            handle.cast_unsigned(),
+            value.as_ptr(),
+            value.len(),
+            request.as_ptr(),
+            request.len(),
+        ) as jni::sys::jint
+    }
+}
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDevicePreferences(
     mut env: jni::JNIEnv<'_>,
@@ -645,6 +736,36 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
         ) as jni::sys::jint
     }
 }
+
+#[no_mangle]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionDevicePreferencesWithRequest(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    device: jni::objects::JString<'_>,
+    enabled: jni::sys::jboolean,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    let value = match env.get_string(&device) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -2,
+    };
+    let request = match env.get_string(&request_id) {
+        Ok(v) => v.to_bytes().to_vec(),
+        Err(_) => return -2,
+    };
+    // SAFETY: both vectors remain live for the synchronous C ABI call.
+    unsafe {
+        session::mila_session_device_prefs_with_request(
+            handle.cast_unsigned(),
+            value.as_ptr(),
+            value.len(),
+            u8::from(enabled != 0),
+            request.as_ptr(),
+            request.len(),
+        ) as jni::sys::jint
+    }
+}
 #[no_mangle]
 pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionClose(
     _env: jni::JNIEnv<'_>,
@@ -652,4 +773,39 @@ pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSession
     handle: jni::sys::jlong,
 ) -> jni::sys::jint {
     session::mila_session_close(handle.cast_unsigned()) as jni::sys::jint
+}
+
+/// @cc [owner:ghuntley,label:protocol] android-clone-request-identity
+/// Preserve the caller's request id; validation and authority belong to the C ABI.
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_dev_overalls_mila_nativeui_MilaRustFfi_nativeSessionMachineClone(
+    mut env: jni::JNIEnv<'_>,
+    _class: jni::objects::JClass<'_>,
+    handle: jni::sys::jlong,
+    machine: jni::objects::JString<'_>,
+    name: jni::objects::JString<'_>,
+    request_id: jni::objects::JString<'_>,
+) -> jni::sys::jint {
+    let Ok(machine) = env.get_string(&machine) else {
+        return -4;
+    };
+    let Ok(name) = env.get_string(&name) else {
+        return -4;
+    };
+    let Ok(request) = env.get_string(&request_id) else {
+        return -4;
+    };
+    let (machine, name, request) = (machine.to_bytes(), name.to_bytes(), request.to_bytes());
+    // SAFETY: every pointer borrows its live JNI string and has the matching length.
+    unsafe {
+        session::mila_session_machine_clone(
+            handle.cast_unsigned(),
+            machine.as_ptr(),
+            machine.len(),
+            name.as_ptr(),
+            name.len(),
+            request.as_ptr(),
+            request.len(),
+        ) as jni::sys::jint
+    }
 }

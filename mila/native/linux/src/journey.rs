@@ -1071,12 +1071,15 @@ fn device_step(
     binding: &Rc<RefCell<SessionBinding>>,
     name: &'static str,
     device: &str,
-    op: impl FnOnce(&mut LiveSession) -> Result<(), SessionError>,
+    op: impl FnOnce(&mut LiveSession, &str) -> Result<(), SessionError>,
     expected: Option<bool>,
     pass: &'static str,
 ) -> bool {
+    let Some(request) = new_request_id() else {
+        return report.record(name, false, "csprng_unavailable");
+    };
     let submitted = match binding.borrow_mut().session_mut() {
-        Some(live) => op(live).map_err(|error| match error {
+        Some(live) => op(live, &request).map_err(|error| match error {
             SessionError::InvalidInput => refusal_code(live.last_refusal().as_deref()),
             other => action_failed(other),
         }),
@@ -1141,7 +1144,7 @@ fn run_notifications(
         binding,
         "notification_device_disable",
         &device,
-        |live| live.device_preference(&device, false),
+        |live, request| live.device_preference(&device, false, request),
         Some(false),
         "disabled_read_back",
     );
@@ -1150,7 +1153,7 @@ fn run_notifications(
         binding,
         "notification_device_enable",
         &device,
-        |live| live.device_preference(&device, true),
+        |live, request| live.device_preference(&device, true, request),
         Some(true),
         "enabled_read_back",
     );
@@ -1159,7 +1162,7 @@ fn run_notifications(
         binding,
         "notification_device_remove",
         &device,
-        |live| live.device_remove(&device),
+        |live, request| live.device_remove(&device, request),
         None,
         "removed_read_back",
     );

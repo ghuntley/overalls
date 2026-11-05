@@ -242,11 +242,13 @@ public extension MilaApplePushRegistration {
 
 /// @cc [owner:ghuntley,label:security;privacy] mila-apple-apns-token-relay
 /// The APNs token from the application delegate MUST go only to the
-/// coordinator that asked for it and only once per request; a token with no
-/// pending request MUST be dropped. The relay MUST NOT retain the token.
+/// coordinator and request generation that asked for it, only once per request.
+/// Reset MUST cancel that coordinator's pending request; callbacks without a
+/// current request MUST be dropped. The relay MUST NOT retain the token.
 @MainActor public final class MilaApplePushTokenRelay {
     public static let shared = MilaApplePushTokenRelay()
     private weak var recipient: MilaApplePushCoordinator?
+    private var requestID: UInt64?
     private let requestToken: @MainActor () -> Void
 
     /// `requestToken` is for tests; production asks the application to register with APNs.
@@ -255,35 +257,51 @@ public extension MilaApplePushRegistration {
     }
 
     static func registerWithAPNs() {
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        // Ad-hoc macOS development builds have no APNs entitlement. The
+        // compile-time custody policy must make this path unreachable.
+        return
+        #else
         #if os(iOS)
         UIApplication.shared.registerForRemoteNotifications()
         #elseif os(macOS)
         NSApplication.shared.registerForRemoteNotifications()
         #endif
+        #endif
     }
 
-    func request(for coordinator: MilaApplePushCoordinator) {
+    func request(for coordinator: MilaApplePushCoordinator, requestID: UInt64) {
         recipient = coordinator
+        self.requestID = requestID
         requestToken()
+    }
+
+    func cancel(for coordinator: MilaApplePushCoordinator) {
+        guard recipient === coordinator else { return }
+        recipient = nil
+        requestID = nil
     }
 
     /// The `didRegisterForRemoteNotificationsWithDeviceToken` path.
     @discardableResult public func deliver(deviceToken: Data) -> Task<Void, Never>? {
-        guard let recipient else { return nil }
+        guard let recipient, let requestID else { return nil }
         self.recipient = nil
-        return Task { _ = await recipient.register(deviceToken: deviceToken) }
+        self.requestID = nil
+        return Task { _ = await recipient.register(deviceToken: deviceToken, requestID: requestID) }
     }
 
     /// The `didFailToRegisterForRemoteNotificationsWithError` path.
     public func failed() {
-        recipient?.tokenUnavailable()
+        if let requestID { recipient?.tokenUnavailable(requestID: requestID) }
         recipient = nil
+        requestID = nil
     }
 }
 
-/// Runs `MilaApplePushRegistration` for the signed-in deployment when APNs
-/// delivers a token. The bound target supplies the authenticated adapter and
-/// deployment host; an outcome for a superseded sign-in is discarded.
+/// @cc [owner:ghuntley,label:security;privacy] apple-push-request-generation
+/// Enabling push MUST capture its approved deployment target before requesting
+/// an APNs token. Reset or a newer request MUST invalidate old callbacks and
+/// completions; they MUST NOT register another target or overwrite newer state.
 @MainActor public final class MilaApplePushCoordinator: ObservableObject {
     public struct Target: Sendable {
         public let adapter: any MilaFFIAdapter
@@ -301,6 +319,8 @@ public extension MilaApplePushRegistration {
     private let relay: MilaApplePushTokenRelay
     private var target: @MainActor () -> Target? = { nil }
     private var isCurrent: @MainActor (UInt64) -> Bool = { _ in false }
+    private var requestGeneration: UInt64 = 0
+    private var pendingTarget: Target?
 
     public init(registration: MilaApplePushRegistration? = nil, environment: MilaPushEnvironment = .buildDefault,
                 relay: MilaApplePushTokenRelay? = nil) {
@@ -310,36 +330,77 @@ public extension MilaApplePushRegistration {
     }
 
     public func bind(target: @escaping @MainActor () -> Target?, isCurrent: @escaping @MainActor (UInt64) -> Bool) {
+        reset()
         self.target = target; self.isCurrent = isCurrent
     }
 
     /// Asks APNs for a device token; registration continues in `register(deviceToken:)`.
     @discardableResult public func enable() -> Bool {
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        state = .failed
+        return false
+        #else
         outcome = nil
-        guard target() != nil else { state = .failed; return false }
+        guard let target = target(), isCurrent(target.generation) else { state = .failed; return false }
+        requestGeneration &+= 1
+        pendingTarget = target
         state = .registering
-        relay.request(for: self)
+        relay.request(for: self, requestID: requestGeneration)
         return true
+        #endif
     }
 
     /// Registers an APNs token with Susan and the deployment. Authorization is
     /// asked first, inside `MilaApplePushRegistration`, before the poke key or
     /// Susan is touched.
     @discardableResult public func register(deviceToken: Data) async -> MilaPushRegistrationOutcome? {
-        guard let target = target() else { state = .off; return nil }
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        // Keep the direct callback/test entry point closed as well as the
+        // user-facing enable path. Ad-hoc software-key builds have no APNs.
+        state = .failed
+        outcome = .deploymentRefused
+        return .deploymentRefused
+        #else
+        guard let target = target(), isCurrent(target.generation) else { state = .off; outcome = nil; return nil }
+        requestGeneration &+= 1
+        pendingTarget = nil
+        relay.cancel(for: self)
+        return await register(deviceToken: deviceToken, target: target, requestID: requestGeneration)
+        #endif
+    }
+
+    fileprivate func register(deviceToken: Data, requestID: UInt64) async -> MilaPushRegistrationOutcome? {
+        guard requestID == requestGeneration, let target = pendingTarget,
+              isCurrent(target.generation) else { return nil }
+        pendingTarget = nil
+        return await register(deviceToken: deviceToken, target: target, requestID: requestID)
+    }
+
+    private func register(deviceToken: Data, target: Target, requestID: UInt64) async -> MilaPushRegistrationOutcome? {
         state = .registering
         let result = await registration.register(adapter: target.adapter, deployment: target.deployment,
                                                  deviceToken: deviceToken, environment: environment)
+        guard requestID == requestGeneration else { return nil }
         guard isCurrent(target.generation) else { state = .off; outcome = nil; return nil }
         outcome = result
         if case .registered = result { state = .on } else { state = .failed }
         return result
     }
 
-    func tokenUnavailable() { outcome = nil; state = .failed }
+    fileprivate func tokenUnavailable(requestID: UInt64) {
+        guard requestID == requestGeneration, let target = pendingTarget,
+              isCurrent(target.generation) else { return }
+        pendingTarget = nil
+        outcome = nil; state = .failed
+    }
 
     /// Sign-out, expiry or a deployment switch.
-    public func reset() { outcome = nil; state = .off }
+    public func reset() {
+        requestGeneration &+= 1
+        pendingTarget = nil
+        relay.cancel(for: self)
+        outcome = nil; state = .off
+    }
 }
 
 #if os(iOS)

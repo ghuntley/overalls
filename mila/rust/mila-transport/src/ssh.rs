@@ -1,10 +1,15 @@
 //! Authenticated Porsche channels over one certificate-pinned SSH connection.
 use crate::{parse_host_certificate_blob, verify_host_certificate, TrustDocument};
+use mila_protocol::{
+    decode_attach_header, AttachHeader, AttachMode, AttachOutcome, MAX_ATTACH_HEADER_BYTES,
+    MAX_TERMINAL_CURSOR,
+};
 use russh::{
     client,
     keys::{Algorithm, EcdsaCurve, PublicKey, PublicKeyOrCertificate},
     ChannelMsg,
 };
+use std::fmt::Write as _;
 use std::{
     borrow::Cow,
     future::Future,
@@ -33,6 +38,10 @@ pub enum SshError {
     Bounds,
     #[error("channel closed without exit status")]
     MissingExit,
+    #[error("terminal attachment header is invalid")]
+    AttachHeader,
+    #[error("terminal attachment does not grant write access")]
+    ReadOnly,
 }
 
 /// OS adapters sign SHA-256 ECDSA with their non-exportable deployment key.
@@ -254,6 +263,17 @@ impl SshSession {
             .await?;
         Ok(())
     }
+
+    pub(crate) async fn watch_channel(&self) -> Result<russh::Channel<client::Msg>, SshError> {
+        tokio::time::timeout(self.timeout, self.connection.channel_open_session())
+            .await
+            .map_err(|_| SshError::Timeout)?
+            .map_err(SshError::from)
+    }
+
+    pub(crate) const fn operation_timeout(&self) -> Duration {
+        self.timeout
+    }
 }
 
 /// A bounded interactive PTY channel on an authenticated SSH session.
@@ -268,11 +288,26 @@ pub enum PtyChunk {
     Closed,
 }
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+pub struct TerminalAttachOptions {
+    /// None requests the server's retained replay buffer.
+    pub cursor: Option<u64>,
+    pub read_only: bool,
+}
+
 pub struct PtySession {
     reader: russh::ChannelReadHalf,
     writer: russh::ChannelWriteHalf<client::Msg>,
     timeout: Duration,
     closed: bool,
+    header: AttachHeader,
+    cursor: u64,
+    read_only: bool,
+    outcome: Option<AttachOutcome>,
+    /// Data received in a larger SSH frame than the native caller requested.
+    /// Keeping the remainder here preserves byte-for-byte replay when a caller
+    /// uses a small read buffer instead of the transport's one MiB maximum.
+    pending: Vec<u8>,
 }
 impl std::fmt::Debug for PtySession {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -290,7 +325,14 @@ impl PtySession {
     /// This legacy entry point names no machine or terminal session; Porsche's
     /// grammar requires both, so the server refuses it. Use [`Self::attach`].
     pub async fn open(session: &SshSession, columns: u32, rows: u32) -> Result<Self, SshError> {
-        Self::open_line(session, "terminal attach --json", columns, rows).await
+        Self::open_line(
+            session,
+            "terminal attach --json",
+            columns,
+            rows,
+            TerminalAttachOptions::default(),
+        )
+        .await
     }
 
     /// @cc [owner:ghuntley,label:protocol;security] rust-pty-attach-named-session
@@ -304,12 +346,47 @@ impl PtySession {
         columns: u32,
         rows: u32,
     ) -> Result<Self, SshError> {
-        let line = mila_protocol::Command::parse(&format!(
-            "terminal attach --json -- {machine} {terminal}"
-        ))
-        .and_then(|command| command.format())
-        .map_err(|_| SshError::Bounds)?;
-        Self::open_line(session, &line, columns, rows).await
+        Self::attach_with_options(
+            session,
+            machine,
+            terminal,
+            columns,
+            rows,
+            TerminalAttachOptions::default(),
+        )
+        .await
+    }
+
+    /// @cc [owner:ghuntley,label:protocol;security] rust-pty-replay-and-write-grant
+    /// Attach MUST bound a replay cursor to the signed protocol range, consume
+    /// the single bounded stderr header before exposing output, and permit input
+    /// and resize only while both the user and server grant read-write access.
+    pub async fn attach_with_options(
+        session: &SshSession,
+        machine: &str,
+        terminal: &str,
+        columns: u32,
+        rows: u32,
+        options: TerminalAttachOptions,
+    ) -> Result<Self, SshError> {
+        if options
+            .cursor
+            .is_some_and(|value| value > MAX_TERMINAL_CURSOR)
+        {
+            return Err(SshError::Bounds);
+        }
+        let mut line = String::from("terminal attach --json");
+        if let Some(cursor) = options.cursor {
+            write!(line, " --cursor={cursor}").map_err(|_| SshError::Bounds)?;
+        }
+        if options.read_only {
+            line.push_str(" --read-only");
+        }
+        let _ = write!(line, " -- {machine} {terminal}");
+        let line = mila_protocol::Command::parse(&line)
+            .and_then(|command| command.format())
+            .map_err(|_| SshError::Bounds)?;
+        Self::open_line(session, &line, columns, rows, options).await
     }
 
     async fn open_line(
@@ -317,6 +394,7 @@ impl PtySession {
         line: &str,
         columns: u32,
         rows: u32,
+        options: TerminalAttachOptions,
     ) -> Result<Self, SshError> {
         if !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) || line.len() > 8192 {
             return Err(SshError::Bounds);
@@ -325,25 +403,61 @@ impl PtySession {
             tokio::time::timeout(session.timeout, session.connection.channel_open_session())
                 .await
                 .map_err(|_| SshError::Timeout)??;
-        let (reader, writer) = channel.split();
+        let (mut reader, writer) = channel.split();
         let result = tokio::time::timeout(session.timeout, async {
             writer
                 .request_pty(true, "xterm-256color", columns, rows, 0, 0, &[])
                 .await?;
             writer.exec(true, line.as_bytes()).await?;
-            Ok::<_, SshError>(())
+            let mut bytes = Vec::new();
+            while let Some(message) = reader.wait().await {
+                match message {
+                    ChannelMsg::ExtendedData { data, ext: 1 } => {
+                        if bytes.len().saturating_add(data.len()) > MAX_ATTACH_HEADER_BYTES {
+                            return Err(SshError::AttachHeader);
+                        }
+                        bytes.extend_from_slice(&data);
+                        if bytes.contains(&b'\n') {
+                            return decode_attach_header(&bytes).ok_or(SshError::AttachHeader);
+                        }
+                    }
+                    ChannelMsg::Success | ChannelMsg::WindowAdjusted { .. } => {}
+                    _ => return Err(SshError::AttachHeader),
+                }
+            }
+            Err(SshError::AttachHeader)
         })
         .await
-        .map_err(|_| SshError::Timeout)?;
-        if let Err(error) = result {
+        .map_err(|_| SshError::Timeout)
+        .and_then(std::convert::identity);
+        let header = match result {
+            Ok(header) => header,
+            Err(error) => {
+                let _ = writer.close().await;
+                return Err(error);
+            }
+        };
+        let (cursor, read_only, outcome) = match header {
+            AttachHeader::Attached { from, mode } => (
+                from,
+                options.read_only || mode == AttachMode::ReadOnly,
+                None,
+            ),
+            AttachHeader::Refused(error) => (0, true, Some(error.outcome())),
+        };
+        if outcome.is_some() {
             let _ = writer.close().await;
-            return Err(error);
         }
         Ok(Self {
             reader,
             writer,
             timeout: session.timeout,
-            closed: false,
+            closed: outcome.is_some(),
+            header,
+            cursor,
+            read_only,
+            outcome,
+            pending: Vec::new(),
         })
     }
 
@@ -352,23 +466,24 @@ impl PtySession {
         self.closed
     }
 
+    pub const fn header(&self) -> AttachHeader {
+        self.header
+    }
+    pub const fn cursor(&self) -> u64 {
+        self.cursor
+    }
+    pub const fn read_only(&self) -> bool {
+        self.read_only
+    }
+    pub const fn outcome(&self) -> Option<AttachOutcome> {
+        self.outcome
+    }
+
     /// Reads one bounded PTY data chunk. Empty means no data or channel close.
     pub async fn read(&mut self) -> Result<Vec<u8>, SshError> {
-        if self.closed {
-            return Ok(Vec::new());
-        }
-        let message = tokio::time::timeout(self.timeout, self.reader.wait())
-            .await
-            .map_err(|_| SshError::Timeout)?;
-        match message {
-            Some(ChannelMsg::Data { data }) if data.len() <= MAX_OUTPUT => Ok(data.to_vec()),
-            Some(ChannelMsg::Data { .. }) => Err(SshError::Bounds),
-            Some(ChannelMsg::Close) | None => {
-                self.closed = true;
-                Ok(Vec::new())
-            }
-            Some(ChannelMsg::Failure) => Err(SshError::Authentication),
-            Some(_) => Ok(Vec::new()),
+        match self.read_within(self.timeout).await? {
+            PtyChunk::Data(bytes) => Ok(bytes),
+            PtyChunk::Idle | PtyChunk::Closed => Ok(Vec::new()),
         }
     }
 
@@ -377,6 +492,26 @@ impl PtySession {
     /// still open, and channel close. Waiting MUST NOT exceed the session
     /// timeout, and an elapsed wait MUST NOT mark the channel closed.
     pub async fn read_within(&mut self, wait: Duration) -> Result<PtyChunk, SshError> {
+        self.read_within_bounded(wait, MAX_OUTPUT).await
+    }
+
+    /// Reads at most `capacity` bytes while retaining any remainder for the
+    /// next call. This is used by native bindings whose UI frame buffer is
+    /// smaller than the transport maximum.
+    pub async fn read_within_bounded(
+        &mut self,
+        wait: Duration,
+        capacity: usize,
+    ) -> Result<PtyChunk, SshError> {
+        if capacity == 0 || capacity > MAX_OUTPUT {
+            return Err(SshError::Bounds);
+        }
+        if !self.pending.is_empty() {
+            let take = capacity.min(self.pending.len());
+            let remainder = self.pending.split_off(take);
+            let data = std::mem::replace(&mut self.pending, remainder);
+            return Ok(PtyChunk::Data(data));
+        }
         if self.closed {
             return Ok(PtyChunk::Closed);
         }
@@ -386,14 +521,43 @@ impl PtySession {
         };
         match message {
             Some(ChannelMsg::Data { data }) if data.len() <= MAX_OUTPUT => {
-                Ok(PtyChunk::Data(data.to_vec()))
+                let frame_bytes = u64::try_from(data.len()).map_err(|_| SshError::Bounds)?;
+                let next = self
+                    .cursor
+                    .checked_add(frame_bytes)
+                    .filter(|value| *value <= MAX_TERMINAL_CURSOR);
+                let Some(next) = next else {
+                    self.finish(AttachOutcome::Invalid).await;
+                    return Err(SshError::Bounds);
+                };
+                self.cursor = next;
+                let mut data = data.to_vec();
+                if data.len() > capacity {
+                    self.pending = data.split_off(capacity);
+                }
+                Ok(PtyChunk::Data(data))
             }
-            Some(ChannelMsg::Data { .. }) => Err(SshError::Bounds),
-            Some(ChannelMsg::Close) | None => {
-                self.closed = true;
+            Some(ChannelMsg::Data { .. }) => {
+                self.finish(AttachOutcome::Invalid).await;
+                Err(SshError::Bounds)
+            }
+            Some(ChannelMsg::ExitStatus { exit_status }) => {
+                let status = i32::try_from(exit_status).ok();
+                self.finish(AttachOutcome::from_status(status)).await;
                 Ok(PtyChunk::Closed)
             }
-            Some(ChannelMsg::Failure) => Err(SshError::Authentication),
+            Some(ChannelMsg::Close) | None => {
+                self.finish(AttachOutcome::Transport).await;
+                Ok(PtyChunk::Closed)
+            }
+            Some(ChannelMsg::Failure | ChannelMsg::ExitSignal { .. }) => {
+                self.finish(AttachOutcome::Transport).await;
+                Err(SshError::Authentication)
+            }
+            Some(ChannelMsg::ExtendedData { .. }) => {
+                self.finish(AttachOutcome::Invalid).await;
+                Err(SshError::AttachHeader)
+            }
             Some(_) => Ok(PtyChunk::Idle),
         }
     }
@@ -401,6 +565,9 @@ impl PtySession {
     pub async fn write(&mut self, input: &[u8]) -> Result<(), SshError> {
         if self.closed || input.len() > MAX_INPUT {
             return Err(SshError::Bounds);
+        }
+        if self.read_only {
+            return Err(SshError::ReadOnly);
         }
         tokio::time::timeout(self.timeout, self.writer.data(input))
             .await
@@ -412,6 +579,9 @@ impl PtySession {
         if self.closed || !(1..=4096).contains(&columns) || !(1..=512).contains(&rows) {
             return Err(SshError::Bounds);
         }
+        if self.read_only {
+            return Err(SshError::ReadOnly);
+        }
         tokio::time::timeout(self.timeout, self.writer.window_change(columns, rows, 0, 0))
             .await
             .map_err(|_| SshError::Timeout)??;
@@ -421,10 +591,17 @@ impl PtySession {
     pub async fn close(&mut self) -> Result<(), SshError> {
         if !self.closed {
             self.closed = true;
+            self.outcome = Some(AttachOutcome::Closed);
             tokio::time::timeout(self.timeout, self.writer.close())
                 .await
                 .map_err(|_| SshError::Timeout)??;
         }
         Ok(())
+    }
+
+    async fn finish(&mut self, outcome: AttachOutcome) {
+        self.closed = true;
+        self.outcome = Some(outcome);
+        let _ = self.writer.close().await;
     }
 }

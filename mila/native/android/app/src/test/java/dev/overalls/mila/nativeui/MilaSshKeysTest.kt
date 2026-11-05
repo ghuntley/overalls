@@ -25,6 +25,25 @@ class MilaSshKeysTest {
   assertTrue(bindings.revoked?.second?.matches(Regex("porsche-[0-9a-f]{32}")) == true)
  }
 
+ @Test fun uncertainRevokeReusesTheSameRequestId() {
+  val id = UUID.fromString("00000000-0000-0000-0000-000000000006")
+  val bindings = object : AndroidKeysRustBindings() {
+   var requests = mutableListOf<String>()
+   var attempts = 0
+   override fun sessionSshKeys(handle: Long): ByteArray? = "{\"keys\":[{\"id\":\"$id\",\"label\":\"phone\",\"algorithm\":\"ssh-ed25519\",\"fingerprint\":\"SHA256:test\"}]}".toByteArray()
+   override fun sessionSshKeyRevoke(handle: Long, key: String, requestId: String): Int {
+    requests += requestId
+    attempts += 1
+    return if (attempts == 1) -11 else 0
+   }
+  }
+  val store = MilaSessionSshKeyStore(MilaSessionHandle(11, bindings))
+  assertFalse(store.revoke(id.toString()))
+  assertTrue(store.revoke(id.toString()))
+  assertEquals(2, bindings.requests.size)
+  assertEquals(bindings.requests[0], bindings.requests[1])
+ }
+
  @Test fun malformedWhitespaceProjectionFailsClosed() {
   val bindings = object : AndroidKeysRustBindings() {
    override fun sessionSshKeys(handle: Long): ByteArray? = "{\"keys\":[{\"id\":\"00000000-0000-0000-0000-000000000003\",\"fingerprint\":\"SHA256: bad\",\"algorithm\":\"ssh-ed25519\",\"label\":\"phone\"}]}".toByteArray()

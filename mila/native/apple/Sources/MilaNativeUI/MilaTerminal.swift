@@ -26,6 +26,7 @@ public protocol MilaTerminalTransport: Sendable {
     /// The default keeps existing host transports source compatible while they are being
     /// upgraded to a real PTY reader.
     func receiveOutput() async throws -> Data?
+    func renderedFrame() async -> MilaTerminalFrame?
     func sendInput(_ input: Data) async throws
     func resize(columns: UInt16, rows: UInt16) async throws
     func close() async
@@ -33,6 +34,7 @@ public protocol MilaTerminalTransport: Sendable {
 
 public extension MilaTerminalTransport {
     func receiveOutput() async throws -> Data? { nil }
+    func renderedFrame() async -> MilaTerminalFrame? { nil }
 }
 
 /// An authenticated host PTY transport. The actual socket/PTY remains owned by the
@@ -88,6 +90,8 @@ public final class MilaAuthenticatedTerminalTransport: MilaTerminalTransport, @u
         return try await transport.receiveOutput()
     }
 
+    public func renderedFrame() async -> MilaTerminalFrame? { await transport.renderedFrame() }
+
     public func close() async { await transport.close() }
 }
 
@@ -106,6 +110,11 @@ public final class MilaAuthenticatedTerminalTransport: MilaTerminalTransport, @u
 /// only for a non-blocking read. Reads, input, resize and kill on one handle
 /// are serialized here, so input and resize wait for an in-flight read instead
 /// of meeting Rust's `Busy` refusal.
+
+/// @cc [owner:ghuntley,label:terminal;security] apple-terminal-attach-reservation
+/// A native attachment MUST reserve its generation before opening a handle.
+/// Close or a newer attachment MUST invalidate that reservation; a superseded
+/// opener MUST kill only its own returned handle and MUST NOT publish it.
 public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unchecked Sendable {
     /// Back-off between empty polls (no data, window adjust, or a closed channel).
     static let idlePoll: Duration = .milliseconds(25)
@@ -119,6 +128,7 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
     private let ffi = NSLock()
     private var terminal: UInt64 = 0
     private var generation: UInt64 = 0
+    private var named: UUID?
 
     /// Keep locking in a synchronous helper; Swift 6 rejects direct
     /// `NSLock.lock/unlock` calls from an async context.
@@ -145,13 +155,38 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
         // `from` is the UI resume cursor, not the opaque PTY handle.  A fresh
         // attachment legitimately starts at zero; authorization comes from the
         // authenticated session and the requested read/write mode.
-        guard readWrite else { throw MilaTerminalError.permissionDenied }
         guard session.isAuthenticated else { throw MilaTerminalError.unavailable }
-        let handle: UInt64
-        do { handle = try session.terminalAttach(machine: machine, columns: UInt32(columns), rows: UInt32(rows)) }
-        catch { throw MilaTerminalError.unavailable }
-        let previous = withTerminalLock { let old = terminal; terminal = handle; generation &+= 1; return old }
+        let (bound, previous, savedName) = withTerminalLock {
+            generation &+= 1
+            let previous = terminal
+            terminal = 0
+            return (generation, previous, named)
+        }
         if previous != 0 { serialized { session.terminalKill(previous) } }
+        let handle: UInt64
+        var sessionName = savedName
+        do {
+            if let live = session as? MilaLiveSession {
+                let sessionID = try savedName ?? live.terminalOpen(machine: machine, requestID: UUID())
+                sessionName = sessionID
+                // A fresh viewport asks for retained replay so its screen can be rebuilt.
+                handle = try live.terminalAttach(machine: machine, session: sessionID, columns: UInt32(columns), rows: UInt32(rows), cursor: from == 0 ? nil : from, readOnly: !readWrite)
+            } else {
+                guard readWrite else { throw MilaTerminalError.permissionDenied }
+                handle = try session.terminalAttach(machine: machine, columns: UInt32(columns), rows: UInt32(rows))
+            }
+        }
+        catch { throw MilaTerminalError.unavailable }
+        let published = withTerminalLock {
+            guard generation == bound else { return false }
+            terminal = handle
+            named = sessionName
+            return true
+        }
+        guard published else {
+            serialized { session.terminalKill(handle) }
+            throw MilaTerminalError.unavailable
+        }
     }
 
     /// One output step: a chunk, an empty chunk after an idle back-off, or nil
@@ -183,6 +218,12 @@ public final class MilaLiveSessionTerminalTransport: MilaTerminalTransport, @unc
         do { try serialized { try session.terminalInput(handle, data: input) } } catch { throw MilaTerminalError.unavailable }
     }
 
+    public func renderedFrame() async -> MilaTerminalFrame? {
+        let handle = withTerminalLock { terminal }
+        guard handle != 0, session.isAuthenticated else { return nil }
+        return try? serialized { try session.terminalFrame(handle) }
+    }
+
     public func resize(columns: UInt16, rows: UInt16) async throws {
         let handle = withTerminalLock { terminal }
         guard handle != 0, session.isAuthenticated else { throw MilaTerminalError.unavailable }
@@ -205,12 +246,21 @@ public struct MilaNoopTerminalTransport: MilaTerminalTransport {
     public func close() async {}
 }
 
-/// Main-actor terminal lifecycle model. Rust validates every operation before host transport use.
+/// @cc [owner:ghuntley,label:terminal;privacy] apple-terminal-generation-viewport
+/// A validated attach or reconnect MUST clear the preceding generation's output
+/// and rendered frame before awaiting the transport. If that attachment fails,
+/// it MUST NOT display text or images retained from the preceding generation.
+
+/// @cc [owner:ghuntley,label:terminal;security] apple-terminal-async-generation
+/// Async operation results and failures MUST update only their initiating
+/// generation. Closing MUST publish detached state and clear the viewport
+/// before awaiting the transport, so late work cannot resurrect the terminal.
 @MainActor
 public final class MilaTerminalController: ObservableObject {
     public static let maximumRenderedOutput = 256 * 1024
     @Published public private(set) var state: MilaTerminalState = .detached
     @Published public private(set) var output = Data()
+    @Published public private(set) var frame: MilaTerminalFrame?
     @Published public private(set) var columns: UInt16 = 80
     @Published public private(set) var rows: UInt16 = 24
     private let transport: any MilaTerminalTransport
@@ -218,6 +268,7 @@ public final class MilaTerminalController: ObservableObject {
     private var receiveTask: Task<Void, Never>?
     private var generation: UInt64 = 0
     private var submittedAttachIDs = Set<UUID>()
+    public var canSendInput: Bool { state == .attached && lastAttach?.readWrite == true }
 
     public init(transport: any MilaTerminalTransport = MilaNoopTerminalTransport()) {
         self.transport = transport
@@ -229,38 +280,49 @@ public final class MilaTerminalController: ObservableObject {
             state = .failed; return
         }
         generation &+= 1
+        let bound = generation
+        receiveTask?.cancel(); receiveTask = nil
+        output.removeAll(keepingCapacity: true)
+        frame = nil
         state = .attaching
         do {
             try await transport.attach(from: from, columns: columns, rows: rows, readWrite: readWrite)
+            guard generation == bound else { return }
             self.columns = columns; self.rows = rows
             lastAttach = (from, columns, rows, readWrite)
             state = .attached
             startReceiving()
-        } catch { state = .failed }
+        } catch { if generation == bound { state = .failed } }
     }
 
     public func reconnect() async {
         guard let request = lastAttach else { state = .failed; return }
         state = .reconnecting
         generation &+= 1
+        let bound = generation
         receiveTask?.cancel()
         // A reconnect starts a fresh PTY stream; never display bytes from the ended generation.
         output.removeAll(keepingCapacity: true)
+        frame = nil
         await transport.close()
+        guard generation == bound else { return }
         do {
             try await transport.attach(from: request.from, columns: request.columns, rows: request.rows, readWrite: request.readWrite)
+            guard generation == bound else { return }
             state = .attached
             startReceiving()
-        } catch { state = .failed }
+        } catch { if generation == bound { state = .failed } }
     }
 
     public func sendInput(_ input: Data) async {
-        guard state == .attached else { state = .failed; return }
+        guard canSendInput else { return }
+        let bound = generation
         let permission: UInt8 = 1
         guard mila_terminal_input_validate(input.count, permission).rawValue == 0 else {
             state = .failed; return
         }
-        do { try await transport.sendInput(input) } catch { state = .failed }
+        do { try await transport.sendInput(input) }
+        catch { if generation == bound { state = .failed } }
     }
 
     public func resize(columns: UInt16, rows: UInt16) async {
@@ -270,8 +332,12 @@ public final class MilaTerminalController: ObservableObject {
             state = .failed
             return
         }
-        do { try await transport.resize(columns: columns, rows: rows); self.columns = columns; self.rows = rows }
-        catch { state = .failed }
+        let bound = generation
+        do {
+            try await transport.resize(columns: columns, rows: rows)
+            guard generation == bound else { return }
+            self.columns = columns; self.rows = rows
+        } catch { if generation == bound { state = .failed } }
     }
 
     public func appendOutput(_ bytes: Data) {
@@ -284,7 +350,9 @@ public final class MilaTerminalController: ObservableObject {
     public func close() async {
         receiveTask?.cancel(); receiveTask = nil
         generation &+= 1
-        await transport.close(); state = .detached; lastAttach = nil; output.removeAll(keepingCapacity: true)
+        state = .detached; lastAttach = nil; output.removeAll(keepingCapacity: true)
+        frame = nil
+        await transport.close()
     }
 
     private func startReceiving() {
@@ -296,9 +364,11 @@ public final class MilaTerminalController: ObservableObject {
                 while !Task.isCancelled {
                     guard let bytes = try await transport.receiveOutput() else { break }
                     guard !bytes.isEmpty else { continue }
+                    let rendered = await transport.renderedFrame()
                     await MainActor.run { [weak self] in
                         guard let self, self.state == .attached, self.generation == generation else { return }
-                        self.appendOutput(bytes)
+                        if let rendered { self.frame = rendered; self.output = Data(rendered.text.utf8) }
+                        else { self.appendOutput(bytes) }
                     }
                 }
                 await MainActor.run { [weak self] in

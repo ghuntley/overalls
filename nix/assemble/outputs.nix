@@ -224,6 +224,7 @@ in
     tool-lyra = built.lyra;
     # mila-build's Linux dev and release targets (ADR-0235).
     tool-mila-linux-native = built.mila.linuxNative;
+    tool-mila-linux-journeys = built.mila.linuxJourneys;
     tool-mila-linux-release = built.mila.linuxRelease;
     # Sources and pinned dependencies for the Windows build (ADR-0235).
     tool-mila-source-bundle = built.mila.sourceBundle;

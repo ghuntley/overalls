@@ -248,6 +248,72 @@ fn machine_resize_sends_only_bounded_commands(tc: TestCase) {
     );
 }
 
+#[test]
+fn machine_clone_sends_one_request_with_optional_name() {
+    let (result, execs) = observe(|session| {
+        Box::pin(async {
+            session
+                .machine_clone(MACHINE, Some("copy-one"), REQUEST)
+                .await
+        })
+    });
+    assert!(result.is_ok(), "{result:?}");
+    assert_eq!(execs.len(), 1);
+    let command = parsed(&execs[0].line);
+    assert_eq!(command.command, "clone");
+    assert_eq!(command.arguments, [MACHINE]);
+    assert_eq!(string_option(&command, "name").as_deref(), Some("copy-one"));
+    assert_eq!(
+        string_option(&command, "request-id").as_deref(),
+        Some(REQUEST)
+    );
+    assert_eq!(
+        command.options.get("no-wait"),
+        Some(&mila_protocol::OptionValue::Bool(true))
+    );
+}
+
+#[test]
+fn thread_mode_and_read_send_typed_mutations_once() {
+    let (_, mode_execs) = observe(|session| {
+        Box::pin(async {
+            session
+                .thread_action(
+                    Some(MACHINE),
+                    "thread mode",
+                    Some("plan"),
+                    None,
+                    Some(REQUEST),
+                )
+                .await
+        })
+    });
+    assert_eq!(mode_execs.len(), 1);
+    let mode = parsed(&mode_execs[0].line);
+    assert_eq!(mode.command, "thread mode");
+    assert_eq!(mode.arguments, [MACHINE, "plan"]);
+    assert_eq!(string_option(&mode, "request-id").as_deref(), Some(REQUEST));
+
+    let (_, read_execs) = observe(|session| {
+        Box::pin(async {
+            session
+                .thread_action(
+                    Some(MACHINE),
+                    "thread read",
+                    Some("42"),
+                    None,
+                    Some(REQUEST),
+                )
+                .await
+        })
+    });
+    assert_eq!(read_execs.len(), 1);
+    let read = parsed(&read_execs[0].line);
+    assert_eq!(read.command, "thread read");
+    assert_eq!(read.arguments, [MACHINE, "42"]);
+    assert_eq!(string_option(&read, "request-id").as_deref(), Some(REQUEST));
+}
+
 /// A 43-symbol base64url X25519 key whose last symbol carries zero pad bits.
 const ENC_KEY: &str = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
 
@@ -300,7 +366,13 @@ fn device_register_sends_the_push_key_only_on_stdin(tc: TestCase) {
         let (push_key, enc_pubkey, label) = (push_key.clone(), enc_pubkey.clone(), label.clone());
         Box::pin(async move {
             session
-                .device_register(platform, &push_key, &enc_pubkey, label.as_deref())
+                .device_register_with_request(
+                    platform,
+                    &push_key,
+                    &enc_pubkey,
+                    label.as_deref(),
+                    REQUEST,
+                )
                 .await
         })
     });
@@ -329,6 +401,10 @@ fn device_register_sends_the_push_key_only_on_stdin(tc: TestCase) {
     );
     assert_eq!(string_option(&command, "enc-pubkey"), Some(enc_pubkey));
     assert_eq!(string_option(&command, "label"), label);
+    assert_eq!(
+        string_option(&command, "request-id").as_deref(),
+        Some(REQUEST)
+    );
 }
 
 const THREAD_COMMANDS: [&str; 9] = [

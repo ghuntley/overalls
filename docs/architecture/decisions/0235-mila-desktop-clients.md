@@ -182,15 +182,24 @@ Remaining gaps:
 
 - No signed macOS build has run, so the Secure Enclave and APNs paths on macOS
   are unverified.
-- The native Swift client does not implement decision 2's `MILA_SOFTWARE_KEYS`
-  dev custody: `MilaDeviceSigner` refuses software fallback, so an ad-hoc dev
-  build cannot sign in. Either implement the owner-only software keys for
-  unsigned macOS dev builds or replace that part of the decision.
+- The native Swift client now implements decision 2's `MILA_SOFTWARE_KEYS`
+  development custody. The build script enables it only for ad-hoc macOS
+  `dev` builds; the signer stores a deployment-scoped owner-only software key,
+  and the same compile-time policy disables APNs registration. Release,
+  `unsigned`, and iOS builds cannot enable the condition. The
+  [development store](../../../mila/native/apple/Sources/MilaNativeUI/MilaSoftwareDeviceKeyStore.swift)
+  uses digest-bound filenames under Application Support, refuses shared,
+  symlinked, hard-linked or malformed storage, and publishes new identities
+  atomically without overwriting an existing key. Hardware key tags are preserved.
+  The [software-key CI target](../../../mila/native/apple/software-keys-test.sh)
+  requires enabled-branch storage and APNs-refusal execution plus a non-DEBUG
+  compiler refusal. Native macOS execution remains unverified here.
 - The Apple release path has not run with real signing material, and no
   notification service extension is built, so APNs pokes to a closed app are
   not delivered by the native client.
-- The Windows runner has not been compiled or run on Windows, and no TPM or
-  software-provider key has been exercised.
+- The changed WinUI runner has not been compiled or run on Windows in this
+  implementation review. Historical Windows CI receipts remain separate from
+  current TPM and software-provider custody acceptance.
 - A Windows device that fell back keeps its software key permanently. Its next
   sign-in reuses it as `SoftwareExisting`, even after its TPM becomes usable,
   because replacing the key would change the device's identity and require a new
@@ -200,9 +209,10 @@ Remaining gaps:
   deployment can see which keys are software and confirm the replacement.
 - No Windows client is released. mila-release's Flutter `windows` job (signed
   MSIX through the removed Dart planner) was retired because its tool no longer
-  exists. The planned follow-up is an unsigned win-x64 zip from
-  `//mila:windows-dotnet`, once the FFI DLL is a reproducible Buck2 artifact.
-  The Windows source bundle is still published.
+  exists. The native [`package-release.ps1`](../../../mila/windows-dotnet/package-release.ps1)
+  now defines audited unsigned win-x64 ZIP/MSIX artifacts through
+  `//mila:windows-release`; Windows packaging execution and publication remain
+  unverified for this change. The Windows source bundle is still published.
 - Signed publishing is deferred: the user decided on 2026-11-01 that
   mila-release stays unsigned for now, so no signing secrets or signed publish
   run are set up. The Android apksigner and Apple signed code paths remain,
@@ -215,6 +225,14 @@ Remaining gaps:
   are not yet recorded as passing in CI.
 
 ## Open questions
+
+The 2026-11-02 [native parity implementation review](../reviews/2026-11-02-mila-native-parity-implementation.md)
+adds evidence for live Windows UI command paths, bounded lock interaction,
+named terminal detachment and Linux persisted notification presentation.
+Windows MSIX/AppInstance activation and native unsigned packaging are implemented;
+their native execution and signed/provider-delivery acceptance remain open. A
+Linux managed smoke check exercises portable production FFI paths while preserving
+Windows-only CNG/DPAPI and WinUI acceptance. This decision stays partial.
 
 - Whether Marshall should record and display the custody kind (hardware or
   software) of a desktop device key. The Windows client now records it and

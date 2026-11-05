@@ -160,6 +160,7 @@ pub enum MilaMachineCommandKind {
     ShareRemove = 11,
     WebShow = 12,
     WebSet = 13,
+    Clone = 14,
 }
 
 /// Projects a parsed machine-management command to a closed operation tag.
@@ -187,6 +188,7 @@ pub unsafe extern "C" fn mila_machine_command_kind(
         "ls" => MilaMachineCommandKind::List,
         "show" => MilaMachineCommandKind::Show,
         "new" => MilaMachineCommandKind::New,
+        "clone" => MilaMachineCommandKind::Clone,
         "resize" => MilaMachineCommandKind::Resize,
         "start" => MilaMachineCommandKind::Start,
         "stop" => MilaMachineCommandKind::Stop,

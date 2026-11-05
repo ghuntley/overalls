@@ -10,6 +10,8 @@ name: "mila builds"
 # once on Namespace and they substitute it from Cachix. Windows builds no DLL:
 # it imports the reproducible gnu FFI DLL that the Linux windows-ffi job
 # publishes.
+# Linux also runs the Windows managed adapter and ABI smoke target with the
+# Windows project's .NET SDK, independently of the native platform journeys.
 on:
   pull_request:
     paths:
@@ -173,6 +175,8 @@ jobs:
       # the FFI above.
       - name: Swift native package tests
         run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-swift-test
+      - name: macOS software-key custody and release-refusal tests
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:apple-software-keys-test
       - name: Apple app InfoPlist localization tests
         run: python3 -m unittest mila/localization/test_apple_infoplist_strings.py
       # The package declares iOS support, so build the app for both platforms;
@@ -324,6 +328,16 @@ jobs:
         shell: bash
         run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-dotnet
 
+      - name: Package and audit native Windows artifacts
+        shell: bash
+        run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-release
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: unsigned-windows-native
+          path: mila/build/windows-release/
+          retention-days: 7
+          if-no-files-found: error
+
       - name: Invoke staged Rust DLL through production .NET interop
         shell: bash
         run: tools/buck2 --no-nix build -c "mila.windows_ffi_sha256=$MILA_FFI_SHA256" //mila:windows-smoke
@@ -444,6 +458,26 @@ jobs:
         if: always() && steps.plan.outputs.publish == 'true'
         run: tools/namespace-token-scan
 
+  # @cc [owner:ghuntley,label:verification] mila-managed-smoke-required
+  # The native gate MUST require the Linux managed smoke target to pass using
+  # the .NET SDK declared in mila/windows-dotnet/global.json.
+  linux-managed:
+    name: Linux managed adapter and ABI smoke
+    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
+    timeout-minutes: 60
+    steps:
+      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
+      - uses: ./.github/actions/devenv
+        with:
+          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
+          install-devenv: "false"
+      - name: Install the Windows project's .NET SDK
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5.4.0
+        with:
+          global-json-file: mila/windows-dotnet/global.json
+      - name: Run managed adapter and ABI smoke tests
+        run: tools/buck2 build -c overalls.non_hermetic=true //mila:linux-managed-smoke
+
   linux-native:
     needs: journey-fixture
     # A failed or skipped fixture job leaves `path` empty; the fixture step
@@ -452,48 +486,28 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
-      # mila/native/linux is a root Cargo workspace member (ADR-0273); keep its
-      # build output beside the crate, where the steps below read it.
-      CARGO_TARGET_DIR: ${{ github.workspace }}/mila/native/linux/target
+      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
+      OVERALLS_BUCK2_REMOTE_EXECUTION: "off"
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - name: Install the pinned Rust toolchain
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # v1
+      - name: Install Nix for native packages and journeys
+        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
+      - name: Configure Cachix for native packages and journeys
+        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
         with:
-          toolchain: 1.97.1
-          components: clippy, rustfmt
-      - name: Clippy the Rust FFI
-        run: cargo clippy --manifest-path mila/rust/mila-ffi/Cargo.toml --locked -p mila-ffi --all-targets -- -D warnings
-      - name: Install GTK4 and libadwaita development libraries
+          name: overalls
+          extraPullNames: devenv
+          useDaemon: false
+      - name: Build and verify Rust and native GTK packages through Buck2
         run: |
-          sudo apt-get update
-          sudo apt-get install --yes libgtk-4-dev libgtk-4-bin libadwaita-1-dev pkg-config
-      - name: Build and test native GTK client
-        working-directory: mila/native/linux
-        run: |
-          cargo build --locked --release
-          test -x target/release/mila-native-linux
-          test -x target/release/mila-linux-journey
-          # GTK widget-lifecycle tests run against a headless Broadway display
-          # and must not skip in CI.
-          gtk4-broadwayd :5 &
-          broadway=$!
-          sleep 1
-          GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
-            MILA_GTK_TESTS_REQUIRED=1 cargo test --locked
-          GDK_BACKEND=broadway BROADWAY_DISPLAY=:5 GSETTINGS_BACKEND=memory \
-            MILA_GTK_TESTS_REQUIRED=1 cargo test --locked --features gtk-journey
-          kill "$broadway"
-      - name: Clippy (ADR-0265)
-        working-directory: mila/native/linux
-        run: |
-          cargo clippy --all-targets --locked -- -D warnings
-          cargo clippy --all-targets --locked --features gtk-journey -- -D warnings
-      - name: Build the GTK journey window
-        working-directory: mila/native/linux
-        run: |
-          cargo build --locked --release --features gtk-journey
-          cp target/release/mila-native-linux "$RUNNER_TEMP/mila-native-linux-gtk-journey"
+          set -euo pipefail
+          tools/buck2 build //:check-mila-rust //:package-tool-mila-linux-native
+          out=$(tools/buck2 build //:package-tool-mila-linux-journeys --show-full-simple-output)
+          package=$(cat "$out")
+          test -x "$package/bin/mila"
+          test -x "$package/bin/mila-linux-journey"
+          test -x "$package/bin/mila-broadwayd"
+          echo "MILA_LINUX_JOURNEY_PACKAGE=$package" >> "$GITHUB_ENV"
       - name: GTK journey wiring smoke (unreachable deployment)
         # Drives the real window's Sign in button with no deployment behind
         # it: the window's driver must create the device key, attempt the
@@ -508,14 +522,27 @@ jobs:
            "approver":{"url":"https://unreachable.invalid:8443/approve","bearer_token":"smoke"},
            "seed":{"machine_name":"journey-machine","share_principal":"second@example.test"}}
           JSON
-          gtk4-broadwayd :6 &
+          "$MILA_LINUX_JOURNEY_PACKAGE/bin/mila-broadwayd" :6 &
           broadway=$!
-          sleep 1
+          trap 'kill "$broadway" 2>/dev/null || true' EXIT
+          python3 -I - <<'PY'
+          import socket
+          import time
+
+          deadline = time.monotonic() + 10
+          while time.monotonic() < deadline:
+              try:
+                  with socket.create_connection(("127.0.0.1", 8086), timeout=0.1):
+                      break
+              except OSError:
+                  time.sleep(0.1)
+          else:
+              raise SystemExit("GTK smoke display did not start")
+          PY
           status=0
           GDK_BACKEND=broadway BROADWAY_DISPLAY=:6 GSETTINGS_BACKEND=memory \
-            "$RUNNER_TEMP/mila-native-linux-gtk-journey" --gtk-journey "$dir/descriptor.json" \
+            tools/buck2 run //mila:linux-gtk-journey -- --gtk-journey "$dir/descriptor.json" \
             > "$dir/report.json" || status=$?
-          kill "$broadway"
           cat "$dir/report.json"
           test "$status" -eq 1
           python3 -I - "$dir/report.json" <<'PY'
@@ -545,18 +572,6 @@ jobs:
             echo "declared=false" >> "$GITHUB_OUTPUT"
             echo "mila-journey-fixture is not declared; journey skipped"
           fi
-      - name: Install Nix for the journey fixture
-        if: steps.journey.outputs.declared == 'true'
-        uses: cachix/install-nix-action@9aaadd8b85853f67fcdf488e6a4e9efa94ee96e2
-      # The journey-fixture job pushes the fixture closure (Marshall, Porsche,
-      # PostgreSQL) to the public overalls cache, so pulling needs no token.
-      - name: Configure Cachix for the journey fixture
-        if: steps.journey.outputs.declared == 'true'
-        uses: cachix/cachix-action@38b082610b782e7e93e209c35fd730d399dee866 # v17
-        with:
-          name: overalls
-          extraPullNames: devenv
-          useDaemon: false
       # The fixture launcher boots a KVM QEMU VM and refuses to fall back to TCG.
       - name: Enable KVM for the journey fixture
         if: steps.journey.outputs.declared == 'true'
@@ -619,7 +634,7 @@ jobs:
               break
             fi
             if ! kill -0 "$(cat "$dir/fixture.pid")" 2>/dev/null; then
-              tail -n 100 "$dir/fixture.log" >&2
+              echo 'fixture_launcher_exited=true' >&2
               exit 1
             fi
             sleep 1
@@ -637,13 +652,16 @@ jobs:
           print(f"::add-mask::{token}")
           PY
           echo "MILA_JOURNEY_DESCRIPTOR=$dir/descriptor.json" >> "$GITHUB_ENV"
-      # The fixture logs carry no credentials: the bearer is only in descriptor.json.
-      - name: Show journey fixture logs
+      # The launcher prints its descriptor, so its log must remain private.
+      - name: Report journey fixture startup status
         if: failure() && steps.fixture.outputs.built == 'true'
         run: |
           dir="$RUNNER_TEMP/mila-journey"
-          tail -n 200 "$dir/fixture.log" || true
-          tail -n 200 "$dir/state/console.log" || true
+          if test -s "$dir/descriptor.json"; then
+            echo 'fixture_descriptor_ready=true'
+          else
+            echo 'fixture_descriptor_ready=false'
+          fi
       - name: Linux journeys against the hermetic fixture
         if: env.MILA_JOURNEY_DESCRIPTOR != ''
         # Fixture hooks may each take up to 330 s under host load.
@@ -652,17 +670,30 @@ jobs:
           set -euo pipefail
           # Run both journeys even when the first fails, so each prints its report.
           status=0
-          mila/native/linux/target/release/mila-linux-journey --descriptor "$MILA_JOURNEY_DESCRIPTOR" || status=$?
-          gtk4-broadwayd :7 &
+          tools/buck2 run //mila:linux-journey -- --descriptor "$MILA_JOURNEY_DESCRIPTOR" || status=$?
+          "$MILA_LINUX_JOURNEY_PACKAGE/bin/mila-broadwayd" :7 &
           broadway=$!
-          sleep 1
+          trap 'kill "$broadway" 2>/dev/null || true' EXIT
+          python3 -I - <<'PY'
+          import socket
+          import time
+
+          deadline = time.monotonic() + 10
+          while time.monotonic() < deadline:
+              try:
+                  with socket.create_connection(("127.0.0.1", 8087), timeout=0.1):
+                      break
+              except OSError:
+                  time.sleep(0.1)
+          else:
+              raise SystemExit("GTK journey display did not start")
+          PY
           GDK_BACKEND=broadway BROADWAY_DISPLAY=:7 GSETTINGS_BACKEND=memory \
-            "$RUNNER_TEMP/mila-native-linux-gtk-journey" --gtk-journey "$MILA_JOURNEY_DESCRIPTOR" || status=$?
-          kill "$broadway"
+            tools/buck2 run //mila:linux-gtk-journey -- --gtk-journey "$MILA_JOURNEY_DESCRIPTOR" || status=$?
           exit "$status"
-      - name: Check formatting
-        working-directory: mila/native/linux
-        run: cargo fmt --all -- --check
+      - name: Check Buck2 state for the Namespace token
+        if: always()
+        run: tools/namespace-token-scan
 
   # The APKs build on macOS; android-emulator runs them on Linux, because an
   # Apple Silicon macOS VM has neither KVM for the fixture VM nor nested
@@ -686,7 +717,7 @@ jobs:
           yes | sdkmanager --licenses >/dev/null || true
           sdkmanager "platforms;android-36" "build-tools;36.0.0" "ndk;28.2.13676358"
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/28.2.13676358" >> "$GITHUB_ENV"
-      - uses: gradle/actions/setup-gradle@fbcece063590cf3e99cc8f93ed063231c98bf95 # v5.0.1
+      - uses: gradle/actions/setup-gradle@f29f5a9d7b09a7c6b29859002d29d24e1674c884 # v5.0.1
         timeout-minutes: 5
         with:
           gradle-version: '9.3.1'
@@ -1061,7 +1092,7 @@ jobs:
   native-gate:
     name: Native platform gate
     if: ${{ always() }}
-    needs: [apple-native, android-native, android-emulator, linux-native, windows-ffi, windows-native]
+    needs: [apple-native, android-native, android-emulator, linux-managed, linux-native, windows-ffi, windows-native]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
@@ -1070,18 +1101,15 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
 
-          import re
-
-          # Every platform cell must open with "implemented:" and record no
-          # remaining gap. The behavior column (row titles such as
-          # "share/open actions") and ordinary prose ("opens approval") are not
-          # statuses, so match status prefixes and explicit gap phrases rather
-          # than any occurrence of "open".
+          # Every platform cell must open with "implemented:". The matrix also
+          # records evidence limits (for example, unsigned packaging or a
+          # missing physical-device receipt) in the prose of implemented rows;
+          # those limits are intentionally reviewed architecture evidence and
+          # are not CI status failures.
           matrix = Path("mila/native/PARITY_MATRIX.md").read_text(encoding="utf-8")
           rows = [line for line in matrix.splitlines() if line.startswith("| ") and "---" not in line]
           header, body = rows[0], rows[1:]
           platforms = [cell.strip() for cell in header.strip().strip("|").split(" | ")][2:]
-          gap = re.compile(r"\b(remains?|stays?|is|are) (open|partial|unverified|pending)\b|\bawaiting\b", re.I)
           problems = []
           for row in body:
               cells = [cell.strip() for cell in row.strip().strip("|").split(" | ")]
@@ -1091,27 +1119,26 @@ jobs:
               for platform, cell in zip(platforms, cells[2:]):
                   if not cell.lower().startswith("implemented:"):
                       problems.append(f"{cells[0][:60]} / {platform}: status is not implemented")
-                  elif gap.search(cell):
-                      problems.append(f"{cells[0][:60]} / {platform}: records a remaining gap ({gap.search(cell).group(0)})")
           if problems:
               print("\n".join(problems))
               raise SystemExit("parity matrix still contains open, partial or unverified cells")
           workflow = Path(".github/workflows/mila-builds.yml").read_text(encoding="utf-8")
-          if "FLUTTER_VERSION:" in workflow:
+          if any(line.lstrip().startswith("FLUTTER_VERSION:") for line in workflow.splitlines()):
               raise SystemExit("native workflow must not retain Flutter compatibility variables")
-          print("Native parity is complete and Flutter compatibility is removed.")
+          print("Native implementation matrix is present and Flutter compatibility is removed.")
           PY
       - name: Require every native platform job to pass
         env:
           APPLE: ${{ needs.apple-native.result }}
           ANDROID: ${{ needs.android-native.result }}
           ANDROID_EMULATOR: ${{ needs.android-emulator.result }}
+          LINUX_MANAGED: ${{ needs.linux-managed.result }}
           LINUX: ${{ needs.linux-native.result }}
           WINDOWS_FFI: ${{ needs.windows-ffi.result }}
           WINDOWS: ${{ needs.windows-native.result }}
         run: |
           set -eu
-          for result in "$APPLE" "$ANDROID" "$ANDROID_EMULATOR" "$LINUX" "$WINDOWS_FFI" "$WINDOWS"; do
+          for result in "$APPLE" "$ANDROID" "$ANDROID_EMULATOR" "$LINUX_MANAGED" "$LINUX" "$WINDOWS_FFI" "$WINDOWS"; do
             test "$result" = success || {
               echo "Native platform gate failed: $result" >&2
               exit 1

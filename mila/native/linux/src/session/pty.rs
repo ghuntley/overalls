@@ -139,7 +139,7 @@ impl LiveSession {
     /// Poll a bounded output chunk from the authenticated PTY.
     pub fn terminal_poll(&mut self) -> Result<Vec<u8>, SessionError> {
         let terminal = self.terminal.ok_or(SessionError::StaleHandle)?;
-        let mut output = vec![0_u8; 65_536];
+        let mut output = vec![0_u8; mila_ffi::session::MILA_TERMINAL_READ_CAPACITY];
         let mut written = 0_usize;
         // SAFETY: every input pointer/length pair borrows a live Rust slice for this
         // synchronous call, each out-pointer is a writable local (or owned buffer
@@ -157,6 +157,15 @@ impl LiveSession {
         }
         output.truncate(written);
         Ok(output)
+    }
+
+    pub fn terminal_screen(&self) -> Result<mila_runtime::TerminalFrame, SessionError> {
+        let terminal = self.terminal.ok_or(SessionError::StaleHandle)?;
+        // SAFETY: copy_output supplies live caller-owned output storage.
+        let bytes = copy_output(|out, capacity, written| unsafe {
+            mila_ffi::session::mila_session_terminal_screen(terminal, out, capacity, written)
+        })?;
+        serde_json::from_slice(&bytes).map_err(|_| SessionError::InvalidInput)
     }
 
     /// The PTY handle opened by [`Self::terminal_attach`], if still open.
@@ -256,7 +265,6 @@ impl LiveSession {
 /// FFI session held by the GTK window or the headless journey driver.
 pub struct SessionPtyBackend {
     binding: std::rc::Rc<std::cell::RefCell<SessionBinding>>,
-    decoder: crate::terminal_text::PtyTextDecoder,
     wait_ms: u32,
 }
 
@@ -274,7 +282,6 @@ impl SessionPtyBackend {
     pub fn new(binding: std::rc::Rc<std::cell::RefCell<SessionBinding>>, wait_ms: u32) -> Self {
         Self {
             binding,
-            decoder: crate::terminal_text::PtyTextDecoder::new(),
             wait_ms: wait_ms.min(1_000),
         }
     }
@@ -322,7 +329,6 @@ impl crate::terminal::HostPtyBackend for SessionPtyBackend {
                 SessionError::InvalidInput => PtyError::InvalidRequest,
                 _ => PtyError::Transport,
             })?;
-        self.decoder = crate::terminal_text::PtyTextDecoder::new();
         Ok(channel)
     }
 
@@ -333,7 +339,9 @@ impl crate::terminal::HostPtyBackend for SessionPtyBackend {
         use crate::terminal::PtyRead;
         let wait_ms = self.wait_ms;
         match self.with_channel(channel, |live| live.terminal_read(wait_ms))? {
-            TerminalChunk::Data(bytes) => Ok(PtyRead::Text(self.decoder.decode(&bytes))),
+            TerminalChunk::Data(_) => self
+                .with_channel(channel, |live| live.terminal_screen())
+                .map(PtyRead::Screen),
             TerminalChunk::Idle => Ok(PtyRead::Idle),
             TerminalChunk::Closed => Ok(PtyRead::Eof),
         }

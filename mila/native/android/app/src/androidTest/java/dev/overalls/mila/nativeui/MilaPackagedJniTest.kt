@@ -3,6 +3,7 @@ package dev.overalls.mila.nativeui
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -42,9 +43,9 @@ class MilaPackagedJniTest {
     @Test
     fun packagedAdapterRefusesCreateAndShareWhileSignedOut() = kotlinx.coroutines.runBlocking<Unit> {
         val adapter = LinkedMilaFfiAdapter()
-        assert(adapter.machineCreate(MilaMachineCreateRequest("devbox", 1, 512, 5)).isFailure)
+        assertTrue(adapter.machineCreate(MilaMachineCreateRequest("devbox", 1, 512, 5)).isFailure)
         val principal = MilaSharePrincipal.parse("person@example.test").getOrThrow()
-        assert(adapter.machineShare(java.util.UUID.fromString(machine), principal, MilaShareRole.Viewer).isFailure)
-        assert(adapter.refreshListing().isFailure)
+        assertTrue(adapter.machineShare(java.util.UUID.fromString(machine), principal, MilaShareRole.Viewer).isFailure)
+        assertTrue(adapter.refreshListing().isFailure)
     }
 }

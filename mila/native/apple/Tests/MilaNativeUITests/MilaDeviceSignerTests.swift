@@ -4,6 +4,14 @@ import XCTest
 @testable import MilaNativeUI
 
 final class MilaDeviceSignerTests: XCTestCase {
+    func testSoftwareKeysRequireTheExplicitDevelopmentCompilationCondition() {
+        #if os(macOS) && MILA_SOFTWARE_KEYS
+        XCTAssertTrue(MilaDeviceSigner.allowsSoftwareKeys)
+        #else
+        XCTAssertFalse(MilaDeviceSigner.allowsSoftwareKeys)
+        #endif
+    }
+
     func testDeploymentHostValidation() {
         for host in ["example.com", "a-b.example", "123.example"] {
             XCTAssertTrue(MilaDeviceSigner.validHost(host))

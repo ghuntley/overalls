@@ -1,3 +1,8 @@
+#![allow(
+    clippy::too_many_lines,
+    clippy::undocumented_unsafe_blocks,
+    reason = "The real-TCP ABI journey keeps all setup and pointer assertions in one auditable scenario."
+)]
 use base64::{engine::general_purpose::STANDARD, Engine};
 use mila_ffi::session::*;
 use mila_transport::{
@@ -429,13 +434,13 @@ fn arbitrary_terminal_reads_refuse_before_consuming(tc: hegel::TestCase) {
     } else {
         assert_eq!(status, SessionStatus::InvalidHandle);
     }
-    // SAFETY: the stated capacity is smaller than the live `output` buffer.
+    // A zero-sized output buffer is refused before the stale handle lookup.
     let small = unsafe {
         mila_session_terminal_read_within(
             handle,
             0,
             output.as_mut_ptr(),
-            MILA_TERMINAL_READ_CAPACITY - 1,
+            0,
             &raw mut written,
             &raw mut state,
         )
@@ -598,4 +603,209 @@ fn terminal_read_refuses_stale_handles_and_null_outputs() {
     };
     assert_eq!(null_event, SessionStatus::Invalid);
     assert_eq!(event, TerminalReadEvent::Data);
+}
+
+#[expect(clippy::unwrap_used, reason = "canonical watch command fixture")]
+fn watch_command() -> String {
+    mila_protocol::Command::parse(&format!("watch --json --session --machine={FIRST}"))
+        .unwrap()
+        .format()
+        .unwrap()
+}
+#[expect(clippy::unwrap_used, reason = "valid watch fixture JSON")]
+fn watch_lines(refused: bool) -> Vec<u8> {
+    let mut data = serde_json::to_vec(&json!({"version":1,"event":"watching",
+        "session_id":"00000000-0000-0000-0000-000000000002", "machines":[FIRST],"threads":[]}))
+    .unwrap();
+    data.push(b'\n');
+    if refused {
+        data.extend_from_slice(b"{\"version\":1,\"status\":\"error\",\"error\":\"forbidden\"}\n");
+    }
+    data
+}
+
+/// @cc [owner:ghuntley,label:verification;security;recovery] mila-watch-ffi-tcp-lifetime
+/// Real-TCP watch reopen MUST allocate a new capability, make its predecessor
+/// stale without writing output, and emit resync before hints. A refusal MUST
+/// fence parent listing and mutation handles, while permitting cleanup.
+#[test]
+fn ffi_watch_reconnect_resync_and_authority_fencing_over_real_tcp() {
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(2)
+        .enable_all()
+        .build()
+        .unwrap();
+    let responses = Arc::new(Mutex::new(VecDeque::from([
+        reply(&watch_command(), watch_lines(false)),
+        reply(&watch_command(), watch_lines(true)),
+    ])));
+    let (trust, port, auth, task) = runtime.block_on(endpoint(responses.clone()));
+    let (public, signer) = identity(Arc::new(AtomicUsize::new(0)));
+    let trust = serde_json::to_vec(&trust).unwrap();
+    let mut parent = 0;
+    // SAFETY: all input buffers and signer context outlive synchronous connect.
+    assert_eq!(
+        unsafe {
+            mila_session_connect(
+                trust.as_ptr(),
+                trust.len(),
+                b"localhost".as_ptr(),
+                9,
+                public.as_ptr(),
+                public.len(),
+                port,
+                5000,
+                Some(sign),
+                &raw const signer as usize,
+                &raw mut parent,
+            )
+        },
+        SessionStatus::Ok
+    );
+    let filters = format!("{{\"machines\":[\"{FIRST}\"],\"threads\":[]}}");
+    let mut watch = 0;
+    // SAFETY: live input and writable local handle.
+    assert_eq!(
+        unsafe { mila_session_watch_open(parent, filters.as_ptr(), filters.len(), &raw mut watch) },
+        SessionStatus::Ok
+    );
+    let mut out = vec![0xa5; MILA_WATCH_READ_CAPACITY];
+    let mut written = 41;
+    let mut event = WatchReadEvent::Idle;
+    // SAFETY: live caller-owned output storage with stated lengths.
+    assert_eq!(
+        unsafe {
+            mila_session_watch_read_within(
+                watch,
+                1000,
+                out.as_mut_ptr(),
+                out.len(),
+                &raw mut written,
+                &raw mut event,
+            )
+        },
+        SessionStatus::Ok
+    );
+    assert_eq!(event, WatchReadEvent::Event);
+    assert_eq!(
+        serde_json::from_slice::<Value>(&out[..written]).unwrap()["event"],
+        "watching"
+    );
+    let mut next = 0;
+    // SAFETY: writable handle storage; reconnect consumes the old capability.
+    assert_eq!(
+        unsafe { mila_session_watch_reconnect(watch, &raw mut next) },
+        SessionStatus::Ok
+    );
+    assert_ne!(next, watch);
+    out.fill(0xa5);
+    written = 41;
+    event = WatchReadEvent::Idle;
+    // SAFETY: stale capability must leave all caller storage untouched.
+    assert_eq!(
+        unsafe {
+            mila_session_watch_read_within(
+                watch,
+                0,
+                out.as_mut_ptr(),
+                out.len(),
+                &raw mut written,
+                &raw mut event,
+            )
+        },
+        SessionStatus::InvalidHandle
+    );
+    assert_eq!(out, vec![0xa5; out.len()]);
+    assert_eq!(written, 41);
+    assert_eq!(event, WatchReadEvent::Idle);
+    // SAFETY: live output storage.
+    assert_eq!(
+        unsafe {
+            mila_session_watch_read_within(
+                next,
+                1000,
+                out.as_mut_ptr(),
+                out.len(),
+                &raw mut written,
+                &raw mut event,
+            )
+        },
+        SessionStatus::Ok
+    );
+    assert_eq!(
+        serde_json::from_slice::<Value>(&out[..written]).unwrap()["event"],
+        "resync"
+    );
+    // SAFETY: live output storage.
+    assert_eq!(
+        unsafe {
+            mila_session_watch_read_within(
+                next,
+                1000,
+                out.as_mut_ptr(),
+                out.len(),
+                &raw mut written,
+                &raw mut event,
+            )
+        },
+        SessionStatus::Ok
+    );
+    assert_eq!(event, WatchReadEvent::AuthorityLost);
+    assert_eq!(written, 0);
+    assert_eq!(
+        mila_session_read_machines(parent, 0),
+        SessionStatus::InvalidHandle
+    );
+    // SAFETY: revoked parent must refuse cached listing without writing output.
+    assert_eq!(
+        unsafe { mila_session_listing(parent, out.as_mut_ptr(), out.len(), &raw mut written) },
+        SessionStatus::InvalidHandle
+    );
+    assert_eq!(mila_session_close(parent), SessionStatus::Ok);
+    assert_eq!(mila_session_watch_close(next), SessionStatus::InvalidHandle);
+    assert_eq!(auth.load(Ordering::SeqCst), 1);
+    assert_eq!(signer.calls.load(Ordering::SeqCst), 1);
+    assert!(responses.lock().unwrap().is_empty());
+    task.abort();
+}
+
+/// @cc [owner:ghuntley,label:verification;security] mila-watch-ffi-refusal-preserves-storage
+/// Arbitrary stale watch handles and invalid bounds MUST refuse without
+/// changing caller buffers or outcome fields.
+#[hegel::test(test_cases = 64)]
+fn arbitrary_stale_watch_reads_leave_output_untouched(tc: hegel::TestCase) {
+    use hegel::generators as gs;
+    let handle = tc.draw(gs::integers::<u64>().min_value(1_u64 << 63));
+    let mut out = vec![0xa5; MILA_WATCH_READ_CAPACITY + 8];
+    let mut written = 41;
+    let mut event = WatchReadEvent::Closed;
+    // SAFETY: declared extent is inside live buffer with eight guard bytes.
+    let status = unsafe {
+        mila_session_watch_read_within(
+            handle,
+            0,
+            out.as_mut_ptr(),
+            MILA_WATCH_READ_CAPACITY,
+            &raw mut written,
+            &raw mut event,
+        )
+    };
+    assert_eq!(status, SessionStatus::InvalidHandle);
+    assert_eq!(out, vec![0xa5; MILA_WATCH_READ_CAPACITY + 8]);
+    assert_eq!(written, 41);
+    assert_eq!(event, WatchReadEvent::Closed);
+    // SAFETY: the undersized declared extent is inside the same live buffer.
+    let status = unsafe {
+        mila_session_watch_read_within(
+            handle,
+            1001,
+            out.as_mut_ptr(),
+            MILA_WATCH_READ_CAPACITY - 1,
+            &raw mut written,
+            &raw mut event,
+        )
+    };
+    assert_eq!(status, SessionStatus::Invalid);
+    assert_eq!(written, 41);
+    assert_eq!(event, WatchReadEvent::Closed);
 }

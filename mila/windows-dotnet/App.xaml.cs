@@ -1,4 +1,7 @@
 using Microsoft.UI.Xaml;
+using Microsoft.Windows.AppLifecycle;
+using Windows.ApplicationModel.Activation;
+using WinUILaunchArgs = Microsoft.UI.Xaml.LaunchActivatedEventArgs;
 
 namespace Mila.Windows;
 
@@ -28,17 +31,32 @@ public partial class App : Application
         }
     }
 
-    protected override void OnLaunched(LaunchActivatedEventArgs args)
+    /// <summary>
+    /// @cc [owner:ghuntley,label:security;desktop] windows-single-instance-navigation
+    /// Redirect secondary activations before creating a window; protocol payloads
+    /// reach only the bounded navigation parser on the primary UI dispatcher.
+    /// </summary>
+    protected override async void OnLaunched(WinUILaunchArgs args)
     {
+        AppActivationArguments activation = AppInstance.GetCurrent().GetActivatedEventArgs();
+        AppInstance primary = AppInstance.FindOrRegisterForKey("dev.overalls.mila");
+        if (!primary.IsCurrent)
+        {
+            await primary.RedirectActivationToAsync(activation);
+            Exit();
+            return;
+        }
+        if (!_started) primary.Activated += OnRedirectedActivation;
+        string arguments = ActivationText(activation, args.Arguments);
         if (_window is MainWindow existing)
         {
-            existing.HandleExternalActivation(args.Arguments);
+            existing.HandleExternalActivation(arguments);
         }
         else
         {
             try
             {
-                _window = new MainWindow(args.Arguments);
+                _window = new MainWindow(arguments);
             }
             catch (Exception error)
             {
@@ -48,6 +66,24 @@ public partial class App : Application
         }
         _window.Activate();
         _started = true;
+    }
+
+    private static string ActivationText(AppActivationArguments activation, string fallback = "") => activation.Data switch
+    {
+        IProtocolActivatedEventArgs protocol => protocol.Uri?.AbsoluteUri ?? "",
+        ILaunchActivatedEventArgs launch => launch.Arguments,
+        _ => fallback,
+    };
+
+    private void OnRedirectedActivation(object? sender, AppActivationArguments activation)
+    {
+        if (_window is not MainWindow window) return;
+        string arguments = ActivationText(activation);
+        window.DispatcherQueue.TryEnqueue(() =>
+        {
+            window.HandleExternalActivation(arguments);
+            window.Activate();
+        });
     }
 
     /// <summary>Names a failure that stops the first window from loading.</summary>

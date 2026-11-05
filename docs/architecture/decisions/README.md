@@ -27,7 +27,9 @@ ADR-0272's dormant NativeLink module, credentials and tests were removed on
 2026-11-01.
 [ADR-0277](0277-mila-native-builds-on-buck2.md) supersedes ADR-0227: Mila builds
 only through Buck2 targets on Nix-pinned toolchains, and the Flutter client,
-dartssh2 overlay and Flutter checks are retired.
+dartssh2 overlay and Flutter checks are retired. Its implementation evidence
+includes explicit-emulator Android tests and mandatory headless GTK tests;
+signed native release acceptance remains partial.
 
 [ADR-0275](0275-bounded-control-request-execution.md) bounds each Lilly control
 socket to two running requests, queueing the rest in FIFO order with a deadline
@@ -77,8 +79,9 @@ superseding ADR-0086 for them while other hosts stay cache-only.
 [ADR-0249](0249-mila-rust-core-native-clients.md) moves Mila's shared protocol,
 cryptography and state logic into Rust crates with thin Swift, Kotlin, GTK4 and
 WinUI clients; implementation remains partial while native parity is built.
-The separate `mila-session` crate now composes validated machine reads with SSH;
-native session adapters and full feature parity remain pending.
+The separate `mila-session` crate composes validated reads and mutations with SSH;
+native adapters, snapshots and watch consumers are wired, while platform release
+acceptance remains partial.
 
 [ADR-0247](0247-sops-operator-source-grant.md) restores Geoffrey Huntley's
 operator source as a reviewed fleet-wide grant whose address lives only in the
@@ -1171,3 +1174,8 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.
+
+The [native parity implementation review](../reviews/2026-11-02-mila-native-parity-implementation.md)
+adds complete-listing, snapshot, watch and terminal implementation evidence plus
+Android SDK, packaged emulator, headless GTK and portable managed FFI checks;
+ADR-0235/0249/0277 remain partial.

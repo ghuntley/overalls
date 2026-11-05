@@ -2,14 +2,17 @@
 use mila_session::ApplicationSession;
 use mila_transport::{
     decode_trust_document,
-    ssh::{DeviceSigner, PtyChunk, PtySession, SshError},
+    ssh::{DeviceSigner, PtyChunk, PtySession, SshError, TerminalAttachOptions},
 };
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::Future,
     sync::{Arc, Mutex, OnceLock},
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
+
+mod watch;
+pub use watch::*;
 
 /// Status codes never include command bodies, signatures or credentials.
 #[repr(i32)]
@@ -58,6 +61,7 @@ struct Entry {
 struct TerminalEntry {
     owner: u64,
     terminal: PtySession,
+    screen: mila_runtime::TerminalScreen,
 }
 #[derive(Default)]
 struct Registry {
@@ -72,6 +76,52 @@ struct TerminalRegistry {
 }
 static TERMINALS: OnceLock<Mutex<TerminalRegistry>> = OnceLock::new();
 static RUNTIME: OnceLock<Result<tokio::runtime::Runtime, std::io::Error>> = OnceLock::new();
+static REVOKED: OnceLock<Mutex<HashSet<u64>>> = OnceLock::new();
+static LEGACY_DEVICE_REQUESTS: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+fn revoked() -> &'static Mutex<HashSet<u64>> {
+    REVOKED.get_or_init(Mutex::default)
+}
+fn legacy_device_request(
+    handle: u64,
+    operation: &str,
+    device: &[u8],
+    enabled: Option<u8>,
+) -> String {
+    let key = format!(
+        "{handle}|{operation}|{}|{}",
+        String::from_utf8_lossy(device),
+        enabled.map_or_else(String::new, |value| value.to_string())
+    );
+    let requests = LEGACY_DEVICE_REQUESTS.get_or_init(Mutex::default);
+    let mut requests = match requests.lock() {
+        Ok(guard) => guard,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    requests
+        .entry(key)
+        .or_insert_with(|| format!("porsche-{}", uuid::Uuid::new_v4().simple()))
+        .clone()
+}
+fn clear_legacy_device_request(handle: u64, operation: &str, device: &[u8], enabled: Option<u8>) {
+    let key = format!(
+        "{handle}|{operation}|{}|{}",
+        String::from_utf8_lossy(device),
+        enabled.map_or_else(String::new, |value| value.to_string())
+    );
+    if let Some(requests) = LEGACY_DEVICE_REQUESTS.get() {
+        if let Ok(mut requests) = requests.lock() {
+            requests.remove(&key);
+        }
+    }
+}
+fn clear_legacy_device_requests_for_handle(handle: u64) {
+    if let Some(requests) = LEGACY_DEVICE_REQUESTS.get() {
+        if let Ok(mut requests) = requests.lock() {
+            let prefix = format!("{handle}|");
+            requests.retain(|key, _| !key.starts_with(&prefix));
+        }
+    }
+}
 fn registry() -> &'static Mutex<Registry> {
     REGISTRY.get_or_init(Mutex::default)
 }
@@ -79,13 +129,21 @@ fn terminals() -> &'static Mutex<TerminalRegistry> {
     TERMINALS.get_or_init(Mutex::default)
 }
 fn terminal_entry(handle: u64) -> Result<Arc<Mutex<Option<TerminalEntry>>>, SessionStatus> {
-    terminals()
+    let terminal = terminals()
         .lock()
         .map_err(|_| SessionStatus::Internal)?
         .entries
         .get(&handle)
         .cloned()
-        .ok_or(SessionStatus::InvalidHandle)
+        .ok_or(SessionStatus::InvalidHandle)?;
+    let owner = terminal
+        .try_lock()
+        .map_err(|_| SessionStatus::Busy)?
+        .as_ref()
+        .ok_or(SessionStatus::InvalidHandle)?
+        .owner;
+    let _parent = entry(owner)?;
+    Ok(terminal)
 }
 
 /// Remove every terminal capability owned by a closing parent session before
@@ -102,8 +160,8 @@ fn take_owned_terminals(owner: u64) -> Result<Vec<PtySession>, SessionStatus> {
     let mut collected = Vec::with_capacity(candidates.len());
     for (handle, entry) in candidates {
         let is_owned = entry
-            .try_lock()
-            .map_err(|_| SessionStatus::Busy)?
+            .lock()
+            .map_err(|_| SessionStatus::Internal)?
             .as_ref()
             .is_some_and(|value| value.owner == owner);
         if !is_owned {
@@ -115,7 +173,7 @@ fn take_owned_terminals(owner: u64) -> Result<Vec<PtySession>, SessionStatus> {
             .entries
             .remove(&handle);
         if let Some(removed) = removed {
-            let mut guard = removed.try_lock().map_err(|_| SessionStatus::Busy)?;
+            let mut guard = removed.lock().map_err(|_| SessionStatus::Internal)?;
             if let Some(entry) = guard.take() {
                 collected.push(entry.terminal);
             }
@@ -152,6 +210,16 @@ unsafe fn bytes<'a>(ptr: *const u8, len: usize, max: usize) -> Result<&'a [u8], 
     Ok(unsafe { std::slice::from_raw_parts(ptr, len) })
 }
 fn entry(handle: u64) -> Result<Arc<Mutex<Option<Entry>>>, SessionStatus> {
+    if revoked()
+        .lock()
+        .map_err(|_| SessionStatus::Internal)?
+        .contains(&handle)
+    {
+        return Err(SessionStatus::InvalidHandle);
+    }
+    raw_entry(handle)
+}
+fn raw_entry(handle: u64) -> Result<Arc<Mutex<Option<Entry>>>, SessionStatus> {
     registry()
         .lock()
         .map_err(|_| SessionStatus::Internal)?
@@ -306,12 +374,15 @@ pub unsafe extern "C" fn mila_session_machine_action(
     guarded(|| {
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
         let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
         let action = std::str::from_utf8(unsafe { bytes(action, action_len, 32) }?)
             .map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
         let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
@@ -327,6 +398,53 @@ pub unsafe extern "C" fn mila_session_machine_action(
                 _ => SessionStatus::Invalid,
             })?;
         Ok(())
+    })
+}
+
+/// Queue an independent full-disk machine clone. An optional name is validated
+/// by the shared session grammar; the request id is required for at-most-once
+/// resolution.
+/// # Safety
+/// Pointer arguments reference their declared readable lengths; null `name`
+/// is permitted only when `name_len` is zero.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_machine_clone(
+    handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    name: *const u8,
+    name_len: usize,
+    request_id: *const u8,
+    request_id_len: usize,
+) -> SessionStatus {
+    guarded(|| {
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
+        let machine = std::str::from_utf8(unsafe { bytes(machine, machine_len, 128) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        let name = if name_len == 0 {
+            None
+        } else {
+            Some(
+                // SAFETY: the caller guarantees each pointer references its declared readable length.
+                std::str::from_utf8(unsafe { bytes(name, name_len, 128) }?)
+                    .map_err(|_| SessionStatus::Invalid)?,
+            )
+        };
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        let runtime = runtime()?;
+        let entry = entry(handle)?;
+        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+        runtime
+            .block_on(session.machine_clone(machine, name, request_id))
+            .map_err(|error| match error {
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })
     })
 }
 
@@ -352,6 +470,7 @@ pub unsafe extern "C" fn mila_session_machine_create(
             std::str::from_utf8(unsafe { bytes(name, name_len, 128) }?).map_err(|_| SessionStatus::Invalid)?;
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
         let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
@@ -829,6 +948,7 @@ pub unsafe extern "C" fn mila_session_device_register(
             3 => mila_model::DevicePlatform::Windows,
             _ => return Err(SessionStatus::Invalid),
         };
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
         let reply = mila_runtime::PushRegistrationReply::decode_susan(
             // SAFETY: the caller guarantees each pointer references its declared readable length;
             // `bytes` refuses null, empty and oversized input.
@@ -838,6 +958,7 @@ pub unsafe extern "C" fn mila_session_device_register(
         .map_err(|_| SessionStatus::Invalid)?;
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
         let enc_pubkey = std::str::from_utf8(unsafe { bytes(enc_pubkey, enc_pubkey_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         if !mila_protocol::device_public_key_valid(enc_pubkey) {
@@ -849,6 +970,7 @@ pub unsafe extern "C" fn mila_session_device_register(
             Some(
                 // SAFETY: the caller guarantees each pointer references its declared readable
                 // length; `bytes` refuses null, empty and oversized input.
+                // SAFETY: the caller guarantees each pointer references its declared readable length.
                 std::str::from_utf8(unsafe { bytes(label, label_len, 256) }?)
                     .map_err(|_| SessionStatus::Invalid)?,
             )
@@ -865,6 +987,87 @@ pub unsafe extern "C" fn mila_session_device_register(
             })?;
         // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable bytes and
         // one writable `usize`, as `output` requires.
+        // SAFETY: output pointers follow the public function contract.
+        unsafe { output(&data, out, capacity, written) }
+    })
+}
+
+/// Register a notification device with a caller-owned request id. This additive
+/// entry point is the preferred API; callers use `mila_session_request_show`
+/// to resolve an uncertain registration without resubmitting it.
+/// # Safety
+/// Input pointers reference their declared readable lengths (`label` and
+/// `request_id` may be null only when their lengths are zero); output pointers
+/// follow [`mila_session_listing`].
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_device_register_with_request(
+    handle: u64,
+    platform: u8,
+    susan_reply: *const u8,
+    susan_reply_len: usize,
+    enc_pubkey: *const u8,
+    enc_pubkey_len: usize,
+    label: *const u8,
+    label_len: usize,
+    request_id: *const u8,
+    request_id_len: usize,
+    now: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        let request_id =
+            mila_model::RequestId::parse(request_id).map_err(|_| SessionStatus::Invalid)?;
+        let platform = match platform {
+            0 => mila_model::DevicePlatform::Ios,
+            1 => mila_model::DevicePlatform::Android,
+            2 => mila_model::DevicePlatform::Macos,
+            3 => mila_model::DevicePlatform::Windows,
+            _ => return Err(SessionStatus::Invalid),
+        };
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
+        let reply = mila_runtime::PushRegistrationReply::decode_susan(
+            // SAFETY: the caller guarantees each pointer references its declared readable length.
+            unsafe { bytes(susan_reply, susan_reply_len, 4096) }?,
+            now,
+        )
+        .map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length.
+        let enc_pubkey = std::str::from_utf8(unsafe { bytes(enc_pubkey, enc_pubkey_len, 64) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        if !mila_protocol::device_public_key_valid(enc_pubkey) {
+            return Err(SessionStatus::Invalid);
+        }
+        let label = if label_len == 0 {
+            None
+        } else {
+            Some(
+                // SAFETY: the caller guarantees each pointer references its declared readable length.
+                std::str::from_utf8(unsafe { bytes(label, label_len, 256) }?)
+                    .map_err(|_| SessionStatus::Invalid)?,
+            )
+        };
+        let runtime = runtime()?;
+        let entry = entry(handle)?;
+        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
+        let data = runtime
+            .block_on(session.device_register_with_request(
+                platform,
+                &reply.push_key,
+                enc_pubkey,
+                label,
+                request_id.as_str(),
+            ))
+            .map_err(|e| match e {
+                mila_session::SessionError::Transport(_) => SessionStatus::Transport,
+                _ => SessionStatus::Invalid,
+            })?;
+        // SAFETY: output pointers follow the public function contract.
         unsafe { output(&data, out, capacity, written) }
     })
 }
@@ -879,20 +1082,61 @@ pub unsafe extern "C" fn mila_session_device_rm(
     device: *const u8,
     device_len: usize,
 ) -> SessionStatus {
+    // SAFETY: `bytes` validates null, empty and oversized input before borrowing the caller's
+    // declared device buffer for this synchronous call.
+    let device_bytes = match unsafe { bytes(device, device_len, 128) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let request = legacy_device_request(handle, "remove", device_bytes, None);
+    // SAFETY: the wrapper's device pointer and length are forwarded unchanged; the temporary
+    // request remains live for the duration of the synchronous call.
+    unsafe {
+        let status = mila_session_device_rm_with_request(
+            handle,
+            device,
+            device_len,
+            request.as_ptr(),
+            request.len(),
+        );
+        if !matches!(
+            status,
+            SessionStatus::Transport | SessionStatus::Internal | SessionStatus::Busy
+        ) {
+            clear_legacy_device_request(handle, "remove", device_bytes, None);
+        }
+        status
+    }
+}
+
+/// Revoke one notification device with a caller-owned request identity.
+/// The legacy wrapper above remains source-compatible and retains its generated identity while
+/// the outcome is uncertain; callers that own retry state should use this explicit entry point.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared readable lengths.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_device_rm_with_request(
+    handle: u64,
+    device: *const u8,
+    device_len: usize,
+    request_id: *const u8,
+    request_id_len: usize,
+) -> SessionStatus {
     guarded(|| {
         // SAFETY: the caller guarantees each pointer references its declared readable length;
         // `bytes` refuses null, empty and oversized input.
         let device = std::str::from_utf8(unsafe { bytes(device, device_len, 128) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
             .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
         let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
         let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
         runtime
-            .block_on(session.device_rm(
-                device,
-                &format!("porsche-{}", uuid::Uuid::new_v4().simple()),
-            ))
+            .block_on(session.device_rm(device, request_id))
             .map_err(|e| match e {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
@@ -911,6 +1155,46 @@ pub unsafe extern "C" fn mila_session_device_prefs(
     device_len: usize,
     enabled: u8,
 ) -> SessionStatus {
+    // SAFETY: `bytes` validates null, empty and oversized input before borrowing the caller's
+    // declared device buffer for this synchronous call.
+    let device_bytes = match unsafe { bytes(device, device_len, 128) } {
+        Ok(value) => value,
+        Err(status) => return status,
+    };
+    let request = legacy_device_request(handle, "prefs", device_bytes, Some(enabled));
+    // SAFETY: the wrapper's device pointer and length are forwarded unchanged; the temporary
+    // request remains live for the duration of the synchronous call.
+    unsafe {
+        let status = mila_session_device_prefs_with_request(
+            handle,
+            device,
+            device_len,
+            enabled,
+            request.as_ptr(),
+            request.len(),
+        );
+        if !matches!(
+            status,
+            SessionStatus::Transport | SessionStatus::Internal | SessionStatus::Busy
+        ) {
+            clear_legacy_device_request(handle, "prefs", device_bytes, Some(enabled));
+        }
+        status
+    }
+}
+
+/// Enable or disable one notification device with a caller-owned request identity.
+/// # Safety
+/// Pointer arguments MUST be valid for their declared readable lengths.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_device_prefs_with_request(
+    handle: u64,
+    device: *const u8,
+    device_len: usize,
+    enabled: u8,
+    request_id: *const u8,
+    request_id_len: usize,
+) -> SessionStatus {
     guarded(|| {
         if enabled > 1 {
             return Err(SessionStatus::Invalid);
@@ -919,16 +1203,16 @@ pub unsafe extern "C" fn mila_session_device_prefs(
         // `bytes` refuses null, empty and oversized input.
         let device = std::str::from_utf8(unsafe { bytes(device, device_len, 128) }?)
             .map_err(|_| SessionStatus::Invalid)?;
+        // SAFETY: the caller guarantees each pointer references its declared readable length;
+        // `bytes` refuses null, empty and oversized input.
+        let request_id = std::str::from_utf8(unsafe { bytes(request_id, request_id_len, 64) }?)
+            .map_err(|_| SessionStatus::Invalid)?;
         let runtime = runtime()?;
         let entry = entry(handle)?;
         let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
         let session = &mut locked.as_mut().ok_or(SessionStatus::InvalidHandle)?.session;
         runtime
-            .block_on(session.device_prefs(
-                device,
-                enabled == 1,
-                &format!("porsche-{}", uuid::Uuid::new_v4().simple()),
-            ))
+            .block_on(session.device_prefs(device, enabled == 1, request_id))
             .map_err(|e| match e {
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
@@ -1087,10 +1371,52 @@ pub unsafe extern "C" fn mila_session_terminal_attach_session(
     rows: u32,
     out_terminal_handle: *mut u64,
 ) -> SessionStatus {
+    // SAFETY: this entry point has the same caller-owned pointer requirements.
+    unsafe {
+        mila_session_terminal_attach_with_options(
+            session_handle,
+            machine,
+            machine_len,
+            terminal,
+            terminal_len,
+            columns,
+            rows,
+            0,
+            0,
+            0,
+            out_terminal_handle,
+        )
+    }
+}
+
+/// @cc [owner:ghuntley,label:security;protocol] mila-terminal-ffi-attach-options
+/// Attach MUST validate flags, cursor and dimensions before opening a channel.
+/// No output handle is written on refusal. A successful handle exposes only
+/// output authenticated by the bounded Porsche attach header.
+/// # Safety
+/// Inputs reference their declared readable lengths; `out_terminal_handle` is writable.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_attach_with_options(
+    session_handle: u64,
+    machine: *const u8,
+    machine_len: usize,
+    terminal: *const u8,
+    terminal_len: usize,
+    columns: u32,
+    rows: u32,
+    cursor: u64,
+    has_cursor: u8,
+    read_only: u8,
+    out_terminal_handle: *mut u64,
+) -> SessionStatus {
     guarded(|| {
         if out_terminal_handle.is_null()
             || !(1..=4096).contains(&columns)
             || !(1..=512).contains(&rows)
+            || has_cursor > 1
+            || read_only > 1
+            || cursor > mila_protocol::MAX_TERMINAL_CURSOR
+            || (has_cursor == 0 && cursor != 0)
         {
             return Err(SessionStatus::Invalid);
         }
@@ -1108,9 +1434,20 @@ pub unsafe extern "C" fn mila_session_terminal_attach_session(
             .ok_or(SessionStatus::InvalidHandle)?
             .session;
         let terminal = runtime
-            .block_on(session.attach_terminal(machine, terminal_id, columns, rows))
+            .block_on(session.attach_terminal_with_options(
+                machine,
+                terminal_id,
+                columns,
+                rows,
+                TerminalAttachOptions {
+                    cursor: (has_cursor == 1).then_some(cursor),
+                    read_only: read_only == 1,
+                },
+            ))
             .map_err(|error| match error {
-                mila_session::SessionError::Transport(SshError::Bounds) => SessionStatus::Invalid,
+                mila_session::SessionError::Transport(
+                    SshError::Bounds | SshError::AttachHeader,
+                ) => SessionStatus::Invalid,
                 mila_session::SessionError::Transport(_) => SessionStatus::Transport,
                 _ => SessionStatus::Invalid,
             })?;
@@ -1125,11 +1462,70 @@ pub unsafe extern "C" fn mila_session_terminal_attach_session(
             Arc::new(Mutex::new(Some(TerminalEntry {
                 owner: session_handle,
                 terminal,
+                screen: mila_runtime::TerminalScreen::new(columns, rows)
+                    .ok_or(SessionStatus::Invalid)?,
             }))),
         );
         // SAFETY: `out_terminal_handle` is non-null and the caller guarantees it is writable.
         unsafe { *out_terminal_handle = id };
         Ok(())
+    })
+}
+
+/// Copies payload-free version-1 PTY state: cursor, read-only restriction,
+/// closed flag and a closed outcome (`closed`, `refused`, `invalid`,
+/// `authority`, `transport`) or null while attached.
+/// # Safety
+/// `out` and `written` reference `capacity` writable bytes and a writable `usize`.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_state(
+    terminal_handle: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let terminal = terminal_entry(terminal_handle)?;
+        let guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let terminal = &guard.as_ref().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let outcome = terminal.outcome().map(|value| match value {
+            mila_protocol::AttachOutcome::Closed => "closed",
+            mila_protocol::AttachOutcome::Refused => "refused",
+            mila_protocol::AttachOutcome::Invalid => "invalid",
+            mila_protocol::AttachOutcome::Authority => "authority",
+            mila_protocol::AttachOutcome::Transport => "transport",
+        });
+        let data = serde_json::to_vec(&serde_json::json!({
+            "version": 1, "cursor": terminal.cursor(), "read_only": terminal.read_only(),
+            "closed": terminal.is_closed(), "outcome": outcome,
+        }))
+        .map_err(|_| SessionStatus::Internal)?;
+        // SAFETY: the caller guarantees the declared output storage.
+        unsafe { output(&data, out, capacity, written) }
+    })
+}
+
+/// @cc [owner:ghuntley,label:security;terminal] mila-terminal-screen-projection
+/// Screen reads MUST preserve the parent-session authority fence, expose only
+/// decoded display spans, and MUST NOT consume PTY output. The screen retains
+/// only the bounded viewport of the current terminal handle.
+/// # Safety
+/// `out` and `written` reference `capacity` writable bytes and a writable `usize`.
+#[no_mangle]
+pub unsafe extern "C" fn mila_session_terminal_screen(
+    terminal_handle: u64,
+    out: *mut u8,
+    capacity: usize,
+    written: *mut usize,
+) -> SessionStatus {
+    guarded(|| {
+        let terminal = terminal_entry(terminal_handle)?;
+        let guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
+        let terminal = guard.as_ref().ok_or(SessionStatus::InvalidHandle)?;
+        let bytes =
+            serde_json::to_vec(&terminal.screen.frame()).map_err(|_| SessionStatus::Internal)?;
+        // SAFETY: the caller guarantees the declared output storage.
+        unsafe { output(&bytes, out, capacity, written) }
     })
 }
 
@@ -1276,6 +1672,8 @@ pub extern "C" fn mila_session_terminal_attach(
             Arc::new(Mutex::new(Some(TerminalEntry {
                 owner: session_handle,
                 terminal,
+                screen: mila_runtime::TerminalScreen::new(columns, rows)
+                    .ok_or(SessionStatus::Invalid)?,
             }))),
         );
         // SAFETY: checked non-null above; the caller supplies writable handle storage.
@@ -1296,13 +1694,21 @@ pub unsafe extern "C" fn mila_session_terminal_poll(
     written: *mut usize,
 ) -> SessionStatus {
     guarded(|| {
-        let runtime = runtime()?;
+        if out.is_null() || written.is_null() {
+            return Err(SessionStatus::Invalid);
+        }
         let terminal = terminal_entry(terminal_handle)?;
+        if capacity < MILA_TERMINAL_READ_CAPACITY {
+            return Err(SessionStatus::Invalid);
+        }
+        let runtime = runtime()?;
         let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
-        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let entry = guard.as_mut().ok_or(SessionStatus::InvalidHandle)?;
+        let terminal = &mut entry.terminal;
         let data = runtime
             .block_on(terminal.read())
             .map_err(|_| SessionStatus::Transport)?;
+        entry.screen.feed(&data);
         // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
         // bytes and one writable `usize`, as `output` requires.
         unsafe { output(&data, out, capacity, written) }
@@ -1335,19 +1741,24 @@ pub unsafe extern "C" fn mila_session_terminal_read(
     event: *mut TerminalReadEvent,
 ) -> SessionStatus {
     guarded(|| {
-        if event.is_null() || written.is_null() {
+        if event.is_null() || written.is_null() || out.is_null() {
+            return Err(SessionStatus::Invalid);
+        }
+        let terminal = terminal_entry(terminal_handle)?;
+        if capacity < MILA_TERMINAL_READ_CAPACITY {
             return Err(SessionStatus::Invalid);
         }
         let runtime = runtime()?;
-        let terminal = terminal_entry(terminal_handle)?;
         let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
-        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let entry = guard.as_mut().ok_or(SessionStatus::InvalidHandle)?;
+        let terminal = &mut entry.terminal;
         let (data, kind) = match runtime.block_on(terminal.read()) {
             Ok(data) if !data.is_empty() => (data, TerminalReadEvent::Data),
             Ok(_) if terminal.is_closed() => (Vec::new(), TerminalReadEvent::Closed),
             Ok(_) | Err(SshError::Timeout) => (Vec::new(), TerminalReadEvent::Idle),
             Err(_) => return Err(SessionStatus::Transport),
         };
+        entry.screen.feed(&data);
         // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
         // bytes and one writable `usize`, as `output` requires.
         unsafe { output(&data, out, capacity, written)? };
@@ -1357,17 +1768,19 @@ pub unsafe extern "C" fn mila_session_terminal_read(
     })
 }
 
-/// Smallest output buffer accepted by [`mila_session_terminal_read_within`].
-/// Data is consumed from the channel, so a buffer that could not hold one
-/// maximal chunk is refused before reading.
+/// Maximum output buffer accepted by [`mila_session_terminal_read_within`].
+/// Smaller buffers are safe because the transport retains any remainder from
+/// a larger SSH frame for the next read.
 pub const MILA_TERMINAL_READ_CAPACITY: usize = 1 << 20;
 
 /// @cc [owner:ghuntley,label:security;terminal] mila-session-terminal-read-states
 /// Read MUST wait at most `wait_ms` (bounded to 1000), shorter than the session
 /// timeout used by [`mila_session_terminal_read`], so a UI frame timer is not
 /// blocked, and report through `event` the same [`TerminalReadEvent`] codes.
-/// Undersized buffers and out-of-range waits MUST be refused before any
-/// channel data is consumed, and stale handles MUST NOT write output.
+/// Zero or oversized buffers and out-of-range waits MUST be refused before any
+/// channel data is consumed. Smaller valid buffers MUST return at most their
+/// capacity and retain any remainder for a later read; stale handles MUST NOT
+/// write output.
 /// # Safety
 /// `out` is writable for `capacity` bytes; `written` and `event` are writable.
 #[no_mangle]
@@ -1384,22 +1797,25 @@ pub unsafe extern "C" fn mila_session_terminal_read_within(
             || written.is_null()
             || event.is_null()
             || wait_ms > 1_000
-            || capacity < MILA_TERMINAL_READ_CAPACITY
+            || capacity == 0
+            || capacity > MILA_TERMINAL_READ_CAPACITY
         {
             return Err(SessionStatus::Invalid);
         }
         let runtime = runtime()?;
         let terminal = terminal_entry(terminal_handle)?;
         let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
-        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let entry = guard.as_mut().ok_or(SessionStatus::InvalidHandle)?;
+        let terminal = &mut entry.terminal;
         let chunk = runtime
-            .block_on(terminal.read_within(Duration::from_millis(wait_ms.into())))
+            .block_on(terminal.read_within_bounded(Duration::from_millis(wait_ms.into()), capacity))
             .map_err(|_| SessionStatus::Transport)?;
         let (data, kind) = match chunk {
             PtyChunk::Data(data) => (data, TerminalReadEvent::Data),
             PtyChunk::Idle => (Vec::new(), TerminalReadEvent::Idle),
             PtyChunk::Closed => (Vec::new(), TerminalReadEvent::Closed),
         };
+        entry.screen.feed(&data);
         // SAFETY: the caller guarantees `out` and `written` reference `capacity` writable
         // bytes and one writable `usize`, as `output` requires.
         unsafe { output(&data, out, capacity, written)? };
@@ -1451,13 +1867,17 @@ pub extern "C" fn mila_session_terminal_resize(
         let runtime = runtime()?;
         let terminal = terminal_entry(terminal_handle)?;
         let mut guard = terminal.try_lock().map_err(|_| SessionStatus::Busy)?;
-        let terminal = &mut guard.as_mut().ok_or(SessionStatus::InvalidHandle)?.terminal;
+        let entry = guard.as_mut().ok_or(SessionStatus::InvalidHandle)?;
+        let terminal = &mut entry.terminal;
         runtime
             .block_on(terminal.resize(columns, rows))
             .map_err(|error| match error {
                 SshError::Bounds => SessionStatus::Invalid,
                 _ => SessionStatus::Transport,
             })?;
+        if !entry.screen.resize(columns, rows) {
+            return Err(SessionStatus::Invalid);
+        }
         Ok(())
     })
 }
@@ -1488,18 +1908,35 @@ pub extern "C" fn mila_session_terminal_kill(terminal_handle: u64) -> SessionSta
 pub extern "C" fn mila_session_close(handle: u64) -> SessionStatus {
     guarded(|| {
         let runtime = runtime()?;
-        let entry = entry(handle)?;
-        let mut locked = entry.try_lock().map_err(|_| SessionStatus::Busy)?;
-        let owned_terminals = take_owned_terminals(handle)?;
-        for mut terminal in owned_terminals {
-            let _ = runtime.block_on(terminal.close());
-        }
-        let entry = locked.take().ok_or(SessionStatus::InvalidHandle)?;
+        let entry = raw_entry(handle)?;
+        // Fence first, then let already-admitted bounded operations finish.
+        // Native lifecycle cleanup must not leave a live session merely
+        // because a one-second watch read was running when sign-out began.
         registry()
             .lock()
             .map_err(|_| SessionStatus::Internal)?
             .entries
+            .remove(&handle)
+            .ok_or(SessionStatus::InvalidHandle)?;
+        revoked()
+            .lock()
+            .map_err(|_| SessionStatus::Internal)?
+            .insert(handle);
+        let mut locked = entry.lock().map_err(|_| SessionStatus::Internal)?;
+        let owned_watches = take_owned_watches(handle)?;
+        let owned_terminals = take_owned_terminals(handle)?;
+        for mut watch in owned_watches {
+            runtime.block_on(watch.close());
+        }
+        for mut terminal in owned_terminals {
+            let _ = runtime.block_on(terminal.close());
+        }
+        let entry = locked.take().ok_or(SessionStatus::InvalidHandle)?;
+        revoked()
+            .lock()
+            .map_err(|_| SessionStatus::Internal)?
             .remove(&handle);
+        clear_legacy_device_requests_for_handle(handle);
         runtime
             .block_on(entry.session.close())
             .map_err(|_| SessionStatus::Transport)?;
