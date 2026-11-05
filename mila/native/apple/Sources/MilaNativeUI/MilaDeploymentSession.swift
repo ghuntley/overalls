@@ -38,7 +38,7 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
         return store.list().first { $0.id == id }
     }
     public func select(_ deployment: MilaDeployment) -> Bool {
-        guard store.list().contains(where: { $0.id == deployment.id }) else { return false }
+        guard store.list().first(where: { $0.id == deployment.id }) == deployment else { return false }
         // Read the prior selection before taking `lock`. `selectedDeployment` also
         // acquires this non-reentrant lock; calling it while holding the lock would
         // deadlock every deployment switch (including the initial selection).
@@ -78,7 +78,8 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
         return true
     }
     @discardableResult public func signIn(_ deployment: MilaDeployment) -> Bool {
-        guard Self.valid(deployment), store.list().contains(where: { $0.id == deployment.id }) else { return false }
+        guard let persisted = store.list().first(where: { $0.id == deployment.id }),
+              persisted == deployment, MilaDeploymentStore.isValid(deployment) else { return false }
         lock.lock(); generation &+= 1; let next = generation; let ended = adapter; adapter = nil; currentState = .connecting(deployment.id); lock.unlock()
         ended?.close()
         do {
@@ -102,7 +103,6 @@ public final class MilaDeploymentSessionCoordinator: @unchecked Sendable {
         guard case .signedIn(_, let actual) = currentState, actual == expectedGeneration else { return nil }; return adapter
     }
     public func currentGeneration() -> UInt64 { lock.lock(); defer { lock.unlock() }; return generation }
-    private static func valid(_ value: MilaDeployment) -> Bool { !value.host.isEmpty && value.host.count <= 253 && value.port > 0 && !value.trust.isEmpty }
 }
 
 /// Main-actor observable bridge used by SwiftUI to render durable deployment sign-in.

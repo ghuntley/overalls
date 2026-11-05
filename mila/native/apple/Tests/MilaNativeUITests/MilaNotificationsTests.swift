@@ -30,16 +30,21 @@ final class MilaNotificationsTests: XCTestCase {
 
     private final class Store: MilaNotificationDeviceStore {
         var values: [MilaNotificationDevice] = []
-        func list() -> [MilaNotificationDevice] { values }
+        func list(deployment: String) -> [MilaNotificationDevice] { values.filter { $0.deployment == deployment } }
+        func all() -> [MilaNotificationDevice] { values }
         func upsert(_ device: MilaNotificationDevice) -> Bool {
             guard !device.id.isEmpty, device.id.utf8.count <= 256,
                   !device.deployment.isEmpty, device.deployment.utf8.count <= 256 else { return false }
-            values.removeAll { $0.id == device.id }
+            values.removeAll { $0.id == device.id && $0.deployment == device.deployment }
             values.append(device)
             if values.count > 128 { values.removeFirst(values.count - 128) }
             return true
         }
-        func remove(id: String) -> Bool { let old = values.count; values.removeAll { $0.id == id }; return values.count != old }
+        func remove(id: String, deployment: String) -> Bool {
+            let old = values.count
+            values.removeAll { $0.id == id && $0.deployment == deployment }
+            return values.count != old
+        }
     }
 
     func testStoreRejectsOversizedMetadataAndBoundsProjection() {
@@ -47,7 +52,7 @@ final class MilaNotificationsTests: XCTestCase {
         XCTAssertFalse(store.upsert(MilaNotificationDevice(id: String(repeating: "x", count: 257), deployment: "mila.example.test", enabled: true)))
         XCTAssertFalse(store.upsert(MilaNotificationDevice(id: "device", deployment: String(repeating: "x", count: 257), enabled: true)))
         for index in 0..<140 { XCTAssertTrue(store.upsert(MilaNotificationDevice(id: "device-\(index)", deployment: "mila.example.test", enabled: true))) }
-        XCTAssertLessThanOrEqual(store.list().count, 128)
+        XCTAssertLessThanOrEqual(store.all().count, 128)
     }
 
     func testRegistrationUsesRustBoundaryAndDoesNotRetainTokenInControllerState() {
@@ -83,6 +88,23 @@ final class MilaNotificationsTests: XCTestCase {
         XCTAssertFalse(controller.removeDevice(id: "com.example.mila"))
         controller.setSessionActive(true)
         XCTAssertEqual(controller.devices.count, 1)
+    }
+
+    func testDeviceProjectionAndRemovalAreBoundToDeployment() {
+        let adapter = Adapter()
+        let store = Store()
+        XCTAssertTrue(store.upsert(MilaNotificationDevice(id: "shared-id", deployment: "first.example.test", enabled: true)))
+        XCTAssertTrue(store.upsert(MilaNotificationDevice(id: "shared-id", deployment: "second.example.test", enabled: true)))
+        let first = MilaNotificationController(adapter: adapter, appID: "app", deployment: "first.example.test", store: store)
+        let second = MilaNotificationController(adapter: adapter, appID: "app", deployment: "second.example.test", store: store)
+        XCTAssertEqual(first.devices.map(\.deployment), ["first.example.test"])
+        XCTAssertEqual(second.devices.map(\.deployment), ["second.example.test"])
+        XCTAssertTrue(first.removeDevice(id: "shared-id"))
+        XCTAssertTrue(second.devices.isEmpty == false, "a removal in the first deployment must not hide the second")
+        second.refreshDevices()
+        XCTAssertEqual(second.devices.map(\.deployment), ["second.example.test"])
+        XCTAssertFalse(first.removeDevice(id: "shared-id"))
+        XCTAssertEqual(store.all().map(\.deployment), ["second.example.test"])
     }
 
 

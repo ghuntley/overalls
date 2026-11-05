@@ -16,7 +16,7 @@ final class MilaDeviceSignerTests: XCTestCase {
         for host in ["example.com", "a-b.example", "123.example"] {
             XCTAssertTrue(MilaDeviceSigner.validHost(host))
         }
-        for host in ["", "localhost", "EXAMPLE.com", "a..com", "a.com.", "-a.com", "a-.com", "a/b.com", "a\u{0}.com", String(repeating: "a", count: 64) + ".com"] {
+        for host in ["", "localhost", "EXAMPLE.com", "a_b.example", "a..com", "a.com.", "-a.com", "a-.com", "a/b.com", "a\u{0}.com", String(repeating: "a", count: 64) + ".com"] {
             XCTAssertFalse(MilaDeviceSigner.validHost(host))
         }
     }

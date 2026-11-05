@@ -168,6 +168,9 @@ Client evidence:
   `//mila:apple-swift-test` step, which runs the unit tests. The job's
   journey step previously filtered on `MilaJourneyTests`, which matches no test case name,
   so the Apple fixture journey had not run; the filter now names the classes.
+  Local notification metadata is deployment-scoped: the store keys records by
+  `(deployment, id)`, and the controller's list and remove paths require the
+  authenticated deployment (`MilaNotificationsTests.testDeviceProjectionAndRemovalAreBoundToDeployment`).
 - **Linux: implemented.** In mila-builds run 41354267251, linux-native passed, and
   both journeys reported every notification step ok.
   [`notifications.rs`](../../../mila/native/linux/src/notifications.rs)

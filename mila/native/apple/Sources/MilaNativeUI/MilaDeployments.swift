@@ -21,10 +21,10 @@ public final class MilaDeploymentStore: @unchecked Sendable {
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
     public func list() -> [MilaDeployment] {
         guard let data = defaults.data(forKey: key), let values = try? JSONDecoder().decode([MilaDeployment].self, from: data) else { return [] }
-        return Array(values.filter(Self.valid).prefix(128))
+        return Array(values.filter(Self.isValid).prefix(128))
     }
     @discardableResult public func upsert(_ deployment: MilaDeployment) -> Bool {
-        guard Self.valid(deployment) else { return false }
+        guard Self.isValid(deployment) else { return false }
         var values = list().filter { $0.id != deployment.id }; values.append(deployment)
         guard let data = try? JSONEncoder().encode(values) else { return false }; defaults.set(data, forKey: key); return true
     }
@@ -33,19 +33,10 @@ public final class MilaDeploymentStore: @unchecked Sendable {
         if remaining.isEmpty { defaults.removeObject(forKey: key) }
         else if let data = try? JSONEncoder().encode(remaining) { defaults.set(data, forKey: key) }
     }
-    private static func valid(_ value: MilaDeployment) -> Bool {
-        guard value.id != UUID.zero, !value.host.isEmpty, value.host.utf8.count <= 253, value.port > 0,
+    public static func isValid(_ value: MilaDeployment) -> Bool {
+        guard value.id != UUID.zero, value.port > 0,
               !value.trust.isEmpty, value.trust.count <= 64 * 1024 else { return false }
-        let labels = value.host.split(separator: ".", omittingEmptySubsequences: false)
-        return !labels.contains(where: { label in
-            label.isEmpty || label.utf8.count > 63 || label.first == "-" || label.last == "-" ||
-                label.unicodeScalars.contains(where: { scalar in
-                    !(scalar.isASCII && (scalar.value == 45 || scalar.value == 95 ||
-                        (scalar.value >= 48 && scalar.value <= 57) ||
-                        (scalar.value >= 65 && scalar.value <= 90) ||
-                        (scalar.value >= 97 && scalar.value <= 122)))
-                })
-        })
+        return MilaHostValidation.validHost(value.host)
     }
 }
 

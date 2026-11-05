@@ -29,6 +29,7 @@ final class MilaRouteTests: XCTestCase {
             "overalls://user@machines",
             "overalls://overalls.example:8443/machines",
             "overalls://Overalls.example/machines",
+            "overalls://over_all.example/machines",
             "overalls://overalls.example/machines/\(machineID.uuidString.uppercased())",
             "overalls://overalls.example/machines/",
         ]

@@ -1,5 +1,7 @@
 # Architecture reviews
 
+- [Mila Apple boundary follow-up (2026-11-05)](2026-11-05-mila-apple-boundary-follow-up.md): shared DNS admission, exact persisted deployment identity, and deployment-scoped Apple notification metadata under ADR-0235 and ADR-0278; Swift execution remains pending macOS CI.
+
 - [Mila native parity implementation (2026-11-02)](2026-11-02-mila-native-parity-implementation.md): typed clone/thread/device APIs, authenticated notification controls, bounded terminal reads and ANSI/SIXEL frames, durable snapshots, reconnecting watches, macOS development-key custody and unsigned Windows packaging; native host, signing and production acceptance evidence remains open under ADR-0220/0222/0223/0235/0249/0264/0277/0278.
 
 - [Startup inference recovery (2026-11-02)](2026-11-02-agent-startup-inference.md): remote Panterloons inference, UUIDv7 correlation, and durable bounded retries after certified pre-output overloads; ADR-0280.

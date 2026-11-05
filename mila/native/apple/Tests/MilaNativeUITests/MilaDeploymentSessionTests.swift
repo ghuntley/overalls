@@ -54,7 +54,26 @@ final class MilaDeploymentSessionTests: XCTestCase {
         let store = MilaDeploymentStore(defaults: defaults)
         XCTAssertFalse(store.upsert(MilaDeployment(id: .zero, host: "mila.example", port: 22, trust: Data([1]))))
         XCTAssertFalse(store.upsert(deployment("bad host.example")))
+        XCTAssertFalse(store.upsert(deployment("bad_host.example")))
+        XCTAssertFalse(store.upsert(deployment("Mila.example")))
         XCTAssertFalse(store.upsert(MilaDeployment(host: "-bad.example", port: 22, trust: Data([1]))))
         XCTAssertFalse(store.upsert(MilaDeployment(host: "mila.example", port: 22, trust: Data(repeating: 1, count: 65_537))))
+    }
+
+    func testSignInRequiresTheExactPersistedDeployment() {
+        let suite = "mila.session.\(UUID().uuidString)"; let defaults = UserDefaults(suiteName: suite)!; defer { defaults.removePersistentDomain(forName: suite) }
+        let store = MilaDeploymentStore(defaults: defaults)
+        let persisted = deployment()
+        XCTAssertTrue(store.upsert(persisted))
+        final class FactoryCounter: @unchecked Sendable { nonisolated(unsafe) var value = 0 }
+        let factoryCalls = FactoryCounter()
+        let coordinator = MilaDeploymentSessionCoordinator(store: store, defaults: defaults) { _ in
+            factoryCalls.value += 1
+            return UnavailableMilaFFIAdapter()
+        }
+        let altered = MilaDeployment(id: persisted.id, host: "other.example", port: persisted.port, trust: persisted.trust)
+        XCTAssertFalse(coordinator.signIn(altered))
+        XCTAssertEqual(factoryCalls.value, 0, "an altered same-ID deployment must not reach the adapter factory")
+        XCTAssertEqual(coordinator.state, .signedOut)
     }
 }

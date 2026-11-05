@@ -33,7 +33,7 @@ public enum MilaRouteParser {
         let authority = value.dropFirst("overalls://".count).split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init)
         guard let host = url.host, !host.isEmpty, host.utf8.count <= 253,
               authority == Optional(host),
-              validHost(host),
+              MilaHostValidation.validHost(host),
               url.path != "/", !url.path.hasSuffix("/"), !url.path.contains("//") else { return nil }
         let parts = url.pathComponents.filter { $0 != "/" }
         guard let page = parts.first else { return nil }
@@ -54,15 +54,6 @@ public enum MilaRouteParser {
         }
     }
 
-    private static func validHost(_ host: String) -> Bool {
-        guard host == host.lowercased(), host.utf8.count <= 253 else { return false }
-        return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
-            label.count <= 63 && !label.isEmpty && !label.hasPrefix("-") && !label.hasSuffix("-") &&
-                label.unicodeScalars.allSatisfy { scalar in
-                    (97...122).contains(scalar.value) || (48...57).contains(scalar.value) || scalar.value == 45
-                }
-        }
-    }
 }
 
 /// A request crossing the native/Rust boundary.

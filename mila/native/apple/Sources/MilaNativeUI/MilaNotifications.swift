@@ -20,10 +20,14 @@ public struct MilaNotificationDevice: Codable, Equatable, Sendable, Identifiable
     public init(id: String, deployment: String, enabled: Bool) { self.id = id; self.deployment = deployment; self.enabled = enabled }
 }
 
+/// @cc [owner:ghuntley,label:security] notification-device-deployment-scope
+/// Notification metadata MUST be keyed by the pair `(deployment, id)`. The
+/// deployment-scoped list and removal operations MUST NOT expose or mutate
+/// another deployment's device record.
 public protocol MilaNotificationDeviceStore: AnyObject {
-    func list() -> [MilaNotificationDevice]
+    func list(deployment: String) -> [MilaNotificationDevice]
     @discardableResult func upsert(_ device: MilaNotificationDevice) -> Bool
-    @discardableResult func remove(id: String) -> Bool
+    @discardableResult func remove(id: String, deployment: String) -> Bool
 }
 
 /// UserDefaults-backed metadata store. Tokens remain owned by the OS and are never persisted.
@@ -31,20 +35,21 @@ public final class MilaUserDefaultsNotificationStore: MilaNotificationDeviceStor
     private let defaults: UserDefaults
     private let key = "mila.notification.devices"
     public init(defaults: UserDefaults = .standard) { self.defaults = defaults }
-    public func list() -> [MilaNotificationDevice] {
+    private func all() -> [MilaNotificationDevice] {
         guard let data = defaults.data(forKey: key), let values = try? JSONDecoder().decode([MilaNotificationDevice].self, from: data) else { return [] }
         return values.filter { !$0.id.isEmpty && $0.id.utf8.count <= 256 && !$0.deployment.isEmpty && $0.deployment.utf8.count <= 256 }.prefix(128).map { $0 }
     }
+    public func list(deployment: String) -> [MilaNotificationDevice] { all().filter { $0.deployment == deployment } }
     @discardableResult public func upsert(_ device: MilaNotificationDevice) -> Bool {
         guard !device.id.isEmpty, device.id.utf8.count <= 256, !device.deployment.isEmpty, device.deployment.utf8.count <= 256 else { return false }
-        var values = list().filter { $0.id != device.id }
+        var values = all().filter { !($0.id == device.id && $0.deployment == device.deployment) }
         values.append(device)
         if values.count > 128 { values.removeFirst(values.count - 128) }
         guard let data = try? JSONEncoder().encode(values) else { return false }
         defaults.set(data, forKey: key); return true
     }
-    @discardableResult public func remove(id: String) -> Bool {
-        let values = list(); let next = values.filter { $0.id != id }
+    @discardableResult public func remove(id: String, deployment: String) -> Bool {
+        let values = all(); let next = values.filter { !($0.id == id && $0.deployment == deployment) }
         guard next.count != values.count, let data = try? JSONEncoder().encode(next) else { return false }
         defaults.set(data, forKey: key); return true
     }
@@ -130,14 +135,17 @@ public final class MilaAppleNotificationService: NSObject, UNUserNotificationCen
     private let deployment: String
     private let store: MilaNotificationDeviceStore
     public init(adapter: any MilaFFIAdapter, appID: String, deployment: String, store: MilaNotificationDeviceStore = MilaUserDefaultsNotificationStore()) {
-        self.adapter = adapter; self.appID = appID; self.deployment = deployment; self.store = store; self.devices = store.list()
+        self.adapter = adapter; self.appID = appID; self.deployment = deployment; self.store = store; self.devices = store.list(deployment: deployment)
     }
     public func setSessionActive(_ active: Bool) {
         sessionActive = active
         if active { refreshDevices() } else { devices = []; state = .off }
     }
-    public func refreshDevices() { guard sessionActive else { devices = []; return }; devices = store.list() }
-    @discardableResult public func removeDevice(id: String) -> Bool { guard sessionActive else { return false }; let ok = store.remove(id: id); refreshDevices(); return ok }
+    public func refreshDevices() { guard sessionActive else { devices = []; return }; devices = store.list(deployment: deployment) }
+    @discardableResult public func removeDevice(id: String) -> Bool {
+        guard sessionActive, store.list(deployment: deployment).contains(where: { $0.id == id }) else { return false }
+        let ok = store.remove(id: id, deployment: deployment); refreshDevices(); return ok
+    }
     /// @cc [owner:ghuntley,label:security] mila-apple-push-token-boundary
     /// Registration MUST require an active session and a 32–200 byte token, and
     /// MUST cross to the Rust validator with no endpoint: APNs has a fixed

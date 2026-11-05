@@ -109,12 +109,7 @@ public final class MilaDeviceSigner {
     }
 
     static func validHost(_ host: String) -> Bool {
-        guard host.utf8.count <= 253, host.contains(".") else { return false }
-        return host.split(separator: ".", omittingEmptySubsequences: false).allSatisfy { label in
-            guard !label.isEmpty, label.utf8.count <= 63,
-                  label.first != "-", label.last != "-" else { return false }
-            return label.utf8.allSatisfy { (97...122).contains($0) || (48...57).contains($0) || $0 == 45 }
-        }
+        host.contains(".") && MilaHostValidation.validHost(host)
     }
 
     // Security.framework takes heterogeneous CFDictionary attributes; values here
