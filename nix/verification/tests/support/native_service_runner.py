@@ -235,7 +235,11 @@ def wait_kernel(
     expected: str,
     platform: Platform,
 ) -> services.Boot:
-    deadline = time.monotonic() + 240
+    # OmniOS boots through firmware and can spend several minutes rebuilding
+    # its boot archive before the native vsock agent appears.  Keep the
+    # FreeBSD bound unchanged, but give the firmware-backed illumos image a
+    # bounded five-minute attestation window.
+    deadline = time.monotonic() + (300 if platform.name == "illumos" else 240)
     while True:
         alive(process)
         try:
