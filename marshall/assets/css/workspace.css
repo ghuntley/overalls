@@ -1024,8 +1024,25 @@ button.machine-editor-link,
 .thread-tool-summary-text {
   color: var(--text-color-alt);
 }
+.thread-tool-duration {
+  color: var(--text-color-alt);
+  justify-self: end;
+}
 .thread-tool-details {
   padding-top: var(--line-height);
+}
+.thread-tool-command h3,
+.thread-tool-arguments summary {
+  margin: 0 0 var(--line-height);
+  font-size: 1rem;
+  line-height: var(--line-height);
+}
+.thread-tool-command pre,
+.thread-tool-arguments pre {
+  margin: 0 0 var(--line-height);
+  padding: calc(var(--line-height) - var(--border-thickness)) 1ch;
+  border-inline-start: var(--border-thickness) solid var(--background-color-alt);
+  overflow-x: auto;
 }
 .thread-tool-output {
   margin: 0 0 var(--line-height);

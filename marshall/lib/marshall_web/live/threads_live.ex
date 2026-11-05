@@ -19,6 +19,10 @@ defmodule MarshallWeb.ThreadsLive do
           status_label: String.t(),
           summary: String.t(),
           metadata: [{String.t(), String.t()}],
+          command: String.t() | nil,
+          arguments: String.t() | nil,
+          command_preview: String.t() | nil,
+          duration: String.t() | nil,
           outputs: [tool_output()],
           open: boolean()
         }
@@ -981,32 +985,32 @@ defmodule MarshallWeb.ThreadsLive do
       socket
       |> assign(
         threads_empty: all_threads == [] and is_nil(socket.assigns[:thread_cursor]),
-      thread_page_empty: all_threads == [] and not is_nil(socket.assigns[:thread_cursor]),
-      thread_matches_empty: visible_threads == [],
-      threads_available: threads_available,
-      thread_next: thread_next,
-      activity_empty: activity_threads == [],
-      selected: selected,
-      generations: generations,
-      generations_available: generations_available,
-      selected_generation: selected_generation,
-      generation_current: generation_current,
-      can_write: not is_nil(selected) and generation_current and permissions.write,
-      can_manage: not is_nil(selected) and permissions.manage,
-      editor_available: generation_current and thread_editor_available?(selected, actor),
-      events_empty: events == [],
-      events_available: events_available,
-      tool_presentations: tool_presentations,
-      catalog: catalog,
-      detail_error: detail_error,
-      activity_team_options: activity_team_options(all_threads)
-    )
-    |> stream(:threads, visible_threads, reset: true)
-    |> stream(:activity_threads, activity_threads, reset: true)
-    |> maybe_seed_defaults(catalog)
-    |> refresh_grants()
-    |> refresh_controls()
-    |> refresh_dialog()
+        thread_page_empty: all_threads == [] and not is_nil(socket.assigns[:thread_cursor]),
+        thread_matches_empty: visible_threads == [],
+        threads_available: threads_available,
+        thread_next: thread_next,
+        activity_empty: activity_threads == [],
+        selected: selected,
+        generations: generations,
+        generations_available: generations_available,
+        selected_generation: selected_generation,
+        generation_current: generation_current,
+        can_write: not is_nil(selected) and generation_current and permissions.write,
+        can_manage: not is_nil(selected) and permissions.manage,
+        editor_available: generation_current and thread_editor_available?(selected, actor),
+        events_empty: events == [],
+        events_available: events_available,
+        tool_presentations: tool_presentations,
+        catalog: catalog,
+        detail_error: detail_error,
+        activity_team_options: activity_team_options(all_threads)
+      )
+      |> stream(:threads, visible_threads, reset: true)
+      |> stream(:activity_threads, activity_threads, reset: true)
+      |> maybe_seed_defaults(catalog)
+      |> refresh_grants()
+      |> refresh_controls()
+      |> refresh_dialog()
 
     event_context =
       if selected && selected_generation,
@@ -2886,8 +2890,17 @@ defmodule MarshallWeb.ThreadsLive do
         <span class="status-label" data-tone={@card.tone}>{@card.status_label}</span>
         <strong class="thread-tool-name">{@card.tool}</strong>
         <span class="thread-tool-summary-text">{@card.summary}</span>
+        <span :if={@card.duration} class="thread-tool-duration">{@card.duration}</span>
       </summary>
       <div class="thread-tool-details">
+        <section :if={@card.command} class="thread-tool-command">
+          <h3>{dgettext("agents", "Command")}</h3>
+          <pre><code>{@card.command_preview}</code></pre>
+          <details :if={@card.arguments} class="thread-tool-arguments">
+            <summary>{dgettext("agents", "Structured arguments")}</summary>
+            <pre><code>{@card.arguments}</code></pre>
+          </details>
+        </section>
         <.kv :if={@card.metadata != []}>
           <:item :for={{label, value} <- @card.metadata} title={label}>{value}</:item>
         </.kv>
@@ -2957,7 +2970,10 @@ defmodule MarshallWeb.ThreadsLive do
           when is_binary(call_id) and is_binary(tool) and is_map(arguments) ->
             Map.put(index, call_id, %{
               tool: String.slice(tool, 0, 80),
-              metadata: tool_metadata(arguments)
+              metadata: tool_metadata(arguments),
+              command: command_value(tool, arguments),
+              arguments: formatted_arguments(arguments),
+              command_preview: command_preview(tool, arguments)
             })
 
           _call, index ->
@@ -2985,7 +3001,12 @@ defmodule MarshallWeb.ThreadsLive do
                 String.slice(tool, 0, 80),
                 tool_metadata(arguments),
                 [],
-                false
+                false,
+                %{
+                  command: command_value(tool, arguments),
+                  arguments: formatted_arguments(arguments),
+                  command_preview: command_preview(tool, arguments)
+                }
               )
             ]
           end
@@ -3009,18 +3030,33 @@ defmodule MarshallWeb.ThreadsLive do
     call = Map.get(call_index, call_id, %{tool: nil, metadata: []})
     tool_status = tool_status(Map.get(result, "status"))
 
-    tool_card(
-      tool_status.state,
-      tool_status.tone,
-      call.tool,
-      call.metadata,
-      output_sections(result),
-      open
-    )
+    card =
+      tool_card(
+        tool_status.state,
+        tool_status.tone,
+        call.tool,
+        call.metadata,
+        output_sections(result),
+        open,
+        call
+      )
+
+    Map.put(card, :duration, duration_label(result))
   end
 
   defp tool_result_card(_body, _call_index, open),
-    do: tool_card("unknown", "muted", nil, [], [], open)
+    do: tool_card("unknown", "muted", nil, [], [], open, %{})
+
+  @spec duration_label(map()) :: String.t() | nil
+  defp duration_label(result) do
+    case Map.get(result, "duration_ms") do
+      value when is_integer(value) and value >= 0 ->
+        if value < 1_000, do: "#{value} ms", else: "#{Float.round(value / 1_000, 1)} s"
+
+      _ ->
+        nil
+    end
+  end
 
   @spec tool_card(
           String.t(),
@@ -3028,9 +3064,10 @@ defmodule MarshallWeb.ThreadsLive do
           String.t() | nil,
           [{String.t(), String.t()}],
           [tool_output()],
-          boolean()
+          boolean(),
+          map()
         ) :: tool_card()
-  defp tool_card(state, tone, tool, metadata, outputs, open) do
+  defp tool_card(state, tone, tool, metadata, outputs, open, call) do
     status = tool_status(state)
 
     %{
@@ -3040,9 +3077,56 @@ defmodule MarshallWeb.ThreadsLive do
       status_label: status.status_label,
       summary: status.summary,
       metadata: [{dgettext("agents", "Status"), status.summary} | metadata],
+      command: Map.get(call, :command),
+      arguments: Map.get(call, :arguments),
+      command_preview: Map.get(call, :command_preview),
+      duration: nil,
       outputs: outputs,
       open: open
     }
+  end
+
+  @spec command_value(String.t(), map()) :: String.t() | nil
+  defp command_value("exec_command", arguments) do
+    case Map.get(arguments, "cmd") || Map.get(arguments, "command") do
+      value when is_binary(value) -> safe_text(value) |> elem(0)
+      _ -> nil
+    end
+  end
+
+  defp command_value(_, _), do: nil
+
+  @spec formatted_arguments(map()) :: String.t() | nil
+  defp formatted_arguments(arguments) do
+    {redacted, _findings} = Marshall.Redaction.Scanner.redact_json(arguments)
+    encoded = Jason.encode!(redacted, pretty: true)
+    {text, truncated} = safe_text(encoded)
+    if text == "{}", do: nil, else: if(truncated, do: text <> "…", else: text)
+  end
+
+  @spec command_preview(String.t(), map()) :: String.t() | nil
+  defp command_preview("exec_command", arguments) do
+    command = command_value("exec_command", arguments)
+    args = Map.get(arguments, "args")
+
+    case {command, args} do
+      {nil, _} ->
+        nil
+
+      {command, args} when is_list(args) ->
+        Enum.join([command | Enum.map(args, &shell_quote/1)], " ")
+
+      {command, _} ->
+        command
+    end
+  end
+
+  defp command_preview(_, _), do: nil
+
+  @spec shell_quote(term()) :: String.t()
+  defp shell_quote(value) do
+    text = if is_binary(value), do: value, else: inspect(value)
+    "'" <> String.replace(text, "'", "'\\\"'\\\"'") <> "'"
   end
 
   @spec tool_status(String.t() | nil) :: %{
