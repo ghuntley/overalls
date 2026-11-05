@@ -6,6 +6,10 @@ defmodule Ziggy.AgentError do
           | :unsupported_compaction
           | :incomplete
           | :cancelled
+          | :no_accounts
+          | :pool_exhausted
+          | :quota_exhausted
+          | :server_is_overloaded
           | :upstream_failed
 
   # @cc [owner:ghuntley,label:security;recovery] agent-error-closed-classification
@@ -28,6 +32,10 @@ defmodule Ziggy.AgentError do
     do: :context_length_exceeded
 
   def classify("unsupported_compaction"), do: :unsupported_compaction
+  def classify("no_accounts"), do: :no_accounts
+  def classify("pool_exhausted"), do: :pool_exhausted
+  def classify("quota_exhausted"), do: :quota_exhausted
+  def classify("server_is_overloaded"), do: :server_is_overloaded
   def classify("incomplete"), do: :incomplete
   def classify(code) when code in ["cancelled", "canceled"], do: :cancelled
   def classify(_), do: :upstream_failed

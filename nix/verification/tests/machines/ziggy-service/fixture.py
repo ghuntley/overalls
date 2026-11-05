@@ -92,7 +92,7 @@ def control(route: str, value: dict[str, object]) -> tuple[int, object]:
                 return reply(
                     dict(
                         call=dict(
-                            id="aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+                            id="aaaaaaaa-aaaa-7aaa-8aaa-aaaaaaaaaaaa",
                             claim_id="bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
                             binding=dict(
                                 host_id=HOST,
@@ -101,7 +101,9 @@ def control(route: str, value: dict[str, object]) -> tuple[int, object]:
                                 execution_epoch=1,
                             ),
                             request=dict(
-                                model="fixture-model",
+                                model=(ROOT / "agent-model").read_text().strip()
+                                if (ROOT / "agent-model").exists()
+                                else "fixture-model",
                                 stream=True,
                                 store=False,
                                 input=[dict(role="user", content="private agent prompt")],

@@ -12,8 +12,24 @@ load("//buck:checks.bzl", "conflict_markers", "contract_check", "repo_check")
 load("//buck:python.bzl", "py_static")
 load("//nix/verification/tests/machines:suites.bzl", "MACHINE_PACKAGES", "MACHINE_TESTS")
 
-# Repository-root files: flake, lock files, configuration.
-nix_owned()
+# Repository-root files: flake, lock files, configuration. Generated
+# Antithesis staging and materialization trees are runtime inputs, not source
+# inventory; excluding them keeps a staged closure from changing every root
+# assembly action and from exposing literal backslash filenames to Buck2.
+repository_sources = native.glob(
+    ["**", "**/.*", "**/.*/**"],
+    exclude = [
+        "BUCK",
+        "BUCK.v2",
+        "antithesis/build/contexts/**",
+        "antithesis/build/selected-test/**",
+        "antithesis/build/.context-*",
+        "antithesis/build/.context-*/**",
+        "antithesis/runtime",
+        "antithesis/runtime/**",
+    ],
+)
+nix_owned(srcs = repository_sources)
 
 # Packages with nix_owned files besides the root. The flake reads all of them;
 # the repository-wide checks below cover them and the toolchains cell.

@@ -44,9 +44,9 @@ in {
     credentialFile = mkOption { type = paths.privatePath; default = "/run/overalls-secrets/ziggy/control.token"; readOnly = true; description = "Dedicated Ziggy control credential runtime file."; };
     openaiKeyFile = mkOption { type = paths.privatePath; default = "/run/overalls-secrets/ziggy/openai.key"; description = "Private runtime OpenAI-compatible proxy key file."; };
     openaiOrigin = mkOption {
-      type = types.enum [ "https://api.openai.com" "http://127.0.0.1:8080" ];
+      type = types.enum [ "https://api.openai.com" "http://127.0.0.1:8080" "https://panterloons.lorikeet-bangus.ts.net" ];
       default = "https://api.openai.com";
-      description = "Fixed OpenAI-compatible origin; enrolled hosts use host-local Underclass.";
+      description = "Fixed OpenAI-compatible origin; enrolled hosts use local Underclass or the reviewed Panterloons HTTPS endpoint.";
     };
     agentEnable = mkOption {
       type = types.bool;

@@ -80,6 +80,12 @@ in
 
   services.ziggy.secretsFile = "${../../../secrets/dungarees-ziggy.enc.json}";
   services.ziggy.enabledProviders = [ "openai" ];
+  # @cc [owner:ghuntley,label:security;deployment] dungarees-remote-inference
+  # Dungarees MUST use verified Panterloons tailnet HTTPS with only its proxy
+  # key. Panterloons admin credentials and provider accounts MUST NOT be copied.
+  services.ziggy.openaiOrigin = "https://panterloons.lorikeet-bangus.ts.net";
+  services.ziggy.openaiKeyFile = "/run/overalls-secrets/underclass-proxy/proxy.key";
+  services.ziggy.secretUnits = [ "overalls-secrets-underclass-proxy.service" ];
   services.galileo.secretsFile = "${../../../secrets/dungarees-galileo.enc.json}";
   services.peach = {
     enable = true;
@@ -91,6 +97,10 @@ in
     rootsFile = "${../../../secrets/private-services-root.pem}";
   };
   services.overallsSecrets.bundles = {
+    underclass-proxy = {
+      encryptedFile = "${../../../secrets/dungarees-underclass-proxy.enc.json}";
+      outputs."proxy.key" = { format = "raw"; secrets = [ "UNDERCLASS_PROXY_KEY" ]; };
+    };
     brady = {
       encryptedFile = "${../../../secrets/dungarees-brady.enc.json}";
       outputs = {

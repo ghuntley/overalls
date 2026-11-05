@@ -90,6 +90,9 @@ in
     pkgs.chromium
     pkgs.podman
     pkgs.podman-compose
+    # Snouty requires Docker Compose v2; keep the pinned provider alongside
+    # Podman's Docker-compatible socket for Antithesis image builds.
+    pkgs.docker-compose
   ];
 
   # https://devenv.sh/languages/

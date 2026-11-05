@@ -265,8 +265,8 @@ The machine navigation drops its Agents tab. Direct machine-agent routes and
 their existing backend authority remain available; global Threads becomes the
 primary visible entry point for agent tasks.
 
-The terminal remains available as a link to the bound machine's terminal page
-and now also has an opt-in, lazy embedded terminal disclosure. The activity
+The terminal remains available as a link to the bound machine's terminal page;
+the thread detail no longer embeds a second terminal surface. The activity
 route keeps the recent-thread rail visible and supports bounded status, time,
 owner, team and text filters over the current authorized keyset page. A
 persistent global rail and project-specific filtering remain separate work.

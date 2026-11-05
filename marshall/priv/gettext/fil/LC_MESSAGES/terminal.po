@@ -528,12 +528,6 @@ msgstr "Hindi mabuksan ang terminal."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "Nakahinto ang makinang ito. Paandarin ito upang buksan ang iyong terminal. Nananatili ang iyong mga file."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "Hindi sinusuportahan ng imahe ng makinang ito ang kasalukuyang editor sa browser."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

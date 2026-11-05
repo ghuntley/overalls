@@ -571,6 +571,49 @@ def check_thread_order(page: Page, *, composer: bool) -> None:
         )
 
 
+def check_thread_tool_details(page: Page) -> None:
+    """@cc [owner:ghuntley,label:product;security;verification] thread-tool-detail-cards
+    Each synthetic tool call MUST render one semantic detail card with its
+    allowlisted tool name and outcome. The newest result MUST be open while
+    older result cards remain collapsed. The visible result may include safe,
+    bounded output and metadata, but raw arguments and call identifiers MUST
+    not appear in the transcript.
+    """
+    transcript = page.locator("#thread-transcript")
+    cards = transcript.locator(".thread-tool-card")
+    expect(cards).to_have_count(3)
+
+    queued = transcript.locator(".thread-tool-card[data-state='queued']")
+    expect(queued).to_have_count(1)
+    for card in queued.all():
+        expect(card).not_to_have_attribute("open", "")
+        expect(card).to_have_attribute("data-tool", "pending_review")
+
+    results = transcript.locator("article[data-kind='tool_result'] .thread-tool-card")
+    expect(results).to_have_count(2)
+    newest = results.nth(0)
+    older = results.nth(1)
+    expect(newest).to_have_attribute("data-tool", "exec_command")
+    expect(newest).to_have_attribute("data-state", "completed")
+    expect(newest).to_have_attribute("open", "")
+    expect(newest).to_contain_text("Tool completed")
+    expect(newest).to_contain_text("Working directory")
+    expect(newest).to_contain_text("/workspace")
+    expect(newest).to_contain_text("exit_code")
+    expect(newest).to_contain_text("0")
+    expect(newest).to_contain_text("Synthetic check completed")
+    expect(older).to_have_attribute("data-tool", "read_file")
+    expect(older).to_have_attribute("data-state", "completed")
+    expect(older).not_to_have_attribute("open", "")
+    expect(older).to_contain_text("/workspace/lib/deployment.ex")
+
+    # The command is present only in the fixture's queued arguments and must
+    # never cross the transcript's presentation boundary.
+    expect(transcript).not_to_contain_text("mix test test/deployment_test.exs")
+    expect(transcript).not_to_contain_text("fixture-check")
+    expect(transcript).not_to_contain_text('"arguments"')
+
+
 def check_thread_share_details(page: Page, fixture: Context) -> None:
     """The manager disclosure shows the immutable owner and current named roles."""
     toggle = page.locator("#thread-share-toggle")
@@ -719,7 +762,9 @@ def check_thread_views(page: Page, fixture: Context, artifacts: Path) -> None:
     """@cc [owner:ghuntley,label:verification] thread-browser-lifecycle-coverage
     The probe MUST check list, new, activity and all five fixture lifecycle views
     in both themes at desktop and mobile widths. Archived and unready views MUST
-    expose no prompt, terminal or editor control; ready views MUST expose all three.
+    expose no prompt, terminal or editor control; ready views MUST expose the
+    external terminal route and editor link. The thread detail MUST NOT embed a
+    terminal iframe.
     Ready views MUST also cover slash completion, the command palette, draft and
     focus preservation, IME composition and mobile touch access. Browser checks
     MUST NOT submit prompts or invoke lifecycle mutations.
@@ -780,12 +825,15 @@ def check_thread_views(page: Page, fixture: Context, artifacts: Path) -> None:
                     expect(page.locator("#thread-list-items > a")).to_have_count(5)
                 elif name == "ready":
                     check_thread_order(page, composer=True)
+                    check_thread_tool_details(page)
                     check_thread_composer_controls(page, mobile=width <= 500)
                     expect(page.locator("#thread-prompt-form")).to_be_visible()
                     expect(page.locator("#thread-terminal a")).to_have_attribute(
                         "href", f"/machines/{fixture['vm_id']}/terminals"
                     )
                     expect(page.locator("#thread-terminal")).to_be_visible()
+                    expect(page.locator("#thread-terminal-embed")).to_have_count(0)
+                    expect(page.locator("iframe[data-thread-terminal-src]")).to_have_count(0)
                     expect(page.locator("#thread-vscode")).to_be_visible()
                     expect(page.locator("#thread-vscode")).to_have_attribute(
                         "href", f"/machines/{fixture['vm_id']}/code"
@@ -798,6 +846,7 @@ def check_thread_views(page: Page, fixture: Context, artifacts: Path) -> None:
                     expect(page.locator("#thread-sharing")).not_to_be_visible()
                 elif name == "archived":
                     check_thread_order(page, composer=False)
+                    check_thread_tool_details(page)
                     expect(page.locator("#thread-archived")).to_be_visible()
                     expect(page.get_by_role("button", name="Reopen", exact=True)).to_be_visible()
                 elif name in ("pending", "provisioning"):

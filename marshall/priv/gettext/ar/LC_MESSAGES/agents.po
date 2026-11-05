@@ -21,13 +21,13 @@ msgstr ""
 "%{value1} يبقى مستوى الاستدلال مرتبطًا بهذه المحادثة. بدّل بين التخطيط "
 "والعمل حسب الحاجة."
 
-#: lib/marshall_web/live/threads_live.ex:2252
+#: lib/marshall_web/live/threads_live.ex:2232
 #, elixir-autogen, elixir-format
 msgid "%{value1} reasoning"
 msgstr "استدلال %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2811
-#: lib/marshall_web/live/threads_live.ex:2814
+#: lib/marshall_web/live/threads_live.ex:2791
+#: lib/marshall_web/live/threads_live.ex:2794
 #, elixir-autogen, elixir-format
 msgid "A context source could not be fully loaded."
 msgstr "تعذر تحميل أحد مصادر السياق بالكامل."
@@ -48,12 +48,12 @@ msgstr ""
 msgid "A space for your next idea"
 msgstr "مساحة لفكرتك القادمة"
 
-#: lib/marshall_web/live/threads_live.ex:2020
+#: lib/marshall_web/live/threads_live.ex:2000
 #, elixir-autogen, elixir-format
 msgid "Access details are temporarily unavailable. Close sharing and try again shortly."
 msgstr "تفاصيل الوصول غير متاحة مؤقتًا. أغلق المشاركة وحاول مجددًا قريبًا."
 
-#: lib/marshall_web/live/threads_live.ex:1985
+#: lib/marshall_web/live/threads_live.ex:1965
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "إجراءات"
@@ -70,7 +70,7 @@ msgid "Activity"
 msgstr "النشاط"
 
 #: lib/marshall_web/live/agent_threads_live.ex:116
-#: lib/marshall_web/live/threads_live.ex:2850
+#: lib/marshall_web/live/threads_live.ex:2830
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "وكيل"
@@ -82,7 +82,7 @@ msgstr "تمت الموافقة على CLI الوكيل لمدة ساعة. عد 
 
 #: lib/marshall_web/live/agent_threads_live.ex:117
 #: lib/marshall_web/live/agent_threads_live.ex:141
-#: lib/marshall_web/live/threads_live.ex:2858
+#: lib/marshall_web/live/threads_live.ex:2838
 #, elixir-autogen, elixir-format
 msgid "Agent started working"
 msgstr "بدأ الوكيل العمل"
@@ -108,7 +108,7 @@ msgstr "جميع المحادثات"
 msgid "All visible"
 msgstr "جميع العناصر المرئية"
 
-#: lib/marshall_web/live/threads_live.ex:2325
+#: lib/marshall_web/live/threads_live.ex:2305
 #, elixir-autogen, elixir-format
 msgid "An operator can answer these questions."
 msgstr "يمكن للمشغّل الإجابة عن هذه الأسئلة."
@@ -118,7 +118,7 @@ msgstr "يمكن للمشغّل الإجابة عن هذه الأسئلة."
 msgid "Answer each question with a choice, your own answer, or both."
 msgstr "أجب عن كل سؤال باختيار أو بإجابتك الخاصة أو بكليهما."
 
-#: lib/marshall_web/live/threads_live.ex:2277
+#: lib/marshall_web/live/threads_live.ex:2257
 #, elixir-autogen, elixir-format
 msgid "Answer these questions to continue the plan."
 msgstr "أجب عن هذه الأسئلة لمتابعة الخطة."
@@ -148,34 +148,34 @@ msgstr "الموافقة على CLI الوكيل"
 msgid "Approving…"
 msgstr "تجري الموافقة…"
 
-#: lib/marshall_web/live/threads_live.ex:1988
+#: lib/marshall_web/live/threads_live.ex:1968
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "أرشفة"
 
 #: lib/marshall_web/live/threads_live.ex:1690
 #: lib/marshall_web/live/threads_live.ex:1787
-#: lib/marshall_web/live/threads_live.ex:2832
+#: lib/marshall_web/live/threads_live.ex:2812
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "مؤرشف"
 
-#: lib/marshall_web/live/threads_live.ex:2370
+#: lib/marshall_web/live/threads_live.ex:2350
 #, elixir-autogen, elixir-format
 msgid "Archived thread. The transcript is read-only. Reopen to continue on a new machine."
 msgstr "محادثة مؤرشفة. النص للقراءة فقط. أعد فتحها للمتابعة على آلة جديدة."
 
-#: lib/marshall_web/live/threads_live.ex:2846
+#: lib/marshall_web/live/threads_live.ex:2826
 #, elixir-autogen, elixir-format
 msgid "Archived · conversation retained"
 msgstr "مؤرشف · المحادثة محفوظة"
 
-#: lib/marshall_web/live/threads_live.ex:2831
+#: lib/marshall_web/live/threads_live.ex:2811
 #, elixir-autogen, elixir-format
 msgid "Archiving"
 msgstr "تجري الأرشفة"
 
-#: lib/marshall_web/live/threads_live.ex:2202
+#: lib/marshall_web/live/threads_live.ex:2182
 #, elixir-autogen, elixir-format
 msgid "Archiving is in progress. Waiting for the machine to be deleted."
 msgstr "الأرشفة قيد التنفيذ. بانتظار حذف الآلة."
@@ -185,7 +185,7 @@ msgstr "الأرشفة قيد التنفيذ. بانتظار حذف الآلة."
 msgid "Archiving requested. The machine will be deleted before archival completes."
 msgstr "طُلبت الأرشفة. ستُحذف الآلة قبل اكتمالها."
 
-#: lib/marshall_web/live/threads_live.ex:2845
+#: lib/marshall_web/live/threads_live.ex:2825
 #, elixir-autogen, elixir-format
 msgid "Archiving · releasing the machine"
 msgstr "تجري الأرشفة · تحرير الآلة"
@@ -197,8 +197,8 @@ msgstr "تجري الأرشفة · تحرير الآلة"
 msgid "Back to threads"
 msgstr "العودة إلى المحادثات"
 
-#: lib/marshall_web/live/threads_live.ex:2641
-#: lib/marshall_web/live/threads_live.ex:2690
+#: lib/marshall_web/live/threads_live.ex:2621
+#: lib/marshall_web/live/threads_live.ex:2670
 #, elixir-autogen, elixir-format
 msgid "Branch, tag or commit"
 msgstr "فرع أو وسم أو إيداع"
@@ -213,7 +213,7 @@ msgstr "ابنِ شيئًا، أصلح خطأً، استكشف فكرة…"
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/threads_live.ex:2055
+#: lib/marshall_web/live/threads_live.ex:2035
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "تغيير"
@@ -234,13 +234,13 @@ msgstr "أُنشئت محادثة فرعية"
 msgid "Choose a valid image and machine size."
 msgstr "اختر صورة وحجم آلة صالحين."
 
-#: lib/marshall_web/live/threads_live.ex:2437
-#: lib/marshall_web/live/threads_live.ex:2481
+#: lib/marshall_web/live/threads_live.ex:2417
+#: lib/marshall_web/live/threads_live.ex:2461
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "إغلاق"
 
-#: lib/marshall_web/live/threads_live.ex:2237
+#: lib/marshall_web/live/threads_live.ex:2217
 #, elixir-autogen, elixir-format
 msgid "Collaboration mode"
 msgstr "وضع التعاون"
@@ -250,26 +250,26 @@ msgstr "وضع التعاون"
 msgid "Collaboration mode updated."
 msgstr "تم تحديث وضع التعاون."
 
-#: lib/marshall_web/live/threads_live.ex:2721
+#: lib/marshall_web/live/threads_live.ex:2701
 #, elixir-autogen, elixir-format
 msgid "Command suggestions"
 msgstr "اقتراحات الأوامر"
 
 #: lib/marshall_web/live/threads_live.ex:1528
 #: lib/marshall_web/live/threads_live.ex:1922
-#: lib/marshall_web/live/threads_live.ex:2255
-#: lib/marshall_web/live/threads_live.ex:2433
-#: lib/marshall_web/live/threads_live.ex:2454
+#: lib/marshall_web/live/threads_live.ex:2235
+#: lib/marshall_web/live/threads_live.ex:2413
+#: lib/marshall_web/live/threads_live.ex:2434
 #, elixir-autogen, elixir-format
 msgid "Commands"
 msgstr "الأوامر"
 
-#: lib/marshall_web/live/threads_live.ex:2625
+#: lib/marshall_web/live/threads_live.ex:2605
 #, elixir-autogen, elixir-format
 msgid "Commit: %{value1}"
 msgstr "الإيداع: %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2569
+#: lib/marshall_web/live/threads_live.ex:2549
 #: lib/marshall_web/thread_commands.ex:18
 #, elixir-autogen, elixir-format
 msgid "Compact context"
@@ -282,12 +282,12 @@ msgstr ""
 "لم يتمكن الضغط من تقليص هذا السياق. قلل التعليمات المطلوبة أو ابدأ محادثة "
 "مركزة."
 
-#: lib/marshall_web/live/threads_live.ex:2788
+#: lib/marshall_web/live/threads_live.ex:2768
 #, elixir-autogen, elixir-format
 msgid "Composer help"
 msgstr "مساعدة محرر الرسائل"
 
-#: lib/marshall_web/live/threads_live.ex:2535
+#: lib/marshall_web/live/threads_live.ex:2515
 #, elixir-autogen, elixir-format
 msgid "Context bytes"
 msgstr "بايتات السياق"
@@ -307,7 +307,7 @@ msgstr "تم اختصار السياق"
 msgid "Context compaction queued."
 msgstr "أُدرج ضغط السياق في الطابور."
 
-#: lib/marshall_web/live/threads_live.ex:2513
+#: lib/marshall_web/live/threads_live.ex:2493
 #, elixir-autogen, elixir-format
 msgid "Context details are unavailable. The thread may still be preparing its workspace."
 msgstr "تفاصيل السياق غير متاحة. ربما لا تزال المحادثة تُعد مساحة العمل."
@@ -317,7 +317,7 @@ msgstr "تفاصيل السياق غير متاحة. ربما لا تزال ال
 msgid "Context reload queued."
 msgstr "أُدرجت إعادة تحميل السياق في الطابور."
 
-#: lib/marshall_web/live/threads_live.ex:2223
+#: lib/marshall_web/live/threads_live.ex:2203
 #, elixir-autogen, elixir-format
 msgid "Continue the work…"
 msgstr "تابع العمل…"
@@ -337,12 +337,12 @@ msgstr "إنشاء محادثة فرعية"
 msgid "Create thread"
 msgstr "إنشاء محادثة"
 
-#: lib/marshall_web/live/threads_live.ex:2888
+#: lib/marshall_web/live/threads_live.ex:2868
 #, elixir-autogen, elixir-format
 msgid "Delegated a task"
 msgstr "فُوّضت مهمة"
 
-#: lib/marshall_web/live/threads_live.ex:1992
+#: lib/marshall_web/live/threads_live.ex:1972
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "حذف"
@@ -357,12 +357,12 @@ msgstr "يجري الحذف"
 msgid "Describe a task. Your agent gets a machine and gets to work."
 msgstr "صف مهمة. يحصل وكيلك على آلة ويبدأ العمل."
 
-#: lib/marshall_web/live/threads_live.ex:2657
+#: lib/marshall_web/live/threads_live.ex:2637
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "تعطيل"
 
-#: lib/marshall_web/live/threads_live.ex:2598
+#: lib/marshall_web/live/threads_live.ex:2578
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr "معطّل"
@@ -372,18 +372,18 @@ msgstr "معطّل"
 msgid "Disk (GiB)"
 msgstr "القرص (GiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2658
+#: lib/marshall_web/live/threads_live.ex:2638
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "تمكين"
 
 #: lib/marshall_web/live/threads_live.ex:1785
-#: lib/marshall_web/live/threads_live.ex:2830
+#: lib/marshall_web/live/threads_live.ex:2810
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "فشل"
 
-#: lib/marshall_web/live/threads_live.ex:2444
+#: lib/marshall_web/live/threads_live.ex:2424
 #, elixir-autogen, elixir-format
 msgid "Find a command"
 msgstr "العثور على أمر"
@@ -395,7 +395,7 @@ msgid "Find a task…"
 msgstr "العثور على مهمة…"
 
 #: lib/marshall_web/live/threads_live.ex:1732
-#: lib/marshall_web/live/threads_live.ex:2067
+#: lib/marshall_web/live/threads_live.ex:2047
 #, elixir-autogen, elixir-format
 msgid "First page"
 msgstr "الصفحة الأولى"
@@ -420,7 +420,7 @@ msgstr "العمل الجيد يبدأ بمحادثة."
 msgid "High"
 msgstr "مرتفع"
 
-#: lib/marshall_web/live/threads_live.ex:2822
+#: lib/marshall_web/live/threads_live.ex:2802
 #, elixir-autogen, elixir-format
 msgid "High gives difficult work more reasoning time."
 msgstr "يمنح المستوى المرتفع العمل الصعب وقتًا أطول للاستدلال."
@@ -430,7 +430,7 @@ msgstr "يمنح المستوى المرتفع العمل الصعب وقتًا 
 msgid "Image"
 msgstr "الصورة"
 
-#: lib/marshall_web/live/threads_live.ex:2353
+#: lib/marshall_web/live/threads_live.ex:2333
 #, elixir-autogen, elixir-format
 msgid "Implement plan"
 msgstr "تنفيذ الخطة"
@@ -445,32 +445,32 @@ msgstr "بدأ تنفيذ هذه الخطة بالفعل."
 msgid "Implementation queued."
 msgstr "أُدرج التنفيذ في الطابور."
 
-#: lib/marshall_web/live/threads_live.ex:2339
+#: lib/marshall_web/live/threads_live.ex:2319
 #, elixir-autogen, elixir-format
 msgid "Implementation started"
 msgstr "بدأ التنفيذ"
 
-#: lib/marshall_web/live/threads_live.ex:2530
+#: lib/marshall_web/live/threads_live.ex:2510
 #, elixir-autogen, elixir-format
 msgid "Input tokens"
 msgstr "رموز الإدخال"
 
-#: lib/marshall_web/live/threads_live.ex:2674
+#: lib/marshall_web/live/threads_live.ex:2654
 #, elixir-autogen, elixir-format
 msgid "Install a skill"
 msgstr "تثبيت مهارة"
 
-#: lib/marshall_web/live/threads_live.ex:2701
+#: lib/marshall_web/live/threads_live.ex:2681
 #, elixir-autogen, elixir-format
 msgid "Install skill"
 msgstr "تثبيت المهارة"
 
-#: lib/marshall_web/live/threads_live.ex:2700
+#: lib/marshall_web/live/threads_live.ex:2680
 #, elixir-autogen, elixir-format
 msgid "Installing…"
 msgstr "يجري التثبيت…"
 
-#: lib/marshall_web/live/threads_live.ex:2540
+#: lib/marshall_web/live/threads_live.ex:2520
 #, elixir-autogen, elixir-format
 msgid "Loaded sources"
 msgstr "المصادر المحملة"
@@ -480,12 +480,12 @@ msgstr "المصادر المحملة"
 msgid "Low"
 msgstr "منخفض"
 
-#: lib/marshall_web/live/threads_live.ex:2821
+#: lib/marshall_web/live/threads_live.ex:2801
 #, elixir-autogen, elixir-format
 msgid "Low is for small, well-defined tasks."
 msgstr "المستوى المنخفض للمهام الصغيرة والمحددة بوضوح."
 
-#: lib/marshall_web/live/threads_live.ex:2132
+#: lib/marshall_web/live/threads_live.ex:2112
 #, elixir-autogen, elixir-format
 msgid "Machine generations"
 msgstr "أجيال الآلة"
@@ -515,13 +515,13 @@ msgstr "الآلة:"
 msgid "Maintenance finished"
 msgstr "اكتملت الصيانة"
 
-#: lib/marshall_web/live/threads_live.ex:2617
+#: lib/marshall_web/live/threads_live.ex:2597
 #, elixir-autogen, elixir-format
 msgid "Managed installations"
 msgstr "التثبيتات المُدارة"
 
-#: lib/marshall_web/live/threads_live.ex:2604
-#: lib/marshall_web/live/threads_live.ex:2757
+#: lib/marshall_web/live/threads_live.ex:2584
+#: lib/marshall_web/live/threads_live.ex:2737
 #, elixir-autogen, elixir-format
 msgid "Managed skill"
 msgstr "مهارة مُدارة"
@@ -531,8 +531,8 @@ msgstr "مهارة مُدارة"
 msgid "Managed skill removed."
 msgstr "تمت إزالة المهارة المُدارة."
 
-#: lib/marshall_web/live/threads_live.ex:2102
-#: lib/marshall_web/live/threads_live.ex:2911
+#: lib/marshall_web/live/threads_live.ex:2082
+#: lib/marshall_web/live/threads_live.ex:2891
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "مدير"
@@ -547,7 +547,7 @@ msgstr "طابق رمز الطلب هذا مع الطرفية قبل الموا�
 msgid "Medium"
 msgstr "متوسط"
 
-#: lib/marshall_web/live/threads_live.ex:2824
+#: lib/marshall_web/live/threads_live.ex:2804
 #, elixir-autogen, elixir-format
 msgid "Medium is a good starting point for most work."
 msgstr "المستوى المتوسط نقطة بداية جيدة لمعظم العمل."
@@ -557,7 +557,7 @@ msgstr "المستوى المتوسط نقطة بداية جيدة لمعظم ا
 msgid "Memory (MiB)"
 msgstr "الذاكرة (MiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2222
+#: lib/marshall_web/live/threads_live.ex:2202
 #, elixir-autogen, elixir-format
 msgid "Message"
 msgstr "رسالة"
@@ -585,7 +585,7 @@ msgid "New thread"
 msgstr "محادثة جديدة"
 
 #: lib/marshall_web/live/threads_live.ex:1739
-#: lib/marshall_web/live/threads_live.ex:2073
+#: lib/marshall_web/live/threads_live.ex:2053
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "الصفحة التالية"
@@ -595,17 +595,17 @@ msgstr "الصفحة التالية"
 msgid "No activity matches this filter."
 msgstr "لا يوجد نشاط يطابق عامل التصفية."
 
-#: lib/marshall_web/live/threads_live.ex:2059
+#: lib/marshall_web/live/threads_live.ex:2039
 #, elixir-autogen, elixir-format
 msgid "No individual thread grants yet."
 msgstr "لا توجد أذونات فردية للمحادثة بعد."
 
-#: lib/marshall_web/live/threads_live.ex:2542
+#: lib/marshall_web/live/threads_live.ex:2522
 #, elixir-autogen, elixir-format
 msgid "No instruction sources collected yet."
 msgstr "لم تُجمع مصادر تعليمات بعد."
 
-#: lib/marshall_web/live/threads_live.ex:2743
+#: lib/marshall_web/live/threads_live.ex:2723
 #, elixir-autogen, elixir-format
 msgid "No matching skills. Use /skills to inspect the catalog."
 msgstr "لا توجد مهارات مطابقة. استخدم /skills لفحص الكتالوج."
@@ -620,23 +620,23 @@ msgstr "لا تتاح محادثات أقدم في هذه الصفحة."
 msgid "No recent threads match your search."
 msgstr "لا تطابق أي محادثة حديثة بحثك."
 
-#: lib/marshall_web/live/threads_live.ex:2586
+#: lib/marshall_web/live/threads_live.ex:2566
 #, elixir-autogen, elixir-format
 msgid "No skills were discovered in this workspace."
 msgstr "لم تُكتشف مهارات في مساحة العمل."
 
-#: lib/marshall_web/live/threads_live.ex:2528
+#: lib/marshall_web/live/threads_live.ex:2508
 #, elixir-autogen, elixir-format
 msgid "Not collected yet"
 msgstr "لم يُجمع بعد"
 
 #: lib/marshall_web/live/threads_live.ex:1489
-#: lib/marshall_web/live/threads_live.ex:2391
+#: lib/marshall_web/live/threads_live.ex:2371
 #, elixir-autogen, elixir-format
 msgid "Objective"
 msgstr "الهدف"
 
-#: lib/marshall_web/live/threads_live.ex:2897
+#: lib/marshall_web/live/threads_live.ex:2877
 #, elixir-autogen, elixir-format
 msgid "Older context summarized"
 msgstr "لُخّص السياق الأقدم"
@@ -646,7 +646,7 @@ msgstr "لُخّص السياق الأقدم"
 msgid "One task. One thread."
 msgstr "مهمة واحدة. محادثة واحدة."
 
-#: lib/marshall_web/live/threads_live.ex:1968
+#: lib/marshall_web/live/threads_live.ex:1948
 #: lib/marshall_web/thread_commands.ex:26
 #, elixir-autogen, elixir-format
 msgid "Open VS Code"
@@ -663,18 +663,13 @@ msgstr "مفتوح المصدر"
 msgid "Open terminal"
 msgstr "فتح طرفية"
 
-#: lib/marshall_web/live/threads_live.ex:1948
-#, elixir-autogen, elixir-format
-msgid "Open terminal here"
-msgstr "فتح طرفية هنا"
-
-#: lib/marshall_web/live/threads_live.ex:2101
-#: lib/marshall_web/live/threads_live.ex:2910
+#: lib/marshall_web/live/threads_live.ex:2081
+#: lib/marshall_web/live/threads_live.ex:2890
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "مشغّل"
 
-#: lib/marshall_web/live/threads_live.ex:2033
+#: lib/marshall_web/live/threads_live.ex:2013
 #, elixir-autogen, elixir-format
 msgid "Owner · cannot be changed"
 msgstr "المالك · لا يمكن تغييره"
@@ -690,8 +685,8 @@ msgid "Past 7 days"
 msgstr "آخر 7 أيام"
 
 #: lib/marshall_web/live/threads_live.ex:1782
-#: lib/marshall_web/live/threads_live.ex:2791
-#: lib/marshall_web/live/threads_live.ex:2827
+#: lib/marshall_web/live/threads_live.ex:2771
+#: lib/marshall_web/live/threads_live.ex:2807
 #, elixir-autogen, elixir-format
 msgid "Pending"
 msgstr "معلق"
@@ -702,7 +697,7 @@ msgid "Pick up where you left off."
 msgstr "تابع من حيث توقفت."
 
 #: lib/marshall_web/live/threads_live.ex:1511
-#: lib/marshall_web/live/threads_live.ex:2782
+#: lib/marshall_web/live/threads_live.ex:2762
 #: lib/marshall_web/thread_commands.ex:14
 #, elixir-autogen, elixir-format
 msgid "Plan"
@@ -713,19 +708,19 @@ msgstr "تخطيط"
 msgid "Plan proposed"
 msgstr "تم اقتراح خطة"
 
-#: lib/marshall_web/live/threads_live.ex:2839
+#: lib/marshall_web/live/threads_live.ex:2819
 #, elixir-autogen, elixir-format
 msgid "Preparing a machine for this task"
 msgstr "تحضير آلة لهذه المهمة"
 
-#: lib/marshall_web/live/threads_live.ex:2172
+#: lib/marshall_web/live/threads_live.ex:2152
 #, elixir-autogen, elixir-format
 msgid "Preparing your workspace"
 msgstr "تحضير مساحة عملك"
 
 #: lib/marshall_web/live/agent_threads_live.ex:115
 #: lib/marshall_web/live/agent_threads_live.ex:225
-#: lib/marshall_web/live/threads_live.ex:2849
+#: lib/marshall_web/live/threads_live.ex:2829
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "توجيه"
@@ -741,18 +736,18 @@ msgstr "أُدرج التوجيه في الطابور."
 msgid "Prompts wake a stopped machine when you have write access."
 msgstr "توقظ التوجيهات آلة متوقفة عندما تملك حق الكتابة."
 
-#: lib/marshall_web/live/threads_live.ex:2336
+#: lib/marshall_web/live/threads_live.ex:2316
 #, elixir-autogen, elixir-format
 msgid "Proposed plan"
 msgstr "الخطة المقترحة"
 
 #: lib/marshall_web/live/threads_live.ex:1783
-#: lib/marshall_web/live/threads_live.ex:2828
+#: lib/marshall_web/live/threads_live.ex:2808
 #, elixir-autogen, elixir-format
 msgid "Provisioning"
 msgstr "التهيئة"
 
-#: lib/marshall_web/live/threads_live.ex:2182
+#: lib/marshall_web/live/threads_live.ex:2162
 #, elixir-autogen, elixir-format
 msgid "Provisioning needs attention."
 msgstr "التهيئة تحتاج إلى اهتمام."
@@ -777,14 +772,14 @@ msgstr "تم إلغاء الأسئلة"
 msgid "Questions requested"
 msgstr "طُلبت أسئلة"
 
-#: lib/marshall_web/live/threads_live.ex:2870
+#: lib/marshall_web/live/threads_live.ex:2850
 #, elixir-autogen, elixir-format
 msgid "Queued: %{tools}"
 msgstr "في الطابور: %{tools}"
 
 #: lib/marshall_web/live/threads_live.ex:1784
-#: lib/marshall_web/live/threads_live.ex:2792
-#: lib/marshall_web/live/threads_live.ex:2829
+#: lib/marshall_web/live/threads_live.ex:2772
+#: lib/marshall_web/live/threads_live.ex:2809
 #, elixir-autogen, elixir-format
 msgid "Ready"
 msgstr "جاهز"
@@ -799,49 +794,49 @@ msgstr "الاستدلال"
 msgid "Recent threads"
 msgstr "المحادثات الحديثة"
 
-#: lib/marshall_web/live/threads_live.ex:2092
+#: lib/marshall_web/live/threads_live.ex:2072
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "البريد المسجل"
 
-#: lib/marshall_web/live/threads_live.ex:2563
+#: lib/marshall_web/live/threads_live.ex:2543
 #, elixir-autogen, elixir-format
 msgid "Reload context"
 msgstr "إعادة تحميل السياق"
 
-#: lib/marshall_web/live/threads_live.ex:2664
-#: lib/marshall_web/live/threads_live.ex:2772
+#: lib/marshall_web/live/threads_live.ex:2644
+#: lib/marshall_web/live/threads_live.ex:2752
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "إزالة"
 
-#: lib/marshall_web/live/threads_live.ex:2771
+#: lib/marshall_web/live/threads_live.ex:2751
 #, elixir-autogen, elixir-format
 msgid "Remove %{skill}"
 msgstr "إزالة %{skill}"
 
-#: lib/marshall_web/live/threads_live.ex:2002
+#: lib/marshall_web/live/threads_live.ex:1982
 #, elixir-autogen, elixir-format
 msgid "Reopen"
 msgstr "إعادة فتح"
 
-#: lib/marshall_web/live/threads_live.ex:2135
+#: lib/marshall_web/live/threads_live.ex:2115
 #, elixir-autogen, elixir-format
 msgid "Reopened machines keep their earlier transcripts. Select one to read it."
 msgstr "تحتفظ الآلات المعاد فتحها بنصوصها السابقة. اختر واحدًا لقراءته."
 
-#: lib/marshall_web/live/threads_live.ex:2683
+#: lib/marshall_web/live/threads_live.ex:2663
 #, elixir-autogen, elixir-format
 msgid "Repository URL"
 msgstr "رابط المستودع"
 
 #: lib/marshall_web/live/agent_threads_live.ex:118
-#: lib/marshall_web/live/threads_live.ex:2859
+#: lib/marshall_web/live/threads_live.ex:2839
 #, elixir-autogen, elixir-format
 msgid "Response received"
 msgstr "تم استلام الرد"
 
-#: lib/marshall_web/live/threads_live.ex:2192
+#: lib/marshall_web/live/threads_live.ex:2172
 #, elixir-autogen, elixir-format
 msgid "Retry"
 msgstr "إعادة المحاولة"
@@ -851,37 +846,37 @@ msgstr "إعادة المحاولة"
 msgid "Return to the conversation whenever you need."
 msgstr "عد إلى المحادثة متى احتجت."
 
-#: lib/marshall_web/live/threads_live.ex:2361
+#: lib/marshall_web/live/threads_live.ex:2341
 #, elixir-autogen, elixir-format
 msgid "Revise"
 msgstr "مراجعة"
 
-#: lib/marshall_web/live/threads_live.ex:2689
+#: lib/marshall_web/live/threads_live.ex:2669
 #, elixir-autogen, elixir-format
 msgid "Revision (optional)"
 msgstr "المراجعة (اختيارية)"
 
-#: lib/marshall_web/live/threads_live.ex:2103
+#: lib/marshall_web/live/threads_live.ex:2083
 #, elixir-autogen, elixir-format
 msgid "Revoke thread grant"
 msgstr "إبطال إذن المحادثة"
 
-#: lib/marshall_web/live/threads_live.ex:2912
+#: lib/marshall_web/live/threads_live.ex:2892
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "مُبطل"
 
-#: lib/marshall_web/live/threads_live.ex:2098
+#: lib/marshall_web/live/threads_live.ex:2078
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "الدور"
 
-#: lib/marshall_web/live/threads_live.ex:2110
+#: lib/marshall_web/live/threads_live.ex:2090
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "حفظ الوصول"
 
-#: lib/marshall_web/live/threads_live.ex:2109
+#: lib/marshall_web/live/threads_live.ex:2089
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "يجري الحفظ…"
@@ -911,7 +906,7 @@ msgstr "يبحث في صفحة المحادثات هذه."
 msgid "Select this skill from the workspace catalog when the machine starts."
 msgstr "اختر هذه المهارة من كتالوج مساحة العمل عند بدء الآلة."
 
-#: lib/marshall_web/live/threads_live.ex:2264
+#: lib/marshall_web/live/threads_live.ex:2244
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "إرسال"
@@ -922,7 +917,7 @@ msgid "Send prompt"
 msgstr "إرسال توجيه"
 
 #: lib/marshall_web/live/agent_threads_live.ex:233
-#: lib/marshall_web/live/threads_live.ex:2262
+#: lib/marshall_web/live/threads_live.ex:2242
 #, elixir-autogen, elixir-format
 msgid "Sending…"
 msgstr "يجري الإرسال…"
@@ -933,7 +928,7 @@ msgstr "يجري الإرسال…"
 msgid "Share"
 msgstr "مشاركة"
 
-#: lib/marshall_web/live/threads_live.ex:2012
+#: lib/marshall_web/live/threads_live.ex:1992
 #, elixir-autogen, elixir-format
 msgid "Share this thread"
 msgstr "مشاركة هذه المحادثة"
@@ -958,7 +953,7 @@ msgstr "عرض"
 msgid "Skill availability updated."
 msgstr "تم تحديث إتاحة المهارة."
 
-#: lib/marshall_web/live/threads_live.ex:2694
+#: lib/marshall_web/live/threads_live.ex:2674
 #, elixir-autogen, elixir-format
 msgid "Skill directory"
 msgstr "دليل المهارات"
@@ -968,7 +963,7 @@ msgstr "دليل المهارات"
 msgid "Skill installation queued."
 msgstr "أُدرج تثبيت المهارة في الطابور."
 
-#: lib/marshall_web/live/threads_live.ex:2740
+#: lib/marshall_web/live/threads_live.ex:2720
 #, elixir-autogen, elixir-format
 msgid "Skill suggestions"
 msgstr "اقتراحات المهارات"
@@ -979,20 +974,20 @@ msgstr "اقتراحات المهارات"
 msgid "Skill update queued."
 msgstr "أُدرج تحديث المهارة في الطابور."
 
-#: lib/marshall_web/live/threads_live.ex:2787
+#: lib/marshall_web/live/threads_live.ex:2767
 #: lib/marshall_web/thread_commands.ex:20
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "المهارات"
 
-#: lib/marshall_web/live/threads_live.ex:2574
+#: lib/marshall_web/live/threads_live.ex:2554
 #, elixir-autogen, elixir-format
 msgid "Skills add reusable instructions to a task. Choose the source you intend to use."
 msgstr ""
 "تضيف المهارات تعليمات قابلة لإعادة الاستخدام إلى المهمة. اختر المصدر الذي "
 "تنوي استخدامه."
 
-#: lib/marshall_web/live/threads_live.ex:2580
+#: lib/marshall_web/live/threads_live.ex:2560
 #, elixir-autogen, elixir-format
 msgid "Skills are unavailable until the workspace context has been collected."
 msgstr "لا تتاح المهارات حتى يُجمع سياق مساحة العمل."
@@ -1002,7 +997,7 @@ msgstr "لا تتاح المهارات حتى يُجمع سياق مساحة ا�
 msgid "Standard"
 msgstr "قياسي"
 
-#: lib/marshall_web/live/threads_live.ex:2505
+#: lib/marshall_web/live/threads_live.ex:2485
 #, elixir-autogen, elixir-format
 msgid "Start with a space to send slash-looking text literally. Type $ to choose a skill by its exact source."
 msgstr ""
@@ -1015,17 +1010,17 @@ msgid "Starting…"
 msgstr "يجري البدء…"
 
 #: lib/marshall_web/live/threads_live.ex:1779
-#: lib/marshall_web/live/threads_live.ex:2520
+#: lib/marshall_web/live/threads_live.ex:2500
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "الحالة"
 
-#: lib/marshall_web/live/threads_live.ex:2320
+#: lib/marshall_web/live/threads_live.ex:2300
 #, elixir-autogen, elixir-format
 msgid "Submit answers"
 msgstr "إرسال الإجابات"
 
-#: lib/marshall_web/live/threads_live.ex:2319
+#: lib/marshall_web/live/threads_live.ex:2299
 #, elixir-autogen, elixir-format
 msgid "Submitting…"
 msgstr "يجري الإرسال…"
@@ -1057,7 +1052,7 @@ msgstr "هذا البريد لا ينتمي إلى حساب مسجل."
 
 #: lib/marshall_web/live/agent_threads_live.ex:123
 #: lib/marshall_web/live/agent_threads_live.ex:145
-#: lib/marshall_web/live/threads_live.ex:2892
+#: lib/marshall_web/live/threads_live.ex:2872
 #, elixir-autogen, elixir-format
 msgid "The agent encountered a problem"
 msgstr "واجه الوكيل مشكلة"
@@ -1103,7 +1098,7 @@ msgstr "تعذر إتمام عملية المحادثة."
 msgid "The thread owner's access cannot be changed."
 msgstr "لا يمكن تغيير وصول مالك المحادثة."
 
-#: lib/marshall_web/live/threads_live.ex:2381
+#: lib/marshall_web/live/threads_live.ex:2361
 #, elixir-autogen, elixir-format
 msgid "The transcript is temporarily unavailable. Try again shortly."
 msgstr "النص غير متاح مؤقتًا. أعد المحاولة قريبًا."
@@ -1178,7 +1173,7 @@ msgstr "ربما حُذفت هذه المحادثة أو الرابط غير ص�
 msgid "This tool is not available for the machine profile."
 msgstr "لا تتاح هذه الأداة لملف الآلة."
 
-#: lib/marshall_web/live/threads_live.ex:2013
+#: lib/marshall_web/live/threads_live.ex:1993
 #, elixir-autogen, elixir-format
 msgid "Thread access also applies to its machine. Separate machine grants and team access are managed independently."
 msgstr ""
@@ -1190,12 +1185,12 @@ msgstr ""
 msgid "Thread access updated."
 msgstr "تم تحديث وصول المحادثة."
 
-#: lib/marshall_web/live/threads_live.ex:1984
+#: lib/marshall_web/live/threads_live.ex:1964
 #, elixir-autogen, elixir-format
 msgid "Thread actions"
 msgstr "إجراءات المحادثة"
 
-#: lib/marshall_web/live/threads_live.ex:2786
+#: lib/marshall_web/live/threads_live.ex:2766
 #, elixir-autogen, elixir-format
 msgid "Thread context"
 msgstr "سياق المحادثة"
@@ -1220,11 +1215,6 @@ msgstr "أُعيد فتح المحادثة؛ تجري تهيئة آلة جديد
 msgid "Thread temporarily unavailable"
 msgstr "المحادثة غير متاحة مؤقتًا"
 
-#: lib/marshall_web/live/threads_live.ex:1956
-#, elixir-autogen, elixir-format
-msgid "Thread terminal"
-msgstr "طرفية المحادثة"
-
 #: lib/marshall_web/live/threads_live.ex:1882
 #, elixir-autogen, elixir-format
 msgid "Thread unavailable"
@@ -1232,7 +1222,7 @@ msgstr "المحادثة غير متاحة"
 
 #: lib/marshall_web/live/agent_threads_live.ex:132
 #: lib/marshall_web/live/agent_threads_live.ex:149
-#: lib/marshall_web/live/threads_live.ex:2902
+#: lib/marshall_web/live/threads_live.ex:2882
 #, elixir-autogen, elixir-format
 msgid "Thread updated"
 msgstr "تم تحديث المحادثة"
@@ -1262,47 +1252,47 @@ msgstr "المحادثات غير متاحة مؤقتًا. أعد المحاول
 msgid "Today"
 msgstr "اليوم"
 
-#: lib/marshall_web/live/threads_live.ex:2533
+#: lib/marshall_web/live/threads_live.ex:2513
 #, elixir-autogen, elixir-format
 msgid "Token allowance"
 msgstr "حد الرموز"
 
-#: lib/marshall_web/live/threads_live.ex:2879
+#: lib/marshall_web/live/threads_live.ex:2859
 #, elixir-autogen, elixir-format
 msgid "Tool cancelled"
 msgstr "أُلغيت الأداة"
 
-#: lib/marshall_web/live/threads_live.ex:2882
+#: lib/marshall_web/live/threads_live.ex:2862
 #, elixir-autogen, elixir-format
 msgid "Tool completed"
 msgstr "اكتملت الأداة"
 
-#: lib/marshall_web/live/threads_live.ex:2876
+#: lib/marshall_web/live/threads_live.ex:2856
 #, elixir-autogen, elixir-format
 msgid "Tool failed"
 msgstr "فشلت الأداة"
 
-#: lib/marshall_web/live/threads_live.ex:2885
+#: lib/marshall_web/live/threads_live.ex:2865
 #, elixir-autogen, elixir-format
 msgid "Tool outcome uncertain"
 msgstr "نتيجة الأداة غير مؤكدة"
 
 #: lib/marshall_web/live/agent_threads_live.ex:120
 #: lib/marshall_web/live/agent_threads_live.ex:148
-#: lib/marshall_web/live/threads_live.ex:2887
+#: lib/marshall_web/live/threads_live.ex:2867
 #, elixir-autogen, elixir-format
 msgid "Tool result received"
 msgstr "استُلمت نتيجة الأداة"
 
 #: lib/marshall_web/live/agent_threads_live.ex:119
 #: lib/marshall_web/live/agent_threads_live.ex:147
-#: lib/marshall_web/live/threads_live.ex:2869
-#: lib/marshall_web/live/threads_live.ex:2873
+#: lib/marshall_web/live/threads_live.ex:2849
+#: lib/marshall_web/live/threads_live.ex:2853
 #, elixir-autogen, elixir-format
 msgid "Tools queued"
 msgstr "الأدوات في الطابور"
 
-#: lib/marshall_web/live/threads_live.ex:2153
+#: lib/marshall_web/live/threads_live.ex:2133
 #, elixir-autogen, elixir-format
 msgid "Transcript"
 msgstr "النص"
@@ -1314,7 +1304,7 @@ msgstr "أعد المحاولة قريبًا."
 
 #: lib/marshall_web/live/agent_threads_live.ex:122
 #: lib/marshall_web/live/agent_threads_live.ex:142
-#: lib/marshall_web/live/threads_live.ex:2889
+#: lib/marshall_web/live/threads_live.ex:2869
 #, elixir-autogen, elixir-format
 msgid "Turn complete"
 msgstr "اكتملت الجولة"
@@ -1324,15 +1314,15 @@ msgstr "اكتملت الجولة"
 msgid "Ultra"
 msgstr "فائق"
 
-#: lib/marshall_web/live/threads_live.ex:2823
+#: lib/marshall_web/live/threads_live.ex:2803
 #, elixir-autogen, elixir-format
 msgid "Ultra is for complex, open-ended work."
 msgstr "المستوى الفائق للعمل المعقد والمفتوح."
 
-#: lib/marshall_web/live/threads_live.ex:2793
-#: lib/marshall_web/live/threads_live.ex:2799
-#: lib/marshall_web/live/threads_live.ex:2833
-#: lib/marshall_web/live/threads_live.ex:2913
+#: lib/marshall_web/live/threads_live.ex:2773
+#: lib/marshall_web/live/threads_live.ex:2779
+#: lib/marshall_web/live/threads_live.ex:2813
+#: lib/marshall_web/live/threads_live.ex:2893
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "مجهول"
@@ -1354,12 +1344,12 @@ msgstr "ألغِ تثبيت آلة هذه المحادثة قبل حذفها."
 msgid "Untitled thread"
 msgstr "محادثة بلا عنوان"
 
-#: lib/marshall_web/live/threads_live.ex:2647
+#: lib/marshall_web/live/threads_live.ex:2627
 #, elixir-autogen, elixir-format
 msgid "Update"
 msgstr "تحديث"
 
-#: lib/marshall_web/live/threads_live.ex:2640
+#: lib/marshall_web/live/threads_live.ex:2620
 #, elixir-autogen, elixir-format
 msgid "Update revision (optional)"
 msgstr "مراجعة التحديث (اختيارية)"
@@ -1369,29 +1359,29 @@ msgstr "مراجعة التحديث (اختيارية)"
 msgid "Updated"
 msgstr "محدّث"
 
-#: lib/marshall_web/live/threads_live.ex:2646
+#: lib/marshall_web/live/threads_live.ex:2626
 #, elixir-autogen, elixir-format
 msgid "Updating…"
 msgstr "يجري التحديث…"
 
-#: lib/marshall_web/live/threads_live.ex:2486
+#: lib/marshall_web/live/threads_live.ex:2466
 #, elixir-autogen, elixir-format
 msgid "Use Commands or press Ctrl/Cmd+K while writing. Start a message with / to find a command; use Tab to complete it."
 msgstr ""
 "استخدم الأوامر أو اضغط Ctrl/Cmd+K أثناء الكتابة. ابدأ الرسالة بـ / للعثور "
 "على أمر؛ واستخدم Tab لإكماله."
 
-#: lib/marshall_web/live/threads_live.ex:2675
+#: lib/marshall_web/live/threads_live.ex:2655
 #, elixir-autogen, elixir-format
 msgid "Use a public GitHub, GitLab, Codeberg or Bitbucket repository."
 msgstr "استخدم مستودعًا عامًا على GitHub أو GitLab أو Codeberg أو Bitbucket."
 
-#: lib/marshall_web/live/threads_live.ex:2083
+#: lib/marshall_web/live/threads_live.ex:2063
 #, elixir-autogen, elixir-format
 msgid "Use an existing account's email to grant, change or revoke a thread role."
 msgstr "استخدم بريد حساب موجود لمنح دور في المحادثة أو تغييره أو إبطاله."
 
-#: lib/marshall_web/live/threads_live.ex:2613
+#: lib/marshall_web/live/threads_live.ex:2593
 #, elixir-autogen, elixir-format
 msgid "Use this skill"
 msgstr "استخدام هذه المهارة"
@@ -1401,13 +1391,13 @@ msgstr "استخدام هذه المهارة"
 msgid "View activity"
 msgstr "عرض النشاط"
 
-#: lib/marshall_web/live/threads_live.ex:2100
-#: lib/marshall_web/live/threads_live.ex:2909
+#: lib/marshall_web/live/threads_live.ex:2080
+#: lib/marshall_web/live/threads_live.ex:2889
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "مشاهد"
 
-#: lib/marshall_web/live/threads_live.ex:2113
+#: lib/marshall_web/live/threads_live.ex:2093
 #, elixir-autogen, elixir-format
 msgid "Viewers read. Operators send prompts. Managers also share and manage the thread."
 msgstr ""
@@ -1420,7 +1410,7 @@ msgstr ""
 msgid "Wait for the current work or pending questions to finish before changing this setting."
 msgstr "انتظر انتهاء العمل الحالي أو الأسئلة المعلقة قبل تغيير هذا الإعداد."
 
-#: lib/marshall_web/live/threads_live.ex:2836
+#: lib/marshall_web/live/threads_live.ex:2816
 #, elixir-autogen, elixir-format
 msgid "Waiting for a workspace"
 msgstr "بانتظار مساحة عمل"
@@ -1430,22 +1420,22 @@ msgstr "بانتظار مساحة عمل"
 msgid "Waiting for machine"
 msgstr "في انتظار الجهاز"
 
-#: lib/marshall_web/live/threads_live.ex:2398
+#: lib/marshall_web/live/threads_live.ex:2378
 #, elixir-autogen, elixir-format
 msgid "Waiting for the agent's first update."
 msgstr "بانتظار أول تحديث للوكيل."
 
-#: lib/marshall_web/live/threads_live.ex:2894
+#: lib/marshall_web/live/threads_live.ex:2874
 #, elixir-autogen, elixir-format
 msgid "Waiting for the machine"
 msgstr "بانتظار الآلة"
 
-#: lib/marshall_web/live/threads_live.ex:2895
+#: lib/marshall_web/live/threads_live.ex:2875
 #, elixir-autogen, elixir-format
 msgid "Waiting for your answers"
 msgstr "بانتظار إجاباتك"
 
-#: lib/marshall_web/live/threads_live.ex:2908
+#: lib/marshall_web/live/threads_live.ex:2888
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "تطبيقات الويب"
@@ -1456,13 +1446,13 @@ msgid "What are we working on?"
 msgstr "على ماذا نعمل؟"
 
 #: lib/marshall_web/live/threads_live.ex:1510
-#: lib/marshall_web/live/threads_live.ex:2783
+#: lib/marshall_web/live/threads_live.ex:2763
 #: lib/marshall_web/thread_commands.ex:16
 #, elixir-autogen, elixir-format
 msgid "Work"
 msgstr "عمل"
 
-#: lib/marshall_web/live/threads_live.ex:2523
+#: lib/marshall_web/live/threads_live.ex:2503
 #, elixir-autogen, elixir-format
 msgid "Working directory"
 msgstr "دليل العمل"
@@ -1477,7 +1467,7 @@ msgstr "يجري جمع سياق مساحة العمل. أعد المحاولة 
 msgid "Workspace context is unavailable. Reload it when the machine is ready."
 msgstr "سياق مساحة العمل غير متاح. أعد تحميله عندما تصبح الآلة جاهزة."
 
-#: lib/marshall_web/live/threads_live.ex:2900
+#: lib/marshall_web/live/threads_live.ex:2880
 #, elixir-autogen, elixir-format
 msgid "Workspace context reloaded"
 msgstr "أُعيد تحميل سياق مساحة العمل"
@@ -1487,12 +1477,12 @@ msgstr "أُعيد تحميل سياق مساحة العمل"
 msgid "Workspace files changed during collection. Reload context and try again."
 msgstr "تغيرت ملفات مساحة العمل أثناء الجمع. أعد تحميل السياق وحاول مجددًا."
 
-#: lib/marshall_web/live/threads_live.ex:2842
+#: lib/marshall_web/live/threads_live.ex:2822
 #, elixir-autogen, elixir-format
 msgid "Workspace ready · open the conversation"
 msgstr "مساحة العمل جاهزة · افتح المحادثة"
 
-#: lib/marshall_web/live/threads_live.ex:2844
+#: lib/marshall_web/live/threads_live.ex:2824
 #, elixir-autogen, elixir-format
 msgid "Workspace setup needs attention"
 msgstr "إعداد مساحة العمل يحتاج إلى اهتمام"
@@ -1502,7 +1492,7 @@ msgstr "إعداد مساحة العمل يحتاج إلى اهتمام"
 msgid "Workspace skill"
 msgstr "مهارة مساحة العمل"
 
-#: lib/marshall_web/live/threads_live.ex:2549
+#: lib/marshall_web/live/threads_live.ex:2529
 #, elixir-autogen, elixir-format
 msgid "Workspace source"
 msgstr "مصدر مساحة العمل"
@@ -1518,7 +1508,7 @@ msgstr "يمكنك قراءة هذه المحادثات. اطلب وصول مش�
 msgid "You do not have access to this thread."
 msgstr "لا تملك وصولًا إلى هذه المحادثة."
 
-#: lib/marshall_web/live/threads_live.ex:2164
+#: lib/marshall_web/live/threads_live.ex:2144
 #, elixir-autogen, elixir-format
 msgid "You have read-only access to this thread."
 msgstr "لديك وصول للقراءة فقط إلى هذه المحادثة."
@@ -1528,27 +1518,27 @@ msgstr "لديك وصول للقراءة فقط إلى هذه المحادثة."
 msgid "Your agent's work runs in a dedicated environment."
 msgstr "يعمل وكيلك في بيئة مخصصة."
 
-#: lib/marshall_web/live/threads_live.ex:2312
+#: lib/marshall_web/live/threads_live.ex:2292
 #, elixir-autogen, elixir-format
 msgid "Your answer or additional detail"
 msgstr "إجابتك أو تفاصيل إضافية"
 
-#: lib/marshall_web/live/threads_live.ex:2896
+#: lib/marshall_web/live/threads_live.ex:2876
 #, elixir-autogen, elixir-format
 msgid "Your answers were received"
 msgstr "تم استلام إجاباتك"
 
-#: lib/marshall_web/live/threads_live.ex:2274
+#: lib/marshall_web/live/threads_live.ex:2254
 #, elixir-autogen, elixir-format
 msgid "Your input is needed"
 msgstr "مطلوب إدخالك"
 
-#: lib/marshall_web/live/threads_live.ex:2174
+#: lib/marshall_web/live/threads_live.ex:2154
 #, elixir-autogen, elixir-format
 msgid "Your machine is starting. The agent will begin with your objective as soon as it is ready."
 msgstr "آلتك تبدأ. سيبدأ الوكيل بهدفك فور جاهزيتها."
 
-#: lib/marshall_web/live/threads_live.ex:2186
+#: lib/marshall_web/live/threads_live.ex:2166
 #, elixir-autogen, elixir-format
 msgid "Your objective is saved. Retry to prepare the workspace again."
 msgstr "حُفظ هدفك. أعد المحاولة لتحضير مساحة العمل مجددًا."
@@ -1558,12 +1548,12 @@ msgstr "حُفظ هدفك. أعد المحاولة لتحضير مساحة ال�
 msgid "Your threads"
 msgstr "محادثاتك"
 
-#: lib/marshall_web/live/threads_live.ex:2498
+#: lib/marshall_web/live/threads_live.ex:2478
 #, elixir-autogen, elixir-format
 msgid "and"
 msgstr "و"
 
-#: lib/marshall_web/live/threads_live.ex:2499
+#: lib/marshall_web/live/threads_live.ex:2479
 #, elixir-autogen, elixir-format
 msgid "choose a mode and submit the task together. Choosing a mode on a new thread does not create a machine."
 msgstr "اختر وضعًا وأرسل المهمة معًا. اختيار وضع في محادثة جديدة لا ينشئ آلة."
@@ -1573,7 +1563,7 @@ msgstr "اختر وضعًا وأرسل المهمة معًا. اختيار وض�
 msgid "· %{value1} reasoning · %{value2}"
 msgstr "· استدلال %{value1} · %{value2}"
 
-#: lib/marshall_web/live/threads_live.ex:2466
+#: lib/marshall_web/live/threads_live.ex:2446
 #, elixir-autogen, elixir-format
 msgid "↑ ↓ choose · Enter run · Escape close"
 msgstr "↑ ↓ اختيار · Enter تشغيل · Escape إغلاق"
@@ -1633,7 +1623,7 @@ msgstr "افتح طرفية جهاز هذه المحادثة"
 msgid "Summarize older context for the next turn"
 msgstr "لخّص السياق الأقدم للدور التالي"
 
-#: lib/marshall_web/live/threads_live.ex:1976
+#: lib/marshall_web/live/threads_live.ex:1956
 #, elixir-autogen, elixir-format
 msgid "Message board"
 msgstr "لوحة الرسائل"

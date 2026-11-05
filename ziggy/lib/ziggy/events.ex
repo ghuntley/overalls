@@ -48,9 +48,29 @@ defmodule Ziggy.Events do
     ]
   )
 
+  defevent("ziggy.upstream_started",
+    message: "Upstream provider attempt started",
+    metadata: [request_id: :uuid]
+  )
+
   defevent("ziggy.upstream_outcome",
     message: "Upstream provider outcome",
-    metadata: [request_id: :uuid, reason: :atom]
+    metadata: [
+      request_id: :uuid,
+      reason: :atom,
+      status: {:int, :optional},
+      duration_ms: :int
+    ]
+  )
+
+  defevent("ziggy.agent_provider_outcome",
+    message: "Agent provider result classified",
+    metadata: [
+      request_id: :uuid,
+      reason: :atom,
+      status: {:int, :optional},
+      duration_ms: :int
+    ]
   )
 
   defevent("ziggy.control_exchange_failed",

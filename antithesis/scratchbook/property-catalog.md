@@ -2289,8 +2289,10 @@ These properties compare actual Restic publication and isolated target markers u
 
 ### team-transfer-consent-preserves-single-owner — Team transfer consent preserves a single owner
 
-| **Priority** | P0 (security and authorization integrity) |
+| | |
 |---|---|
+| **Type** | Safety (`Always` primary) |
+| **Priority** | P0 (security and authorization integrity) |
 | **Property** | Concurrent team transfer and account lifecycle operations never leave an active team with zero or multiple owners; only the designated target can accept, terminal transfer states remain immutable, and acceptance atomically swaps owner/admin roles. |
 | **Invariant** | `Always` over committed team membership and transfer rows: exactly one active owner per active team and no terminal-state transition. `Reachable` records a successful accepted transfer; `Sometimes` records progress after a healed concurrent race. Planned literal SDK message: **"Team transfer concurrency preserves exactly one owner and immutable terminal state"**. |
 | **Antithesis Angle** | Race offer/accept/decline/cancel with duplicate requests, membership removal and account retirement; delay or kill between state transition and receipt/event scheduling; independently reconcile PostgreSQL rows, history and audit receipts. |
@@ -2305,7 +2307,7 @@ These properties compare actual Restic publication and isolated target markers u
 | **Type** | Safety plus liveness (`Always` primary, `Sometimes` post-marker liveness) |
 | **Priority / Confidence / Status** | P1 / source-grounded / new; workload unimplemented |
 | **Property** | Every selected profile emits one setup marker only after independent readiness and keeps its bootstrap owner alive without implicit restart. |
-| **Invariant** | `Always` joins marker ordering and cardinality to probe evidence; `Reachable` records successful setup; `Sometimes` requires post-marker owner liveness after a controlled fault. |
+| **Invariant** | `Always` joins marker ordering and cardinality to probe evidence; `Reachable` records successful setup; `Sometimes` requires post-marker owner liveness after a controlled fault. Planned literal SDK message: **"Bootstrap setup marker follows independent readiness and retains one live owner"**. |
 | **Antithesis Angle** | Fault a required endpoint before readiness, signal/restart the owner after readiness, and reconcile markers with process identity and Compose restart events. |
 | **Why It Matters** | Duplicate or premature setup markers can let workloads race an unready SUT; silent owner restart can invalidate all subsequent observations. |
 | **Evidence** | [Source and oracle](properties/bootstrap-setup-complete-single-owner.md); `antithesis/workload/core/bootstrap.py:94-105`. |

@@ -8,6 +8,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tarfile
 import tempfile
 import unittest
 from contextlib import ExitStack
@@ -16,7 +17,7 @@ from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from assertions import roster
+from assertions import roster, scan_catalog
 from campaign import (
     MAX_ACTIVE_ATTEMPTS,
     initialize,
@@ -59,6 +60,16 @@ from selection import (
 )
 
 
+def archive_rootfs(rootfs: Path) -> None:
+    def root_owned(member: tarfile.TarInfo) -> tarfile.TarInfo:
+        member.uid = member.gid = 0
+        member.uname = member.gname = ""
+        return member
+
+    with tarfile.open(rootfs.with_name("rootfs.tar"), "w", dereference=False) as archive:
+        archive.add(rootfs, arcname=".", filter=root_owned)
+
+
 def hash_output(lines: str) -> bytes:
     return b"".join(line.encode("utf-8") + b"\0" for line in lines.splitlines())
 
@@ -97,6 +108,32 @@ def reserve_worker(
 
 
 class VerificationTests(unittest.TestCase):
+    def test_research_catalog_keeps_planned_bootstrap_safety_separate_from_marker(self) -> None:
+        root = Path(__file__).resolve().parents[3]
+        catalog = root / "antithesis/scratchbook/property-catalog.md"
+        properties = scan_catalog(catalog)
+        bootstrap = next(
+            prop for prop in properties if prop.slug == "bootstrap-setup-complete-single-owner"
+        )
+        self.assertEqual(bootstrap.primary_kind, "always")
+        self.assertEqual(
+            bootstrap.message,
+            "Bootstrap setup marker follows independent readiness and retains one live owner",
+        )
+        data = roster(root, catalog, {"antithesis/workload/core/bootstrap.py"})
+        self.assertIn(
+            "bootstrap-setup-complete-single-owner",
+            arr(field(data, "missing_primary_properties"), "missing primary properties"),
+        )
+        self.assertNotIn(
+            "bootstrap-setup-complete-single-owner",
+            arr(field(data, "mismatched_primary_properties"), "mismatched primary properties"),
+        )
+        self.assertIn(
+            "Overalls bootstrap observed Control connection and independent oracle",
+            arr(field(data, "supportive_messages"), "supportive messages"),
+        )
+
     def test_image_hashes_preserve_backslash_escaped_paths(self) -> None:
         path = "/opt/overalls/line\\nwith\\backslash"
         digest = "a" * 64
@@ -153,6 +190,8 @@ class VerificationTests(unittest.TestCase):
             (staged / "rootfs/opt/overalls/context-output.txt").write_text(
                 output + "\n", encoding="utf-8"
             )
+            (staged / "context-output.txt").write_text(output + "\n", encoding="utf-8")
+            archive_rootfs(staged / "rootfs")
             self.assertEqual(
                 compare_context_trees(staged, expected, "workload", output),
                 walk_inputs(
@@ -160,9 +199,11 @@ class VerificationTests(unittest.TestCase):
                 ),
             )
             (staged / "rootfs/opt/overalls/image-identity.json").write_bytes(b"stale")
+            archive_rootfs(staged / "rootfs")
             with self.assertRaisesRegex(EvidenceError, "differs from current built output"):
                 compare_context_trees(staged, expected, "workload", output)
             (staged / "rootfs/opt/overalls/context-output.txt").write_bytes(b"old output\n")
+            archive_rootfs(staged / "rootfs")
             with self.assertRaisesRegex(EvidenceError, "no current output stamp"):
                 compare_context_trees(staged, expected, "workload", output)
             derivation = "/nix/store/" + "d" * 32 + "-workload-context.drv"
@@ -207,8 +248,7 @@ class VerificationTests(unittest.TestCase):
             stamp = (output + "\n").encode()
             (context / "identity.json").write_bytes(identity)
             (context / "closure-store-paths.txt").write_bytes(closure)
-            (context / "rootfs/opt/overalls").mkdir(parents=True)
-            (context / "rootfs/opt/overalls/context-output.txt").write_bytes(stamp)
+            (context / "context-output.txt").write_bytes(stamp)
             records: list[dict[str, Json]] = [{"stage": "workload", "current_nix_context": output}]
             images: dict[str, Json] = {"workload": {"image_id": "sha256:" + "a" * 64}}
             with patch("identity.command_bytes", side_effect=[identity, closure, stamp]):
@@ -302,13 +342,14 @@ class VerificationTests(unittest.TestCase):
             (rootfs / "etc/base").write_bytes(b"rootfs bytes")
             (rootfs / "etc/link").symlink_to("base")
             (rootfs / "opt/overalls").mkdir(parents=True)
+            archive_rootfs(rootfs)
             operator = root / "antithesis/operator"
             operator.mkdir(parents=True)
             (operator / "runner.exs").write_bytes(b"operator bytes")
             dockerfile = root / "antithesis/Dockerfile"
             dockerfile.write_text(
                 "FROM scratch AS workload\n"
-                "COPY antithesis/build/contexts/workload/rootfs/ /\n"
+                "ADD antithesis/build/contexts/workload/rootfs.tar /\n"
                 "COPY antithesis/operator/ /opt/overalls/operator/\n",
                 encoding="utf-8",
             )
@@ -351,7 +392,7 @@ class VerificationTests(unittest.TestCase):
                     "identity.command_bytes",
                     return_value=f"{'0' * 64}  /etc/base".encode() + b"\0",
                 ),
-                self.assertRaisesRegex(EvidenceError, "image COPY bytes differ.*rootfs/"),
+                self.assertRaisesRegex(EvidenceError, "image COPY bytes differ.*rootfs.tar"),
             ):
                 verify_image_copies(
                     root, "podman", ["workload"], {"workload": {"image_id": image_id}}
@@ -751,18 +792,23 @@ class VerificationTests(unittest.TestCase):
             # split into one instrumentor root per package and the SDK then
             # registers only one package's catalog per process.
             link = staged_root / "antithesis/build/contexts/workload/rootfs/opt/antithesis/catalog"
+            rootfs = link.parents[2]
+            link.parent.mkdir(parents=True)
+            archive_rootfs(rootfs)
             with self.assertRaisesRegex(EvidenceError, "lacks the single-root catalog link"):
                 verify_catalog_link(staged_root)
-            link.parent.mkdir(parents=True)
             (link / "workload").mkdir(parents=True)
+            archive_rootfs(rootfs)
             with self.assertRaisesRegex(EvidenceError, "lacks the single-root catalog link"):
                 verify_catalog_link(staged_root)
             shutil.rmtree(link)
             link.symlink_to("/opt/overalls-antithesis/catalog")
+            archive_rootfs(rootfs)
             with self.assertRaisesRegex(EvidenceError, "unexpected tree"):
                 verify_catalog_link(staged_root)
             link.unlink()
             link.symlink_to("/opt/overalls-antithesis/catalog/workload")
+            archive_rootfs(rootfs)
             verify_catalog_link(staged_root)
             command = replica / "v1/control/serial_driver_smoke.py"
             command.write_text("stale command", encoding="utf-8")

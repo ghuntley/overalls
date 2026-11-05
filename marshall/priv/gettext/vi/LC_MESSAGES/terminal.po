@@ -526,12 +526,6 @@ msgstr "Không thể mở thiết bị đầu cuối."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "Máy này đã dừng. Khởi động để mở thiết bị đầu cuối. Các tệp của bạn được giữ lại."
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "Ảnh hệ thống của máy này không hỗ trợ trình chỉnh sửa trình duyệt hiện tại."
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

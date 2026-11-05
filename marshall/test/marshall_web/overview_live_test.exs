@@ -181,22 +181,18 @@ defmodule MarshallWeb.OverviewLiveTest do
            )
   end
 
-  test "overview explains unsupported images without an editor link", %{conn: conn} do
+  # @cc [owner:ghuntley,label:verification;product] overview-unsupported-editor-hidden
+  # Unsupported images MUST omit active and disabled editor actions and their
+  # notice from overview cards, matching the shared component contract.
+  test "overview hides editor actions for unsupported images", %{conn: conn} do
     put_editor_release()
     fixture = Marshall.TerminalFixtures.terminal_fixture()
     machine_id = fixture.vm.id
     {:ok, view, _} = live(signed_in(conn, fixture.owner), "/overview")
 
     refute has_element?(view, "#overview-machine-#{machine_id}-vscode")
-    assert has_element?(view, "#overview-machine-#{machine_id}-vscode-disabled[disabled]")
-
-    assert has_element?(
-             view,
-             "#overview-machine-#{machine_id}-vscode-reason",
-             "does not support the current browser editor"
-           )
-
-    refute has_element?(view, "#overview-machine-#{machine_id}-vscode-reason", "new machine")
+    refute has_element?(view, "#overview-machine-#{machine_id}-vscode-disabled")
+    refute has_element?(view, "#overview-machine-#{machine_id}-vscode-reason")
   end
 
   test "machine preview stays bounded", %{conn: conn} do

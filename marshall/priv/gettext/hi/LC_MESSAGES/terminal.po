@@ -537,12 +537,6 @@ msgstr ""
 "यह मशीन बंद है। टर्मिनल खोलने के लिए इसे शुरू करें। आपकी फ़ाइलें सुरक्षित "
 "हैं।"
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:530
-#, elixir-autogen, elixir-format
-msgid "This machine's image does not support the current browser editor."
-msgstr "इस मशीन की इमेज वर्तमान ब्राउज़र एडिटर का समर्थन नहीं करती।"
-
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

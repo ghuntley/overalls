@@ -1,7 +1,26 @@
 load("@root//buck:mix.bzl", "mix_sources", "mix_tree")
 load("@root//buck:nix.bzl", "nix_owned")
 
-nix_owned()
+# `prepare-contexts.sh` materializes selected Nix closures below
+# `antithesis/build/contexts` and `selection.py` writes the selected catalog
+# below `antithesis/build/selected-test`.  These are generated runtime inputs,
+# not repository sources.  Keep them out of the recursive source inventory so
+# staging one context cannot change the inputs (or filenames) seen while
+# assembling another context.
+antithesis_sources = native.glob(
+    ["**", "**/.*", "**/.*/**"],
+    exclude = [
+        "BUCK",
+        "BUCK.v2",
+        "build/contexts/**",
+        "build/selected-test/**",
+        "build/.context-*",
+        "build/.context-*/**",
+        "runtime",
+        "runtime/**",
+    ],
+)
+nix_owned(srcs = antithesis_sources)
 
 # Fallback SDK and harness sources, selected only by the antithesis release
 # variants (contract harness-source-isolation).

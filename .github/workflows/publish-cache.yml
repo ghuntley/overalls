@@ -170,36 +170,3 @@ jobs:
             echo "::error::a build shard did not succeed ($BUILD)"
             exit 1
           fi
-
-  # Host deployments are intentionally built one per runner: each system
-  # closure is large, and publishing the exact deployment closure lets the
-  # enrolled host substitute it instead of compiling its Marshall release.
-  deployments:
-    name: deployment (${{ matrix.host }})
-    runs-on: namespace-profile-cached-amd64-xl;container.privileged=true
-    timeout-minutes: 180
-    strategy:
-      fail-fast: false
-      matrix:
-        host: [dungarees, panterloons, salopettes]
-    env:
-      NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
-    steps:
-      - uses: namespacelabs/nscloud-checkout-action@66f2dc6f6c42a8ac6c4e53473c4840006822831e # v9
-      - uses: ./.github/actions/devenv
-        with:
-          cachix-auth-token: ${{ secrets.CACHIX_AUTH_TOKEN }}
-          install-devenv: "false"
-      - name: Build and publish host deployment
-        run: |
-          set -euo pipefail
-          target="//fleet/hosts/${{ matrix.host }}:deployment"
-          cachix watch-exec overalls -- tools/buck2 build "$target" \
-            --build-report "$RUNNER_TEMP/build-report.json"
-      - name: Realise deployment closure
-        run: |
-          set -euo pipefail
-          while read -r file; do
-            path=$(cat "$file")
-            nix-store --check-validity "$path" || nix-store --realise "$path" > /dev/null
-          done < <(jq -r '.results[].outputs.DEFAULT[]?' "$RUNNER_TEMP/build-report.json")
