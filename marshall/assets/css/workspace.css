@@ -781,7 +781,7 @@ button.machine-editor-link,
   align-items: center;
   justify-content: space-between;
   gap: var(--line-height) 2ch;
-  padding: 0 1ch calc(var(--line-height) - var(--border-thickness));
+  padding-bottom: calc(var(--line-height) - var(--border-thickness));
   border-bottom: var(--border-thickness) solid var(--background-color-alt);
   margin-bottom: calc(var(--line-height) * 2);
 }
@@ -804,16 +804,19 @@ button.machine-editor-link,
 .threads-layout {
   min-width: 0;
 }
-.threads-layout-detail,
+.threads-layout-detail {
+  display: grid;
+  grid-template-columns: 25ch minmax(0, 1fr);
+  gap: 0 3ch;
+}
 .threads-layout-activity {
   display: grid;
-  grid-template-columns: 23ch minmax(0, 1fr);
-  gap: 0 4ch;
-  align-items: start;
+  grid-template-columns: 25ch minmax(0, 1fr);
+  gap: 0 3ch;
 }
 .threads-layout-activity .thread-activity {
-  max-width: 104ch;
-  margin: 0;
+  max-width: 100ch;
+  margin-top: var(--line-height);
 }
 .thread-navigation-activity-link {
   display: block;
@@ -828,11 +831,6 @@ button.machine-editor-link,
 }
 .threads-navigation {
   min-width: 0;
-}
-.threads-layout-detail .threads-navigation,
-.threads-layout-activity .threads-navigation {
-  padding-inline-end: 2ch;
-  border-inline-end: var(--border-thickness) solid var(--background-color-alt);
 }
 .thread-list-heading h2 {
   margin: 0 0 var(--line-height);
@@ -883,8 +881,8 @@ button.machine-editor-link,
   display: none;
 }
 .threads-index {
-  max-width: 104ch;
-  margin: 0 auto;
+  max-width: 100ch;
+  margin: var(--line-height) auto 0;
 }
 .threads-index .thread-navigation-item {
   display: grid;
@@ -907,7 +905,6 @@ button.machine-editor-link,
 }
 .thread-workspace {
   min-width: 0;
-  max-width: 104ch;
 }
 .thread-workspace:not(:has(> *)) {
   display: none;
@@ -917,18 +914,18 @@ button.machine-editor-link,
   flex-wrap: wrap;
   align-items: start;
   justify-content: space-between;
-  gap: var(--line-height) 3ch;
-  padding: 0 1ch calc(var(--line-height) - var(--border-thickness));
+  gap: var(--line-height) 2ch;
+  padding-bottom: calc(var(--line-height) - var(--border-thickness));
   border-bottom: var(--border-thickness) solid var(--background-color-alt);
   margin-bottom: calc(var(--line-height) * 2);
 }
 .thread-detail-title {
-  flex: 1 1 36ch;
+  flex: 1 1 28ch;
   min-width: 0;
 }
 .thread-detail-title h1 {
-  font-size: 1.5rem;
-  line-height: calc(var(--line-height) * 2);
+  font-size: 1rem;
+  line-height: var(--line-height);
   text-transform: none;
   overflow-wrap: anywhere;
   margin: 0 0 var(--line-height);
@@ -938,11 +935,29 @@ button.machine-editor-link,
 }
 .thread-detail-actions {
   display: flex;
-  flex: 1 1 36ch;
   align-items: start;
-  justify-content: flex-end;
   flex-wrap: wrap;
-  gap: 0 2ch;
+  gap: 0 1ch;
+}
+.thread-terminal-embed {
+  flex-basis: 100%;
+  margin-top: var(--line-height);
+}
+.thread-terminal-embed summary {
+  display: inline-block;
+}
+.thread-terminal-frame {
+  width: 100%;
+  height: calc(var(--line-height) * 24);
+  margin-top: var(--line-height);
+  outline: var(--border-thickness) solid var(--background-color-alt);
+  outline-offset: calc(-1 * var(--border-thickness));
+}
+.thread-terminal-frame iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 .thread-actions-menu {
   border: 0;
@@ -961,18 +976,16 @@ button.machine-editor-link,
   display: grid;
 }
 .thread-conversation {
-  width: calc(min(88ch, round(down, 100%, 1ch)));
+  width: calc(min(80ch, round(down, 100%, 1ch)));
   margin: 0 auto;
 }
 .thread-events {
   min-width: 0;
-  padding: 0 2ch;
+  padding: 0 1ch;
 }
 .thread-message {
   margin: 0 0 calc(var(--line-height) * 2);
   min-width: 0;
-  padding-inline-start: 1ch;
-  border-inline-start: var(--border-thickness) solid var(--background-color-alt);
 }
 .thread-message-role {
   font-weight: var(--font-weight-bold);
@@ -987,7 +1000,6 @@ button.machine-editor-link,
 .thread-message[data-kind="prompt"] {
   background: var(--background-color-alt);
   padding: var(--line-height) 2ch;
-  border-inline-start-color: var(--text-color);
 }
 .thread-message[data-kind="prompt"] .thread-message-role {
   color: var(--text-color-alt);
@@ -996,67 +1008,6 @@ button.machine-editor-link,
   padding-inline-start: 2ch;
   color: var(--text-color-alt);
   margin-bottom: var(--line-height);
-}
-.thread-tool-events {
-  display: grid;
-  gap: var(--line-height);
-}
-.thread-tool-card {
-  margin: 0;
-  border-color: var(--background-color-alt);
-  color: var(--text-color);
-}
-.thread-tool-card[data-tone="danger"] {
-  border-style: double;
-  border-width: calc(var(--border-thickness) * 3);
-  padding: calc(var(--line-height) - var(--border-thickness) * 3) calc(1ch - var(--border-thickness) * 3);
-}
-.thread-tool-summary {
-  display: grid;
-  grid-template-columns: max-content minmax(12ch, max-content) minmax(0, 1fr);
-  align-items: start;
-  gap: 0 2ch;
-}
-.thread-tool-name,
-.thread-tool-summary-text {
-  overflow-wrap: anywhere;
-}
-.thread-tool-summary-text {
-  color: var(--text-color-alt);
-}
-.thread-tool-duration {
-  color: var(--text-color-alt);
-  justify-self: end;
-}
-.thread-tool-details {
-  padding-top: var(--line-height);
-}
-.thread-tool-command h3,
-.thread-tool-arguments summary {
-  margin: 0 0 var(--line-height);
-  font-size: 1rem;
-  line-height: var(--line-height);
-}
-.thread-tool-command pre,
-.thread-tool-arguments pre {
-  margin: 0 0 var(--line-height);
-  padding: calc(var(--line-height) - var(--border-thickness)) 1ch;
-  border-inline-start: var(--border-thickness) solid var(--background-color-alt);
-  overflow-x: auto;
-}
-.thread-tool-output {
-  margin: 0 0 var(--line-height);
-}
-.thread-tool-output h3 {
-  margin: 0 0 var(--line-height);
-  font-size: 1rem;
-  line-height: var(--line-height);
-  text-transform: none;
-}
-.thread-tool-output pre {
-  margin: 0;
-  padding: calc(var(--line-height) - var(--border-thickness)) 1ch;
-  border-inline-start: var(--border-thickness) solid var(--background-color-alt);
 }
 .thread-event-label {
   margin: 0;
@@ -1090,8 +1041,8 @@ button.machine-editor-link,
   text-transform: none;
 }
 .thread-start {
-  width: calc(min(88ch, round(down, 100%, 1ch)));
-  margin: calc(var(--line-height) * 3) auto 0;
+  width: calc(min(80ch, round(down, 100%, 1ch)));
+  margin: calc(var(--line-height) * 5) auto 0;
 }
 .thread-start-heading h1 {
   text-transform: none;
@@ -1188,8 +1139,8 @@ button.machine-editor-link,
   margin-bottom: calc(var(--line-height) * 2);
 }
 .thread-activity {
-  max-width: 104ch;
-  margin: 0 auto;
+  max-width: 100ch;
+  margin: var(--line-height) auto 0;
 }
 .thread-activity-heading {
   display: flex;
@@ -1302,15 +1253,6 @@ button.machine-editor-link,
   }
   .thread-message[data-kind="prompt"] {
     padding: var(--line-height) 1ch;
-  }
-  .thread-tool-summary {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 0;
-  }
-  .thread-tool-summary .status-label,
-  .thread-tool-name,
-  .thread-tool-summary-text {
-    margin-bottom: var(--line-height);
   }
   .threads-index .thread-navigation-item {
     grid-template-columns: minmax(0, 1fr);

@@ -70,7 +70,7 @@ impl Totals {
     fn new() -> Result<Self, Error> {
         Ok(Self {
             started_at_unix_nano: now_ns()?,
-            incarnation: uuid::Uuid::now_v7().simple().to_string(),
+            incarnation: uuid::Uuid::new_v4().simple().to_string(),
             requests: 0,
             successes: 0,
             failures: 0,
@@ -234,7 +234,7 @@ impl Journal {
         if self.fenced.load(Ordering::SeqCst) {
             return Err(Error::Unavailable);
         }
-        let id = uuid::Uuid::now_v7().to_string();
+        let id = uuid::Uuid::new_v4().to_string();
         let mut conn = self.conn.lock().map_err(|_| Error::Unavailable)?;
         if self.fenced.load(Ordering::SeqCst) {
             return Err(Error::Unavailable);
@@ -589,7 +589,7 @@ mod tests {
     impl TestDirectory {
         fn new() -> Self {
             let path =
-                std::env::temp_dir().join(format!("underclass-slo-{}", uuid::Uuid::now_v7()));
+                std::env::temp_dir().join(format!("underclass-slo-{}", uuid::Uuid::new_v4()));
             fs::DirBuilder::new().mode(0o700).create(&path).unwrap();
             Self(path)
         }
@@ -854,7 +854,7 @@ mod tests {
             for _ in 0..CAPACITY {
                 tx.execute(
                     "INSERT INTO slo_pending(id) VALUES (?1)",
-                    [uuid::Uuid::now_v7().to_string()],
+                    [uuid::Uuid::new_v4().to_string()],
                 )
                 .unwrap();
             }

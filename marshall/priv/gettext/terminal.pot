@@ -48,7 +48,7 @@ msgstr ""
 msgid "Allow viewing"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:412
+#: lib/marshall_web/components/workspace_components.ex:417
 #, elixir-autogen, elixir-format
 msgid "Already installed"
 msgstr ""
@@ -74,7 +74,7 @@ msgstr ""
 msgid "A−"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:435
+#: lib/marshall_web/components/workspace_components.ex:440
 #: lib/marshall_web/live/terminal_live.ex:655
 #, elixir-autogen, elixir-format
 msgid "Boot log"
@@ -100,7 +100,7 @@ msgstr ""
 msgid "Close terminal %{value1}"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:380
+#: lib/marshall_web/components/workspace_components.ex:385
 #, elixir-autogen, elixir-format
 msgid "Connect from your computer"
 msgstr ""
@@ -111,24 +111,24 @@ msgid "Connecting…"
 msgstr ""
 
 #: lib/marshall_web/components/workspace_components.ex:277
-#: lib/marshall_web/components/workspace_components.ex:399
-#: lib/marshall_web/components/workspace_components.ex:409
-#: lib/marshall_web/components/workspace_components.ex:420
+#: lib/marshall_web/components/workspace_components.ex:404
+#: lib/marshall_web/components/workspace_components.ex:414
+#: lib/marshall_web/components/workspace_components.ex:425
 #, elixir-autogen, elixir-format
 msgid "Copy"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:398
+#: lib/marshall_web/components/workspace_components.ex:403
 #, elixir-autogen, elixir-format
 msgid "Copy Linux and macOS install command"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:419
+#: lib/marshall_web/components/workspace_components.ex:424
 #, elixir-autogen, elixir-format
 msgid "Copy SSH command"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:408
+#: lib/marshall_web/components/workspace_components.ex:413
 #, elixir-autogen, elixir-format
 msgid "Copy Windows PowerShell install command"
 msgstr ""
@@ -138,7 +138,7 @@ msgstr ""
 msgid "Copy machine ID"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:548
+#: lib/marshall_web/components/workspace_components.ex:554
 #, elixir-autogen, elixir-format
 msgid "Customer"
 msgstr ""
@@ -194,17 +194,17 @@ msgstr ""
 msgid "Increase terminal font size"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:389
+#: lib/marshall_web/components/workspace_components.ex:394
 #, elixir-autogen, elixir-format
 msgid "Install and connect"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:384
+#: lib/marshall_web/components/workspace_components.ex:389
 #, elixir-autogen, elixir-format
 msgid "Installs Overalls, configures SSH, and connects to this machine. On Windows the installer also installs OpenSSH 9.6 or newer and, with administrator approval, makes it the default ssh."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:391
+#: lib/marshall_web/components/workspace_components.ex:396
 #, elixir-autogen, elixir-format
 msgid "Linux / macOS"
 msgstr ""
@@ -256,13 +256,13 @@ msgstr ""
 
 #: lib/marshall_web/components/workspace_components.ex:291
 #: lib/marshall_web/components/workspace_components.ex:301
-#: lib/marshall_web/components/workspace_components.ex:475
-#: lib/marshall_web/components/workspace_components.ex:483
+#: lib/marshall_web/components/workspace_components.ex:480
+#: lib/marshall_web/components/workspace_components.ex:488
 #, elixir-autogen, elixir-format
 msgid "Open VS Code"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:474
+#: lib/marshall_web/components/workspace_components.ex:479
 #, elixir-autogen, elixir-format
 msgid "Open VS Code for %{value1}"
 msgstr ""
@@ -372,12 +372,12 @@ msgstr ""
 msgid "Running"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:442
+#: lib/marshall_web/components/workspace_components.ex:447
 #, elixir-autogen, elixir-format
 msgid "SSH connection details are temporarily unavailable."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:438
+#: lib/marshall_web/components/workspace_components.ex:443
 #, elixir-autogen, elixir-format
 msgid "SSH connection requires write access to this machine."
 msgstr ""
@@ -417,7 +417,7 @@ msgstr ""
 msgid "Share view"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:549
+#: lib/marshall_web/components/workspace_components.ex:555
 #, elixir-autogen, elixir-format
 msgid "Standard"
 msgstr ""
@@ -525,7 +525,13 @@ msgstr ""
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:426
+#: lib/marshall_web/components/workspace_components.ex:356
+#: lib/marshall_web/components/workspace_components.ex:530
+#, elixir-autogen, elixir-format
+msgid "This machine's image does not support the current browser editor."
+msgstr ""
+
+#: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"
 msgstr ""
@@ -551,33 +557,33 @@ msgid "Unavailable"
 msgstr ""
 
 #: lib/marshall_web/components/workspace_components.ex:88
-#: lib/marshall_web/components/workspace_components.ex:551
+#: lib/marshall_web/components/workspace_components.ex:557
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:440
+#: lib/marshall_web/components/workspace_components.ex:445
 #, elixir-autogen, elixir-format
 msgid "Use the browser terminal for this Inception environment."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:358
+#: lib/marshall_web/components/workspace_components.ex:363
 #, elixir-autogen, elixir-format
 msgid "VS Code is temporarily unavailable for this machine."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:530
+#: lib/marshall_web/components/workspace_components.ex:536
 #, elixir-autogen, elixir-format
 msgid "VS Code is temporarily unavailable."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:533
+#: lib/marshall_web/components/workspace_components.ex:539
 #, elixir-autogen, elixir-format
 msgid "VS Code is unavailable for this machine."
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:356
-#: lib/marshall_web/components/workspace_components.ex:527
+#: lib/marshall_web/components/workspace_components.ex:361
+#: lib/marshall_web/components/workspace_components.ex:533
 #, elixir-autogen, elixir-format
 msgid "VS Code requires a running machine."
 msgstr ""
@@ -597,7 +603,7 @@ msgstr ""
 msgid "Waiting for the machine to start…"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:401
+#: lib/marshall_web/components/workspace_components.ex:406
 #, elixir-autogen, elixir-format
 msgid "Windows"
 msgstr ""
@@ -642,7 +648,7 @@ msgstr ""
 msgid "rename"
 msgstr ""
 
-#: lib/marshall_web/components/workspace_components.ex:436
+#: lib/marshall_web/components/workspace_components.ex:441
 #, elixir-autogen, elixir-format
 msgid "to view the read-only host console."
 msgstr ""

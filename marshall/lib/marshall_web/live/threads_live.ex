@@ -11,23 +11,6 @@ defmodule MarshallWeb.ThreadsLive do
   @type socket :: Phoenix.LiveView.Socket.t()
   @type user :: Marshall.Accounts.User.t()
   @type thread :: Threads.Thread.t()
-  @type tool_output :: %{kind: String.t(), text: String.t(), truncated: boolean()}
-  @type tool_card :: %{
-          tool: String.t(),
-          state: String.t(),
-          tone: String.t(),
-          status_label: String.t(),
-          summary: String.t(),
-          metadata: [{String.t(), String.t()}],
-          command: String.t() | nil,
-          arguments: String.t() | nil,
-          command_preview: String.t() | nil,
-          duration: String.t() | nil,
-          outputs: [tool_output()],
-          open: boolean()
-        }
-
-  @tool_text_limit 8_192
 
   @impl true
   @spec mount(map(), map(), socket()) :: {:ok, socket()}
@@ -46,7 +29,7 @@ defmodule MarshallWeb.ThreadsLive do
         generation_current: true,
         events_empty: true,
         events_available: true,
-        tool_presentations: %{},
+        events_context: nil,
         generation_query_error: nil,
         catalog: %{images: []},
         form: to_form(default_form(), as: :thread),
@@ -64,837 +47,835 @@ defmodule MarshallWeb.ThreadsLive do
         thread_cursor: nil,
         thread_next: nil,
         thread_page_empty: false,
-        thread_matches_empty: true,
-        can_write: false,
-        can_manage: false,
-        share_open: false,
-        share_form: to_form(%{"email" => "", "role" => "viewer"}, as: :access),
-        share_request_key: Ash.UUID.generate(),
-        share_error: nil,
-        grant_owner: nil,
-        grant_cursor: nil,
-        grant_next: nil,
-        grants_available: false,
-        grants_empty: true,
-        prompt_request_key: Ash.UUID.generate(),
-        prompt_form: to_form(%{"text" => ""}, as: :prompt),
-        collaboration_mode: :work,
-        controls_available: false,
-        work_busy: false,
-        pending_question: nil,
-        latest_plan: nil,
-        question_form: to_form(%{}, as: :answers),
-        question_answers: %{},
-        control_request_key: Ash.UUID.generate(),
-        thread_dialog: nil,
-        context_info: nil,
-        context_available: false,
-        skills: [],
-        managed_skills: [],
-        skills_available: false,
-        skill_query: nil,
-        selected_skills: [],
-        skill_form: to_form(%{"url" => "", "revision" => "", "subdirectory" => "."}, as: :skill)
-      )
-      |> stream_configure(:activity_threads, dom_id: &"activity-thread-#{&1.id}")
-      |> stream(:threads, [])
-      |> stream(:activity_threads, [])
-      |> stream(:events, [])
-      |> stream(:thread_grants, [])
-
-    # handle_params/3 always follows mount and performs the first refresh.
-    if connected?(socket), do: Process.send_after(self(), :refresh_threads, 2_000)
-    {:ok, socket}
-  end
-
-  @impl true
-  @spec handle_params(map(), String.t(), socket()) :: {:noreply, socket()}
-  def handle_params(params, _uri, socket) do
-    selected_id = params["id"]
-
-    {:noreply,
-     socket
-     |> assign(
-       selected_id: selected_id,
-       selected_generation_ordinal: parse_generation_ordinal(params["generation"]),
-       generation_query_error: generation_query_error(params["generation"]),
-       thread_cursor: nil,
-       selected_skills:
-         if(socket.assigns.live_action == :new and socket.assigns[:selected_id] != selected_id,
-           do: [],
-           else: socket.assigns.selected_skills
-         )
-     )
-     |> refresh()}
-  end
-
-  @impl true
-  @spec handle_info(:refresh_threads, socket()) :: {:noreply, socket()}
-  def handle_info(:refresh_threads, socket) do
-    Process.send_after(self(), :refresh_threads, 2_000)
-    {:noreply, refresh(socket)}
-  end
-
-  @impl true
-  @spec handle_event(String.t(), map(), socket()) :: {:noreply, socket()}
-  def handle_event("validate", %{"thread" => params}, socket) when is_map(params) do
-    {:noreply,
-     assign(socket,
-       form: to_form(Map.merge(socket.assigns.form.params, params), as: :thread),
-       error: nil
-     )}
-  end
-
-  def handle_event("create", %{"thread" => params}, socket) when is_map(params) do
-    values = Map.merge(socket.assigns.form.params, params)
-    socket = assign(socket, form: to_form(values, as: :thread))
-
-    case ThreadCommands.parse(values["objective"] || "") do
-      {:prompt, text} ->
-        create_thread(socket, Map.put(values, "objective", text))
-
-      {:command, mode, task} when mode in [:plan, :work] and task != "" ->
-        create_thread(
-          socket,
-          Map.merge(values, %{"objective" => task, "collaboration_mode" => Atom.to_string(mode)})
+          thread_matches_empty: true,
+          can_write: false,
+          can_manage: false,
+          share_open: false,
+          share_form: to_form(%{"email" => "", "role" => "viewer"}, as: :access),
+          share_request_key: Ash.UUID.generate(),
+          share_error: nil,
+          grant_owner: nil,
+          grant_cursor: nil,
+          grant_next: nil,
+          grants_available: false,
+          grants_empty: true,
+          prompt_request_key: Ash.UUID.generate(),
+          prompt_form: to_form(%{"text" => ""}, as: :prompt),
+          collaboration_mode: :work,
+          controls_available: false,
+          work_busy: false,
+          pending_question: nil,
+          latest_plan: nil,
+          question_form: to_form(%{}, as: :answers),
+          question_answers: %{},
+          control_request_key: Ash.UUID.generate(),
+          thread_dialog: nil,
+          context_info: nil,
+          context_available: false,
+          skills: [],
+          managed_skills: [],
+          skills_available: false,
+          skill_query: nil,
+          selected_skills: [],
+          skill_form: to_form(%{"url" => "", "revision" => "", "subdirectory" => "."}, as: :skill)
         )
+        |> stream_configure(:activity_threads, dom_id: &"activity-thread-#{&1.id}")
+        |> stream(:threads, [])
+        |> stream(:activity_threads, [])
+        |> stream(:events, [])
+        |> stream(:thread_grants, [])
 
-      {:command, command, ""} ->
-        {:noreply, run_command(socket, command)}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
+      # handle_params/3 always follows mount and performs the first refresh.
+      if connected?(socket), do: Process.send_after(self(), :refresh_threads, 2_000)
+      {:ok, socket}
     end
-  end
 
-  # @cc [owner:ghuntley,label:security] selected-thread-actions
-  # Missing or unavailable thread detail MUST refuse lifecycle and prompt events
-  # without a domain mutation. Available detail MUST still use current domain
-  # authorization; the cached selection is only a resource identifier.
-  def handle_event(event, _params, %{assigns: %{selected: nil}} = socket)
-      when event in ["prompt", "retry", "archive", "delete", "reopen", "thread_share"] do
-    {:noreply, assign(socket, error: error_message(socket.assigns.detail_error || :not_found))}
-  end
-
-  # @cc [owner:ghuntley,label:recovery;security] prompt-request-key-stability
-  # A prompt form MUST reuse its request key while LiveView retries or re-renders
-  # the submission, then rotate it only after an accepted prompt.
-  def handle_event("prompt", %{"prompt" => %{"text" => text}}, socket) when is_binary(text) do
-    socket = assign(socket, prompt_form: to_form(%{"text" => text}, as: :prompt))
-
-    case ThreadCommands.parse(text) do
-      {:prompt, text} ->
-        {:noreply, submit_prompt(socket, text, nil)}
-
-      {:command, mode, task} when mode in [:plan, :work] and task != "" ->
-        {:noreply, submit_prompt(socket, task, mode)}
-
-      {:command, command, ""} ->
-        {:noreply, run_command(socket, command)}
-
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
-    end
-  end
-
-  def handle_event("validate_prompt", %{"prompt" => params}, socket) when is_map(params) do
-    {:noreply, assign(socket, prompt_form: to_form(params, as: :prompt), error: nil)}
-  end
-
-  def handle_event("thread_command", %{"command" => name}, socket) when is_binary(name) do
-    case ThreadCommands.parse("/" <> name) do
-      {:command, command, ""} -> {:noreply, run_command(socket, command)}
-      _ -> {:noreply, assign(socket, error: error_message(:unknown_command))}
-    end
-  end
-
-  def handle_event("collaboration_mode", %{"collaboration" => %{"mode" => mode}}, socket)
-      when mode in ["plan", "work"] do
-    {:noreply, run_command(socket, if(mode == "plan", do: :plan, else: :work))}
-  end
-
-  def handle_event("close_thread_dialog", _params, socket),
-    do: {:noreply, assign(socket, thread_dialog: nil)}
-
-  def handle_event("reload_context", _params, socket) do
-    {:noreply,
-     control_action(
-       socket,
-       &Threads.reload_context/2,
-       %{},
-       dgettext("agents", "Context reload queued.")
-     )}
-  end
-
-  def handle_event("validate_questions", %{"answers" => answers}, socket) when is_map(answers),
-    do: {:noreply, assign(socket, question_answers: answers)}
-
-  def handle_event(
-        "answer_questions",
-        %{"answers" => answers, "question_id" => question_id},
-        socket
-      )
-      when is_map(answers) and is_binary(question_id) do
-    socket = assign(socket, question_answers: answers)
-
-    {:noreply,
-     control_action(
-       socket,
-       &Threads.answer_questions/2,
-       %{question_id: question_id, answers: answers},
-       dgettext("agents", "Answers submitted.")
-     )}
-  end
-
-  def handle_event("implement_plan", %{"plan_id" => plan_id}, socket) when is_binary(plan_id) do
-    {:noreply,
-     control_action(
-       socket,
-       &Threads.implement_plan/2,
-       %{plan_id: plan_id},
-       dgettext("agents", "Implementation queued.")
-     )}
-  end
-
-  def handle_event("revise_plan", %{"plan_id" => plan_id}, socket) do
-    case socket.assigns.latest_plan do
-      %{id: ^plan_id} ->
-        {:noreply, socket |> run_command(:plan) |> push_event("thread-focus-composer", %{})}
-
-      _ ->
-        {:noreply, assign(socket, error: error_message(:stale_plan))}
-    end
-  end
-
-  # @cc [owner:ghuntley,label:product;security] new-thread-skill-selection
-  # Before a machine exists, skill metadata cannot be read from a guest context.
-  # A new-thread skill search MUST therefore retain the exact bounded source name
-  # as a pending selection, survive the periodic refresh, and flow into create;
-  # existing-thread searches continue to use the authorized catalog returned by
-  # the Threads domain.
-  def handle_event("skill_search", %{"query" => query}, %{assigns: %{live_action: :new}} = socket)
-      when is_binary(query) do
-    query = query |> String.trim() |> String.slice(0, 128)
-
-    skills =
-      if query == "" do
-        []
-      else
-        [
-          %{
-            id: query,
-            name: query,
-            description:
-              dgettext(
-                "agents",
-                "Select this skill from the workspace catalog when the machine starts."
-              ),
-            path: dgettext("agents", "Workspace skill"),
-            enabled: true
-          }
-        ]
-      end
-
-    {:noreply, assign(socket, skill_query: query, skills: skills, skills_available: query != "")}
-  end
-
-  def handle_event("skill_search", %{"query" => query}, socket) when is_binary(query) do
-    {:noreply, socket |> assign(skill_query: String.slice(query, 0, 100)) |> refresh_skills()}
-  end
-
-  def handle_event("dismiss_skill_search", _params, socket),
-    do: {:noreply, assign(socket, skill_query: nil)}
-
-  def handle_event("select_skill", %{"id" => id}, socket) when is_binary(id) do
-    skill = Enum.find(socket.assigns.skills, &(skill_value(&1, :id) == id))
-
-    can_select = socket.assigns.can_write or socket.assigns.live_action == :new
-
-    if (can_select and skill) && skill_value(skill, :enabled, true) do
-      selected =
-        Enum.uniq_by(socket.assigns.selected_skills ++ [skill], &skill_value(&1, :id))
-        |> Enum.take(20)
+    @impl true
+    @spec handle_params(map(), String.t(), socket()) :: {:noreply, socket()}
+    def handle_params(params, _uri, socket) do
+      selected_id = params["id"]
 
       {:noreply,
        socket
-       |> assign(selected_skills: selected, skill_query: nil, thread_dialog: nil)
-       |> push_event("thread-skill-selected", %{})}
-    else
-      {:noreply, assign(socket, error: error_message(:forbidden))}
+       |> assign(
+         selected_id: selected_id,
+         selected_generation_ordinal: parse_generation_ordinal(params["generation"]),
+         generation_query_error: generation_query_error(params["generation"]),
+         thread_cursor: nil,
+         selected_skills:
+           if(socket.assigns.live_action == :new and socket.assigns[:selected_id] != selected_id,
+             do: [],
+             else: socket.assigns.selected_skills
+           )
+       )
+       |> refresh()}
     end
-  end
 
-  def handle_event("remove_selected_skill", %{"id" => id}, socket),
-    do:
+    @impl true
+    @spec handle_info(:refresh_threads, socket()) :: {:noreply, socket()}
+    def handle_info(:refresh_threads, socket) do
+      Process.send_after(self(), :refresh_threads, 2_000)
+      {:noreply, refresh(socket)}
+    end
+
+    @impl true
+    @spec handle_event(String.t(), map(), socket()) :: {:noreply, socket()}
+    def handle_event("validate", %{"thread" => params}, socket) when is_map(params) do
       {:noreply,
        assign(socket,
-         selected_skills:
-           Enum.reject(socket.assigns.selected_skills, &(skill_value(&1, :id) == id))
+         form: to_form(Map.merge(socket.assigns.form.params, params), as: :thread),
+         error: nil
        )}
+    end
 
-  def handle_event("validate_skill", %{"skill" => params}, socket) when is_map(params),
-    do: {:noreply, assign(socket, skill_form: to_form(params, as: :skill))}
+    def handle_event("create", %{"thread" => params}, socket) when is_map(params) do
+      values = Map.merge(socket.assigns.form.params, params)
+      socket = assign(socket, form: to_form(values, as: :thread))
 
-  def handle_event("install_skill", %{"skill" => params}, socket) when is_map(params) do
-    socket = assign(socket, skill_form: to_form(params, as: :skill))
+      case ThreadCommands.parse(values["objective"] || "") do
+        {:prompt, text} ->
+          create_thread(socket, Map.put(values, "objective", text))
 
-    {:noreply,
-     control_action(
-       socket,
-       &Threads.install_skill/2,
-       %{
-         url: params["url"],
-         revision: blank_to_nil(params["revision"]),
-         subdirectory: params["subdirectory"]
-       },
-       dgettext("agents", "Skill installation queued."),
-       :idempotency_key
-     )}
-  end
+        {:command, mode, task} when mode in [:plan, :work] and task != "" ->
+          create_thread(
+            socket,
+            Map.merge(values, %{"objective" => task, "collaboration_mode" => Atom.to_string(mode)})
+          )
 
-  def handle_event("update_skill", %{"update" => %{"installation_id" => id} = params}, socket) do
-    {:noreply,
-     control_action(
-       socket,
-       &Threads.update_skill/2,
-       %{installation_id: id, revision: blank_to_nil(params["revision"])},
-       dgettext("agents", "Skill update queued."),
-       :idempotency_key
-     )}
-  end
+        {:command, command, ""} ->
+          {:noreply, run_command(socket, command)}
 
-  def handle_event("update_skill", %{"id" => id}, socket),
-    do:
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
+    end
+
+    # @cc [owner:ghuntley,label:security] selected-thread-actions
+    # Missing or unavailable thread detail MUST refuse lifecycle and prompt events
+    # without a domain mutation. Available detail MUST still use current domain
+    # authorization; the cached selection is only a resource identifier.
+    def handle_event(event, _params, %{assigns: %{selected: nil}} = socket)
+        when event in ["prompt", "retry", "archive", "delete", "reopen", "thread_share"] do
+      {:noreply, assign(socket, error: error_message(socket.assigns.detail_error || :not_found))}
+    end
+
+    # @cc [owner:ghuntley,label:recovery;security] prompt-request-key-stability
+    # A prompt form MUST reuse its request key while LiveView retries or re-renders
+    # the submission, then rotate it only after an accepted prompt.
+    def handle_event("prompt", %{"prompt" => %{"text" => text}}, socket) when is_binary(text) do
+      socket = assign(socket, prompt_form: to_form(%{"text" => text}, as: :prompt))
+
+      case ThreadCommands.parse(text) do
+        {:prompt, text} ->
+          {:noreply, submit_prompt(socket, text, nil)}
+
+        {:command, mode, task} when mode in [:plan, :work] and task != "" ->
+          {:noreply, submit_prompt(socket, task, mode)}
+
+        {:command, command, ""} ->
+          {:noreply, run_command(socket, command)}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
+    end
+
+    def handle_event("validate_prompt", %{"prompt" => params}, socket) when is_map(params) do
+      {:noreply, assign(socket, prompt_form: to_form(params, as: :prompt), error: nil)}
+    end
+
+    def handle_event("thread_command", %{"command" => name}, socket) when is_binary(name) do
+      case ThreadCommands.parse("/" <> name) do
+        {:command, command, ""} -> {:noreply, run_command(socket, command)}
+        _ -> {:noreply, assign(socket, error: error_message(:unknown_command))}
+      end
+    end
+
+    def handle_event("collaboration_mode", %{"collaboration" => %{"mode" => mode}}, socket)
+        when mode in ["plan", "work"] do
+      {:noreply, run_command(socket, if(mode == "plan", do: :plan, else: :work))}
+    end
+
+    def handle_event("close_thread_dialog", _params, socket),
+      do: {:noreply, assign(socket, thread_dialog: nil)}
+
+    def handle_event("reload_context", _params, socket) do
+      {:noreply,
+       control_action(
+         socket,
+         &Threads.reload_context/2,
+         %{},
+         dgettext("agents", "Context reload queued.")
+       )}
+    end
+
+    def handle_event("validate_questions", %{"answers" => answers}, socket) when is_map(answers),
+      do: {:noreply, assign(socket, question_answers: answers)}
+
+    def handle_event(
+          "answer_questions",
+          %{"answers" => answers, "question_id" => question_id},
+          socket
+        )
+        when is_map(answers) and is_binary(question_id) do
+      socket = assign(socket, question_answers: answers)
+
+      {:noreply,
+       control_action(
+         socket,
+         &Threads.answer_questions/2,
+         %{question_id: question_id, answers: answers},
+         dgettext("agents", "Answers submitted.")
+       )}
+    end
+
+    def handle_event("implement_plan", %{"plan_id" => plan_id}, socket) when is_binary(plan_id) do
+      {:noreply,
+       control_action(
+         socket,
+         &Threads.implement_plan/2,
+         %{plan_id: plan_id},
+         dgettext("agents", "Implementation queued.")
+       )}
+    end
+
+    def handle_event("revise_plan", %{"plan_id" => plan_id}, socket) do
+      case socket.assigns.latest_plan do
+        %{id: ^plan_id} ->
+          {:noreply, socket |> run_command(:plan) |> push_event("thread-focus-composer", %{})}
+
+        _ ->
+          {:noreply, assign(socket, error: error_message(:stale_plan))}
+      end
+    end
+
+    # @cc [owner:ghuntley,label:product;security] new-thread-skill-selection
+    # Before a machine exists, skill metadata cannot be read from a guest context.
+    # A new-thread skill search MUST therefore retain the exact bounded source name
+    # as a pending selection, survive the periodic refresh, and flow into create;
+    # existing-thread searches continue to use the authorized catalog returned by
+    # the Threads domain.
+    def handle_event("skill_search", %{"query" => query}, %{assigns: %{live_action: :new}} = socket)
+        when is_binary(query) do
+      query = query |> String.trim() |> String.slice(0, 128)
+
+      skills =
+        if query == "" do
+          []
+        else
+          [
+            %{
+              id: query,
+              name: query,
+              description:
+                dgettext(
+                  "agents",
+                  "Select this skill from the workspace catalog when the machine starts."
+                ),
+              path: dgettext("agents", "Workspace skill"),
+              enabled: true
+            }
+          ]
+        end
+
+      {:noreply, assign(socket, skill_query: query, skills: skills, skills_available: query != "")}
+    end
+
+    def handle_event("skill_search", %{"query" => query}, socket) when is_binary(query) do
+      {:noreply, socket |> assign(skill_query: String.slice(query, 0, 100)) |> refresh_skills()}
+    end
+
+    def handle_event("dismiss_skill_search", _params, socket),
+      do: {:noreply, assign(socket, skill_query: nil)}
+
+    def handle_event("select_skill", %{"id" => id}, socket) when is_binary(id) do
+      skill = Enum.find(socket.assigns.skills, &(skill_value(&1, :id) == id))
+
+      can_select = socket.assigns.can_write or socket.assigns.live_action == :new
+
+      if (can_select and skill) && skill_value(skill, :enabled, true) do
+        selected =
+          Enum.uniq_by(socket.assigns.selected_skills ++ [skill], &skill_value(&1, :id))
+          |> Enum.take(20)
+
+        {:noreply,
+         socket
+         |> assign(selected_skills: selected, skill_query: nil, thread_dialog: nil)
+         |> push_event("thread-skill-selected", %{})}
+      else
+        {:noreply, assign(socket, error: error_message(:forbidden))}
+      end
+    end
+
+    def handle_event("remove_selected_skill", %{"id" => id}, socket),
+      do:
+        {:noreply,
+         assign(socket,
+           selected_skills:
+             Enum.reject(socket.assigns.selected_skills, &(skill_value(&1, :id) == id))
+         )}
+
+    def handle_event("validate_skill", %{"skill" => params}, socket) when is_map(params),
+      do: {:noreply, assign(socket, skill_form: to_form(params, as: :skill))}
+
+    def handle_event("install_skill", %{"skill" => params}, socket) when is_map(params) do
+      socket = assign(socket, skill_form: to_form(params, as: :skill))
+
+      {:noreply,
+       control_action(
+         socket,
+         &Threads.install_skill/2,
+         %{
+           url: params["url"],
+           revision: blank_to_nil(params["revision"]),
+           subdirectory: params["subdirectory"]
+         },
+         dgettext("agents", "Skill installation queued."),
+         :idempotency_key
+       )}
+    end
+
+    def handle_event("update_skill", %{"update" => %{"installation_id" => id} = params}, socket) do
       {:noreply,
        control_action(
          socket,
          &Threads.update_skill/2,
-         %{installation_id: id},
+         %{installation_id: id, revision: blank_to_nil(params["revision"])},
          dgettext("agents", "Skill update queued."),
          :idempotency_key
        )}
+    end
 
-  def handle_event("set_skill_enabled", %{"id" => id, "enabled" => enabled}, socket)
-      when enabled in ["true", "false"],
+    def handle_event("update_skill", %{"id" => id}, socket),
       do:
         {:noreply,
          control_action(
            socket,
-           &Threads.set_skill_enabled/2,
-           %{installation_id: id, enabled: enabled == "true"},
-           dgettext("agents", "Skill availability updated."),
+           &Threads.update_skill/2,
+           %{installation_id: id},
+           dgettext("agents", "Skill update queued."),
            :idempotency_key
          )}
 
-  def handle_event("remove_skill", %{"id" => id}, socket),
-    do:
-      {:noreply,
-       control_action(
-         socket,
-         &Threads.remove_skill/2,
-         %{installation_id: id},
-         dgettext("agents", "Managed skill removed."),
-         :idempotency_key
-       )}
+    def handle_event("set_skill_enabled", %{"id" => id, "enabled" => enabled}, socket)
+        when enabled in ["true", "false"],
+        do:
+          {:noreply,
+           control_action(
+             socket,
+             &Threads.set_skill_enabled/2,
+             %{installation_id: id, enabled: enabled == "true"},
+             dgettext("agents", "Skill availability updated."),
+             :idempotency_key
+           )}
 
-  def handle_event("retry", _params, socket) do
-    case Threads.retry_provisioning(%{thread_id: socket.assigns.selected.id},
-           actor: socket.assigns.current_user
-         ) do
-      {:ok, _} ->
+    def handle_event("remove_skill", %{"id" => id}, socket),
+      do:
         {:noreply,
-         socket |> put_flash(:info, dgettext("agents", "Provisioning will retry.")) |> refresh()}
+         control_action(
+           socket,
+           &Threads.remove_skill/2,
+           %{installation_id: id},
+           dgettext("agents", "Managed skill removed."),
+           :idempotency_key
+         )}
 
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
+    def handle_event("retry", _params, socket) do
+      case Threads.retry_provisioning(%{thread_id: socket.assigns.selected.id},
+             actor: socket.assigns.current_user
+           ) do
+        {:ok, _} ->
+          {:noreply,
+           socket |> put_flash(:info, dgettext("agents", "Provisioning will retry.")) |> refresh()}
+
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
     end
-  end
 
-  def handle_event("archive", _params, socket) do
-    case Threads.archive_thread(%{thread_id: socket.assigns.selected.id},
-           actor: socket.assigns.current_user
-         ) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> put_flash(
-           :info,
-           dgettext(
-             "agents",
-             "Archiving requested. The machine will be deleted before archival completes."
+    def handle_event("archive", _params, socket) do
+      case Threads.archive_thread(%{thread_id: socket.assigns.selected.id},
+             actor: socket.assigns.current_user
+           ) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> put_flash(
+             :info,
+             dgettext(
+               "agents",
+               "Archiving requested. The machine will be deleted before archival completes."
+             )
            )
-         )
-         |> push_navigate(to: ~p"/threads")}
+           |> push_navigate(to: ~p"/threads")}
 
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
     end
-  end
 
-  def handle_event("delete", _params, socket) do
-    case Threads.delete_thread(%{thread_id: socket.assigns.selected.id},
-           actor: socket.assigns.current_user
-         ) do
-      {:ok, _} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, dgettext("agents", "Thread deletion requested."))
-         |> push_navigate(to: ~p"/threads")}
+    def handle_event("delete", _params, socket) do
+      case Threads.delete_thread(%{thread_id: socket.assigns.selected.id},
+             actor: socket.assigns.current_user
+           ) do
+        {:ok, _} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, dgettext("agents", "Thread deletion requested."))
+           |> push_navigate(to: ~p"/threads")}
 
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
     end
-  end
 
-  def handle_event("reopen", _params, socket) do
-    case Threads.reopen_thread(%{thread_id: socket.assigns.selected.id},
-           actor: socket.assigns.current_user
-         ) do
-      {:ok, thread} ->
-        {:noreply,
-         socket
-         |> put_flash(:info, dgettext("agents", "Thread reopened; provisioning a new machine."))
-         |> push_navigate(to: ~p"/threads/#{thread.id}")}
+    def handle_event("reopen", _params, socket) do
+      case Threads.reopen_thread(%{thread_id: socket.assigns.selected.id},
+             actor: socket.assigns.current_user
+           ) do
+        {:ok, thread} ->
+          {:noreply,
+           socket
+           |> put_flash(:info, dgettext("agents", "Thread reopened; provisioning a new machine."))
+           |> push_navigate(to: ~p"/threads/#{thread.id}")}
 
-      {:error, reason} ->
-        {:noreply, assign(socket, error: error_message(reason))}
+        {:error, reason} ->
+          {:noreply, assign(socket, error: error_message(reason))}
+      end
     end
-  end
 
-  def handle_event(
-        "thread_filter",
-        %{"filter" => %{"query" => query, "status" => status}},
-        socket
-      )
-      when is_binary(query) and status in ["all", "active", "archived"] do
-    {:noreply,
-     socket
-     |> assign(
-       thread_query: String.slice(query, 0, 200),
-       thread_filter: status,
-       thread_cursor: nil
-     )
-     |> refresh()}
-  end
-
-  # @cc [owner:ghuntley,label:product;durability] thread-index-keyset-controls
-  # Thread index and activity navigation MUST advance the authorized keyset
-  # cursor returned by Threads.list_thread_page. A page change MUST preserve
-  # the domain's bounded result and never fetch an unbounded list in LiveView.
-  def handle_event("threads_next", _params, %{assigns: %{thread_next: nil}} = socket),
-    do: {:noreply, socket}
-
-  def handle_event("threads_next", _params, socket) do
-    {:noreply, socket |> assign(thread_cursor: socket.assigns.thread_next) |> refresh()}
-  end
-
-  def handle_event("threads_first", _params, socket),
-    do: {:noreply, socket |> assign(thread_cursor: nil) |> refresh()}
-
-  def handle_event("toggle_share", _params, socket) do
-    {:noreply, socket |> assign(share_open: !socket.assigns.share_open) |> refresh()}
-  end
-
-  def handle_event("validate_access", %{"access" => params}, socket) when is_map(params) do
-    {:noreply, assign(socket, share_form: to_form(params, as: :access), share_error: nil)}
-  end
-
-  def handle_event("edit_access", %{"email" => email, "role" => role}, socket)
-      when is_binary(email) and role in ["viewer", "operator", "manager", "revoked"] do
-    {:noreply,
-     assign(socket, share_form: to_form(%{"email" => email, "role" => role}, as: :access))}
-  end
-
-  # @cc [owner:ghuntley,label:security;durability] thread-sharing-through-domain
-  # Sharing MUST delegate registered-recipient resolution, role validation and
-  # current management authority to Threads.set_access with the current actor.
-  # The server-held request key MUST survive errors and rotate only after success.
-  def handle_event("thread_share", %{"access" => params}, socket) when is_map(params) do
-    socket = assign(socket, share_form: to_form(params, as: :access))
-
-    case Threads.set_access(
-           %{
-             thread_id: socket.assigns.selected.id,
-             email: params["email"],
-             role: params["role"],
-             idempotency_key: socket.assigns.share_request_key
-           },
-           actor: socket.assigns.current_user
-         ) do
-      {:ok, _change} ->
-        {:noreply,
-         socket
-         |> assign(
-           share_form: to_form(%{"email" => "", "role" => "viewer"}, as: :access),
-           share_request_key: Ash.UUID.generate(),
-           share_error: nil,
-           grant_cursor: nil
-         )
-         |> put_flash(:info, dgettext("agents", "Thread access updated."))
-         |> refresh()}
-
-      {:error, reason} ->
-        {:noreply, socket |> assign(share_error: error_message(reason)) |> refresh()}
-    end
-  end
-
-  def handle_event("grants_next", _params, socket),
-    do: {:noreply, socket |> assign(grant_cursor: socket.assigns.grant_next) |> refresh()}
-
-  def handle_event("grants_first", _params, socket),
-    do: {:noreply, socket |> assign(grant_cursor: nil) |> refresh()}
-
-  def handle_event(
-        "activity_filter",
-        %{"filter" => %{"status" => status} = filters},
-        socket
-      )
-      when status in ["all", "pending", "provisioning", "ready", "failed", "deleting", "archived"] do
-    time = Map.get(filters, "time", socket.assigns.activity_time_filter)
-    owner = Map.get(filters, "owner", socket.assigns.activity_owner_filter)
-    team = Map.get(filters, "team", socket.assigns.activity_team_filter)
-    query = Map.get(filters, "query", socket.assigns.activity_query)
-
-    if time in ["all", "today", "week", "month"] and owner in ["all", "mine", "shared"] and
-         is_binary(team) and is_binary(query) do
+    def handle_event(
+          "thread_filter",
+          %{"filter" => %{"query" => query, "status" => status}},
+          socket
+        )
+        when is_binary(query) and status in ["all", "active", "archived"] do
       {:noreply,
        socket
        |> assign(
-         activity_filter: status,
-         activity_time_filter: time,
-         activity_owner_filter: owner,
-         activity_team_filter: team,
-         activity_query: String.slice(query, 0, 200),
+         thread_query: String.slice(query, 0, 200),
+         thread_filter: status,
          thread_cursor: nil
        )
        |> refresh()}
-    else
-      {:noreply, socket}
     end
-  end
 
-  def handle_event(
-        "generation_select",
-        %{"generation" => %{"ordinal" => ordinal}},
-        %{assigns: %{selected: %{id: thread_id}}} = socket
-      )
-      when is_binary(ordinal) do
-    case parse_generation_ordinal(ordinal) do
-      nil ->
-        {:noreply, assign(socket, error: error_message(:not_found))}
+    # @cc [owner:ghuntley,label:product;durability] thread-index-keyset-controls
+    # Thread index and activity navigation MUST advance the authorized keyset
+    # cursor returned by Threads.list_thread_page. A page change MUST preserve
+    # the domain's bounded result and never fetch an unbounded list in LiveView.
+    def handle_event("threads_next", _params, %{assigns: %{thread_next: nil}} = socket),
+      do: {:noreply, socket}
 
-      selected ->
-        {:noreply,
-         socket
-         |> assign(selected_generation_ordinal: selected)
-         |> push_patch(to: ~p"/threads/#{thread_id}?generation=#{selected}")}
+    def handle_event("threads_next", _params, socket) do
+      {:noreply, socket |> assign(thread_cursor: socket.assigns.thread_next) |> refresh()}
     end
-  end
 
-  def handle_event(_event, _params, socket), do: {:noreply, socket}
+    def handle_event("threads_first", _params, socket),
+      do: {:noreply, socket |> assign(thread_cursor: nil) |> refresh()}
 
-  # @cc [owner:ghuntley,label:security;durability] composer-domain-actions
-  # Commands MUST use the authenticated domain surface. Browser selection and
-  # cached permissions MUST NOT authorize mutations. A refused command MUST keep
-  # the user's draft and stable operation key for an unambiguous retry.
-  @spec create_thread(socket(), map()) :: {:noreply, socket()}
-  defp create_thread(socket, values) do
-    with {:ok, spec} <- machine_spec(values),
-         {:ok, thread} <-
-           Threads.create_thread(
+    def handle_event("toggle_share", _params, socket) do
+      {:noreply, socket |> assign(share_open: !socket.assigns.share_open) |> refresh()}
+    end
+
+    def handle_event("validate_access", %{"access" => params}, socket) when is_map(params) do
+      {:noreply, assign(socket, share_form: to_form(params, as: :access), share_error: nil)}
+    end
+
+    def handle_event("edit_access", %{"email" => email, "role" => role}, socket)
+        when is_binary(email) and role in ["viewer", "operator", "manager", "revoked"] do
+      {:noreply,
+       assign(socket, share_form: to_form(%{"email" => email, "role" => role}, as: :access))}
+    end
+
+    # @cc [owner:ghuntley,label:security;durability] thread-sharing-through-domain
+    # Sharing MUST delegate registered-recipient resolution, role validation and
+    # current management authority to Threads.set_access with the current actor.
+    # The server-held request key MUST survive errors and rotate only after success.
+    def handle_event("thread_share", %{"access" => params}, socket) when is_map(params) do
+      socket = assign(socket, share_form: to_form(params, as: :access))
+
+      case Threads.set_access(
              %{
-               objective: values["objective"],
-               mode: values["mode"],
-               collaboration_mode: values["collaboration_mode"] || "work",
-               selected_skill_ids:
-                 Enum.map(socket.assigns.selected_skills, &skill_value(&1, :id)),
-               machine_spec: spec,
-               idempotency_key: values["request_key"]
+               thread_id: socket.assigns.selected.id,
+               email: params["email"],
+               role: params["role"],
+               idempotency_key: socket.assigns.share_request_key
              },
              actor: socket.assigns.current_user
            ) do
-      {:noreply, push_navigate(socket, to: ~p"/threads/#{thread.id}")}
-    else
-      {:error, reason} ->
+        {:ok, _change} ->
+          {:noreply,
+           socket
+           |> assign(
+             share_form: to_form(%{"email" => "", "role" => "viewer"}, as: :access),
+             share_request_key: Ash.UUID.generate(),
+             share_error: nil,
+             grant_cursor: nil
+           )
+           |> put_flash(:info, dgettext("agents", "Thread access updated."))
+           |> refresh()}
+
+        {:error, reason} ->
+          {:noreply, socket |> assign(share_error: error_message(reason)) |> refresh()}
+      end
+    end
+
+    def handle_event("grants_next", _params, socket),
+      do: {:noreply, socket |> assign(grant_cursor: socket.assigns.grant_next) |> refresh()}
+
+    def handle_event("grants_first", _params, socket),
+      do: {:noreply, socket |> assign(grant_cursor: nil) |> refresh()}
+
+    def handle_event(
+          "activity_filter",
+          %{"filter" => %{"status" => status} = filters},
+          socket
+        )
+        when status in ["all", "pending", "provisioning", "ready", "failed", "deleting", "archived"] do
+      time = Map.get(filters, "time", socket.assigns.activity_time_filter)
+      owner = Map.get(filters, "owner", socket.assigns.activity_owner_filter)
+      team = Map.get(filters, "team", socket.assigns.activity_team_filter)
+      query = Map.get(filters, "query", socket.assigns.activity_query)
+
+      if time in ["all", "today", "week", "month"] and owner in ["all", "mine", "shared"] and
+           is_binary(team) and is_binary(query) do
         {:noreply,
-         assign(socket, form: to_form(values, as: :thread), error: error_message(reason))}
+         socket
+         |> assign(
+           activity_filter: status,
+           activity_time_filter: time,
+           activity_owner_filter: owner,
+           activity_team_filter: team,
+           activity_query: String.slice(query, 0, 200),
+           thread_cursor: nil
+         )
+         |> refresh()}
+      else
+        {:noreply, socket}
+      end
     end
-  end
 
-  @spec submit_prompt(socket(), String.t(), atom() | nil) :: socket()
-  defp submit_prompt(socket, text, mode) do
-    params = %{
-      thread_id: socket.assigns.selected.id,
-      prompt: text,
-      request_key: socket.assigns.prompt_request_key,
-      selected_skill_ids: Enum.map(socket.assigns.selected_skills, &skill_value(&1, :id))
-    }
-
-    params = if mode, do: Map.put(params, :collaboration_mode, mode), else: params
-
-    case Threads.submit_prompt(params, actor: socket.assigns.current_user) do
-      {:ok, _} ->
-        socket
-        |> assign(
-          prompt_request_key: Ash.UUID.generate(),
-          error: nil,
-          prompt_form: to_form(%{"text" => ""}, as: :prompt),
-          selected_skills: []
+    def handle_event(
+          "generation_select",
+          %{"generation" => %{"ordinal" => ordinal}},
+          %{assigns: %{selected: %{id: thread_id}}} = socket
         )
-        |> push_event("thread-composer-clear", %{})
-        |> put_flash(:info, dgettext("agents", "Prompt queued."))
-        |> refresh()
+        when is_binary(ordinal) do
+      case parse_generation_ordinal(ordinal) do
+        nil ->
+          {:noreply, assign(socket, error: error_message(:not_found))}
 
-      {:error, reason} ->
-        assign(socket, error: error_message(reason))
+        selected ->
+          {:noreply,
+           socket
+           |> assign(selected_generation_ordinal: selected)
+           |> push_patch(to: ~p"/threads/#{thread_id}?generation=#{selected}")}
+      end
     end
-  end
 
-  @spec run_command(socket(), ThreadCommands.command()) :: socket()
-  defp run_command(%{assigns: %{live_action: :new}} = socket, mode) when mode in [:plan, :work] do
-    values = Map.put(socket.assigns.form.params, "collaboration_mode", Atom.to_string(mode))
-    assign(socket, form: to_form(values, as: :thread), error: nil)
-  end
+    def handle_event(_event, _params, socket), do: {:noreply, socket}
 
-  defp run_command(socket, :help), do: assign(socket, thread_dialog: :help, error: nil)
-
-  defp run_command(%{assigns: %{selected: nil}} = socket, _command),
-    do: assign(socket, error: error_message(:operation_unavailable))
-
-  defp run_command(socket, mode) when mode in [:plan, :work],
-    do:
-      control_action(
-        socket,
-        &Threads.set_collaboration_mode/2,
-        %{collaboration_mode: mode},
-        dgettext("agents", "Collaboration mode updated."),
-        :none
-      )
-
-  defp run_command(socket, :compact),
-    do:
-      control_action(
-        socket,
-        &Threads.compact_context/2,
-        %{},
-        dgettext("agents", "Context compaction queued.")
-      )
-
-  defp run_command(socket, :context),
-    do: socket |> assign(thread_dialog: :context, error: nil) |> refresh_dialog()
-
-  defp run_command(socket, :skills),
-    do: socket |> assign(thread_dialog: :skills, error: nil) |> refresh_skills()
-
-  defp run_command(%{assigns: %{can_manage: true}} = socket, :share),
-    do: socket |> assign(share_open: true, error: nil) |> refresh_grants()
-
-  defp run_command(
-         %{assigns: %{can_write: true, selected: %{status: :ready, machine_id: id}}} = socket,
-         :terminal
-       )
-       when is_binary(id), do: push_navigate(socket, to: ~p"/machines/#{id}/terminals")
-
-  defp run_command(
-         %{assigns: %{editor_available: true, selected: %{machine_id: id}}} = socket,
-         :code
-       )
-       when is_binary(id), do: redirect(socket, to: ~p"/machines/#{id}/code")
-
-  defp run_command(socket, _command),
-    do: assign(socket, error: error_message(:operation_unavailable))
-
-  @type control_action :: (map(), keyword() -> {:ok, term()} | {:error, term()})
-  @spec control_action(
-          socket(),
-          control_action(),
-          map(),
-          String.t(),
-          :request_key | :idempotency_key | :none
-        ) :: socket()
-  defp control_action(socket, action, params, message, key_kind \\ :request_key)
-
-  defp control_action(
-         %{assigns: %{selected: nil}} = socket,
-         _action,
-         _params,
-         _message,
-         _key_kind
-       ),
-       do: assign(socket, error: error_message(:operation_unavailable))
-
-  defp control_action(socket, action, params, message, key_kind) do
-    params = Map.put(params, :thread_id, socket.assigns.selected.id)
-
-    params =
-      if key_kind == :none,
-        do: params,
-        else: Map.put(params, key_kind, socket.assigns.control_request_key)
-
-    case action.(params, actor: socket.assigns.current_user) do
-      {:ok, _} ->
-        socket
-        |> assign(error: nil, control_request_key: Ash.UUID.generate())
-        |> put_flash(:info, message)
-        |> refresh()
-
-      {:error, reason} ->
-        assign(socket, error: error_message(reason))
+    # @cc [owner:ghuntley,label:security;durability] composer-domain-actions
+    # Commands MUST use the authenticated domain surface. Browser selection and
+    # cached permissions MUST NOT authorize mutations. A refused command MUST keep
+    # the user's draft and stable operation key for an unambiguous retry.
+    @spec create_thread(socket(), map()) :: {:noreply, socket()}
+    defp create_thread(socket, values) do
+      with {:ok, spec} <- machine_spec(values),
+           {:ok, thread} <-
+             Threads.create_thread(
+               %{
+                 objective: values["objective"],
+                 mode: values["mode"],
+                 collaboration_mode: values["collaboration_mode"] || "work",
+                 selected_skill_ids:
+                   Enum.map(socket.assigns.selected_skills, &skill_value(&1, :id)),
+                 machine_spec: spec,
+                 idempotency_key: values["request_key"]
+               },
+               actor: socket.assigns.current_user
+             ) do
+        {:noreply, push_navigate(socket, to: ~p"/threads/#{thread.id}")}
+      else
+        {:error, reason} ->
+          {:noreply,
+           assign(socket, form: to_form(values, as: :thread), error: error_message(reason))}
+      end
     end
-  end
 
-  @spec refresh_controls(socket()) :: socket()
-  defp refresh_controls(%{assigns: %{selected: %{id: id}}} = socket) do
-    case Threads.thread_controls(%{thread_id: id}, actor: socket.assigns.current_user) do
-      {:ok, controls} ->
-        assign(socket,
-          controls_available: true,
-          collaboration_mode: controls.collaboration_mode,
-          work_busy: controls.busy,
-          pending_question: controls.pending_question,
-          question_answers:
-            if(
-              question_identity(controls.pending_question) ==
-                question_identity(socket.assigns.pending_question),
-              do: socket.assigns.question_answers,
-              else: %{}
-            ),
-          latest_plan: controls.latest_plan
+    @spec submit_prompt(socket(), String.t(), atom() | nil) :: socket()
+    defp submit_prompt(socket, text, mode) do
+      params = %{
+        thread_id: socket.assigns.selected.id,
+        prompt: text,
+        request_key: socket.assigns.prompt_request_key,
+        selected_skill_ids: Enum.map(socket.assigns.selected_skills, &skill_value(&1, :id))
+      }
+
+      params = if mode, do: Map.put(params, :collaboration_mode, mode), else: params
+
+      case Threads.submit_prompt(params, actor: socket.assigns.current_user) do
+        {:ok, _} ->
+          socket
+          |> assign(
+            prompt_request_key: Ash.UUID.generate(),
+            error: nil,
+            prompt_form: to_form(%{"text" => ""}, as: :prompt),
+            selected_skills: []
+          )
+          |> push_event("thread-composer-clear", %{})
+          |> put_flash(:info, dgettext("agents", "Prompt queued."))
+          |> refresh()
+
+        {:error, reason} ->
+          assign(socket, error: error_message(reason))
+      end
+    end
+
+    @spec run_command(socket(), ThreadCommands.command()) :: socket()
+    defp run_command(%{assigns: %{live_action: :new}} = socket, mode) when mode in [:plan, :work] do
+      values = Map.put(socket.assigns.form.params, "collaboration_mode", Atom.to_string(mode))
+      assign(socket, form: to_form(values, as: :thread), error: nil)
+    end
+
+    defp run_command(socket, :help), do: assign(socket, thread_dialog: :help, error: nil)
+
+    defp run_command(%{assigns: %{selected: nil}} = socket, _command),
+      do: assign(socket, error: error_message(:operation_unavailable))
+
+    defp run_command(socket, mode) when mode in [:plan, :work],
+      do:
+        control_action(
+          socket,
+          &Threads.set_collaboration_mode/2,
+          %{collaboration_mode: mode},
+          dgettext("agents", "Collaboration mode updated."),
+          :none
         )
 
-      _ ->
-        assign(socket,
-          controls_available: false,
-          work_busy: true,
-          pending_question: nil,
-          latest_plan: nil
+    defp run_command(socket, :compact),
+      do:
+        control_action(
+          socket,
+          &Threads.compact_context/2,
+          %{},
+          dgettext("agents", "Context compaction queued.")
         )
+
+    defp run_command(socket, :context),
+      do: socket |> assign(thread_dialog: :context, error: nil) |> refresh_dialog()
+
+    defp run_command(socket, :skills),
+      do: socket |> assign(thread_dialog: :skills, error: nil) |> refresh_skills()
+
+    defp run_command(%{assigns: %{can_manage: true}} = socket, :share),
+      do: socket |> assign(share_open: true, error: nil) |> refresh_grants()
+
+    defp run_command(
+           %{assigns: %{can_write: true, selected: %{status: :ready, machine_id: id}}} = socket,
+           :terminal
+         )
+         when is_binary(id), do: push_navigate(socket, to: ~p"/machines/#{id}/terminals")
+
+    defp run_command(
+           %{assigns: %{editor_available: true, selected: %{machine_id: id}}} = socket,
+           :code
+         )
+         when is_binary(id), do: redirect(socket, to: ~p"/machines/#{id}/code")
+
+    defp run_command(socket, _command),
+      do: assign(socket, error: error_message(:operation_unavailable))
+
+    @type control_action :: (map(), keyword() -> {:ok, term()} | {:error, term()})
+    @spec control_action(
+            socket(),
+            control_action(),
+            map(),
+            String.t(),
+            :request_key | :idempotency_key | :none
+          ) :: socket()
+    defp control_action(socket, action, params, message, key_kind \\ :request_key)
+
+    defp control_action(
+           %{assigns: %{selected: nil}} = socket,
+           _action,
+           _params,
+           _message,
+           _key_kind
+         ),
+         do: assign(socket, error: error_message(:operation_unavailable))
+
+    defp control_action(socket, action, params, message, key_kind) do
+      params = Map.put(params, :thread_id, socket.assigns.selected.id)
+
+      params =
+        if key_kind == :none,
+          do: params,
+          else: Map.put(params, key_kind, socket.assigns.control_request_key)
+
+      case action.(params, actor: socket.assigns.current_user) do
+        {:ok, _} ->
+          socket
+          |> assign(error: nil, control_request_key: Ash.UUID.generate())
+          |> put_flash(:info, message)
+          |> refresh()
+
+        {:error, reason} ->
+          assign(socket, error: error_message(reason))
+      end
     end
-  end
 
-  defp refresh_controls(%{assigns: %{live_action: :new}} = socket) do
-    assign(socket,
-      controls_available: false,
-      work_busy: false,
-      pending_question: nil,
-      latest_plan: nil,
-      context_info: nil,
-      context_available: false
-    )
-  end
+    @spec refresh_controls(socket()) :: socket()
+    defp refresh_controls(%{assigns: %{selected: %{id: id}}} = socket) do
+      case Threads.thread_controls(%{thread_id: id}, actor: socket.assigns.current_user) do
+        {:ok, controls} ->
+          assign(socket,
+            controls_available: true,
+            collaboration_mode: controls.collaboration_mode,
+            work_busy: controls.busy,
+            pending_question: controls.pending_question,
+            question_answers:
+              if(
+                question_identity(controls.pending_question) ==
+                  question_identity(socket.assigns.pending_question),
+                do: socket.assigns.question_answers,
+                else: %{}
+              ),
+            latest_plan: controls.latest_plan
+          )
 
-  defp refresh_controls(socket),
-    do:
+        _ ->
+          assign(socket,
+            controls_available: false,
+            work_busy: true,
+            pending_question: nil,
+            latest_plan: nil
+          )
+      end
+    end
+
+    defp refresh_controls(%{assigns: %{live_action: :new}} = socket) do
       assign(socket,
         controls_available: false,
         work_busy: false,
         pending_question: nil,
         latest_plan: nil,
-        selected_skills: [],
         context_info: nil,
-        context_available: false,
-        skills: [],
-        managed_skills: [],
-        skills_available: false,
-        skill_query: nil
+        context_available: false
       )
-
-  @spec refresh_dialog(socket()) :: socket()
-  defp refresh_dialog(%{assigns: %{selected: %{id: id}, thread_dialog: :context}} = socket) do
-    case Threads.context_info(%{thread_id: id}, actor: socket.assigns.current_user) do
-      {:ok, info} -> assign(socket, context_info: info, context_available: true)
-      _ -> assign(socket, context_info: nil, context_available: false)
     end
-  end
 
-  defp refresh_dialog(%{assigns: %{thread_dialog: :skills}} = socket), do: refresh_skills(socket)
-  defp refresh_dialog(socket), do: socket
-
-  @spec refresh_skills(socket()) :: socket()
-  defp refresh_skills(%{assigns: %{selected: %{id: id}}} = socket) do
-    case Threads.list_skills(%{thread_id: id, limit: 100}, actor: socket.assigns.current_user) do
-      {:ok, page} ->
+    defp refresh_controls(socket),
+      do:
         assign(socket,
-          skills: page.items,
-          managed_skills: Map.get(page, :installations, []),
-          skills_available: true
+          controls_available: false,
+          work_busy: false,
+          pending_question: nil,
+          latest_plan: nil,
+          selected_skills: [],
+          context_info: nil,
+          context_available: false,
+          skills: [],
+          managed_skills: [],
+          skills_available: false,
+          skill_query: nil
         )
 
-      _ ->
-        assign(socket, skills: [], managed_skills: [], skills_available: false)
+    @spec refresh_dialog(socket()) :: socket()
+    defp refresh_dialog(%{assigns: %{selected: %{id: id}, thread_dialog: :context}} = socket) do
+      case Threads.context_info(%{thread_id: id}, actor: socket.assigns.current_user) do
+        {:ok, info} -> assign(socket, context_info: info, context_available: true)
+        _ -> assign(socket, context_info: nil, context_available: false)
+      end
     end
-  end
 
-  defp refresh_skills(socket),
-    do: assign(socket, skills: [], managed_skills: [], skills_available: false)
+    defp refresh_dialog(%{assigns: %{thread_dialog: :skills}} = socket), do: refresh_skills(socket)
+    defp refresh_dialog(socket), do: socket
 
-  @spec skill_value(map(), atom(), term()) :: term()
-  defp skill_value(skill, key, default \\ nil),
-    do: Map.get(skill, key, Map.get(skill, Atom.to_string(key), default))
+    @spec refresh_skills(socket()) :: socket()
+    defp refresh_skills(%{assigns: %{selected: %{id: id}}} = socket) do
+      case Threads.list_skills(%{thread_id: id, limit: 100}, actor: socket.assigns.current_user) do
+        {:ok, page} ->
+          assign(socket,
+            skills: page.items,
+            managed_skills: Map.get(page, :installations, []),
+            skills_available: true
+          )
 
-  @spec matching_skills([map()], String.t() | nil) :: [map()]
-  defp matching_skills(skills, query) do
-    if is_binary(query) do
-      Enum.filter(
-        skills,
-        &(skill_value(&1, :enabled, true) and
-            String.contains?(String.downcase(skill_value(&1, :name, "")), String.downcase(query)))
-      )
-      |> Enum.take(20)
-    else
-      []
+        _ ->
+          assign(socket, skills: [], managed_skills: [], skills_available: false)
+      end
     end
-  end
 
-  # @cc [owner:ghuntley,label:security] thread-refresh-known-read-denial
-  # When a refresh learns that current thread read permission is absent, it MUST
-  # clear selected content, its list entry, transcript and machine actions in that
-  # same refresh, even if later permission reads observe a concurrent regrant.
-  @spec refresh(socket()) :: socket()
-  # @cc [owner:ghuntley,label:reliability;security] threads-refresh-fails-closed
-  # A database or authorization failure during refresh MUST degrade the page to
-  # its unavailable state instead of crashing the LiveView, and MUST clear the
-  # selected thread, its events, write/manage controls and grants rather than
-  # keep details or permissions from an earlier refresh.
-  @spec refresh(socket()) :: socket()
-  defp refresh(socket) do
-    load(socket)
-  rescue
-    _ in [
-      Ash.Error.Forbidden,
-      Ash.Error.Invalid,
-      Ash.Error.Unknown,
-      DBConnection.ConnectionError,
-      Postgrex.Error
-    ] ->
-      unavailable(socket)
-  end
+    defp refresh_skills(socket),
+      do: assign(socket, skills: [], managed_skills: [], skills_available: false)
 
-  @spec unavailable(socket()) :: socket()
-  defp unavailable(socket) do
-    socket
-    |> assign(
-      threads_empty: false,
-      thread_page_empty: false,
-      thread_matches_empty: false,
-      threads_available: false,
-      activity_empty: true,
-      selected: nil,
-      generations: [],
-      selected_generation: nil,
-      generation_current: false,
-      can_write: false,
-      can_manage: false,
-      editor_available: false,
-      events_empty: true,
-      events_available: false,
-      tool_presentations: %{},
-      controls_available: false,
-      work_busy: false,
-      pending_question: nil,
-      latest_plan: nil,
-      detail_error: if(socket.assigns[:selected_id], do: :unavailable)
-    )
+    @spec skill_value(map(), atom(), term()) :: term()
+    defp skill_value(skill, key, default \\ nil),
+      do: Map.get(skill, key, Map.get(skill, Atom.to_string(key), default))
+
+    @spec matching_skills([map()], String.t() | nil) :: [map()]
+    defp matching_skills(skills, query) do
+      if is_binary(query) do
+        Enum.filter(
+          skills,
+          &(skill_value(&1, :enabled, true) and
+              String.contains?(String.downcase(skill_value(&1, :name, "")), String.downcase(query)))
+        )
+        |> Enum.take(20)
+      else
+        []
+      end
+    end
+
+    # @cc [owner:ghuntley,label:security] thread-refresh-known-read-denial
+    # When a refresh learns that current thread read permission is absent, it MUST
+    # clear selected content, its list entry, transcript and machine actions in that
+    # same refresh, even if later permission reads observe a concurrent regrant.
+    @spec refresh(socket()) :: socket()
+    # @cc [owner:ghuntley,label:reliability;security] threads-refresh-fails-closed
+    # A database or authorization failure during refresh MUST degrade the page to
+    # its unavailable state instead of crashing the LiveView, and MUST clear the
+    # selected thread, its events, write/manage controls and grants rather than
+    # keep details or permissions from an earlier refresh.
+    @spec refresh(socket()) :: socket()
+    defp refresh(socket) do
+      load(socket)
+    rescue
+      _ in [
+        Ash.Error.Forbidden,
+        Ash.Error.Invalid,
+        Ash.Error.Unknown,
+        DBConnection.ConnectionError,
+        Postgrex.Error
+      ] ->
+        unavailable(socket)
+    end
+
+    @spec unavailable(socket()) :: socket()
+    defp unavailable(socket) do
+      socket
+      |> assign(
+        threads_empty: false,
+        thread_page_empty: false,
+        thread_matches_empty: false,
+        threads_available: false,
+        activity_empty: true,
+        selected: nil,
+        generations: [],
+        selected_generation: nil,
+        generation_current: false,
+        can_write: false,
+        can_manage: false,
+        editor_available: false,
+        events_empty: true,
+        events_available: false,
+        controls_available: false,
+        work_busy: false,
+        pending_question: nil,
+        latest_plan: nil,
+        detail_error: if(socket.assigns[:selected_id], do: :unavailable)    )
     |> stream(:threads, [], reset: true)
     |> stream(:activity_threads, [], reset: true)
     |> stream(:events, [], reset: true)
@@ -979,38 +960,36 @@ defmodule MarshallWeb.ThreadsLive do
          else: {[], true}
 
     catalog = catalog(actor)
-    tool_presentations = tool_presentations(events)
 
     socket =
       socket
       |> assign(
         threads_empty: all_threads == [] and is_nil(socket.assigns[:thread_cursor]),
         thread_page_empty: all_threads == [] and not is_nil(socket.assigns[:thread_cursor]),
-        thread_matches_empty: visible_threads == [],
-        threads_available: threads_available,
-        thread_next: thread_next,
-        activity_empty: activity_threads == [],
-        selected: selected,
-        generations: generations,
-        generations_available: generations_available,
-        selected_generation: selected_generation,
-        generation_current: generation_current,
-        can_write: not is_nil(selected) and generation_current and permissions.write,
-        can_manage: not is_nil(selected) and permissions.manage,
-        editor_available: generation_current and thread_editor_available?(selected, actor),
-        events_empty: events == [],
-        events_available: events_available,
-        tool_presentations: tool_presentations,
-        catalog: catalog,
-        detail_error: detail_error,
-        activity_team_options: activity_team_options(all_threads)
-      )
-      |> stream(:threads, visible_threads, reset: true)
-      |> stream(:activity_threads, activity_threads, reset: true)
-      |> maybe_seed_defaults(catalog)
-      |> refresh_grants()
-      |> refresh_controls()
-      |> refresh_dialog()
+      thread_matches_empty: visible_threads == [],
+      threads_available: threads_available,
+      thread_next: thread_next,
+      activity_empty: activity_threads == [],
+      selected: selected,
+      generations: generations,
+      generations_available: generations_available,
+      selected_generation: selected_generation,
+      generation_current: generation_current,
+      can_write: not is_nil(selected) and generation_current and permissions.write,
+      can_manage: not is_nil(selected) and permissions.manage,
+      editor_available: generation_current and thread_editor_available?(selected, actor),
+      events_empty: events == [],
+      events_available: events_available,
+      catalog: catalog,
+      detail_error: detail_error,
+      activity_team_options: activity_team_options(all_threads)
+    )
+    |> stream(:threads, visible_threads, reset: true)
+    |> stream(:activity_threads, activity_threads, reset: true)
+    |> maybe_seed_defaults(catalog)
+    |> refresh_grants()
+    |> refresh_controls()
+    |> refresh_dialog()
 
     event_context =
       if selected && selected_generation,
@@ -1453,8 +1432,8 @@ defmodule MarshallWeb.ThreadsLive do
   # Thread views MUST keep the objective and authorized transcript primary. Machine
   # settings MUST remain optional disclosure, and pending/failed/archived states
   # MUST explain the available next action without exposing provider diagnostics.
-  # The terminal action MUST use the existing machine route, preserving that
-  # route's current authorization and terminal session checks.
+  # The embedded terminal MUST load lazily through the existing machine route,
+  # preserving that route's current authorization and terminal session checks.
 
   # @cc [owner:ghuntley,label:product] thread-newest-first-reading-order
   # The ready-thread composer MUST precede its transcript in DOM order. Authorized
@@ -1972,6 +1951,26 @@ defmodule MarshallWeb.ThreadsLive do
                             class="console-button ghost"
                           >{dgettext("agents", "Open terminal")} <.glyph name="arrow_up_right" /></.link>
                         </div>
+                        <details
+                          :if={@can_write and @selected.status == :ready and @selected.machine_id}
+                          id="thread-terminal-embed"
+                          class="thread-terminal-embed"
+                          data-thread-terminal
+                        >
+                          <summary class="console-button ghost">
+                            {dgettext("agents", "Open terminal here")}
+                          </summary>
+                          <div class="thread-terminal-frame">
+                            <iframe
+                              id="thread-terminal-frame"
+                              data-thread-terminal-src={
+                                ~p"/machines/#{@selected.machine_id}/terminals"
+                              }
+                              title={dgettext("agents", "Thread terminal")}
+                              loading="lazy"
+                            ></iframe>
+                          </div>
+                        </details>
                         <.link
                           :if={@editor_available}
                           id="thread-vscode"
@@ -2411,11 +2410,7 @@ defmodule MarshallWeb.ThreadsLive do
                         >
                           {dgettext("agents", "Waiting for the agent's first update.")}
                         </p>
-                        <div
-                          id="thread-transcript"
-                          phx-update="stream"
-                          phx-hook="ThreadTranscript"
-                        >
+                        <div id="thread-transcript" phx-update="stream">
                           <article
                             :for={{dom_id, event} <- @streams.events}
                             id={dom_id}
@@ -2429,14 +2424,7 @@ defmodule MarshallWeb.ThreadsLive do
                               <p class="thread-message-role">{event_role(event.kind)}</p>
                               <pre>{event_text(event)}</pre>
                             <% else %>
-                              <%= case Map.get(@tool_presentations, event.id) do %>
-                                <% cards when is_list(cards) and cards != [] -> %>
-                                  <div class="thread-tool-events">
-                                    <.tool_event_card :for={card <- cards} card={card} />
-                                  </div>
-                                <% _ -> %>
-                                  <p class="thread-event-label">{event_text(event)}</p>
-                              <% end %>
+                              <p class="thread-event-label">{event_text(event)}</p>
                             <% end %>
                           </article>
                         </div>
@@ -2733,9 +2721,9 @@ defmodule MarshallWeb.ThreadsLive do
     """
   end
 
-  attr(:skills, :list, required: true)
-  attr(:query, :string, default: nil)
-  attr(:selected_skills, :list, required: true)
+  attr :skills, :list, required: true
+  attr :query, :string, default: nil
+  attr :selected_skills, :list, required: true
 
   @spec composer_suggestions(map()) :: Phoenix.LiveView.Rendered.t()
   defp composer_suggestions(assigns) do
@@ -2873,389 +2861,6 @@ defmodule MarshallWeb.ThreadsLive do
   @spec event_role(atom()) :: String.t()
   defp event_role(:prompt), do: dgettext("agents", "Prompt")
   defp event_role(:assistant), do: dgettext("agents", "Agent")
-
-  attr(:card, :map, required: true)
-
-  @spec tool_event_card(map()) :: Phoenix.LiveView.Rendered.t()
-  defp tool_event_card(assigns) do
-    ~H"""
-    <details
-      class="thread-tool-card"
-      data-tool={@card.tool}
-      data-state={@card.state}
-      data-tone={@card.tone}
-      open={@card.open}
-    >
-      <summary class="thread-tool-summary">
-        <span class="status-label" data-tone={@card.tone}>{@card.status_label}</span>
-        <strong class="thread-tool-name">{@card.tool}</strong>
-        <span class="thread-tool-summary-text">{@card.summary}</span>
-        <span :if={@card.duration} class="thread-tool-duration">{@card.duration}</span>
-      </summary>
-      <div class="thread-tool-details">
-        <section :if={@card.command} class="thread-tool-command">
-          <h3>{dgettext("agents", "Command")}</h3>
-          <pre><code>{@card.command_preview}</code></pre>
-          <details :if={@card.arguments} class="thread-tool-arguments">
-            <summary>{dgettext("agents", "Structured arguments")}</summary>
-            <pre><code>{@card.arguments}</code></pre>
-          </details>
-        </section>
-        <.kv :if={@card.metadata != []}>
-          <:item :for={{label, value} <- @card.metadata} title={label}>{value}</:item>
-        </.kv>
-        <section :for={output <- @card.outputs} class="thread-tool-output">
-          <h3><code>{output.kind}</code></h3>
-          <pre>{output.text}<%= if output.truncated, do: "…" %></pre>
-        </section>
-      </div>
-    </details>
-    """
-  end
-
-  # @cc [owner:ghuntley,label:security;product] thread-tool-detail-redaction
-  # Tool detail cards MUST render only allowlisted event fields after redaction
-  # and bounded truncation; raw arguments, identifiers and unrestricted output
-  # MUST remain outside the authorized transcript presentation.
-  @spec tool_presentations([Marshall.Agents.Event.t()]) :: %{
-          optional(String.t()) => [tool_card()]
-        }
-  defp tool_presentations(events) do
-    call_index = tool_call_index(events)
-    completed_call_ids = tool_result_call_ids(events)
-
-    latest_result_id =
-      events
-      |> Enum.filter(&(&1.kind == :tool_result))
-      |> List.last()
-      |> case do
-        %{id: id} -> id
-        _ -> nil
-      end
-
-    Enum.reduce(events, %{}, fn
-      %{id: id, kind: :tool_queued, body: body}, presentations ->
-        case queued_tool_cards(body, completed_call_ids) do
-          [] -> presentations
-          cards -> Map.put(presentations, id, cards)
-        end
-
-      %{id: id, kind: :tool_result, body: body}, presentations ->
-        Map.put(presentations, id, [tool_result_card(body, call_index, id == latest_result_id)])
-
-      _event, presentations ->
-        presentations
-    end)
-  end
-
-  @spec tool_result_call_ids([Marshall.Agents.Event.t()]) :: MapSet.t(String.t())
-  defp tool_result_call_ids(events) do
-    Enum.reduce(events, MapSet.new(), fn
-      %{kind: :tool_result, body: %{"call_id" => call_id}}, ids when is_binary(call_id) ->
-        MapSet.put(ids, call_id)
-
-      _event, ids ->
-        ids
-    end)
-  end
-
-  @spec tool_call_index([Marshall.Agents.Event.t()]) :: %{
-          optional(String.t()) => %{tool: String.t(), metadata: [{String.t(), String.t()}]}
-        }
-  defp tool_call_index(events) do
-    Enum.reduce(events, %{}, fn
-      %{kind: :tool_queued, body: %{"calls" => calls}}, index when is_list(calls) ->
-        Enum.reduce(calls, index, fn
-          %{"call_id" => call_id, "tool" => tool, "arguments" => arguments}, index
-          when is_binary(call_id) and is_binary(tool) and is_map(arguments) ->
-            Map.put(index, call_id, %{
-              tool: String.slice(tool, 0, 80),
-              metadata: tool_metadata(arguments),
-              command: command_value(tool, arguments),
-              arguments: formatted_arguments(arguments),
-              command_preview: command_preview(tool, arguments)
-            })
-
-          _call, index ->
-            index
-        end)
-
-      _event, index ->
-        index
-    end)
-  end
-
-  @spec queued_tool_cards(map(), MapSet.t(String.t())) :: [tool_card()]
-  defp queued_tool_cards(%{"calls" => calls}, completed_call_ids) when is_list(calls) do
-    cards =
-      Enum.flat_map(calls, fn
-        %{"call_id" => call_id, "tool" => tool, "arguments" => arguments}
-        when is_binary(call_id) and is_binary(tool) and is_map(arguments) ->
-          if MapSet.member?(completed_call_ids, call_id) do
-            []
-          else
-            [
-              tool_card(
-                "queued",
-                "pending",
-                String.slice(tool, 0, 80),
-                tool_metadata(arguments),
-                [],
-                false,
-                %{
-                  command: command_value(tool, arguments),
-                  arguments: formatted_arguments(arguments),
-                  command_preview: command_preview(tool, arguments)
-                }
-              )
-            ]
-          end
-
-        _call ->
-          []
-      end)
-
-    cards
-  end
-
-  defp queued_tool_cards(_body, _completed_call_ids), do: []
-
-  @spec tool_result_card(map(), map(), boolean()) :: tool_card()
-  defp tool_result_card(
-         %{"call_id" => call_id, "result" => result},
-         call_index,
-         open
-       )
-       when is_binary(call_id) and is_map(result) do
-    call =
-      Map.get(call_index, call_id, %{
-        tool: nil,
-        metadata: [],
-        command: nil,
-        arguments: nil,
-        command_preview: nil
-      })
-
-    tool_status = tool_status(Map.get(result, "status"))
-
-    card =
-      tool_card(
-        tool_status.state,
-        tool_status.tone,
-        Map.get(call, :tool),
-        Map.get(call, :metadata, []),
-        output_sections(result),
-        open,
-        call
-      )
-
-    Map.put(card, :duration, duration_label(result))
-  end
-
-  defp tool_result_card(_body, _call_index, open),
-    do: tool_card("unknown", "muted", nil, [], [], open, %{})
-
-  @spec duration_label(map()) :: String.t() | nil
-  defp duration_label(result) do
-    case Map.get(result, "duration_ms") do
-      value when is_integer(value) and value >= 0 ->
-        if value < 1_000, do: "#{value} ms", else: "#{Float.round(value / 1_000, 1)} s"
-
-      _ ->
-        nil
-    end
-  end
-
-  @spec tool_card(
-          String.t(),
-          String.t(),
-          String.t() | nil,
-          [{String.t(), String.t()}],
-          [tool_output()],
-          boolean(),
-          map()
-        ) :: tool_card()
-  defp tool_card(state, tone, tool, metadata, outputs, open, call) do
-    status = tool_status(state)
-
-    %{
-      tool: tool || dgettext("agents", "Unknown"),
-      state: status.state,
-      tone: tone,
-      status_label: status.status_label,
-      summary: status.summary,
-      metadata: [{dgettext("agents", "Status"), status.summary} | metadata],
-      command: Map.get(call, :command),
-      arguments: Map.get(call, :arguments),
-      command_preview: Map.get(call, :command_preview),
-      duration: nil,
-      outputs: outputs,
-      open: open
-    }
-  end
-
-  @spec command_value(String.t(), map()) :: String.t() | nil
-  defp command_value("exec_command", arguments) do
-    case Map.get(arguments, "cmd") || Map.get(arguments, "command") do
-      value when is_binary(value) -> safe_text(value) |> elem(0)
-      _ -> nil
-    end
-  end
-
-  defp command_value(_, _), do: nil
-
-  @spec formatted_arguments(map()) :: String.t() | nil
-  defp formatted_arguments(arguments) do
-    {redacted, _findings} = Marshall.Redaction.Scanner.redact_json(arguments)
-    encoded = Jason.encode!(redacted, pretty: true)
-    {text, truncated} = safe_text(encoded)
-    if text == "{}", do: nil, else: if(truncated, do: text <> "…", else: text)
-  end
-
-  @spec command_preview(String.t(), map()) :: String.t() | nil
-  defp command_preview("exec_command", arguments) do
-    command = command_value("exec_command", arguments)
-    args = Map.get(arguments, "args")
-
-    case {command, args} do
-      {nil, _} ->
-        nil
-
-      {command, args} when is_list(args) ->
-        Enum.join([command | Enum.map(args, &shell_quote/1)], " ")
-
-      {command, _} ->
-        command
-    end
-  end
-
-  defp command_preview(_, _), do: nil
-
-  @spec shell_quote(term()) :: String.t()
-  defp shell_quote(value) do
-    text = if is_binary(value), do: value, else: inspect(value)
-    "'" <> String.replace(text, "'", "'\\\"'\\\"'") <> "'"
-  end
-
-  @spec tool_status(String.t() | nil) :: %{
-          state: String.t(),
-          tone: String.t(),
-          status_label: String.t(),
-          summary: String.t()
-        }
-  defp tool_status("queued"),
-    do: %{
-      state: "queued",
-      tone: "pending",
-      status_label: dgettext("agents", "Tools queued"),
-      summary: dgettext("agents", "Tools queued")
-    }
-
-  defp tool_status("completed"),
-    do: %{
-      state: "completed",
-      tone: "success",
-      status_label: dgettext("agents", "Tool completed"),
-      summary: dgettext("agents", "Tool completed")
-    }
-
-  defp tool_status("failed"),
-    do: %{
-      state: "failed",
-      tone: "danger",
-      status_label: dgettext("agents", "Tool failed"),
-      summary: dgettext("agents", "Tool failed")
-    }
-
-  defp tool_status("cancelled"),
-    do: %{
-      state: "cancelled",
-      tone: "muted",
-      status_label: dgettext("agents", "Tool cancelled"),
-      summary: dgettext("agents", "Tool cancelled")
-    }
-
-  defp tool_status("uncertain"),
-    do: %{
-      state: "uncertain",
-      tone: "warning",
-      status_label: dgettext("agents", "Tool outcome uncertain"),
-      summary: dgettext("agents", "Tool outcome uncertain")
-    }
-
-  defp tool_status("claimed"),
-    do: %{
-      state: "claimed",
-      tone: "pending",
-      status_label: dgettext("agents", "Tool result received"),
-      summary: dgettext("agents", "Tool result received")
-    }
-
-  defp tool_status("started"), do: tool_status("claimed")
-
-  defp tool_status(_status),
-    do: %{
-      state: "unknown",
-      tone: "muted",
-      status_label: dgettext("agents", "Unknown"),
-      summary: dgettext("agents", "Tool result received")
-    }
-
-  @spec tool_metadata(map()) :: [{String.t(), String.t()}]
-  defp tool_metadata(arguments) do
-    [
-      metadata_value(dgettext("agents", "Working directory"), Map.get(arguments, "workdir")),
-      metadata_value(dgettext("agents", "Workspace source"), Map.get(arguments, "path"))
-    ]
-    |> Enum.reject(&is_nil/1)
-  end
-
-  @spec metadata_value(String.t(), term()) :: {String.t(), String.t()} | nil
-  defp metadata_value(_label, value) when value in [nil, ""], do: nil
-
-  defp metadata_value(label, value) when is_binary(value) do
-    {text, truncated} = safe_text(value)
-    {label, if(truncated, do: text <> "…", else: text)}
-  end
-
-  defp metadata_value(label, value) when is_integer(value),
-    do: {label, Integer.to_string(value)}
-
-  defp metadata_value(_label, _value), do: nil
-
-  @spec output_sections(map()) :: [tool_output()]
-  defp output_sections(result) do
-    [
-      "contents",
-      "stdout",
-      "stderr",
-      "text",
-      "exit_code",
-      "reason"
-    ]
-    |> Enum.flat_map(fn key ->
-      case Map.get(result, key) do
-        value when is_binary(value) and value != "" ->
-          {text, truncated} = safe_text(value)
-          [%{kind: key, text: text, truncated: truncated}]
-
-        value when is_integer(value) ->
-          [%{kind: key, text: Integer.to_string(value), truncated: false}]
-
-        _ ->
-          []
-      end
-    end)
-  end
-
-  @spec safe_text(String.t()) :: {String.t(), boolean()}
-  defp safe_text(value) do
-    redacted = Marshall.Redaction.Scanner.redact(value).value
-
-    if byte_size(redacted) > @tool_text_limit,
-      do: {String.slice(redacted, 0, @tool_text_limit), true},
-      else: {redacted, false}
-  end
 
   @spec event_text(Marshall.Agents.Event.t()) :: String.t()
   defp event_text(%{kind: :prompt, body: body}), do: Map.get(body, "prompt", "")

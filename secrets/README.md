@@ -1,15 +1,5 @@
 # Deployment secrets
 
-## Dungarees inference proxy
-
-`dungarees-underclass-proxy.enc.json` contains only Panterloons's proxy key under
-`overalls-underclass-proxy.production.UNDERCLASS_PROXY_KEY`, sealed to Dungarees
-and the recovery recipients. It publishes `/run/overalls-secrets/underclass-proxy/proxy.key`
-for Ziggy's verified Panterloons HTTPS origin (ADR-0280). It contains no admin
-token, provider account credentials or database. Rotate this copy with the
-Panterloons source key before activating both configurations. Dungarees's
-separate local Underclass document remains independent.
-
 ## SSH host CA
 
 [`ssh-host-ca.pub`](ssh-host-ca.pub) is the dedicated Ed25519 SSH host authority.

@@ -4,7 +4,7 @@ defmodule Ziggy.AgentStream do
   @limit 1_048_576
   @max_items 256
 
-  defstruct buffer: "", items: %{}, completed: nil, error: nil, pre_output?: true
+  defstruct buffer: "", items: %{}, completed: nil, error: nil
 
   @type error :: Ziggy.AgentError.reason() | :invalid_response | :too_large
 
@@ -12,8 +12,7 @@ defmodule Ziggy.AgentStream do
           buffer: binary(),
           items: %{optional(non_neg_integer()) => map()},
           completed: map() | nil,
-          error: error() | nil,
-          pre_output?: boolean()
+          error: error() | nil
         }
 
   # @cc [owner:ghuntley,label:security;recovery] agent-stream-final-only
@@ -57,22 +56,6 @@ defmodule Ziggy.AgentStream do
 
   def finish(_), do: {:error, :invalid_response}
 
-  # @cc [owner:ghuntley,label:recovery] agent-overload-positive-no-output-proof
-  # Retry evidence MUST require an exact terminal overload and a complete stream
-  # containing only recognized pre-output events. Output, unknown or malformed
-  # events, conflicting terminals and a trailing partial frame permanently
-  # disqualify it, even when failure handling discards collected output items.
-  @spec overload_before_output?(t()) :: boolean()
-  def overload_before_output?(%__MODULE__{
-        error: :server_is_overloaded,
-        pre_output?: true,
-        completed: nil,
-        buffer: buffer
-      }),
-      do: String.trim(buffer) == ""
-
-  def overload_before_output?(_), do: false
-
   @spec output(map(), %{optional(non_neg_integer()) => map()}) ::
           {:ok, [map()]} | {:error, :invalid_response}
   defp output(%{"output" => output}, _items) when is_list(output) and output != [] do
@@ -94,27 +77,18 @@ defmodule Ziggy.AgentStream do
   defp output(_, _), do: {:error, :invalid_response}
 
   @spec accept(t(), binary()) :: {:ok, t()} | {:error, :too_large}
-  defp accept(state, frame) do
-    lines = String.split(frame, "\n")
+  defp accept(%{error: error} = state, _) when not is_nil(error), do: {:ok, state}
 
+  defp accept(state, frame) do
     data =
-      lines
+      frame
+      |> String.split("\n")
       |> Enum.filter(&String.starts_with?(&1, "data:"))
       |> Enum.map_join("\n", fn line ->
         line |> String.replace_prefix("data:", "") |> String.replace_prefix(" ", "")
       end)
 
-    decoded = Jason.decode(data)
-    state = %{state | pre_output?: state.pre_output? and pre_output_frame?(state, lines, decoded)}
-    accept_event(state, decoded)
-  end
-
-  @spec accept_event(t(), {:ok, term()} | {:error, Jason.DecodeError.t()}) ::
-          {:ok, t()} | {:error, :too_large}
-  defp accept_event(%{error: error} = state, _) when not is_nil(error), do: {:ok, state}
-
-  defp accept_event(state, decoded) do
-    case decoded do
+    case Jason.decode(data) do
       {:ok, %{"type" => "response.output_item.done", "output_index" => index, "item" => item}}
       when is_integer(index) and index >= 0 and index < @max_items and is_map(item) ->
         items = Map.put(state.items, index, item)
@@ -156,86 +130,6 @@ defmodule Ziggy.AgentStream do
         {:ok, state}
     end
   end
-
-  @spec pre_output_frame?(t(), [binary()], {:ok, term()} | {:error, Jason.DecodeError.t()}) ::
-          boolean()
-  defp pre_output_frame?(state, lines, decoded) do
-    comment? = Enum.all?(lines, &(&1 == "" or String.starts_with?(&1, ":")))
-
-    cond do
-      comment? -> true
-      state.error != nil or state.completed != nil -> false
-      true -> recognized_pre_output?(lines, decoded)
-    end
-  end
-
-  @spec recognized_pre_output?([binary()], {:ok, term()} | {:error, Jason.DecodeError.t()}) ::
-          boolean()
-  defp recognized_pre_output?(lines, {:ok, %{"type" => type} = event}) when is_binary(type) do
-    valid_lines? =
-      Enum.all?(lines, fn line ->
-        line == "" or String.starts_with?(line, [":", "data:"]) or
-          line in ["event:" <> type, "event: " <> type]
-      end)
-
-    valid_lines? and no_output?(event) and
-      case type do
-        preamble when preamble in ["response.created", "response.in_progress"] ->
-          case event do
-            %{"response" => response} when is_map(response) ->
-              Map.get(response, "status", "in_progress") in ["queued", "in_progress"] and
-                Ziggy.AgentError.terminal(response) == nil and no_output?(response)
-
-            _ ->
-              false
-          end
-
-        "response.failed" ->
-          case event do
-            %{"response" => response} when is_map(response) ->
-              Map.get(response, "status", "failed") == "failed" and no_output?(response) and
-                Ziggy.AgentError.classify(response) == :server_is_overloaded
-
-            _ ->
-              false
-          end
-
-        "error" ->
-          Map.keys(event) -- ~w(type code error message param sequence_number) == [] and
-            error_without_output?(Map.get(event, "error")) and
-            Ziggy.AgentError.classify(event) == :server_is_overloaded
-
-        _ ->
-          false
-      end
-  end
-
-  defp recognized_pre_output?(_, _), do: false
-
-  @spec no_output?(map()) :: boolean()
-  defp no_output?(value) do
-    Map.get(value, "output", []) == [] and Map.get(value, "choices", []) == [] and
-      not Enum.any?(~w(item delta content), &Map.has_key?(value, &1)) and
-      no_output_usage?(Map.get(value, "usage"))
-  end
-
-  @spec no_output_usage?(term()) :: boolean()
-  defp no_output_usage?(nil), do: true
-
-  defp no_output_usage?(usage) when is_map(usage) do
-    Enum.all?(~w(output_tokens completion_tokens reasoning_tokens), &(Map.get(usage, &1, 0) == 0)) and
-      case Map.get(usage, "output_tokens_details") do
-        nil -> true
-        details when is_map(details) -> Map.get(details, "reasoning_tokens", 0) == 0
-        _ -> false
-      end
-  end
-
-  defp no_output_usage?(_), do: false
-
-  @spec error_without_output?(term()) :: boolean()
-  defp error_without_output?(error) when is_map(error), do: no_output?(error)
-  defp error_without_output?(error), do: is_nil(error) or is_binary(error)
 
   @spec complete(t(), map()) :: {:ok, t()} | {:error, :too_large}
   defp complete(%{completed: completed} = state, _) when not is_nil(completed),

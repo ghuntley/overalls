@@ -25,7 +25,6 @@ nixos_machine_test(
         "//nix:module-secrets",
         "//nix:module-underclass",
         "//nix:module-ziggy",
-        "//nix/verification/tests/machines/underclass-slo:srcs",
         "//nix/verification/tests/machines/ziggy-service:srcs",
     ],
 )

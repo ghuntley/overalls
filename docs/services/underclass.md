@@ -1,12 +1,10 @@
 # Underclass fleet service
 
-Panterloons and Dungarees retain independent
-[Underclass](https://github.com/ghuntley/underclass) account databases. Dungarees
-Ziggy sends inference to `https://panterloons.lorikeet-bangus.ts.net` using a
-dedicated proxy-only encrypted credential bundle
-([ADR-0280](../architecture/decisions/0280-remote-underclass-and-safe-agent-retries.md)).
-Provider accounts, SQLite state, sticky bindings and administrative credentials
-are not replicated. Onboard provider accounts on Panterloons for this route.
+Every current enrolled production host runs its own independent
+[Underclass](https://github.com/ghuntley/underclass) subscription pool. Overalls
+and Dungarees do not replicate accounts, SQLite state, sticky bindings or tokens.
+Onboard provider accounts separately on each host and choose the desired host in
+each client configuration.
 Future hosts opt in by declaring a host-specific `NAME-underclass` encrypted
 document; generic enrollment and base/recovery configurations remain independent.
 
@@ -23,10 +21,8 @@ Tailnet identity is a network admission control, not application authorization.
 Clients still send the host-specific `UNDERCLASS_PROXY_KEY` to `/v1/*`; the web
 UI and `/admin/api/*` require that host's `UNDERCLASS_UI_TOKEN`.
 
-The local encrypted documents are `panterloons-underclass` and
-`dungarees-underclass`; `dungarees-underclass-proxy` holds only the Panterloons
-proxy key. Rotate the source key and its proxy-only copy together. Recover a
-document to a private file outside the checkout
+The encrypted documents are `overalls-underclass` and
+`dungarees-underclass`. Recover a document to a private file outside the checkout
 with the ordinary `tools/buck2 run //:secrets -- decrypt ...` workflow in
 [fleet-users.md](../operations/fleet-users.md). Never put either value in a command argument,
 Nix expression, issue, or diagnostic output.
@@ -60,19 +56,6 @@ deadline, while an explicit allowed result readmits the account. When no usable
 deadline is available, the configured cooldown remains the fallback.
 
 ## Operations and failure behavior
-
-New request and account identifiers use UUIDv7. Underclass preserves one valid
-UUIDv7 `x-request-id`, replacing other versions and malformed/duplicate headers.
-Search a model-call ID across Marshall, Ziggy and Underclass to trace admission,
-provider start and terminal outcome; internal account attempts share that ID.
-Local monitor readiness describes the local pool, so Dungarees's empty local
-pool does not describe the health of its remote Ziggy provider route.
-
-Marshall retries only Ziggy's positively verified pre-output overload result:
-at most three fresh model calls, delayed one then two seconds. Failed attempts
-remain in history. Empty pools, quota exhaustion and ambiguous/lost results are
-terminal. The proxy-owned retry-safety header certifies only an overload-only
-attempt chain; generic HTTP503 is not a retry instruction.
 
 Revision `8c1a38c` retains the existing refresh-token rotation and rotates stored
 Codex refresh tokens after 24 hours,

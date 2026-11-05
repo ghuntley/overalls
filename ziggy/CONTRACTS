@@ -3,10 +3,10 @@ Provider keys MUST come from private runtime files. Keys, prompts, responses,
 tool payloads and raw upstream errors MUST NOT enter logs or durable accounting.
 
 @cc [owner:ghuntley,label:security;deployment] ziggy-underclass-origin
-The OpenAI-compatible origin MUST be the fixed public provider origin,
-enrolled host-local Underclass loopback, or the exact configured Panterloons
-HTTPS tailnet origin. Underclass MUST receive only its proxy credential, never
-its administrative UI token. Request input MUST NOT select an upstream origin.
+The OpenAI-compatible origin MUST be either the fixed public provider origin
+or enrolled host-local Underclass loopback. The latter MUST receive only its
+proxy credential, never its administrative UI token. Request input MUST NOT
+select an upstream origin.
 
 @cc [owner:ghuntley,label:architecture] ziggy-authority-boundary
 Ziggy MUST obtain current Marshall authority before provider effects and MUST

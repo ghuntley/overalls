@@ -5,9 +5,6 @@ defmodule Ziggy.Upstream do
   @type result :: %{
           status: integer() | nil,
           provider_request_id: binary() | nil,
-          retry_safe: boolean(),
-          trusted_proxy: boolean(),
-          headers_received: boolean(),
           response_bytes: non_neg_integer(),
           usage: map(),
           outcome: atom()
@@ -16,14 +13,11 @@ defmodule Ziggy.Upstream do
   # @cc [owner:ghuntley,label:security] upstream-fixed-origin-single-attempt
   # The caller MUST already hold durable admission and live request authority.
   # Production requests MUST use the configured fixed provider origin or the
-  # configured Underclass loopback or exact Panterloons HTTPS origin, never
+  # host-local Underclass loopback origin, never
   # follow redirects or retry inference. Guest authorization and forwarding
   # headers MUST NOT be sent upstream. Consumer failure MUST cancel streaming.
   # Only the route's validated query enum may add an upstream query; native paths
   # MUST remain query-free for operation accounting.
-  # Underclass may hold each pool attempt before output, so its receive timeout
-  # MUST allow the model call's ten-minute authority window. The independent
-  # lease MUST still cancel a blocked read when authority expires or is revoked.
   @spec stream(
           Ziggy.Route.route(),
           binary(),
@@ -32,59 +26,46 @@ defmodule Ziggy.Upstream do
           keyword()
         ) :: result()
   def stream(route, key, headers, consume, options) do
-    request_id = Keyword.fetch!(options, :request_id)
-    true = Ziggy.RequestId.valid?(request_id)
-    origin = origin(route.provider, options)
-
     request =
       Finch.build(
         :post,
-        origin <> route.path <> query_suffix(route.query),
-        [{"x-request-id", request_id} | headers(route.provider, key, headers)],
+        origin(route.provider, options) <> route.path <> query_suffix(route.query),
+        headers(route.provider, key, headers),
         route.body
       )
 
     initial = %{
       status: nil,
       provider_request_id: nil,
-      retry_safe: false,
-      trusted_proxy: route.provider == :openai and underclass_origin?(origin),
-      headers_received: false,
       response_bytes: 0,
       usage: Ziggy.Usage.new(route.provider, :json),
       outcome: :completed
     }
 
     finch = Keyword.fetch!(options, :finch)
+    request_id = Keyword.fetch!(options, :request_id)
+    true = is_binary(request_id)
     callback = fn event, state -> receive_event(event, state, route.provider, consume) end
 
     finch_module = Keyword.get(options, :finch_module, Finch)
-    started = System.monotonic_time(:millisecond)
-    Ziggy.Events.emit("ziggy.upstream_started", request_id: request_id)
 
-    state =
-      case finch_module.stream_while(request, finch, initial, callback,
-             pool_timeout: 5000,
-             receive_timeout: if(initial.trusted_proxy, do: 600_000, else: 30_000),
-             request_timeout: :infinity
-           ) do
-        {:ok, state} -> state
-        {:error, _reason, state} -> %{state | outcome: :transport_error, retry_safe: false}
-      end
+    case finch_module.stream_while(request, finch, initial, callback,
+           pool_timeout: 5000,
+           receive_timeout: 30_000,
+           request_timeout: :infinity
+         ) do
+      {:ok, state} ->
+        state = %{state | usage: Ziggy.Usage.finish(state.usage)}
+        Ziggy.Events.emit("ziggy.upstream_outcome", request_id: request_id, reason: state.outcome)
+        state
 
-    Ziggy.Events.emit("ziggy.upstream_outcome",
-      request_id: request_id,
-      reason: state.outcome,
-      status: state.status,
-      duration_ms: System.monotonic_time(:millisecond) - started
-    )
+      {:error, _reason, state} ->
+        state = %{state | usage: Ziggy.Usage.finish(state.usage), outcome: :transport_error}
 
-    %{state | usage: Ziggy.Usage.finish(state.usage)}
+        Ziggy.Events.emit("ziggy.upstream_outcome", request_id: request_id, reason: state.outcome)
+        state
+    end
   end
-
-  @spec underclass_origin?(binary()) :: boolean()
-  defp underclass_origin?(origin),
-    do: origin in ["http://127.0.0.1:8080", "https://panterloons.lorikeet-bangus.ts.net"]
 
   defp origin(:openai, options),
     do: Keyword.get(options, :openai_origin, Ziggy.Route.origin(:openai))
@@ -132,7 +113,10 @@ defmodule Ziggy.Upstream do
            name == "content-type" and String.starts_with?(value, "text/event-stream")
          end), do: :sse, else: :json
 
-    safe = Enum.filter(headers, fn {name, _} -> name in ~w(content-type retry-after) end)
+    safe =
+      Enum.filter(headers, fn {name, _} ->
+        name in ~w(content-type request-id x-request-id retry-after)
+      end)
 
     request_id =
       Enum.find_value(headers, fn {key, value} ->
@@ -145,10 +129,7 @@ defmodule Ziggy.Upstream do
     deliver(consume, {:headers, safe}, %{
       state
       | usage: Ziggy.Usage.new(provider, mode),
-        provider_request_id: request_id,
-        retry_safe:
-          state.trusted_proxy and not state.headers_received and retry_safe_header?(headers),
-        headers_received: true
+        provider_request_id: request_id
     })
   end
 
@@ -165,21 +146,10 @@ defmodule Ziggy.Upstream do
 
   defp receive_event(_, state, _, _), do: {:cont, state}
 
-  # @cc [owner:ghuntley,label:security;recovery] proxy-retry-evidence-is-private
-  # Only one exact proxy-owned safety header from a configured Underclass origin
-  # may establish evidence. It MUST NOT be forwarded to guests or inferred from
-  # provider status, arbitrary values or guest headers. Response identities MUST
-  # NOT overwrite Ziggy's admitted x-request-id.
-  @spec retry_safe_header?([{binary(), binary()}]) :: boolean()
-  defp retry_safe_header?(headers) do
-    for({name, value} <- headers, String.downcase(name) == "x-underclass-retry-safe", do: value) ==
-      ["pre-output-overload"]
-  end
-
   defp deliver(consume, event, state) do
     case consume.(event) do
       :ok -> {:cont, state}
-      :halt -> {:halt, %{state | outcome: :cancelled, retry_safe: false}}
+      :halt -> {:halt, %{state | outcome: :cancelled}}
     end
   end
 end

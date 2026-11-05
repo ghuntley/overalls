@@ -10,18 +10,15 @@ The `pg` stage uses the locked `buildNixpkgs` PostgreSQL 18 closure in a scratch
 image. Its entrypoint initializes the private volume under UID 10001, creates
 the synthetic oracle role, and refuses incomplete retained initialization.
 
-Each `//:package-antithesis-<stage>-context` Buck2 target assembles the complete recursive
+Each `antithesis-<stage>-context` flake package copies the complete recursive
 runtime closure into `rootfs/nix/store`, adds fixed `/bin/sh`, user, CA and
 runtime tool links, and writes `identity.json` and
 `closure-store-paths.txt` at the context root and inside the image at
 `/opt/overalls/image-identity.json` and
 `/opt/overalls/closure-store-paths.txt`. The identity records release, source and closure-root
-store paths without runtime credentials. Staging packages the exact rootfs as
-`rootfs.tar`, preserving file bytes, modes and symlink targets, and embeds the
-built Nix output path. Docker builds unpack that archive with `ADD`; closure
-filenames never enter Buck2's source scanner. The identity verifier compares
-the archive to the current built output and the resulting image. Containers
-need no host `/nix/store` mount or runtime download.
+store paths without runtime credentials. Docker builds copy that rootfs from
+the repository build context; containers need no host `/nix/store` mount or
+runtime download.
 
 After the desired context packages are built, stage them with:
 

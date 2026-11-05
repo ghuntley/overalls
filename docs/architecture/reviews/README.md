@@ -1,7 +1,5 @@
 # Architecture reviews
 
-- [Startup inference recovery (2026-11-02)](2026-11-02-agent-startup-inference.md): remote Panterloons inference, UUIDv7 correlation, and durable bounded retries after certified pre-output overloads; ADR-0280.
-
 - [Control request concurrency (2026-10-30)](2026-10-30-control-request-concurrency.md): ADR-0275 bounds each Lilly control socket to two running requests with a FIFO queue and deadline after hint-triggered bursts exhausted Marshall's pool in run 41126173301, and reports pool checkout timeouts and longest waits; fleet machine-test acceptance remains open.
 - [Cedar single authorization source (2026-10-30)](2026-10-30-cedar-single-authorization-source.md): ADR-0268 cutover to one Cedar-mapped authorizer, service principals, SQL record decisions and list filters from Cedar residuals, with the VM decision table and query budgets; Galileo machine eligibility, benchmarks and machine tests remain open.
 - [Rust code quality (2026-10-30)](2026-10-30-rust-quality.md): ADR-0265 adoption across every Rust crate with `--strict` drift checking, pure-move `lib.rs` splits (mila-ffi symbols unchanged), proptest replaced by Hegel plus gap properties, and fatal clippy gates; Lyra/terminald unsafe confinement and three protocol/journey defects remain open.

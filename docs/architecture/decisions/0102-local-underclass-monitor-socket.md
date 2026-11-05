@@ -2,17 +2,13 @@
 
 - ID: ADR-0102
 - Date: 2026-09-23
-- Status: superseded
+- Status: accepted
 - Implementation: partial
 - Components: Underclass, NixOS services, host-local authorization
 - Supersedes: ADR-0081
-- Superseded by: ADR-0280
+- Superseded by: none
 
 ## Context
-
-[ADR-0280](0280-remote-underclass-and-safe-agent-retries.md) preserves the local
-monitor and credential boundaries while replacing compulsory independent-pool
-routing for Dungarees with Panterloons tailnet HTTPS.
 
 ADR-0081 requires proxy and administration bearer tokens. Its host-local
 Underclass service runs as a dynamic user with a private SQLite database and

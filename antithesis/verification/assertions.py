@@ -22,7 +22,7 @@ DISPLAY_KIND = {
 }
 HEADING = re.compile(r"^### ([a-z0-9][a-z0-9-]*) — ", re.MULTILINE)
 TYPE = re.compile(
-    r"\*\*Type\*\* \| (Safety(?: plus liveness)?|Liveness) \(`?(AlwaysOrUnreachable|Always|Unreachable|Sometimes|Reachable)`? primary(?:, [^)]*)?\)"
+    r"\*\*Type\*\* \| (Safety|Liveness) \(`?(AlwaysOrUnreachable|Always|Unreachable|Sometimes|Reachable)`? primary\)"
 )
 LITERAL = re.compile(r'\*\*"([^"]+)"\*\*')
 

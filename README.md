@@ -9,7 +9,7 @@
 
 **An AI-first developer platform that you own.**
 
-> **Research preview.** Not for consumption. Overalls launches on 12 November 2026.
+> **Research preview.** Not for consumption. Overalls launches on 3 November 2026.
 > [Get notified](https://overalls.dev/#newsletter).
 
 Overalls is a self-hosted platform for development machines and the AI agents

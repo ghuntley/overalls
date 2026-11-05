@@ -536,6 +536,12 @@ msgstr "ما قدرناش نفتح الطرفية."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "الآلة دي متوقفة. شغّلها لفتح الطرفية. تُحفظ ملفاتك."
 
+#: lib/marshall_web/components/workspace_components.ex:356
+#: lib/marshall_web/components/workspace_components.ex:530
+#, elixir-autogen, elixir-format
+msgid "This machine's image does not support the current browser editor."
+msgstr "لا تدعم صورة الآلة دي محرر المتصفح الحالي."
+
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

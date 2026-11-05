@@ -526,6 +526,12 @@ msgstr "Terminal tidak dapat dibuka."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "Mesin ini berhenti. Mulai untuk membuka terminal Anda. Berkas Anda tetap disimpan."
 
+#: lib/marshall_web/components/workspace_components.ex:356
+#: lib/marshall_web/components/workspace_components.ex:530
+#, elixir-autogen, elixir-format
+msgid "This machine's image does not support the current browser editor."
+msgstr "Citra mesin ini tidak mendukung editor peramban saat ini."
+
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

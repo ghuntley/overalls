@@ -528,6 +528,12 @@ msgstr "Päätettä ei voitu avata."
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "Tämä kone on pysäytetty. Käynnistä se avataksesi päätteen. Tiedostosi säilyvät."
 
+#: lib/marshall_web/components/workspace_components.ex:356
+#: lib/marshall_web/components/workspace_components.ex:530
+#, elixir-autogen, elixir-format
+msgid "This machine's image does not support the current browser editor."
+msgstr "Tämän koneen levykuva ei tue nykyistä selainmuokkainta."
+
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

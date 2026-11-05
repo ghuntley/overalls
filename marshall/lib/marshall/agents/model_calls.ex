@@ -22,8 +22,7 @@ defmodule Marshall.Agents.ModelCalls do
   # @cc [owner:ghuntley,label:recovery;concurrency] agent-model-one-attempt
   # A running turn may queue one model step at a time. Provider work MUST be
   # claimed and audited before Ziggy sends upstream bytes. Claimed work never
-  # returns to queued. A safe overload retry MUST use a fresh ModelCall ID and
-  # preserve the original claim, response and completion receipt.
+  # returns to queued after timeout, relocation or process loss.
   @spec queue(String.t(), String.t(), atom()) ::
           {:ok, ModelCall.t() | :compacted} | {:error, term()}
   def queue(turn_id, model, reasoning_effort \\ :medium) do
@@ -51,12 +50,6 @@ defmodule Marshall.Agents.ModelCalls do
 
       if Enum.any?(calls, &(&1.status in [:queued, :claimed])),
         do: Ledger.rollback(:already_queued)
-
-      case provider_retry(calls, Ledger.now()) do
-        :wait -> Ledger.rollback(:retry_waiting)
-        :exhausted -> Ledger.rollback(:provider_failed)
-        _ -> :ok
-      end
 
       commands = Ledger.read!(Command, turn_id: turn.id)
 
@@ -453,12 +446,11 @@ defmodule Marshall.Agents.ModelCalls do
         true -> :failed
       end
 
-    call =
-      Ledger.update!(call, :transition, %{
-        status: status,
-        response: response,
-        finished_at: Ledger.now()
-      })
+    Ledger.update!(call, :transition, %{
+      status: status,
+      response: response,
+      finished_at: Ledger.now()
+    })
 
     Ledger.create!(AuditEvent, :record, %{
       vm_id: vm.id,
@@ -491,11 +483,15 @@ defmodule Marshall.Agents.ModelCalls do
       recoverable_rejection?(call, response) ->
         :ok
 
-      retryable_overload?(call) and
-          provider_retry(Ledger.read!(ModelCall, turn_id: turn.id), Ledger.now()) in [
-            :wait,
-            :ready
-          ] ->
+      transient_provider_failure?(call, response) ->
+        Ledger.update!(call, :transition, %{
+          status: :queued,
+          response: nil,
+          finished_at: nil,
+          claim_id: nil,
+          claimed_at: nil
+        })
+
         :ok
 
       match?({:ok, {:assistant, _}}, outcome) ->
@@ -526,44 +522,20 @@ defmodule Marshall.Agents.ModelCalls do
     %{acknowledged: call.id}
   end
 
-  # @cc [owner:ghuntley,label:recovery] agent-overload-durable-retry-budget
-  # Only Ziggy's closed retryable_overload result for failed inference work
-  # permits another attempt. The latest consecutive failed attempts allow at
-  # most three calls, waiting one then two seconds from durable finished_at
-  # using the database clock. Success or maintenance resets this local budget;
-  # total turn limits still apply. Unknown or ambiguous failures never retry.
   @doc false
-  @spec provider_retry([ModelCall.t()], DateTime.t()) :: :none | :wait | :ready | :exhausted
-  def provider_retry(calls, now) do
-    failures =
-      calls
-      |> Enum.sort_by(& &1.iteration, :desc)
-      |> Enum.take_while(&retryable_overload?/1)
-
-    case failures do
-      [] ->
-        :none
-
-      [_, _, _ | _] ->
-        :exhausted
-
-      [latest | _] ->
-        if DateTime.diff(now, latest.finished_at, :microsecond) >= length(failures) * 1_000_000,
-          do: :ready,
-          else: :wait
-    end
+  @spec retryable_provider_response?(atom(), pos_integer(), map()) :: boolean()
+  def retryable_provider_response?(purpose, iteration, response)
+      when is_atom(purpose) and is_integer(iteration) and is_map(response) do
+    purpose == :inference and iteration < 3 and
+      get_in(response, ["error"]) in ["upstream_failed", "server_is_overloaded"]
   end
 
-  @spec retryable_overload?(ModelCall.t()) :: boolean()
-  defp retryable_overload?(%ModelCall{
-         purpose: :inference,
-         status: :failed,
-         finished_at: %DateTime{},
-         response: response
-       }),
-       do: response == %{"error" => "retryable_overload"}
+  def retryable_provider_response?(_, _, _), do: false
 
-  defp retryable_overload?(_), do: false
+  @spec transient_provider_failure?(ModelCall.t(), map()) :: boolean()
+  defp transient_provider_failure?(%ModelCall{purpose: purpose, iteration: iteration}, response) do
+    retryable_provider_response?(purpose, iteration, response)
+  end
 
   @spec recoverable_rejection?(ModelCall.t(), map()) :: boolean()
   defp recoverable_rejection?(call, response) do

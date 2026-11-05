@@ -21,13 +21,13 @@ msgstr ""
 "%{value1} తర్క స్థాయి ఈ సంభాషణతోనే ఉంటుంది. అవసరాన్ని బట్టి ప్రణాళిక, పని "
 "మధ్య మారండి."
 
-#: lib/marshall_web/live/threads_live.ex:2232
+#: lib/marshall_web/live/threads_live.ex:2252
 #, elixir-autogen, elixir-format
 msgid "%{value1} reasoning"
 msgstr "%{value1} తర్కం"
 
-#: lib/marshall_web/live/threads_live.ex:2791
-#: lib/marshall_web/live/threads_live.ex:2794
+#: lib/marshall_web/live/threads_live.ex:2811
+#: lib/marshall_web/live/threads_live.ex:2814
 #, elixir-autogen, elixir-format
 msgid "A context source could not be fully loaded."
 msgstr "ఒక సందర్భ మూలాన్ని పూర్తిగా లోడ్ చేయలేకపోయాం."
@@ -49,14 +49,14 @@ msgstr ""
 msgid "A space for your next idea"
 msgstr "మీ తదుపరి ఆలోచనకు స్థలం"
 
-#: lib/marshall_web/live/threads_live.ex:2000
+#: lib/marshall_web/live/threads_live.ex:2020
 #, elixir-autogen, elixir-format
 msgid "Access details are temporarily unavailable. Close sharing and try again shortly."
 msgstr ""
 "ప్రాప్యత వివరాలు తాత్కాలికంగా అందుబాటులో లేవు. పంచుకోవడం మూసి త్వరలో మళ్లీ "
 "ప్రయత్నించండి."
 
-#: lib/marshall_web/live/threads_live.ex:1965
+#: lib/marshall_web/live/threads_live.ex:1985
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "చర్యలు"
@@ -73,7 +73,7 @@ msgid "Activity"
 msgstr "కార్యాచరణ"
 
 #: lib/marshall_web/live/agent_threads_live.ex:116
-#: lib/marshall_web/live/threads_live.ex:2830
+#: lib/marshall_web/live/threads_live.ex:2850
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "ఏజెంట్"
@@ -85,7 +85,7 @@ msgstr "ఏజెంట్ CLIకి గంటపాటు ఆమోదం ల�
 
 #: lib/marshall_web/live/agent_threads_live.ex:117
 #: lib/marshall_web/live/agent_threads_live.ex:141
-#: lib/marshall_web/live/threads_live.ex:2838
+#: lib/marshall_web/live/threads_live.ex:2858
 #, elixir-autogen, elixir-format
 msgid "Agent started working"
 msgstr "ఏజెంట్ పని ప్రారంభించింది"
@@ -111,7 +111,7 @@ msgstr "అన్ని సంభాషణలు"
 msgid "All visible"
 msgstr "కనిపించేవన్నీ"
 
-#: lib/marshall_web/live/threads_live.ex:2305
+#: lib/marshall_web/live/threads_live.ex:2325
 #, elixir-autogen, elixir-format
 msgid "An operator can answer these questions."
 msgstr "ఆపరేటర్ ఈ ప్రశ్నలకు జవాబివ్వగలరు."
@@ -121,7 +121,7 @@ msgstr "ఆపరేటర్ ఈ ప్రశ్నలకు జవాబివ
 msgid "Answer each question with a choice, your own answer, or both."
 msgstr "ప్రతి ప్రశ్నకు ఎంపికతో, సొంత జవాబుతో లేదా రెండింటితో జవాబివ్వండి."
 
-#: lib/marshall_web/live/threads_live.ex:2257
+#: lib/marshall_web/live/threads_live.ex:2277
 #, elixir-autogen, elixir-format
 msgid "Answer these questions to continue the plan."
 msgstr "ప్రణాళిక కొనసాగించడానికి ఈ ప్రశ్నలకు జవాబివ్వండి."
@@ -151,36 +151,36 @@ msgstr "ఏజెంట్ CLIకి ఆమోదం ఇవ్వు"
 msgid "Approving…"
 msgstr "ఆమోదిస్తోంది…"
 
-#: lib/marshall_web/live/threads_live.ex:1968
+#: lib/marshall_web/live/threads_live.ex:1988
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "భద్రపరచు"
 
 #: lib/marshall_web/live/threads_live.ex:1690
 #: lib/marshall_web/live/threads_live.ex:1787
-#: lib/marshall_web/live/threads_live.ex:2812
+#: lib/marshall_web/live/threads_live.ex:2832
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "భద్రపరచబడింది"
 
-#: lib/marshall_web/live/threads_live.ex:2350
+#: lib/marshall_web/live/threads_live.ex:2370
 #, elixir-autogen, elixir-format
 msgid "Archived thread. The transcript is read-only. Reopen to continue on a new machine."
 msgstr ""
 "భద్రపరచిన సంభాషణ. ప్రతిలేఖనం చదవడానికి మాత్రమే. కొత్త యంత్రంపై "
 "కొనసాగించడానికి మళ్లీ తెరవండి."
 
-#: lib/marshall_web/live/threads_live.ex:2826
+#: lib/marshall_web/live/threads_live.ex:2846
 #, elixir-autogen, elixir-format
 msgid "Archived · conversation retained"
 msgstr "భద్రపరచబడింది · సంభాషణ నిలిచింది"
 
-#: lib/marshall_web/live/threads_live.ex:2811
+#: lib/marshall_web/live/threads_live.ex:2831
 #, elixir-autogen, elixir-format
 msgid "Archiving"
 msgstr "భద్రపరుస్తోంది"
 
-#: lib/marshall_web/live/threads_live.ex:2182
+#: lib/marshall_web/live/threads_live.ex:2202
 #, elixir-autogen, elixir-format
 msgid "Archiving is in progress. Waiting for the machine to be deleted."
 msgstr "భద్రపరచడం జరుగుతోంది. యంత్రం తొలగింపుకు వేచి ఉంది."
@@ -191,7 +191,7 @@ msgid "Archiving requested. The machine will be deleted before archival complete
 msgstr ""
 "భద్రపరచడం అభ్యర్థించబడింది. అది పూర్తికాకముందే యంత్రం తొలగించబడుతుంది."
 
-#: lib/marshall_web/live/threads_live.ex:2825
+#: lib/marshall_web/live/threads_live.ex:2845
 #, elixir-autogen, elixir-format
 msgid "Archiving · releasing the machine"
 msgstr "భద్రపరుస్తోంది · యంత్రాన్ని విడుదల చేస్తోంది"
@@ -203,8 +203,8 @@ msgstr "భద్రపరుస్తోంది · యంత్రాన్�
 msgid "Back to threads"
 msgstr "సంభాషణలకు తిరిగి"
 
-#: lib/marshall_web/live/threads_live.ex:2621
-#: lib/marshall_web/live/threads_live.ex:2670
+#: lib/marshall_web/live/threads_live.ex:2641
+#: lib/marshall_web/live/threads_live.ex:2690
 #, elixir-autogen, elixir-format
 msgid "Branch, tag or commit"
 msgstr "బ్రాంచ్, ట్యాగ్ లేదా కమిట్"
@@ -219,7 +219,7 @@ msgstr "ఏదైనా నిర్మించండి, లోపాన్న
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/threads_live.ex:2035
+#: lib/marshall_web/live/threads_live.ex:2055
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "మార్చు"
@@ -240,13 +240,13 @@ msgstr "ఉప సంభాషణ సృష్టించబడింది"
 msgid "Choose a valid image and machine size."
 msgstr "చెల్లుబాటు అయ్యే ఇమేజ్, యంత్ర పరిమాణాన్ని ఎంచుకోండి."
 
-#: lib/marshall_web/live/threads_live.ex:2417
-#: lib/marshall_web/live/threads_live.ex:2461
+#: lib/marshall_web/live/threads_live.ex:2437
+#: lib/marshall_web/live/threads_live.ex:2481
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "మూసివేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2217
+#: lib/marshall_web/live/threads_live.ex:2237
 #, elixir-autogen, elixir-format
 msgid "Collaboration mode"
 msgstr "సహకార మోడ్"
@@ -256,26 +256,26 @@ msgstr "సహకార మోడ్"
 msgid "Collaboration mode updated."
 msgstr "సహకార మోడ్ నవీకరించబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:2701
+#: lib/marshall_web/live/threads_live.ex:2721
 #, elixir-autogen, elixir-format
 msgid "Command suggestions"
 msgstr "కమాండ్ సూచనలు"
 
 #: lib/marshall_web/live/threads_live.ex:1528
 #: lib/marshall_web/live/threads_live.ex:1922
-#: lib/marshall_web/live/threads_live.ex:2235
-#: lib/marshall_web/live/threads_live.ex:2413
-#: lib/marshall_web/live/threads_live.ex:2434
+#: lib/marshall_web/live/threads_live.ex:2255
+#: lib/marshall_web/live/threads_live.ex:2433
+#: lib/marshall_web/live/threads_live.ex:2454
 #, elixir-autogen, elixir-format
 msgid "Commands"
 msgstr "కమాండ్లు"
 
-#: lib/marshall_web/live/threads_live.ex:2605
+#: lib/marshall_web/live/threads_live.ex:2625
 #, elixir-autogen, elixir-format
 msgid "Commit: %{value1}"
 msgstr "కమిట్: %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2549
+#: lib/marshall_web/live/threads_live.ex:2569
 #: lib/marshall_web/thread_commands.ex:18
 #, elixir-autogen, elixir-format
 msgid "Compact context"
@@ -288,12 +288,12 @@ msgstr ""
 "సంక్షిప్తీకరణ ఈ సందర్భాన్ని తగ్గించలేకపోయింది. అవసరమైన సూచనలు తగ్గించండి "
 "లేదా కేంద్రీకృత సంభాషణ ప్రారంభించండి."
 
-#: lib/marshall_web/live/threads_live.ex:2768
+#: lib/marshall_web/live/threads_live.ex:2788
 #, elixir-autogen, elixir-format
 msgid "Composer help"
 msgstr "సందేశ ఎడిటర్ సహాయం"
 
-#: lib/marshall_web/live/threads_live.ex:2515
+#: lib/marshall_web/live/threads_live.ex:2535
 #, elixir-autogen, elixir-format
 msgid "Context bytes"
 msgstr "సందర్భ బైట్లు"
@@ -313,7 +313,7 @@ msgstr "సందర్భం సంక్షిప్తం చేయబడి�
 msgid "Context compaction queued."
 msgstr "సందర్భ సంక్షిప్తీకరణ క్యూలో చేర్చబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:2493
+#: lib/marshall_web/live/threads_live.ex:2513
 #, elixir-autogen, elixir-format
 msgid "Context details are unavailable. The thread may still be preparing its workspace."
 msgstr ""
@@ -325,7 +325,7 @@ msgstr ""
 msgid "Context reload queued."
 msgstr "సందర్భ రీలోడ్ క్యూలో చేర్చబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:2203
+#: lib/marshall_web/live/threads_live.ex:2223
 #, elixir-autogen, elixir-format
 msgid "Continue the work…"
 msgstr "పనిని కొనసాగించు…"
@@ -345,12 +345,12 @@ msgstr "ఉప సంభాషణను సృష్టించు"
 msgid "Create thread"
 msgstr "సంభాషణను సృష్టించు"
 
-#: lib/marshall_web/live/threads_live.ex:2868
+#: lib/marshall_web/live/threads_live.ex:2888
 #, elixir-autogen, elixir-format
 msgid "Delegated a task"
 msgstr "పని అప్పగించబడింది"
 
-#: lib/marshall_web/live/threads_live.ex:1972
+#: lib/marshall_web/live/threads_live.ex:1992
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "తొలగించు"
@@ -365,12 +365,12 @@ msgstr "తొలగిస్తోంది"
 msgid "Describe a task. Your agent gets a machine and gets to work."
 msgstr "పనిని వివరించండి. మీ ఏజెంట్ యంత్రాన్ని పొంది పని ప్రారంభిస్తుంది."
 
-#: lib/marshall_web/live/threads_live.ex:2637
+#: lib/marshall_web/live/threads_live.ex:2657
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "నిలిపివేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2578
+#: lib/marshall_web/live/threads_live.ex:2598
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr "నిలిపివేయబడింది"
@@ -380,18 +380,18 @@ msgstr "నిలిపివేయబడింది"
 msgid "Disk (GiB)"
 msgstr "డిస్క్ (GiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2638
+#: lib/marshall_web/live/threads_live.ex:2658
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "ప్రారంభించు"
 
 #: lib/marshall_web/live/threads_live.ex:1785
-#: lib/marshall_web/live/threads_live.ex:2810
+#: lib/marshall_web/live/threads_live.ex:2830
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "విఫలమైంది"
 
-#: lib/marshall_web/live/threads_live.ex:2424
+#: lib/marshall_web/live/threads_live.ex:2444
 #, elixir-autogen, elixir-format
 msgid "Find a command"
 msgstr "కమాండ్‌ను కనుగొను"
@@ -403,7 +403,7 @@ msgid "Find a task…"
 msgstr "పనిని కనుగొను…"
 
 #: lib/marshall_web/live/threads_live.ex:1732
-#: lib/marshall_web/live/threads_live.ex:2047
+#: lib/marshall_web/live/threads_live.ex:2067
 #, elixir-autogen, elixir-format
 msgid "First page"
 msgstr "మొదటి పేజీ"
@@ -428,7 +428,7 @@ msgstr "మంచి పని సంభాషణతో మొదలవుతు
 msgid "High"
 msgstr "అధిక"
 
-#: lib/marshall_web/live/threads_live.ex:2802
+#: lib/marshall_web/live/threads_live.ex:2822
 #, elixir-autogen, elixir-format
 msgid "High gives difficult work more reasoning time."
 msgstr "అధిక స్థాయి క్లిష్ట పనికి ఎక్కువ తర్క సమయాన్ని ఇస్తుంది."
@@ -438,7 +438,7 @@ msgstr "అధిక స్థాయి క్లిష్ట పనికి �
 msgid "Image"
 msgstr "ఇమేజ్"
 
-#: lib/marshall_web/live/threads_live.ex:2333
+#: lib/marshall_web/live/threads_live.ex:2353
 #, elixir-autogen, elixir-format
 msgid "Implement plan"
 msgstr "ప్రణాళిక అమలు చేయి"
@@ -453,32 +453,32 @@ msgstr "ఈ ప్రణాళిక అమలు ఇప్పటికే మ�
 msgid "Implementation queued."
 msgstr "అమలు క్యూలో ఉంది."
 
-#: lib/marshall_web/live/threads_live.ex:2319
+#: lib/marshall_web/live/threads_live.ex:2339
 #, elixir-autogen, elixir-format
 msgid "Implementation started"
 msgstr "అమలు మొదలైంది"
 
-#: lib/marshall_web/live/threads_live.ex:2510
+#: lib/marshall_web/live/threads_live.ex:2530
 #, elixir-autogen, elixir-format
 msgid "Input tokens"
 msgstr "ఇన్‌పుట్ టోకెన్లు"
 
-#: lib/marshall_web/live/threads_live.ex:2654
+#: lib/marshall_web/live/threads_live.ex:2674
 #, elixir-autogen, elixir-format
 msgid "Install a skill"
 msgstr "నైపుణ్యాన్ని ఇన్‌స్టాల్ చేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2681
+#: lib/marshall_web/live/threads_live.ex:2701
 #, elixir-autogen, elixir-format
 msgid "Install skill"
 msgstr "నైపుణ్యాన్ని ఇన్‌స్టాల్ చేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2680
+#: lib/marshall_web/live/threads_live.ex:2700
 #, elixir-autogen, elixir-format
 msgid "Installing…"
 msgstr "ఇన్‌స్టాల్ చేస్తోంది…"
 
-#: lib/marshall_web/live/threads_live.ex:2520
+#: lib/marshall_web/live/threads_live.ex:2540
 #, elixir-autogen, elixir-format
 msgid "Loaded sources"
 msgstr "లోడ్ చేసిన మూలాలు"
@@ -488,12 +488,12 @@ msgstr "లోడ్ చేసిన మూలాలు"
 msgid "Low"
 msgstr "తక్కువ"
 
-#: lib/marshall_web/live/threads_live.ex:2801
+#: lib/marshall_web/live/threads_live.ex:2821
 #, elixir-autogen, elixir-format
 msgid "Low is for small, well-defined tasks."
 msgstr "తక్కువ స్థాయి చిన్న, స్పష్టమైన పనులకు."
 
-#: lib/marshall_web/live/threads_live.ex:2112
+#: lib/marshall_web/live/threads_live.ex:2132
 #, elixir-autogen, elixir-format
 msgid "Machine generations"
 msgstr "యంత్ర తరాలు"
@@ -523,13 +523,13 @@ msgstr "యంత్రం:"
 msgid "Maintenance finished"
 msgstr "నిర్వహణ పూర్తయింది"
 
-#: lib/marshall_web/live/threads_live.ex:2597
+#: lib/marshall_web/live/threads_live.ex:2617
 #, elixir-autogen, elixir-format
 msgid "Managed installations"
 msgstr "నిర్వహిత ఇన్‌స్టాలేషన్‌లు"
 
-#: lib/marshall_web/live/threads_live.ex:2584
-#: lib/marshall_web/live/threads_live.ex:2737
+#: lib/marshall_web/live/threads_live.ex:2604
+#: lib/marshall_web/live/threads_live.ex:2757
 #, elixir-autogen, elixir-format
 msgid "Managed skill"
 msgstr "నిర్వహిత నైపుణ్యం"
@@ -539,8 +539,8 @@ msgstr "నిర్వహిత నైపుణ్యం"
 msgid "Managed skill removed."
 msgstr "నిర్వహిత నైపుణ్యం తొలగించబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:2082
-#: lib/marshall_web/live/threads_live.ex:2891
+#: lib/marshall_web/live/threads_live.ex:2102
+#: lib/marshall_web/live/threads_live.ex:2911
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "మేనేజర్"
@@ -555,7 +555,7 @@ msgstr "ఆమోదానికి ముందు ఈ అభ్యర్థన
 msgid "Medium"
 msgstr "మధ్యస్థ"
 
-#: lib/marshall_web/live/threads_live.ex:2804
+#: lib/marshall_web/live/threads_live.ex:2824
 #, elixir-autogen, elixir-format
 msgid "Medium is a good starting point for most work."
 msgstr "మధ్యస్థ స్థాయి ఎక్కువ పనులకు మంచి ప్రారంభం."
@@ -565,7 +565,7 @@ msgstr "మధ్యస్థ స్థాయి ఎక్కువ పనుల
 msgid "Memory (MiB)"
 msgstr "మెమరీ (MiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2202
+#: lib/marshall_web/live/threads_live.ex:2222
 #, elixir-autogen, elixir-format
 msgid "Message"
 msgstr "సందేశం"
@@ -595,7 +595,7 @@ msgid "New thread"
 msgstr "కొత్త సంభాషణ"
 
 #: lib/marshall_web/live/threads_live.ex:1739
-#: lib/marshall_web/live/threads_live.ex:2053
+#: lib/marshall_web/live/threads_live.ex:2073
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "తదుపరి పేజీ"
@@ -605,17 +605,17 @@ msgstr "తదుపరి పేజీ"
 msgid "No activity matches this filter."
 msgstr "వడపోతకు సరిపడే కార్యాచరణ లేదు."
 
-#: lib/marshall_web/live/threads_live.ex:2039
+#: lib/marshall_web/live/threads_live.ex:2059
 #, elixir-autogen, elixir-format
 msgid "No individual thread grants yet."
 msgstr "వ్యక్తిగత సంభాషణ అనుమతులు ఇంకా లేవు."
 
-#: lib/marshall_web/live/threads_live.ex:2522
+#: lib/marshall_web/live/threads_live.ex:2542
 #, elixir-autogen, elixir-format
 msgid "No instruction sources collected yet."
 msgstr "సూచనల మూలాలు ఇంకా సేకరించలేదు."
 
-#: lib/marshall_web/live/threads_live.ex:2723
+#: lib/marshall_web/live/threads_live.ex:2743
 #, elixir-autogen, elixir-format
 msgid "No matching skills. Use /skills to inspect the catalog."
 msgstr "సరిపడే నైపుణ్యాలు లేవు. జాబితా చూడడానికి /skills వాడండి."
@@ -630,23 +630,23 @@ msgstr "ఈ పేజీలో పాత సంభాషణలు అందు�
 msgid "No recent threads match your search."
 msgstr "శోధనకు సరిపడే ఇటీవలి సంభాషణలు లేవు."
 
-#: lib/marshall_web/live/threads_live.ex:2566
+#: lib/marshall_web/live/threads_live.ex:2586
 #, elixir-autogen, elixir-format
 msgid "No skills were discovered in this workspace."
 msgstr "ఈ పని స్థలంలో నైపుణ్యాలు కనుగొనబడలేదు."
 
-#: lib/marshall_web/live/threads_live.ex:2508
+#: lib/marshall_web/live/threads_live.ex:2528
 #, elixir-autogen, elixir-format
 msgid "Not collected yet"
 msgstr "ఇంకా సేకరించలేదు"
 
 #: lib/marshall_web/live/threads_live.ex:1489
-#: lib/marshall_web/live/threads_live.ex:2371
+#: lib/marshall_web/live/threads_live.ex:2391
 #, elixir-autogen, elixir-format
 msgid "Objective"
 msgstr "లక్ష్యం"
 
-#: lib/marshall_web/live/threads_live.ex:2877
+#: lib/marshall_web/live/threads_live.ex:2897
 #, elixir-autogen, elixir-format
 msgid "Older context summarized"
 msgstr "పాత సందర్భం సంక్షిప్తమైంది"
@@ -656,7 +656,7 @@ msgstr "పాత సందర్భం సంక్షిప్తమైంద�
 msgid "One task. One thread."
 msgstr "ఒక పని. ఒక సంభాషణ."
 
-#: lib/marshall_web/live/threads_live.ex:1948
+#: lib/marshall_web/live/threads_live.ex:1968
 #: lib/marshall_web/thread_commands.ex:26
 #, elixir-autogen, elixir-format
 msgid "Open VS Code"
@@ -673,13 +673,18 @@ msgstr "ఓపెన్ సోర్స్"
 msgid "Open terminal"
 msgstr "టెర్మినల్ తెరువు"
 
-#: lib/marshall_web/live/threads_live.ex:2081
-#: lib/marshall_web/live/threads_live.ex:2890
+#: lib/marshall_web/live/threads_live.ex:1948
+#, elixir-autogen, elixir-format
+msgid "Open terminal here"
+msgstr "ఇక్కడ టెర్మినల్ తెరువు"
+
+#: lib/marshall_web/live/threads_live.ex:2101
+#: lib/marshall_web/live/threads_live.ex:2910
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "ఆపరేటర్"
 
-#: lib/marshall_web/live/threads_live.ex:2013
+#: lib/marshall_web/live/threads_live.ex:2033
 #, elixir-autogen, elixir-format
 msgid "Owner · cannot be changed"
 msgstr "యజమాని · మార్చలేరు"
@@ -695,8 +700,8 @@ msgid "Past 7 days"
 msgstr "గత 7 రోజులు"
 
 #: lib/marshall_web/live/threads_live.ex:1782
-#: lib/marshall_web/live/threads_live.ex:2771
-#: lib/marshall_web/live/threads_live.ex:2807
+#: lib/marshall_web/live/threads_live.ex:2791
+#: lib/marshall_web/live/threads_live.ex:2827
 #, elixir-autogen, elixir-format
 msgid "Pending"
 msgstr "పెండింగ్"
@@ -707,7 +712,7 @@ msgid "Pick up where you left off."
 msgstr "ఆపిన చోటు నుంచి కొనసాగించండి."
 
 #: lib/marshall_web/live/threads_live.ex:1511
-#: lib/marshall_web/live/threads_live.ex:2762
+#: lib/marshall_web/live/threads_live.ex:2782
 #: lib/marshall_web/thread_commands.ex:14
 #, elixir-autogen, elixir-format
 msgid "Plan"
@@ -718,19 +723,19 @@ msgstr "ప్రణాళిక"
 msgid "Plan proposed"
 msgstr "ప్రణాళిక ప్రతిపాదించబడింది"
 
-#: lib/marshall_web/live/threads_live.ex:2819
+#: lib/marshall_web/live/threads_live.ex:2839
 #, elixir-autogen, elixir-format
 msgid "Preparing a machine for this task"
 msgstr "ఈ పని కోసం యంత్రాన్ని సిద్ధం చేస్తోంది"
 
-#: lib/marshall_web/live/threads_live.ex:2152
+#: lib/marshall_web/live/threads_live.ex:2172
 #, elixir-autogen, elixir-format
 msgid "Preparing your workspace"
 msgstr "పని స్థలాన్ని సిద్ధం చేస్తోంది"
 
 #: lib/marshall_web/live/agent_threads_live.ex:115
 #: lib/marshall_web/live/agent_threads_live.ex:225
-#: lib/marshall_web/live/threads_live.ex:2829
+#: lib/marshall_web/live/threads_live.ex:2849
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "సూచన"
@@ -746,18 +751,18 @@ msgstr "సూచన క్యూలో ఉంది."
 msgid "Prompts wake a stopped machine when you have write access."
 msgstr "రాసే ప్రాప్యత ఉన్నప్పుడు సూచనలు ఆపివున్న యంత్రాన్ని మేల్కొలుపుతాయి."
 
-#: lib/marshall_web/live/threads_live.ex:2316
+#: lib/marshall_web/live/threads_live.ex:2336
 #, elixir-autogen, elixir-format
 msgid "Proposed plan"
 msgstr "ప్రతిపాదిత ప్రణాళిక"
 
 #: lib/marshall_web/live/threads_live.ex:1783
-#: lib/marshall_web/live/threads_live.ex:2808
+#: lib/marshall_web/live/threads_live.ex:2828
 #, elixir-autogen, elixir-format
 msgid "Provisioning"
 msgstr "సమకూరుస్తోంది"
 
-#: lib/marshall_web/live/threads_live.ex:2162
+#: lib/marshall_web/live/threads_live.ex:2182
 #, elixir-autogen, elixir-format
 msgid "Provisioning needs attention."
 msgstr "సమకూర్పుకు శ్రద్ధ అవసరం."
@@ -782,14 +787,14 @@ msgstr "ప్రశ్నలు రద్దు చేయబడ్డాయి"
 msgid "Questions requested"
 msgstr "ప్రశ్నలు కోరబడ్డాయి"
 
-#: lib/marshall_web/live/threads_live.ex:2850
+#: lib/marshall_web/live/threads_live.ex:2870
 #, elixir-autogen, elixir-format
 msgid "Queued: %{tools}"
 msgstr "క్యూలో: %{tools}"
 
 #: lib/marshall_web/live/threads_live.ex:1784
-#: lib/marshall_web/live/threads_live.ex:2772
-#: lib/marshall_web/live/threads_live.ex:2809
+#: lib/marshall_web/live/threads_live.ex:2792
+#: lib/marshall_web/live/threads_live.ex:2829
 #, elixir-autogen, elixir-format
 msgid "Ready"
 msgstr "సిద్ధం"
@@ -804,50 +809,50 @@ msgstr "తర్కం"
 msgid "Recent threads"
 msgstr "ఇటీవలి సంభాషణలు"
 
-#: lib/marshall_web/live/threads_live.ex:2072
+#: lib/marshall_web/live/threads_live.ex:2092
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "నమోదైన ఇమెయిల్"
 
-#: lib/marshall_web/live/threads_live.ex:2543
+#: lib/marshall_web/live/threads_live.ex:2563
 #, elixir-autogen, elixir-format
 msgid "Reload context"
 msgstr "సందర్భాన్ని మళ్లీ లోడ్ చేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2644
-#: lib/marshall_web/live/threads_live.ex:2752
+#: lib/marshall_web/live/threads_live.ex:2664
+#: lib/marshall_web/live/threads_live.ex:2772
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "తొలగించు"
 
-#: lib/marshall_web/live/threads_live.ex:2751
+#: lib/marshall_web/live/threads_live.ex:2771
 #, elixir-autogen, elixir-format
 msgid "Remove %{skill}"
 msgstr "%{skill}ను తొలగించు"
 
-#: lib/marshall_web/live/threads_live.ex:1982
+#: lib/marshall_web/live/threads_live.ex:2002
 #, elixir-autogen, elixir-format
 msgid "Reopen"
 msgstr "మళ్లీ తెరువు"
 
-#: lib/marshall_web/live/threads_live.ex:2115
+#: lib/marshall_web/live/threads_live.ex:2135
 #, elixir-autogen, elixir-format
 msgid "Reopened machines keep their earlier transcripts. Select one to read it."
 msgstr ""
 "మళ్లీ తెరిచిన యంత్రాలు పాత ప్రతిలేఖనాలను ఉంచుతాయి. చదవడానికి ఒకటి ఎంచుకోండి."
 
-#: lib/marshall_web/live/threads_live.ex:2663
+#: lib/marshall_web/live/threads_live.ex:2683
 #, elixir-autogen, elixir-format
 msgid "Repository URL"
 msgstr "రిపోజిటరీ URL"
 
 #: lib/marshall_web/live/agent_threads_live.ex:118
-#: lib/marshall_web/live/threads_live.ex:2839
+#: lib/marshall_web/live/threads_live.ex:2859
 #, elixir-autogen, elixir-format
 msgid "Response received"
 msgstr "ప్రతిస్పందన వచ్చింది"
 
-#: lib/marshall_web/live/threads_live.ex:2172
+#: lib/marshall_web/live/threads_live.ex:2192
 #, elixir-autogen, elixir-format
 msgid "Retry"
 msgstr "మళ్లీ ప్రయత్నించు"
@@ -857,37 +862,37 @@ msgstr "మళ్లీ ప్రయత్నించు"
 msgid "Return to the conversation whenever you need."
 msgstr "అవసరమైనప్పుడు సంభాషణకు తిరిగి రండి."
 
-#: lib/marshall_web/live/threads_live.ex:2341
+#: lib/marshall_web/live/threads_live.ex:2361
 #, elixir-autogen, elixir-format
 msgid "Revise"
 msgstr "సవరించు"
 
-#: lib/marshall_web/live/threads_live.ex:2669
+#: lib/marshall_web/live/threads_live.ex:2689
 #, elixir-autogen, elixir-format
 msgid "Revision (optional)"
 msgstr "సంచిక (ఐచ్ఛికం)"
 
-#: lib/marshall_web/live/threads_live.ex:2083
+#: lib/marshall_web/live/threads_live.ex:2103
 #, elixir-autogen, elixir-format
 msgid "Revoke thread grant"
 msgstr "సంభాషణ అనుమతిని రద్దు చేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2892
+#: lib/marshall_web/live/threads_live.ex:2912
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "రద్దు చేయబడింది"
 
-#: lib/marshall_web/live/threads_live.ex:2078
+#: lib/marshall_web/live/threads_live.ex:2098
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "పాత్ర"
 
-#: lib/marshall_web/live/threads_live.ex:2090
+#: lib/marshall_web/live/threads_live.ex:2110
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "ప్రాప్యత సేవ్ చేయి"
 
-#: lib/marshall_web/live/threads_live.ex:2089
+#: lib/marshall_web/live/threads_live.ex:2109
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "సేవ్ చేస్తోంది…"
@@ -917,7 +922,7 @@ msgstr "ఈ సంభాషణల పేజీలో శోధిస్తుం
 msgid "Select this skill from the workspace catalog when the machine starts."
 msgstr "యంత్రం ప్రారంభంలో పని స్థల జాబితా నుంచి నైపుణ్యాన్ని ఎంచుకోండి."
 
-#: lib/marshall_web/live/threads_live.ex:2244
+#: lib/marshall_web/live/threads_live.ex:2264
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "పంపు"
@@ -928,7 +933,7 @@ msgid "Send prompt"
 msgstr "సూచన పంపు"
 
 #: lib/marshall_web/live/agent_threads_live.ex:233
-#: lib/marshall_web/live/threads_live.ex:2242
+#: lib/marshall_web/live/threads_live.ex:2262
 #, elixir-autogen, elixir-format
 msgid "Sending…"
 msgstr "పంపుతోంది…"
@@ -939,7 +944,7 @@ msgstr "పంపుతోంది…"
 msgid "Share"
 msgstr "పంచుకో"
 
-#: lib/marshall_web/live/threads_live.ex:1992
+#: lib/marshall_web/live/threads_live.ex:2012
 #, elixir-autogen, elixir-format
 msgid "Share this thread"
 msgstr "ఈ సంభాషణను పంచుకో"
@@ -964,7 +969,7 @@ msgstr "చూపు"
 msgid "Skill availability updated."
 msgstr "నైపుణ్య అందుబాటు నవీకరించబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:2674
+#: lib/marshall_web/live/threads_live.ex:2694
 #, elixir-autogen, elixir-format
 msgid "Skill directory"
 msgstr "నైపుణ్య డైరెక్టరీ"
@@ -974,7 +979,7 @@ msgstr "నైపుణ్య డైరెక్టరీ"
 msgid "Skill installation queued."
 msgstr "నైపుణ్య ఇన్‌స్టాల్ క్యూలో ఉంది."
 
-#: lib/marshall_web/live/threads_live.ex:2720
+#: lib/marshall_web/live/threads_live.ex:2740
 #, elixir-autogen, elixir-format
 msgid "Skill suggestions"
 msgstr "నైపుణ్య సూచనలు"
@@ -985,20 +990,20 @@ msgstr "నైపుణ్య సూచనలు"
 msgid "Skill update queued."
 msgstr "నైపుణ్య నవీకరణ క్యూలో ఉంది."
 
-#: lib/marshall_web/live/threads_live.ex:2767
+#: lib/marshall_web/live/threads_live.ex:2787
 #: lib/marshall_web/thread_commands.ex:20
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "నైపుణ్యాలు"
 
-#: lib/marshall_web/live/threads_live.ex:2554
+#: lib/marshall_web/live/threads_live.ex:2574
 #, elixir-autogen, elixir-format
 msgid "Skills add reusable instructions to a task. Choose the source you intend to use."
 msgstr ""
 "నైపుణ్యాలు పనికి తిరిగి వాడగల సూచనలు చేర్చుతాయి. వాడదలచిన మూలాన్ని "
 "ఎంచుకోండి."
 
-#: lib/marshall_web/live/threads_live.ex:2560
+#: lib/marshall_web/live/threads_live.ex:2580
 #, elixir-autogen, elixir-format
 msgid "Skills are unavailable until the workspace context has been collected."
 msgstr "పని స్థల సందర్భం సేకరించేవరకు నైపుణ్యాలు అందుబాటులో ఉండవు."
@@ -1008,7 +1013,7 @@ msgstr "పని స్థల సందర్భం సేకరించేవ
 msgid "Standard"
 msgstr "ప్రామాణిక"
 
-#: lib/marshall_web/live/threads_live.ex:2485
+#: lib/marshall_web/live/threads_live.ex:2505
 #, elixir-autogen, elixir-format
 msgid "Start with a space to send slash-looking text literally. Type $ to choose a skill by its exact source."
 msgstr ""
@@ -1021,17 +1026,17 @@ msgid "Starting…"
 msgstr "ప్రారంభిస్తోంది…"
 
 #: lib/marshall_web/live/threads_live.ex:1779
-#: lib/marshall_web/live/threads_live.ex:2500
+#: lib/marshall_web/live/threads_live.ex:2520
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "స్థితి"
 
-#: lib/marshall_web/live/threads_live.ex:2300
+#: lib/marshall_web/live/threads_live.ex:2320
 #, elixir-autogen, elixir-format
 msgid "Submit answers"
 msgstr "జవాబులు సమర్పించు"
 
-#: lib/marshall_web/live/threads_live.ex:2299
+#: lib/marshall_web/live/threads_live.ex:2319
 #, elixir-autogen, elixir-format
 msgid "Submitting…"
 msgstr "సమర్పిస్తోంది…"
@@ -1063,7 +1068,7 @@ msgstr "ఆ ఇమెయిల్ నమోదైన ఖాతాకు చె�
 
 #: lib/marshall_web/live/agent_threads_live.ex:123
 #: lib/marshall_web/live/agent_threads_live.ex:145
-#: lib/marshall_web/live/threads_live.ex:2872
+#: lib/marshall_web/live/threads_live.ex:2892
 #, elixir-autogen, elixir-format
 msgid "The agent encountered a problem"
 msgstr "ఏజెంట్‌కు సమస్య ఎదురైంది"
@@ -1111,7 +1116,7 @@ msgstr "సంభాషణ చర్యను పూర్తిచేయలే�
 msgid "The thread owner's access cannot be changed."
 msgstr "సంభాషణ యజమాని ప్రాప్యత మార్చలేరు."
 
-#: lib/marshall_web/live/threads_live.ex:2361
+#: lib/marshall_web/live/threads_live.ex:2381
 #, elixir-autogen, elixir-format
 msgid "The transcript is temporarily unavailable. Try again shortly."
 msgstr "ప్రతిలేఖనం తాత్కాలికంగా అందుబాటులో లేదు. త్వరలో మళ్లీ ప్రయత్నించండి."
@@ -1187,7 +1192,7 @@ msgstr "సంభాషణ తొలగించబడి ఉండవచ్చ�
 msgid "This tool is not available for the machine profile."
 msgstr "ఈ సాధనం యంత్ర ప్రొఫైల్‌కు అందుబాటులో లేదు."
 
-#: lib/marshall_web/live/threads_live.ex:1993
+#: lib/marshall_web/live/threads_live.ex:2013
 #, elixir-autogen, elixir-format
 msgid "Thread access also applies to its machine. Separate machine grants and team access are managed independently."
 msgstr ""
@@ -1199,12 +1204,12 @@ msgstr ""
 msgid "Thread access updated."
 msgstr "సంభాషణ ప్రాప్యత నవీకరించబడింది."
 
-#: lib/marshall_web/live/threads_live.ex:1964
+#: lib/marshall_web/live/threads_live.ex:1984
 #, elixir-autogen, elixir-format
 msgid "Thread actions"
 msgstr "సంభాషణ చర్యలు"
 
-#: lib/marshall_web/live/threads_live.ex:2766
+#: lib/marshall_web/live/threads_live.ex:2786
 #, elixir-autogen, elixir-format
 msgid "Thread context"
 msgstr "సంభాషణ సందర్భం"
@@ -1229,6 +1234,11 @@ msgstr "సంభాషణ మళ్లీ తెరవబడింది; క�
 msgid "Thread temporarily unavailable"
 msgstr "సంభాషణ తాత్కాలికంగా అందుబాటులో లేదు"
 
+#: lib/marshall_web/live/threads_live.ex:1956
+#, elixir-autogen, elixir-format
+msgid "Thread terminal"
+msgstr "సంభాషణ టెర్మినల్"
+
 #: lib/marshall_web/live/threads_live.ex:1882
 #, elixir-autogen, elixir-format
 msgid "Thread unavailable"
@@ -1236,7 +1246,7 @@ msgstr "సంభాషణ అందుబాటులో లేదు"
 
 #: lib/marshall_web/live/agent_threads_live.ex:132
 #: lib/marshall_web/live/agent_threads_live.ex:149
-#: lib/marshall_web/live/threads_live.ex:2882
+#: lib/marshall_web/live/threads_live.ex:2902
 #, elixir-autogen, elixir-format
 msgid "Thread updated"
 msgstr "సంభాషణ నవీకరించబడింది"
@@ -1266,47 +1276,47 @@ msgstr "సంభాషణలు తాత్కాలికంగా అంద�
 msgid "Today"
 msgstr "ఈరోజు"
 
-#: lib/marshall_web/live/threads_live.ex:2513
+#: lib/marshall_web/live/threads_live.ex:2533
 #, elixir-autogen, elixir-format
 msgid "Token allowance"
 msgstr "టోకెన్ పరిమితి"
 
-#: lib/marshall_web/live/threads_live.ex:2859
+#: lib/marshall_web/live/threads_live.ex:2879
 #, elixir-autogen, elixir-format
 msgid "Tool cancelled"
 msgstr "సాధనం రద్దయింది"
 
-#: lib/marshall_web/live/threads_live.ex:2862
+#: lib/marshall_web/live/threads_live.ex:2882
 #, elixir-autogen, elixir-format
 msgid "Tool completed"
 msgstr "సాధనం పూర్తయింది"
 
-#: lib/marshall_web/live/threads_live.ex:2856
+#: lib/marshall_web/live/threads_live.ex:2876
 #, elixir-autogen, elixir-format
 msgid "Tool failed"
 msgstr "సాధనం విఫలమైంది"
 
-#: lib/marshall_web/live/threads_live.ex:2865
+#: lib/marshall_web/live/threads_live.ex:2885
 #, elixir-autogen, elixir-format
 msgid "Tool outcome uncertain"
 msgstr "సాధన ఫలితం అనిశ్చితం"
 
 #: lib/marshall_web/live/agent_threads_live.ex:120
 #: lib/marshall_web/live/agent_threads_live.ex:148
-#: lib/marshall_web/live/threads_live.ex:2867
+#: lib/marshall_web/live/threads_live.ex:2887
 #, elixir-autogen, elixir-format
 msgid "Tool result received"
 msgstr "సాధన ఫలితం వచ్చింది"
 
 #: lib/marshall_web/live/agent_threads_live.ex:119
 #: lib/marshall_web/live/agent_threads_live.ex:147
-#: lib/marshall_web/live/threads_live.ex:2849
-#: lib/marshall_web/live/threads_live.ex:2853
+#: lib/marshall_web/live/threads_live.ex:2869
+#: lib/marshall_web/live/threads_live.ex:2873
 #, elixir-autogen, elixir-format
 msgid "Tools queued"
 msgstr "సాధనాలు క్యూలో ఉన్నాయి"
 
-#: lib/marshall_web/live/threads_live.ex:2133
+#: lib/marshall_web/live/threads_live.ex:2153
 #, elixir-autogen, elixir-format
 msgid "Transcript"
 msgstr "ప్రతిలేఖనం"
@@ -1318,7 +1328,7 @@ msgstr "త్వరలో మళ్లీ ప్రయత్నించండ�
 
 #: lib/marshall_web/live/agent_threads_live.ex:122
 #: lib/marshall_web/live/agent_threads_live.ex:142
-#: lib/marshall_web/live/threads_live.ex:2869
+#: lib/marshall_web/live/threads_live.ex:2889
 #, elixir-autogen, elixir-format
 msgid "Turn complete"
 msgstr "మలుపు పూర్తయింది"
@@ -1328,15 +1338,15 @@ msgstr "మలుపు పూర్తయింది"
 msgid "Ultra"
 msgstr "అల్ట్రా"
 
-#: lib/marshall_web/live/threads_live.ex:2803
+#: lib/marshall_web/live/threads_live.ex:2823
 #, elixir-autogen, elixir-format
 msgid "Ultra is for complex, open-ended work."
 msgstr "అల్ట్రా క్లిష్టమైన, విస్తృత పనులకు."
 
-#: lib/marshall_web/live/threads_live.ex:2773
-#: lib/marshall_web/live/threads_live.ex:2779
-#: lib/marshall_web/live/threads_live.ex:2813
-#: lib/marshall_web/live/threads_live.ex:2893
+#: lib/marshall_web/live/threads_live.ex:2793
+#: lib/marshall_web/live/threads_live.ex:2799
+#: lib/marshall_web/live/threads_live.ex:2833
+#: lib/marshall_web/live/threads_live.ex:2913
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "తెలియదు"
@@ -1360,12 +1370,12 @@ msgstr "తొలగించే ముందు సంభాషణ యంత్
 msgid "Untitled thread"
 msgstr "శీర్షిక లేని సంభాషణ"
 
-#: lib/marshall_web/live/threads_live.ex:2627
+#: lib/marshall_web/live/threads_live.ex:2647
 #, elixir-autogen, elixir-format
 msgid "Update"
 msgstr "నవీకరించు"
 
-#: lib/marshall_web/live/threads_live.ex:2620
+#: lib/marshall_web/live/threads_live.ex:2640
 #, elixir-autogen, elixir-format
 msgid "Update revision (optional)"
 msgstr "నవీకరణ సంచిక (ఐచ్ఛికం)"
@@ -1375,30 +1385,30 @@ msgstr "నవీకరణ సంచిక (ఐచ్ఛికం)"
 msgid "Updated"
 msgstr "నవీకరించబడింది"
 
-#: lib/marshall_web/live/threads_live.ex:2626
+#: lib/marshall_web/live/threads_live.ex:2646
 #, elixir-autogen, elixir-format
 msgid "Updating…"
 msgstr "నవీకరిస్తోంది…"
 
-#: lib/marshall_web/live/threads_live.ex:2466
+#: lib/marshall_web/live/threads_live.ex:2486
 #, elixir-autogen, elixir-format
 msgid "Use Commands or press Ctrl/Cmd+K while writing. Start a message with / to find a command; use Tab to complete it."
 msgstr ""
 "రాస్తున్నప్పుడు కమాండ్లు లేదా Ctrl/Cmd+K వాడండి. కమాండ్ కోసం /తో సందేశం "
 "ప్రారంభించండి; పూర్తిచేయడానికి Tab వాడండి."
 
-#: lib/marshall_web/live/threads_live.ex:2655
+#: lib/marshall_web/live/threads_live.ex:2675
 #, elixir-autogen, elixir-format
 msgid "Use a public GitHub, GitLab, Codeberg or Bitbucket repository."
 msgstr "పబ్లిక్ GitHub, GitLab, Codeberg లేదా Bitbucket రిపోజిటరీ వాడండి."
 
-#: lib/marshall_web/live/threads_live.ex:2063
+#: lib/marshall_web/live/threads_live.ex:2083
 #, elixir-autogen, elixir-format
 msgid "Use an existing account's email to grant, change or revoke a thread role."
 msgstr ""
 "సంభాషణ పాత్ర ఇవ్వడానికి, మార్చడానికి, రద్దుకు ఉన్న ఖాతా ఇమెయిల్ వాడండి."
 
-#: lib/marshall_web/live/threads_live.ex:2593
+#: lib/marshall_web/live/threads_live.ex:2613
 #, elixir-autogen, elixir-format
 msgid "Use this skill"
 msgstr "ఈ నైపుణ్యం వాడు"
@@ -1408,13 +1418,13 @@ msgstr "ఈ నైపుణ్యం వాడు"
 msgid "View activity"
 msgstr "కార్యాచరణ చూడు"
 
-#: lib/marshall_web/live/threads_live.ex:2080
-#: lib/marshall_web/live/threads_live.ex:2889
+#: lib/marshall_web/live/threads_live.ex:2100
+#: lib/marshall_web/live/threads_live.ex:2909
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "వీక్షకుడు"
 
-#: lib/marshall_web/live/threads_live.ex:2093
+#: lib/marshall_web/live/threads_live.ex:2113
 #, elixir-autogen, elixir-format
 msgid "Viewers read. Operators send prompts. Managers also share and manage the thread."
 msgstr ""
@@ -1429,7 +1439,7 @@ msgstr ""
 "సెట్టింగ్ మార్చడానికి ముందు ప్రస్తుత పని లేదా పెండింగ్ ప్రశ్నలు ముగిసే వరకు "
 "వేచి ఉండండి."
 
-#: lib/marshall_web/live/threads_live.ex:2816
+#: lib/marshall_web/live/threads_live.ex:2836
 #, elixir-autogen, elixir-format
 msgid "Waiting for a workspace"
 msgstr "పని స్థలం కోసం వేచి ఉంది"
@@ -1439,22 +1449,22 @@ msgstr "పని స్థలం కోసం వేచి ఉంది"
 msgid "Waiting for machine"
 msgstr "యంత్రం కోసం వేచి ఉంది"
 
-#: lib/marshall_web/live/threads_live.ex:2378
+#: lib/marshall_web/live/threads_live.ex:2398
 #, elixir-autogen, elixir-format
 msgid "Waiting for the agent's first update."
 msgstr "ఏజెంట్ మొదటి నవీకరణకు వేచి ఉంది."
 
-#: lib/marshall_web/live/threads_live.ex:2874
+#: lib/marshall_web/live/threads_live.ex:2894
 #, elixir-autogen, elixir-format
 msgid "Waiting for the machine"
 msgstr "యంత్రం కోసం వేచి ఉంది"
 
-#: lib/marshall_web/live/threads_live.ex:2875
+#: lib/marshall_web/live/threads_live.ex:2895
 #, elixir-autogen, elixir-format
 msgid "Waiting for your answers"
 msgstr "మీ జవాబుల కోసం వేచి ఉంది"
 
-#: lib/marshall_web/live/threads_live.ex:2888
+#: lib/marshall_web/live/threads_live.ex:2908
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "వెబ్ యాప్‌లు"
@@ -1465,13 +1475,13 @@ msgid "What are we working on?"
 msgstr "మనం దేనిపై పని చేస్తున్నాం?"
 
 #: lib/marshall_web/live/threads_live.ex:1510
-#: lib/marshall_web/live/threads_live.ex:2763
+#: lib/marshall_web/live/threads_live.ex:2783
 #: lib/marshall_web/thread_commands.ex:16
 #, elixir-autogen, elixir-format
 msgid "Work"
 msgstr "పని"
 
-#: lib/marshall_web/live/threads_live.ex:2503
+#: lib/marshall_web/live/threads_live.ex:2523
 #, elixir-autogen, elixir-format
 msgid "Working directory"
 msgstr "పని డైరెక్టరీ"
@@ -1487,7 +1497,7 @@ msgid "Workspace context is unavailable. Reload it when the machine is ready."
 msgstr ""
 "పని స్థల సందర్భం అందుబాటులో లేదు. యంత్రం సిద్ధమైనప్పుడు రీలోడ్ చేయండి."
 
-#: lib/marshall_web/live/threads_live.ex:2880
+#: lib/marshall_web/live/threads_live.ex:2900
 #, elixir-autogen, elixir-format
 msgid "Workspace context reloaded"
 msgstr "పని స్థల సందర్భం రీలోడ్ అయింది"
@@ -1497,12 +1507,12 @@ msgstr "పని స్థల సందర్భం రీలోడ్ అయ�
 msgid "Workspace files changed during collection. Reload context and try again."
 msgstr "సేకరణలో పని స్థల ఫైళ్లు మారాయి. సందర్భం రీలోడ్ చేసి ప్రయత్నించండి."
 
-#: lib/marshall_web/live/threads_live.ex:2822
+#: lib/marshall_web/live/threads_live.ex:2842
 #, elixir-autogen, elixir-format
 msgid "Workspace ready · open the conversation"
 msgstr "పని స్థలం సిద్ధం · సంభాషణ తెరవండి"
 
-#: lib/marshall_web/live/threads_live.ex:2824
+#: lib/marshall_web/live/threads_live.ex:2844
 #, elixir-autogen, elixir-format
 msgid "Workspace setup needs attention"
 msgstr "పని స్థల సెటప్‌కు శ్రద్ధ అవసరం"
@@ -1512,7 +1522,7 @@ msgstr "పని స్థల సెటప్‌కు శ్రద్ధ అ�
 msgid "Workspace skill"
 msgstr "పని స్థల నైపుణ్యం"
 
-#: lib/marshall_web/live/threads_live.ex:2529
+#: lib/marshall_web/live/threads_live.ex:2549
 #, elixir-autogen, elixir-format
 msgid "Workspace source"
 msgstr "పని స్థల మూలం"
@@ -1528,7 +1538,7 @@ msgstr "ఈ సంభాషణలు చదవవచ్చు. సూచనల�
 msgid "You do not have access to this thread."
 msgstr "ఈ సంభాషణకు ప్రాప్యత లేదు."
 
-#: lib/marshall_web/live/threads_live.ex:2144
+#: lib/marshall_web/live/threads_live.ex:2164
 #, elixir-autogen, elixir-format
 msgid "You have read-only access to this thread."
 msgstr "సంభాషణకు చదవడానికి మాత్రమే ప్రాప్యత ఉంది."
@@ -1538,28 +1548,28 @@ msgstr "సంభాషణకు చదవడానికి మాత్రమ�
 msgid "Your agent's work runs in a dedicated environment."
 msgstr "ఏజెంట్ పని ప్రత్యేక వాతావరణంలో నడుస్తుంది."
 
-#: lib/marshall_web/live/threads_live.ex:2292
+#: lib/marshall_web/live/threads_live.ex:2312
 #, elixir-autogen, elixir-format
 msgid "Your answer or additional detail"
 msgstr "మీ జవాబు లేదా అదనపు వివరాలు"
 
-#: lib/marshall_web/live/threads_live.ex:2876
+#: lib/marshall_web/live/threads_live.ex:2896
 #, elixir-autogen, elixir-format
 msgid "Your answers were received"
 msgstr "మీ జవాబులు వచ్చాయి"
 
-#: lib/marshall_web/live/threads_live.ex:2254
+#: lib/marshall_web/live/threads_live.ex:2274
 #, elixir-autogen, elixir-format
 msgid "Your input is needed"
 msgstr "మీ ఇన్‌పుట్ అవసరం"
 
-#: lib/marshall_web/live/threads_live.ex:2154
+#: lib/marshall_web/live/threads_live.ex:2174
 #, elixir-autogen, elixir-format
 msgid "Your machine is starting. The agent will begin with your objective as soon as it is ready."
 msgstr ""
 "యంత్రం ప్రారంభమవుతోంది. సిద్ధమైన వెంటనే ఏజెంట్ లక్ష్యంతో పని మొదలుపెడుతుంది."
 
-#: lib/marshall_web/live/threads_live.ex:2166
+#: lib/marshall_web/live/threads_live.ex:2186
 #, elixir-autogen, elixir-format
 msgid "Your objective is saved. Retry to prepare the workspace again."
 msgstr ""
@@ -1570,12 +1580,12 @@ msgstr ""
 msgid "Your threads"
 msgstr "మీ సంభాషణలు"
 
-#: lib/marshall_web/live/threads_live.ex:2478
+#: lib/marshall_web/live/threads_live.ex:2498
 #, elixir-autogen, elixir-format
 msgid "and"
 msgstr "మరియు"
 
-#: lib/marshall_web/live/threads_live.ex:2479
+#: lib/marshall_web/live/threads_live.ex:2499
 #, elixir-autogen, elixir-format
 msgid "choose a mode and submit the task together. Choosing a mode on a new thread does not create a machine."
 msgstr ""
@@ -1587,7 +1597,7 @@ msgstr ""
 msgid "· %{value1} reasoning · %{value2}"
 msgstr "· %{value1} తర్కం · %{value2}"
 
-#: lib/marshall_web/live/threads_live.ex:2446
+#: lib/marshall_web/live/threads_live.ex:2466
 #, elixir-autogen, elixir-format
 msgid "↑ ↓ choose · Enter run · Escape close"
 msgstr "↑ ↓ ఎంచుకో · Enter అమలు · Escape మూసివేయి"
@@ -1647,7 +1657,7 @@ msgstr "ఈ థ్రెడ్ మెషీన్ టెర్మినల్‌
 msgid "Summarize older context for the next turn"
 msgstr "తదుపరి మలుపు కోసం పాత సందర్భాన్ని సంగ్రహించండి"
 
-#: lib/marshall_web/live/threads_live.ex:1956
+#: lib/marshall_web/live/threads_live.ex:1976
 #, elixir-autogen, elixir-format
 msgid "Message board"
 msgstr "సందేశ బోర్డు"

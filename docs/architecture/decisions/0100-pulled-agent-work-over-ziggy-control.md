@@ -2,17 +2,13 @@
 
 - ID: ADR-0100
 - Date: 2026-09-23
-- Status: superseded
+- Status: accepted
 - Implementation: partial
 - Components: Marshall, Ziggy, Audi, Lyra, guest images
 - Supersedes: ADR-0099
-- Superseded by: ADR-0280
+- Superseded by: none
 
 ## Context
-
-[ADR-0280](0280-remote-underclass-and-safe-agent-retries.md) carries forward this
-authority and transport design while permitting the reviewed remote pool and
-fresh attempts after positively certified pre-output overloads.
 
 [ADR-0099](0099-marshall-owned-agent-threads.md) accepted Marshall ownership
 of threads, turns, context, model scheduling, tool commands, recovery and audit.

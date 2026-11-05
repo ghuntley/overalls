@@ -36,12 +36,7 @@ defmodule Ziggy.Config do
          }
          when is_binary(host) and uri_path in [nil, ""] <- URI.parse(value["control_plane"]),
          false <- String.contains?(host, ":"),
-         openai_origin
-         when openai_origin in [
-                "https://api.openai.com",
-                "http://127.0.0.1:8080",
-                "https://panterloons.lorikeet-bangus.ts.net"
-              ] <-
+         openai_origin when openai_origin in ["https://api.openai.com", "http://127.0.0.1:8080"] <-
            Map.get(value, "openai_origin", "https://api.openai.com"),
          agent_enabled when is_boolean(agent_enabled) <- Map.get(value, "agent_enabled", false),
          lyra_release when is_nil(lyra_release) or is_binary(lyra_release) <-

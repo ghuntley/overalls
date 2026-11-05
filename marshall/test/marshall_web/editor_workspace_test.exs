@@ -65,18 +65,21 @@ defmodule MarshallWeb.EditorWorkspaceTest do
     assert vm_id == c.vm.id
   end
 
-  # @cc [owner:ghuntley,label:verification;product] editor-unsupported-actions-hidden
-  # Unsupported images MUST hide both active and disabled editor actions and
-  # their notice. A release change MUST remove mounted actions; direct launch
-  # MUST still fail closed for either unsupported image history.
   @tag legacy: true
-  test "a real retained legacy image hides editor actions and cannot launch", c do
+  test "a real retained legacy image explains new image requirements without a launch link", c do
     assert {:ok, vm} = Compute.get_vm(%{vm_id: c.vm.id}, actor: c.owner)
     assert vm.editor_image_status == :unsupported_image
     assert {:ok, view, _} = live(signed_in(c.owner, c.token), "/machines/#{c.vm.id}")
     refute has_element?(view, "#open-vscode")
-    refute has_element?(view, "#open-vscode-disabled")
-    refute has_element?(view, "#vscode-unavailable")
+    assert has_element?(view, "#open-vscode-disabled[disabled]")
+
+    assert has_element?(
+             view,
+             "#vscode-unavailable",
+             "does not support the current browser editor"
+           )
+
+    refute has_element?(view, "#vscode-unavailable", "Create a new machine")
     assert get(signed_in(c.owner, c.token), "/machines/#{c.vm.id}/code").status == 403
   end
 
@@ -88,8 +91,13 @@ defmodule MarshallWeb.EditorWorkspaceTest do
     send(view.pid, :refresh_terminals)
     refute has_element?(view, "#open-vscode")
 
-    refute has_element?(view, "#open-vscode-disabled")
-    refute has_element?(view, "#vscode-unavailable")
+    assert has_element?(
+             view,
+             "#vscode-unavailable",
+             "does not support the current browser editor"
+           )
+
+    refute has_element?(view, "#vscode-unavailable", "Create a new machine")
     assert get(signed_in(c.owner, c.token), "/machines/#{c.vm.id}/code").status == 403
   end
 

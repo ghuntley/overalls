@@ -3,10 +3,6 @@
   # Panterloons is a separate copy of the Overalls deployment (ADR-0246) with
   # its own database, secrets and fleet tunnel; Dungarees is its worker.
   imports = [ ../../roles/control-plane/configuration.nix ];
-  # @cc [owner:ghuntley,label:security;deployment] panterloons-inference-publication
-  # Dungarees inference MUST reach this loopback Underclass only through the
-  # supervised tailnet HTTPS publisher; provider accounts remain on Panterloons.
-  services.underclass.tailscaleServe.enable = true;
   overalls.controlPlaneHost = {
     # The administrative address and telemetry worker come from the fleet
     # host roster (nix/policy/fleet/hosts.nix).

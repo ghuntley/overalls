@@ -528,6 +528,12 @@ msgstr "முனையத்தைத் திறக்க முடியவ�
 msgid "This machine is stopped. Start it to open your terminal. Your files are retained."
 msgstr "இந்த இயந்திரம் நிறுத்தப்பட்டுள்ளது. முனையத்தைத் திறக்க இதைத் தொடங்கவும். உங்கள் கோப்புகள் பாதுகாக்கப்பட்டுள்ளன."
 
+#: lib/marshall_web/components/workspace_components.ex:356
+#: lib/marshall_web/components/workspace_components.ex:530
+#, elixir-autogen, elixir-format
+msgid "This machine's image does not support the current browser editor."
+msgstr "இந்த இயந்திரத்தின் படிமம் தற்போதைய உலாவித் திருத்தியை ஆதரிக்காது."
+
 #: lib/marshall_web/components/workspace_components.ex:431
 #, elixir-autogen, elixir-format
 msgid "This machine's image has no guest agents yet: SSH, the browser terminal and agents are unavailable. Use"

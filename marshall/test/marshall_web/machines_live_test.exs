@@ -796,18 +796,22 @@ defmodule MarshallWeb.MachinesLiveTest do
     assert has_element?(view, "#machine-#{machine_id}-vscode-reason", "temporarily unavailable")
   end
 
-  # @cc [owner:ghuntley,label:verification;product] machine-list-unsupported-editor-hidden
-  # Unsupported images MUST omit active and disabled editor actions and their
-  # notice from the machine list, matching the shared component contract.
-  test "machine list hides editor actions for unsupported images", %{conn: conn} do
+  test "machine list explains unsupported images without an editor link", %{conn: conn} do
     put_editor_release()
     fixture = Marshall.TerminalFixtures.terminal_fixture()
     machine_id = fixture.vm.id
     {:ok, view, _} = live(signed_in(conn, fixture.owner), ~p"/machines")
 
     refute has_element?(view, "#machine-#{machine_id}-vscode")
-    refute has_element?(view, "#machine-#{machine_id}-vscode-disabled")
-    refute has_element?(view, "#machine-#{machine_id}-vscode-reason")
+    assert has_element?(view, "#machine-#{machine_id}-vscode-disabled[disabled]")
+
+    assert has_element?(
+             view,
+             "#machine-#{machine_id}-vscode-reason",
+             "does not support the current browser editor"
+           )
+
+    refute has_element?(view, "#machine-#{machine_id}-vscode-reason", "new machine")
   end
 
   test "current headroom distinguishes unknown telemetry from measured zero", %{

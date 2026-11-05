@@ -57,11 +57,6 @@ was instrumented" should name module `workload`, and every selected assertion
 that no command reaches should appear with zero examples (for example the
 `admission-stub` profile's `Always` properties when its commands are blocked).
 
-Staged contexts contain `rootfs.tar`, the exact built output's identity and
-closure list, and its output-path stamp. Identity verification reads archive
-members without extracting them into the checkout and checks their paths,
-modes, symlink targets and bytes against both the current Nix output and image.
-
 After the selected Nix contexts are built and staged, stage the commands, build
 Compose images, then materialize the selected graph as a standalone Snouty
 config directory. The materializer rejects local bind mounts and removes build

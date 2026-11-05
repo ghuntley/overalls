@@ -69,10 +69,6 @@
       "path": "secrets/dungarees-underclass.enc.json"
     },
     {
-      "name": "dungarees-underclass-proxy",
-      "path": "secrets/dungarees-underclass-proxy.enc.json"
-    },
-    {
       "name": "dungarees-audi",
       "path": "secrets/dungarees-audi.enc.json"
     },

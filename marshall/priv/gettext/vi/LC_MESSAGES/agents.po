@@ -21,13 +21,13 @@ msgstr ""
 "%{value1} Mức suy luận được giữ theo cuộc hội thoại này. Chuyển giữa Lập kế "
 "hoạch và Làm việc khi cần."
 
-#: lib/marshall_web/live/threads_live.ex:2232
+#: lib/marshall_web/live/threads_live.ex:2252
 #, elixir-autogen, elixir-format
 msgid "%{value1} reasoning"
 msgstr "Suy luận %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2791
-#: lib/marshall_web/live/threads_live.ex:2794
+#: lib/marshall_web/live/threads_live.ex:2811
+#: lib/marshall_web/live/threads_live.ex:2814
 #, elixir-autogen, elixir-format
 msgid "A context source could not be fully loaded."
 msgstr "Không thể tải đầy đủ một nguồn ngữ cảnh."
@@ -48,14 +48,14 @@ msgstr ""
 msgid "A space for your next idea"
 msgstr "Không gian cho ý tưởng tiếp theo"
 
-#: lib/marshall_web/live/threads_live.ex:2000
+#: lib/marshall_web/live/threads_live.ex:2020
 #, elixir-autogen, elixir-format
 msgid "Access details are temporarily unavailable. Close sharing and try again shortly."
 msgstr ""
 "Chi tiết truy cập tạm thời không khả dụng. Đóng chia sẻ rồi thử lại sau ít "
 "phút."
 
-#: lib/marshall_web/live/threads_live.ex:1965
+#: lib/marshall_web/live/threads_live.ex:1985
 #, elixir-autogen, elixir-format
 msgid "Actions"
 msgstr "Thao tác"
@@ -72,7 +72,7 @@ msgid "Activity"
 msgstr "Hoạt động"
 
 #: lib/marshall_web/live/agent_threads_live.ex:116
-#: lib/marshall_web/live/threads_live.ex:2830
+#: lib/marshall_web/live/threads_live.ex:2850
 #, elixir-autogen, elixir-format
 msgid "Agent"
 msgstr "Tác tử"
@@ -84,7 +84,7 @@ msgstr "CLI tác tử được duyệt trong một giờ. Quay lại terminal."
 
 #: lib/marshall_web/live/agent_threads_live.ex:117
 #: lib/marshall_web/live/agent_threads_live.ex:141
-#: lib/marshall_web/live/threads_live.ex:2838
+#: lib/marshall_web/live/threads_live.ex:2858
 #, elixir-autogen, elixir-format
 msgid "Agent started working"
 msgstr "Tác tử đã bắt đầu làm việc"
@@ -110,7 +110,7 @@ msgstr "Mọi cuộc hội thoại"
 msgid "All visible"
 msgstr "Tất cả hiển thị"
 
-#: lib/marshall_web/live/threads_live.ex:2305
+#: lib/marshall_web/live/threads_live.ex:2325
 #, elixir-autogen, elixir-format
 msgid "An operator can answer these questions."
 msgstr "Người vận hành có thể trả lời các câu hỏi này."
@@ -120,7 +120,7 @@ msgstr "Người vận hành có thể trả lời các câu hỏi này."
 msgid "Answer each question with a choice, your own answer, or both."
 msgstr "Trả lời mỗi câu bằng lựa chọn, câu trả lời riêng hoặc cả hai."
 
-#: lib/marshall_web/live/threads_live.ex:2257
+#: lib/marshall_web/live/threads_live.ex:2277
 #, elixir-autogen, elixir-format
 msgid "Answer these questions to continue the plan."
 msgstr "Trả lời các câu hỏi này để tiếp tục kế hoạch."
@@ -150,34 +150,34 @@ msgstr "Chấp thuận CLI của tác tử"
 msgid "Approving…"
 msgstr "Đang chấp thuận…"
 
-#: lib/marshall_web/live/threads_live.ex:1968
+#: lib/marshall_web/live/threads_live.ex:1988
 #, elixir-autogen, elixir-format
 msgid "Archive"
 msgstr "Lưu trữ"
 
 #: lib/marshall_web/live/threads_live.ex:1690
 #: lib/marshall_web/live/threads_live.ex:1787
-#: lib/marshall_web/live/threads_live.ex:2812
+#: lib/marshall_web/live/threads_live.ex:2832
 #, elixir-autogen, elixir-format
 msgid "Archived"
 msgstr "Đã lưu trữ"
 
-#: lib/marshall_web/live/threads_live.ex:2350
+#: lib/marshall_web/live/threads_live.ex:2370
 #, elixir-autogen, elixir-format
 msgid "Archived thread. The transcript is read-only. Reopen to continue on a new machine."
 msgstr "Luồng đã lưu trữ. Bản ghi chỉ đọc. Mở lại để tiếp tục trên máy mới."
 
-#: lib/marshall_web/live/threads_live.ex:2826
+#: lib/marshall_web/live/threads_live.ex:2846
 #, elixir-autogen, elixir-format
 msgid "Archived · conversation retained"
 msgstr "Đã lưu trữ · giữ lại hội thoại"
 
-#: lib/marshall_web/live/threads_live.ex:2811
+#: lib/marshall_web/live/threads_live.ex:2831
 #, elixir-autogen, elixir-format
 msgid "Archiving"
 msgstr "Đang lưu trữ"
 
-#: lib/marshall_web/live/threads_live.ex:2182
+#: lib/marshall_web/live/threads_live.ex:2202
 #, elixir-autogen, elixir-format
 msgid "Archiving is in progress. Waiting for the machine to be deleted."
 msgstr "Đang lưu trữ. Chờ máy được xóa."
@@ -187,7 +187,7 @@ msgstr "Đang lưu trữ. Chờ máy được xóa."
 msgid "Archiving requested. The machine will be deleted before archival completes."
 msgstr "Đã yêu cầu lưu trữ. Máy sẽ được xóa trước khi hoàn tất lưu trữ."
 
-#: lib/marshall_web/live/threads_live.ex:2825
+#: lib/marshall_web/live/threads_live.ex:2845
 #, elixir-autogen, elixir-format
 msgid "Archiving · releasing the machine"
 msgstr "Đang lưu trữ · giải phóng máy"
@@ -199,8 +199,8 @@ msgstr "Đang lưu trữ · giải phóng máy"
 msgid "Back to threads"
 msgstr "Quay lại các luồng"
 
-#: lib/marshall_web/live/threads_live.ex:2621
-#: lib/marshall_web/live/threads_live.ex:2670
+#: lib/marshall_web/live/threads_live.ex:2641
+#: lib/marshall_web/live/threads_live.ex:2690
 #, elixir-autogen, elixir-format
 msgid "Branch, tag or commit"
 msgstr "Nhánh, thẻ hoặc commit"
@@ -215,7 +215,7 @@ msgstr "Xây dựng, sửa lỗi, khám phá ý tưởng…"
 msgid "CPU"
 msgstr "CPU"
 
-#: lib/marshall_web/live/threads_live.ex:2035
+#: lib/marshall_web/live/threads_live.ex:2055
 #, elixir-autogen, elixir-format
 msgid "Change"
 msgstr "Thay đổi"
@@ -236,13 +236,13 @@ msgstr "Đã tạo luồng con"
 msgid "Choose a valid image and machine size."
 msgstr "Chọn ảnh và kích thước máy hợp lệ."
 
-#: lib/marshall_web/live/threads_live.ex:2417
-#: lib/marshall_web/live/threads_live.ex:2461
+#: lib/marshall_web/live/threads_live.ex:2437
+#: lib/marshall_web/live/threads_live.ex:2481
 #, elixir-autogen, elixir-format
 msgid "Close"
 msgstr "Đóng"
 
-#: lib/marshall_web/live/threads_live.ex:2217
+#: lib/marshall_web/live/threads_live.ex:2237
 #, elixir-autogen, elixir-format
 msgid "Collaboration mode"
 msgstr "Chế độ cộng tác"
@@ -252,26 +252,26 @@ msgstr "Chế độ cộng tác"
 msgid "Collaboration mode updated."
 msgstr "Đã cập nhật chế độ cộng tác."
 
-#: lib/marshall_web/live/threads_live.ex:2701
+#: lib/marshall_web/live/threads_live.ex:2721
 #, elixir-autogen, elixir-format
 msgid "Command suggestions"
 msgstr "Gợi ý lệnh"
 
 #: lib/marshall_web/live/threads_live.ex:1528
 #: lib/marshall_web/live/threads_live.ex:1922
-#: lib/marshall_web/live/threads_live.ex:2235
-#: lib/marshall_web/live/threads_live.ex:2413
-#: lib/marshall_web/live/threads_live.ex:2434
+#: lib/marshall_web/live/threads_live.ex:2255
+#: lib/marshall_web/live/threads_live.ex:2433
+#: lib/marshall_web/live/threads_live.ex:2454
 #, elixir-autogen, elixir-format
 msgid "Commands"
 msgstr "Lệnh"
 
-#: lib/marshall_web/live/threads_live.ex:2605
+#: lib/marshall_web/live/threads_live.ex:2625
 #, elixir-autogen, elixir-format
 msgid "Commit: %{value1}"
 msgstr "Bản ghi commit: %{value1}"
 
-#: lib/marshall_web/live/threads_live.ex:2549
+#: lib/marshall_web/live/threads_live.ex:2569
 #: lib/marshall_web/thread_commands.ex:18
 #, elixir-autogen, elixir-format
 msgid "Compact context"
@@ -282,12 +282,12 @@ msgstr "Thu gọn ngữ cảnh"
 msgid "Compaction could not reduce this context. Reduce required instructions or start a focused thread."
 msgstr "Không thể thu gọn thêm ngữ cảnh này. Giảm chỉ dẫn bắt buộc hoặc bắt đầu luồng tập trung hơn."
 
-#: lib/marshall_web/live/threads_live.ex:2768
+#: lib/marshall_web/live/threads_live.ex:2788
 #, elixir-autogen, elixir-format
 msgid "Composer help"
 msgstr "Trợ giúp soạn thảo"
 
-#: lib/marshall_web/live/threads_live.ex:2515
+#: lib/marshall_web/live/threads_live.ex:2535
 #, elixir-autogen, elixir-format
 msgid "Context bytes"
 msgstr "Số byte ngữ cảnh"
@@ -307,7 +307,7 @@ msgstr "Đã thu gọn ngữ cảnh"
 msgid "Context compaction queued."
 msgstr "Đã xếp hàng thu gọn ngữ cảnh."
 
-#: lib/marshall_web/live/threads_live.ex:2493
+#: lib/marshall_web/live/threads_live.ex:2513
 #, elixir-autogen, elixir-format
 msgid "Context details are unavailable. The thread may still be preparing its workspace."
 msgstr "Chi tiết ngữ cảnh không khả dụng. Luồng có thể vẫn đang chuẩn bị không gian làm việc."
@@ -317,7 +317,7 @@ msgstr "Chi tiết ngữ cảnh không khả dụng. Luồng có thể vẫn đa
 msgid "Context reload queued."
 msgstr "Đã xếp hàng tải lại ngữ cảnh."
 
-#: lib/marshall_web/live/threads_live.ex:2203
+#: lib/marshall_web/live/threads_live.ex:2223
 #, elixir-autogen, elixir-format
 msgid "Continue the work…"
 msgstr "Tiếp tục công việc…"
@@ -337,12 +337,12 @@ msgstr "Tạo luồng con"
 msgid "Create thread"
 msgstr "Tạo luồng"
 
-#: lib/marshall_web/live/threads_live.ex:2868
+#: lib/marshall_web/live/threads_live.ex:2888
 #, elixir-autogen, elixir-format
 msgid "Delegated a task"
 msgstr "Đã ủy thác nhiệm vụ"
 
-#: lib/marshall_web/live/threads_live.ex:1972
+#: lib/marshall_web/live/threads_live.ex:1992
 #, elixir-autogen, elixir-format
 msgid "Delete"
 msgstr "Xóa"
@@ -357,12 +357,12 @@ msgstr "Đang xóa"
 msgid "Describe a task. Your agent gets a machine and gets to work."
 msgstr "Mô tả nhiệm vụ. Tác tử của bạn nhận máy và bắt đầu làm việc."
 
-#: lib/marshall_web/live/threads_live.ex:2637
+#: lib/marshall_web/live/threads_live.ex:2657
 #, elixir-autogen, elixir-format
 msgid "Disable"
 msgstr "Vô hiệu hóa"
 
-#: lib/marshall_web/live/threads_live.ex:2578
+#: lib/marshall_web/live/threads_live.ex:2598
 #, elixir-autogen, elixir-format
 msgid "Disabled"
 msgstr "Đã vô hiệu hóa"
@@ -372,18 +372,18 @@ msgstr "Đã vô hiệu hóa"
 msgid "Disk (GiB)"
 msgstr "Đĩa (GiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2638
+#: lib/marshall_web/live/threads_live.ex:2658
 #, elixir-autogen, elixir-format
 msgid "Enable"
 msgstr "Bật"
 
 #: lib/marshall_web/live/threads_live.ex:1785
-#: lib/marshall_web/live/threads_live.ex:2810
+#: lib/marshall_web/live/threads_live.ex:2830
 #, elixir-autogen, elixir-format
 msgid "Failed"
 msgstr "Thất bại"
 
-#: lib/marshall_web/live/threads_live.ex:2424
+#: lib/marshall_web/live/threads_live.ex:2444
 #, elixir-autogen, elixir-format
 msgid "Find a command"
 msgstr "Tìm lệnh"
@@ -395,7 +395,7 @@ msgid "Find a task…"
 msgstr "Tìm nhiệm vụ…"
 
 #: lib/marshall_web/live/threads_live.ex:1732
-#: lib/marshall_web/live/threads_live.ex:2047
+#: lib/marshall_web/live/threads_live.ex:2067
 #, elixir-autogen, elixir-format
 msgid "First page"
 msgstr "Trang đầu"
@@ -420,7 +420,7 @@ msgstr "Công việc tốt bắt đầu từ một luồng."
 msgid "High"
 msgstr "Cao"
 
-#: lib/marshall_web/live/threads_live.ex:2802
+#: lib/marshall_web/live/threads_live.ex:2822
 #, elixir-autogen, elixir-format
 msgid "High gives difficult work more reasoning time."
 msgstr "Mức cao cho công việc khó thêm thời gian suy luận."
@@ -430,7 +430,7 @@ msgstr "Mức cao cho công việc khó thêm thời gian suy luận."
 msgid "Image"
 msgstr "Ảnh máy"
 
-#: lib/marshall_web/live/threads_live.ex:2333
+#: lib/marshall_web/live/threads_live.ex:2353
 #, elixir-autogen, elixir-format
 msgid "Implement plan"
 msgstr "Thực hiện kế hoạch"
@@ -445,32 +445,32 @@ msgstr "Kế hoạch này đã bắt đầu được thực hiện."
 msgid "Implementation queued."
 msgstr "Đã xếp hàng thực hiện."
 
-#: lib/marshall_web/live/threads_live.ex:2319
+#: lib/marshall_web/live/threads_live.ex:2339
 #, elixir-autogen, elixir-format
 msgid "Implementation started"
 msgstr "Đã bắt đầu thực hiện"
 
-#: lib/marshall_web/live/threads_live.ex:2510
+#: lib/marshall_web/live/threads_live.ex:2530
 #, elixir-autogen, elixir-format
 msgid "Input tokens"
 msgstr "Token đầu vào"
 
-#: lib/marshall_web/live/threads_live.ex:2654
+#: lib/marshall_web/live/threads_live.ex:2674
 #, elixir-autogen, elixir-format
 msgid "Install a skill"
 msgstr "Cài kỹ năng"
 
-#: lib/marshall_web/live/threads_live.ex:2681
+#: lib/marshall_web/live/threads_live.ex:2701
 #, elixir-autogen, elixir-format
 msgid "Install skill"
 msgstr "Cài đặt kỹ năng"
 
-#: lib/marshall_web/live/threads_live.ex:2680
+#: lib/marshall_web/live/threads_live.ex:2700
 #, elixir-autogen, elixir-format
 msgid "Installing…"
 msgstr "Đang cài đặt…"
 
-#: lib/marshall_web/live/threads_live.ex:2520
+#: lib/marshall_web/live/threads_live.ex:2540
 #, elixir-autogen, elixir-format
 msgid "Loaded sources"
 msgstr "Nguồn đã tải"
@@ -480,12 +480,12 @@ msgstr "Nguồn đã tải"
 msgid "Low"
 msgstr "Thấp"
 
-#: lib/marshall_web/live/threads_live.ex:2801
+#: lib/marshall_web/live/threads_live.ex:2821
 #, elixir-autogen, elixir-format
 msgid "Low is for small, well-defined tasks."
 msgstr "Mức thấp dành cho nhiệm vụ nhỏ, được xác định rõ."
 
-#: lib/marshall_web/live/threads_live.ex:2112
+#: lib/marshall_web/live/threads_live.ex:2132
 #, elixir-autogen, elixir-format
 msgid "Machine generations"
 msgstr "Thế hệ máy"
@@ -515,13 +515,13 @@ msgstr "Máy:"
 msgid "Maintenance finished"
 msgstr "Đã hoàn tất bảo trì"
 
-#: lib/marshall_web/live/threads_live.ex:2597
+#: lib/marshall_web/live/threads_live.ex:2617
 #, elixir-autogen, elixir-format
 msgid "Managed installations"
 msgstr "Bản cài đặt được quản lý"
 
-#: lib/marshall_web/live/threads_live.ex:2584
-#: lib/marshall_web/live/threads_live.ex:2737
+#: lib/marshall_web/live/threads_live.ex:2604
+#: lib/marshall_web/live/threads_live.ex:2757
 #, elixir-autogen, elixir-format
 msgid "Managed skill"
 msgstr "Kỹ năng được quản lý"
@@ -531,8 +531,8 @@ msgstr "Kỹ năng được quản lý"
 msgid "Managed skill removed."
 msgstr "Đã xóa kỹ năng được quản lý."
 
-#: lib/marshall_web/live/threads_live.ex:2082
-#: lib/marshall_web/live/threads_live.ex:2891
+#: lib/marshall_web/live/threads_live.ex:2102
+#: lib/marshall_web/live/threads_live.ex:2911
 #, elixir-autogen, elixir-format
 msgid "Manager"
 msgstr "Người quản lý"
@@ -547,7 +547,7 @@ msgstr "Đối chiếu mã yêu cầu với thiết bị đầu cuối trước 
 msgid "Medium"
 msgstr "Trung bình"
 
-#: lib/marshall_web/live/threads_live.ex:2804
+#: lib/marshall_web/live/threads_live.ex:2824
 #, elixir-autogen, elixir-format
 msgid "Medium is a good starting point for most work."
 msgstr "Mức trung bình là khởi đầu phù hợp cho phần lớn công việc."
@@ -557,7 +557,7 @@ msgstr "Mức trung bình là khởi đầu phù hợp cho phần lớn công vi
 msgid "Memory (MiB)"
 msgstr "Bộ nhớ (MiB)"
 
-#: lib/marshall_web/live/threads_live.ex:2202
+#: lib/marshall_web/live/threads_live.ex:2222
 #, elixir-autogen, elixir-format
 msgid "Message"
 msgstr "Tin nhắn"
@@ -585,7 +585,7 @@ msgid "New thread"
 msgstr "Luồng mới"
 
 #: lib/marshall_web/live/threads_live.ex:1739
-#: lib/marshall_web/live/threads_live.ex:2053
+#: lib/marshall_web/live/threads_live.ex:2073
 #, elixir-autogen, elixir-format
 msgid "Next page"
 msgstr "Trang tiếp"
@@ -595,17 +595,17 @@ msgstr "Trang tiếp"
 msgid "No activity matches this filter."
 msgstr "Không có hoạt động khớp bộ lọc."
 
-#: lib/marshall_web/live/threads_live.ex:2039
+#: lib/marshall_web/live/threads_live.ex:2059
 #, elixir-autogen, elixir-format
 msgid "No individual thread grants yet."
 msgstr "Chưa cấp quyền luồng cá nhân."
 
-#: lib/marshall_web/live/threads_live.ex:2522
+#: lib/marshall_web/live/threads_live.ex:2542
 #, elixir-autogen, elixir-format
 msgid "No instruction sources collected yet."
 msgstr "Chưa thu thập nguồn chỉ dẫn."
 
-#: lib/marshall_web/live/threads_live.ex:2723
+#: lib/marshall_web/live/threads_live.ex:2743
 #, elixir-autogen, elixir-format
 msgid "No matching skills. Use /skills to inspect the catalog."
 msgstr "Không có kỹ năng phù hợp. Dùng /skills để xem danh mục."
@@ -620,23 +620,23 @@ msgstr "Không có luồng cũ hơn trên trang này."
 msgid "No recent threads match your search."
 msgstr "Không có luồng gần đây khớp tìm kiếm."
 
-#: lib/marshall_web/live/threads_live.ex:2566
+#: lib/marshall_web/live/threads_live.ex:2586
 #, elixir-autogen, elixir-format
 msgid "No skills were discovered in this workspace."
 msgstr "Không tìm thấy kỹ năng trong không gian làm việc này."
 
-#: lib/marshall_web/live/threads_live.ex:2508
+#: lib/marshall_web/live/threads_live.ex:2528
 #, elixir-autogen, elixir-format
 msgid "Not collected yet"
 msgstr "Chưa thu thập"
 
 #: lib/marshall_web/live/threads_live.ex:1489
-#: lib/marshall_web/live/threads_live.ex:2371
+#: lib/marshall_web/live/threads_live.ex:2391
 #, elixir-autogen, elixir-format
 msgid "Objective"
 msgstr "Mục tiêu"
 
-#: lib/marshall_web/live/threads_live.ex:2877
+#: lib/marshall_web/live/threads_live.ex:2897
 #, elixir-autogen, elixir-format
 msgid "Older context summarized"
 msgstr "Đã tóm tắt ngữ cảnh cũ"
@@ -646,7 +646,7 @@ msgstr "Đã tóm tắt ngữ cảnh cũ"
 msgid "One task. One thread."
 msgstr "Một nhiệm vụ. Một luồng."
 
-#: lib/marshall_web/live/threads_live.ex:1948
+#: lib/marshall_web/live/threads_live.ex:1968
 #: lib/marshall_web/thread_commands.ex:26
 #, elixir-autogen, elixir-format
 msgid "Open VS Code"
@@ -663,13 +663,18 @@ msgstr "Mã nguồn mở"
 msgid "Open terminal"
 msgstr "Mở thiết bị đầu cuối"
 
-#: lib/marshall_web/live/threads_live.ex:2081
-#: lib/marshall_web/live/threads_live.ex:2890
+#: lib/marshall_web/live/threads_live.ex:1948
+#, elixir-autogen, elixir-format
+msgid "Open terminal here"
+msgstr "Mở thiết bị đầu cuối tại đây"
+
+#: lib/marshall_web/live/threads_live.ex:2101
+#: lib/marshall_web/live/threads_live.ex:2910
 #, elixir-autogen, elixir-format
 msgid "Operator"
 msgstr "Người vận hành"
 
-#: lib/marshall_web/live/threads_live.ex:2013
+#: lib/marshall_web/live/threads_live.ex:2033
 #, elixir-autogen, elixir-format
 msgid "Owner · cannot be changed"
 msgstr "Chủ sở hữu · không thể thay đổi"
@@ -685,8 +690,8 @@ msgid "Past 7 days"
 msgstr "7 ngày qua"
 
 #: lib/marshall_web/live/threads_live.ex:1782
-#: lib/marshall_web/live/threads_live.ex:2771
-#: lib/marshall_web/live/threads_live.ex:2807
+#: lib/marshall_web/live/threads_live.ex:2791
+#: lib/marshall_web/live/threads_live.ex:2827
 #, elixir-autogen, elixir-format
 msgid "Pending"
 msgstr "Đang chờ"
@@ -697,7 +702,7 @@ msgid "Pick up where you left off."
 msgstr "Tiếp tục từ nơi bạn dừng lại."
 
 #: lib/marshall_web/live/threads_live.ex:1511
-#: lib/marshall_web/live/threads_live.ex:2762
+#: lib/marshall_web/live/threads_live.ex:2782
 #: lib/marshall_web/thread_commands.ex:14
 #, elixir-autogen, elixir-format
 msgid "Plan"
@@ -708,19 +713,19 @@ msgstr "Kế hoạch"
 msgid "Plan proposed"
 msgstr "Đã đề xuất kế hoạch"
 
-#: lib/marshall_web/live/threads_live.ex:2819
+#: lib/marshall_web/live/threads_live.ex:2839
 #, elixir-autogen, elixir-format
 msgid "Preparing a machine for this task"
 msgstr "Đang chuẩn bị máy cho nhiệm vụ"
 
-#: lib/marshall_web/live/threads_live.ex:2152
+#: lib/marshall_web/live/threads_live.ex:2172
 #, elixir-autogen, elixir-format
 msgid "Preparing your workspace"
 msgstr "Đang chuẩn bị không gian làm việc"
 
 #: lib/marshall_web/live/agent_threads_live.ex:115
 #: lib/marshall_web/live/agent_threads_live.ex:225
-#: lib/marshall_web/live/threads_live.ex:2829
+#: lib/marshall_web/live/threads_live.ex:2849
 #, elixir-autogen, elixir-format
 msgid "Prompt"
 msgstr "Chỉ dẫn"
@@ -736,18 +741,18 @@ msgstr "Đã xếp hàng chỉ dẫn."
 msgid "Prompts wake a stopped machine when you have write access."
 msgstr "Chỉ dẫn đánh thức máy đã dừng khi bạn có quyền ghi."
 
-#: lib/marshall_web/live/threads_live.ex:2316
+#: lib/marshall_web/live/threads_live.ex:2336
 #, elixir-autogen, elixir-format
 msgid "Proposed plan"
 msgstr "Kế hoạch đề xuất"
 
 #: lib/marshall_web/live/threads_live.ex:1783
-#: lib/marshall_web/live/threads_live.ex:2808
+#: lib/marshall_web/live/threads_live.ex:2828
 #, elixir-autogen, elixir-format
 msgid "Provisioning"
 msgstr "Đang cấp phát"
 
-#: lib/marshall_web/live/threads_live.ex:2162
+#: lib/marshall_web/live/threads_live.ex:2182
 #, elixir-autogen, elixir-format
 msgid "Provisioning needs attention."
 msgstr "Cấp phát cần được xử lý."
@@ -772,14 +777,14 @@ msgstr "Đã hủy câu hỏi"
 msgid "Questions requested"
 msgstr "Đã yêu cầu câu hỏi"
 
-#: lib/marshall_web/live/threads_live.ex:2850
+#: lib/marshall_web/live/threads_live.ex:2870
 #, elixir-autogen, elixir-format
 msgid "Queued: %{tools}"
 msgstr "Đã xếp hàng: %{tools}"
 
 #: lib/marshall_web/live/threads_live.ex:1784
-#: lib/marshall_web/live/threads_live.ex:2772
-#: lib/marshall_web/live/threads_live.ex:2809
+#: lib/marshall_web/live/threads_live.ex:2792
+#: lib/marshall_web/live/threads_live.ex:2829
 #, elixir-autogen, elixir-format
 msgid "Ready"
 msgstr "Sẵn sàng"
@@ -794,49 +799,49 @@ msgstr "Suy luận"
 msgid "Recent threads"
 msgstr "Luồng gần đây"
 
-#: lib/marshall_web/live/threads_live.ex:2072
+#: lib/marshall_web/live/threads_live.ex:2092
 #, elixir-autogen, elixir-format
 msgid "Registered email"
 msgstr "Email đã đăng ký"
 
-#: lib/marshall_web/live/threads_live.ex:2543
+#: lib/marshall_web/live/threads_live.ex:2563
 #, elixir-autogen, elixir-format
 msgid "Reload context"
 msgstr "Tải lại ngữ cảnh"
 
-#: lib/marshall_web/live/threads_live.ex:2644
-#: lib/marshall_web/live/threads_live.ex:2752
+#: lib/marshall_web/live/threads_live.ex:2664
+#: lib/marshall_web/live/threads_live.ex:2772
 #, elixir-autogen, elixir-format
 msgid "Remove"
 msgstr "Xóa"
 
-#: lib/marshall_web/live/threads_live.ex:2751
+#: lib/marshall_web/live/threads_live.ex:2771
 #, elixir-autogen, elixir-format
 msgid "Remove %{skill}"
 msgstr "Xóa %{skill}"
 
-#: lib/marshall_web/live/threads_live.ex:1982
+#: lib/marshall_web/live/threads_live.ex:2002
 #, elixir-autogen, elixir-format
 msgid "Reopen"
 msgstr "Mở lại"
 
-#: lib/marshall_web/live/threads_live.ex:2115
+#: lib/marshall_web/live/threads_live.ex:2135
 #, elixir-autogen, elixir-format
 msgid "Reopened machines keep their earlier transcripts. Select one to read it."
 msgstr "Máy được mở lại giữ các bản ghi trước đó. Chọn một bản để đọc."
 
-#: lib/marshall_web/live/threads_live.ex:2663
+#: lib/marshall_web/live/threads_live.ex:2683
 #, elixir-autogen, elixir-format
 msgid "Repository URL"
 msgstr "URL kho mã"
 
 #: lib/marshall_web/live/agent_threads_live.ex:118
-#: lib/marshall_web/live/threads_live.ex:2839
+#: lib/marshall_web/live/threads_live.ex:2859
 #, elixir-autogen, elixir-format
 msgid "Response received"
 msgstr "Đã nhận phản hồi"
 
-#: lib/marshall_web/live/threads_live.ex:2172
+#: lib/marshall_web/live/threads_live.ex:2192
 #, elixir-autogen, elixir-format
 msgid "Retry"
 msgstr "Thử lại"
@@ -846,37 +851,37 @@ msgstr "Thử lại"
 msgid "Return to the conversation whenever you need."
 msgstr "Quay lại cuộc trò chuyện bất cứ khi nào bạn cần."
 
-#: lib/marshall_web/live/threads_live.ex:2341
+#: lib/marshall_web/live/threads_live.ex:2361
 #, elixir-autogen, elixir-format
 msgid "Revise"
 msgstr "Sửa đổi"
 
-#: lib/marshall_web/live/threads_live.ex:2669
+#: lib/marshall_web/live/threads_live.ex:2689
 #, elixir-autogen, elixir-format
 msgid "Revision (optional)"
 msgstr "Bản sửa đổi (tùy chọn)"
 
-#: lib/marshall_web/live/threads_live.ex:2083
+#: lib/marshall_web/live/threads_live.ex:2103
 #, elixir-autogen, elixir-format
 msgid "Revoke thread grant"
 msgstr "Thu hồi quyền đối với luồng"
 
-#: lib/marshall_web/live/threads_live.ex:2892
+#: lib/marshall_web/live/threads_live.ex:2912
 #, elixir-autogen, elixir-format
 msgid "Revoked"
 msgstr "Đã thu hồi"
 
-#: lib/marshall_web/live/threads_live.ex:2078
+#: lib/marshall_web/live/threads_live.ex:2098
 #, elixir-autogen, elixir-format
 msgid "Role"
 msgstr "Vai trò"
 
-#: lib/marshall_web/live/threads_live.ex:2090
+#: lib/marshall_web/live/threads_live.ex:2110
 #, elixir-autogen, elixir-format
 msgid "Save access"
 msgstr "Lưu quyền truy cập"
 
-#: lib/marshall_web/live/threads_live.ex:2089
+#: lib/marshall_web/live/threads_live.ex:2109
 #, elixir-autogen, elixir-format
 msgid "Saving…"
 msgstr "Đang lưu…"
@@ -906,7 +911,7 @@ msgstr "Tìm kiếm trên trang luồng này."
 msgid "Select this skill from the workspace catalog when the machine starts."
 msgstr "Chọn kỹ năng này từ danh mục không gian làm việc khi máy khởi động."
 
-#: lib/marshall_web/live/threads_live.ex:2244
+#: lib/marshall_web/live/threads_live.ex:2264
 #, elixir-autogen, elixir-format
 msgid "Send"
 msgstr "Gửi"
@@ -917,7 +922,7 @@ msgid "Send prompt"
 msgstr "Gửi lời nhắc"
 
 #: lib/marshall_web/live/agent_threads_live.ex:233
-#: lib/marshall_web/live/threads_live.ex:2242
+#: lib/marshall_web/live/threads_live.ex:2262
 #, elixir-autogen, elixir-format
 msgid "Sending…"
 msgstr "Đang gửi…"
@@ -928,7 +933,7 @@ msgstr "Đang gửi…"
 msgid "Share"
 msgstr "Chia sẻ"
 
-#: lib/marshall_web/live/threads_live.ex:1992
+#: lib/marshall_web/live/threads_live.ex:2012
 #, elixir-autogen, elixir-format
 msgid "Share this thread"
 msgstr "Chia sẻ luồng này"
@@ -953,7 +958,7 @@ msgstr "Hiển thị"
 msgid "Skill availability updated."
 msgstr "Đã cập nhật tính khả dụng của kỹ năng."
 
-#: lib/marshall_web/live/threads_live.ex:2674
+#: lib/marshall_web/live/threads_live.ex:2694
 #, elixir-autogen, elixir-format
 msgid "Skill directory"
 msgstr "Thư mục kỹ năng"
@@ -963,7 +968,7 @@ msgstr "Thư mục kỹ năng"
 msgid "Skill installation queued."
 msgstr "Đã đưa yêu cầu cài kỹ năng vào hàng đợi."
 
-#: lib/marshall_web/live/threads_live.ex:2720
+#: lib/marshall_web/live/threads_live.ex:2740
 #, elixir-autogen, elixir-format
 msgid "Skill suggestions"
 msgstr "Gợi ý kỹ năng"
@@ -974,18 +979,18 @@ msgstr "Gợi ý kỹ năng"
 msgid "Skill update queued."
 msgstr "Đã đưa yêu cầu cập nhật kỹ năng vào hàng đợi."
 
-#: lib/marshall_web/live/threads_live.ex:2767
+#: lib/marshall_web/live/threads_live.ex:2787
 #: lib/marshall_web/thread_commands.ex:20
 #, elixir-autogen, elixir-format
 msgid "Skills"
 msgstr "Kỹ năng"
 
-#: lib/marshall_web/live/threads_live.ex:2554
+#: lib/marshall_web/live/threads_live.ex:2574
 #, elixir-autogen, elixir-format
 msgid "Skills add reusable instructions to a task. Choose the source you intend to use."
 msgstr "Kỹ năng thêm hướng dẫn có thể tái sử dụng vào tác vụ. Chọn nguồn bạn muốn dùng."
 
-#: lib/marshall_web/live/threads_live.ex:2560
+#: lib/marshall_web/live/threads_live.ex:2580
 #, elixir-autogen, elixir-format
 msgid "Skills are unavailable until the workspace context has been collected."
 msgstr "Kỹ năng không khả dụng cho đến khi thu thập xong ngữ cảnh không gian làm việc."
@@ -995,7 +1000,7 @@ msgstr "Kỹ năng không khả dụng cho đến khi thu thập xong ngữ cả
 msgid "Standard"
 msgstr "Tiêu chuẩn"
 
-#: lib/marshall_web/live/threads_live.ex:2485
+#: lib/marshall_web/live/threads_live.ex:2505
 #, elixir-autogen, elixir-format
 msgid "Start with a space to send slash-looking text literally. Type $ to choose a skill by its exact source."
 msgstr "Bắt đầu bằng dấu cách để gửi nguyên văn nội dung giống lệnh gạch chéo. Gõ $ để chọn kỹ năng theo đúng nguồn."
@@ -1006,17 +1011,17 @@ msgid "Starting…"
 msgstr "Đang khởi động…"
 
 #: lib/marshall_web/live/threads_live.ex:1779
-#: lib/marshall_web/live/threads_live.ex:2500
+#: lib/marshall_web/live/threads_live.ex:2520
 #, elixir-autogen, elixir-format
 msgid "Status"
 msgstr "Tình trạng"
 
-#: lib/marshall_web/live/threads_live.ex:2300
+#: lib/marshall_web/live/threads_live.ex:2320
 #, elixir-autogen, elixir-format
 msgid "Submit answers"
 msgstr "Gửi câu trả lời"
 
-#: lib/marshall_web/live/threads_live.ex:2299
+#: lib/marshall_web/live/threads_live.ex:2319
 #, elixir-autogen, elixir-format
 msgid "Submitting…"
 msgstr "Đang gửi…"
@@ -1048,7 +1053,7 @@ msgstr "Email đó không thuộc tài khoản đã đăng ký."
 
 #: lib/marshall_web/live/agent_threads_live.ex:123
 #: lib/marshall_web/live/agent_threads_live.ex:145
-#: lib/marshall_web/live/threads_live.ex:2872
+#: lib/marshall_web/live/threads_live.ex:2892
 #, elixir-autogen, elixir-format
 msgid "The agent encountered a problem"
 msgstr "Tác nhân gặp sự cố"
@@ -1094,7 +1099,7 @@ msgstr "Không thể hoàn tất thao tác luồng."
 msgid "The thread owner's access cannot be changed."
 msgstr "Không thể thay đổi quyền truy cập của chủ sở hữu luồng."
 
-#: lib/marshall_web/live/threads_live.ex:2361
+#: lib/marshall_web/live/threads_live.ex:2381
 #, elixir-autogen, elixir-format
 msgid "The transcript is temporarily unavailable. Try again shortly."
 msgstr "Bản ghi tạm thời không khả dụng. Hãy thử lại sau giây lát."
@@ -1169,7 +1174,7 @@ msgstr "Luồng này có thể đã bị xóa hoặc liên kết không hợp l�
 msgid "This tool is not available for the machine profile."
 msgstr "Công cụ này không khả dụng cho hồ sơ máy."
 
-#: lib/marshall_web/live/threads_live.ex:1993
+#: lib/marshall_web/live/threads_live.ex:2013
 #, elixir-autogen, elixir-format
 msgid "Thread access also applies to its machine. Separate machine grants and team access are managed independently."
 msgstr "Quyền truy cập luồng cũng áp dụng cho máy của luồng. Các quyền máy riêng và quyền truy cập nhóm được quản lý độc lập."
@@ -1179,12 +1184,12 @@ msgstr "Quyền truy cập luồng cũng áp dụng cho máy của luồng. Các
 msgid "Thread access updated."
 msgstr "Đã cập nhật quyền truy cập luồng."
 
-#: lib/marshall_web/live/threads_live.ex:1964
+#: lib/marshall_web/live/threads_live.ex:1984
 #, elixir-autogen, elixir-format
 msgid "Thread actions"
 msgstr "Thao tác luồng"
 
-#: lib/marshall_web/live/threads_live.ex:2766
+#: lib/marshall_web/live/threads_live.ex:2786
 #, elixir-autogen, elixir-format
 msgid "Thread context"
 msgstr "Ngữ cảnh luồng"
@@ -1209,6 +1214,11 @@ msgstr "Đã mở lại luồng; đang cấp phát máy mới."
 msgid "Thread temporarily unavailable"
 msgstr "Luồng tạm thời không khả dụng"
 
+#: lib/marshall_web/live/threads_live.ex:1956
+#, elixir-autogen, elixir-format
+msgid "Thread terminal"
+msgstr "Thiết bị đầu cuối của luồng"
+
 #: lib/marshall_web/live/threads_live.ex:1882
 #, elixir-autogen, elixir-format
 msgid "Thread unavailable"
@@ -1216,7 +1226,7 @@ msgstr "Luồng không khả dụng"
 
 #: lib/marshall_web/live/agent_threads_live.ex:132
 #: lib/marshall_web/live/agent_threads_live.ex:149
-#: lib/marshall_web/live/threads_live.ex:2882
+#: lib/marshall_web/live/threads_live.ex:2902
 #, elixir-autogen, elixir-format
 msgid "Thread updated"
 msgstr "Đã cập nhật luồng"
@@ -1246,47 +1256,47 @@ msgstr "Các luồng tạm thời không khả dụng. Hãy thử lại sau giâ
 msgid "Today"
 msgstr "Hôm nay"
 
-#: lib/marshall_web/live/threads_live.ex:2513
+#: lib/marshall_web/live/threads_live.ex:2533
 #, elixir-autogen, elixir-format
 msgid "Token allowance"
 msgstr "Giới hạn token"
 
-#: lib/marshall_web/live/threads_live.ex:2859
+#: lib/marshall_web/live/threads_live.ex:2879
 #, elixir-autogen, elixir-format
 msgid "Tool cancelled"
 msgstr "Đã hủy công cụ"
 
-#: lib/marshall_web/live/threads_live.ex:2862
+#: lib/marshall_web/live/threads_live.ex:2882
 #, elixir-autogen, elixir-format
 msgid "Tool completed"
 msgstr "Công cụ đã hoàn tất"
 
-#: lib/marshall_web/live/threads_live.ex:2856
+#: lib/marshall_web/live/threads_live.ex:2876
 #, elixir-autogen, elixir-format
 msgid "Tool failed"
 msgstr "Công cụ thất bại"
 
-#: lib/marshall_web/live/threads_live.ex:2865
+#: lib/marshall_web/live/threads_live.ex:2885
 #, elixir-autogen, elixir-format
 msgid "Tool outcome uncertain"
 msgstr "Kết quả công cụ chưa chắc chắn"
 
 #: lib/marshall_web/live/agent_threads_live.ex:120
 #: lib/marshall_web/live/agent_threads_live.ex:148
-#: lib/marshall_web/live/threads_live.ex:2867
+#: lib/marshall_web/live/threads_live.ex:2887
 #, elixir-autogen, elixir-format
 msgid "Tool result received"
 msgstr "Đã nhận kết quả công cụ"
 
 #: lib/marshall_web/live/agent_threads_live.ex:119
 #: lib/marshall_web/live/agent_threads_live.ex:147
-#: lib/marshall_web/live/threads_live.ex:2849
-#: lib/marshall_web/live/threads_live.ex:2853
+#: lib/marshall_web/live/threads_live.ex:2869
+#: lib/marshall_web/live/threads_live.ex:2873
 #, elixir-autogen, elixir-format
 msgid "Tools queued"
 msgstr "Các công cụ đã vào hàng đợi"
 
-#: lib/marshall_web/live/threads_live.ex:2133
+#: lib/marshall_web/live/threads_live.ex:2153
 #, elixir-autogen, elixir-format
 msgid "Transcript"
 msgstr "Bản ghi"
@@ -1298,7 +1308,7 @@ msgstr "Hãy thử lại sau giây lát."
 
 #: lib/marshall_web/live/agent_threads_live.ex:122
 #: lib/marshall_web/live/agent_threads_live.ex:142
-#: lib/marshall_web/live/threads_live.ex:2869
+#: lib/marshall_web/live/threads_live.ex:2889
 #, elixir-autogen, elixir-format
 msgid "Turn complete"
 msgstr "Đã hoàn tất lượt"
@@ -1308,15 +1318,15 @@ msgstr "Đã hoàn tất lượt"
 msgid "Ultra"
 msgstr "Siêu cấp"
 
-#: lib/marshall_web/live/threads_live.ex:2803
+#: lib/marshall_web/live/threads_live.ex:2823
 #, elixir-autogen, elixir-format
 msgid "Ultra is for complex, open-ended work."
 msgstr "Siêu cấp dành cho công việc phức tạp, không giới hạn trước."
 
-#: lib/marshall_web/live/threads_live.ex:2773
-#: lib/marshall_web/live/threads_live.ex:2779
-#: lib/marshall_web/live/threads_live.ex:2813
-#: lib/marshall_web/live/threads_live.ex:2893
+#: lib/marshall_web/live/threads_live.ex:2793
+#: lib/marshall_web/live/threads_live.ex:2799
+#: lib/marshall_web/live/threads_live.ex:2833
+#: lib/marshall_web/live/threads_live.ex:2913
 #, elixir-autogen, elixir-format
 msgid "Unknown"
 msgstr "Không xác định"
@@ -1338,12 +1348,12 @@ msgstr "Bỏ ghim máy của luồng này trước khi xóa."
 msgid "Untitled thread"
 msgstr "Luồng chưa đặt tên"
 
-#: lib/marshall_web/live/threads_live.ex:2627
+#: lib/marshall_web/live/threads_live.ex:2647
 #, elixir-autogen, elixir-format
 msgid "Update"
 msgstr "Cập nhật"
 
-#: lib/marshall_web/live/threads_live.ex:2620
+#: lib/marshall_web/live/threads_live.ex:2640
 #, elixir-autogen, elixir-format
 msgid "Update revision (optional)"
 msgstr "Cập nhật bản sửa đổi (tùy chọn)"
@@ -1353,27 +1363,27 @@ msgstr "Cập nhật bản sửa đổi (tùy chọn)"
 msgid "Updated"
 msgstr "Đã cập nhật"
 
-#: lib/marshall_web/live/threads_live.ex:2626
+#: lib/marshall_web/live/threads_live.ex:2646
 #, elixir-autogen, elixir-format
 msgid "Updating…"
 msgstr "Đang cập nhật…"
 
-#: lib/marshall_web/live/threads_live.ex:2466
+#: lib/marshall_web/live/threads_live.ex:2486
 #, elixir-autogen, elixir-format
 msgid "Use Commands or press Ctrl/Cmd+K while writing. Start a message with / to find a command; use Tab to complete it."
 msgstr "Dùng Lệnh hoặc nhấn Ctrl/Cmd+K khi viết. Bắt đầu tin nhắn bằng / để tìm lệnh; dùng Tab để hoàn thành."
 
-#: lib/marshall_web/live/threads_live.ex:2655
+#: lib/marshall_web/live/threads_live.ex:2675
 #, elixir-autogen, elixir-format
 msgid "Use a public GitHub, GitLab, Codeberg or Bitbucket repository."
 msgstr "Dùng kho mã công khai trên GitHub, GitLab, Codeberg hoặc Bitbucket."
 
-#: lib/marshall_web/live/threads_live.ex:2063
+#: lib/marshall_web/live/threads_live.ex:2083
 #, elixir-autogen, elixir-format
 msgid "Use an existing account's email to grant, change or revoke a thread role."
 msgstr "Dùng email của tài khoản hiện có để cấp, thay đổi hoặc thu hồi vai trò trong luồng."
 
-#: lib/marshall_web/live/threads_live.ex:2593
+#: lib/marshall_web/live/threads_live.ex:2613
 #, elixir-autogen, elixir-format
 msgid "Use this skill"
 msgstr "Dùng kỹ năng này"
@@ -1383,13 +1393,13 @@ msgstr "Dùng kỹ năng này"
 msgid "View activity"
 msgstr "Xem hoạt động"
 
-#: lib/marshall_web/live/threads_live.ex:2080
-#: lib/marshall_web/live/threads_live.ex:2889
+#: lib/marshall_web/live/threads_live.ex:2100
+#: lib/marshall_web/live/threads_live.ex:2909
 #, elixir-autogen, elixir-format
 msgid "Viewer"
 msgstr "Người xem"
 
-#: lib/marshall_web/live/threads_live.ex:2093
+#: lib/marshall_web/live/threads_live.ex:2113
 #, elixir-autogen, elixir-format
 msgid "Viewers read. Operators send prompts. Managers also share and manage the thread."
 msgstr "Người xem đọc nội dung. Người vận hành gửi lời nhắc. Người quản lý còn chia sẻ và quản lý luồng."
@@ -1400,7 +1410,7 @@ msgstr "Người xem đọc nội dung. Người vận hành gửi lời nhắc.
 msgid "Wait for the current work or pending questions to finish before changing this setting."
 msgstr "Chờ công việc hiện tại hoặc câu hỏi đang chờ hoàn tất trước khi thay đổi cài đặt này."
 
-#: lib/marshall_web/live/threads_live.ex:2816
+#: lib/marshall_web/live/threads_live.ex:2836
 #, elixir-autogen, elixir-format
 msgid "Waiting for a workspace"
 msgstr "Đang chờ không gian làm việc"
@@ -1410,22 +1420,22 @@ msgstr "Đang chờ không gian làm việc"
 msgid "Waiting for machine"
 msgstr "Đang chờ máy"
 
-#: lib/marshall_web/live/threads_live.ex:2378
+#: lib/marshall_web/live/threads_live.ex:2398
 #, elixir-autogen, elixir-format
 msgid "Waiting for the agent's first update."
 msgstr "Đang chờ cập nhật đầu tiên từ tác nhân."
 
-#: lib/marshall_web/live/threads_live.ex:2874
+#: lib/marshall_web/live/threads_live.ex:2894
 #, elixir-autogen, elixir-format
 msgid "Waiting for the machine"
 msgstr "Đang chờ máy"
 
-#: lib/marshall_web/live/threads_live.ex:2875
+#: lib/marshall_web/live/threads_live.ex:2895
 #, elixir-autogen, elixir-format
 msgid "Waiting for your answers"
 msgstr "Đang chờ câu trả lời của bạn"
 
-#: lib/marshall_web/live/threads_live.ex:2888
+#: lib/marshall_web/live/threads_live.ex:2908
 #, elixir-autogen, elixir-format
 msgid "Web apps"
 msgstr "Ứng dụng web"
@@ -1436,13 +1446,13 @@ msgid "What are we working on?"
 msgstr "Chúng ta sẽ làm gì?"
 
 #: lib/marshall_web/live/threads_live.ex:1510
-#: lib/marshall_web/live/threads_live.ex:2763
+#: lib/marshall_web/live/threads_live.ex:2783
 #: lib/marshall_web/thread_commands.ex:16
 #, elixir-autogen, elixir-format
 msgid "Work"
 msgstr "Công việc"
 
-#: lib/marshall_web/live/threads_live.ex:2503
+#: lib/marshall_web/live/threads_live.ex:2523
 #, elixir-autogen, elixir-format
 msgid "Working directory"
 msgstr "Thư mục làm việc"
@@ -1457,7 +1467,7 @@ msgstr "Đang thu thập ngữ cảnh không gian làm việc. Hãy thử lại 
 msgid "Workspace context is unavailable. Reload it when the machine is ready."
 msgstr "Ngữ cảnh không gian làm việc không khả dụng. Tải lại khi máy sẵn sàng."
 
-#: lib/marshall_web/live/threads_live.ex:2880
+#: lib/marshall_web/live/threads_live.ex:2900
 #, elixir-autogen, elixir-format
 msgid "Workspace context reloaded"
 msgstr "Đã tải lại ngữ cảnh không gian làm việc"
@@ -1467,12 +1477,12 @@ msgstr "Đã tải lại ngữ cảnh không gian làm việc"
 msgid "Workspace files changed during collection. Reload context and try again."
 msgstr "Tệp không gian làm việc đã thay đổi khi thu thập. Tải lại ngữ cảnh và thử lại."
 
-#: lib/marshall_web/live/threads_live.ex:2822
+#: lib/marshall_web/live/threads_live.ex:2842
 #, elixir-autogen, elixir-format
 msgid "Workspace ready · open the conversation"
 msgstr "Không gian làm việc sẵn sàng · mở cuộc trò chuyện"
 
-#: lib/marshall_web/live/threads_live.ex:2824
+#: lib/marshall_web/live/threads_live.ex:2844
 #, elixir-autogen, elixir-format
 msgid "Workspace setup needs attention"
 msgstr "Cần xử lý việc thiết lập không gian làm việc"
@@ -1482,7 +1492,7 @@ msgstr "Cần xử lý việc thiết lập không gian làm việc"
 msgid "Workspace skill"
 msgstr "Kỹ năng không gian làm việc"
 
-#: lib/marshall_web/live/threads_live.ex:2529
+#: lib/marshall_web/live/threads_live.ex:2549
 #, elixir-autogen, elixir-format
 msgid "Workspace source"
 msgstr "Nguồn không gian làm việc"
@@ -1498,7 +1508,7 @@ msgstr "Bạn có thể đọc các luồng này. Yêu cầu quyền vận hành
 msgid "You do not have access to this thread."
 msgstr "Bạn không có quyền truy cập luồng này."
 
-#: lib/marshall_web/live/threads_live.ex:2144
+#: lib/marshall_web/live/threads_live.ex:2164
 #, elixir-autogen, elixir-format
 msgid "You have read-only access to this thread."
 msgstr "Bạn chỉ có quyền đọc luồng này."
@@ -1508,27 +1518,27 @@ msgstr "Bạn chỉ có quyền đọc luồng này."
 msgid "Your agent's work runs in a dedicated environment."
 msgstr "Công việc của tác nhân chạy trong môi trường riêng."
 
-#: lib/marshall_web/live/threads_live.ex:2292
+#: lib/marshall_web/live/threads_live.ex:2312
 #, elixir-autogen, elixir-format
 msgid "Your answer or additional detail"
 msgstr "Câu trả lời hoặc chi tiết bổ sung của bạn"
 
-#: lib/marshall_web/live/threads_live.ex:2876
+#: lib/marshall_web/live/threads_live.ex:2896
 #, elixir-autogen, elixir-format
 msgid "Your answers were received"
 msgstr "Đã nhận câu trả lời của bạn"
 
-#: lib/marshall_web/live/threads_live.ex:2254
+#: lib/marshall_web/live/threads_live.ex:2274
 #, elixir-autogen, elixir-format
 msgid "Your input is needed"
 msgstr "Cần thông tin từ bạn"
 
-#: lib/marshall_web/live/threads_live.ex:2154
+#: lib/marshall_web/live/threads_live.ex:2174
 #, elixir-autogen, elixir-format
 msgid "Your machine is starting. The agent will begin with your objective as soon as it is ready."
 msgstr "Máy đang khởi động. Tác nhân sẽ bắt đầu thực hiện mục tiêu của bạn ngay khi máy sẵn sàng."
 
-#: lib/marshall_web/live/threads_live.ex:2166
+#: lib/marshall_web/live/threads_live.ex:2186
 #, elixir-autogen, elixir-format
 msgid "Your objective is saved. Retry to prepare the workspace again."
 msgstr "Đã lưu mục tiêu của bạn. Thử lại để chuẩn bị lại không gian làm việc."
@@ -1538,12 +1548,12 @@ msgstr "Đã lưu mục tiêu của bạn. Thử lại để chuẩn bị lại 
 msgid "Your threads"
 msgstr "Luồng của bạn"
 
-#: lib/marshall_web/live/threads_live.ex:2478
+#: lib/marshall_web/live/threads_live.ex:2498
 #, elixir-autogen, elixir-format
 msgid "and"
 msgstr "và"
 
-#: lib/marshall_web/live/threads_live.ex:2479
+#: lib/marshall_web/live/threads_live.ex:2499
 #, elixir-autogen, elixir-format
 msgid "choose a mode and submit the task together. Choosing a mode on a new thread does not create a machine."
 msgstr "chọn chế độ và gửi cùng tác vụ. Chọn chế độ trên luồng mới không tạo máy."
@@ -1553,7 +1563,7 @@ msgstr "chọn chế độ và gửi cùng tác vụ. Chọn chế độ trên l
 msgid "· %{value1} reasoning · %{value2}"
 msgstr "· suy luận %{value1} · %{value2}"
 
-#: lib/marshall_web/live/threads_live.ex:2446
+#: lib/marshall_web/live/threads_live.ex:2466
 #, elixir-autogen, elixir-format
 msgid "↑ ↓ choose · Enter run · Escape close"
 msgstr "↑ ↓ chọn · Enter chạy · Escape đóng"
@@ -1613,7 +1623,7 @@ msgstr "Mở thiết bị đầu cuối của máy trong luồng này"
 msgid "Summarize older context for the next turn"
 msgstr "Tóm tắt ngữ cảnh cũ cho lượt tiếp theo"
 
-#: lib/marshall_web/live/threads_live.ex:1956
+#: lib/marshall_web/live/threads_live.ex:1976
 #, elixir-autogen, elixir-format
 msgid "Message board"
 msgstr "Bảng tin nhắn"

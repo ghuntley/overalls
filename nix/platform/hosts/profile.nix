@@ -418,9 +418,8 @@ in {
     externalInterfaces = fleetExporterInterfaces;
   };
   # @cc [owner:ghuntley,label:deployment] enrolled-host-underclass
-  # Every credentialed enrolled fleet host MUST retain its Underclass pool
-  # with host-specific credentials and host-local state. Ziggy may select the
-  # reviewed remote pool with a separate proxy-only credential. Base and generic
+  # Every credentialed enrolled fleet host MUST run an independent Underclass
+  # pool with host-specific credentials and host-local state. Base and generic
   # enrollment hosts without that explicit document MUST run neither.
   services.underclass = lib.mkIf underclassEnrolled {
     enable = true;
@@ -433,16 +432,12 @@ in {
     egress = { enable = true; route = true; };
   };
   # @cc [owner:ghuntley,label:security;deployment] ziggy-host-local-underclass
-  # Enrolled Ziggy defaults to the local proxy credential, never the Underclass
-  # UI token. A reviewed remote origin MUST override the credential and publisher
-  # together; it MUST NOT depend on the unused local credential publisher.
+  # Enrolled Ziggy uses only the proxy credential, never the Underclass UI token.
   services.ziggy = lib.mkIf (lillyEnrolled && underclassEnrolled) {
     agentEnable = true;
-    openaiOrigin = lib.mkDefault "http://127.0.0.1:8080";
-    openaiKeyFile = lib.mkDefault "/run/overalls-secrets/underclass/proxy.key";
-    secretUnits = lib.optional
-      (config.services.ziggy.openaiKeyFile == "/run/overalls-secrets/underclass/proxy.key")
-      "overalls-secrets-underclass.service";
+    openaiOrigin = "http://127.0.0.1:8080";
+    openaiKeyFile = lib.mkForce "/run/overalls-secrets/underclass/proxy.key";
+    secretUnits = [ "overalls-secrets-underclass.service" ];
   };
   systemd.services.overalls-host-ready = {
     wantedBy = [ "multi-user.target" ]; wants = [ "network-online.target" ];

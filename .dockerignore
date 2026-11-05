@@ -1,9 +1,5 @@
 .git
 .devenv
-buck-out
-.buck-cells
-.buck-cells.*
-antithesis/runtime
 **/_build
 **/deps
 **/.elixir_ls

@@ -60,7 +60,7 @@ async fn respond(State(fixture): State<Arc<Fixture>>, Json(request): Json<Reques
         }
         Case::Complete => (
             content,
-            "event: response.completed\ndata: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\",\"output\":[{\"type\":\"message\",\"role\":\"assistant\",\"content\":[{\"type\":\"output_text\",\"text\":\"synthetic agent reply\"}]}],\"usage\":{\"input_tokens\":3,\"output_tokens\":7}}}\n\n",
+            "event: response.completed\ndata: {\"type\":\"response.completed\"}\n\n",
         )
             .into_response(),
         Case::Unterminated => (

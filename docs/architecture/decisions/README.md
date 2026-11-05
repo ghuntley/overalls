@@ -728,9 +728,9 @@ native workflow completion and production activation retain separate scopes.
 | [ADR-0105](0105-public-audi-wildcard-custody.md) | superseded | partial | Public Audi wildcard issuance and encrypted custody |
 | [ADR-0104](0104-private-guest-cli-updates.md) | accepted | partial | Private guest CLI updates |
 | [ADR-0103](0103-profile-scoped-agent-capabilities.md) | superseded | implemented | Profile-scoped agent capabilities |
-| [ADR-0102](0102-local-underclass-monitor-socket.md) | superseded | partial | Local Underclass monitor socket |
+| [ADR-0102](0102-local-underclass-monitor-socket.md) | accepted | partial | Local Underclass monitor socket |
 | [ADR-0101](0101-browser-approved-agent-cli.md) | accepted | partial | Browser-approved agent CLI sessions |
-| [ADR-0100](0100-pulled-agent-work-over-ziggy-control.md) | superseded | partial | Pulled agent work over Ziggy control |
+| [ADR-0100](0100-pulled-agent-work-over-ziggy-control.md) | accepted | partial | Pulled agent work over Ziggy control |
 | [ADR-0099](0099-marshall-owned-agent-threads.md) | superseded | partial | Marshall-owned agent threads and VM tool executors |
 | [ADR-0098](0098-image-artifact-limits.md) | accepted | implemented | Expanded image artifact admission limits |
 | [ADR-0096](0096-lyra-developer-ssh.md) | superseded | partial | Lyra developer SSH client |
@@ -1167,7 +1167,6 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0277](0277-mila-native-builds-on-buck2.md) | accepted | partial | Mila native builds on Buck2 with Nix toolchains |
 | [ADR-0278](0278-mila-push-notification-parity-scope.md) | accepted | implemented | Mila push-notification parity scope |
 | [ADR-0279](0279-mila-apple-app-lock-and-link-launch-parity-scope.md) | proposed | planned | Mila Apple app-lock and link-launch parity scope |
-| [ADR-0280](0280-remote-underclass-and-safe-agent-retries.md) | accepted | partial | Remote Underclass and safe agent retries |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

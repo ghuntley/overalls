@@ -443,7 +443,7 @@ defmodule Ziggy.HTTP do
   def artifact_decision(_, _), do: {:error, :unavailable}
 
   defp infer(conn, config, wire, route) do
-    id = Ziggy.RequestId.generate()
+    id = uuid()
 
     input =
       Map.merge(wire, %{
@@ -463,10 +463,7 @@ defmodule Ziggy.HTTP do
           vm_id: Map.get(wire, "vm_id")
         )
 
-        Process.put(
-          {__MODULE__, :conn},
-          conn |> put_resp_header("x-request-id", id) |> put_resp_header("x-ziggy-request-id", id)
-        )
+        Process.put({__MODULE__, :conn}, put_resp_header(conn, "x-ziggy-request-id", id))
 
         result =
           Ziggy.Upstream.stream(
@@ -633,4 +630,14 @@ defmodule Ziggy.HTTP do
   defp operation("/v1/chat/completions"), do: "chat"
   defp operation("/v1/messages"), do: "messages"
   defp operation("/v1/messages/count_tokens"), do: "count_tokens"
+
+  defp uuid do
+    <<a::32, b::16, _::4, c::12, _::2, d::14, e::48>> = :crypto.strong_rand_bytes(16)
+
+    Enum.map_join(
+      [{a, 8}, {b, 4}, {Bitwise.bor(c, 0x4000), 4}, {Bitwise.bor(d, 0x8000), 4}, {e, 12}],
+      "-",
+      fn {v, n} -> Integer.to_string(v, 16) |> String.downcase() |> String.pad_leading(n, "0") end
+    )
+  end
 end

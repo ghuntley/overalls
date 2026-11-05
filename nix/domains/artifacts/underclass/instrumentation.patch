@@ -54,19 +54,18 @@
      state
          .resets
          .maybe_reset(&state.pool, &state.store, &state.tokens, &request_id)
-@@ -617,7 +631,11 @@ async fn run(state: Arc<AppState>, req: Request, surface: Surface) -> Response {
+@@ -572,7 +586,10 @@ async fn run(state: Arc<AppState>, req: Request, surface: Surface) -> Response {
                      resp.status().as_u16(),
                      started.elapsed().as_millis() as u64,
                  );
--                return finish_response(resp, &request_id, false);
-+                let resp = finish_response(resp, &request_id, false);
+-                return resp;
 +                return match slo_admission {
 +                    Some(admission) => admission.wrap_response(resp),
 +                    None => resp,
 +                };
              }
-             Attempt::Overloaded {
-                 account_id,
+             Attempt::Overloaded { account_id, replay } => {
+                 overloaded.insert(account_id);
 --- a/src/store.rs
 +++ b/src/store.rs
 @@ -121,6 +121,7 @@ pub struct UsageSummary {
