@@ -10,6 +10,7 @@ import Darwin
 /// hard-linked or malformed storage without replacing it. Creation MUST publish
 /// a complete owner-only file atomically and never overwrite a winning creator.
 final class MilaSoftwareDeviceKeyStore {
+    private static let creationLock = NSLock()
     private let directory: URL
 
     init(directory: URL? = nil) {
@@ -21,6 +22,11 @@ final class MilaSoftwareDeviceKeyStore {
 
     func loadOrCreate(host: String) throws -> P256.Signing.PrivateKey {
         guard MilaDeviceSigner.validHost(host) else { throw MilaDeviceSignerError.invalidHost }
+        // Swift's concurrentPerform invokes this path from multiple threads in
+        // one process. Serialize those callers before the filesystem race, while
+        // renameatx_np(RENAME_EXCL) below remains the cross-process guard.
+        Self.creationLock.lock()
+        defer { Self.creationLock.unlock() }
         // DNS hosts may be 253 bytes, longer than NAME_MAX after a filename
         // prefix. A fixed-width digest also keeps hostnames out of directory
         // listings; the software-key directory separates it from hardware keys.
