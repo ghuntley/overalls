@@ -178,6 +178,16 @@ from XCTest, CTest, Dart tests and CI builds.
   key store. The `windows-native` journey prints the custody it obtained. The
   Windows client has no diagnostic event catalogue, so no event is emitted.
 
+Fresh native CI evidence is recorded on the current implementation revision:
+the macOS software-key custody/refusal target and Apple app builds passed in
+`mila-builds` run [42043283124](https://github.com/ghuntley/overalls/actions/runs/42043283124),
+and the unsigned macOS, iOS and Android release jobs passed in
+`mila-release` run [42043283439](https://github.com/ghuntley/overalls/actions/runs/42043283439).
+The same `mila-builds` run compiled the Windows client, ran its production .NET
+smoke, packaged the audited unsigned artifact and completed the WinUI UI
+Automation picker journey. The Apple fixture journey in that run remains a
+separate backend/tunnel acceptance failure.
+
 Remaining gaps:
 
 - No signed macOS build has run, so the Secure Enclave and APNs paths on macOS
@@ -193,13 +203,15 @@ Remaining gaps:
   atomically without overwriting an existing key. Hardware key tags are preserved.
   The [software-key CI target](../../../mila/native/apple/software-keys-test.sh)
   requires enabled-branch storage and APNs-refusal execution plus a non-DEBUG
-  compiler refusal. Native macOS execution remains unverified here.
+  compiler refusal. The target passed on macOS in `mila-builds` run
+  `42043283124`; signed Secure Enclave execution remains separate evidence.
 - The Apple release path has not run with real signing material, and no
   notification service extension is built, so APNs pokes to a closed app are
   not delivered by the native client.
-- The changed WinUI runner has not been compiled or run on Windows in this
-  implementation review. Historical Windows CI receipts remain separate from
-  current TPM and software-provider custody acceptance.
+- The native WinUI runner, production .NET smoke, audited unsigned packaging and
+  UI Automation deployment-picker journey passed on Windows in `mila-builds`
+  run `42043283124`. Signed installation, physical-device custody and provider
+  delivery remain separate evidence.
 - A Windows device that fell back keeps its software key permanently. Its next
   sign-in reuses it as `SoftwareExisting`, even after its TPM becomes usable,
   because replacing the key would change the device's identity and require a new
@@ -211,8 +223,9 @@ Remaining gaps:
   MSIX through the removed Dart planner) was retired because its tool no longer
   exists. The native [`package-release.ps1`](../../../mila/windows-dotnet/package-release.ps1)
   now defines audited unsigned win-x64 ZIP/MSIX artifacts through
-  `//mila:windows-release`; Windows packaging execution and publication remain
-  unverified for this change. The Windows source bundle is still published.
+  `//mila:windows-release`; packaging execution and artifact upload passed in
+  `mila-builds` run `42043283124`. Signed publication and installation remain
+  unverified. The Windows source bundle is still published.
 - Signed publishing is deferred: the user decided on 2026-11-01 that
   mila-release stays unsigned for now, so no signing secrets or signed publish
   run are set up. The Android apksigner and Apple signed code paths remain,
@@ -222,7 +235,7 @@ Remaining gaps:
   not yet provisioned, so the signed paths, including the Android apksigner
   step, are untested. The apksigner path is hard-coded to Android
   build-tools 36.0.0 and has never run. The unsigned Android and Apple builds
-  are not yet recorded as passing in CI.
+  are recorded as passing in `mila-release` run `42043283439`.
 
 ## Open questions
 

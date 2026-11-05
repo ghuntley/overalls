@@ -70,9 +70,12 @@ The initial workspace and adapters are in [`mila/rust`](../../../mila/rust) (sin
 [`mila/windows-dotnet`](../../../mila/windows-dotnet). The Rust workspace,
 Hegel fixtures and Nix checks pass on Linux. Native feature screens,
 deployment-bound snapshots and generation-scoped watch consumers are now wired
-through the shared FFI; transport edge cases, release secure-storage evidence,
-native-host acceptance and release evidence remain open. Flutter was removed in
-`af4ad42e0`; its historical evidence is distinguished from current native evidence.
+through the shared FFI; transport edge cases, signed release secure-storage
+evidence, physical-device acceptance and provisioned-guest acceptance remain
+open. Apple and Windows native-host build, smoke and UI Automation evidence is
+recorded in current CI, while the backend/tunnel journey remains environment
+dependent. Flutter was removed in `af4ad42e0`; its historical evidence is
+distinguished from current native evidence.
 
 [`mila-session`](../../../mila/rust/mila-session/src/listing.rs) composes the pure
 runtime with the certificate-pinned SSH transport for validated machine reads.
@@ -93,8 +96,9 @@ state, current-generation headers, replay reset accounting, closed outcomes,
 retry exhaustion and server/user permission gates. Hegel action sequences in
 [`terminal.rs`](../../../mila/rust/mila-runtime/tests/terminal.rs) exercise the
 pure reducer. Linux and Android fixture journeys exercise the native PTY path;
-the current Apple/Windows changes, native image rendering and provisioned-guest
-acceptance retain their separate execution gaps.
+the current Apple/Windows changes now have macOS and Windows CI execution
+receipts; native image rendering and provisioned-guest acceptance retain their
+separate execution gaps.
 
 The [release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 recorded Linux/Android release outputs and source-bundle consumers depending on
@@ -162,7 +166,9 @@ turns it off and on again with each change read back, refuses a malformed id
 and removes it, as the Android journey does. WNS and Susan are stand-ins there:
 the channel URI is made up and the push key is a random Susan-shaped reply.
 The whole Windows journey passed through the tunnelled fixture in
-mila-builds run 41305124503. Real WNS delivery remains open.
+mila-builds run `42043283124`; its production .NET smoke, unsigned packaging
+and WinUI UI Automation picker also passed there. Real WNS delivery remains
+open.
 
 The Linux GTK client keeps its decisions in GTK-independent library modules:
 the bounded [deployment list](../../../mila/native/linux/src/deployments.rs),
@@ -258,5 +264,9 @@ respectively. GTK Busy reads use bounded, authority-fenced recovery; fixture
 config, data and snapshot caches stay private to the journey work directory. Windows
 validates native terminal outcomes and uses separately bounded, one-call frame,
 listing and snapshot projections; its portable smoke passes against production
-FFI. Apple/Windows host acceptance, image-rendering journeys and release
-execution remain open; implementation stays partial.
+FFI. Current CI also passes the macOS software-key custody target and Apple app
+builds, the Windows production smoke/package/UI Automation path, and the
+unsigned Apple/Android release jobs (`mila-builds` run `42043283124`,
+`mila-release` run `42043283439`). Signed release execution, physical-device
+and provider delivery, native image rendering, WebView ingress and provisioned
+guest acceptance remain open; implementation stays partial.

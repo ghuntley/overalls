@@ -51,16 +51,19 @@ port by digest, including maximum-length hosts.
 Apple watch callbacks now fence each awaited machine/thread read against the
 approved session. Windows terminal open, attach and polling retain the original
 operation generation and handle, including delayed failure and handle cleanup.
-The corresponding bounded race regressions preserve session ownership; Apple
-execution still requires macOS. Linux package checks require a live Broadway
-display and execute the GTK widget test in both feature configurations.
+The corresponding bounded race regressions preserve session ownership. The
+Apple software-key and app-build targets now pass in macOS CI (`mila-builds`
+run `42043283124`). Linux package checks require a live Broadway display and
+execute the GTK widget test in both feature configurations.
 
 Local Android SDK assembly, packaged JNI builds and JVM regressions execute
 through Buck2. The explicit-emulator target also passes all 12 packaged JNI,
 route and app-lock instrumentation tests on API 35, with no skips; it excludes
 the authenticated fixture journey. The Linux managed smoke executes the portable .NET adapters
 against the actual production FFI package; it excludes Windows CNG, DPAPI, WinUI
-and activation acceptance. New Apple regressions remain pending macOS execution.
+and activation acceptance. The Windows native smoke, audited packaging and UI
+Automation picker also pass in `mila-builds` run `42043283124`; signed and
+physical-device acceptance remains separate evidence.
 The [implementation review](../../docs/architecture/reviews/2026-11-02-mila-native-parity-implementation.md)
 records the checks and their scope separately from historical CI receipts.
 
