@@ -225,7 +225,7 @@ def digest(path: Path) -> str:
 
 def alive(process: subprocess.Popen[bytes]) -> None:
     if process.poll() is not None:
-        raise RuntimeError("native service VM exited unexpectedly")
+        raise RuntimeError(f"native service VM exited unexpectedly (status={process.returncode})")
 
 
 def wait_kernel(
