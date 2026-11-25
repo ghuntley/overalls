@@ -9,12 +9,13 @@
 # signals exit only for the exact CloudHv byte request and rejects malformed
 # writes through both the device and registered I/O bus, and the OmniOS serial
 # sync marker signals that same exit event only after an exact split-safe match,
-# a BAR reprogrammed by
-# the guest moves on the MMIO bus with its queue notification ioeventfds, PCI configuration capability queue
+# both virtio-pci BARs (capability BAR 0 and the separate MSI-X BAR 4) follow
+# the guest on the MMIO bus with their queue notification ioeventfds, on a
+# decode enable or a completed 64-bit write while decoding, trading places
+# atomically, PCI configuration capability queue
 # notifications signal only valid matching queue events, MSI-X capability and
 # routing reset states agree and disabled MSI-X cannot inject queue interrupts,
-# the block and net devices reset
-# and re-activate, block requests spanning several descriptors are
+# devices reset and re-activate through upstream 1.17 reset, block requests spanning several descriptors are
 # transferred whole by both I/O engines (the upstream parser, engine and
 # property tests run again against the changed request shape), and the vsock
 # device resolves indirect descriptor tables for RX and TX packets while
@@ -42,22 +43,21 @@ packages.vmm.overrideAttrs (previous: {
     "serial::tests::test_omnios_shutdown_marker_signals_after_split_output"
     "serial::tests::test_omnios_shutdown_marker_refuses_near_match"
     "test_native_uart_thre_enable_after_fifo"
-    "bar_tests"
-    "test_bar_relocation_follows_config_write"
-    "test_bar_relocation_moves_notification_ioevents"
-    "test_bar_relocation_defers_until_high_half"
+    "test_bar_relocation"
+    "test_msix_bar_is_separate_and_relocates"
+    "test_pci_device_config"
+    "test_pci_bar_is_freed_on_unplug"
+    "bus_move_ranges_swaps_atomically"
+    "test_msix_capability"
     "test_hotplug_block"
     "test_queue_setup_in_init_status"
     "test_pci_configuration_notification"
     "msix::tests"
     "test_native_msix_disabled_refuses_queue_interrupt"
-    "test_native_rx_reset_reuses_mapping_without_memfd"
-    "test_reset_deactivates_and_allows_reinitialization"
-    "rng::device::tests::test_reset_deactivates_and_allows_reinitialization"
-    # The net variant of this test needs /dev/net/tun, which the sandbox lacks;
-    # it is run outside the sandbox and recorded in the spike review.
-    "block::virtio::device::tests::test_reset_returns_interrupt_and_deactivates"
-    "test_reset_deactivates_and_allows_reinitialization"
+    # Upstream 1.17 virtio device reset, which replaced the Overalls reset
+    # patches, through the PCI and MMIO transports.
+    "test_reset_and_reinitialization"
+    "test_bus_device_reset"
     "test_parse_scatter_gather"
     "test_scatter_gather"
     "test_parse_generic"

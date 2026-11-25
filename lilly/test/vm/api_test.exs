@@ -30,9 +30,9 @@ defmodule Lilly.VM.APITest do
 
   test "requires a running matching instance and supported VMM version" do
     for {id, state, version, expected} <- [
-          {@id, "Running", "1.16.1", true},
-          {@id, "Not started", "1.16.1", false},
-          {"another-vm", "Running", "1.16.1", false},
+          {@id, "Running", "1.17.0", true},
+          {@id, "Not started", "1.17.0", false},
+          {"another-vm", "Running", "1.17.0", false},
           {@id, "Running", "unknown", false}
         ] do
       body = JSON.encode!(%{"id" => id, "state" => state, "vmm_version" => version})

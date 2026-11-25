@@ -1,6 +1,6 @@
 --- a/src/vmm/src/devices/virtio/transport/pci/common_config.rs
 +++ b/src/vmm/src/devices/virtio/transport/pci/common_config.rs
-@@ -243,7 +243,11 @@
+@@ -243,7 +243,11 @@ impl VirtioPciCommonConfig {
      /// Queue configuration must only be done between FEATURES_OK and DRIVER_OK.
      fn update_queue_field<F: FnOnce(&mut Queue)>(&mut self, queues: &mut [Queue], f: F) {
          let status = self.driver_status;
@@ -13,10 +13,11 @@
              self.with_queue_mut(queues, f);
          } else {
              warn!(
-@@ -949,6 +953,29 @@
+@@ -947,6 +951,29 @@ mod tests {
+         (lo32 as u64) | ((hi32 as u64) << 32)
      }
-
-     #[test]
+ 
++    #[test]
 +    fn test_queue_setup_in_init_status() {
 +        let mut config = default_pci_common_config();
 +        let device = default_device();
@@ -39,7 +40,6 @@
 +        assert_eq!(desc_lo, 0x0000_1000);
 +    }
 +
-+    #[test]
+     #[test]
      fn test_queue_addresses() {
          let mut config = default_pci_common_config();
-         let device = default_device();

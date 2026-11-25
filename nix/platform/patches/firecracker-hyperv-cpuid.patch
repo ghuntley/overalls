@@ -1,7 +1,6 @@
-diff -ruN b2/src/vmm/src/arch/x86_64/vcpu.rs b3/src/vmm/src/arch/x86_64/vcpu.rs
---- a/src/vmm/src/arch/x86_64/vcpu.rs	2026-10-13 16:50:45.802843414 +0000
-+++ b/src/vmm/src/arch/x86_64/vcpu.rs	2026-10-13 19:20:49.376478890 +0000
-@@ -10,7 +10,8 @@
+--- a/src/vmm/src/arch/x86_64/vcpu.rs
++++ b/src/vmm/src/arch/x86_64/vcpu.rs
+@@ -10,7 +10,8 @@ use std::fmt::Debug;
  use std::sync::Arc;
  
  use kvm_bindings::{
@@ -11,7 +10,7 @@ diff -ruN b2/src/vmm/src/arch/x86_64/vcpu.rs b3/src/vmm/src/arch/x86_64/vcpu.rs
      kvm_mp_state, kvm_regs, kvm_sregs, kvm_vcpu_events, kvm_xcrs, kvm_xsave, kvm_xsave2,
  };
  use kvm_ioctls::{VcpuExit, VcpuFd};
-@@ -714,6 +715,42 @@
+@@ -750,6 +751,42 @@ impl KvmVcpu {
      }
  }
  
@@ -54,10 +53,10 @@ diff -ruN b2/src/vmm/src/arch/x86_64/vcpu.rs b3/src/vmm/src/arch/x86_64/vcpu.rs
  impl Peripherals {
      /// Runs the vCPU in KVM context and handles the kvm exit reason.
      ///
-diff -ruN b2/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs b3/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs
---- a/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs	2026-10-13 16:50:45.816843948 +0000
-+++ b/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs	2026-10-13 19:20:49.375478851 +0000
-@@ -129,6 +129,12 @@
+
+--- a/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs
++++ b/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs
+@@ -129,6 +129,12 @@ pub struct CustomCpuTemplate {
      /// Modifiers for model specific registers.
      #[serde(default)]
      pub msr_modifiers: Vec<RegisterModifier>,
@@ -70,13 +69,13 @@ diff -ruN b2/src/vmm/src/cpu_config/x86_64/custom_cpu_template.rs b3/src/vmm/src
  }
  
  impl CustomCpuTemplate {
-diff -ruN b2/src/vmm/src/cpu_config/x86_64/mod.rs b3/src/vmm/src/cpu_config/x86_64/mod.rs
---- a/src/vmm/src/cpu_config/x86_64/mod.rs	2026-10-13 16:50:45.816843948 +0000
-+++ b/src/vmm/src/cpu_config/x86_64/mod.rs	2026-10-13 19:20:49.375478851 +0000
-@@ -17,7 +17,31 @@
+
+--- a/src/vmm/src/cpu_config/x86_64/mod.rs
++++ b/src/vmm/src/cpu_config/x86_64/mod.rs
+@@ -14,7 +14,31 @@ use std::collections::BTreeMap;
+ 
  use self::custom_cpu_template::CpuidRegister;
  use super::templates::CustomCpuTemplate;
- use crate::Vcpu;
 -use crate::cpu_config::x86_64::cpuid::{Cpuid, CpuidKey};
 +use crate::cpu_config::x86_64::cpuid::{
 +    Cpuid, CpuidEntry, CpuidKey, CpuidRegisters, KvmCpuidFlags,
@@ -106,103 +105,113 @@ diff -ruN b2/src/vmm/src/cpu_config/x86_64/mod.rs b3/src/vmm/src/cpu_config/x86_
  
  /// Errors thrown while configuring templates.
  #[derive(Debug, PartialEq, Eq, thiserror::Error, displaydoc::Display)]
-@@ -111,8 +135,89 @@
-             }
+@@ -72,9 +96,89 @@ pub(crate) fn apply_template_to_cpuid(
          }
- 
-+        if template.hyperv {
-+            Self::apply_hyperv_leaves(guest_cpuid);
-+        }
-+
-         Ok(Self { cpuid, msrs })
      }
-+
-+    /// Install the Hyper-V interface leaves at `HYPERV_CPUID_BASE`.
-+    ///
-+    /// KVM implements the advertised MSRs unconditionally once the guest sees
-+    /// the `Hv#1` interface signature; no `KVM_ENABLE_CAP` call is needed for
-+    /// this feature set. The KVM signature leaves keep their content at
-+    /// `KVM_CPUID_RELOCATED_BASE` so Linux guests still find kvmclock.
-+    fn apply_hyperv_leaves(guest_cpuid: &mut BTreeMap<CpuidKey, CpuidEntry>) {
-+        let kvm_leaves: Vec<(CpuidKey, CpuidEntry)> = guest_cpuid
-+            .range(CpuidKey::leaf(HYPERV_CPUID_BASE)..CpuidKey::leaf(KVM_CPUID_RELOCATED_BASE))
-+            .map(|(key, entry)| (key.clone(), entry.clone()))
-+            .collect();
-+        for (key, _) in &kvm_leaves {
-+            guest_cpuid.remove(key);
-+        }
-+        for (key, mut entry) in kvm_leaves {
-+            let relocated = key.leaf - HYPERV_CPUID_BASE + KVM_CPUID_RELOCATED_BASE;
-+            if key.leaf == HYPERV_CPUID_BASE {
-+                // Maximum leaf of the relocated KVM block.
-+                entry.result.eax =
-+                    entry.result.eax - HYPERV_CPUID_BASE + KVM_CPUID_RELOCATED_BASE;
-+            }
-+            guest_cpuid.insert(
-+                CpuidKey {
-+                    leaf: relocated,
-+                    subleaf: key.subleaf,
-+                },
-+                entry,
-+            );
-+        }
-+
-+        let leaf = |leaf: u32, eax: u32, ebx: u32, ecx: u32, edx: u32| {
-+            (
-+                CpuidKey::leaf(leaf),
-+                CpuidEntry {
-+                    flags: KvmCpuidFlags::EMPTY,
-+                    result: CpuidRegisters { eax, ebx, ecx, edx },
-+                },
-+            )
-+        };
-+        let hyperv_leaves = [
-+            // Maximum leaf and vendor signature "Linux KVM Hv".
-+            leaf(0x4000_0000, HYPERV_CPUID_MAX, 0x756e_694c, 0x564b_2078, 0x7648_204d),
-+            // Interface signature "Hv#1".
-+            leaf(0x4000_0001, 0x3123_7648, 0, 0, 0),
-+            // Hypervisor build number and version.
-+            leaf(0x4000_0002, 0x3839, 0xa_0000, 0, 0),
-+            // Features.
-+            leaf(
-+                0x4000_0003,
-+                HV_MSR_VP_RUNTIME_AVAILABLE
-+                    | HV_MSR_TIME_REF_COUNT_AVAILABLE
-+                    | HV_MSR_APIC_ACCESS_AVAILABLE
-+                    | HV_MSR_HYPERCALL_AVAILABLE
-+                    | HV_MSR_VP_INDEX_AVAILABLE
-+                    | HV_MSR_REFERENCE_TSC_AVAILABLE
-+                    | HV_ACCESS_FREQUENCY_MSRS,
-+                0,
-+                0,
-+                HV_FEATURE_FREQUENCY_MSRS_AVAILABLE,
-+            ),
-+            // Recommendations; EBX is the spinlock retry count before trapping.
-+            leaf(
-+                0x4000_0004,
-+                HV_X64_APIC_ACCESS_RECOMMENDED | HV_X64_RELAXED_TIMING_RECOMMENDED,
-+                0xfff,
-+                0,
-+                0,
-+            ),
-+        ];
-+        for (key, entry) in hyperv_leaves {
-+            guest_cpuid.insert(key, entry);
-+        }
-+        for leaf_id in 0x4000_0005..=HYPERV_CPUID_MAX {
-+            guest_cpuid.insert(CpuidKey::leaf(leaf_id), CpuidEntry::default());
-+        }
+ 
++    if template.hyperv {
++        apply_hyperv_leaves(guest_cpuid);
 +    }
++
+     Ok(cpuid)
  }
  
- #[cfg(test)]
-@@ -232,6 +337,59 @@
++/// Install the Hyper-V interface leaves at `HYPERV_CPUID_BASE`.
++///
++/// KVM implements the advertised MSRs unconditionally once the guest sees
++/// the `Hv#1` interface signature; no `KVM_ENABLE_CAP` call is needed for
++/// this feature set. The KVM signature leaves keep their content at
++/// `KVM_CPUID_RELOCATED_BASE` so Linux guests still find kvmclock.
++fn apply_hyperv_leaves(guest_cpuid: &mut BTreeMap<CpuidKey, CpuidEntry>) {
++    let kvm_leaves: Vec<(CpuidKey, CpuidEntry)> = guest_cpuid
++        .range(CpuidKey::leaf(HYPERV_CPUID_BASE)..CpuidKey::leaf(KVM_CPUID_RELOCATED_BASE))
++        .map(|(key, entry)| (key.clone(), entry.clone()))
++        .collect();
++    for (key, _) in &kvm_leaves {
++        guest_cpuid.remove(key);
++    }
++    for (key, mut entry) in kvm_leaves {
++        let relocated = key.leaf - HYPERV_CPUID_BASE + KVM_CPUID_RELOCATED_BASE;
++        if key.leaf == HYPERV_CPUID_BASE {
++            // Maximum leaf of the relocated KVM block.
++            entry.result.eax = entry.result.eax - HYPERV_CPUID_BASE + KVM_CPUID_RELOCATED_BASE;
++        }
++        guest_cpuid.insert(
++            CpuidKey {
++                leaf: relocated,
++                subleaf: key.subleaf,
++            },
++            entry,
++        );
++    }
++
++    let leaf = |leaf: u32, eax: u32, ebx: u32, ecx: u32, edx: u32| {
++        (
++            CpuidKey::leaf(leaf),
++            CpuidEntry {
++                flags: KvmCpuidFlags::EMPTY,
++                result: CpuidRegisters { eax, ebx, ecx, edx },
++            },
++        )
++    };
++    let hyperv_leaves = [
++        // Maximum leaf and vendor signature "Linux KVM Hv".
++        leaf(0x4000_0000, HYPERV_CPUID_MAX, 0x756e_694c, 0x564b_2078, 0x7648_204d),
++        // Interface signature "Hv#1".
++        leaf(0x4000_0001, 0x3123_7648, 0, 0, 0),
++        // Hypervisor build number and version.
++        leaf(0x4000_0002, 0x3839, 0xa_0000, 0, 0),
++        // Features.
++        leaf(
++            0x4000_0003,
++            HV_MSR_VP_RUNTIME_AVAILABLE
++                | HV_MSR_TIME_REF_COUNT_AVAILABLE
++                | HV_MSR_APIC_ACCESS_AVAILABLE
++                | HV_MSR_HYPERCALL_AVAILABLE
++                | HV_MSR_VP_INDEX_AVAILABLE
++                | HV_MSR_REFERENCE_TSC_AVAILABLE
++                | HV_ACCESS_FREQUENCY_MSRS,
++            0,
++            0,
++            HV_FEATURE_FREQUENCY_MSRS_AVAILABLE,
++        ),
++        // Recommendations; EBX is the spinlock retry count before trapping.
++        leaf(
++            0x4000_0004,
++            HV_X64_APIC_ACCESS_RECOMMENDED | HV_X64_RELAXED_TIMING_RECOMMENDED,
++            0xfff,
++            0,
++            0,
++        ),
++    ];
++    for (key, entry) in hyperv_leaves {
++        guest_cpuid.insert(key, entry);
++    }
++    for leaf_id in 0x4000_0005..=HYPERV_CPUID_MAX {
++        guest_cpuid.insert(CpuidKey::leaf(leaf_id), CpuidEntry::default());
++    }
++}
++
+ /// Applies the MSR modifiers from a CPU template.
+ pub(crate) fn apply_template_to_msrs(
+     mut msrs: BTreeMap<u32, u64>,
+@@ -100,7 +204,7 @@ mod tests {
+     use super::custom_cpu_template::{CpuidLeafModifier, CpuidRegisterModifier, RegisterModifier};
+     use super::*;
+     use crate::cpu_config::templates::RegisterValueFilter;
+-    use crate::cpu_config::x86_64::cpuid::{CpuidEntry, IntelCpuid, KvmCpuidFlags};
++    use crate::cpu_config::x86_64::cpuid::IntelCpuid;
+ 
+     fn build_test_template() -> CustomCpuTemplate {
+         CustomCpuTemplate {
+@@ -193,6 +297,58 @@ mod tests {
+         );
      }
  
-     #[test]
++    #[test]
 +    fn test_apply_hyperv_leaves() {
-+        let mut config = supported_cpu_config();
-+        config.cpuid.inner_mut().insert(
++        let mut cpuid = build_supported_cpuid();
++        cpuid.inner_mut().insert(
 +            CpuidKey::leaf(0x4000_0000),
 +            CpuidEntry {
 +                flags: KvmCpuidFlags::EMPTY,
@@ -214,7 +223,7 @@ diff -ruN b2/src/vmm/src/cpu_config/x86_64/mod.rs b3/src/vmm/src/cpu_config/x86_
 +                },
 +            },
 +        );
-+        config.cpuid.inner_mut().insert(
++        cpuid.inner_mut().insert(
 +            CpuidKey::leaf(0x4000_0001),
 +            CpuidEntry {
 +                flags: KvmCpuidFlags::EMPTY,
@@ -225,16 +234,15 @@ diff -ruN b2/src/vmm/src/cpu_config/x86_64/mod.rs b3/src/vmm/src/cpu_config/x86_
 +            },
 +        );
 +        let without =
-+            CpuConfiguration::apply_template(config.clone(), &CustomCpuTemplate::default())
-+                .unwrap();
-+        assert_eq!(without, config);
++            apply_template_to_cpuid(cpuid.clone(), &CustomCpuTemplate::default()).unwrap();
++        assert_eq!(without, cpuid);
 +
 +        let template = CustomCpuTemplate {
 +            hyperv: true,
 +            ..Default::default()
 +        };
-+        let with = CpuConfiguration::apply_template(config, &template).unwrap();
-+        let cpuid = with.cpuid.inner();
++        let with = apply_template_to_cpuid(cpuid, &template).unwrap();
++        let cpuid = with.inner();
 +        let base = &cpuid[&CpuidKey::leaf(HYPERV_CPUID_BASE)].result;
 +        assert_eq!(base.eax, HYPERV_CPUID_MAX);
 +        assert_eq!(base.ebx, 0x756e_694c);
@@ -252,14 +260,13 @@ diff -ruN b2/src/vmm/src/cpu_config/x86_64/mod.rs b3/src/vmm/src/cpu_config/x86_
 +        assert!(!cpuid.contains_key(&CpuidKey::leaf(0x4000_000b)));
 +    }
 +
-+    #[test]
-     fn test_apply_template() {
-         let host_configuration = supported_cpu_config();
-         let cpu_config_result = host_configuration
-diff -ruN b2/src/vmm/src/vstate/vcpu.rs b3/src/vmm/src/vstate/vcpu.rs
---- a/src/vmm/src/vstate/vcpu.rs	2026-10-13 16:50:45.914847690 +0000
-+++ b/src/vmm/src/vstate/vcpu.rs	2026-10-13 19:20:49.376478890 +0000
-@@ -406,6 +406,8 @@
+     #[test]
+     fn test_apply_template_to_cpuid() {
+         let template = build_test_template();
+
+--- a/src/vmm/src/vstate/vcpu.rs
++++ b/src/vmm/src/vstate/vcpu.rs
+@@ -427,6 +427,8 @@ impl Vcpu {
  
                  Ok(VcpuEmulation::Paused)
              }

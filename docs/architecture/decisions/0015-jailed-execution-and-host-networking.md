@@ -23,7 +23,7 @@ It does not make those receipts executable or claim fleet readiness.
 
 ## Decision
 
-Use matching statically linked musl Firecracker/jailer 1.16.1 binaries from the
+Use matching statically linked musl Firecracker/jailer 1.17.0 binaries from the
 pinned Nix package. Validate ELF architecture and absence of a dynamic
 interpreter. The earlier unjailed GNU image smoke remains historical evidence;
 GNU binaries are unsupported by the jailer. Pin the ordinary Linux utilities
@@ -202,7 +202,7 @@ Obtain the second independent KVM host for cross-host acceptance.
 [ADR-0013](0013-capacity-collection-and-local-receipt.md),
 [ADR-0014](0014-image-and-address-admission.md).
 
-Interface references: [Firecracker 1.16.1 jailer](https://github.com/firecracker-microvm/firecracker/blob/v1.16.1/docs/jailer.md),
-[Firecracker API](https://github.com/firecracker-microvm/firecracker/blob/v1.16.1/src/firecracker/swagger/firecracker.yaml),
+Interface references: [Firecracker 1.17.0 jailer](https://github.com/firecracker-microvm/firecracker/blob/v1.17.0/docs/jailer.md),
+[Firecracker API](https://github.com/firecracker-microvm/firecracker/blob/v1.17.0/src/firecracker/swagger/firecracker.yaml),
 [nftables](https://www.netfilter.org/projects/nftables/manpage.html),
 [IANA special IPv4 registry](https://www.iana.org/assignments/iana-ipv4-special-registry/iana-ipv4-special-registry.xhtml).

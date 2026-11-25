@@ -51,13 +51,17 @@ let
     '') workspace.members}
   '';
   vendored = pkgs.rustPlatform.importCargoLock { inherit (workspace) lockFile; };
+  # nixpkgs' cargo setup hook now forces system C libraries (LIBGIT2_NO_VENDOR,
+  # AWS_LC_SYS_USE_SYSTEM, ...) and its reindeer has no libgit2 input; build
+  # reindeer's vendored libgit2 as before.
+  reindeer = pkgs.reindeer.overrideAttrs { dontCargoUseSystemLibs = true; };
   # Crates with build scripts default to running them (buildscript_run);
   # a committed nix/buck/rust/fixups/<crate>/fixups.toml overrides that.
   committedFixups = ./rust/fixups;
   hasCommittedFixups = builtins.pathExists committedFixups;
 in
 pkgs.runCommand "overalls-buck-rust-cell" {
-  nativeBuildInputs = [ rust pkgs.reindeer pkgs.python3 ];
+  nativeBuildInputs = [ rust reindeer pkgs.python3 ];
 } ''
   export HOME="$TMPDIR"
   mkdir -p "$out/vendor" "$out/patches" "$out/.cargo"

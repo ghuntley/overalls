@@ -1,9 +1,58 @@
---- a/src/vmm/src/devices/legacy/serial.rs	2026-06-29 09:33:24.000000000 +0000
-+++ b/src/vmm/src/devices/legacy/serial.rs	2026-10-18 00:15:21.828800540 +0000
-@@ -26,6 +26,35 @@
+--- a/src/vmm/src/device_manager/mod.rs
++++ b/src/vmm/src/device_manager/mod.rs
+@@ -151,13 +151,15 @@ impl DeviceManager {
+         output: Option<&PathBuf>,
+         state: Option<&serial::SerialState>,
+         rate_limiter: Option<TokenBucket>,
++        shutdown_evt: Option<EventFd>,
+     ) -> Result<Arc<Mutex<SerialDevice>>, std::io::Error> {
+         let (serial_in, serial_out) = match output {
+             Some(path) => (
+                 None,
+-                SerialOut::new(
++                SerialOut::with_shutdown(
+                     SerialOutInner::File(open_file_nonblock(path)?),
+                     rate_limiter,
++                    shutdown_evt,
+                 ),
+             ),
+             None => {
+@@ -165,7 +167,11 @@ impl DeviceManager {
+ 
+                 (
+                     Some(std::io::stdin()),
+-                    SerialOut::new(SerialOutInner::Stdout(std::io::stdout()), rate_limiter),
++                    SerialOut::with_shutdown(
++                        SerialOutInner::Stdout(std::io::stdout()),
++                        rate_limiter,
++                        shutdown_evt,
++                    ),
+                 )
+             }
+         };
+@@ -208,11 +214,15 @@ impl DeviceManager {
+         serial_rate_limiter: Option<TokenBucket>,
+     ) -> Result<PortIODeviceManager, DeviceManagerCreateError> {
+         // Create serial device
++        let shutdown_evt = vcpus_exit_evt
++            .try_clone()
++            .map_err(DeviceManagerCreateError::EventFd)?;
+         let serial = Self::setup_serial_device(
+             event_manager,
+             serial_output,
+             serial_state,
+             serial_rate_limiter,
++            Some(shutdown_evt),
+         )?;
+         let reset_evt = vcpus_exit_evt
+             .try_clone()
+
+--- a/src/vmm/src/devices/legacy/serial.rs
++++ b/src/vmm/src/devices/legacy/serial.rs
+@@ -26,6 +26,35 @@ use crate::rate_limiter::{BucketReduction, TokenBucket};
  use crate::utils::usize_to_u64;
  use crate::vstate::bus::BusDevice;
-
+ 
 +/// OmniOS emits this fixed marker after all guest filesystems are synced.
 +const ILLUMOS_SYNC_MARKER: &[u8] = b"syncing file systems... done";
 +
@@ -36,7 +85,7 @@
  /// Metrics specific to the UART device.
  #[derive(Debug, Serialize, Default)]
  pub struct SerialDeviceMetrics {
-@@ -139,24 +168,34 @@
+@@ -139,24 +168,34 @@ pub struct SerialOut {
      inner: SerialOutInner,
      /// Optional rate limiter for serial output bandwidth.
      rate_limiter: Option<TokenBucket>,
@@ -44,7 +93,7 @@
 +    shutdown_evt: Option<EventFd>,
 +    shutdown_detector: ShutdownMarkerDetector,
  }
-
+ 
  impl SerialOut {
      /// Create a new `SerialOut` with the given inner sink and optional rate limiter.
      pub fn new(inner: SerialOutInner, rate_limiter: Option<TokenBucket>) -> Self {
@@ -65,7 +114,7 @@
          }
      }
  }
-
+ 
  impl std::io::Write for SerialOut {
      fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
 -        if let SerialOutInner::Sink = self.inner {
@@ -75,10 +124,10 @@
          // Check rate limiter if configured.
          if let Some(ref mut rl) = self.rate_limiter {
              match rl.reduce(usize_to_u64(buf.len())) {
-@@ -170,11 +209,28 @@
+@@ -170,11 +209,28 @@ impl std::io::Write for SerialOut {
              }
          }
-
+ 
 -        match &mut self.inner {
 +        let result = match &mut self.inner {
              SerialOutInner::Stdout(stdout) => stdout.write(buf),
@@ -105,10 +154,11 @@
      }
      fn flush(&mut self) -> std::io::Result<()> {
          match &mut self.inner {
-@@ -450,6 +506,34 @@
+@@ -449,6 +505,34 @@ mod tests {
+         SerialOut::new(SerialOutInner::Sink, None)
      }
-
-     #[test]
+ 
++    #[test]
 +    fn test_omnios_shutdown_marker_signals_after_split_output() {
 +        let event = EventFd::new(libc::EFD_NONBLOCK).unwrap();
 +        let mut output =
@@ -136,55 +186,6 @@
 +        );
 +    }
 +
-+    #[test]
+     #[test]
      fn test_serial_bus_read() {
          let intr_evt = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
-
---- a/src/vmm/src/device_manager/mod.rs	2026-06-29 09:33:24.000000000 +0000
-+++ b/src/vmm/src/device_manager/mod.rs	2026-10-18 00:10:14.681330246 +0000
-@@ -148,13 +148,15 @@
-         output: Option<&PathBuf>,
-         state: Option<&serial::SerialState>,
-         rate_limiter: Option<TokenBucket>,
-+        shutdown_evt: Option<EventFd>,
-     ) -> Result<Arc<Mutex<SerialDevice>>, std::io::Error> {
-         let (serial_in, serial_out) = match output {
-             Some(path) => (
-                 None,
--                SerialOut::new(
-+                SerialOut::with_shutdown(
-                     SerialOutInner::File(open_file_nonblock(path)?),
-                     rate_limiter,
-+                    shutdown_evt,
-                 ),
-             ),
-             None => {
-@@ -162,7 +164,11 @@
-
-                 (
-                     Some(std::io::stdin()),
--                    SerialOut::new(SerialOutInner::Stdout(std::io::stdout()), rate_limiter),
-+                    SerialOut::with_shutdown(
-+                        SerialOutInner::Stdout(std::io::stdout()),
-+                        rate_limiter,
-+                        shutdown_evt,
-+                    ),
-                 )
-             }
-         };
-@@ -205,11 +211,15 @@
-         serial_rate_limiter: Option<TokenBucket>,
-     ) -> Result<PortIODeviceManager, DeviceManagerCreateError> {
-         // Create serial device
-+        let shutdown_evt = vcpus_exit_evt
-+            .try_clone()
-+            .map_err(DeviceManagerCreateError::EventFd)?;
-         let serial = Self::setup_serial_device(
-             event_manager,
-             serial_output,
-             serial_state,
-             serial_rate_limiter,
-+            Some(shutdown_evt),
-         )?;
-         let reset_evt = vcpus_exit_evt
-             .try_clone()

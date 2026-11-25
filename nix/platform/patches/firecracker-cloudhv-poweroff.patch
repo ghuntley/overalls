@@ -1,6 +1,6 @@
 --- a/src/vmm/src/device_manager/legacy.rs
 +++ b/src/vmm/src/device_manager/legacy.rs
-@@ -12,8 +12,9 @@
+@@ -12,8 +12,9 @@ use acpi_tables::aml::AmlError;
  use acpi_tables::{Aml, aml};
  
  use crate::devices::legacy::acpi_pm_timer::{ACPI_PM_TIMER_PORT, ACPI_PM_TIMER_SIZE};
@@ -11,7 +11,7 @@
  use crate::vstate::bus::BusError;
  use crate::vstate::vm::KvmVm;
  
-@@ -38,6 +39,8 @@
+@@ -38,6 +39,8 @@ pub struct PortIODeviceManager {
      pub acpi_pm_timer: Arc<Mutex<AcpiPmTimer>>,
      // Read-only CMOS wall clock for firmware and Windows guests.
      pub cmos_rtc: Arc<Mutex<CmosRtc>>,
@@ -20,20 +20,20 @@
  }
  
  impl PortIODeviceManager {
-@@ -76,6 +79,12 @@
-             ACPI_PM_TIMER_SIZE,
+@@ -77,6 +80,12 @@ impl PortIODeviceManager {
          )?;
          io_bus.insert(self.cmos_rtc.clone(), CMOS_RTC_PORT, CMOS_RTC_SIZE)?;
-+
+ 
 +        io_bus.insert(
 +            self.cloudhv_power.clone(),
 +            CLOUDHV_POWER_PORT,
 +            CLOUDHV_POWER_SIZE,
 +        )?;
- 
++
          vm.register_irq(
              self.stdio_serial
-@@ -169,6 +178,7 @@
+                 .lock()
+@@ -169,6 +178,7 @@ mod tests {
      fn test_register_legacy_devices() {
          let vm = setup_vm_with_memory(0x1000);
          vm.setup_irqchip().unwrap();
@@ -41,7 +41,7 @@
          let mut ldm = PortIODeviceManager {
              stdio_serial: Arc::new(Mutex::new(SerialDevice {
                  serial: Serial::with_events(
-@@ -185,8 +195,16 @@
+@@ -185,8 +195,16 @@ mod tests {
              )),
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
              cmos_rtc: Arc::new(Mutex::new(CmosRtc::new())),
@@ -58,9 +58,10 @@
          let mut status_d = [0u8; 1];
          vm.pio_bus.write(CMOS_RTC_PORT, &[0x0d]).unwrap();
          vm.pio_bus.read(CMOS_RTC_PORT + 1, &mut status_d).unwrap();
+
 --- a/src/vmm/src/device_manager/mod.rs
 +++ b/src/vmm/src/device_manager/mod.rs
-@@ -25,12 +25,12 @@
+@@ -28,12 +28,12 @@ use vmm_sys_util::eventfd::EventFd;
  
  use crate::EventManager;
  use crate::device_manager::acpi::ACPIDeviceError;
@@ -75,7 +76,7 @@
  use crate::devices::pseudo::BootTimer;
  use crate::devices::virtio::ActivateError;
  use crate::devices::virtio::balloon::BalloonError;
-@@ -223,6 +223,11 @@
+@@ -226,6 +226,11 @@ impl DeviceManager {
              i8042,
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
              cmos_rtc: Arc::new(Mutex::new(CmosRtc::new())),
@@ -87,7 +88,7 @@
          };
          legacy_devices.register_devices(vm)?;
          Ok(legacy_devices)
-@@ -822,6 +827,9 @@
+@@ -814,6 +819,9 @@ pub(crate) mod tests {
              )),
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
              cmos_rtc: Arc::new(Mutex::new(CmosRtc::new())),
@@ -97,27 +98,8 @@
          };
  
          DeviceManager {
---- a/src/vmm/src/devices/legacy/mod.rs
-+++ b/src/vmm/src/devices/legacy/mod.rs
-@@ -8,6 +8,8 @@
- //! Implements legacy devices (UART, RTC etc).
- #[cfg(target_arch = "x86_64")]
- pub mod acpi_pm_timer;
-+#[cfg(target_arch = "x86_64")]
-+pub mod cloudhv_power;
- #[cfg(target_arch = "x86_64")]
- pub mod cmos_rtc;
- mod i8042;
-@@ -25,6 +27,8 @@
- 
- #[cfg(target_arch = "x86_64")]
- pub use self::acpi_pm_timer::AcpiPmTimer;
-+#[cfg(target_arch = "x86_64")]
-+pub use self::cloudhv_power::CloudHvPower;
- #[cfg(target_arch = "x86_64")]
- pub use self::cmos_rtc::CmosRtc;
- pub use self::i8042::{I8042Device, I8042Error as I8042DeviceError};
---- a/src/vmm/src/devices/legacy/cloudhv_power.rs
+
+--- /dev/null
 +++ b/src/vmm/src/devices/legacy/cloudhv_power.rs
 @@ -0,0 +1,79 @@
 +// Copyright 2026 Overalls contributors.
@@ -199,3 +181,24 @@
 +        assert_eq!(event.read().unwrap(), 1);
 +    }
 +}
+
+--- a/src/vmm/src/devices/legacy/mod.rs
++++ b/src/vmm/src/devices/legacy/mod.rs
+@@ -9,6 +9,8 @@
+ #[cfg(target_arch = "x86_64")]
+ pub mod acpi_pm_timer;
+ #[cfg(target_arch = "x86_64")]
++pub mod cloudhv_power;
++#[cfg(target_arch = "x86_64")]
+ pub mod cmos_rtc;
+ mod i8042;
+ #[cfg(target_arch = "aarch64")]
+@@ -26,6 +28,8 @@ use vmm_sys_util::eventfd::EventFd;
+ #[cfg(target_arch = "x86_64")]
+ pub use self::acpi_pm_timer::AcpiPmTimer;
+ #[cfg(target_arch = "x86_64")]
++pub use self::cloudhv_power::CloudHvPower;
++#[cfg(target_arch = "x86_64")]
+ pub use self::cmos_rtc::CmosRtc;
+ pub use self::i8042::{I8042Device, I8042Error as I8042DeviceError};
+ #[cfg(target_arch = "aarch64")]

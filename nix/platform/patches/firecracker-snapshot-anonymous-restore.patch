@@ -16,19 +16,18 @@ All-zero host pages are not written and stay unpopulated. A short file is still
 refused; dirty tracking starts clean. The API, snapshot format and version are
 unchanged; only the residency of the restored memory changes.
 
-diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 --- a/src/vmm/src/vstate/memory.rs
 +++ b/src/vmm/src/vstate/memory.rs
-@@ -53,6 +53,8 @@
-     OffsetTooLarge,
-     /// Cannot retrieve snapshot file metadata: {0}
+@@ -62,6 +62,8 @@ pub enum MemoryError {
      FileMetadata(std::io::Error),
+     /// Memory region has zero size
+     ZeroSize,
 +    /// Cannot read snapshot memory file: {0}
 +    SnapshotFileRead(std::io::Error),
      /// Memory region has zero slots
      ZeroSlots,
      /// Memory region of {region_size} bytes is not evenly divisible into {slot_count} slots
-@@ -575,6 +577,17 @@
+@@ -961,6 +963,17 @@ pub fn anonymous(
  
  /// Creates a GuestMemoryMmap given a `file` containing the data
  /// and a `state` containing mapping information.
@@ -46,7 +45,7 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
  pub fn snapshot_file(
      file: File,
      regions: impl Iterator<Item = (GuestAddress, usize)>,
-@@ -585,20 +598,64 @@
+@@ -972,21 +985,72 @@ pub fn snapshot_file(
          .iter()
          .try_fold(0u64, |acc, (_, size)| acc.checked_add(*size as u64))
          .ok_or(MemoryError::OffsetTooLarge)?;
@@ -64,12 +63,18 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
      }
  
 -    create(
--        regions.into_iter(),
++    // Hugetlbfs is refused for File-backend restores before this point; THP
++    // keeps the upstream madvise hint on the anonymous copy.
++    let guest_regions = create(
+         regions.into_iter(),
 -        libc::MAP_PRIVATE,
 -        Some(file),
--        track_dirty_pages,
++        libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
++        None,
+         track_dirty_pages,
+         huge_pages.madvise_flags(),
 -    )
-+    let guest_regions = anonymous(regions.into_iter(), track_dirty_pages, HugePageConfig::None)?;
++    )?;
 +    copy_snapshot_file(&file, &guest_regions)?;
 +    Ok(guest_regions)
 +}
@@ -104,7 +109,7 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +            }
 +            done += count;
 +        }
-+        if let Some(bitmap) = Deref::deref(region).bitmap() {
++        if let Some(bitmap) = (***region).bitmap() {
 +            bitmap.reset();
 +        }
 +        file_offset += region_size as u64;
@@ -119,10 +124,11 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
  }
  
  /// Defines the interface for snapshotting memory.
-@@ -947,6 +1004,93 @@
+@@ -1350,6 +1414,99 @@ mod tests {
+         assert_eq!(guest_regions.len(), 3);
      }
  
-     #[test]
++    #[test]
 +    fn test_snapshot_file_restores_into_anonymous_memory() {
 +        let page_size = host_page_size();
 +        let mut contents = vec![0u8; 5 * page_size];
@@ -137,7 +143,7 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +            (GuestAddress(0), 2 * page_size),
 +            (GuestAddress(0x100000), 3 * page_size),
 +        ];
-+        let guest_regions = snapshot_file(file, regions.into_iter(), true).unwrap();
++        let guest_regions = snapshot_file(file, regions.into_iter(), true, HugePageConfig::None).unwrap();
 +        assert_eq!(guest_regions.len(), 2);
 +
 +        let mut resident = Vec::new();
@@ -146,7 +152,7 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +            assert!(region.file_offset().is_none());
 +            assert_ne!(region.flags() & libc::MAP_ANONYMOUS, 0);
 +            // Restored pages are not reported dirty.
-+            let bitmap = Deref::deref(region).bitmap().as_ref().unwrap();
++            let bitmap = (***region).bitmap().as_ref().unwrap();
 +            for page in 0..u64_to_usize(region.len()) / page_size {
 +                assert!(!bitmap.dirty_at(page * page_size));
 +            }
@@ -189,7 +195,13 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +        file.write_all(&contents).unwrap();
 +
 +        let memory = into_region_ext(
-+            snapshot_file(file, std::iter::once((GuestAddress(0), size)), false).unwrap(),
++            snapshot_file(
++                file,
++                std::iter::once((GuestAddress(0), size)),
++                false,
++                HugePageConfig::None,
++            )
++            .unwrap(),
 +        );
 +        let mut actual = vec![0u8; size];
 +        memory.read(&mut actual[..], GuestAddress(0)).unwrap();
@@ -205,15 +217,14 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +            (GuestAddress(0), page_size),
 +            (GuestAddress(0x10000), page_size),
 +        ];
-+        let result = snapshot_file(file, regions.into_iter(), false);
++        let result = snapshot_file(file, regions.into_iter(), false, HugePageConfig::None);
 +        assert!(matches!(result.unwrap_err(), MemoryError::OffsetTooLarge));
 +    }
 +
-+    #[test]
+     #[test]
      fn test_snapshot_file_offset_too_large() {
          let page_size = 0x1000;
-         let mut file = TempFile::new().unwrap().into_file();
-@@ -1811,5 +1955,72 @@
+@@ -2234,6 +2391,73 @@ mod tests {
                  }
              }
          }
@@ -267,7 +278,7 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +                let mut file = TempFile::new().unwrap().into_file();
 +                file.write_all(&contents).unwrap();
 +
-+                let guest_regions = snapshot_file(file, regions.clone().into_iter(), false).unwrap();
++                let guest_regions = snapshot_file(file, regions.clone().into_iter(), false, HugePageConfig::None).unwrap();
 +                let resident: Vec<bool> = guest_regions.iter().flat_map(resident_pages).collect();
 +                prop_assert_eq!(resident, expected);
 +                for region in &guest_regions {
@@ -285,4 +296,5 @@ diff --git a/src/vmm/src/vstate/memory.rs b/src/vmm/src/vstate/memory.rs
 +            }
 +        }
      }
- }
+ 
+     #[test]

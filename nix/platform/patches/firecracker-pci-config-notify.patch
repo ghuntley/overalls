@@ -1,6 +1,6 @@
 --- a/src/vmm/src/devices/virtio/transport/pci/device.rs
 +++ b/src/vmm/src/devices/virtio/transport/pci/device.rs
-@@ -906,8 +906,27 @@
+@@ -1306,8 +1306,27 @@ impl PciDevice for VirtioPciDevice {
                  ..u64::from(NOTIFICATION_BAR_OFFSET + NOTIFICATION_SIZE))
                  .contains(&o) =>
              {
@@ -28,12 +28,13 @@
 +                    error!("pci: cannot signal queue notification event: {error}");
 +                }
              }
-             o if (u64::from(MSIX_TABLE_BAR_OFFSET)
-                 ..u64::from(MSIX_TABLE_BAR_OFFSET + MSIX_TABLE_SIZE))
-@@ -1433,6 +1452,29 @@
+             _ => (),
+         };
+@@ -2002,6 +2021,29 @@ mod tests {
+         device.write_config_register(data_register, 0, data);
      }
-
-     #[test]
+ 
++    #[test]
 +    fn test_pci_configuration_notification() {
 +        let vmm = create_vmm_with_virtio_pci_device();
 +        let device = get_virtio_device(&vmm);
@@ -56,7 +57,6 @@
 +        }
 +    }
 +
-+    #[test]
+     #[test]
      fn test_pci_configuration_cap() {
-         let mut vmm = create_vmm_with_virtio_pci_device();
-         let device = get_virtio_device(&vmm);
+         let vmm = create_vmm_with_virtio_pci_device();

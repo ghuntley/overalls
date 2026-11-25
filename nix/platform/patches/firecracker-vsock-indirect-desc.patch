@@ -1,7 +1,6 @@
-diff -ruN a/src/vmm/src/devices/virtio/queue.rs b/src/vmm/src/devices/virtio/queue.rs
---- a/src/vmm/src/devices/virtio/queue.rs	2026-10-14 21:50:44.858039052 +0000
-+++ b/src/vmm/src/devices/virtio/queue.rs	2026-10-14 21:50:44.861039170 +0000
-@@ -14,6 +14,7 @@
+--- a/src/vmm/src/devices/virtio/queue.rs
++++ b/src/vmm/src/devices/virtio/queue.rs
+@@ -15,6 +15,7 @@ use crate::vstate::memory::{Bitmap, ByteValued, GuestAddress};
  
  pub const VIRTQ_DESC_F_NEXT: u16 = 0x1;
  pub const VIRTQ_DESC_F_WRITE: u16 = 0x2;
@@ -9,7 +8,7 @@ diff -ruN a/src/vmm/src/devices/virtio/queue.rs b/src/vmm/src/devices/virtio/que
  
  /// Max size of virtio queues offered by firecracker's virtio devices.
  pub(super) const FIRECRACKER_MAX_QUEUE_SIZE: u16 = 256;
-@@ -38,6 +39,8 @@
+@@ -39,6 +40,8 @@ pub enum QueueError {
      NotReady,
      /// Virtio queue with invalid size: {0}
      InvalidSize(u16),
@@ -18,7 +17,7 @@ diff -ruN a/src/vmm/src/devices/virtio/queue.rs b/src/vmm/src/devices/virtio/que
  }
  
  /// Error type indicating the guest configured a virtio queue such that the avail_idx field would
-@@ -154,6 +157,50 @@
+@@ -155,6 +158,50 @@ impl DescriptorChain {
          self.flags & VIRTQ_DESC_F_WRITE != 0
      }
  
@@ -38,7 +37,7 @@ diff -ruN a/src/vmm/src/devices/virtio/queue.rs b/src/vmm/src/devices/virtio/que
 +    /// its tables 8-byte aligned inside its packet structures, so only the
 +    /// descriptor's own alignment is required) or larger than the queue, and a
 +    /// table entry that is itself indirect are refused.
-+    pub fn resolve_indirect<M: GuestMemory>(self, mem: &M) -> Result<Self, QueueError> {
++    pub fn resolve_indirect<M: GuestMemoryBackend>(self, mem: &M) -> Result<Self, QueueError> {
 +        if !self.is_indirect() {
 +            return Ok(self);
 +        }
@@ -69,10 +68,10 @@ diff -ruN a/src/vmm/src/devices/virtio/queue.rs b/src/vmm/src/devices/virtio/que
      /// Gets the next descriptor in this descriptor chain, if there is one.
      ///
      /// Note that this is distinct from the next descriptor chain returned by `AvailIter`, which is
-diff -ruN a/src/vmm/src/devices/virtio/vsock/mod.rs b/src/vmm/src/devices/virtio/vsock/mod.rs
---- a/src/vmm/src/devices/virtio/vsock/mod.rs	2026-10-14 21:50:44.859039091 +0000
-+++ b/src/vmm/src/devices/virtio/vsock/mod.rs	2026-10-14 21:50:44.861039170 +0000
-@@ -32,6 +32,7 @@
+
+--- a/src/vmm/src/devices/virtio/vsock/mod.rs
++++ b/src/vmm/src/devices/virtio/vsock/mod.rs
+@@ -32,6 +32,7 @@ pub use self::unix::{VsockUnixBackend, VsockUnixBackendError};
  use super::iov_deque::IovDequeError;
  use crate::devices::virtio::iovec::IoVecError;
  use crate::devices::virtio::persist::PersistError as VirtioStateError;
@@ -80,7 +79,7 @@ diff -ruN a/src/vmm/src/devices/virtio/vsock/mod.rs b/src/vmm/src/devices/virtio
  
  mod defs {
      use crate::devices::virtio::queue::FIRECRACKER_MAX_QUEUE_SIZE;
-@@ -112,6 +113,8 @@
+@@ -112,6 +113,8 @@ pub enum VsockError {
      DescChainOverflow,
      /// The vsock header `len` field holds an invalid value: {0}
      InvalidPktLen(u32),
@@ -89,10 +88,10 @@ diff -ruN a/src/vmm/src/devices/virtio/vsock/mod.rs b/src/vmm/src/devices/virtio
      /// A data fetch was attempted when no data was available.
      NoData,
      /// A data buffer was expected for the provided packet, but it is missing.
-diff -ruN a/src/vmm/src/devices/virtio/vsock/packet.rs b/src/vmm/src/devices/virtio/vsock/packet.rs
---- a/src/vmm/src/devices/virtio/vsock/packet.rs	2026-10-14 21:50:44.859039091 +0000
-+++ b/src/vmm/src/devices/virtio/vsock/packet.rs	2026-10-14 21:50:44.862039209 +0000
-@@ -214,6 +214,11 @@
+
+--- a/src/vmm/src/devices/virtio/vsock/packet.rs
++++ b/src/vmm/src/devices/virtio/vsock/packet.rs
+@@ -220,6 +220,11 @@ impl VsockPacketTx {
          mem: &GuestMemoryMmap,
          chain: DescriptorChain,
      ) -> Result<(), VsockError> {
@@ -104,7 +103,7 @@ diff -ruN a/src/vmm/src/devices/virtio/vsock/packet.rs b/src/vmm/src/devices/vir
          // SAFETY: This descriptor chain is only loaded once
          // virtio requests are handled sequentially so no two IoVecBuffers
          // are live at the same time, meaning this has exclusive ownership over the memory
-@@ -309,6 +314,11 @@
+@@ -321,6 +326,11 @@ impl VsockPacketRx {
          mem: &GuestMemoryMmap,
          chain: DescriptorChain,
      ) -> Result<(), VsockError> {
@@ -116,7 +115,7 @@ diff -ruN a/src/vmm/src/devices/virtio/vsock/packet.rs b/src/vmm/src/devices/vir
          // SAFETY: This descriptor chain is only loaded once
          // virtio requests are handled sequentially so no two IoVecBuffers
          // are live at the same time, meaning this has exclusive ownership over the memory
-@@ -376,7 +386,9 @@
+@@ -388,7 +398,9 @@ mod tests {
      use vm_memory::Bytes;
  
      use super::*;
@@ -127,7 +126,7 @@ diff -ruN a/src/vmm/src/devices/virtio/vsock/packet.rs b/src/vmm/src/devices/vir
      use crate::devices::virtio::test_utils::VirtqDesc as GuestQDesc;
      use crate::devices::virtio::vsock::defs::MAX_PKT_BUF_SIZE;
      use crate::devices::virtio::vsock::device::{RXQ_INDEX, TXQ_INDEX};
-@@ -578,6 +590,146 @@
+@@ -590,6 +602,146 @@ mod tests {
          }
      }
  

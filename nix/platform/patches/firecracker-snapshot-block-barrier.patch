@@ -9,10 +9,12 @@ that may contain an incomplete asynchronous completion queue. Lilly retains its
 unfinished capture journal and cannot publish a ready checkpoint without the
 successful API response.
 
-diff --git a/src/vmm/src/devices/virtio/block/virtio/device.rs b/src/vmm/src/devices/virtio/block/virtio/device.rs
 --- a/src/vmm/src/devices/virtio/block/virtio/device.rs
 +++ b/src/vmm/src/devices/virtio/block/virtio/device.rs
-@@ -577,4 +577,9 @@ impl VirtioBlock {
+@@ -748,7 +748,12 @@ impl VirtioBlock {
+             return;
+         }
+ 
 -        self.drain_and_flush(false);
 +        // Snapshot publication requires a successful block barrier. A failed
 +        // barrier must never be converted into a successful memory snapshot.

@@ -365,7 +365,7 @@ assert lib.hasInfix "vsock: { guest_cid: 3, uds_path: $vsock }" bootScript;
 assert !(lib.hasInfix "boot_args" bootScript) && !(lib.hasInfix "initrd_path" bootScript);
 # Firmware and VMM provenance.
 assert firmware.pname == "cloudhv-firecracker-firmware";
-assert packages.vmm.version == "1.16.1";
+assert packages.vmm.version == "1.17.0";
 assert firmwarePatches == [
   "firecracker-snapshot-block-barrier.patch"
   "firecracker-snapshot-anonymous-restore.patch"
@@ -381,12 +381,8 @@ assert firmwarePatches == [
   "firecracker-virtio-init-queue.patch"
   "firecracker-pci-config-notify.patch"
   "firecracker-msix-reset-state.patch"
-  "firecracker-virtio-reset.patch"
-  "firecracker-net-reset-reuse.patch"
   "firecracker-virtio-blk-sg.patch"
   "firecracker-vsock-indirect-desc.patch"
-  "firecracker-vsock-reset.patch"
-  "firecracker-rng-reset.patch"
   "firecracker-uart-thre-enable.patch"
 ];
 # Builder argument validation stays in Nix evaluation.

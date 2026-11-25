@@ -1,7 +1,6 @@
-diff -ruN a/src/vmm/src/devices/virtio/transport/pci/device.rs b4/src/vmm/src/devices/virtio/transport/pci/device.rs
---- a/src/vmm/src/devices/virtio/transport/pci/device.rs	2026-10-13 16:12:21.011907968 +0000
-+++ b4/src/vmm/src/devices/virtio/transport/pci/device.rs	2026-10-13 18:10:31.409440738 +0000
-@@ -335,7 +335,14 @@
+--- a/src/vmm/src/devices/virtio/transport/pci/device.rs
++++ b/src/vmm/src/devices/virtio/transport/pci/device.rs
+@@ -346,7 +346,14 @@ impl VirtioPciDevice {
          )
      }
  
@@ -17,7 +16,7 @@ diff -ruN a/src/vmm/src/devices/virtio/transport/pci/device.rs b4/src/vmm/src/de
      ///
      /// This must happen only during the creation of a brand new VM. When a VM is restored from a
      /// known state, the BARs are already created with the right content, therefore we don't need
-@@ -361,6 +368,17 @@
+@@ -369,6 +376,17 @@ impl VirtioPciDevice {
              BarPrefetchable::No,
          );
          self.add_pci_capabilities();
@@ -34,4 +33,4 @@ diff -ruN a/src/vmm/src/devices/virtio/transport/pci/device.rs b4/src/vmm/src/de
 +        );
      }
  
-     /// Constructs a new PCI transport for the given virtio device.
+     /// Free the PCI BAR of the VirtIO device.

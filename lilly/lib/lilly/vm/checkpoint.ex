@@ -297,7 +297,7 @@ defmodule Lilly.VM.Checkpoint do
       {:ok,
        digest(
          IO.iodata_to_binary([
-           "firecracker:1.16.1:x86_64\n",
+           "firecracker:1.17.0:x86_64\n",
            build_digest,
            "\n",
            kernel | Enum.map(keys, &[&1, "=", fields[&1], "\n"])

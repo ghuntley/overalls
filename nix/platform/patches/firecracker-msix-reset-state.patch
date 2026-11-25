@@ -1,68 +1,6 @@
---- a/src/vmm/src/pci/msix.rs
-+++ b/src/vmm/src/pci/msix.rs
-@@ -110,7 +110,7 @@
-             pba_entries,
-             sbdf,
-             vectors,
--            masked: true,
-+            masked: false,
-             enabled: false,
-         }
-     }
-@@ -508,8 +508,10 @@
-     ) -> Self {
-         assert!(table_size < MAX_MSIX_VECTORS_PER_DEVICE);
- 
--        // Set the table size and enable MSI-X.
--        let msg_ctl: u16 = 0x8000u16 + table_size - 1;
-+        // MSI-X Enable and Function Mask both reset to zero. This MUST match
-+        // MsixConfig::new so a guest that conditionally enables MSI-X cannot
-+        // observe a pre-enabled capability backed by a disabled/masked VMM.
-+        let msg_ctl: u16 = table_size - 1;
- 
-         MsixCap {
-             msg_ctl,
-@@ -539,10 +541,27 @@
-     }
- 
-     #[test]
-+    fn test_native_msix_reset_state_matches_capability() {
-+        let cap = MsixCap::new(4, 2, 0, 4, 0x40000);
-+        let mut config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
-+        assert_eq!({ cap.msg_ctl }, 1);
-+        assert!(!config.enabled);
-+        assert!(!config.masked);
-+        assert!(config.table_entries.iter().all(MsixTableEntry::masked));
-+
-+        // illumos enables only when the guest-visible enable bit is clear.
-+        if cap.msg_ctl & 0x8000 == 0 {
-+            config.write_msg_ctl_register(2, &(cap.msg_ctl | 0x8000).to_le_bytes());
-+        }
-+        assert!(config.enabled);
-+        assert!(!config.masked);
-+    }
-+
-+    #[test]
-     fn test_new_msix_config() {
-         let config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
-         assert_eq!(config.sbdf, PciSBDF::from(0x42));
--        assert!(config.masked);
-+        assert!(!config.masked);
-         assert!(!config.enabled);
-         assert_eq!(config.table_entries.len(), 2);
-         assert_eq!(config.pba_entries.len(), 1);
-@@ -553,7 +572,7 @@
-         let mut config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
- 
-         assert!(!config.enabled);
--        assert!(config.masked);
-+        assert!(!config.masked);
- 
-         // Bit 15 marks whether MSI-X is enabled
-         // Bit 14 marks whether vectors are masked
 --- a/src/vmm/src/devices/virtio/transport/pci/device.rs
 +++ b/src/vmm/src/devices/virtio/transport/pci/device.rs
-@@ -805,6 +805,9 @@
+@@ -1113,6 +1113,9 @@ impl VirtioInterrupt for VirtioInterruptMsix {
          }
  
          let config = &mut self.msix_config.lock().unwrap();
@@ -72,10 +10,11 @@
          let entry = &config.table_entries[vector as usize];
          // In case the vector control register associated with the entry
          // has its first bit set, this means the vector is masked and the
-@@ -1240,6 +1243,28 @@
+@@ -1462,6 +1465,28 @@ mod tests {
+             .clone()
      }
  
-     #[test]
++    #[test]
 +    fn test_native_msix_disabled_refuses_queue_interrupt() {
 +        use crate::devices::virtio::transport::{VirtioInterrupt, VirtioInterruptType};
 +
@@ -97,7 +36,96 @@
 +        );
 +    }
 +
-+    #[test]
+     #[test]
      fn test_pci_device_config() {
-         let mut vmm = create_vmm_with_virtio_pci_device();
-         let device = get_virtio_device(&vmm);
+         let vmm = create_vmm_with_virtio_pci_device();
+
+--- a/src/vmm/src/pci/configuration.rs
++++ b/src/vmm/src/pci/configuration.rs
+@@ -656,8 +656,8 @@ mod tests {
+         assert_eq!(((reg >> 8) & 0xff) as u8, 0);
+         let msg_ctl = (reg >> 16) as u16;
+ 
+-        // MSI-X is enabled
+-        assert_eq!(msg_ctl & 0x8000, 0x8000);
++        // Overalls: MSI-X Enable resets to zero, matching MsixConfig::new
++        assert_eq!(msg_ctl & 0x8000, 0x0);
+         // Vectors are not masked
+         assert_eq!(msg_ctl & 0x4000, 0x0);
+         // Reserved bits are 0
+@@ -698,8 +698,9 @@ mod tests {
+         // Try to flip all bits
+         cfg.write_config_register(cap_reg, 2, &u16::to_le_bytes(!msg_ctl));
+         let msg_ctl = (cfg.read_reg(cap_reg) >> 16) as u16;
+-        // MSI enabled and Vectors masked should be flipped (MSI disabled and vectors masked)
+-        assert_eq!(msg_ctl & 0xc000, 0x4000);
++        // MSI enabled and Vectors masked should be flipped (Overalls: both start
++        // clear, so MSI enabled and vectors masked)
++        assert_eq!(msg_ctl & 0xc000, 0xc000);
+         // Reserved bits should still be 0
+         assert_eq!(msg_ctl & 0x3800, 0);
+         // Table size should not have changed
+
+--- a/src/vmm/src/pci/msix.rs
++++ b/src/vmm/src/pci/msix.rs
+@@ -110,7 +110,7 @@ impl MsixConfig {
+             pba_entries,
+             sbdf,
+             vectors,
+-            masked: true,
++            masked: false,
+             enabled: false,
+         }
+     }
+@@ -522,8 +522,10 @@ impl MsixCap {
+     ) -> Self {
+         assert!(table_size < MAX_MSIX_VECTORS_PER_DEVICE);
+ 
+-        // Set the table size and enable MSI-X.
+-        let msg_ctl: u16 = 0x8000u16 + table_size - 1;
++        // MSI-X Enable and Function Mask both reset to zero. This MUST match
++        // MsixConfig::new so a guest that conditionally enables MSI-X cannot
++        // observe a pre-enabled capability backed by a disabled/masked VMM.
++        let msg_ctl: u16 = table_size - 1;
+ 
+         MsixCap {
+             msg_ctl,
+@@ -603,11 +605,28 @@ mod tests {
+         MsixConfig::new(msix_vector_group(2049), PciSBDF::from(0x42));
+     }
+ 
++    #[test]
++    fn test_native_msix_reset_state_matches_capability() {
++        let cap = MsixCap::new(4, 2, 0, 4, 0x40000);
++        let mut config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
++        assert_eq!({ cap.msg_ctl }, 1);
++        assert!(!config.enabled);
++        assert!(!config.masked);
++        assert!(config.table_entries.iter().all(MsixTableEntry::masked));
++
++        // illumos enables only when the guest-visible enable bit is clear.
++        if cap.msg_ctl & 0x8000 == 0 {
++            config.write_msg_ctl_register(2, &(cap.msg_ctl | 0x8000).to_le_bytes());
++        }
++        assert!(config.enabled);
++        assert!(!config.masked);
++    }
++
+     #[test]
+     fn test_new_msix_config() {
+         let config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
+         assert_eq!(config.sbdf, PciSBDF::from(0x42));
+-        assert!(config.masked);
++        assert!(!config.masked);
+         assert!(!config.enabled);
+         assert_eq!(config.table_entries.len(), 2);
+         assert_eq!(config.pba_entries.len(), 1);
+@@ -618,7 +637,7 @@ mod tests {
+         let mut config = MsixConfig::new(msix_vector_group(2), PciSBDF::from(0x42));
+ 
+         assert!(!config.enabled);
+-        assert!(config.masked);
++        assert!(!config.masked);
+ 
+         // Bit 15 marks whether MSI-X is enabled
+         // Bit 14 marks whether vectors are masked

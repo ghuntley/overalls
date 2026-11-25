@@ -1,161 +1,113 @@
---- a/resources/seccomp/aarch64-unknown-linux-musl.json
-+++ b/resources/seccomp/aarch64-unknown-linux-musl.json
-@@ -1335,6 +1335,19 @@
-                         "comment": "KVM_IRQFD"
-                     }
-                 ]
-+            },
-+            {
-+                "syscall": "ioctl",
-+                "comment": "Needed for moving queue notification ioeventfds when the guest relocates a BAR",
-+                "args": [
-+                    {
-+                        "index": 1,
-+                        "type": "dword",
-+                        "op": "eq",
-+                        "val": 1077980793,
-+                        "comment": "KVM_IOEVENTFD"
-+                    }
-+                ]
-             }
-         ]
-     }
-
---- a/resources/seccomp/x86_64-unknown-linux-musl.json
-+++ b/resources/seccomp/x86_64-unknown-linux-musl.json
-@@ -1467,6 +1467,19 @@
-                         "comment": "KVM_IRQFD"
-                     }
-                 ]
-+            },
-+            {
-+                "syscall": "ioctl",
-+                "comment": "Needed for moving queue notification ioeventfds when the guest relocates a BAR",
-+                "args": [
-+                    {
-+                        "index": 1,
-+                        "type": "dword",
-+                        "op": "eq",
-+                        "val": 1077980793,
-+                        "comment": "KVM_IOEVENTFD"
-+                    }
-+                ]
-             }
-         ]
-     }
-
---- a/src/vmm/src/device_manager/mod.rs	2026-06-29 09:33:24.000000000 +0000
-+++ b/src/vmm/src/device_manager/mod.rs	2026-10-17 04:54:47.685774729 +0000
-@@ -603,6 +603,10 @@
-             .mmio_bus
-             .remove(pci_device.config_bar_addr(), CAPABILITY_BAR_SIZE)
-             .map_err(PciManagerError::Bus)?;
-+        vm.common
-+            .mmio_bus
-+            .remove(pci_device.msix_bar_addr(), CAPABILITY_BAR_SIZE)
-+            .map_err(PciManagerError::Bus)?;
-
-         self.pci_devices
-             .pci_segment
-@@ -911,6 +915,21 @@
-                 .virtio_devices
-                 .contains_key(&(VirtioDeviceType::Block, "block0".to_string()))
-         );
-+        // Both PCI BARs must be present before unplug and absent afterwards.
-+        let block = vmm
-+            .device_manager
-+            .pci_devices
-+            .virtio_devices
-+            .get(&(VirtioDeviceType::Block, "block0".to_string()))
-+            .unwrap()
-+            .lock()
-+            .unwrap();
-+        let config_bar = block.config_bar_addr();
-+        let msix_bar = block.msix_bar_addr();
-+        let mmio_bus = Arc::clone(&vmm.vm.as_kvm().unwrap().common.mmio_bus);
-+        assert!(mmio_bus.resolve(config_bar).is_some());
-+        assert!(mmio_bus.resolve(msix_bar).is_some());
-+        drop(block);
-
-         // Duplicate device ID is rejected
-         let cfg2 = HotplugDeviceConfig::Block(make_hotplug_block_cfg("block0", &f, false));
-@@ -945,6 +964,8 @@
-                 .virtio_devices
-                 .contains_key(&device_id)
-         );
-+        assert!(mmio_bus.resolve(config_bar).is_none());
-+        assert!(mmio_bus.resolve(msix_bar).is_none());
-     }
-
-     #[test]
-
 --- a/src/vmm/src/device_manager/pci_mngr.rs
 +++ b/src/vmm/src/device_manager/pci_mngr.rs
-@@ -102,6 +102,16 @@
-             virtio_device_locked.config_bar_addr(),
-             CAPABILITY_BAR_SIZE,
-         )?;
+@@ -88,7 +88,7 @@ impl PciDevices {
+         virtio_device: Arc<Mutex<VirtioPciDevice>>,
+         event_manager: &mut EventManager,
+     ) -> Result<(), PciManagerError> {
+-        let bar_address = {
++        let (bar_address, msix_bar_address) = {
+             let mut device = virtio_device.lock().unwrap();
+ 
+             device.register_notification_ioevents(vm)?;
+@@ -96,7 +96,7 @@ impl PciDevices {
+             let sub_id = event_manager.add_subscriber(device.virtio_device());
+             device.sub_id = Some(sub_id);
+ 
+-            device.bar_address()
++            (device.bar_address(), device.msix_bar_address())
+         };
+ 
+         self.virtio_devices
+@@ -115,6 +115,13 @@ impl PciDevices {
+         vm.common
+             .mmio_bus
+             .insert(virtio_device.clone(), bar_address, CAPABILITY_BAR_SIZE)?;
 +        debug!(
 +            "Inserting MSI-X BAR region: {:#x}:{:#x}",
-+            virtio_device_locked.msix_bar_addr(),
-+            CAPABILITY_BAR_SIZE
++            msix_bar_address, CAPABILITY_BAR_SIZE
 +        );
-+        vm.common.mmio_bus.insert(
-+            virtio_device.clone(),
-+            virtio_device_locked.msix_bar_addr(),
-+            CAPABILITY_BAR_SIZE,
-+        )?;
-
++        vm.common
++            .mmio_bus
++            .insert(virtio_device.clone(), msix_bar_address, CAPABILITY_BAR_SIZE)?;
+ 
          Ok(())
      }
-@@ -118,11 +128,11 @@
-         // We should only be reaching this point if PCI is enabled
-         let pci_segment = self.pci_segment.as_ref().unwrap();
-
--        pci_segment
--            .pci_bus
--            .lock()
--            .expect("Poisoned lock")
--            .add_device(sbdf.device(), virtio_device.clone())?;
-+        {
-+            let mut pci_bus = pci_segment.pci_bus.lock().expect("Poisoned lock");
-+            pci_bus.add_device(sbdf.device(), virtio_device.clone())?;
-+            pci_bus.set_bar_device(sbdf.device(), virtio_device.clone());
+@@ -196,13 +203,18 @@ impl PciDevices {
+             pci_device
+                 .unregister_notification_ioevents(vm)
+                 .map_err(PciManagerError::Kvm)?;
+-            (pci_device.bar_address(), pci_device.sub_id)
++            (
++                [pci_device.bar_address(), pci_device.msix_bar_address()],
++                pci_device.sub_id,
++            )
+         };
+ 
+-        vm.common
+-            .mmio_bus
+-            .remove(bar_addr, CAPABILITY_BAR_SIZE)
+-            .map_err(PciManagerError::Bus)?;
++        for bar_addr in bar_addr {
++            vm.common
++                .mmio_bus
++                .remove(bar_addr, CAPABILITY_BAR_SIZE)
++                .map_err(PciManagerError::Bus)?;
 +        }
-
-         self.virtio_devices
-             .insert((device_type, id), virtio_device.clone());
-
---- a/src/vmm/src/devices/pci/pci_segment.rs
-+++ b/src/vmm/src/devices/pci/pci_segment.rs
-@@ -72,7 +72,10 @@
- impl PciSegment {
-     fn build(id: u16, vm: &Arc<KvmVm>, pci_irq_slots: &[u8; 32]) -> Result<PciSegment, BusError> {
-         let pci_root = PciRoot::new(None);
--        let pci_bus = Arc::new(Mutex::new(PciBus::new(pci_root)));
-+        let pci_bus = Arc::new(Mutex::new(PciBus::new(
-+            pci_root,
-+            Arc::clone(&vm.common.mmio_bus),
-+        )));
-
-         let pci_config_mmio = Arc::new(Mutex::new(PciConfigMmio::new(Arc::clone(&pci_bus))));
-         let mmio_config_address = PCI_MMCONFIG_START + PCI_MMIO_CONFIG_SIZE_PER_SEGMENT * id as u64;
+ 
+         if let Some(sub_id) = sub_id
+             && event_manager.remove_subscriber(sub_id).is_err()
+@@ -213,7 +225,7 @@ impl PciDevices {
+         pci_device_arc
+             .lock()
+             .expect("Poisoned lock")
+-            .free_bars(&mut vm.resource_allocator().mmio64_memory);
++            .free_bars(&mut vm.resource_allocator());
+ 
+         // Ensure no other references to the device remain, so it is freed when
+         // this function returns.
 
 --- a/src/vmm/src/devices/virtio/transport/pci/device.rs
 +++ b/src/vmm/src/devices/virtio/transport/pci/device.rs
-@@ -53,6 +53,11 @@
-
+@@ -40,13 +40,38 @@ use crate::pci::{
+ };
+ use crate::vstate::bus::BusDevice;
+ use crate::vstate::interrupts::{InterruptError, MsixVectorGroup};
++use crate::vstate::resources::ResourceAllocator;
+ use crate::vstate::vm::KvmVm;
+ 
++/// Address range of a capability-sized BAR at `base`.
++fn bar_range(base: u64) -> RangeInclusive {
++    let end = base
++        .checked_add(CAPABILITY_BAR_SIZE - 1)
++        .expect("virtio-pci BAR end address overflows");
++    RangeInclusive::new(base, end).expect("Invalid virtio-pci BAR range")
++}
++
++/// The device window holding `base`: a guest may place a BAR in either of
++/// the PCI host bridge's memory windows.
++fn bar_allocator(allocator: &mut ResourceAllocator, base: u64) -> &mut AddressAllocator {
++    if base < 1 << 32 {
++        &mut allocator.mmio32_memory
++    } else {
++        &mut allocator.mmio64_memory
++    }
++}
++
+ /// Vector value used to disable MSI for a queue.
+ pub const VIRTQ_MSI_NO_VECTOR: u16 = 0xffff;
+ 
  /// BAR index we are using for VirtIO configuration
  const VIRTIO_BAR_INDEX: u8 = 0;
 +/// BAR used for the MSI-X table and pending-bit array.
 +///
-+/// Keep MSI-X in a separate BAR: FreeBSD maps the table through the BIR from
-+/// the capability and rejects a table that shares the virtio capability BAR.
++/// Overalls: keep MSI-X in a separate BAR. FreeBSD maps the table through the
++/// BIR from the capability and rejects a table that shares the virtio
++/// capability BAR.
 +const MSIX_BAR_INDEX: u8 = 4;
-
+ 
  enum PciCapabilityType {
      Common = 1,
-@@ -218,11 +223,11 @@
+@@ -213,11 +238,11 @@ const DEVICE_CONFIG_BAR_OFFSET: u32 = 0x4000;
  const DEVICE_CONFIG_SIZE: u32 = 0x1000;
  const NOTIFICATION_BAR_OFFSET: u32 = 0x6000;
  const NOTIFICATION_SIZE: u32 = 0x1000;
@@ -169,23 +121,26 @@
  // The size is 2KiB because the Pending Bit Array has one bit per vector and it
  // can support up to 2048 vectors.
  const MSIX_PBA_SIZE: u32 = 0x800;
-@@ -270,6 +275,11 @@
-     configuration: PciConfiguration,
-     // BARs region from configuration space handled separately
-     bars: Bars,
-+    /// BAR move requested by the guest, collected by the PCI bus.
-+    pending_bar_relocation: Option<BarReprogrammingParams>,
-+    /// Original address captured while firmware writes the low half of a 64-bit BAR.
-+    /// Relocation is emitted only after the high half completes the address.
-+    pending_bar_bases: [Option<u64>; NUM_BAR_REGS as usize],
-
-     // virtio PCI common configuration
-     common_config: VirtioPciCommonConfig,
-@@ -380,1 +380,18 @@
-+        // MSI-X has its own BAR.  PCI consumers are allowed to map each BIR
+@@ -298,6 +323,11 @@ pub struct VirtioPciDevice {
+     // yet in effect.
+     bar_address: u64,
+ 
++    // GPA base at which the MSI-X BAR is currently mapped on the mmio bus.
++    // 0 means unmapped. Not part of the snapshot state: a restore maps it at
++    // the address held in the BAR registers.
++    msix_bar_address: u64,
++
+     // Add a dedicated structure to hold information about the very specific
+     // virtio-pci capability VIRTIO_PCI_CAP_PCI_CFG. This is needed to support
+     // the legacy/backward compatible mechanism of letting the guest access the
+@@ -375,6 +405,23 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+             CAPABILITY_BAR_SIZE,
+             BarPrefetchable::No,
+         );
++        // MSI-X has its own BAR. PCI consumers are allowed to map each BIR
 +        // independently; in particular FreeBSD's virtio-pci driver allocates
 +        // a resource for the MSI-X table BAR before attaching vtblk.
-+        let msix_bar_addr = mmio64_allocator
++        self.msix_bar_address = mmio64_allocator
 +            .allocate(
 +                CAPABILITY_BAR_SIZE,
 +                CAPABILITY_BAR_SIZE,
@@ -195,43 +150,89 @@
 +            .start();
 +        self.bars.set_bar_64(
 +            MSIX_BAR_INDEX,
-+            msix_bar_addr,
++            self.msix_bar_address,
 +            CAPABILITY_BAR_SIZE,
 +            BarPrefetchable::No,
 +        );
          self.add_pci_capabilities();
-@@ -407,6 +453,8 @@
-             memory,
+         // Firecracker assigns every BAR itself and cannot relocate one, so
+         // the device leaves the VMM in the state a firmware would leave it
+@@ -389,18 +436,16 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+         );
+     }
+ 
+-    /// Free the PCI BAR of the VirtIO device.
+-    pub fn free_bars(&mut self, mmio64_allocator: &mut AddressAllocator) {
+-        let bar_end = self
+-            .bar_address
+-            .checked_add(CAPABILITY_BAR_SIZE - 1)
+-            .expect("virtio-pci BAR end address overflows");
+-        let range =
+-            RangeInclusive::new(self.bar_address, bar_end).expect("Invalid virtio-pci BAR range");
+-        mmio64_allocator
+-            .free(&range)
+-            .expect("virtio-pci BAR is not allocated");
++    /// Free the PCI BARs of the VirtIO device.
++    pub fn free_bars(&mut self, resource_allocator: &mut ResourceAllocator) {
++        for base in [self.bar_address, self.msix_bar_address] {
++            let range = bar_range(base);
++            bar_allocator(resource_allocator, base)
++                .free(&range)
++                .expect("virtio-pci BAR is not allocated");
++        }
+         self.bar_address = 0;
++        self.msix_bar_address = 0;
+     }
+ 
+     /// Constructs a new PCI transport for the given virtio device.
+@@ -445,6 +490,7 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+             virtio_interrupt: Some(interrupt),
+             vm: vm.clone(),
+             bar_address: 0,
++            msix_bar_address: 0,
              cap_pci_cfg_info: VirtioPciCfgCapInfo::default(),
              bars: Bars::default(),
-+            pending_bar_relocation: None,
-+            pending_bar_bases: [None; NUM_BAR_REGS as usize],
              msix_config,
-             msix_config_cap_offset: 0,
-         };
-@@ -467,6 +515,8 @@
-             memory: vm.guest_memory().clone(),
+@@ -508,6 +554,12 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+         {
+             return Err(PciConfigurationError::InvalidBarIdx(VIRTIO_BAR_INDEX).into());
+         }
++        if !state.bars.bar_idx_valid(MSIX_BAR_INDEX)
++            || !state.bars.bars[MSIX_BAR_INDEX as usize].is_64bit()
++        {
++            return Err(PciConfigurationError::InvalidBarIdx(MSIX_BAR_INDEX).into());
++        }
++        let msix_bar_address = state.bars.get_bar_addr_64(MSIX_BAR_INDEX);
+ 
+         let virtio_pci_device = VirtioPciDevice {
+             id,
+@@ -520,6 +572,7 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+             virtio_interrupt: Some(interrupt),
+             vm: vm.clone(),
+             bar_address: state.bar_address,
++            msix_bar_address,
              cap_pci_cfg_info,
              bars: state.bars,
-+            pending_bar_relocation: None,
-+            pending_bar_bases: [None; NUM_BAR_REGS as usize],
              msix_config,
-             msix_config_cap_offset: state.msix_config_cap_offset,
-         };
-@@ -499,6 +549,11 @@
-         self.bars.get_bar_addr_64(VIRTIO_BAR_INDEX)
+@@ -575,6 +628,16 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+         self.bar_address
      }
-
-+    /// Address of the BAR containing the MSI-X table and pending-bit array.
-+    pub fn msix_bar_addr(&self) -> u64 {
+ 
++    /// GPA base currently written in the MSI-X BAR register.
++    pub fn config_msix_bar_addr(&self) -> u64 {
 +        self.bars.get_bar_addr_64(MSIX_BAR_INDEX)
++    }
++
++    /// GPA base at which the MSI-X BAR is currently mapped on the mmio bus.
++    pub fn msix_bar_address(&self) -> u64 {
++        self.msix_bar_address
 +    }
 +
      fn add_pci_capabilities(&mut self) {
          // Add pointers to the different configuration structures from the PCI capabilities.
          let common_cap = VirtioPciCap::new(
-@@ -539,7 +594,7 @@
-
+@@ -615,7 +678,7 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+ 
          if let Some(interrupt) = &self.virtio_interrupt {
              let msix_cap = MsixCap::new(
 -                VIRTIO_BAR_INDEX,
@@ -239,7 +240,7 @@
                  interrupt
                      .msix_config
                      .lock()
-@@ -547,7 +602,7 @@
+@@ -623,7 +686,7 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
                      .vectors
                      .num_vectors(),
                  MSIX_TABLE_BAR_OFFSET,
@@ -248,152 +249,260 @@
                  MSIX_PBA_BAR_OFFSET,
              );
              // The whole Configuration region is 4K, so u16 can address it all
-@@ -639,6 +694,46 @@
-         Ok(())
+@@ -729,69 +792,180 @@ const COMMAND_BUS_MASTER: u16 = 1 << 2;
+         self.configuration.read_reg(COMMAND_REG) & COMMAND_MEMORY_SPACE_ENABLE != 0
      }
-
-+    /// Move the queue notification ioeventfds after the guest relocated the BAR,
-+    /// so doorbell writes at the new address still reach the device.
-+    fn move_notification_ioevents(&self, old_base: u64, new_base: u64) {
-+        let Some(interrupt) = self.virtio_interrupt.as_ref() else {
-+            return;
-+        };
-+        let vm = &interrupt.vectors.vm;
-+        let device = self.device.lock().expect("Poisoned lock");
-+        for (i, queue_evt) in device.queue_events().iter().enumerate() {
-+            let offset =
-+                u64::from(NOTIFICATION_BAR_OFFSET) + i as u64 * u64::from(NOTIFY_OFF_MULTIPLIER);
-+            let old_addr = IoEventAddress::Mmio(old_base + offset);
-+            let new_addr = IoEventAddress::Mmio(new_base + offset);
-+            if let Err(err) = vm
-+                .fd()
-+                .unregister_ioevent(queue_evt, &old_addr, NoDatamatch)
+ 
+-    /// Relocate the PCI bar if a new address was written to the registers
++    /// Relocate the PCI BARs whose registers hold a new address.
++    ///
++    /// Overalls: both the capability BAR and the separate MSI-X BAR follow
++    /// the guest, and they move together so a firmware may swap them. Nothing
++    /// moves unless every new range can be reserved and mapped.
+     fn maybe_relocate_bar(&mut self) {
+-        let old_base = self.bar_address;
+-        let new_base = self.config_bar_addr();
+-        if new_base == old_base {
++        let moves: Vec<(u8, u64, u64)> = [
++            (VIRTIO_BAR_INDEX, self.bar_address, self.config_bar_addr()),
++            (
++                MSIX_BAR_INDEX,
++                self.msix_bar_address,
++                self.config_msix_bar_addr(),
++            ),
++        ]
++        .into_iter()
++        .filter(|(_, old_base, new_base)| old_base != new_base)
++        .collect();
++        if moves.is_empty() {
+             return;
+         }
+ 
+-        // Try to allocate the new range from the resource allocator.
+-        let new_range = match self.vm.resource_allocator().mmio64_memory.allocate(
+-            CAPABILITY_BAR_SIZE,
+-            CAPABILITY_BAR_SIZE,
+-            AllocPolicy::ExactMatch(new_base),
+-        ) {
+-            Ok(range) => range,
+-            Err(err) => {
+-                error!("Cannot reserve relocated BAR range at {new_base:#x}: {err:?}");
+-                return;
++        // Release the old ranges first so the BARs of this device may trade
++        // places, then reserve every new range or restore the old ones.
++        {
++            let mut allocator = self.vm.resource_allocator();
++            for &(_, old_base, _) in &moves {
++                let _ = bar_allocator(&mut allocator, old_base).free(&bar_range(old_base));
++            }
++            let mut reserved = Vec::with_capacity(moves.len());
++            for &(_, _, new_base) in &moves {
++                match bar_allocator(&mut allocator, new_base).allocate(
++                    CAPABILITY_BAR_SIZE,
++                    CAPABILITY_BAR_SIZE,
++                    AllocPolicy::ExactMatch(new_base),
++                ) {
++                    Ok(_) => reserved.push(new_base),
++                    Err(err) => {
++                        error!("Cannot reserve relocated BAR range at {new_base:#x}: {err:?}");
++                        for base in reserved {
++                            let _ = bar_allocator(&mut allocator, base).free(&bar_range(base));
++                        }
++                        for &(_, old_base, _) in &moves {
++                            let _ = bar_allocator(&mut allocator, old_base).allocate(
++                                CAPABILITY_BAR_SIZE,
++                                CAPABILITY_BAR_SIZE,
++                                AllocPolicy::ExactMatch(old_base),
++                            );
++                        }
++                        return;
++                    }
++                }
++            }
++        }
++
++        let release_new = |device: &Self| {
++            let mut allocator = device.vm.resource_allocator();
++            for &(_, old_base, new_base) in &moves {
++                let _ = bar_allocator(&mut allocator, new_base).free(&bar_range(new_base));
++                let _ = bar_allocator(&mut allocator, old_base).allocate(
++                    CAPABILITY_BAR_SIZE,
++                    CAPABILITY_BAR_SIZE,
++                    AllocPolicy::ExactMatch(old_base),
++                );
+             }
+         };
+ 
+         // Register the new notification ioeventfds first. If this fails
+         // nothing has moved yet, so the device keeps working at its old base.
+-        if let Err(err) = self.set_notification_ioevents(&self.vm, new_base, true) {
++        let notify_move = moves
++            .iter()
++            .find(|(bar_idx, _, _)| *bar_idx == VIRTIO_BAR_INDEX)
++            .map(|&(_, old_base, new_base)| (old_base, new_base));
++        if let Some((_, new_base)) = notify_move
++            && let Err(err) = self.set_notification_ioevents(&self.vm, new_base, true)
++        {
+             error!("Failed to add notification ioeventfds at {new_base:#x}: {err:?}");
+             // set_notification_ioevents() might leave some ioeventfds
+-            // registered in case of failure. Do not return the possibly
+-            // "poisoned" address range to the mmio64_allocator.
++            // registered in case of failure. Keep the possibly "poisoned"
++            // new range reserved and the old ranges released.
+             return;
+         }
+ 
+-        if let Err(err) =
+-            self.vm
+-                .common
+-                .mmio_bus
+-                .move_range(old_base, new_base, CAPABILITY_BAR_SIZE)
+-        {
+-            error!("Failed to relocate BAR mapping {old_base:#x} -> {new_base:#x}: {err:?}");
+-            if let Err(err) = self.set_notification_ioevents(&self.vm, new_base, false) {
+-                error!("Failed to remove notification ioeventfds at {new_base:#x}: {err:?}");
+-                // As above, only release the old range if it has no ioeventfds left.
+-            } else {
+-                let _ = self.vm.resource_allocator().mmio64_memory.free(&new_range);
++        let bus_moves: Vec<(u64, u64, u64)> = moves
++            .iter()
++            .map(|&(_, old_base, new_base)| (old_base, new_base, CAPABILITY_BAR_SIZE))
++            .collect();
++        if let Err(err) = self.vm.common.mmio_bus.move_ranges(&bus_moves) {
++            error!("Failed to relocate BAR mappings {bus_moves:#x?}: {err:?}");
++            if let Some((_, new_base)) = notify_move {
++                if let Err(err) = self.set_notification_ioevents(&self.vm, new_base, false) {
++                    error!("Failed to remove notification ioeventfds at {new_base:#x}: {err:?}");
++                    return;
++                }
+             }
++            release_new(self);
+             return;
+         }
+ 
+-        if let Err(err) = self.set_notification_ioevents(&self.vm, old_base, false) {
+-            // As above, only release the old range if it has no ioeventfds left.
++        if let Some((old_base, _)) = notify_move
++            && let Err(err) = self.set_notification_ioevents(&self.vm, old_base, false)
++        {
+             error!("Failed to remove old notification ioeventfds at {old_base:#x}: {err:?}");
+-        } else {
+-            // SAFETY: old_base was allocated from the resource allocator, comes
+-            // from a previous relocation which validated it, or comes from a
+-            // snapshot, which is trusted. So the range is always valid.
+-            let old_end = old_base
+-                .checked_add(CAPABILITY_BAR_SIZE - 1)
+-                .expect("BAR end address overflows");
+-            let old_range = RangeInclusive::new(old_base, old_end).expect("Invalid BAR range");
+-            let _ = self.vm.resource_allocator().mmio64_memory.free(&old_range);
+         }
+ 
+-        self.bar_address = new_base;
+-        debug!("Relocated virtio-pci BAR mapping {old_base:#x} -> {new_base:#x}");
++        for &(bar_idx, old_base, new_base) in &moves {
++            if bar_idx == VIRTIO_BAR_INDEX {
++                self.bar_address = new_base;
++            } else {
++                self.msix_bar_address = new_base;
++            }
++            debug!("Relocated virtio-pci BAR {bar_idx} mapping {old_base:#x} -> {new_base:#x}");
++        }
++    }
++
++    /// Serve a read from the MSI-X table and pending-bit array BAR.
++    fn read_msix_bar(&mut self, offset: u64, data: &mut [u8]) {
++        match offset {
++            o if (u64::from(MSIX_TABLE_BAR_OFFSET)
++                ..u64::from(MSIX_TABLE_BAR_OFFSET + MSIX_TABLE_SIZE))
++                .contains(&o) =>
 +            {
-+                warn!(
-+                    "pci: cannot unregister notification ioevent at {:#x}: {err}",
-+                    old_base + offset
-+                );
++                if let Some(interrupt) = &self.virtio_interrupt {
++                    interrupt
++                        .msix_config
++                        .lock()
++                        .unwrap()
++                        .read_table(o - u64::from(MSIX_TABLE_BAR_OFFSET), data);
++                }
 +            }
-+            if let Err(err) = vm.fd().register_ioevent(queue_evt, &new_addr, NoDatamatch) {
-+                warn!(
-+                    "pci: cannot register notification ioevent at {:#x}: {err}",
-+                    new_base + offset
-+                );
++            o if (u64::from(MSIX_PBA_BAR_OFFSET)
++                ..u64::from(MSIX_PBA_BAR_OFFSET + MSIX_PBA_SIZE))
++                .contains(&o) =>
++            {
++                if let Some(interrupt) = &self.virtio_interrupt {
++                    interrupt
++                        .msix_config
++                        .lock()
++                        .unwrap()
++                        .read_pba(o - u64::from(MSIX_PBA_BAR_OFFSET), data);
++                }
 +            }
++            _ => data.fill(0),
 +        }
 +    }
 +
-+    /// Complete a successful MMIO BAR move. The PCI bus invokes this only after
-+    /// replacing the old range, so queue doorbells never point at an unregistered
-+    /// address while the bus is resolving accesses.
-+    fn bar_reprogrammed(&mut self, params: &BarReprogrammingParams) {
-+        if params.bar_idx == VIRTIO_BAR_INDEX {
-+            self.move_notification_ioevents(params.old_base, params.new_base);
++    /// Serve a write to the MSI-X table and pending-bit array BAR.
++    fn write_msix_bar(&mut self, offset: u64, data: &[u8]) {
++        match offset {
++            o if (u64::from(MSIX_TABLE_BAR_OFFSET)
++                ..u64::from(MSIX_TABLE_BAR_OFFSET + MSIX_TABLE_SIZE))
++                .contains(&o) =>
++            {
++                if let Some(interrupt) = &self.virtio_interrupt {
++                    interrupt
++                        .msix_config
++                        .lock()
++                        .unwrap()
++                        .write_table(o - u64::from(MSIX_TABLE_BAR_OFFSET), data);
++                }
++            }
++            o if (u64::from(MSIX_PBA_BAR_OFFSET)
++                ..u64::from(MSIX_PBA_BAR_OFFSET + MSIX_PBA_SIZE))
++                .contains(&o) =>
++            {
++                if let Some(interrupt) = &self.virtio_interrupt {
++                    interrupt
++                        .msix_config
++                        .lock()
++                        .unwrap()
++                        .write_pba(o - u64::from(MSIX_PBA_BAR_OFFSET), data);
++                }
++            }
++            _ => (),
 +        }
-+    }
-+
-     pub fn state(&self) -> VirtioPciDeviceState {
-         VirtioPciDeviceState {
-             sbdf: self.sbdf,
-@@ -767,7 +862,46 @@
-             // reg_idx is in [BAR0_REG_IDX, BAR0_REG_IDX+NUM_BAR_REGS), so the difference is 0..5.
+     }
+ 
+     /// Register the IoEvent notifications for a VirtIO device.
+@@ -996,6 +1170,16 @@ impl PciDevice for VirtioPciDevice {
              #[allow(clippy::cast_possible_truncation)]
              let bar_idx = (reg_idx - BAR0_REG_IDX) as u8;
-+            // A 64-bit BAR occupies two config registers. Normalize writes to
-+            // the high half so the bus relocates the complete BAR range.
-+            let bar_base_idx = match bar_idx {
-+                1 => VIRTIO_BAR_INDEX,
-+                5 => MSIX_BAR_INDEX,
-+                _ => bar_idx,
-+            };
-+            let old_base = self.bars.get_bar_addr_64(bar_base_idx);
-+            let sizing_probe = offset == 0
-+                && data.len() == 4
-+                && u32::from_le_bytes(data.try_into().unwrap()) == u32::MAX;
              self.bars.write(bar_idx, offset, data);
-+            if sizing_probe {
-+                return None;
-+            }
-+            let new_base = self.bars.get_bar_addr_64(bar_base_idx);
-+            if bar_idx == bar_base_idx {
-+                if new_base != old_base {
-+                    // Firmware writes the low half first. Keep the original
-+                    // base until the high half has been written, otherwise
-+                    // two devices can transiently claim the same address.
-+                    self.pending_bar_bases[bar_base_idx as usize] =
-+                        Some(self.pending_bar_bases[bar_base_idx as usize].unwrap_or(old_base));
-+                }
-+            } else {
-+                // A high-half write completes the pending sequence even when
-+                // its value is unchanged. Firmware commonly writes both halves
-+                // unconditionally after changing only the low half.
-+                let relocation_old = self.pending_bar_bases[bar_base_idx as usize]
-+                    .take()
-+                    .unwrap_or(old_base);
-+                if relocation_old != new_base {
-+                    self.pending_bar_relocation = Some(BarReprogrammingParams {
-+                        bar_idx: bar_base_idx,
-+                        old_base: relocation_old,
-+                        new_base,
-+                        len: CAPABILITY_BAR_SIZE,
-+                    });
-+                }
++            // Overalls: the device decodes from creation, so firmware and
++            // guests may reprogram a BAR without toggling memory decoding.
++            // Writing the high half of a 64-bit BAR completes the address;
++            // an all-ones sizing probe does not.
++            let completes_address =
++                bar_idx == VIRTIO_BAR_INDEX + 1 || bar_idx == MSIX_BAR_INDEX + 1;
++            let sizing_probe = offset == 0 && data.len() == 4 && data.iter().all(|b| *b == 0xff);
++            if completes_address && !sizing_probe && self.memory_space_enabled() {
++                self.maybe_relocate_bar();
 +            }
              None
          } else if in_msix_cap_header {
              // For the MsixCap structure, we need to capture writes to the second 2 bytes
-@@ -790,6 +923,10 @@
+@@ -1051,7 +1235,11 @@ impl PciDevice for VirtioPciDevice {
          }
      }
-
-+    fn take_bar_reprogramming(&mut self) -> Option<BarReprogrammingParams> {
-+        self.pending_bar_relocation.take()
-+    }
-+
-     fn read_config_register(&mut self, reg_idx: u16) -> u32 {
-         let in_bars = BAR0_REG_IDX <= reg_idx && reg_idx < BAR0_REG_IDX + u16::from(NUM_BAR_REGS);
-         let in_pci_cfg = self.cap_pci_cfg_info.in_range(reg_idx, 0, 4);
-@@ -819,7 +956,38 @@
-         }
-     }
-
+ 
 -    fn read_bar(&mut self, _base: u64, offset: u64, data: &mut [u8]) {
 +    fn read_bar(&mut self, base: u64, offset: u64, data: &mut [u8]) {
-+        if base == self.msix_bar_addr() {
-+            match offset {
-+                o if (u64::from(MSIX_TABLE_BAR_OFFSET)
-+                    ..u64::from(MSIX_TABLE_BAR_OFFSET + MSIX_TABLE_SIZE))
-+                    .contains(&o) =>
-+                {
-+                    if let Some(interrupt) = &self.virtio_interrupt {
-+                        interrupt
-+                            .msix_config
-+                            .lock()
-+                            .unwrap()
-+                            .read_table(o - u64::from(MSIX_TABLE_BAR_OFFSET), data);
-+                    }
-+                }
-+                o if (u64::from(MSIX_PBA_BAR_OFFSET)
-+                    ..u64::from(MSIX_PBA_BAR_OFFSET + MSIX_PBA_SIZE))
-+                    .contains(&o) =>
-+                {
-+                    if let Some(interrupt) = &self.virtio_interrupt {
-+                        interrupt
-+                            .msix_config
-+                            .lock()
-+                            .unwrap()
-+                            .read_pba(o - u64::from(MSIX_PBA_BAR_OFFSET), data);
-+                    }
-+                }
-+                _ => data.fill(0),
-+            }
++        if base == self.msix_bar_address {
++            self.read_msix_bar(offset, data);
 +            return;
 +        }
-+
          match offset {
              o if o < u64::from(COMMON_CONFIG_BAR_OFFSET + COMMON_CONFIG_SIZE) => {
                  self.common_config.read(
-@@ -850,35 +1018,42 @@
+@@ -1082,35 +1270,15 @@ impl PciDevice for VirtioPciDevice {
                  // Handled with ioeventfds.
                  warn!("pci: unexpected read to notification BAR. Offset {o:#x}");
              }
@@ -407,25 +516,7 @@
 -                        .lock()
 -                        .unwrap()
 -                        .read_table(o - u64::from(MSIX_TABLE_BAR_OFFSET), data);
-+            _ => (),
-+        }
-+    }
-+
-+    fn write_bar(&mut self, base: u64, offset: u64, data: &[u8]) -> Option<Arc<Barrier>> {
-+        if base == self.msix_bar_addr() {
-+            match offset {
-+                o if (u64::from(MSIX_TABLE_BAR_OFFSET)
-+                    ..u64::from(MSIX_TABLE_BAR_OFFSET + MSIX_TABLE_SIZE))
-+                    .contains(&o) =>
-+                {
-+                    if let Some(interrupt) = &self.virtio_interrupt {
-+                        interrupt
-+                            .msix_config
-+                            .lock()
-+                            .unwrap()
-+                            .write_table(o - u64::from(MSIX_TABLE_BAR_OFFSET), data);
-+                    }
-                 }
+-                }
 -            }
 -            o if (u64::from(MSIX_PBA_BAR_OFFSET)
 -                ..u64::from(MSIX_PBA_BAR_OFFSET + MSIX_PBA_SIZE))
@@ -437,30 +528,22 @@
 -                        .lock()
 -                        .unwrap()
 -                        .read_pba(o - u64::from(MSIX_PBA_BAR_OFFSET), data);
-+                o if (u64::from(MSIX_PBA_BAR_OFFSET)
-+                    ..u64::from(MSIX_PBA_BAR_OFFSET + MSIX_PBA_SIZE))
-+                    .contains(&o) =>
-+                {
-+                    if let Some(interrupt) = &self.virtio_interrupt {
-+                        interrupt
-+                            .msix_config
-+                            .lock()
-+                            .unwrap()
-+                            .write_pba(o - u64::from(MSIX_PBA_BAR_OFFSET), data);
-+                    }
-                 }
-+                _ => {}
-             }
--            _ => (),
-+            return None;
+-                }
+-            }
+             _ => (),
          }
--    }
-
+     }
+ 
 -    fn write_bar(&mut self, _base: u64, offset: u64, data: &[u8]) -> Option<Arc<Barrier>> {
++    fn write_bar(&mut self, base: u64, offset: u64, data: &[u8]) -> Option<Arc<Barrier>> {
++        if base == self.msix_bar_address {
++            self.write_msix_bar(offset, data);
++            return None;
++        }
          match offset {
              o if o < u64::from(COMMON_CONFIG_BAR_OFFSET + COMMON_CONFIG_SIZE) => {
                  self.common_config.write(
-@@ -909,30 +1084,6 @@
+@@ -1141,30 +1309,6 @@ impl PciDevice for VirtioPciDevice {
                  // Handled with ioeventfds.
                  warn!("pci: unexpected write to notification BAR. Offset {o:#x}");
              }
@@ -490,497 +573,258 @@
 -            }
              _ => (),
          };
-
-@@ -1022,7 +1171,7 @@
-     use linux_loader::loader::Cmdline;
+ 
+@@ -1249,7 +1393,10 @@ mod tests {
+     use vm_allocator::{AllocPolicy, RangeInclusive};
      use vm_memory::{ByteValued, Le32};
-
--    use super::{PciCapabilityType, VirtioPciDevice};
-+    use super::{CAPABILITY_BAR_SIZE, PciCapabilityType, VIRTIO_BAR_INDEX, VirtioPciDevice};
+ 
+-    use super::{EventFd, IoEventAddress, KvmVm, NoDatamatch, PciCapabilityType, VirtioPciDevice};
++    use super::{
++        EventFd, IoEventAddress, KvmVm, MSIX_BAR_INDEX, NoDatamatch, PciCapabilityType,
++        VirtioPciDevice,
++    };
      use crate::Vmm;
-     use crate::arch::MEM_64BIT_DEVICES_START;
-     use crate::builder::tests::default_vmm;
-@@ -1170,6 +1319,53 @@
-     }
-
-     #[test]
-+    fn test_bar_relocation_moves_notification_ioevents() {
-+        use kvm_ioctls::{IoEventAddress, NoDatamatch};
-+
-+        let vmm = create_vmm_with_virtio_pci_device();
-+        let device = get_virtio_device(&vmm);
-+        let mut pci_device = device.lock().unwrap();
-+        let old_base = pci_device.config_bar_addr();
-+        // The guest rewrites the high half of the 64-bit BAR.
-+        let new_base = old_base + (1u64 << 32);
-+        pci_device.write_config_register(0x5, 0, &((new_base >> 32) as u32).to_le_bytes());
-+        assert_eq!(pci_device.config_bar_addr(), new_base);
-+        let params = pci_device.take_bar_reprogramming().unwrap();
-+        assert_eq!((params.old_base, params.new_base), (old_base, new_base));
-+        pci_device.bar_reprogrammed(&params);
-+        assert!(pci_device.take_bar_reprogramming().is_none());
-+
-+        // The doorbell moved with the BAR: the new address is taken, the old one is free.
-+        let vm = vmm.vm.as_kvm().unwrap();
-+        let virtio_device = pci_device.virtio_device();
-+        let virtio_device = virtio_device.lock().unwrap();
-+        let queue_evt = &virtio_device.queue_events()[0];
-+        let notify = |base: u64| IoEventAddress::Mmio(base + u64::from(NOTIFICATION_BAR_OFFSET));
-+        vm.fd()
-+            .register_ioevent(queue_evt, &notify(new_base), NoDatamatch)
-+            .unwrap_err();
-+        vm.fd()
-+            .register_ioevent(queue_evt, &notify(old_base), NoDatamatch)
-+            .unwrap();
-+    }
-+
-+    #[test]
-+    fn test_bar_relocation_defers_until_high_half() {
-+        let vmm = create_vmm_with_virtio_pci_device();
-+        let device = get_virtio_device(&vmm);
-+        let mut pci_device = device.lock().unwrap();
-+        let old_base = pci_device.config_bar_addr();
-+        let new_base = old_base + CAPABILITY_BAR_SIZE;
-+
-+        pci_device.write_config_register(0x4, 0, &(new_base as u32).to_le_bytes());
-+        assert!(pci_device.take_bar_reprogramming().is_none());
-+        pci_device.write_config_register(0x5, 0, &((new_base >> 32) as u32).to_le_bytes());
-+        let params = pci_device.take_bar_reprogramming().unwrap();
-+        assert_eq!(params.bar_idx, VIRTIO_BAR_INDEX);
-+        assert_eq!((params.old_base, params.new_base), (old_base, new_base));
-+    }
-+
-+    #[test]
-     fn test_reading_bars() {
-         let mut vmm = create_vmm_with_virtio_pci_device();
+     use crate::arch::{MEM_64BIT_DEVICES_SIZE, MEM_64BIT_DEVICES_START};
+     use crate::builder::tests::default_vmm_with_pci;
+@@ -1327,8 +1474,9 @@ mod tests {
+         //              |------------|-----------|
+         // regiger 0x1: |   Status   |  Command  |
+         // We offer the capabilities list (bit 4 of status register) at offset 0x34
++        // Overalls: memory decoding and bus mastering start enabled.
+         let reg1 = locked_virtio_pci_device.read_config_register(1);
+-        assert_eq!(reg1, 0x0010_0000);
++        assert_eq!(reg1, 0x0010_0006);
+ 
+         //               |   8 bits   |  8 bits  | 8 bits  |    8 bits   |
+         // register 0x2: | Class code | Subclass | Prog IF | Revision ID |
+@@ -1494,11 +1642,13 @@ mod tests {
+         let vmm = create_vmm_with_virtio_pci_device();
          let device = get_virtio_device(&vmm);
-@@ -1207,6 +1403,17 @@
-         // region
-         assert_eq!(bar_addr & 0xffff_ffff_ffff_fff0, MEM_64BIT_DEVICES_START);
-
-+        // MSI-X is advertised in a separate BAR so FreeBSD can allocate the
-+        // table resource using the capability's BIR.
-+        let msix_bar_lo = locked_virtio_pci_device.read_config_register(0x8);
-+        let msix_bar_hi = locked_virtio_pci_device.read_config_register(0x9);
-+        let msix_bar = msix_bar_lo as u64 + ((msix_bar_hi as u64) << 32);
-+        assert_ne!(
-+            msix_bar & 0xffff_ffff_ffff_fff0,
-+            bar_addr & 0xffff_ffff_ffff_fff0
-+        );
-+        assert_eq!(msix_bar & (CAPABILITY_BAR_SIZE - 1), 0);
-+
-         // Reading the BAR size is a bit more convoluted. According to OSDev wiki:
-         //
-         // To determine the amount of address space needed by a PCI device, you must save the
---- a/src/vmm/src/pci/bus.rs	2026-06-29 09:33:24.000000000 +0000
-+++ b/src/vmm/src/pci/bus.rs	2026-10-17 04:57:35.850930042 +0000
-@@ -11,10 +11,11 @@
-
- use byteorder::{ByteOrder, LittleEndian};
-
-+use crate::logger::{error, info};
- use crate::pci::configuration::PciConfiguration;
--use crate::pci::{PciBridgeSubclass, PciClassCode, PciDevice};
-+use crate::pci::{BarReprogrammingParams, PciBridgeSubclass, PciClassCode, PciDevice};
- use crate::utils::u64_to_usize;
--use crate::vstate::bus::BusDevice;
-+use crate::vstate::bus::{Bus, BusDevice, BusDeviceSync};
-
- /// Errors for device manager.
- #[derive(Debug, thiserror::Error, displaydoc::Display)]
-@@ -81,6 +82,10 @@
-     /// Device 0 is host bridge.
-     pub devices: HashMap<u8, Arc<Mutex<dyn PciDevice>>>,
-     device_ids: Vec<bool>,
-+    /// MMIO bus on which the devices' BAR regions are registered.
-+    mmio_bus: Arc<Bus>,
-+    /// Per-slot handle used to re-register a BAR region after a guest moves it.
-+    bar_devices: HashMap<u8, Arc<dyn BusDeviceSync>>,
- }
-
- impl Debug for PciBus {
-@@ -93,7 +98,7 @@
-
- impl PciBus {
-     /// Create a new PCI bus
--    pub fn new(pci_root: PciRoot) -> Self {
-+    pub fn new(pci_root: PciRoot, mmio_bus: Arc<Bus>) -> Self {
-         let mut devices: HashMap<u8, Arc<Mutex<dyn PciDevice>>> = HashMap::new();
-         let mut device_ids: Vec<bool> = vec![false; NUM_DEVICE_IDS];
-
-@@ -103,6 +108,62 @@
-         PciBus {
-             devices,
-             device_ids,
-+            mmio_bus,
-+            bar_devices: HashMap::new(),
-+        }
-+    }
-+
-+    /// Record the MMIO bus handle of a slot's device so its BAR can follow
-+    /// guest reprogramming.
-+    pub fn set_bar_device(&mut self, device_id: u8, device: Arc<dyn BusDeviceSync>) {
-+        self.bar_devices.insert(device_id, device);
-+    }
-+
-+    /// Write a configuration register of the device in `device_id` and move
-+    /// its BAR region on the MMIO bus if the write relocated it.
-+    pub fn write_config(
-+        &self,
-+        device_id: u8,
-+        register: u16,
-+        offset: u8,
-+        data: &[u8],
-+    ) -> Option<Arc<Barrier>> {
-+        let Some(d) = self.devices.get(&device_id) else {
-+            return None;
-+        };
-+        let mut device = d.lock().unwrap();
-+        let barrier = device.write_config_register(register, offset, data);
-+        if let Some(params) = device.take_bar_reprogramming() {
-+            drop(device);
-+            self.relocate_bar(device_id, params);
-+        }
-+        barrier
-+    }
-+
-+    fn relocate_bar(&self, device_id: u8, params: BarReprogrammingParams) {
-+        let Some(handle) = self.bar_devices.get(&device_id) else {
-+            return;
-+        };
-+        // The old region may already be gone if an earlier half-written
-+        // address could not be registered; that is not an error.
-+        let _ = self.mmio_bus.remove(params.old_base, params.len);
-+        match self
-+            .mmio_bus
-+            .insert(Arc::clone(handle), params.new_base, params.len)
-+        {
-+            Ok(()) => {
-+                if let Some(device) = self.devices.get(&device_id) {
-+                    device.lock().unwrap().bar_reprogrammed(&params);
-+                }
-+                info!(
-+                    "pci: moved BAR of device {device_id} from {:#x} to {:#x}",
-+                    params.old_base, params.new_base
-+                );
-+            }
-+            Err(err) => error!(
-+                "pci: cannot register BAR of device {device_id} at {:#x}: {err:?}",
-+                params.new_base
-+            ),
-         }
-     }
-
-@@ -123,6 +184,7 @@
-     /// Remove a device from the bus and free its device ID slot
-     pub fn remove_device(&mut self, device_id: u8) {
-         self.devices.remove(&device_id);
-+        self.bar_devices.remove(&device_id);
-         self.device_ids[device_id as usize] = false;
-     }
-
-@@ -229,19 +291,14 @@
-         // NOTE: Potential contention among vCPU threads on this lock. This should not
-         // be a problem currently, since we mainly access this when we are setting up devices.
-         // We might want to do some profiling to ensure this does not become a bottleneck.
--        let pci_bus = self.pci_bus.as_ref().lock().unwrap();
--        if let Some(d) = pci_bus.devices.get(&device) {
--            let mut device = d.lock().unwrap();
--
--            // offset is validated to be < 4 at the top of this function.
--            #[allow(clippy::cast_possible_truncation)]
--            let offset = offset as u8;
--
--            // Update the register value
--            device.write_config_register(register, offset, data)
--        } else {
--            None
--        }
-+        // offset is validated to be < 4 at the top of this function.
-+        #[allow(clippy::cast_possible_truncation)]
-+        let offset = offset as u8;
-+        self.pci_bus
-+            .as_ref()
-+            .lock()
-+            .unwrap()
-+            .write_config(device, register, offset, data)
-     }
-
-     fn set_config_address(&mut self, offset: u64, data: &[u8]) {
-@@ -353,17 +410,13 @@
-             return;
-         }
-
--        let pci_bus = self.pci_bus.lock().unwrap();
--        if let Some(d) = pci_bus.devices.get(&device) {
--            let mut device = d.lock().unwrap();
--
--            // offset is validated to be < 4 at the top of this function.
--            #[allow(clippy::cast_possible_truncation)]
--            let offset = offset as u8;
--
--            // Update the register value
--            device.write_config_register(register, offset, data);
--        }
-+        // offset is validated to be < 4 at the top of this function.
-+        #[allow(clippy::cast_possible_truncation)]
-+        let offset = offset as u8;
-+        self.pci_bus
-+            .lock()
-+            .unwrap()
-+            .write_config(device, register, offset, data);
-     }
- }
-
-@@ -496,10 +549,74 @@
-         }
-     }
-
-+    use std::sync::Barrier;
-+
-+    use crate::pci::BarReprogrammingParams;
-+    use crate::vstate::bus::Bus;
-+
-+    /// Device whose BAR write reports a relocation to the bus.
-+    struct RelocatingDevice {
-+        pending: Option<BarReprogrammingParams>,
-+    }
-+
-+    impl BusDevice for RelocatingDevice {}
-+
-+    impl PciDevice for RelocatingDevice {
-+        fn write_config_register(
-+            &mut self,
-+            reg_idx: u16,
-+            _offset: u8,
-+            data: &[u8],
-+        ) -> Option<Arc<Barrier>> {
-+            if reg_idx == 4 {
-+                self.pending = Some(BarReprogrammingParams {
-+                    bar_idx: 0,
-+                    old_base: 0x4000_0000,
-+                    new_base: u64::from(u32::from_le_bytes(data.try_into().unwrap())),
-+                    len: 0x1000,
-+                });
-+            }
-+            None
-+        }
-+
-+        fn read_config_register(&mut self, _reg_idx: u16) -> u32 {
-+            0
-+        }
-+
-+        fn take_bar_reprogramming(&mut self) -> Option<BarReprogrammingParams> {
-+            self.pending.take()
-+        }
-+    }
-+
-+    #[test]
-+    fn test_bar_relocation_follows_config_write() {
-+        let mmio_bus = Arc::new(Bus::new());
-+        let root = PciRoot::new(None);
-+        let mut pci_bus = PciBus::new(root, Arc::clone(&mmio_bus));
-+        let device = Arc::new(Mutex::new(RelocatingDevice { pending: None }));
-+        pci_bus.add_device(1, device.clone()).unwrap();
-+        pci_bus.set_bar_device(1, device.clone());
-+        mmio_bus
-+            .insert(device.clone(), 0x4000_0000, 0x1000)
-+            .unwrap();
-+        assert!(mmio_bus.resolve(0x4000_0000).is_some());
-+
-+        pci_bus.write_config(1, 4, 0, &0x8000_0000u32.to_le_bytes());
-+        assert!(mmio_bus.resolve(0x4000_0000).is_none());
-+        assert!(mmio_bus.resolve(0x8000_0800).is_some());
-+
-+        // A write to another register moves nothing.
-+        pci_bus.write_config(1, 1, 0, &[0x06, 0x00]);
-+        assert!(mmio_bus.resolve(0x8000_0800).is_some());
-+    }
-+
-     #[test]
-     fn test_writing_io_config_address() {
-         let root = PciRoot::new(None);
--        let mut bus = PciConfigIo::new(Arc::new(Mutex::new(PciBus::new(root))));
-+        let mut bus = PciConfigIo::new(Arc::new(Mutex::new(PciBus::new(
-+            root,
-+            Arc::new(Bus::new()),
-+        ))));
-
-         assert_eq!(bus.config_address, 0);
-         // Writing more than 32 bits will should fail
-@@ -540,7 +657,10 @@
-     #[test]
-     fn test_reading_io_config_address() {
-         let root = PciRoot::new(None);
--        let mut bus = PciConfigIo::new(Arc::new(Mutex::new(PciBus::new(root))));
-+        let mut bus = PciConfigIo::new(Arc::new(Mutex::new(PciBus::new(
-+            root,
-+            Arc::new(Bus::new()),
-+        ))));
-
-         let mut buffer = [0u8; 4];
-
-@@ -587,7 +707,7 @@
-
-     fn initialize_bus() -> (PciConfigMmio, PciConfigIo) {
-         let root = PciRoot::new(None);
--        let mut bus = PciBus::new(root);
-+        let mut bus = PciBus::new(root, Arc::new(Bus::new()));
-         bus.add_device(1, Arc::new(Mutex::new(PciDevMock::new())))
-             .unwrap();
-
-
---- a/src/vmm/src/pci/configuration.rs
-+++ b/src/vmm/src/pci/configuration.rs
-@@ -7,7 +7,9 @@
-
- use byteorder::{ByteOrder, LittleEndian};
- use serde::{Deserialize, Serialize};
--use zerocopy::{FromBytes, IntoBytes};
-+use zerocopy::FromBytes;
-+#[cfg(test)]
-+use zerocopy::IntoBytes;
-
- use crate::logger::warn;
- use crate::pci::{PciCapabilityId, PciClassCode};
-@@ -130,31 +132,55 @@
-             && value == 0xffff_ffff
+         let old_base = MEM_64BIT_DEVICES_START;
+-        let new_base = old_base + CAPABILITY_BAR_SIZE;
++        // The MSI-X BAR occupies the next range.
++        let new_base = old_base + 2 * CAPABILITY_BAR_SIZE;
+ 
          {
-             self.bars[bar_idx as usize].about_to_be_read = true;
--        } else {
--            self.bars[bar_idx as usize].about_to_be_read = false;
--            // There is no BAR relocation support as of right now.
--            // PCI specification does not provide a way for a device to
--            // tell the driver that it does not support BAR relocation, but
--            // linux kernel does check this at:
--            // https://elixir.bootlin.com/linux/v6.19.8/source/drivers/pci/setup-res.c#L107
-+            return;
-+        }
-+        self.bars[bar_idx as usize].about_to_be_read = false;
-+        // Address write (possibly partial): merge it into the current encoded
-+        // value, keep the type bits of the low half and the alignment implied
-+        // by the size mask. Unused BARs (size 0) stay 0.
-+        let is_high_half = bar_idx > 0
-+            && self.bars[bar_idx as usize - 1].encoded_addr & 0b110 == 0b100
-+            && self.bars[bar_idx as usize - 1].encoded_size != 0;
-+        let bar = &mut self.bars[bar_idx as usize];
-+        if bar.encoded_size == 0 && !is_high_half {
-+            return;
-         }
-+        let mut bytes = bar.encoded_addr.to_le_bytes();
-+        bytes[offset as usize..offset as usize + data.len()].copy_from_slice(data);
-+        let value = u32::from_le_bytes(bytes);
-+        bar.encoded_addr = if is_high_half {
-+            value & bar.encoded_size
-+        } else {
-+            (value & bar.encoded_size & 0xffff_fff0) | (bar.encoded_addr & 0b1111)
-+        };
+             let mut device = device.lock().unwrap();
+             assert_eq!(device.bar_address(), old_base);
++            set_memory_space_enable(&mut device, false);
+ 
+             // Writing the BAR does not move the device on its own. The
+             // relocation happens when memory space decoding gets enabled.
+@@ -1534,27 +1684,83 @@ mod tests {
      }
-     /// Reads from a given BAR register at the given offset
-     pub fn read(&mut self, bar_idx: u8, offset: u8, data: &mut [u8]) {
-         // There are only 6 registers each 4 bytes long
-         assert!(bar_idx < NUM_BAR_REGS);
-         assert!(offset as usize + data.len() <= 4);
-+        // The low half of a 64-bit BAR keeps its read-only type and prefetch
-+        // bits in a sizing read: firmware (edk2 PciBusDxe) classifies the BAR
-+        // from the sized value, not from the address it read before probing.
-+        let is_high_half = bar_idx > 0
-+            && self.bars[bar_idx as usize - 1].encoded_addr & 0b110 == 0b100
-+            && self.bars[bar_idx as usize - 1].encoded_size != 0;
-         let bar = &mut self.bars[bar_idx as usize];
--        let bytes = if bar.about_to_be_read {
-+        let value = if bar.about_to_be_read {
-             // This technically allows for an inconsistent behaviour where the guest would read
-             // only a part of the `size` of the BAR on the first read, but will get `addr` bytes
-             // on following reads. Any sane driver will read the whole register, so this should
--            // not be an issue. This will be fixed once we support BAR relocation/resizing.
-+            // not be an issue.
-             bar.about_to_be_read = false;
--            bar.encoded_size.as_bytes()
-+            if is_high_half || bar.encoded_size == 0 {
-+                bar.encoded_size
-+            } else {
-+                bar.encoded_size | (bar.encoded_addr & 0b1111)
-+            }
-         } else {
--            bar.encoded_addr.as_bytes()
-+            bar.encoded_addr
-         };
-+        let bytes = value.to_le_bytes();
-         data.copy_from_slice(&bytes[offset as usize..][..data.len()]);
-     }
- }
-@@ -167,6 +193,47 @@
-     fn id(&self) -> PciCapabilityId;
- }
-
-+#[cfg(test)]
-+mod bar_tests {
-+    use super::*;
+ 
+     #[test]
+-    fn test_bar_relocation_on_memory_space_enable_only() {
++    fn test_bar_relocation_on_high_half_while_decoding() {
+         let vmm = create_vmm_with_virtio_pci_device();
+         let device = get_virtio_device(&vmm);
+         let mut device = device.lock().unwrap();
+         let old_base = MEM_64BIT_DEVICES_START;
+-        let new_base = old_base + CAPABILITY_BAR_SIZE;
++        let new_base = old_base + 2 * CAPABILITY_BAR_SIZE;
+ 
+-        // Enabling memory space decoding with an unchanged BAR is a no-op.
++        // Overalls: the device decodes from creation. Enabling memory space
++        // decoding again with an unchanged BAR is a no-op.
+         set_memory_space_enable(&mut device, true);
+         assert_eq!(device.bar_address(), old_base);
+ 
+-        // A BAR write while memory space decoding is already enabled does not
+-        // relocate the device.
+-        write_bar_base(&mut device, new_base);
++        // The low half alone does not move the device; the high half
++        // completes the address and relocates it while decoding is enabled.
++        device.write_config_register(BAR0_REG_IDX, 0, &(new_base as u32).to_le_bytes());
+         assert_eq!(device.bar_address(), old_base);
++        device.write_config_register(
++            BAR0_REG_IDX + 1,
++            0,
++            &((new_base >> 32) as u32).to_le_bytes(),
++        );
++        assert_eq!(device.bar_address(), new_base);
++
++        // A sizing probe of the high half does not move it.
++        device.write_config_register(BAR0_REG_IDX + 1, 0, &[0xff; 4]);
++        assert_eq!(device.bar_address(), new_base);
++        write_bar_base(&mut device, new_base);
++        assert_eq!(device.bar_address(), new_base);
+ 
+-        // Only the transition from disabled to enabled does.
++        // With decoding disabled a BAR write waits for the enable.
+         set_memory_space_enable(&mut device, false);
++        write_bar_base(&mut device, old_base);
++        assert_eq!(device.bar_address(), new_base);
++        set_memory_space_enable(&mut device, true);
+         assert_eq!(device.bar_address(), old_base);
++    }
 +
 +    #[test]
-+    fn test_bar_relocation_write_updates_address() {
-+        let mut bars = Bars::default();
-+        bars.set_bar_64(0, 0x40_0000_0000, 0x8_0000, BarPrefetchable::No);
-+        assert_eq!(bars.get_bar_addr_64(0), 0x40_0000_0000);
-+        // Sizing probe: the address is unchanged and the next read is the size
-+        // mask with the 64-bit type bit kept in the low half only.
-+        bars.write(0, 0, &0xffff_ffffu32.to_le_bytes());
-+        let mut size = [0u8; 4];
-+        bars.read(0, 0, &mut size);
-+        assert_eq!(u32::from_le_bytes(size), 0xfff8_0004);
-+        bars.write(1, 0, &0xffff_ffffu32.to_le_bytes());
-+        bars.read(1, 0, &mut size);
-+        assert_eq!(u32::from_le_bytes(size), 0xffff_ffff);
-+        assert_eq!(bars.get_bar_addr_64(0), 0x40_0000_0000);
-+        // Firmware moves the BAR to 0x1_4000_0000: low half then high half.
-+        bars.write(0, 0, &0x4000_0000u32.to_le_bytes());
-+        assert_eq!(bars.get_bar_addr_64(0), 0x40_4000_0000);
-+        bars.write(1, 0, &0x1u32.to_le_bytes());
-+        assert_eq!(bars.get_bar_addr_64(0), 0x1_4000_0000);
-+        // Type bits survive and misaligned low bits are dropped.
-+        let mut low = [0u8; 4];
-+        bars.read(0, 0, &mut low);
-+        assert_eq!(u32::from_le_bytes(low) & 0b1111, 0b100);
-+        bars.write(0, 0, &0x4001_2345u32.to_le_bytes());
-+        assert_eq!(bars.get_bar_addr_64(0), 0x1_4000_0000);
-+        // Partial writes merge into the register.
-+        bars.write(1, 0, &[0x02]);
-+        assert_eq!(bars.get_bar_addr_64(0), 0x2_4000_0000);
-+        // Unused BARs ignore address writes.
-+        bars.write(3, 0, &0x8000_0000u32.to_le_bytes());
-+        let mut unused = [0u8; 4];
-+        bars.read(3, 0, &mut unused);
-+        assert_eq!(unused, [0; 4]);
-+    }
-+}
++    fn test_msix_bar_is_separate_and_relocates() {
++        let vmm = create_vmm_with_virtio_pci_device();
++        let device = get_virtio_device(&vmm);
++        let mut device = device.lock().unwrap();
++        let bar_base = device.bar_address();
++        let msix_base = device.msix_bar_address();
++        assert_eq!(msix_base, bar_base + CAPABILITY_BAR_SIZE);
++        assert_eq!(device.config_msix_bar_addr(), msix_base);
 +
- // This encodes the BAR size as expected by the software running inside the guest.
- // It assumes that bar_size is not 0
- fn encode_64_bits_bar_size(bar_size: u64) -> (u32, u32) {
++        // The MSI-X capability names BAR 4 for both the table and the PBA.
++        let mut msix_cap = [0u8; 12];
++        let msix_cap_reg = device.msix_config_cap_offset / 4;
++        for (index, chunk) in msix_cap.chunks_mut(4).enumerate() {
++            let reg = device.read_config_register(msix_cap_reg + index as u16);
++            chunk.copy_from_slice(&reg.to_le_bytes());
++        }
++        assert_eq!(msix_cap[4] & 0b111, MSIX_BAR_INDEX);
++        assert_eq!(msix_cap[8] & 0b111, MSIX_BAR_INDEX);
++
++        // The two BARs trade places in one decode enable.
++        set_memory_space_enable(&mut device, false);
++        write_bar_base(&mut device, msix_base);
++        let msix_reg = BAR0_REG_IDX + u16::from(MSIX_BAR_INDEX);
++        device.write_config_register(msix_reg, 0, &(bar_base as u32).to_le_bytes());
++        device.write_config_register(msix_reg + 1, 0, &((bar_base >> 32) as u32).to_le_bytes());
+         set_memory_space_enable(&mut device, true);
+-        assert_eq!(device.bar_address(), new_base);
++        assert_eq!(device.bar_address(), msix_base);
++        assert_eq!(device.msix_bar_address(), bar_base);
++        drop(device);
++
++        // MSI-X table entries are served at the new MSI-X base.
++        let bus = &kvm_vm(&vmm).common.mmio_bus;
++        bus.write(bar_base + 8, &0xdead_beefu32.to_le_bytes())
++            .unwrap();
++        let mut data = [0u8; 4];
++        bus.read(bar_base + 8, &mut data).unwrap();
++        assert_eq!(u32::from_le_bytes(data), 0xdead_beef);
++        register_probe_ioevent(&vmm, msix_base).unwrap_err();
++        register_probe_ioevent(&vmm, bar_base).unwrap();
+     }
+ 
+     #[test]
+@@ -1564,7 +1770,7 @@ mod tests {
+         let old_base = MEM_64BIT_DEVICES_START;
+ 
+         // A range that is already allocated to someone else.
+-        let taken_base = old_base + CAPABILITY_BAR_SIZE;
++        let taken_base = old_base + 2 * CAPABILITY_BAR_SIZE;
+         allocate_bar_range(&vmm, taken_base).unwrap();
+         // A range outside the 64-bit MMIO window.
+         let outside_base = MEM_64BIT_DEVICES_START + MEM_64BIT_DEVICES_SIZE;
 
---- a/src/vmm/src/pci/mod.rs
-+++ b/src/vmm/src/pci/mod.rs
-@@ -20,6 +20,8 @@
- #[derive(Clone, Copy, Debug, PartialEq, Eq)]
- /// Parameters for performing a BAR reprogramming operation
- pub struct BarReprogrammingParams {
-+    /// BAR register index (the low register of the pair)
-+    pub bar_idx: u8,
-     /// Previous address of the BAR
-     pub old_base: u64,
-     /// New address of the BAR
-@@ -42,6 +44,13 @@
-     /// Gets a register from the configuration space.
-     /// * `reg_idx` - The index of the config register to read.
-     fn read_config_register(&mut self, reg_idx: u16) -> u32;
-+    /// Returns, once, the BAR move requested by the last configuration write.
-+    /// The bus uses it to re-register the device's MMIO region.
-+    fn take_bar_reprogramming(&mut self) -> Option<BarReprogrammingParams> {
-+        None
+--- a/src/vmm/src/vstate/bus.rs
++++ b/src/vmm/src/vstate/bus.rs
+@@ -239,6 +239,62 @@ impl Bus {
+         Ok(())
+     }
+ 
++    /// Moves several registered ranges at once.
++    ///
++    /// Every old range is removed before any destination is checked, so the
++    /// ranges of one device can trade places (Overalls: a firmware may swap a
++    /// device's capability and MSI-X BARs). Nothing moves if any old range is
++    /// missing or any destination overlaps another range or another
++    /// destination.
++    pub fn move_ranges(&self, moves: &[(u64, u64, u64)]) -> Result<(), BusError> {
++        let mut parsed = Vec::with_capacity(moves.len());
++        for &(old_base, new_base, len) in moves {
++            parsed.push((BusRange::new(old_base, len)?, BusRange::new(new_base, len)?));
++        }
++
++        let mut ranges = self.ranges.write().unwrap();
++
++        let mut removed = Vec::with_capacity(parsed.len());
++        for (old_range, _) in &parsed {
++            match ranges.remove_entry(old_range) {
++                Some((registered, slot)) if registered.end() == old_range.end() => {
++                    removed.push((registered, slot));
++                }
++                Some((registered, slot)) => {
++                    ranges.insert(registered, slot);
++                    for (range, slot) in removed {
++                        ranges.insert(range, slot);
++                    }
++                    return Err(BusError::MissingAddressRange);
++                }
++                None => {
++                    for (range, slot) in removed {
++                        ranges.insert(range, slot);
++                    }
++                    return Err(BusError::MissingAddressRange);
++                }
++            }
++        }
++
++        let overlaps = parsed.iter().enumerate().any(|(index, (_, new_range))| {
++            ranges.keys().any(|range| range.overlaps(new_range))
++                || parsed[index + 1..]
++                    .iter()
++                    .any(|(_, other)| other.overlaps(new_range))
++        });
++        if overlaps {
++            for (range, slot) in removed {
++                ranges.insert(range, slot);
++            }
++            return Err(BusError::Overlap);
++        }
++
++        for ((_, new_range), (_, slot)) in parsed.into_iter().zip(removed) {
++            ranges.insert(new_range, slot);
++        }
++        Ok(())
 +    }
-+    /// Completes a BAR relocation after the MMIO bus has installed its new range.
-+    fn bar_reprogrammed(&mut self, _params: &BarReprogrammingParams) {}
-     /// Reads from a BAR region mapped into the device.
-     /// * `addr` - The guest address inside the BAR.
-     /// * `data` - Filled with the data from `addr`.
++
+     /// Reads data from the device that owns the range containing `addr` and puts it into `data`.
+     ///
+     /// Returns true on success, otherwise `data` is untouched.
+@@ -423,6 +479,48 @@ mod tests {
+         bus.remove(0x13, 0x12).unwrap();
+     }
+ 
++    #[test]
++    fn bus_move_ranges_swaps_atomically() {
++        let bus = Bus::new();
++        let first = Arc::new(Mutex::new(ConstantDevice));
++        let second = Arc::new(Mutex::new(ConstantDevice));
++        let other = Arc::new(Mutex::new(ConstantDevice));
++        bus.insert(first.clone(), 0x10, 0x10).unwrap();
++        bus.insert(second.clone(), 0x20, 0x10).unwrap();
++        bus.insert(other.clone(), 0x40, 0x10).unwrap();
++
++        // Two ranges trade places in one call.
++        bus.move_ranges(&[(0x10, 0x20, 0x10), (0x20, 0x10, 0x10)])
++            .unwrap();
++        let mut values = [0u8; 4];
++        assert!(bus.read(0x10, &mut values).is_ok());
++        assert!(bus.read(0x20, &mut values).is_ok());
++
++        // A destination overlapping another device moves nothing.
++        assert!(matches!(
++            bus.move_ranges(&[(0x10, 0x30, 0x10), (0x20, 0x48, 0x10)]),
++            Err(BusError::Overlap)
++        ));
++        assert!(bus.read(0x10, &mut values).is_ok());
++        assert!(bus.read(0x20, &mut values).is_ok());
++        assert!(bus.read(0x30, &mut values).is_err());
++
++        // Two destinations overlapping each other move nothing.
++        assert!(matches!(
++            bus.move_ranges(&[(0x10, 0x60, 0x10), (0x20, 0x68, 0x10)]),
++            Err(BusError::Overlap)
++        ));
++        assert!(bus.read(0x60, &mut values).is_err());
++
++        // A missing source moves nothing.
++        assert!(matches!(
++            bus.move_ranges(&[(0x10, 0x60, 0x10), (0x80, 0x90, 0x10)]),
++            Err(BusError::MissingAddressRange)
++        ));
++        assert!(bus.read(0x10, &mut values).is_ok());
++        assert!(bus.read(0x60, &mut values).is_err());
++    }
++
+     #[test]
+     fn bus_move_range() {
+         let bus = Bus::new();

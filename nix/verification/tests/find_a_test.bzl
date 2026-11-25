@@ -174,7 +174,7 @@ FIND_A_TEST = {
     },
     "firecracker-patch-tests": {
         "location": "`evaluation/firecracker-patch-tests.nix`",
-        "description": "Unit coverage for PVH RSDP, ACPI timer, Hyper-V leaves, CMOS, PCI BAR relocation and configuration notifications, virtio reset/scatter-gather and vsock indirect descriptors. No native guest or Windows acceptance.",
+        "description": "Unit coverage for PVH RSDP, ACPI timer, Hyper-V leaves, CMOS, PCI BAR relocation (with the separate MSI-X BAR) and configuration notifications, upstream virtio reset, scatter-gather and vsock indirect descriptors. No native guest or Windows acceptance.",
     },
     "firecracker-vmm": {
         "location": "`evaluation/firecracker-vmm.nix`",

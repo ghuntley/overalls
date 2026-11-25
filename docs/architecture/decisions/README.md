@@ -455,12 +455,13 @@ agentless admission before allocation. Historical Lilly launch evidence remains 
 [Windows Lilly launch review](../reviews/2026-10-14-windows-lilly-launch.md).
 
 [ADR-0169](0169-firmware-booted-windows-guests.md) proposes firmware-booted
-Windows guests under Firecracker: the pinned static Firecracker 1.16.1 gains
-eight reviewed patches (PVH start info carries the RSDP, a read-only ACPI PM
+Windows guests under Firecracker: the pinned static Firecracker 1.17.0 gains
+reviewed patches (PVH start info carries the RSDP, a read-only ACPI PM
 timer at port 0x608, opt-in Hyper-V CPUID leaves through the custom CPU
 template, virtio-pci decode enabled at reset, a read-only CMOS clock,
-guest-driven BAR relocation, virtio device reset and scatter-gather block
-requests; ADR-0171 adds a ninth for vsock indirect descriptor tables), edk2's CloudHv UEFI is built as the PVH payload with its PCI aperture
+guest-driven BAR relocation with a separate MSI-X BAR and scatter-gather block
+requests; ADR-0171 adds vsock indirect descriptor tables; virtio device reset
+is upstream since 1.17), edk2's CloudHv UEFI is built as the PVH payload with its PCI aperture
 ending at Firecracker's MMCONFIG, and a Windows Server 2025 evaluation image is
 installed offline in a KVM sandbox with EMS on COM1. The image carries a
 version-5 manifest (`boot.kind = firmware`, `root.format = raw-gpt`,

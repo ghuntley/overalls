@@ -1,7 +1,6 @@
-diff -ruN a/src/vmm/src/arch/x86_64/mod.rs b1/src/vmm/src/arch/x86_64/mod.rs
---- a/src/vmm/src/arch/x86_64/mod.rs	2026-10-13 16:12:20.997907426 +0000
-+++ b1/src/vmm/src/arch/x86_64/mod.rs	2026-10-13 16:23:03.344965109 +0000
-@@ -315,6 +315,9 @@
+--- a/src/vmm/src/arch/x86_64/mod.rs
++++ b/src/vmm/src/arch/x86_64/mod.rs
+@@ -369,6 +369,9 @@ fn configure_pvh(
          magic: XEN_HVM_START_MAGIC_VALUE,
          version: 1,
          cmdline_paddr: cmdline_addr.raw_value(),
@@ -11,7 +10,7 @@ diff -ruN a/src/vmm/src/arch/x86_64/mod.rs b1/src/vmm/src/arch/x86_64/mod.rs
          memmap_paddr: layout::MEMMAP_START,
          memmap_entries: memmap.len() as u32,
          nr_modules: modules.len() as u32,
-@@ -539,6 +542,7 @@
+@@ -641,6 +644,7 @@ mod tests {
      use crate::arch::x86_64::layout::FIRST_ADDR_PAST_32BITS;
      use crate::test_utils::{arch_mem, single_region_mem};
      use crate::utils::mib_to_bytes;
@@ -19,9 +18,9 @@ diff -ruN a/src/vmm/src/arch/x86_64/mod.rs b1/src/vmm/src/arch/x86_64/mod.rs
      use crate::vstate::resources::ResourceAllocator;
  
      #[test]
-@@ -585,6 +589,11 @@
+@@ -687,6 +691,11 @@ mod tests {
          mptable::setup_mptable(&gm, &mut resource_allocator, no_vcpus).unwrap();
-         configure_64bit_boot(&gm, GuestAddress(0), 0, &None).unwrap();
+         configure_64bit_boot(&gm, GuestAddress(0), 0, &None, None).unwrap();
          configure_pvh(&gm, GuestAddress(0), &None).unwrap();
 +        let start_info: hvm_start_info = gm
 +            .read_obj(GuestAddress(layout::PVH_INFO_START))

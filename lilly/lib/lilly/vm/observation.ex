@@ -88,8 +88,8 @@ defmodule Lilly.VM.Observation do
   end
 
   # @cc [owner:ghuntley,label:isolation;recovery] unconfigured-restore-is-preboot-only
-  # Firecracker 1.16.1 installs its main-thread seccomp filter at the end of
-  # build_microvm_from_snapshot (vmm/src/builder.rs), after snapshot/load.
+  # Firecracker 1.17.0 installs its main-thread seccomp filter once the builder
+  # returns (firecracker/src/api_server_adapter.rs), after snapshot/load.
   # Before that request, this check MUST require an unconfigured API and the
   # exact unfiltered main thread, retaining every other confinement check.
   # This proof MUST NOT establish a paused or running guest. Those require

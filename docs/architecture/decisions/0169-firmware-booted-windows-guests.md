@@ -48,7 +48,8 @@ image is a spike for booting, not yet a Lilly-launchable guest family.
 ## Decision
 
 1. **Patched static Firecracker.** `nix/domains/artifacts/infrastructure/firecracker.nix` applies eight
-   reviewed patches to the pinned nixpkgs static Firecracker 1.16.1 and is the
+   reviewed patches to the pinned nixpkgs static Firecracker (1.17.0 since
+   2026-11-25; first 1.16.1) and is the
    only VMM Lilly's release metadata and the development shell reference. The
    patches do not change the version string, `Cargo.toml` or `Cargo.lock`:
    `firecracker-pvh-rsdp-paddr` (PVH start info carries `RSDP_ADDR`),
@@ -63,15 +64,25 @@ image is a spike for booting, not yet a Lilly-launchable guest family.
    `firecracker-pci-bar-relocation` (a BAR sizing read keeps the read-only
    type bits, and the MMIO registration and queue doorbell ioeventfds follow a
    BAR the guest reprograms, so firmware may enumerate and assign the bus
-   normally), `firecracker-virtio-reset` (virtio-blk and virtio-net
-   implement device reset and the transport keeps its MSI-X object, so the
-   operating system can re-initialize a device the firmware activated) and
+   normally; MSI-X has its own BAR 4), `firecracker-virtio-reset` (virtio-blk
+   and virtio-net implement device reset and the transport keeps its MSI-X
+   object, so the operating system can re-initialize a device the firmware
+   activated) and
    `firecracker-virtio-blk-sg` (block requests may spread their data over
    several descriptors; both I/O engines transfer every segment).
    [ADR-0171](0171-windows-guest-agents.md) adds a ninth,
    `firecracker-vsock-indirect-desc` (the vsock device walks the indirect
    descriptor tables the virtio-win viosock driver posts), under the same
    rules; this list is otherwise unchanged.
+
+   Implementation update (2026-11-25, Firecracker 1.17.0): upstream now
+   provides masked BAR writes, BAR relocation on the memory-decode enable and
+   virtio device reset for every device. `firecracker-virtio-reset` and the
+   later net, vsock and entropy reset patches were dropped as superseded;
+   `firecracker-pci-bar-relocation` now builds on upstream relocation and adds
+   the separate MSI-X BAR, relocation while decoding stays enabled and an
+   atomic move of both BARs. The guest-visible behavior this decision relies
+   on is unchanged.
 2. **CloudHv firmware as the PVH payload.** `nix/domains/artifacts/guest/windows/firmware.nix`
    builds `CLOUDHV.fd` from the pinned edk2 with one patch that ends the 32-bit
    PCI aperture at Firecracker's MMCONFIG base; bus enumeration and BAR
@@ -129,11 +140,12 @@ Microsoft).
 - Linux guests see no behavior change: the PM timer is not in their ACPI
   tables, Hyper-V leaves require an explicit template field, and the RSDP
   address in PVH start info matches what the Linux boot path already set.
-- Lilly's `vmm_version == "1.16.1"` check and static-binary checks remain
-  valid because the version string is unchanged. The syscall surface changes
+- Lilly's `vmm_version` check (now `"1.17.0"`) and static-binary checks remain
+  valid because the patches leave the version string unchanged. The syscall surface changes
   in exactly one place: the vCPU thread's seccomp filter additionally allows
   the `KVM_IOEVENTFD` ioctl, which the BAR relocation uses to move queue
-  doorbells (the VMM thread already allowed it for hotplug). The PM timer and
+  doorbells (the VMM thread already allowed it for hotplug); Firecracker 1.17.0
+  ships that rule upstream. The PM timer and
   CMOS clock read the clocks through the vDSO and add no syscalls.
 - Windows installation is not byte-stable: every rebuild yields a new image
   identity. This is an explicit exception to the reproducibility goals of
@@ -146,7 +158,7 @@ Microsoft).
 
 ## Invariants and verification
 
-- The patched VMM reports `Firecracker v1.16.1`, lists `--enable-pci` and is a
+- The patched VMM reports `Firecracker v1.17.0`, lists `--enable-pci` and is a
   static x86-64 pair (`nix/verification/tests/evaluation/firecracker-vmm.nix`).
 - The firmware is a single PVH ELF with a Xen note and the patched aperture
   (`postInstall` checks in `firmware.nix`; the `windows-firmware` check builds it).
@@ -160,8 +172,8 @@ Microsoft).
   and relocates the KVM leaves, the CMOS clock encodes the host time, a BAR
   sizing read returns the size mask with the 64-bit type bit, a BAR
   reprogrammed through config space moves on the MMIO bus together with its
-  queue notification ioeventfds, block and net devices deactivate on reset
-  and accept a second activation, and multi-descriptor block requests parse
+  queue notification ioeventfds (both BARs, trading places atomically),
+  devices deactivate on upstream reset and accept a second activation, and multi-descriptor block requests parse
   and transfer whole on both I/O engines.
 
 Failure cases that would disprove the design: the firmware fails to find ACPI
@@ -177,7 +189,7 @@ MMCONFIG; Windows timekeeping is unstable without synthetic timers.
   [PCI decode enabled](../../../nix/platform/patches/firecracker-pci-decode-enabled.patch),
   [CMOS RTC](../../../nix/platform/patches/firecracker-cmos-rtc.patch),
   [BAR relocation](../../../nix/platform/patches/firecracker-pci-bar-relocation.patch),
-  [virtio reset](../../../nix/platform/patches/firecracker-virtio-reset.patch) and
+  [MSI-X reset state](../../../nix/platform/patches/firecracker-msix-reset-state.patch) and
   [virtio-blk scatter-gather](../../../nix/platform/patches/firecracker-virtio-blk-sg.patch)
   and, from ADR-0171, [vsock indirect descriptors](../../../nix/platform/patches/firecracker-vsock-indirect-desc.patch),
   applied by the [patched VMM package](../../../nix/domains/artifacts/infrastructure/firecracker.nix)

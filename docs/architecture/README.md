@@ -150,10 +150,11 @@ fixture acceptance and deployment evidence.
 [ADR-0169](decisions/0169-firmware-booted-windows-guests.md) proposes a third
 guest family: Windows Server 2025 booted under Firecracker through edk2's CloudHv
 UEFI firmware loaded as a PVH payload with the opt-in virtio-pci transport. The
-pinned static Firecracker 1.16.1 carries nine reviewed patches (PVH RSDP
-address, ACPI PM timer, Hyper-V CPUID leaves, PCI decode at reset, CMOS clock, BAR
-relocation, virtio reset, scatter-gather block requests and, from ADR-0171, vsock
-indirect descriptor tables) and keeps its version string. The image
+pinned static Firecracker 1.17.0 carries reviewed patches (PVH RSDP
+address, ACPI PM timer, Hyper-V CPUID leaves, PCI decode at reset, CMOS clock,
+BAR relocation with a separate MSI-X BAR, scatter-gather block requests and,
+from ADR-0171, vsock indirect descriptor tables; virtio reset is upstream since
+1.17) and keeps its version string. The image
 is installed offline from Microsoft's hash-pinned evaluation ISO inside a KVM Nix
 sandbox and described by a version-5 manifest.
 [ADR-0170](decisions/0170-lilly-firmware-guest-launch.md) admits that manifest

@@ -107,7 +107,9 @@ in
     buildRustPackage = args:
       if args ? cargoBuildType then
         throw "${args.pname or "a Rust leaf"}: cargoBuildType is ignored by buildRustPackage; declare the profile with buildType"
-      else rust.rustPlatform.buildRustPackage args;
+      # nixpkgs' cargo setup hook forces system C libraries for -sys crates;
+      # first-party leaves keep building their vendored sources.
+      else rust.rustPlatform.buildRustPackage ({ dontCargoUseSystemLibs = true; } // args);
   };
   # @cc [owner:ghuntley,label:build;security] cargo-workspace-static-musl
   # buildStaticMusl MUST produce x86_64 musl executables that link only

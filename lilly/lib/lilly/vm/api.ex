@@ -6,7 +6,7 @@ defmodule Lilly.VM.API do
   @spec state(Path.t(), String.t()) :: {:ok, state()} | {:error, :vmm_api_unavailable}
   def state(path, id) do
     with {:ok, 200, body} <- request(path, "GET", "/", ""),
-         {:ok, %{"id" => ^id, "state" => state, "vmm_version" => "1.16.1"}} <- JSON.decode(body),
+         {:ok, %{"id" => ^id, "state" => state, "vmm_version" => "1.17.0"}} <- JSON.decode(body),
          {_, decoded} <-
            Enum.find(
              [{"Running", :running}, {"Paused", :paused}, {"Not started", :unconfigured}],
@@ -20,7 +20,7 @@ defmodule Lilly.VM.API do
 
   # @cc [owner:ghuntley,label:protocol] vmm-readiness-matches-id-version
   # API.running?/2 MUST require HTTP 200 with the requested VM ID, Running state and supported
-  # Firecracker 1.16.1 version. Oversized, ambiguous, truncated or invalid replies must not
+  # Firecracker 1.17.0 version. Oversized, ambiguous, truncated or invalid replies must not
   # establish readiness.
   @spec running?(Path.t(), String.t()) :: boolean()
   def running?(path, id) do

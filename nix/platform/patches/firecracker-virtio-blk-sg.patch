@@ -1,7 +1,6 @@
-diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs
---- a/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs	2026-10-13 18:10:31.380439584 +0000
-+++ b/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs	2026-10-13 20:36:18.818812486 +0000
-@@ -10,12 +10,12 @@
+--- a/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs
++++ b/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs
+@@ -10,12 +10,12 @@ use vm_memory::{GuestMemoryBackend, GuestMemoryError};
  use vmm_sys_util::eventfd::EventFd;
  
  use crate::devices::virtio::block::virtio::io::RequestError;
@@ -11,12 +10,12 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/s
  use crate::io_uring::restriction::Restriction;
  use crate::io_uring::{IoUring, IoUringError};
  use crate::logger::log_dev_preview_warning;
--use crate::vstate::memory::{GuestAddress, GuestMemory, GuestMemoryExtension, GuestMemoryMmap};
-+use crate::vstate::memory::{GuestMemory, GuestMemoryExtension, GuestMemoryMmap};
+-use crate::vstate::memory::{GuestAddress, GuestMemoryExtension, GuestMemoryMmap};
++use crate::vstate::memory::{GuestMemoryExtension, GuestMemoryMmap};
  
  #[derive(Debug, thiserror::Error, displaydoc::Display)]
  pub enum AsyncIoError {
-@@ -40,33 +40,84 @@
+@@ -42,33 +42,84 @@ pub struct AsyncFileEngine {
      completion_evt: EventFd,
  }
  
@@ -108,7 +107,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/s
  impl AsyncFileEngine {
      fn new_ring(
          file: &File,
-@@ -81,6 +132,8 @@
+@@ -83,6 +134,8 @@ impl AsyncFileEngine {
                  // Allowlist of opcodes.
                  Restriction::AllowOpCode(OpCode::Read),
                  Restriction::AllowOpCode(OpCode::Write),
@@ -117,7 +116,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/s
                  Restriction::AllowOpCode(OpCode::Fsync),
              ],
              Some(completion_fd),
-@@ -119,16 +172,18 @@
+@@ -120,16 +173,18 @@ impl AsyncFileEngine {
          &self.completion_evt
      }
  
@@ -141,7 +140,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/s
              Err(err) => {
                  return Err(RequestError {
                      req,
-@@ -136,55 +191,58 @@
+@@ -137,55 +192,58 @@ impl AsyncFileEngine {
                  });
              }
          };
@@ -235,10 +234,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/async_io.rs b8/src/vmm/s
      }
  
      pub fn push_flush(&mut self, req: PendingRequest) -> Result<(), RequestError<AsyncIoError>> {
-diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/devices/virtio/block/virtio/io/mod.rs
---- a/src/vmm/src/devices/virtio/block/virtio/io/mod.rs	2026-10-13 18:10:31.380439584 +0000
-+++ b/src/vmm/src/devices/virtio/block/virtio/io/mod.rs	2026-10-13 20:36:18.818812486 +0000
-@@ -9,9 +9,9 @@
+
+--- a/src/vmm/src/devices/virtio/block/virtio/io/mod.rs
++++ b/src/vmm/src/devices/virtio/block/virtio/io/mod.rs
+@@ -9,9 +9,9 @@ use std::fs::File;
  
  pub use self::async_io::{AsyncFileEngine, AsyncIoError};
  pub use self::sync_io::{SyncFileEngine, SyncIoError};
@@ -250,7 +249,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
  
  #[derive(Debug)]
  pub struct RequestOk {
-@@ -83,55 +83,71 @@
+@@ -82,55 +82,71 @@ impl FileEngine {
          }
      }
  
@@ -342,21 +341,20 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
          }
      }
  
-@@ -187,7 +203,9 @@
+@@ -209,7 +225,7 @@ pub mod tests {
      use crate::utils::u64_to_usize;
      use crate::vmm_config::machine_config::HugePageConfig;
      use crate::vstate::memory;
--    use crate::vstate::memory::{Bitmap, Bytes, GuestMemory, GuestRegionMmapExt};
-+    use crate::vstate::memory::{
-+        Bitmap, Bytes, GuestAddress, GuestMemory, GuestRegionMmapExt,
-+    };
+-    use crate::vstate::memory::{Bitmap, Bytes, GuestRegionMmapExt};
++    use crate::vstate::memory::{Bitmap, Bytes, GuestAddress, GuestRegionMmapExt};
  
      const FILE_LEN: u32 = 1024;
      // 2 pages of memory should be enough to test read/write ops and also dirty tracking.
-@@ -251,6 +269,74 @@
+@@ -272,6 +288,74 @@ pub mod tests {
+         }
      }
  
-     #[test]
++    #[test]
 +    fn test_scatter_gather() {
 +        for engine_type in [FileEngineType::Sync, FileEngineType::Async] {
 +            let file = TempFile::new().unwrap().into_file();
@@ -424,11 +422,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
 +        }
 +    }
 +
-+    #[test]
+     #[test]
      fn test_sync() {
          let mem = create_mem();
-         // Create backing file.
-@@ -266,13 +352,13 @@
+@@ -288,13 +372,13 @@ pub mod tests {
          let addr = GuestAddress(MEM_LEN as u64 - u64::from(partial_len));
          mem.write(&data, addr).unwrap();
          assert_sync_execution!(
@@ -444,7 +441,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
              partial_len
          );
          // Check data
-@@ -286,13 +372,13 @@
+@@ -308,13 +392,13 @@ pub mod tests {
          let addr = GuestAddress(0);
          mem.write(&data, addr).unwrap();
          assert_sync_execution!(
@@ -460,7 +457,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
              partial_len
          );
          // Check data
-@@ -306,8 +392,7 @@
+@@ -328,8 +412,7 @@ pub mod tests {
              engine.write(
                  0,
                  &mem,
@@ -470,7 +467,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
                  PendingRequest::default()
              ),
              FILE_LEN
-@@ -318,8 +403,7 @@
+@@ -340,8 +423,7 @@ pub mod tests {
              engine.read(
                  0,
                  &mem,
@@ -480,7 +477,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
                  PendingRequest::default()
              ),
              FILE_LEN
-@@ -354,11 +438,11 @@
+@@ -376,11 +458,11 @@ pub mod tests {
          let partial_len = 50;
          let addr = GuestAddress(0);
          mem.write(&data, addr).unwrap();
@@ -494,7 +491,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
          assert_async_execution(&mem, &mut engine, partial_len);
          // Check data
          let mut buf = vec![0u8; partial_len as usize];
-@@ -370,12 +454,12 @@
+@@ -392,12 +474,12 @@ pub mod tests {
  
          // Full write
          mem.write(&data, GuestAddress(0)).unwrap();
@@ -509,10 +506,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/io/mod.rs b8/src/vmm/src/de
          assert_async_execution(&mem, &mut engine, FILE_LEN);
          // Check data
          let mut buf = vec![0u8; FILE_LEN as usize];
-diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/devices/virtio/block/virtio/request.rs
---- a/src/vmm/src/devices/virtio/block/virtio/request.rs	2026-10-13 18:10:31.380439584 +0000
-+++ b/src/vmm/src/devices/virtio/block/virtio/request.rs	2026-10-13 20:36:18.817812447 +0000
-@@ -231,13 +231,23 @@
+
+--- a/src/vmm/src/devices/virtio/block/virtio/request.rs
++++ b/src/vmm/src/devices/virtio/block/virtio/request.rs
+@@ -256,13 +256,23 @@ impl RequestHeader {
      }
  }
  
@@ -537,7 +534,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
  }
  
  impl Request {
-@@ -255,41 +265,44 @@
+@@ -280,26 +290,19 @@ impl Request {
          let mut req = Request {
              r#type: RequestType::from(request_header.request_type),
              sector: request_header.sector,
@@ -571,7 +568,8 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
                  .next_descriptor()
                  .ok_or(VirtioBlockError::DescriptorChainTooShort)?;
  
-             if data_desc.is_write_only() && req.r#type == RequestType::Out {
+@@ -308,15 +311,25 @@ impl Request {
+             {
                  return Err(VirtioBlockError::UnexpectedWriteOnlyDescriptor);
              }
 -            if !data_desc.is_write_only() && req.r#type == RequestType::In {
@@ -602,7 +600,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
          }
  
          // check request validity
-@@ -308,7 +321,13 @@
+@@ -335,7 +348,13 @@ impl Request {
                      return Err(VirtioBlockError::InvalidOffset);
                  }
              }
@@ -616,8 +614,26 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
 +            {
                  return Err(VirtioBlockError::InvalidDataLength);
              }
-             _ => {}
-@@ -373,19 +392,23 @@
+             RequestType::Discard => {
+@@ -363,12 +382,16 @@ impl Request {
+         mem: &GuestMemoryMmap,
+         num_disk_sectors: u64,
+     ) -> Result<(), VirtioBlockError> {
++        // The single range must sit in one data descriptor.
++        let [segment] = self.segments.as_slice() else {
++            return Err(VirtioBlockError::InvalidDataLength);
++        };
+         if self.data_len != DISCARD_RANGE_SIZE {
+             return Err(VirtioBlockError::InvalidDataLength);
+         }
+ 
+         let range: DiscardWriteZeroes = mem
+-            .read_obj(self.data_addr)
++            .read_obj(segment.addr)
+             .map_err(VirtioBlockError::GuestMemory)?;
+ 
+         if range.num_sectors == 0 || range.num_sectors > MAX_DISCARD_SECTORS || range.flags != 0 {
+@@ -445,12 +468,12 @@ impl Request {
              RequestType::In => {
                  let _metric = block_metrics.read_agg.record_latency_metrics();
                  disk.file_engine
@@ -629,6 +645,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
                  disk.file_engine
 -                    .write(self.offset(), mem, self.data_addr, self.data_len, pending)
 +                    .write(self.offset(), mem, &self.segments, pending)
+             }
+             RequestType::Discard => {
+                 if !discard_supported {
+@@ -466,10 +489,14 @@ impl Request {
              }
              RequestType::Flush => disk.file_engine.flush(pending),
              RequestType::GetDeviceID => {
@@ -647,10 +667,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
                  return ProcessingResult::Executed(pending.finish(mem, res, block_metrics));
              }
              RequestType::Unsupported(_) => {
-@@ -501,7 +524,12 @@
-             assert_eq!(request.sector, expected_header.sector);
+@@ -600,7 +627,12 @@ mod tests {
+             }
  
-             if check_data {
+             if check_data && request.r#type != RequestType::Discard {
 -                assert_eq!(request.data_addr.raw_value(), self.data_desc.addr.get());
 +                assert_eq!(request.segments.len(), 1);
 +                assert_eq!(
@@ -661,10 +681,11 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
                  assert_eq!(request.data_len, self.data_desc.len.get());
              }
  
-@@ -562,6 +590,51 @@
+@@ -660,6 +692,51 @@ mod tests {
+         chain.check_parse(true);
      }
  
-     #[test]
++    #[test]
 +    fn test_parse_scatter_gather() {
 +        let mem = &default_mem();
 +        let queue = VirtQueue::new(GuestAddress(0), mem, 16);
@@ -709,11 +730,10 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
 +        chain.check_parse_err(VirtioBlockError::InvalidDataLength);
 +    }
 +
-+    #[test]
+     #[test]
      fn test_parse_in() {
          let mem = &default_mem();
-         let queue = VirtQueue::new(GuestAddress(0), mem, 16);
-@@ -831,7 +904,10 @@
+@@ -1009,7 +1086,10 @@ mod tests {
              data_len: valid_data_len,
              status_addr,
              sector: sector & (NUM_DISK_SECTORS - sectors_len),
@@ -725,7 +745,7 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
          };
          let mut request_header = RequestHeader::new(virtio_request_id, request.sector);
  
-@@ -841,12 +917,12 @@
+@@ -1019,12 +1099,12 @@ mod tests {
  
          // Flush requests have no data desc.
          if request.r#type == RequestType::Flush {
@@ -740,10 +760,28 @@ diff -ruN b7/src/vmm/src/devices/virtio/block/virtio/request.rs b8/src/vmm/src/d
                  request.data_len,
                  request_type_flags(request.r#type),
                  2,
-diff -ruN b7/src/vmm/src/io_uring/mod.rs b8/src/vmm/src/io_uring/mod.rs
---- a/src/vmm/src/io_uring/mod.rs	2026-10-13 18:10:31.384439743 +0000
-+++ b/src/vmm/src/io_uring/mod.rs	2026-10-13 20:36:18.819812526 +0000
-@@ -26,7 +26,7 @@
+@@ -1038,7 +1118,7 @@ mod tests {
+                         num_sectors: 1,
+                         flags: 0,
+                     },
+-                    request.data_addr,
++                    data_addr,
+                 )
+                 .unwrap();
+                 request.sector = discard_sector * u64::from(SECTOR_SIZE);
+@@ -1138,7 +1218,7 @@ mod tests {
+                             num_sectors: 1,
+                             flags: 0,
+                         },
+-                        request.data_addr,
++                        data_addr,
+                     )
+                     .unwrap();
+                     return (Err(VirtioBlockError::InvalidOffset), mem, q);
+
+--- a/src/vmm/src/io_uring/mod.rs
++++ b/src/vmm/src/io_uring/mod.rs
+@@ -26,7 +26,7 @@ use vmm_sys_util::syscall::SyscallReturnCode;
  use crate::io_uring::generated::io_uring_register_op;
  
  // IO_uring operations that we require to be supported by the host kernel.
@@ -752,10 +790,10 @@ diff -ruN b7/src/vmm/src/io_uring/mod.rs b8/src/vmm/src/io_uring/mod.rs
  // Taken from linux/fs/io_uring.c
  const IORING_MAX_FIXED_FILES: usize = 1 << 15;
  
-diff -ruN b7/src/vmm/src/io_uring/operation/mod.rs b8/src/vmm/src/io_uring/operation/mod.rs
---- a/src/vmm/src/io_uring/operation/mod.rs	2026-10-13 18:10:31.384439743 +0000
-+++ b/src/vmm/src/io_uring/operation/mod.rs	2026-10-13 20:36:18.819812526 +0000
-@@ -27,6 +27,10 @@
+
+--- a/src/vmm/src/io_uring/operation/mod.rs
++++ b/src/vmm/src/io_uring/operation/mod.rs
+@@ -27,6 +27,10 @@ pub enum OpCode {
      Read = io_uring_op::IORING_OP_READ as u8,
      /// Write operation.
      Write = io_uring_op::IORING_OP_WRITE as u8,
@@ -766,7 +804,7 @@ diff -ruN b7/src/vmm/src/io_uring/operation/mod.rs b8/src/vmm/src/io_uring/opera
      /// Fsync operation.
      Fsync = io_uring_op::IORING_OP_FSYNC as u8,
  }
-@@ -37,6 +41,8 @@
+@@ -37,6 +41,8 @@ impl From<OpCode> for &'static str {
          match opcode {
              OpCode::Read => "read",
              OpCode::Write => "write",
@@ -775,15 +813,10 @@ diff -ruN b7/src/vmm/src/io_uring/operation/mod.rs b8/src/vmm/src/io_uring/opera
              OpCode::Fsync => "fsync",
          }
      }
-@@ -95,6 +101,34 @@
-             addr: Some(addr),
-             len: Some(len),
-             flags: 0,
-+            offset: Some(offset),
-+            user_data,
-+        }
-+    }
-+
+@@ -100,6 +106,34 @@ impl<T: Debug> Operation<T> {
+         }
+     }
+ 
 +    /// Construct a vectored read operation. `addr` points at `len` `iovec`s that
 +    /// must stay valid until the operation completes.
 +    pub fn readv(fd: FixedFd, addr: usize, len: u32, offset: u64, user_data: T) -> Self {
@@ -807,6 +840,11 @@ diff -ruN b7/src/vmm/src/io_uring/operation/mod.rs b8/src/vmm/src/io_uring/opera
 +            addr: Some(addr),
 +            len: Some(len),
 +            flags: 0,
-             offset: Some(offset),
-             user_data,
-         }
++            offset: Some(offset),
++            user_data,
++        }
++    }
++
+     /// Construct a fsync operation.
+     pub fn fsync(fd: FixedFd, user_data: T) -> Self {
+         Self {

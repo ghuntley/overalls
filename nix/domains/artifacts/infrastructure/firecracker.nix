@@ -1,7 +1,7 @@
 { pkgs }:
 let
   # @cc [owner:ghuntley,label:build] firecracker-patches-keep-upstream-identity
-  # vmm MUST be the pinned nixpkgs static Firecracker 1.16.1 with only the
+  # vmm MUST be the pinned nixpkgs static Firecracker 1.17.0 with only the
   # patches listed here applied. Patches MUST NOT change the crate version
   # string, Cargo.toml or Cargo.lock: Lilly matches `vmm_version` exactly and
   # the vendored dependency hash is keyed on the unpatched source.
@@ -42,10 +42,12 @@ let
     ../../../platform/patches/firecracker-omnios-serial-shutdown.patch
     # Exercise the pinned UART dependency through its production public API.
     ../../../platform/patches/firecracker-uart-thre-tests.patch
-    # Guest-initiated BAR relocation: the MMIO bus follows a BAR the firmware
-    # or OS reprograms (MMIO registration and queue doorbell ioeventfds), and a
-    # sizing read keeps the 64-bit type bits, so edk2 can enumerate the bus
-    # normally.
+    # MSI-X lives in its own BAR 4 (FreeBSD maps the table by its BIR), and
+    # both BARs follow the guest: upstream 1.17 relocates on the memory-decode
+    # enable; this also relocates when a BAR's high half is rewritten while
+    # decoding stays enabled, and moves both BARs atomically so firmware may
+    # swap them. Upstream 1.17 implements the masked BAR writes and virtio
+    # device reset (block, net, vsock, rng) that earlier patches carried.
     ../../../platform/patches/firecracker-pci-bar-relocation.patch
     # Firmware configures virtio queues while the device is still in INIT;
     # retain those queue addresses until the guest completes feature negotiation.
@@ -57,12 +59,6 @@ let
     # illumos conditionally enables MSI-X; a pre-enabled capability otherwise
     # leaves the VMM's interrupts disabled and first block I/O waiting forever.
     ../../../platform/patches/firecracker-msix-reset-state.patch
-    # virtio-blk and virtio-net implement device reset, so a device the
-    # firmware activated can be re-initialized by the operating system.
-    ../../../platform/patches/firecracker-virtio-reset.patch
-    # Network reset runs under the vCPU seccomp filter. Retain its existing
-    # receive mapping rather than attempting forbidden memfd allocation.
-    ../../../platform/patches/firecracker-net-reset-reuse.patch
     # virtio-blk requests may spread their data over several descriptors
     # (Windows viostor uses one per physical page); both I/O engines transfer
     # every segment, io_uring through vectored operations.
@@ -73,12 +69,6 @@ let
     # for each packet. The feature is still not offered, so Linux guests keep
     # their direct chains.
     ../../../platform/patches/firecracker-vsock-indirect-desc.patch
-    # Reset the vsock backend at guest shutdown, reusing its preallocated packet
-    # ring storage so the vCPU seccomp filter never needs memfd_create during reset.
-    ../../../platform/patches/firecracker-vsock-reset.patch
-    # Reset the entropy backend at guest shutdown, reusing its preallocated iovec
-    # storage so the vCPU seccomp filter never needs memfd_create during reset.
-    ../../../platform/patches/firecracker-rng-reset.patch
   ];
   # Applied to the pinned writable Cargo vendor copy, preserving Cargo metadata.
   uartPatch = ../../../platform/patches/firecracker-uart-thre-enable.patch;
@@ -89,6 +79,10 @@ in
   # jail chroot needs no host libraries (contract jailed-vmm-static-runtime).
   vmm = pkgs.pkgsStatic.firecracker.overrideAttrs (previous: {
     patches = (previous.patches or [ ]) ++ patches;
+    # nixpkgs' cargo setup hook exports AWS_LC_SYS_USE_SYSTEM=1 for every Rust
+    # package; there is no static musl system AWS-LC, so keep building the
+    # vendored aws-lc-sys from source as upstream Firecracker does.
+    dontCargoUseSystemLibs = true;
     postPatch = (previous.postPatch or "") + ''
       mapfile -t uart_sources < <(find "$cargoDepsCopy" -maxdepth 2 -type d -name vm-superio-0.8.1)
       test "''${#uart_sources[@]}" -eq 1

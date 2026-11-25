@@ -1,7 +1,6 @@
-diff -ruN b2/src/vmm/src/device_manager/legacy.rs b5/src/vmm/src/device_manager/legacy.rs
---- a/src/vmm/src/device_manager/legacy.rs	2026-10-13 16:50:45.990850591 +0000
-+++ b/src/vmm/src/device_manager/legacy.rs	2026-10-13 18:24:51.006511600 +0000
-@@ -12,7 +12,8 @@
+--- a/src/vmm/src/device_manager/legacy.rs
++++ b/src/vmm/src/device_manager/legacy.rs
+@@ -12,7 +12,8 @@ use acpi_tables::aml::AmlError;
  use acpi_tables::{Aml, aml};
  
  use crate::devices::legacy::acpi_pm_timer::{ACPI_PM_TIMER_PORT, ACPI_PM_TIMER_SIZE};
@@ -11,7 +10,7 @@ diff -ruN b2/src/vmm/src/device_manager/legacy.rs b5/src/vmm/src/device_manager/
  use crate::vstate::bus::BusError;
  use crate::vstate::vm::KvmVm;
  
-@@ -35,6 +36,8 @@
+@@ -35,6 +36,8 @@ pub struct PortIODeviceManager {
      pub i8042: Arc<Mutex<I8042Device>>,
      // Read-only ACPI PM timer required by PVH-booted UEFI firmware.
      pub acpi_pm_timer: Arc<Mutex<AcpiPmTimer>>,
@@ -20,7 +19,7 @@ diff -ruN b2/src/vmm/src/device_manager/legacy.rs b5/src/vmm/src/device_manager/
  }
  
  impl PortIODeviceManager {
-@@ -72,6 +75,7 @@
+@@ -72,6 +75,7 @@ impl PortIODeviceManager {
              ACPI_PM_TIMER_PORT,
              ACPI_PM_TIMER_SIZE,
          )?;
@@ -28,7 +27,7 @@ diff -ruN b2/src/vmm/src/device_manager/legacy.rs b5/src/vmm/src/device_manager/
  
          vm.register_irq(
              self.stdio_serial
-@@ -180,8 +184,13 @@
+@@ -180,8 +184,13 @@ mod tests {
                  I8042Device::new(EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap(),
              )),
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
@@ -42,10 +41,10 @@ diff -ruN b2/src/vmm/src/device_manager/legacy.rs b5/src/vmm/src/device_manager/
          let mut ticks = [0u8; 4];
          vm.pio_bus.read(ACPI_PM_TIMER_PORT, &mut ticks).unwrap();
          assert_ne!(ticks, [0xff; 4]);
-diff -ruN b2/src/vmm/src/device_manager/mod.rs b5/src/vmm/src/device_manager/mod.rs
---- a/src/vmm/src/device_manager/mod.rs	2026-10-13 16:50:45.991850629 +0000
-+++ b/src/vmm/src/device_manager/mod.rs	2026-10-13 18:24:51.006511600 +0000
-@@ -26,7 +26,7 @@
+
+--- a/src/vmm/src/device_manager/mod.rs
++++ b/src/vmm/src/device_manager/mod.rs
+@@ -29,7 +29,7 @@ use vmm_sys_util::eventfd::EventFd;
  use crate::EventManager;
  use crate::device_manager::acpi::ACPIDeviceError;
  #[cfg(target_arch = "x86_64")]
@@ -54,7 +53,7 @@ diff -ruN b2/src/vmm/src/device_manager/mod.rs b5/src/vmm/src/device_manager/mod
  #[cfg(target_arch = "aarch64")]
  use crate::devices::legacy::RTCDevice;
  use crate::devices::legacy::SerialDevice;
-@@ -222,6 +222,7 @@
+@@ -225,6 +225,7 @@ impl DeviceManager {
              stdio_serial: serial,
              i8042,
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
@@ -62,7 +61,7 @@ diff -ruN b2/src/vmm/src/device_manager/mod.rs b5/src/vmm/src/device_manager/mod
          };
          legacy_devices.register_devices(vm)?;
          Ok(legacy_devices)
-@@ -816,6 +817,7 @@
+@@ -812,6 +813,7 @@ pub(crate) mod tests {
                  I8042Device::new(EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap(),
              )),
              acpi_pm_timer: Arc::new(Mutex::new(AcpiPmTimer::new())),
@@ -70,9 +69,9 @@ diff -ruN b2/src/vmm/src/device_manager/mod.rs b5/src/vmm/src/device_manager/mod
          };
  
          DeviceManager {
-diff -ruN b2/src/vmm/src/devices/legacy/cmos_rtc.rs b5/src/vmm/src/devices/legacy/cmos_rtc.rs
---- a/src/vmm/src/devices/legacy/cmos_rtc.rs	1970-01-01 00:00:00.000000000 +0000
-+++ b/src/vmm/src/devices/legacy/cmos_rtc.rs	2026-10-13 18:24:51.005511560 +0000
+
+--- /dev/null
++++ b/src/vmm/src/devices/legacy/cmos_rtc.rs
 @@ -0,0 +1,240 @@
 +// Copyright 2026 Overalls contributors.
 +// SPDX-License-Identifier: Apache-2.0
@@ -314,9 +313,9 @@ diff -ruN b2/src/vmm/src/devices/legacy/cmos_rtc.rs b5/src/vmm/src/devices/legac
 +        assert_eq!(wide, [0xff, 0xff]);
 +    }
 +}
-diff -ruN b2/src/vmm/src/devices/legacy/mod.rs b5/src/vmm/src/devices/legacy/mod.rs
---- a/src/vmm/src/devices/legacy/mod.rs	2026-10-13 16:50:45.988850515 +0000
-+++ b/src/vmm/src/devices/legacy/mod.rs	2026-10-13 18:24:51.006511600 +0000
+
+--- a/src/vmm/src/devices/legacy/mod.rs
++++ b/src/vmm/src/devices/legacy/mod.rs
 @@ -8,6 +8,8 @@
  //! Implements legacy devices (UART, RTC etc).
  #[cfg(target_arch = "x86_64")]
@@ -326,7 +325,7 @@ diff -ruN b2/src/vmm/src/devices/legacy/mod.rs b5/src/vmm/src/devices/legacy/mod
  mod i8042;
  #[cfg(target_arch = "aarch64")]
  pub mod rtc_pl031;
-@@ -23,6 +25,8 @@
+@@ -23,6 +25,8 @@ use vmm_sys_util::eventfd::EventFd;
  
  #[cfg(target_arch = "x86_64")]
  pub use self::acpi_pm_timer::AcpiPmTimer;

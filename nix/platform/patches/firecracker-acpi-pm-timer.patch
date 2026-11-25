@@ -1,7 +1,6 @@
-diff -ruN a/src/vmm/src/device_manager/legacy.rs b2/src/vmm/src/device_manager/legacy.rs
---- a/src/vmm/src/device_manager/legacy.rs	2026-10-13 16:12:21.042909168 +0000
-+++ b2/src/vmm/src/device_manager/legacy.rs	2026-10-13 16:50:45.990850591 +0000
-@@ -11,7 +11,8 @@
+--- a/src/vmm/src/device_manager/legacy.rs
++++ b/src/vmm/src/device_manager/legacy.rs
+@@ -11,7 +11,8 @@ use std::sync::{Arc, Mutex};
  use acpi_tables::aml::AmlError;
  use acpi_tables::{Aml, aml};
  
@@ -11,7 +10,7 @@ diff -ruN a/src/vmm/src/device_manager/legacy.rs b2/src/vmm/src/device_manager/l
  use crate::vstate::bus::BusError;
  use crate::vstate::vm::KvmVm;
  
-@@ -25,13 +26,15 @@
+@@ -25,13 +26,15 @@ pub enum LegacyDeviceError {
  }
  
  /// The `PortIODeviceManager` is a wrapper that is used for registering legacy devices
@@ -28,7 +27,7 @@ diff -ruN a/src/vmm/src/device_manager/legacy.rs b2/src/vmm/src/device_manager/l
  }
  
  impl PortIODeviceManager {
-@@ -64,6 +67,11 @@
+@@ -64,6 +67,11 @@ impl PortIODeviceManager {
              Self::I8042_KDB_DATA_REGISTER_ADDRESS,
              Self::I8042_KDB_DATA_REGISTER_SIZE,
          )?;
@@ -40,7 +39,7 @@ diff -ruN a/src/vmm/src/device_manager/legacy.rs b2/src/vmm/src/device_manager/l
  
          vm.register_irq(
              self.stdio_serial
-@@ -171,7 +179,11 @@
+@@ -171,7 +179,11 @@ mod tests {
              i8042: Arc::new(Mutex::new(
                  I8042Device::new(EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap(),
              )),
@@ -52,10 +51,10 @@ diff -ruN a/src/vmm/src/device_manager/legacy.rs b2/src/vmm/src/device_manager/l
 +        assert_ne!(ticks, [0xff; 4]);
      }
  }
-diff -ruN a/src/vmm/src/device_manager/mod.rs b2/src/vmm/src/device_manager/mod.rs
---- a/src/vmm/src/device_manager/mod.rs	2026-10-13 16:12:21.042909168 +0000
-+++ b2/src/vmm/src/device_manager/mod.rs	2026-10-13 16:50:45.991850629 +0000
-@@ -26,7 +26,7 @@
+
+--- a/src/vmm/src/device_manager/mod.rs
++++ b/src/vmm/src/device_manager/mod.rs
+@@ -29,7 +29,7 @@ use vmm_sys_util::eventfd::EventFd;
  use crate::EventManager;
  use crate::device_manager::acpi::ACPIDeviceError;
  #[cfg(target_arch = "x86_64")]
@@ -64,7 +63,7 @@ diff -ruN a/src/vmm/src/device_manager/mod.rs b2/src/vmm/src/device_manager/mod.
  #[cfg(target_arch = "aarch64")]
  use crate::devices::legacy::RTCDevice;
  use crate::devices::legacy::SerialDevice;
-@@ -221,6 +221,7 @@
+@@ -224,6 +224,7 @@ impl DeviceManager {
          let mut legacy_devices = PortIODeviceManager {
              stdio_serial: serial,
              i8042,
@@ -72,7 +71,7 @@ diff -ruN a/src/vmm/src/device_manager/mod.rs b2/src/vmm/src/device_manager/mod.
          };
          legacy_devices.register_devices(vm)?;
          Ok(legacy_devices)
-@@ -814,6 +815,7 @@
+@@ -810,6 +811,7 @@ pub(crate) mod tests {
              i8042: Arc::new(Mutex::new(
                  I8042Device::new(EventFd::new(libc::EFD_NONBLOCK).unwrap()).unwrap(),
              )),
@@ -80,9 +79,9 @@ diff -ruN a/src/vmm/src/device_manager/mod.rs b2/src/vmm/src/device_manager/mod.
          };
  
          DeviceManager {
-diff -ruN a/src/vmm/src/devices/legacy/acpi_pm_timer.rs b2/src/vmm/src/devices/legacy/acpi_pm_timer.rs
---- a/src/vmm/src/devices/legacy/acpi_pm_timer.rs	1970-01-01 00:00:00.000000000 +0000
-+++ b2/src/vmm/src/devices/legacy/acpi_pm_timer.rs	2026-10-13 16:50:45.987850477 +0000
+
+--- /dev/null
++++ b/src/vmm/src/devices/legacy/acpi_pm_timer.rs
 @@ -0,0 +1,112 @@
 +// Copyright 2026 Overalls contributors.
 +// SPDX-License-Identifier: Apache-2.0
@@ -196,9 +195,9 @@ diff -ruN a/src/vmm/src/devices/legacy/acpi_pm_timer.rs b2/src/vmm/src/devices/l
 +        assert_ne!(after, [0xff; 4]);
 +    }
 +}
-diff -ruN a/src/vmm/src/devices/legacy/mod.rs b2/src/vmm/src/devices/legacy/mod.rs
---- a/src/vmm/src/devices/legacy/mod.rs	2026-10-13 16:12:21.007907813 +0000
-+++ b2/src/vmm/src/devices/legacy/mod.rs	2026-10-13 16:50:45.988850515 +0000
+
+--- a/src/vmm/src/devices/legacy/mod.rs
++++ b/src/vmm/src/devices/legacy/mod.rs
 @@ -6,6 +6,8 @@
  // found in the THIRD-PARTY file.
  
@@ -208,7 +207,7 @@ diff -ruN a/src/vmm/src/devices/legacy/mod.rs b2/src/vmm/src/devices/legacy/mod.
  mod i8042;
  #[cfg(target_arch = "aarch64")]
  pub mod rtc_pl031;
-@@ -19,6 +21,8 @@
+@@ -19,6 +21,8 @@ use serde::ser::SerializeMap;
  use vm_superio::Trigger;
  use vmm_sys_util::eventfd::EventFd;
  

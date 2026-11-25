@@ -1,9 +1,10 @@
 --- a/src/vmm/src/devices/legacy/serial.rs
 +++ b/src/vmm/src/devices/legacy/serial.rs
-@@ -450,6 +450,47 @@
+@@ -533,6 +533,47 @@ mod tests {
+         );
      }
  
-     #[test]
++    #[test]
 +    fn test_native_uart_thre_enable_after_fifo() {
 +        let event = EventFd::new(libc::EFD_NONBLOCK).unwrap();
 +        let mut serial = Serial::new(
@@ -44,7 +45,6 @@
 +        assert_eq!(event.read().unwrap_err().kind(), io::ErrorKind::WouldBlock);
 +    }
 +
-+    #[test]
+     #[test]
      fn test_serial_bus_read() {
          let intr_evt = EventFdTrigger::new(EventFd::new(libc::EFD_NONBLOCK).unwrap());
- 
