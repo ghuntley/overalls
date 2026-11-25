@@ -1,7 +1,7 @@
 # Every NixOS module, instantiated over one package set (ADR-0269). The flake
 # exports these over its own set; lib.assemble instantiates them over the set
 # that includes Buck2 artifacts, so no module captures a different build.
-{ packages, nixCompact, tribuchet, nix-grpc-store, nixpkgs, pkgs }:
+{ packages, nixCompact, nix-grpc-store, nixpkgs, pkgs }:
 let
   modules = {
     default = import ../domains/system/catalog.nix { packages = packages; nixCompact = nixCompact; };
@@ -9,8 +9,8 @@ let
     # their files (ADR-0270, buck/machine_tests.py).
     select = names: import ../domains/system/catalog.nix { packages = packages; nixCompact = nixCompact; only = names; };
     # Kept out of the default catalog: only flake-packages hosts and tests that
-    # pass the locked inputs import tribuchet and nix-grpc-store (ADR-0248).
-    fleetBuilds = import ../domains/system/fleet-builds.nix { inherit tribuchet; nixGrpcStore = nix-grpc-store; };
+    # pass the locked inputs import nix-grpc-store (ADR-0248).
+    fleetBuilds = import ../domains/system/fleet-builds.nix { nixGrpcStore = nix-grpc-store; };
     services = {
       marshall = import ../domains/system/marshall.nix { packages = packages; };
       lilly = import ../domains/system/lilly.nix { packages = packages; };

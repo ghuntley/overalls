@@ -8,10 +8,11 @@ This repository consumes its pinned flake through `flake.lock` and `devenv.lock`
 - [Logging, retrieval, retention and replay manual](https://github.com/ghuntley/nix-compact/blob/9e43798f4ebf1b969432b6e1eb9f8a0bdf69fede/MANUAL.md)
 - [Implementation design and verification boundaries](https://github.com/ghuntley/nix-compact/blob/9e43798f4ebf1b969432b6e1eb9f8a0bdf69fede/DESIGN.md)
 
-`devenv shell` uses the standalone package factory with this repository's pinned
-development package set. The fleet's NixOS adapter uses the stable host package
-set. Both require the supported Nix version rather than silently using another
-toolchain. Hosts enable compact output through the public
+nix-compact supports only Nix 2.36.0, which neither this repository's development
+package set nor its stable host package set ships. `devenv shell`, the fleet's NixOS
+adapter and both `tool-nix-compact` targets therefore use the package the pinned
+nix-compact flake builds from its own Nixpkgs input
+([ADR-0281](../architecture/decisions/0281-nix-compact-own-package-input.md)). Hosts enable compact output through the public
 `programs.nix-compact.enable` option. Explicit NixOS package choices retain
 ordinary precedence.
 
@@ -25,7 +26,8 @@ tools/buck2 build //:check-nix-compact-core \
   //:check-nix-compact-configuration
 ```
 
-The first three checks delegate to the standalone factories; configuration
+The first three checks delegate to the standalone factories (both native checks
+test the flake's package, with build and stable test tooling respectively); configuration
 checks remain here to verify this repository's compatibility adapter. Direct
 imports used by existing NixOS fixtures resolve the external source from the root
 flake lock through `nix/domains/artifacts/nix-compact/source.nix`, without another source

@@ -9,11 +9,13 @@ let
   enabled = evaluate {};
   disabled = evaluate { programs.nix-compact.enable = false; };
   override = evaluate { nix.package = pkgs.nix; };
-  patched = nixCompact.lib.mkPackage { inherit pkgs; };
+  # The flake's package, built from nix-compact's own Nixpkgs input.
+  patched = nixCompact.packages.${system}.default;
+  upstream = nixCompact.inputs.nixpkgs.legacyPackages.${system}.nixVersions.nix_2_36;
   checks = {
     nativePackageSelected = enabled.nix.package.outPath == patched.outPath;
-    cliActuallyPatched = patched.nix-cli.outPath != pkgs.nix.nix-cli.outPath;
-    daemonLibrariesUnchanged = patched.libs.nix-store.outPath == pkgs.nix.libs.nix-store.outPath;
+    cliActuallyPatched = patched.nix-cli.outPath != upstream.nix-cli.outPath;
+    daemonLibrariesUnchanged = patched.libs.nix-store.outPath == upstream.libs.nix-store.outPath;
     canDisable = disabled.nix.package.outPath == pkgs.nix.outPath;
     explicitPackageWins = override.nix.package.outPath == pkgs.nix.outPath;
     enabledByDefault = enabled.programs.nix-compact.enable;

@@ -1,4 +1,4 @@
-{ tribuchet, nixGrpcStore }:
+{ nixGrpcStore }:
 { config, lib, pkgs, ... }:
 let
   inherit (lib) mkOption types;
@@ -12,7 +12,6 @@ let
   bundle = config.services.overallsSecrets.bundles.fleet-builds;
   secretFile = name: "${bundle.directory}/${name}";
   grpcCredential = "/run/credentials/nix-grpc-daemon.service/grpc.key";
-  hubConfigDir = "/run/overalls-fleet-builds/tribuchet";
   # The client side of every grpc:// store runs in nix-daemon (root): the
   # substituter and the build hook both present this host's certificate from
   # the plugin's default /run/nix-grpc-store pair. Nix names a lock file after
@@ -22,30 +21,14 @@ let
   # plugin's 30 s default retry per call.
   grpcQuery = "connect-timeout=5&ca-cert=${grpcCa}";
   grpcStore = machine: "grpc://${machine.address}:${toString cfg.grpcPort}";
-  hubPort = 7437;
-  hub = config.services.tribuchet-hub;
-  # Tribuchet's shim fails a build outright when its hub socket refuses
-  # connections. Decline instead: print Nix's builder ready marker, then exit
-  # 222 (tribuchet's DECLINE_EXIT_CODE), so the patched Nix builds locally; an
-  # exit before the marker is a setup failure. A listening socket whose hub is
-  # restarting still accepts.
-  attachOrDecline = pkgs.writeShellScript "tribuchet-attach-or-decline" ''
-    if ! ${lib.getExe pkgs.socat} -u OPEN:/dev/null UNIX-CONNECT:${toString hub.socketPath} 2>/dev/null; then
-      printf '\002\n' >&2
-      exit 222
-    fi
-    exec ${lib.getExe' hub.package "tribuchet"} attach "$1" --socket ${toString hub.socketPath}
-  '';
-  systems = lib.unique (lib.concatMap (m: m.systems) (lib.attrValues cfg.machines));
 in {
-  imports = [ tribuchet.nixosModules.default nixGrpcStore.nixosModules.server nixGrpcStore.nixosModules.client ];
+  imports = [ nixGrpcStore.nixosModules.server nixGrpcStore.nixosModules.client ];
 
   options.overalls.fleetBuilds = {
-    enable = lib.mkEnableOption "fleet build scheduling through a tribuchet hub and grpc:// stores";
+    enable = lib.mkEnableOption "fleet builds delegated to one scheduler over grpc:// stores";
     localName = mkOption { type = nameType; default = config.networking.hostName; };
-    scheduler = mkOption { type = nameType; description = "The one participant running the tribuchet hub."; };
+    scheduler = mkOption { type = nameType; description = "The one participant the others delegate builds to."; };
     grpcPort = mkOption { type = types.port; default = 50051; };
-    tribuchetCaCertificate = mkOption { type = types.path; description = "Public tribuchet CA certificate."; };
     grpcCaCertificate = mkOption { type = types.path; description = "Public nix-grpc-store CA certificate."; };
     machines = mkOption {
       default = {};
@@ -55,8 +38,6 @@ in {
           systems = mkOption { type = types.listOf (types.strMatching "[a-zA-Z0-9_-]+"); };
           logicalCpus = mkOption { type = types.ints.positive; };
           supportedFeatures = mkOption { type = types.listOf (types.strMatching "[a-zA-Z0-9_-]+"); default = []; };
-          tribuchetCertificate = mkOption { type = types.path; description = "Public tribuchet worker certificate."; };
-          tribuchetHubCertificate = mkOption { type = types.nullOr types.path; default = null; };
           grpcCertificate = mkOption { type = types.path; description = "Public grpc certificate, CN build-NAME."; };
           encryptedFile = mkOption { type = (import ./types.nix { inherit lib; }).absolutePath; };
         };
@@ -65,12 +46,11 @@ in {
   };
 
   # @cc [owner:ghuntley,label:security;deployment] fleet-build-scheduling
-  # Exactly one registered participant MUST run the tribuchet hub, and it MUST
-  # NOT configure nix.buildMachines; the others MUST delegate only to that
-  # scheduler's grpc:// store under its mTLS-pinned CA. Tribuchet workers only
-  # import through their nix-daemon and never re-delegate, so no build cycle
-  # exists (ADR-0248). Signature checking MUST remain enabled, and the hub and
-  # grpc listeners MUST NOT be opened on any firewall interface beyond the
+  # Exactly one registered participant is the scheduler, and it MUST NOT
+  # configure nix.buildMachines; the others MUST delegate only to that
+  # scheduler's grpc:// store under its mTLS-pinned CA, so no build cycle
+  # exists (ADR-0248, ADR-0282). Signature checking MUST remain enabled, and
+  # the grpc listener MUST NOT be opened on any firewall interface beyond the
   # trusted tailnet.
 
   # @cc [owner:ghuntley,label:security] fleet-build-grpc-caches
@@ -89,14 +69,10 @@ in {
           message = "Fleet build participant addresses must be distinct."; }
         { assertion = lib.all (m: m.systems != []) (lib.attrValues cfg.machines);
           message = "Fleet build participants require systems."; }
-        { assertion = lib.length (lib.filter (m: m.tribuchetHubCertificate != null) (lib.attrValues cfg.machines)) == 1
-            && scheduler.tribuchetHubCertificate != null;
-          message = "Exactly the scheduler must carry a tribuchet hub certificate."; }
         { assertion = !isScheduler || config.nix.buildMachines == [];
           message = "The fleet build scheduler must not delegate builds."; }
         { assertion = config.nix.settings.require-sigs; message = "Fleet builds must preserve signature checking."; }
-        { assertion = !(lib.elem hubPort config.networking.firewall.allowedTCPPorts)
-            && !(lib.elem cfg.grpcPort config.networking.firewall.allowedTCPPorts);
+        { assertion = !(lib.elem cfg.grpcPort config.networking.firewall.allowedTCPPorts);
           message = "Fleet build listeners must not be opened publicly."; }
       ];
 
@@ -104,12 +80,7 @@ in {
         enable = true;
         bundles.fleet-builds = {
           encryptedFile = local.encryptedFile;
-          outputs = {
-            "tribuchet-worker.key" = { format = "raw"; secrets = [ "TRIBUCHET_WORKER_KEY" ]; };
-            "grpc.key" = { format = "raw"; secrets = [ "GRPC_KEY" ]; };
-          } // lib.optionalAttrs isScheduler {
-            "tribuchet-hub.key" = { format = "raw"; secrets = [ "TRIBUCHET_HUB_KEY" ]; };
-          };
+          outputs."grpc.key" = { format = "raw"; secrets = [ "GRPC_KEY" ]; };
         };
       };
       # @cc [owner:ghuntley,label:recovery] fleet-build-credentials-optional-for-local-builds
@@ -118,7 +89,7 @@ in {
       systemd.services.overalls-secrets-fleet-builds.wantedBy = [ "multi-user.target" ];
       systemd.services.nix-daemon = { wants = [ bundle.unit ]; after = [ bundle.unit ]; };
 
-      # Every participant serves its store over grpc:// and runs a worker.
+      # Every participant serves its store over grpc://.
       services.nix-grpc-daemon = {
         enable = true;
         listen = "0.0.0.0:${toString cfg.grpcPort}";
@@ -151,50 +122,7 @@ in {
         (lib.filter (name: !(builtins.hasAttr name cfg.machines))
           (lib.attrNames (lib.filterAttrs (name: _: name != config.overalls.remoteBuilders.localName) config.overalls.remoteBuilders.machines)));
       nix.settings.substituters = lib.mapAttrsToList (_: machine: "${grpcStore machine}?trusted=true&${grpcQuery}&priority=50") peers;
-
-      services.tribuchet-worker = {
-        enable = true;
-        keyFile = secretFile "tribuchet-worker.key";
-        settings = {
-          hub = "https://${scheduler.address}:${toString hubPort}";
-          ca-cert = "${cfg.tribuchetCaCertificate}";
-          cert = "${local.tribuchetCertificate}";
-          systems = local.systems;
-          max-jobs = local.logicalCpus;
-        };
-      };
-      systemd.services.tribuchet-worker = { wants = [ bundle.unit ]; after = [ bundle.unit ]; };
     }
-
-    (lib.mkIf isScheduler {
-      services.tribuchet-hub = {
-        enable = true;
-        port = hubPort;
-        openFirewall = false;
-        configDir = hubConfigDir;
-        settings.metrics-listen = "127.0.0.1:7438";
-        externalBuilders = {
-          enable = true;
-          inherit systems;
-          patchNix = true;
-          # Stack tribuchet's patches on the compact-log Nix (ADR-0087).
-          nixPackage = config.programs.nix-compact.package;
-        };
-      };
-      # @cc [owner:ghuntley,label:recovery] fleet-build-hub-outage-local
-      # An unreachable hub MUST NOT fail scheduler builds: they decline to
-      # local execution.
-      nix.settings.external-builders = lib.mkForce (builtins.toJSON [
-        { inherit systems; program = attachOrDecline; args = []; }
-      ]);
-      systemd.tmpfiles.rules = [
-        "d ${hubConfigDir}/ca 0700 root root -"
-        "L+ ${hubConfigDir}/ca/ca.crt - - - - ${cfg.tribuchetCaCertificate}"
-        "L+ ${hubConfigDir}/ca/hub.crt - - - - ${local.tribuchetHubCertificate}"
-        "L+ ${hubConfigDir}/ca/hub.key - - - - ${secretFile "tribuchet-hub.key"}"
-      ];
-      systemd.services.tribuchet-hub = { wants = [ bundle.unit ]; after = [ bundle.unit ]; };
-    })
 
     (lib.mkIf (!isScheduler) {
       nix.distributedBuilds = true;

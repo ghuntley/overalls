@@ -305,8 +305,8 @@ an entry shows `—`.
 | `nix-cache-configuration` | `//:check-nix-cache-configuration` | — | — |
 | `nix-compact-configuration` | `//:check-nix-compact-configuration` | `../packages/nix-compact/configuration-check.nix` | NixOS package selection, opt-out, explicit override and unchanged daemon libraries. |
 | `nix-compact-core` | `//:check-nix-compact-core` | pinned `nix-compact` flake `lib.mkCoreCheck` | C++ classification/archive regressions and Hegel properties for lossless capture, structured severity, budgets, interleaving, pagination and retention. |
-| `nix-compact-native` | `//:check-nix-compact-native` | pinned `nix-compact` flake `lib.mkNativeCheck` | Development-input native Nix: Hegel real-build status/capture checks, clean stdout, TTY, Unix daemon, remote protocols, heartbeat and SIGINT. |
-| `nix-compact-native-host` | `//:check-nix-compact-native-host` | pinned `nix-compact` flake `lib.mkNativeCheck` | The same native checks against the stable NixOS package input. |
+| `nix-compact-native` | `//:check-nix-compact-native` | pinned `nix-compact` flake `lib.mkNativeCheck` | nix-compact flake package with build-input test tooling: Hegel real-build status/capture checks, clean stdout, TTY, Unix daemon, remote protocols, heartbeat and SIGINT. |
+| `nix-compact-native-host` | `//:check-nix-compact-native-host` | pinned `nix-compact` flake `lib.mkNativeCheck` | The same native checks on the same package with stable NixOS test tooling. |
 | `nix-gc-configuration` | `//:check-nix-gc-configuration` | `evaluation/nix-gc.nix` | Threshold-gated bounded store collection: opt-in units, script bounds and pinned Nix, typed option rejection and fleet default enablement. No guest or runtime GC claim. |
 | `nix-ld` | `//nix/verification/tests/machines/nix-ld:nix-ld` | `machines/nix-ld/` | Host `programs.nix-ld` runs an unpackaged dynamically linked ELF through a login shell; the disabled stub loader refuses the same binary. No Firecracker claim. |
 | `otel-audi-ssh-native` | `//nix/verification/tests/machines/fleet:otel-audi-ssh-native` | `machines/fleet/` | — |

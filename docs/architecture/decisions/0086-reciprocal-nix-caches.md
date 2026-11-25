@@ -11,8 +11,8 @@
 ## Context
 
 [ADR-0248](0248-fleet-build-scheduling.md) replaces cache-only operation for
-Panterloons and Dungarees with a single tribuchet scheduler and `grpc://`
-stores, and carries this record forward unchanged for every other host. This
+Panterloons and Dungarees with a single scheduler and `grpc://` stores
+(tribuchet removed by [ADR-0282](0282-remove-tribuchet.md)), and carries this record forward unchanged for every other host. This
 record retains its rationale and historical implementation evidence.
 
 Fleet automatic updates failed on every candidate after the reciprocal builder

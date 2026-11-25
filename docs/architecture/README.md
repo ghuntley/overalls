@@ -812,9 +812,11 @@ the [review](reviews/2026-09-22-guest-ssh.md).
 compact Nix build logging: private numbered archives, structured-first diagnostic
 classification, bounded console output and a bounded log reader. Its implementation
 is maintained in [ghuntley/nix-compact](https://github.com/ghuntley/nix-compact) and
-consumed through pinned flake/devenv inputs with compatibility adapters. Hegel and native
-build checks verify capture, budgets, unchanged results, retention, interruption,
-Unix daemon and remote protocol paths for both pinned package inputs. The
+consumed through pinned flake/devenv inputs with compatibility adapters. Under
+[ADR-0281](decisions/0281-nix-compact-own-package-input.md) the package is Nix 2.36.0
+built from nix-compact's own pinned Nixpkgs input. Hegel and native build checks verify
+capture, budgets, unchanged results, retention, interruption, Unix daemon and remote
+protocol paths for that package with both pinned test-tooling package sets. The
 [guide](../development/nix-build-logs.md) covers usage and
 [review](reviews/2026-09-21-compact-nix-build-logs.md) records validation and rollout
 boundaries. Existing fleet hosts receive the package on normal activation.
@@ -949,9 +951,9 @@ because reciprocal build delegation deadlocked concurrent host updates. See the
 [review addendum](reviews/2026-09-18-remote-builders.md) for the incident and
 rollout evidence.
 [ADR-0248](decisions/0248-fleet-build-scheduling.md) supersedes it for Panterloons
-and Dungarees: Panterloons' nix-daemon sends builds to a tribuchet hub that
-schedules them onto workers on both hosts, Dungarees delegates through
-Panterloons' mTLS `grpc://` store, and the pair substitute from each other over
+and Dungarees: Panterloons builds locally, Dungarees delegates through
+Panterloons' mTLS `grpc://` store ([ADR-0282](decisions/0282-remove-tribuchet.md)
+removed the tribuchet hub and workers), and the pair substitute from each other over
 `grpc://`. Other hosts remain cache-only. See the
 [fleet build scheduling review](reviews/2026-10-20-fleet-build-scheduling.md).
 Buck2's remote cache and remote execution are on Namespace

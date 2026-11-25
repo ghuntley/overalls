@@ -8,11 +8,8 @@ from pathlib import Path
 fixtures = Path("/etc/fixtures")
 host = socket.gethostname()
 values: dict[str, str] = {
-    "TRIBUCHET_WORKER_KEY": (fixtures / f"tribuchet-{host}.key").read_text(),
     "GRPC_KEY": (fixtures / f"grpc-{host}.key").read_text(),
 }
-if host == "alpha":
-    values["TRIBUCHET_HUB_KEY"] = (fixtures / "tribuchet-hub.key").read_text()
 recipient = subprocess.check_output(
     ["ssh-to-age", "-i", "/etc/ssh/ssh_host_ed25519_key.pub"], text=True
 ).strip()

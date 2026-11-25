@@ -6,7 +6,9 @@
 - Implementation: partial
 - Components: NixOS, Nix daemon, fleet secret delivery, Panterloons, Dungarees
 - Supersedes: ADR-0086
-- Superseded by: none
+- Superseded by: ADR-0282
+
+> [ADR-0282](0282-remove-tribuchet.md) removes the tribuchet hub, workers and patched hub Nix. Panterloons stays the single scheduler and builds locally; the `grpc://` delegation, caches and access rules below remain.
 
 ## Context
 

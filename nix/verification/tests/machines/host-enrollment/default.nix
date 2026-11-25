@@ -1,4 +1,4 @@
-{ pkgs, nixpkgs, module, packages, diskoModule, diskoSource, imageSource, nixCompactSource }:
+{ pkgs, nixpkgs, module, packages, diskoModule, diskoSource, imageSource, nixCompactSource, nixCompactNixpkgsSource }:
 let
   lib = pkgs.lib;
   key = imageSource + "/nix/kexec-installer/ssh-keys/id_ed25519";
@@ -24,6 +24,7 @@ let
       fixturePath = [
         "overalls-fixture-nixpkgs=${nixpkgs}" "overalls-fixture-project=${source}"
         "overalls-fixture-disko=${diskoSource}" "overalls-fixture-nix-compact=${nixCompactSource}"
+        "overalls-fixture-nix-compact-nixpkgs=${nixCompactNixpkgsSource}"
       ];
     in {
       imports = [ (modulesPath + "/testing/test-instrumentation.nix") ];
@@ -73,16 +74,16 @@ let
       };
       outputs = { self, cells }:
       let
-        system = { nixpkgs, project, disko, nixCompact, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
+        system = { nixpkgs, project, disko, nixCompact, nixCompactNixpkgs, marshall, lilly, secretspec, sops, sshToAge, observabilityRuntimes }: import (nixpkgs.outPath + "/nixos/lib/eval-config.nix") {
           system = "x86_64-linux";
           modules = [
             (import (project.outPath + "/nix/domains/system/catalog.nix") {
-              # The flake's locked nix-compact, from its preloaded source: the
-              # default reads the root flake.lock and fetches from GitHub.
-              nixCompact = {
-                lib.mkPackage = import (nixCompact.outPath + "/package");
-                nixosModules.default = import (nixCompact.outPath + "/modules/nixos.nix") {
-                  packageForSystem = _: throw "the catalog selects the nix-compact package";
+              # The flake's locked nix-compact and its Nixpkgs input, from their
+              # preloaded sources: the default reads the root flake.lock and
+              # fetches from GitHub. Must match `enrolled` below exactly.
+              nixCompact.nixosModules.default = import (nixCompact.outPath + "/modules/nixos.nix") {
+                packageForSystem = system: import (nixCompact.outPath + "/package") {
+                  pkgs = import nixCompactNixpkgs.outPath { inherit system; config = { }; overlays = [ ]; };
                 };
               };
               packages = { marshall = marshall.outPath; lilly = lilly.outPath;
@@ -118,6 +119,7 @@ let
           systems.fixture-enrollment = system {
             nixpkgs = source "overalls-fixture-nixpkgs"; project = source "overalls-fixture-project";
             disko = source "overalls-fixture-disko"; nixCompact = source "overalls-fixture-nix-compact";
+            nixCompactNixpkgs = source "overalls-fixture-nix-compact-nixpkgs";
             marshall = store "${pkgs.hello}"; lilly = store "${pkgs.hello}";
             secretspec = store "${packages.secretTools.secretspec}"; sops = store "${packages.secretTools.sops}";
             sshToAge = store "${packages.secretTools.ssh-to-age}";
@@ -143,10 +145,9 @@ let
     system = "x86_64-linux";
     modules = [
       (import ../../../../domains/system/catalog.nix {
-        nixCompact = {
-          lib.mkPackage = import (nixCompactSource + "/package");
-          nixosModules.default = import (nixCompactSource + "/modules/nixos.nix") {
-            packageForSystem = _: throw "the catalog selects the nix-compact package";
+        nixCompact.nixosModules.default = import (nixCompactSource + "/modules/nixos.nix") {
+          packageForSystem = system: import (nixCompactSource + "/package") {
+            pkgs = import nixCompactNixpkgsSource { inherit system; config = { }; overlays = [ ]; };
           };
         };
         packages = { marshall = pkgs.hello; lilly = pkgs.hello;
@@ -180,7 +181,7 @@ let
       environment.systemPackages = [ (import ../../../../domains/artifacts/host { inherit pkgs; }) pkgs.git pkgs.nix pkgs.sops pkgs.ssh-to-age ];
       # Native builds change only public configuration. Preload their toolchain
       # and immutable source inputs so this isolated test needs no network cache.
-      system.extraDependencies = [ source nixpkgs.outPath diskoSource nixCompactSource pkgs.hello
+      system.extraDependencies = [ source nixpkgs.outPath diskoSource nixCompactSource nixCompactNixpkgsSource pkgs.hello
         packages.secretTools.secretspec packages.secretTools.sops packages.secretTools.ssh-to-age
         packages.observabilityRuntimes pkgs.stdenv pkgs.stdenvNoCC ];
       system.build.overallsEnrollmentImages = lib.overrideDerivation config.system.build.diskoImages (old: {

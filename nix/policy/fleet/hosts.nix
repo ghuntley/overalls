@@ -27,8 +27,8 @@
     panterloons = {
       controlPlane = "panterloons";
       telemetry = { central = "panterloons"; worker = "dungarees"; };
-      # Panterloons runs the tribuchet hub and the scheduler (ADR-0248).
-      builds = { scheduler = "panterloons"; hub = "panterloons"; participants = [ "dungarees" "panterloons" ]; };
+      # Panterloons is the build scheduler Dungarees delegates to (ADR-0248).
+      builds = { scheduler = "panterloons"; participants = [ "dungarees" "panterloons" ]; };
       tunnel = {
         panterloons = { address = "10.90.0.1"; endpoint = "panterloonsPrimary"; peers = [ "dungarees" "salopettes" ]; };
         dungarees = { address = "10.90.0.2"; endpoint = "dungareesPrimary"; peers = [ "panterloons" ]; };
@@ -69,8 +69,8 @@ let
         || (inTunnel deployment.telemetry.worker && tunnel.${deployment.telemetry.worker}.address == workerAddress)))
       "Fleet deployment ${name}: central telemetry is the control plane and the worker holds ${workerAddress}";
     assert lib.assertMsg (participants != [] && unique participants && lib.all (host: inTunnel host && hosts.${host}.builder != null) participants
-      && builtins.elem deployment.builds.scheduler participants && builtins.elem deployment.builds.hub participants)
-      "Fleet deployment ${name}: build participants must be tunnel members with builder capacity, including the scheduler and hub";
+      && builtins.elem deployment.builds.scheduler participants)
+      "Fleet deployment ${name}: build participants must be tunnel members with builder capacity, including the scheduler";
     true;
 in
 assert lib.assertMsg (builtins.attrNames hosts == builtins.attrNames inventory)

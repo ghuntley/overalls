@@ -6,9 +6,10 @@
 - Implementation: implemented
 - Components: Nix CLI, NixOS, development shell
 - Supersedes: none
-- Superseded by: ADR-0159
+- Superseded by: ADR-0159, ADR-0281
 
 > Superseded by [ADR-0159](0159-remove-legacy-compatibility.md) only for the preserved legacy `overalls.nixCompact.enable` option and adapters. ADR-0159 carries every other requirement of this record forward unchanged.
+> [ADR-0281](0281-nix-compact-own-package-input.md) supersedes only its use of overalls' development/stable package sets: overalls now uses the package nix-compact builds from its own pinned input.
 
 ## Context
 

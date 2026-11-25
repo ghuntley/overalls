@@ -14,11 +14,7 @@ let
       openssl x509 -req -in $2.csr -CA $1-ca.crt -CAkey $1-ca.key -CAcreateserial -out $2.crt -days 30 -extfile $2.ext 2>/dev/null
       rm $2.csr $2.ext
     }
-    ca tribuchet; ca grpc; ca rogue
-    leaf tribuchet tribuchet-hub hub ${addresses.alpha}
-    leaf tribuchet tribuchet-alpha alpha ${addresses.alpha}
-    leaf tribuchet tribuchet-beta beta ${addresses.beta}
-    leaf rogue rogue-worker beta ${addresses.beta}
+    ca grpc
     leaf grpc grpc-alpha build-alpha ${addresses.alpha}
     leaf grpc grpc-beta build-beta ${addresses.beta}
     leaf grpc grpc-mallory build-mallory ${addresses.beta}
@@ -28,8 +24,6 @@ let
     systems = [ "x86_64-linux" ];
     logicalCpus = 2;
     supportedFeatures = [ "big-parallel" ];
-    tribuchetCertificate = "${fixtures}/tribuchet-${name}.crt";
-    tribuchetHubCertificate = if name == "alpha" then "${fixtures}/tribuchet-hub.crt" else null;
     grpcCertificate = "${fixtures}/grpc-${name}.crt";
     encryptedFile = "/run/fixture/keys.enc.json";
   };
@@ -50,7 +44,6 @@ in pkgs.testers.runNixOSTest {
       enable = true;
       localName = config.networking.hostName;
       scheduler = "alpha";
-      tribuchetCaCertificate = "${fixtures}/tribuchet-ca.crt";
       grpcCaCertificate = "${fixtures}/grpc-ca.crt";
       machines = { alpha = machine "alpha"; beta = machine "beta"; };
     };

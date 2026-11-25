@@ -3,7 +3,7 @@
 # nix_assemble writes it next to this file and lib.assemble evaluates it with
 # these names in scope. The checks that are not machine tests live in
 # nix/assemble/outputs.nix and take the same scope.
-{ buildPkgs, testPkgs, nixpkgs, packages, modules, fixtures, kexec, imageSource, diskoModule, diskoSource, nixCompactSource }:
+{ buildPkgs, testPkgs, nixpkgs, packages, modules, fixtures, kexec, imageSource, diskoModule, diskoSource, nixCompactSource, nixCompactNixpkgsSource }:
 let
   # Keep the application build input separate from the stable NixOS test input.
   service = { pkgs = testPkgs; module = modules.default; inherit packages; };
@@ -41,6 +41,6 @@ let
   };
 in
 {
-  inherit buildPkgs testPkgs nixpkgs packages modules fixtures kexec imageSource diskoModule diskoSource nixCompactSource;
+  inherit buildPkgs testPkgs nixpkgs packages modules fixtures kexec imageSource diskoModule diskoSource nixCompactSource nixCompactNixpkgsSource;
   inherit service serviceOf storage hegel hegelLibhegel hegelPython featureFleet featureFleets;
 }

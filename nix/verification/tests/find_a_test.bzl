@@ -378,11 +378,11 @@ FIND_A_TEST = {
     },
     "nix-compact-native": {
         "location": "pinned `nix-compact` flake `lib.mkNativeCheck`",
-        "description": "Development-input native Nix: Hegel real-build status/capture checks, clean stdout, TTY, Unix daemon, remote protocols, heartbeat and SIGINT.",
+        "description": "nix-compact flake package with build-input test tooling: Hegel real-build status/capture checks, clean stdout, TTY, Unix daemon, remote protocols, heartbeat and SIGINT.",
     },
     "nix-compact-native-host": {
         "location": "pinned `nix-compact` flake `lib.mkNativeCheck`",
-        "description": "The same native checks against the stable NixOS package input.",
+        "description": "The same native checks on the same package with stable NixOS test tooling.",
     },
     "nix-gc-configuration": {
         "location": "`evaluation/nix-gc.nix`",

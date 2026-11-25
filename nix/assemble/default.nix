@@ -1,7 +1,7 @@
 # lib.assemble: the only NixOS assembly entry point (ADR-0269). Buck2's
 # nix_assemble rule evaluates it through builtins.getFlake over a copied,
 # declared-only source tree under restrict-eval.
-{ nixpkgs, buildNixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store }:
+{ nixpkgs, buildNixpkgs, disko, nixos-images, nix-compact, nix-grpc-store }:
 
 # @cc [owner:ghuntley,label:build] assembly-revision-from-argument
 # Assembly MUST name the deployed source through its revision argument, never
@@ -77,7 +77,7 @@ let
     packageSet = variant: if variant == { } then packages else packageSet variant;
   };
   modules = import ./modules.nix {
-    inherit packages nixpkgs pkgs tribuchet nix-grpc-store;
+    inherit packages nixpkgs pkgs nix-grpc-store;
     nixCompact = nix-compact;
   };
   fleetBuilds = modules.fleetBuilds;
@@ -171,6 +171,7 @@ let
     diskoSource = disko.outPath;
     imageSource = nixos-images.outPath;
     nixCompactSource = nix-compact.outPath;
+    nixCompactNixpkgsSource = nix-compact.inputs.nixpkgs.outPath;
   };
   outputs = import ./outputs.nix {
     inherit nixpkgs pkgs revision packages modules systems kexec antithesis nix-compact tests;

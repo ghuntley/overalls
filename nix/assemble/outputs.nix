@@ -19,8 +19,10 @@ let
   };
   ownChecks = {
     nix-compact-core = nix-compact.lib.mkCoreCheck { inherit pkgs; };
-    nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; };
-    nix-compact-native-host = nix-compact.lib.mkNativeCheck { pkgs = stablePkgs; };
+    # Neither package set ships nix-compact's Nix 2.36.0: both native checks
+    # exercise the flake's own package, with each package set's test tooling.
+    nix-compact-native = nix-compact.lib.mkNativeCheck { inherit pkgs; package = nix-compact.packages.${system}.default; };
+    nix-compact-native-host = nix-compact.lib.mkNativeCheck { pkgs = stablePkgs; package = nix-compact.packages.${system}.default; };
     nix-compact-configuration = import ../domains/artifacts/nix-compact/configuration-check.nix {
       inherit nixpkgs; nixCompact = nix-compact;
     };
@@ -219,8 +221,10 @@ in
     host-tools = built.hostTools;
     host = import ../domains/artifacts/host { pkgs = stablePkgs; };
     host-kexec = kexec;
-    tool-nix-compact = nix-compact.lib.mkPackage { inherit pkgs; };
-    tool-nix-compact-host = nix-compact.lib.mkPackage { pkgs = stablePkgs; };
+    # Both are the nix-compact flake's package (its own Nixpkgs input); hosts
+    # select the same package through the module default.
+    tool-nix-compact = nix-compact.packages.${system}.default;
+    tool-nix-compact-host = nix-compact.packages.${system}.default;
     tool-lyra = built.lyra;
     # mila-build's Linux dev and release targets (ADR-0235).
     tool-mila-linux-native = built.mila.linuxNative;

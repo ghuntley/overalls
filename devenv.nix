@@ -8,7 +8,9 @@ let
   hostLock = import ./nix/domains/artifacts/hosts/host-tools.nix { inherit pkgs; };
   # The one Rust toolchain (ADR-0273), pinned by flake.lock's rust-overlay.
   rust = import ./nix/rust-toolchain.nix { inherit pkgs; };
-  compactNix = inputs.nix-compact.lib.mkPackage { inherit pkgs; };
+  # nix-compact supports only Nix 2.36.0, which devenv-nixpkgs does not ship;
+  # use the package nix-compact builds from its own pinned Nixpkgs input.
+  compactNix = inputs.nix-compact.packages.${pkgs.stdenv.hostPlatform.system}.default;
   # The same patched Firecracker the release metadata points Lilly at.
   inherit (import ./nix/domains/artifacts/infrastructure/firecracker.nix { inherit pkgs; }) vmm;
 

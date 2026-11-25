@@ -14,7 +14,7 @@
     # Dungarees is a gateway peer in its tunnel, as it was for Overalls.
     audiRelay = true;
   };
-  # Panterloons runs the fleet tribuchet hub and a worker (ADR-0248).
+  # Panterloons is the fleet build scheduler (ADR-0248).
   overalls.fleetBuilds = {
     enable = true;
     localName = "panterloons";

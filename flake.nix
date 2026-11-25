@@ -8,7 +8,7 @@
   # pinned only by flake.lock; the package-input-lock check MUST fail when
   # flake.lock and devenv.lock lock different revisions.
   inputs = {
-    nix-compact.url = "github:ghuntley/nix-compact/84475ca7652fcdabd36428d80d4c1122bb03bab6";
+    nix-compact.url = "github:ghuntley/nix-compact/404e6750c864cf8e0c8e6b0e704994db90a29907";
     buildNixpkgs.url = "github:cachix/devenv-nixpkgs/rolling";
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-26.05";
     nixos-images = {
@@ -20,14 +20,8 @@
       url = "github:nix-community/disko/ff8702b4de27f72b4c78573dfb89ec74e36abdf1";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Fleet build scheduling (ADR-0248): host modules and packages follow the
-    # stable NixOS input; crane stays separately locked.
-    tribuchet = {
-      url = "github:Mic92/tribuchet/1a1002096f3c1f6d7b32b3ef9822e542b095a948";
-      inputs.nixpkgs.follows = "nixpkgs";
-      inputs.treefmt-nix.follows = "";
-      inputs.nix-darwin.follows = "";
-    };
+    # Fleet build delegation and caches (ADR-0248, ADR-0282): host modules
+    # follow the stable NixOS input.
     nix-grpc-store = {
       url = "github:Mic92/nix-grpc-store/17f4ff97a6fdac3c68458a0f15210762eba261ea";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -47,12 +41,12 @@
   # toolchains), lib.assemble (NixOS assembly over Buck2 artifacts),
   # lib.dependencyPins (the pin refresh builds) and nixosModules. It MUST NOT
   # export packages, checks, legacyPackages, apps or nixosConfigurations.
-  outputs = { buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, tribuchet, nix-grpc-store, ... }:
+  outputs = { buildNixpkgs, nixpkgs, disko, nixos-images, nix-compact, nix-grpc-store, ... }:
     let
       system = "x86_64-linux";
       pkgs = buildNixpkgs.legacyPackages.${system};
       assemble = import ./nix/assemble {
-        inherit nixpkgs buildNixpkgs disko nixos-images nix-compact tribuchet nix-grpc-store;
+        inherit nixpkgs buildNixpkgs disko nixos-images nix-compact nix-grpc-store;
       };
       # Revision-independent: the toolchain, the pin builds and the modules.
       # Systems name their revision through Buck2 (`-c overalls.revision`).

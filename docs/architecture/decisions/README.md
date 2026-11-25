@@ -1,5 +1,15 @@
 # Architecture decision records
 
+[ADR-0282](0282-remove-tribuchet.md) removes tribuchet: Panterloons stays the
+fleet build scheduler and builds locally, Dungarees delegates to it over
+`grpc://`, and both keep their `grpc://` caches. It supersedes only ADR-0248's
+hub and workers.
+
+[ADR-0281](0281-nix-compact-own-package-input.md) moves compact Nix to 2.36.0,
+built from nix-compact's own pinned Nixpkgs input: overalls' development and
+stable package sets do not ship that version. It supersedes only ADR-0087's
+package-set clause.
+
 [ADR-0278](0278-mila-push-notification-parity-scope.md) scopes the Mila
 parity matrix push row: clients prove permission or enablement plus device
 register, list, preferences and remove against the hermetic fixture, Susan's
@@ -72,8 +82,8 @@ adds `turn_finished` feed notifications and audited subscription revocation jobs
 and every HLDD gate, superseding ADR-0250. ADRs and architecture reviews remain.
 
 [ADR-0248](0248-fleet-build-scheduling.md) makes Panterloons the single
-tribuchet build scheduler for itself and Dungarees, which delegates over a
-`grpc://` store; the two hosts substitute from each other over `grpc://`,
+build scheduler for itself and Dungarees, which delegates over a
+`grpc://` store ([ADR-0282](0282-remove-tribuchet.md) removed its tribuchet hub); the two hosts substitute from each other over `grpc://`,
 superseding ADR-0086 for them while other hosts stay cache-only.
 
 [ADR-0249](0249-mila-rust-core-native-clients.md) moves Mila's shared protocol,
@@ -1138,7 +1148,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0245](0245-underclass-egress-node-tag.md) | accepted | partial | Underclass egress node tag |
 | [ADR-0246](0246-panterloons-control-plane-deployment.md) | accepted | partial | Panterloons control-plane deployment |
 | [ADR-0247](0247-sops-operator-source-grant.md) | accepted | partial | SOPS-held operator source grant |
-| [ADR-0248](0248-fleet-build-scheduling.md) | accepted | partial | Fleet build scheduling through a tribuchet hub and grpc:// stores |
+| [ADR-0248](0248-fleet-build-scheduling.md) | superseded | partial | Fleet build scheduling through a tribuchet hub and grpc:// stores |
 | [ADR-0250](0250-independent-hldd-review-records.md) | superseded | implemented | Independent HLDD review records |
 | [ADR-0249](0249-mila-rust-core-native-clients.md) | accepted | partial | Mila Rust core with native platform clients |
 | [ADR-0251](0251-thread-owned-durable-attachments.md) | accepted | partial | Thread-owned durable attachments |
@@ -1171,6 +1181,8 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0278](0278-mila-push-notification-parity-scope.md) | accepted | implemented | Mila push-notification parity scope |
 | [ADR-0279](0279-mila-apple-app-lock-and-link-launch-parity-scope.md) | proposed | planned | Mila Apple app-lock and link-launch parity scope |
 | [ADR-0280](0280-remote-underclass-and-safe-agent-retries.md) | accepted | partial | Remote Underclass and safe agent retries |
+| [ADR-0281](0281-nix-compact-own-package-input.md) | accepted | partial | nix-compact builds Nix from its own pinned package input |
+| [ADR-0282](0282-remove-tribuchet.md) | accepted | partial | Remove tribuchet from fleet builds |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

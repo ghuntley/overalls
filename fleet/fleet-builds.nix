@@ -14,12 +14,9 @@ in
 # host inventory. Only public certificates are committed in fleet/fleet-builds.
 {
   inherit (builds) scheduler;
-  tribuchetCaCertificate = certificate "tribuchet-ca";
   grpcCaCertificate = certificate "grpc-ca";
   machines = lib.genAttrs participants (name: {
     inherit (builders.${name}) address logicalCpus systems supportedFeatures;
-    tribuchetCertificate = certificate "tribuchet-${name}";
-    tribuchetHubCertificate = if name == builds.hub then certificate "tribuchet-hub" else null;
     grpcCertificate = certificate "grpc-${name}";
     encryptedFile = let
       document = lib.findFirst (item: item.name == "${name}-fleet-builds")
