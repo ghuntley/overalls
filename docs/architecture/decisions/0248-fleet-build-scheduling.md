@@ -2,7 +2,7 @@
 
 - ID: ADR-0248
 - Date: 2026-10-20
-- Status: accepted
+- Status: superseded
 - Implementation: partial
 - Components: NixOS, Nix daemon, fleet secret delivery, Panterloons, Dungarees
 - Supersedes: ADR-0086

@@ -10,6 +10,7 @@ NIX_INPUTS = [
     "//fleet:srcs",
     # Host and platform packages (ADR-0271) own their directories' files.
     "//fleet/hosts/dungarees:srcs",
+    "//fleet/hosts/overalls:srcs",
     "//fleet/hosts/panterloons:srcs",
     "//fleet/hosts/salopettes:srcs",
     # Every nix/ file except the NixOS modules; machine_tests.py adds those.

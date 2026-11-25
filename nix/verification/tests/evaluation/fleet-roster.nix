@@ -19,7 +19,7 @@ let
   rejectsDeployments = deployments: rejects (rosterOf { inherit deployments; });
   cases = {
     accepts-reviewed-fleet = builtins.deepSeq [ ports roster fleetServices ] true;
-    host-names-match-declarations = builtins.attrNames roster.hosts == [ "dungarees" "panterloons" "salopettes" ];
+    host-names-match-declarations = builtins.attrNames roster.hosts == [ "dungarees" "overalls" "panterloons" "salopettes" ];
     control-plane-ports = fleetServices.tunnelPorts "panterloons" == [ 4317 5443 5445 8443 9464 9467 ];
     relay-ports = fleetServices.tunnelPorts "salopettes" == [ 443 9464 9467 ];
     worker-ports = fleetServices.tunnelPorts "dungarees" == [ 9464 9467 ];

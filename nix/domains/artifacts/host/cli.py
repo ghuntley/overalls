@@ -20,7 +20,9 @@ from remote import Binding, Facts, Identity, Inventory, StorageFacts
 
 REPOSITORY = "ssh://git@github.com/ghuntley/overalls"
 REMOTE = Path(__file__).with_name("remote.py")
-PLATFORMS = ("hetzner", "ec2", "hcloud")
+PLATFORMS = ("hetzner", "metal", "ec2", "hcloud")
+# Platforms whose single ZFS zroot carries both zroot/root and zroot/lilly.
+SHARED_ROOT = ("hetzner", "metal")
 
 
 class Failure(Exception):
@@ -301,6 +303,17 @@ def validate(h: Host) -> Host:
             or h["storage"]["quotaBytes"] <= 0
         ):
             raise Failure("Hetzner requires two system disks and a reviewed guest quota")
+    elif h["platform"] == "metal":
+        # @cc [owner:ghuntley,label:deployment;capacity] metal-shared-zfs-root
+        # An on-premises metal host MUST select one or two system disks (two
+        # are mirrored), no guest disks, and a reviewed positive guest quota.
+        if (
+            len(system) not in (1, 2)
+            or guests
+            or type(h["storage"]["quotaBytes"]) is not int
+            or h["storage"]["quotaBytes"] <= 0
+        ):
+            raise Failure("Metal requires one or two system disks and a reviewed guest quota")
     elif h["platform"] == "hcloud":
         # @cc [owner:ghuntley,label:deployment;capacity] hcloud-single-zfs-root
         # A Hetzner Cloud host MUST select exactly one system disk, no guest

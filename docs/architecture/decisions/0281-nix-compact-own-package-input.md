@@ -5,7 +5,7 @@
 - Status: accepted
 - Implementation: partial
 - Components: Nix CLI, NixOS, development shell
-- Supersedes: ADR-0087 (package-set clause only)
+- Supersedes: ADR-0087
 - Superseded by: none
 
 ## Context

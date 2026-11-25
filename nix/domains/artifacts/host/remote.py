@@ -288,7 +288,9 @@ def storage(host: Declaration, root: str = "", binding: Binding | None = None) -
     for key, value in (("compression", "lz4"), ("reservation", "0"), ("refreservation", "0")):
         if run(["zfs", "get", "-Hp", "-o", "value", key, dataset]) != value:
             raise ValueError("guest storage policy differs")
-    expected_quota = str(host["storage"]["quotaBytes"]) if host["platform"] == "hetzner" else "0"
+    expected_quota = (
+        str(host["storage"]["quotaBytes"]) if host["platform"] in ("hetzner", "metal") else "0"
+    )
     if run(["zfs", "get", "-Hp", "-o", "value", "quota", dataset]) != expected_quota:
         raise ValueError("guest quota differs")
     return {

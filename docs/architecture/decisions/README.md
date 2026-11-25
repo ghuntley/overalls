@@ -1,5 +1,10 @@
 # Architecture decision records
 
+[ADR-0283](0283-on-premises-metal-hosts.md) adds the `metal` host platform: one or
+two system disks (mirrored only with two) on a shared ZFS root with a
+quota-bounded `zroot/lilly`, KVM and Lilly, and static uplinks through the
+fleet-addresses SOPS document.
+
 [ADR-0282](0282-remove-tribuchet.md) removes tribuchet: Panterloons stays the
 fleet build scheduler and builds locally, Dungarees delegates to it over
 `grpc://`, and both keep their `grpc://` caches. It supersedes only ADR-0248's
@@ -1184,6 +1189,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0280](0280-remote-underclass-and-safe-agent-retries.md) | accepted | partial | Remote Underclass and safe agent retries |
 | [ADR-0281](0281-nix-compact-own-package-input.md) | accepted | partial | nix-compact builds Nix from its own pinned package input |
 | [ADR-0282](0282-remove-tribuchet.md) | accepted | partial | Remove tribuchet from fleet builds |
+| [ADR-0283](0283-on-premises-metal-hosts.md) | accepted | partial | On-premises metal hosts |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

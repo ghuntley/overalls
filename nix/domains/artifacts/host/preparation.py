@@ -140,10 +140,10 @@ def guest_capacity_bytes(host: cli.Host) -> int:
     or above capacity would leave an enrolled pool that can never admit a disk.
     The bound uses only reviewed declarations, never a logical commitment cap.
     """
-    if host["platform"] == "hetzner":
+    if host["platform"] in cli.SHARED_ROOT:
         quota = host["storage"]["quotaBytes"]
         if quota is None or type(quota) is not int or quota <= 0:
-            raise cli.Failure("Hetzner requires a reviewed guest quota")
+            raise cli.Failure("Shared-root hosts require a reviewed guest quota")
         return quota
     disks = {d["id"]: d["size"] for d in host["inventory"]["disks"]}
     if not host["storage"]["guests"] or any(d not in disks for d in host["storage"]["guests"]):
@@ -181,7 +181,7 @@ def declaration_request(
         "backend": "zfs",
         "zpool_guid": observed["poolGuid"],
         "dataset_guid": observed["datasetGuid"],
-        "dataset": ("zroot" if host["platform"] == "hetzner" else "guests") + "/lilly",
+        "dataset": ("zroot" if host["platform"] in cli.SHARED_ROOT else "guests") + "/lilly",
     }
     request: RegistrationRequest = {
         "version": 3,

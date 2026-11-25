@@ -3,13 +3,18 @@
 let
   h = host;
   efi = h.firmware == "uefi";
-  mirror = h.platform == "hetzner";
+  # @cc [owner:ghuntley,label:deployment;capacity] metal-shared-zfs-root
+  # Hetzner and on-premises metal hosts MUST share one ZFS zroot between the
+  # system (zroot/root) and a quota-bounded Lilly dataset (zroot/lilly). The
+  # pool MUST mirror exactly when two system disks are selected.
+  shared = builtins.elem h.platform [ "hetzner" "metal" ];
+  mirror = builtins.length h.storage.system == 2;
   # @cc [owner:ghuntley,label:deployment;capacity] hcloud-single-zfs-root
   # A Hetzner Cloud host MUST boot from exactly one system disk carrying a ZFS
   # zroot/root dataset. It has no guest disks, guest dataset or guest quota.
   cloud = h.platform == "hcloud";
   ec2 = h.platform == "ec2";
-  zfsRoot = mirror || cloud;
+  zfsRoot = shared || cloud;
   disks = lib.listToAttrs (map (d: lib.nameValuePair d.id d) h.inventory.disks);
   bootDisks = h.storage.system;
   guestDisks = if zfsRoot then [] else h.storage.guests;
@@ -123,9 +128,9 @@ in {
         && config.services.overallsSecrets.bundles.lilly.outputs."credential.json".secrets == [ "LILLY_CREDENTIAL" ]
         && config.services.lilly.egressInterface == lillySettings.egressInterface); message = "Generated Lilly secret delivery or egress conflicts with manual configuration"; }
     { assertion = !lillyEnrolled || map (p: builtins.removeAttrs p [ "max_iops" "max_iops_source" ]) config.services.lilly.pools == lillyPools; message = "Generated Lilly pools conflict with manual configuration"; }
-    { assertion = builtins.elem h.platform [ "hetzner" "ec2" "hcloud" ] && builtins.elem h.firmware [ "bios" "uefi" ]; message = "Unsupported host platform or firmware"; }
+    { assertion = builtins.elem h.platform [ "hetzner" "metal" "ec2" "hcloud" ] && builtins.elem h.firmware [ "bios" "uefi" ]; message = "Unsupported host platform or firmware"; }
     { assertion = h.inventory.arch == "x86_64" && h.reviewed; message = "Hosts require reviewed x86_64 hardware and network"; }
-    { assertion = builtins.length bootDisks == (if mirror then 2 else 1); message = "Invalid system disk count"; }
+    { assertion = (if h.platform == "hetzner" then builtins.length bootDisks == 2 else if h.platform == "metal" then builtins.elem (builtins.length bootDisks) [ 1 2 ] else builtins.length bootDisks == 1); message = "Invalid system disk count"; }
     { assertion = if cloud then builtins.attrNames h.budgets == [ "arcMaxMiB" ] && h.budgets.arcMaxMiB > 0
         else builtins.attrNames h.budgets == [ "arcMaxMiB" "guestCpuCores" "guestMemoryMiB" ] && h.budgets.guestMemoryMiB > 0 && h.budgets.guestCpuCores > 0 && h.budgets.arcMaxMiB > 0; message = "Explicit production resource budgets required"; }
     # @cc [owner:ghuntley,label:deployment;security] hcloud-no-kvm-no-lilly
@@ -148,7 +153,7 @@ in {
           && !(lib.hasInfix "." (route.Destination or ""))) (network.routes or [])) (builtins.attrValues h.network);
       message = "Runtime uplink networks keep IPv4 addresses and routes out of the repository"; }
     { assertion = lillyBinding == null || lib.all (p: builtins.attrNames p == [ "filesystem_id" "id" "name" "storage" ]) lillyBinding.pools; message = "Lilly binding pools must carry exactly id, name, filesystem_id and storage"; }
-    { assertion = !mirror || h.storage.quotaBytes > 0; message = "Shared root storage requires a reviewed guest quota"; }
+    { assertion = !shared || h.storage.quotaBytes > 0; message = "Shared root storage requires a reviewed guest quota"; }
     { assertion = !ec2 || (guestDisks != [] && lib.sort builtins.lessThan guestDisks == lib.sort builtins.lessThan (map (d: d.id) (lib.filter (d: d.kind == "local-nvme") h.inventory.disks)) && disks.${builtins.head bootDisks}.kind == "ebs"); message = "EC2 requires EBS root and every local NVMe drive"; }
     { assertion = !config.services.lilly.enable || lib.all (path: !lib.hasPrefix "/var/lib/lilly/pool" path)
         [ config.services.lilly.stateDirectory config.services.lilly.vmStateDirectory config.services.lilly.networkStateDirectory ]; message = "Lilly control journals must remain on system storage"; }
@@ -302,7 +307,7 @@ in {
       }; } // lib.optionalAttrs (!cloud) { lilly = {
         type = "zfs_fs";
         options = { mountpoint = "/var/lib/lilly/pool"; canmount = "on"; }
-          // lib.optionalAttrs mirror { quota = toString h.storage.quotaBytes; };
+          // lib.optionalAttrs shared { quota = toString h.storage.quotaBytes; };
         mountpoint = "/var/lib/lilly/pool";
       }; };
     };
@@ -338,7 +343,7 @@ in {
   environment.etc."overalls-installation.json".text = builtins.toJSON binding;
   services.overallsAutoUpdate = {
     installationBinding = binding;
-    resourcePolicy = if lillyEnrolled && mirror then {
+    resourcePolicy = if lillyEnrolled && shared then {
       version = 1;
       cpuCores = h.budgets.guestCpuCores;
       memoryMiB = h.budgets.guestMemoryMiB;
@@ -447,9 +452,9 @@ in {
   systemd.services.overalls-host-ready = {
     wantedBy = [ "multi-user.target" ]; wants = [ "network-online.target" ];
     # Resource receipt replay must precede readiness during switch and boot.
-    requires = lib.optional (lillyEnrolled && mirror) "overalls-resource-policy.service";
+    requires = lib.optional (lillyEnrolled && shared) "overalls-resource-policy.service";
     after = [ "network-online.target" "zfs-mount.service" ]
-      ++ lib.optional (lillyEnrolled && mirror) "overalls-resource-policy.service";
+      ++ lib.optional (lillyEnrolled && shared) "overalls-resource-policy.service";
     serviceConfig = { Type = "oneshot"; ExecStart = "${check}/bin/overalls-host-check --storage"; };
   };
   systemd.services.lilly = lib.mkIf config.services.lilly.enable {

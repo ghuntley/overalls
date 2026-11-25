@@ -1,0 +1,101 @@
+{
+  "addresses": {
+    "names": {
+      "gateway": "OVERALLS_GATEWAY_IPV4",
+      "prefix": "OVERALLS_PREFIX"
+    },
+    "uplink": {
+      "addresses": [
+        "overallsPrimary",
+        "overallsService"
+      ],
+      "gateway": "gateway",
+      "hostRoutes": [],
+      "network": "10-ens18",
+      "prefix": "prefix"
+    }
+  },
+  "budgets": {
+    "arcMaxMiB": 8192,
+    "guestCpuCores": 24,
+    "guestMemoryMiB": 40960
+  },
+  "credentials": [],
+  "discovery": {
+    "routes": [
+      {
+        "dev": "ens18",
+        "dst": "default"
+      }
+    ],
+    "sourceKey": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIKROYDOtlZLGKHvJ8Jyrc4KxQir7xxgmqg8VFqtub1Xn"
+  },
+  "firmware": "bios",
+  "git": {
+    "knownHosts": "github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl\n",
+    "repository": "ssh://git@github.com/ghuntley/overalls"
+  },
+  "identity": {
+    "hostId": "b9807e6c",
+    "sshKeys": []
+  },
+  "inventory": {
+    "arch": "x86_64",
+    "disks": [
+      {
+        "active": false,
+        "aliases": [
+          "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0"
+        ],
+        "device": "/dev/disk/by-id/scsi-0QEMU_QEMU_HARDDISK_drive-scsi0",
+        "id": "disk-9658ecd2e6d7c1e9cc38b423",
+        "kind": "physical",
+        "model": "QEMU HARDDISK",
+        "path": "/dev/sda",
+        "serial": "drive-scsi0",
+        "size": 4398046511104,
+        "transport": "unknown"
+      }
+    ],
+    "machine": "32cb76ec-6907-467c-93c4-223a40012434"
+  },
+  "lilly": {
+    "controlPlane": "https://ghuntley.dev:5443",
+    "credentialTtlSeconds": 157680000,
+    "egressInterface": "ens18",
+    "overheads": {
+      "cores": 0,
+      "memoryBytes": 0,
+      "storageBytes": 0
+    },
+    "transferEndpoint": {
+      "addressSecret": "OVERALLS_PRIMARY_IPV4",
+      "port": 2223
+    }
+  },
+  "name": "overalls",
+  "network": {
+    "10-ens18": {
+      "matchConfig": {
+        "MACAddress": "bc:24:11:fa:e8:98"
+      },
+      "networkConfig": {
+        "DNS": [
+          "10.10.10.254"
+        ],
+        "IPv6AcceptRA": false,
+        "LinkLocalAddressing": "no"
+      }
+    }
+  },
+  "platform": "metal",
+  "reviewed": true,
+  "storage": {
+    "ashift": 12,
+    "guests": [],
+    "quotaBytes": 3758096384000,
+    "system": [
+      "disk-9658ecd2e6d7c1e9cc38b423"
+    ]
+  }
+}

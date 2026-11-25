@@ -18,6 +18,7 @@
 , hosts ? {
     dungarees = { tailnetAddress = "100.96.244.44"; builder.logicalCpus = 96; };
     panterloons = { tailnetAddress = "100.98.214.120"; builder.logicalCpus = 96; };
+    overalls = { tailnetAddress = null; builder = null; };
     salopettes = { tailnetAddress = null; builder = null; };
   }
   # Each deployment's roles and its own fleet tunnel.

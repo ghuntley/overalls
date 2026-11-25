@@ -128,7 +128,7 @@ def enrollment_configuration(
             "zpoolGuid": observed["poolGuid"],
             "datasetGuid": observed["datasetGuid"],
         }
-        if host["platform"] != "hetzner" or new != expected:
+        if host["platform"] not in ("hetzner", "metal") or new != expected:
             raise ValueError("enrollment resource baseline mismatch")
     # Activation applies already-declared limits. An updater transition would
     # instead require the receipt that only successful enrollment may create.

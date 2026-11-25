@@ -5,7 +5,7 @@
 - Status: accepted
 - Implementation: partial
 - Components: NixOS, Nix daemon, fleet secret delivery, Panterloons, Dungarees
-- Supersedes: ADR-0248 (tribuchet hub and workers only)
+- Supersedes: ADR-0248
 - Superseded by: none
 
 ## Context

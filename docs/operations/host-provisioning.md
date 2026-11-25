@@ -50,8 +50,8 @@ Review Hetzner gateways, on-link routes, DNS, IPv6 and MAC matches explicitly.
 Before copying the candidate to `fleet/hosts/NAME/host.json`:
 
 - Set `reviewed` to true after validating hardware, firmware and networking.
-- Select `storage.system` by disk IDs: two physical disks on Hetzner; the existing
-  root EBS volume on EC2. Select every local-NVMe ID in `storage.guests` on EC2;
+- Select `storage.system` by disk IDs: two physical disks on Hetzner; one or two
+  on metal (two are mirrored); the existing root EBS volume on EC2. Select every local-NVMe ID in `storage.guests` on EC2;
   leave that list empty on Hetzner. EBS volumes are excluded even when NVMe.
 - Keep the complete discovery inventory, including unused EBS volumes. Disk
   model, serial, size, transport, controller classification and stable by-id path
@@ -60,7 +60,7 @@ Before copying the candidate to `fleet/hosts/NAME/host.json`:
   Leave `identity.sshKeys` empty until the installed identity is retrieved.
 - Set exactly the positive `budgets.guestCpuCores`, `guestMemoryMiB` and
   `arcMaxMiB`; any other budget key, including the retired `logicalBytes`, is
-  refused. Set a reviewed `storage.quotaBytes` on Hetzner; EC2 has no guest quota.
+  refused. Set a reviewed `storage.quotaBytes` on Hetzner and metal; EC2 has no guest quota.
   Enrollment storage headroom (`lilly.overheads.storageBytes`) must stay below
   the guest quota on Hetzner, or below the summed raw size of the local guest
   disks on EC2.
@@ -164,6 +164,18 @@ Updates follow this repository over SSH on `main`, with the existing ten-second
 interval and jitter. Platform, firmware, disk inventory, boot/pool topology and
 persistent identity changes are rejected by ordinary updates. Use deliberate
 maintenance instead of trying to roll such a change through the timer.
+
+## On-premises metal hosts
+
+`metal` ([ADR-0283](../architecture/decisions/0283-on-premises-metal-hosts.md))
+is for on-premises machines and virtual machines with KVM (nested
+virtualisation for a VM). Storage matches Hetzner (shared ZFS `zroot` with a
+quota-bounded `zroot/lilly`) but takes one or two system disks. For a static
+LAN uplink, configure the rescue system with exactly the final addresses and
+default gateway before discovery: installation records the observed addresses
+as the uplink recovery copy. Replace the proposed `Address` list with
+`addresses.uplink` names and keep only the resolvers in `networkConfig.DNS`.
+[Overalls](../../fleet/hosts/overalls/host.json) is the reference declaration.
 
 ## Hetzner Cloud hosts
 
