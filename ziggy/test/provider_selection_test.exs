@@ -73,7 +73,7 @@ defmodule Ziggy.ProviderSelectionTest do
     assert {:ok, %{openai_origin: "http://127.0.0.1:8080"}} =
              load(dir, Map.put(config, "openai_origin", "http://127.0.0.1:8080"))
 
-    remote = "https://panterloons.lorikeet-bangus.ts.net"
+    remote = "https://overalls.lorikeet-bangus.ts.net"
     assert {:ok, %{openai_origin: ^remote}} = load(dir, Map.put(config, "openai_origin", remote))
 
     for origin <- [

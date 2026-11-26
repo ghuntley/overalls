@@ -11,36 +11,60 @@ let
   ports = portsOf { };
   roster = rosterOf { };
   fleetServices = servicesOf { };
-  base = roster.deployments.panterloons;
+  # A synthetic fleet with a worker and build delegation keeps every guarded
+  # shape covered while the production deployment has neither (ADR-0284).
+  fixtureInventory = { central = { }; worker = { }; relay = { }; };
+  fixtureHosts = {
+    central = { tailnetAddress = "100.64.0.1"; builder.logicalCpus = 8; };
+    worker = { tailnetAddress = "100.64.0.2"; builder.logicalCpus = 8; };
+    relay = { tailnetAddress = null; builder = null; };
+  };
+  base = {
+    controlPlane = "central";
+    telemetry = { central = "central"; worker = "worker"; };
+    builds = { scheduler = "central"; participants = [ "central" "worker" ]; };
+    tunnel = {
+      central = { address = "10.90.0.1"; endpoint = "overallsPrimary"; peers = [ "worker" "relay" ]; };
+      worker = { address = "10.90.0.2"; endpoint = "overallsService"; peers = [ "central" ]; };
+      relay = { address = "10.90.0.3"; endpoint = "salopettesPrimary"; peers = [ "central" ]; };
+    };
+  };
+  fixtureOf = args: rosterOf ({ inventory = fixtureInventory; hosts = fixtureHosts; deployments = { fixture = base; }; } // args);
+  fixture = fixtureOf { };
+  fixtureServices = servicesOf { roster = fixture; services = fleetServices.services // {
+    susan = fleetServices.services.susan // { placement = [ "relay" ]; }; }; };
   # Each case forces the whole result so lazily evaluated assertions fire.
   rejects = value: !(builtins.tryEval (builtins.deepSeq value true)).success;
-  withTunnel = tunnel: { panterloons = base // { tunnel = base.tunnel // tunnel; }; };
-  withDeployment = changes: { panterloons = base // changes; };
-  rejectsDeployments = deployments: rejects (rosterOf { inherit deployments; });
+  withTunnel = tunnel: { fixture = base // { tunnel = base.tunnel // tunnel; }; };
+  withDeployment = changes: { fixture = base // changes; };
+  rejectsDeployments = deployments: rejects (fixtureOf { inherit deployments; });
   cases = {
     accepts-reviewed-fleet = builtins.deepSeq [ ports roster fleetServices ] true;
-    host-names-match-declarations = builtins.attrNames roster.hosts == [ "dungarees" "overalls" "panterloons" "salopettes" ];
-    control-plane-ports = fleetServices.tunnelPorts "panterloons" == [ 4317 5443 5445 8443 9464 9467 ];
+    accepts-fixture-fleet = builtins.deepSeq [ fixture fixtureServices ] true;
+    host-names-match-declarations = builtins.attrNames roster.hosts == [ "overalls" "salopettes" ];
+    control-plane-ports = fleetServices.tunnelPorts "overalls" == [ 4317 5443 5445 8443 9464 9467 ];
     relay-ports = fleetServices.tunnelPorts "salopettes" == [ 443 9464 9467 ];
-    worker-ports = fleetServices.tunnelPorts "dungarees" == [ 9464 9467 ];
+    worker-ports = fixtureServices.tunnelPorts "worker" == [ 9464 9467 ];
+    no-build-delegation = roster.deployments.overalls.builds == null;
     unknown-tunnel-host = rejects (roster.deploymentOf "absent");
     duplicate-port = rejects (portsOf { ports = ports // { duplicate = ports.enrico; }; });
     out-of-range-port = rejects (portsOf { ports = ports // { invalid = 65536; }; });
     undeclared-host = rejects (rosterOf { hosts = roster.hosts // { absent = { tailnetAddress = null; builder = null; }; }; });
     missing-host = rejects (rosterOf { hosts = builtins.removeAttrs roster.hosts [ "salopettes" ]; });
-    duplicate-tailnet = rejects (rosterOf { hosts = roster.hosts // {
-      dungarees = roster.hosts.dungarees // { tailnetAddress = roster.hosts.panterloons.tailnetAddress; }; }; });
-    builder-without-tailnet = rejects (rosterOf { hosts = roster.hosts // {
-      dungarees = roster.hosts.dungarees // { tailnetAddress = null; }; }; });
-    non-reciprocal-peer = rejectsDeployments (withTunnel { dungarees = base.tunnel.dungarees // { peers = [ "panterloons" "salopettes" ]; }; });
-    unknown-peer = rejectsDeployments (withTunnel { dungarees = base.tunnel.dungarees // { peers = [ "panterloons" "absent" ]; }; });
-    unknown-endpoint = rejectsDeployments (withTunnel { dungarees = base.tunnel.dungarees // { endpoint = "absentPrimary"; }; });
-    duplicate-tunnel-address = rejectsDeployments (withTunnel { salopettes = base.tunnel.salopettes // { address = "10.90.0.2"; }; });
-    outside-tunnel-prefix = rejectsDeployments (withTunnel { salopettes = base.tunnel.salopettes // { address = "10.90.1.3"; }; });
-    misplaced-control-plane = rejectsDeployments (withDeployment { controlPlane = "dungarees"; });
-    misplaced-worker = rejectsDeployments (withDeployment { telemetry = { central = "panterloons"; worker = "salopettes"; }; });
-    builder-free-participant = rejectsDeployments (withDeployment { builds = base.builds // { participants = [ "panterloons" "salopettes" ]; }; });
-    scheduler-outside-participants = rejectsDeployments (withDeployment { builds = base.builds // { participants = [ "dungarees" ]; }; });
+    duplicate-tailnet = rejects (fixtureOf { hosts = fixtureHosts // {
+      worker = fixtureHosts.worker // { tailnetAddress = fixtureHosts.central.tailnetAddress; }; }; });
+    builder-without-tailnet = rejects (fixtureOf { hosts = fixtureHosts // {
+      worker = fixtureHosts.worker // { tailnetAddress = null; }; }; });
+    non-reciprocal-peer = rejectsDeployments (withTunnel { worker = base.tunnel.worker // { peers = [ "central" "relay" ]; }; });
+    unknown-peer = rejectsDeployments (withTunnel { worker = base.tunnel.worker // { peers = [ "central" "absent" ]; }; });
+    unknown-endpoint = rejectsDeployments (withTunnel { worker = base.tunnel.worker // { endpoint = "absentPrimary"; }; });
+    duplicate-tunnel-address = rejectsDeployments (withTunnel { relay = base.tunnel.relay // { address = "10.90.0.2"; }; });
+    outside-tunnel-prefix = rejectsDeployments (withTunnel { relay = base.tunnel.relay // { address = "10.90.1.3"; }; });
+    misplaced-control-plane = rejectsDeployments (withDeployment { controlPlane = "worker"; });
+    misplaced-worker = rejectsDeployments (withDeployment { telemetry = { central = "central"; worker = "relay"; }; });
+    builder-free-participant = rejectsDeployments (withDeployment { builds = base.builds // { participants = [ "central" "relay" ]; }; });
+    scheduler-outside-participants = rejectsDeployments (withDeployment { builds = base.builds // { participants = [ "worker" ]; }; });
+    accepts-no-builds = !(rejectsDeployments (withDeployment { builds = null; }));
     host-in-two-deployments = rejectsDeployments (withTunnel { } // { copy = base; });
     unnamed-service-port = rejects (servicesOf { services = fleetServices.services // { extra = { placement = "everyHost"; port = 1; }; }; });
     unknown-placement = rejects (servicesOf { services = fleetServices.services // { extra = { placement = [ "absent" ]; port = ports.audiRelay; }; }; });

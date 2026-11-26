@@ -85,8 +85,8 @@ destination readiness; clients reconnect after existing connections break.
 The physical fleet applies this design under
 [ADR-0090](../architecture/decisions/0090-second-audi-dns-replica-on-worker.md) and
 [ADR-0091](../architecture/decisions/0091-fleet-perimeter-public-listeners.md):
-Overalls and Dungarees each run the gateway and DNS roles on reserved explicit
-addresses for the delegated `apps.ghuntley.dev` subzone, publicly reachable
+Overalls runs the gateway and DNS roles on its reserved explicit service
+address (the only replica since ADR-0284) for the delegated `apps.ghuntley.dev` subzone, publicly reachable
 through the reviewed fleet-perimeter listener registry. Enrollment uses the
 `audi-dns-rotate` / `audi-gateway-rotate` / verify / revoke operator CLI actions.
 The [fleet network guide](../operations/fleet-network.md) carries the operator rollout

@@ -70,7 +70,7 @@ let
   forcedOff = evaluate { services.ziggy.enable = lib.mkForce false; };
   openaiOnly = evaluate { services.ziggy.enabledProviders = [ "openai" ]; };
   remoteUnderclass = evaluate {
-    services.ziggy.openaiOrigin = "https://panterloons.lorikeet-bangus.ts.net";
+    services.ziggy.openaiOrigin = "https://overalls.lorikeet-bangus.ts.net";
     services.ziggy.openaiKeyFile = "/run/underclass-proxy/proxy.key";
     services.ziggy.secretUnits = [ "underclass-proxy-key.service" ];
   };
@@ -91,7 +91,7 @@ let
 in
 assert valid openaiOnly;
 assert valid remoteUnderclass;
-assert remoteUnderclass.services.ziggy.openaiOrigin == "https://panterloons.lorikeet-bangus.ts.net";
+assert remoteUnderclass.services.ziggy.openaiOrigin == "https://overalls.lorikeet-bangus.ts.net";
 assert builtins.elem "underclass-proxy-key.service" remoteUnderclass.systemd.services.ziggy.requires;
 assert builtins.elem "openai.key:/run/underclass-proxy/proxy.key" remoteUnderclass.systemd.services.ziggy.serviceConfig.LoadCredential;
 assert !valid noProviders;

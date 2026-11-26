@@ -1,7 +1,10 @@
 # Reciprocal builders and caches
 
-Dungarees and Panterloons use [one registry](../../fleet/remote-builders.nix) through
-`nixosModules.platform.remote-builders`. Import that module and set
+The [registry](../../fleet/remote-builders.nix) is shared through
+`nixosModules.platform.remote-builders`. It is currently empty: the single
+production control plane, Overalls, builds locally and has no peer
+([ADR-0284](../architecture/decisions/0284-overalls-replaces-panterloons-and-dungarees.md)),
+so the control-plane role leaves remote builders disabled. Import that module and set
 `overalls.remoteBuilders.enable`, `localName`, and `machines` to opt in elsewhere.
 The default aggregate module exposes the same options without enabling them.
 
@@ -11,12 +14,11 @@ and encrypted document path. The registry excludes the local entry from builders
 substituters, known hosts and authorized client keys. Tailnet addresses,
 the administrative SSH port and measured CPU counts come from the
 [fleet host roster](../../nix/policy/fleet/hosts.nix) and
-[port roster](../../nix/policy/fleet/ports.nix). Both production hosts have
-96 logical CPUs (authenticated `nproc --all`, 2026-10-20) and advertise that many
-remote jobs; local jobs are automatic and each build can use all cores. This can oversubscribe CPU and memory; it does not alter
+[port roster](../../nix/policy/fleet/ports.nix). A registered host advertises its
+measured logical CPUs as remote jobs; local jobs are automatic and each build can use all cores. This can oversubscribe CPU and memory; it does not alter
 Lilly's guest resource budget.
 
-Both hosts use administrative port 2222 over Tailscale. Host pins derive from
+Registered hosts use administrative port 2222 over Tailscale. Host pins derive from
 `host.json`, never unauthenticated `ssh-keyscan`. A bare hostname's saved key is
 not a substitute for authenticating the intended administrative endpoint.
 
@@ -29,8 +31,8 @@ hosts belong in this registry.
 
 ## Credentials and rotation
 
-The inventory-managed documents `dungarees-remote-builders` and
-`panterloons-remote-builders` contain distinct client keys under
+Each registered host's inventory-managed `HOST-remote-builders` document holds a
+distinct client key under
 `overalls-remote-builders.production.SSH_PRIVATE_KEY`. The owning host and all
 recovery-enabled users are recipients. At runtime the secret preparer publishes
 `/run/overalls-secrets/remote-builders/id_ed25519` with root-only access.

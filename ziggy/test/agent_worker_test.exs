@@ -267,7 +267,7 @@ defmodule Ziggy.AgentWorkerTest do
         {"certified local proxy", [{"x-underclass-retry-safe", "pre-output-overload"}],
          "http://127.0.0.1:8080", :ok, "retryable_overload"},
         {"certified remote proxy", [{"x-underclass-retry-safe", "pre-output-overload"}],
-         "https://panterloons.lorikeet-bangus.ts.net", :ok, "retryable_overload"},
+         "https://overalls.lorikeet-bangus.ts.net", :ok, "retryable_overload"},
         {"missing evidence", [], "http://127.0.0.1:8080", :ok, "server_is_overloaded"},
         {"duplicate evidence",
          List.duplicate({"x-underclass-retry-safe", "pre-output-overload"}, 2),

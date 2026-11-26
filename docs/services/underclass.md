@@ -1,12 +1,15 @@
 # Underclass fleet service
 
-Panterloons and Dungarees retain independent
-[Underclass](https://github.com/ghuntley/underclass) account databases. Dungarees
-Ziggy sends inference to `https://panterloons.lorikeet-bangus.ts.net` using a
-dedicated proxy-only encrypted credential bundle
-([ADR-0280](../architecture/decisions/0280-remote-underclass-and-safe-agent-retries.md)).
+Overalls runs the only production
+[Underclass](https://github.com/ghuntley/underclass) account database and its Ziggy
+uses it locally
+([ADR-0284](../architecture/decisions/0284-overalls-replaces-panterloons-and-dungarees.md)).
+The remote route of
+[ADR-0280](../architecture/decisions/0280-remote-underclass-and-safe-agent-retries.md),
+where another host's Ziggy sends inference to `https://overalls.lorikeet-bangus.ts.net`
+with a proxy-only credential bundle, has no consumer until a worker returns.
 Provider accounts, SQLite state, sticky bindings and administrative credentials
-are not replicated. Onboard provider accounts on Panterloons for this route.
+are not replicated. Onboard provider accounts on Overalls.
 Future hosts opt in by declaring a host-specific `NAME-underclass` encrypted
 document; generic enrollment and base/recovery configurations remain independent.
 
@@ -23,9 +26,8 @@ Tailnet identity is a network admission control, not application authorization.
 Clients still send the host-specific `UNDERCLASS_PROXY_KEY` to `/v1/*`; the web
 UI and `/admin/api/*` require that host's `UNDERCLASS_UI_TOKEN`.
 
-The local encrypted documents are `panterloons-underclass` and
-`dungarees-underclass`; `dungarees-underclass-proxy` holds only the Panterloons
-proxy key. Rotate the source key and its proxy-only copy together. Recover a
+The local encrypted document is `overalls-underclass`. A future remote
+consumer's `HOST-underclass-proxy` copy must be rotated together with it. Recover a
 document to a private file outside the checkout
 with the ordinary `tools/buck2 run //:secrets -- decrypt ...` workflow in
 [fleet-users.md](../operations/fleet-users.md). Never put either value in a command argument,
@@ -65,8 +67,8 @@ New request and account identifiers use UUIDv7. Underclass preserves one valid
 UUIDv7 `x-request-id`, replacing other versions and malformed/duplicate headers.
 Search a model-call ID across Marshall, Ziggy and Underclass to trace admission,
 provider start and terminal outcome; internal account attempts share that ID.
-Local monitor readiness describes the local pool, so Dungarees's empty local
-pool does not describe the health of its remote Ziggy provider route.
+Local monitor readiness describes the local pool, so a remote consumer's empty
+local pool would not describe the health of its remote Ziggy provider route.
 
 Marshall retries only Ziggy's positively verified pre-output overload result:
 at most three fresh model calls, delayed one then two seconds. Failed attempts

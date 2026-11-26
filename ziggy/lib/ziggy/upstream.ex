@@ -16,7 +16,7 @@ defmodule Ziggy.Upstream do
   # @cc [owner:ghuntley,label:security] upstream-fixed-origin-single-attempt
   # The caller MUST already hold durable admission and live request authority.
   # Production requests MUST use the configured fixed provider origin or the
-  # configured Underclass loopback or exact Panterloons HTTPS origin, never
+  # configured Underclass loopback or exact Overalls HTTPS origin, never
   # follow redirects or retry inference. Guest authorization and forwarding
   # headers MUST NOT be sent upstream. Consumer failure MUST cancel streaming.
   # Only the route's validated query enum may add an upstream query; native paths
@@ -84,7 +84,7 @@ defmodule Ziggy.Upstream do
 
   @spec underclass_origin?(binary()) :: boolean()
   defp underclass_origin?(origin),
-    do: origin in ["http://127.0.0.1:8080", "https://panterloons.lorikeet-bangus.ts.net"]
+    do: origin in ["http://127.0.0.1:8080", "https://overalls.lorikeet-bangus.ts.net"]
 
   defp origin(:openai, options),
     do: Keyword.get(options, :openai_origin, Ziggy.Route.origin(:openai))

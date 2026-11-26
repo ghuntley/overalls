@@ -102,7 +102,7 @@ lyra_cross = rule(
     impl = _lyra_cross_impl,
     attrs = {
         "build_script": attrs.source(),
-        # Cargo jobs inside the action (panterloons runs production guests).
+        # Cargo jobs inside the action (overalls runs production guests).
         "jobs": attrs.int(default = 16),
         "labels": attrs.list(attrs.string(), default = []),
         "mode": attrs.enum(["client", "windows", "native"]),

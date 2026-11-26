@@ -25,7 +25,7 @@ in {
   # Physical fleet peers MUST use distinct encrypted host credentials and pinned
   # public keys, and peer only inside their own deployment's tunnel. Only that
   # tunnel's control plane (10.90.0.1) may admit fleet API traffic; Salopettes
-  # admits only the Susan relay and metrics, and peers only with Panterloons. Guest
+  # admits only the Susan relay and metrics, and has no peer until it is re-peered with Overalls (ADR-0284). Guest
   # prefixes MUST remain protected, and transport failure MUST NOT select the
   # browser API.
   overalls.fleetNetwork = {

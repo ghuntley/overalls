@@ -4,7 +4,7 @@ tool payloads and raw upstream errors MUST NOT enter logs or durable accounting.
 
 @cc [owner:ghuntley,label:security;deployment] ziggy-underclass-origin
 The OpenAI-compatible origin MUST be the fixed public provider origin,
-enrolled host-local Underclass loopback, or the exact configured Panterloons
+enrolled host-local Underclass loopback, or the exact configured Overalls
 HTTPS tailnet origin. Underclass MUST receive only its proxy credential, never
 its administrative UI token. Request input MUST NOT select an upstream origin.
 

@@ -2,11 +2,11 @@
 
 - ID: ADR-0246
 - Date: 2026-10-20
-- Status: accepted
+- Status: superseded
 - Implementation: partial
 - Components: NixOS hosts, Marshall, secrets, fleet network
 - Supersedes: none
-- Superseded by: none
+- Superseded by: ADR-0284
 
 ## Context
 

@@ -1,5 +1,7 @@
 # Architecture reviews
 
+- [Overalls replaces Panterloons and Dungarees (2026-11-26)](2026-11-26-overalls-replaces-panterloons.md): ADR-0283 `metal` hosts and ADR-0284 single on-premises control plane; single-host risk, reused secrets (lost disks destroyed), delegation-free roster; enrollment and cutover pending.
+
 - [Mila Apple boundary follow-up (2026-11-05)](2026-11-05-mila-apple-boundary-follow-up.md): shared DNS admission, exact persisted deployment identity, and deployment-scoped Apple notification metadata under ADR-0235 and ADR-0278; Swift execution remains pending macOS CI.
 
 - [Mila native parity implementation (2026-11-02)](2026-11-02-mila-native-parity-implementation.md): typed clone/thread/device APIs, authenticated notification controls, bounded terminal reads and ANSI/SIXEL frames, durable snapshots, reconnecting watches, macOS development-key custody and unsigned Windows packaging; native host, signing and production acceptance evidence remains open under ADR-0220/0222/0223/0235/0249/0264/0277/0278.

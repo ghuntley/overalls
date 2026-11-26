@@ -41,7 +41,7 @@ let
   valid = c: lib.all (a: a.assertion) c.assertions;
   good = evaluate host {};
   remote = evaluate host {
-    services.ziggy.openaiOrigin = "https://panterloons.lorikeet-bangus.ts.net";
+    services.ziggy.openaiOrigin = "https://overalls.lorikeet-bangus.ts.net";
     services.ziggy.openaiKeyFile = "/run/underclass-proxy/proxy.key";
     services.ziggy.secretUnits = [ "underclass-proxy-key.service" ];
   };
@@ -75,7 +75,7 @@ assert builtins.hasContext good.services.overallsSecrets.bundles.git.encryptedFi
 assert builtins.hasContext good.services.overallsSecrets.bundles.lilly.encryptedFile;
 assert good.services.underclass.enable;
 assert remote.services.underclass.enable;
-assert remote.services.ziggy.openaiOrigin == "https://panterloons.lorikeet-bangus.ts.net";
+assert remote.services.ziggy.openaiOrigin == "https://overalls.lorikeet-bangus.ts.net";
 assert remote.services.ziggy.openaiKeyFile == "/run/underclass-proxy/proxy.key";
 assert builtins.elem "underclass-proxy-key.service" remote.services.ziggy.secretUnits;
 assert !(builtins.elem "overalls-secrets-underclass.service" remote.services.ziggy.secretUnits);

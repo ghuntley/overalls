@@ -172,9 +172,10 @@ The catalogued [materialization event](../../../lilly/lib/lilly/events.ex)
 now includes a closed source kind and optional validated template record and
 incarnation UUIDs. This makes the verified uncached path distinguishable from
 an actual template use without logging an image ID, path or command. The typed
-[benchmark runner](../../../scripts/provisioning_benchmark.py) requires that
-native correlation and host/pool-bound construction audit before counting warm
-samples; no accepted matched performance result is recorded yet.
+benchmark runner (`scripts/provisioning_benchmark.py`, removed by ADR-0284
+when the two-host fleet it measured was lost) required that native
+correlation and host/pool-bound construction audit before counting warm
+samples; no accepted matched performance result is recorded.
 The first readers-off campaign obtained ten sequential SSH samples per
 distribution but failed two concurrent creations. Their original failed
 requests and manifest-planned cleanup IDs were reconciled; all run-owned VMs

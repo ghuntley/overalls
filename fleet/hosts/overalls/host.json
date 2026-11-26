@@ -20,7 +20,104 @@
     "guestCpuCores": 24,
     "guestMemoryMiB": 40960
   },
-  "credentials": [],
+  "credentials": [
+    {
+      "name": "fleet-addresses",
+      "path": "secrets/fleet-addresses.enc.json"
+    },
+    {
+      "name": "fleet-tailscale",
+      "path": "secrets/fleet-tailscale.enc.json"
+    },
+    {
+      "name": "overalls-audi",
+      "path": "secrets/overalls-audi.enc.json"
+    },
+    {
+      "name": "overalls-audi-dns",
+      "path": "secrets/overalls-audi-dns.enc.json"
+    },
+    {
+      "name": "overalls-audi-private",
+      "path": "secrets/overalls-audi-private.enc.json"
+    },
+    {
+      "name": "overalls-backend-tls",
+      "path": "secrets/overalls-backend-tls.enc.json"
+    },
+    {
+      "name": "overalls-brady",
+      "path": "secrets/overalls-brady.enc.json"
+    },
+    {
+      "name": "overalls-cachix",
+      "path": "secrets/overalls-cachix.enc.json"
+    },
+    {
+      "name": "overalls-database",
+      "path": "secrets/overalls-database.enc.json"
+    },
+    {
+      "name": "overalls-enrico",
+      "path": "secrets/overalls-enrico.enc.json"
+    },
+    {
+      "name": "overalls-fleet-network",
+      "path": "secrets/overalls-fleet-network.enc.json"
+    },
+    {
+      "name": "overalls-galileo",
+      "path": "secrets/overalls-galileo.enc.json"
+    },
+    {
+      "name": "overalls-peach",
+      "path": "secrets/overalls-peach.enc.json"
+    },
+    {
+      "name": "overalls-github-oauth",
+      "path": "secrets/overalls-github-oauth.enc.json"
+    },
+    {
+      "name": "overalls-lilly",
+      "path": "secrets/overalls-lilly.enc.json"
+    },
+    {
+      "name": "overalls-logstore",
+      "path": "secrets/overalls-logstore.enc.json"
+    },
+    {
+      "name": "overalls-marshall",
+      "path": "secrets/overalls-marshall.enc.json"
+    },
+    {
+      "name": "overalls-porsche",
+      "path": "secrets/overalls-porsche.enc.json"
+    },
+    {
+      "name": "overalls-smtp",
+      "path": "secrets/overalls-smtp.enc.json"
+    },
+    {
+      "name": "overalls-ssh-host-ca",
+      "path": "secrets/overalls-ssh-host-ca.enc.json"
+    },
+    {
+      "name": "overalls-underclass",
+      "path": "secrets/overalls-underclass.enc.json"
+    },
+    {
+      "name": "overalls-ziggy",
+      "path": "secrets/overalls-ziggy.enc.json"
+    },
+    {
+      "name": "fleet-namespace",
+      "path": "secrets/fleet-namespace.enc.json"
+    },
+    {
+      "name": "overalls-git",
+      "path": "secrets/overalls-git.enc.json"
+    }
+  ],
   "discovery": {
     "routes": [
       {
@@ -37,7 +134,9 @@
   },
   "identity": {
     "hostId": "b9807e6c",
-    "sshKeys": []
+    "sshKeys": [
+      "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIIxeQ/2cV9TsZlRUIKeE7dAmtYxlp2Qu+wehzgMjCOQ6"
+    ]
   },
   "inventory": {
     "arch": "x86_64",

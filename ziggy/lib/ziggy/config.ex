@@ -40,7 +40,7 @@ defmodule Ziggy.Config do
          when openai_origin in [
                 "https://api.openai.com",
                 "http://127.0.0.1:8080",
-                "https://panterloons.lorikeet-bangus.ts.net"
+                "https://overalls.lorikeet-bangus.ts.net"
               ] <-
            Map.get(value, "openai_origin", "https://api.openai.com"),
          agent_enabled when is_boolean(agent_enabled) <- Map.get(value, "agent_enabled", false),

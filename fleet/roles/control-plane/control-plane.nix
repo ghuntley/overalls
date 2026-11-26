@@ -20,7 +20,7 @@ in
     };
     peerNameservers = mkOption {
       type = types.listOf addressName;
-      default = [ "dungareesService" ];
+      default = [ ];
       description = "Fleet address names of the other Audi DNS replicas used by the wildcard issuer.";
     };
     adminAddress = mkOption {

@@ -1,5 +1,11 @@
 # Architecture decision records
 
+[ADR-0284](0284-overalls-replaces-panterloons-and-dungarees.md) replaces the lost
+Panterloons and Dungarees with the on-premises `overalls` control plane: one
+host with no telemetry worker or build delegation, Salopettes kept in its
+tunnel without a peer, and the Panterloons secrets resealed as `overalls-*`.
+It supersedes ADR-0246.
+
 [ADR-0283](0283-on-premises-metal-hosts.md) adds the `metal` host platform: one or
 two system disks (mirrored only with two) on a shared ZFS root with a
 quota-bounded `zroot/lilly`, KVM and Lilly, and static uplinks through the
@@ -104,7 +110,8 @@ fleet-addresses SOPS document.
 
 [ADR-0246](0246-panterloons-control-plane-deployment.md) runs Panterloons as a
 copy of the Overalls deployment from the same parameterised host roles, with
-fresh secrets and a bootstrap stage before its own Marshall issues credentials.
+fresh secrets and a bootstrap stage before its own Marshall issues credentials;
+superseded by ADR-0284, which keeps the parameterised roles and bootstrap stage.
 
 [ADR-0245](0245-underclass-egress-node-tag.md) makes `underclass-egress up`
 advertise `tag:underclass` so tailnet policy can identify the Underclass
@@ -1152,7 +1159,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0241](0241-sops-tailscale-auto-join.md) | accepted | partial | SOPS-delivered automatic Tailscale joining |
 | [ADR-0243](0243-native-guest-durability-verification.md) | accepted | partial | Native guest durability across interrupted growth, host power loss and relocation |
 | [ADR-0245](0245-underclass-egress-node-tag.md) | accepted | partial | Underclass egress node tag |
-| [ADR-0246](0246-panterloons-control-plane-deployment.md) | accepted | partial | Panterloons control-plane deployment |
+| [ADR-0246](0246-panterloons-control-plane-deployment.md) | superseded | partial | Panterloons control-plane deployment |
 | [ADR-0247](0247-sops-operator-source-grant.md) | accepted | partial | SOPS-held operator source grant |
 | [ADR-0248](0248-fleet-build-scheduling.md) | superseded | partial | Fleet build scheduling through a tribuchet hub and grpc:// stores |
 | [ADR-0250](0250-independent-hldd-review-records.md) | superseded | implemented | Independent HLDD review records |
@@ -1190,6 +1197,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0281](0281-nix-compact-own-package-input.md) | accepted | partial | nix-compact builds Nix from its own pinned package input |
 | [ADR-0282](0282-remove-tribuchet.md) | accepted | partial | Remove tribuchet from fleet builds |
 | [ADR-0283](0283-on-premises-metal-hosts.md) | accepted | partial | On-premises metal hosts |
+| [ADR-0284](0284-overalls-replaces-panterloons-and-dungarees.md) | accepted | partial | Overalls replaces Panterloons and Dungarees |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

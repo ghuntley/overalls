@@ -4,11 +4,12 @@ Each machine runs its own Fluent Bit process and connects directly to its select
 outputs. There is no fleet log relay. Applications, guest consoles and VM lifetimes
 do not depend on the collector. Export is disabled until explicitly configured.
 
-The enrolled Panterloons/Dungarees fleet enables independent OpenTelemetry collection
-through `services.overallsOtelFleet`. Panterloons stores ninety-day Prometheus metrics
-and ninety-day Tempo traces within its monitored trace quota, plus authenticated
-Grafana and the fleet VictoriaLogs store. Dungarees exports over the pinned fleet
-tunnel. Seven-day objectives retain their existing targets and unknown-data guards;
+The enrolled fleet enables independent OpenTelemetry collection through
+`services.overallsOtelFleet`. Overalls is the central store with no worker
+([ADR-0284](../architecture/decisions/0284-overalls-replaces-panterloons-and-dungarees.md)):
+it keeps ninety-day Prometheus metrics and ninety-day Tempo traces within its
+monitored trace quota, plus authenticated Grafana and the fleet VictoriaLogs store.
+A future worker exports over the pinned fleet tunnel. Seven-day objectives retain their existing targets and unknown-data guards;
 store retention does not change their horizon. The ten-second fleet scrape cadence
 requires 60,480 observations for seven-day coverage and uses 8,640 per history day.
 Each application source exports exactly one duration histogram whose bounds the
@@ -310,7 +311,7 @@ duplicate the envelope event identity. Useful LogsQL:
 
 ```text
 _msg:"admission refused" AND source:marshall | sort by (_time desc)
-origin.hostname:("dungarees") AND payload.event:"vm.admission_refused"
+origin.hostname:("overalls") AND payload.event:"vm.admission_refused"
 ```
 
 ## Encrypted Erlang crash dumps

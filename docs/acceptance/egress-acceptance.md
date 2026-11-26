@@ -22,7 +22,7 @@ Create a unique mode-0700 directory outside Git. Its `run.json` contains:
 ```
 
 `protected_address` is the host's primary public IPv4 address, which guests must
-not reach. It is a fleet secret (for example `PANTERLOONS_PRIMARY_IPV4` in
+not reach. It is a fleet secret (for example `OVERALLS_PRIMARY_IPV4` in
 `secrets/fleet-addresses.enc.json`); copy it from the decrypted document and keep
 it only in the private directory.
 

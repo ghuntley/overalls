@@ -8,8 +8,8 @@ random offset of up to five minutes. Keep twelve complete host recovery points
 
 The implementation and isolated recovery tests follow [ADR-0070](../architecture/decisions/0070-host-recovery-backups.md).
 Production backups are not enabled until an operator supplies the S3 destination
-and provisions the host's encrypted backup document. Panterloons and Dungarees
-already explicitly select `randomizedDelaySec = 300`.
+and provisions the host's encrypted backup document. The control-plane role
+(Overalls) already explicitly selects `randomizedDelaySec = 300`.
 
 The native backup-recovery test creates an active Marshall wildcard certificate
 and ACME account with AshCloak-encrypted fields, captures the PostgreSQL dump
@@ -43,9 +43,9 @@ services.overallsBackups = {
 };
 ```
 
-For hostname `panterloons`, that selects
-`s3:https://objects.example.com/node-recovery/hosts/panterloons`. Dungarees uses the
-same destination with `/dungarees`. Changing a hostname requires an explicit
+For hostname `overalls`, that selects
+`s3:https://objects.example.com/node-recovery/hosts/overalls`. Another host uses the
+same destination with its own hostname. Changing a hostname requires an explicit
 repository migration/recovery decision; it does not discover the old repository.
 
 Useful optional settings:
@@ -88,7 +88,7 @@ tools/buck2 run //:secrets -- encrypt overalls-backup --input /private/overalls-
 tools/buck2 run //:secrets -- check
 ```
 
-Repeat for Dungarees with a different Restic password. The inventory workflow
+Repeat for each further host with a different Restic password. The inventory workflow
 includes the authenticated host recipients and retained recovery recipients.
 Verify recovery decryption with an operator key before relying on the backup.
 An actual restore drill must decrypt the restored ciphertext generation: the

@@ -4,13 +4,9 @@
 # with a human-readable comment. Address literals, private keys and dynamic DNS
 # names MUST NOT appear.
 {
-  dungarees = {
-    name = "dungareesPrimary";
-    comment = "Dungarees fleet host";
-  };
-  panterloons = {
-    name = "panterloonsPrimary";
-    comment = "Panterloons fleet host";
+  overalls = {
+    name = "overallsPrimary";
+    comment = "Overalls fleet host";
   };
   geoffreyHuntley = {
     name = "geoffreyHuntley";

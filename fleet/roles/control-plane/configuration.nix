@@ -39,9 +39,11 @@ in
   };
 
   # Peers awaiting an installed identity are omitted, so the control plane keeps
-  # evaluating while a replacement host is a base declaration.
+  # evaluating while a replacement host is a base declaration. A control plane
+  # that is not itself a registered builder, or has no other builder, has no
+  # reciprocal caches.
   overalls.remoteBuilders = let machines = import ../../remote-builders.nix { inherit lib; }; in {
-    enable = lib.attrNames machines != [ host.name ];
+    enable = machines ? ${host.name} && lib.attrNames machines != [ host.name ];
     localName = host.name;
     inherit machines;
   };

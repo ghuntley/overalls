@@ -2,8 +2,12 @@
 let
   inventory = (import ../nix/platform/hosts/inventory.nix { inherit lib; }).hosts;
   builders = import ./remote-builders.nix { inherit lib; };
-  # The one deployment's build roles (ADR-0248) come from the fleet host roster.
-  inherit ((import ../nix/policy/fleet/hosts.nix { inherit lib; }).deployments.panterloons) builds;
+  # The build roles (ADR-0248) of the one deployment that delegates builds come
+  # from the fleet host roster; a deployment without delegation declares null.
+  builds = lib.findFirst (value: value != null)
+    (throw "No fleet deployment delegates builds")
+    (map (deployment: deployment.builds) (builtins.attrValues
+      (import ../nix/policy/fleet/hosts.nix { inherit lib; }).deployments));
   inherit (builds) participants;
   # Interpolation copies each certificate alone, not the repository source.
   certificate = name: "${./fleet-builds + "/${name}.crt"}";

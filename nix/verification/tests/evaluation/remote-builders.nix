@@ -31,14 +31,13 @@ let
     in !result.success;
   fleet = import ../../../../fleet/remote-builders.nix { inherit lib; };
   inventory = (import ../../../platform/hosts/inventory.nix { inherit lib; }).hosts;
-  # nproc --all over pinned administrative SSH (the replacement Dungarees and
-  # Panterloons AX162 hosts 2026-10-20), restated independently of the roster.
-  measuredCpus = { dungarees = 96; panterloons = 96; };
   cases = {
+    # The production fleet has no reciprocal builders since Overalls replaced
+    # Panterloons and Dungarees (ADR-0284); registered builders keep their
+    # derived inputs.
     fleet-inputs = lib.all (name: builtins.pathExists fleet.${name}.encryptedFile
-      && fleet.${name}.hostPublicKey == builtins.head inventory.${name}.identity.sshKeys
-      && fleet.${name}.logicalCpus == measuredCpus.${name}) (builtins.attrNames fleet)
-      && fleet ? dungarees && fleet ? panterloons;
+      && fleet.${name}.hostPublicKey == builtins.head inventory.${name}.identity.sshKeys) (builtins.attrNames fleet)
+      && fleet == { };
     # A base declaration awaiting its installed key is not a builder peer.
     unkeyed-omitted = lib.all (name: inventory.${name}.identity.sshKeys != []) (builtins.attrNames fleet);
     disabled = !(evaluate { overalls.remoteBuilders.enable = lib.mkForce false; }).nix.sshServe.enable;

@@ -181,7 +181,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        host: [dungarees, panterloons, salopettes]
+        host: [overalls, salopettes]
     env:
       NAMESPACE_RBE_TOKEN: ${{ secrets.NAMESPACE_RBE_TOKEN }}
     steps:

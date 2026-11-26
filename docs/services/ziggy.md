@@ -52,7 +52,7 @@ An explicit nonempty selection limits discovery and inference to those providers
 readiness still requires discovery for every enabled provider and valid Marshall
 authority. Disabled providers return `provider_unavailable` before admission or
 provider effects. Existing runtime configurations without `enabled_providers`
-retain both providers. Overalls and dungarees currently select only OpenAI; the
+retain both providers. Overalls currently selects only OpenAI; the
 retained Anthropic placeholder does not enable Anthropic inference.
 Configure `services.ziggy.secretsFile` with its SOPS document; missing secrets
 must not silently disable the required service. That

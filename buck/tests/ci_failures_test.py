@@ -22,7 +22,7 @@ from ci_failures import (
     since_green,
 )
 
-HOST = "root//fleet/hosts/panterloons:deployment"
+HOST = "root//fleet/hosts/overalls:deployment"
 LIB = "root//lilly:lib"
 CHECK = "root//:check-python-static"
 SYSCTL = "root//nix/verification/tests/machines/sysctl:sysctl"
@@ -67,7 +67,7 @@ def check_since_green() -> None:
 
 
 def check_job_targets() -> None:
-    assert job_targets("build fleet/hosts/panterloons:deployment", AFFECTED) == [HOST]
+    assert job_targets("build fleet/hosts/overalls:deployment", AFFECTED) == [HOST]
     # The build job never ran hosts, evaluated flake outputs or probes.
     assert job_targets("build", AFFECTED) == [LIB], job_targets("build", AFFECTED)
     assert job_targets("test", AFFECTED) == [UNIT]
@@ -83,12 +83,12 @@ def check_job_targets() -> None:
 
 
 def check_failed_then_untouched() -> None:
-    # Run 3 failed the Panterloons deployment and a machine test; run 4
+    # Run 3 failed the Overalls deployment and a machine test; run 4
     # touched neither and failed nothing, so its jobs did not run them. Run 5
     # (this one) must still select both: only a green run clears them.
     jobs = {
         3: [
-            Job("build fleet/hosts/panterloons:deployment", "failure"),
+            Job("build fleet/hosts/overalls:deployment", "failure"),
             Job("sysctl", "timed_out"),
             Job("test", "success"),
             Job("ci", "failure"),

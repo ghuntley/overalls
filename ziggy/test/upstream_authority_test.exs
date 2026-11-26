@@ -32,7 +32,7 @@ defmodule Ziggy.UpstreamAuthorityTest do
           finch: owner,
           finch_module: BlockedFinch,
           request_id: request_id,
-          openai_origin: "https://panterloons.lorikeet-bangus.ts.net"
+          openai_origin: "https://overalls.lorikeet-bangus.ts.net"
         )
       end)
 

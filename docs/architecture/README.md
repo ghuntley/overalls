@@ -1,5 +1,11 @@
 # Architecture
 
+[ADR-0284](decisions/0284-overalls-replaces-panterloons-and-dungarees.md) replaces
+the lost Panterloons and Dungarees with one on-premises `metal` control plane,
+`overalls` ([ADR-0283](decisions/0283-on-premises-metal-hosts.md)). It runs every
+control-plane role and Lilly itself, with no telemetry worker and no build
+delegation, and reuses the Panterloons secrets resealed as `overalls-*`.
+
 [ADR-0280](decisions/0280-remote-underclass-and-safe-agent-retries.md) routes
 Dungarees inference through Panterloons Underclass with proxy-only credentials,
 UUIDv7 correlation and bounded fresh attempts for certified pre-output overloads.
@@ -509,8 +515,7 @@ preflight. The later captured watcher NixOS lifecycle passes as recorded under
 [ADR-0149](decisions/0149-independent-observability.md), before the incoming
 Starship guests and retained-state profile migration.
 
-Current [Dungarees](../../fleet/hosts/dungarees/configuration.nix) and
-[Overalls](../../fleet/roles/control-plane/services.nix) declarations enable templates
+The [control-plane role](../../fleet/roles/control-plane/services.nix) declarations enable templates
 with a 32 GiB per-pool budget, 128 standby disks per image and same-pool block-copy
 clones. Incoming `e3300040` reports rollout and sampled NixOS creates of
 10.8–15.1 seconds; those author-reported observations are distinct from this
@@ -955,7 +960,8 @@ rollout evidence.
 and Dungarees: Panterloons builds locally, Dungarees delegates through
 Panterloons' mTLS `grpc://` store ([ADR-0282](decisions/0282-remove-tribuchet.md)
 removed the tribuchet hub and workers), and the pair substitute from each other over
-`grpc://`. Other hosts remain cache-only. See the
+`grpc://`. Other hosts remain cache-only. Since ADR-0284 the single-host
+deployment delegates no builds and has no reciprocal caches. See the
 [fleet build scheduling review](reviews/2026-10-20-fleet-build-scheduling.md).
 Buck2's remote cache and remote execution are on Namespace
 ([ADR-0276](decisions/0276-namespace-buck2-remote-cache-and-execution.md)). It

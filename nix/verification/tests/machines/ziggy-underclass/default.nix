@@ -12,7 +12,7 @@ let
       -subj /CN=ziggy-isolated-test -keyout ca.key -out $out/ca.pem 2>/dev/null
     openssl req -new -newkey ec -pkeyopt ec_paramgen_curve:P-256 -nodes \
       -subj /CN=control.test -keyout $out/server.key -out server.csr 2>/dev/null
-    printf 'subjectAltName=DNS:control.test,DNS:provider.test,DNS:panterloons.lorikeet-bangus.ts.net\nextendedKeyUsage=serverAuth\n' > extensions
+    printf 'subjectAltName=DNS:control.test,DNS:provider.test,DNS:overalls.lorikeet-bangus.ts.net\nextendedKeyUsage=serverAuth\n' > extensions
     openssl x509 -req -in server.csr -CA $out/ca.pem -CAkey ca.key -CAcreateserial \
       -days 3650 -extfile extensions -out $out/server.pem 2>/dev/null
   '';
@@ -71,7 +71,7 @@ in pkgs.testers.runNixOSTest {
             '';
           };
         };
-        "panterloons.lorikeet-bangus.ts.net" = {
+        "overalls.lorikeet-bangus.ts.net" = {
           onlySSL = true;
           sslCertificate = "${tls}/server.pem";
           sslCertificateKey = "${tls}/server.key";
@@ -89,7 +89,7 @@ in pkgs.testers.runNixOSTest {
     networking.hostId = "12345678";
     networking.extraHosts = ''
       127.0.0.1 control.test
-      ${nodes.pool.networking.primaryIPAddress} panterloons.lorikeet-bangus.ts.net
+      ${nodes.pool.networking.primaryIPAddress} overalls.lorikeet-bangus.ts.net
     '';
     security.pki.certificateFiles = [ "${tls}/ca.pem" ];
     services.lilly = {
@@ -120,7 +120,7 @@ in pkgs.testers.runNixOSTest {
       caFile = "${tls}/ca.pem";
       secretsFile = "/run/ziggy-fixture/ziggy.enc.json";
       enabledProviders = [ "openai" ];
-      openaiOrigin = "https://panterloons.lorikeet-bangus.ts.net";
+      openaiOrigin = "https://overalls.lorikeet-bangus.ts.net";
       agentEnable = true;
       openaiKeyFile = "/run/underclass-test/proxy.key";
       secretUnits = [ "underclass-test-key.service" ];
@@ -209,8 +209,8 @@ in pkgs.testers.runNixOSTest {
 
     with subtest("remote proxy credential boundary"):
         for key in ["synthetic-admin-token", "wrong", ""]:
-            assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H " + shlex.quote("Authorization: Bearer " + key) + " https://panterloons.lorikeet-bangus.ts.net/v1/models").strip() == "401"
-        assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H 'Authorization: Bearer synthetic-proxy-key' https://panterloons.lorikeet-bangus.ts.net/admin/api/state").strip() == "401"
+            assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H " + shlex.quote("Authorization: Bearer " + key) + " https://overalls.lorikeet-bangus.ts.net/v1/models").strip() == "401"
+        assert machine.succeed("curl --silent --output /dev/null --write-out '%{http_code}' -H 'Authorization: Bearer synthetic-proxy-key' https://overalls.lorikeet-bangus.ts.net/admin/api/state").strip() == "401"
 
     with subtest("provider sends a completed SSE body mislabeled as JSON"):
         pool.succeed(

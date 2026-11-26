@@ -11,30 +11,28 @@
 { lib
   # Reviewed host declarations; every roster host MUST have one and vice versa.
 , inventory ? (import ../../platform/hosts/inventory.nix { inherit lib; }).hosts
-  # Per-host reachability outside the fleet tunnel. CPU counts were measured
-  # with nproc --all over inventory-pinned administrative SSH: the replacement
-  # Dungarees and Panterloons on 2026-10-20. Guest budgets are not CPU discovery.
-  # Builders are reached over Tailscale so no public address is evaluated.
+  # Per-host reachability outside the fleet tunnel. CPU counts are measured
+  # with nproc --all over inventory-pinned administrative SSH. Guest budgets
+  # are not CPU discovery. Builders are reached over Tailscale so no public
+  # address is evaluated; a host joins the tailnet only after enrollment.
 , hosts ? {
-    dungarees = { tailnetAddress = "100.96.244.44"; builder.logicalCpus = 96; };
-    panterloons = { tailnetAddress = "100.98.214.120"; builder.logicalCpus = 96; };
     overalls = { tailnetAddress = null; builder = null; };
     salopettes = { tailnetAddress = null; builder = null; };
   }
-  # Each deployment's roles and its own fleet tunnel.
+  # Each deployment's roles and its own fleet tunnel. A deployment without
+  # build delegation (ADR-0248) declares builds = null.
 , deployments ? {
-    # Panterloons is the control plane; Dungarees is its Lilly worker
-    # (ADR-0246) and Salopettes hosts the Susan relay (ADR-0224).
-    panterloons = {
-      controlPlane = "panterloons";
-      telemetry = { central = "panterloons"; worker = "dungarees"; };
-      # Panterloons is the build scheduler Dungarees delegates to (ADR-0248).
-      builds = { scheduler = "panterloons"; participants = [ "dungarees" "panterloons" ]; };
+    # Overalls is the control plane, sole Lilly host and central telemetry
+    # host after Panterloons and Dungarees were lost (ADR-0284). Salopettes
+    # hosts the Susan relay (ADR-0224) and stays a tunnel member with no peer
+    # until it is re-peered with Overalls.
+    overalls = {
+      controlPlane = "overalls";
+      telemetry = { central = "overalls"; worker = null; };
+      builds = null;
       tunnel = {
-        panterloons = { address = "10.90.0.1"; endpoint = "panterloonsPrimary"; peers = [ "dungarees" "salopettes" ]; };
-        dungarees = { address = "10.90.0.2"; endpoint = "dungareesPrimary"; peers = [ "panterloons" ]; };
-        # Salopettes reaches only Panterloons: Marshall delivers Susan pokes over fleet0.
-        salopettes = { address = "10.90.0.3"; endpoint = "salopettesPrimary"; peers = [ "panterloons" ]; };
+        overalls = { address = "10.90.0.1"; endpoint = "overallsPrimary"; peers = [ ]; };
+        salopettes = { address = "10.90.0.3"; endpoint = "salopettesPrimary"; peers = [ ]; };
       };
     };
   }
@@ -54,7 +52,7 @@ let
   validDeployment = name: deployment: let
     tunnel = deployment.tunnel;
     inTunnel = host: tunnel ? ${host};
-    participants = deployment.builds.participants;
+    builds = deployment.builds;
   in
     assert lib.assertMsg (lib.all (host: lib.all (peer: inTunnel peer && peer != host
       && builtins.elem host tunnel.${peer}.peers) tunnel.${host}.peers) (builtins.attrNames tunnel))
@@ -69,8 +67,9 @@ let
       && (deployment.telemetry.worker == null
         || (inTunnel deployment.telemetry.worker && tunnel.${deployment.telemetry.worker}.address == workerAddress)))
       "Fleet deployment ${name}: central telemetry is the control plane and the worker holds ${workerAddress}";
-    assert lib.assertMsg (participants != [] && unique participants && lib.all (host: inTunnel host && hosts.${host}.builder != null) participants
-      && builtins.elem deployment.builds.scheduler participants)
+    assert lib.assertMsg (builds == null || (builds.participants != [] && unique builds.participants
+      && lib.all (host: inTunnel host && hosts.${host}.builder != null) builds.participants
+      && builtins.elem builds.scheduler builds.participants))
       "Fleet deployment ${name}: build participants must be tunnel members with builder capacity, including the scheduler";
     true;
 in
