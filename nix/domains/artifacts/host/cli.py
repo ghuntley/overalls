@@ -777,11 +777,13 @@ def encrypt(args: argparse.Namespace) -> None:
             json.dumps({"overalls-git": {"production": {"GIT_DEPLOY_KEY": key.read_text()}}})
         )
         plaintext.chmod(0o600)
+        # Buck2 is the only build entry point (ADR-0269); the flake has no
+        # secrets app.
         run(
             [
-                "nix",
+                root / "tools/buck2",
                 "run",
-                str(root) + "#secrets",
+                "//:secrets",
                 "--",
                 "encrypt",
                 args.host + "-git",
@@ -789,7 +791,9 @@ def encrypt(args: argparse.Namespace) -> None:
                 root,
                 "--input",
                 plaintext,
-            ]
+            ],
+            cwd=root,
+            diagnostics=True,
         )
     print(
         "Encrypted shared deploy key. Publish the host declaration and ciphertext, then enroll --revision COMMIT."

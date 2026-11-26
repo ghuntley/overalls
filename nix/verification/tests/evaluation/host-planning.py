@@ -1229,9 +1229,20 @@ class HostPlanning(unittest.TestCase):
             args = SimpleNamespace(root=str(root), deploy_key=str(key), host="example")
             payloads: list[object] = []
 
-            def command(arguments: list[str], payloads: list[object] = payloads) -> bytes:
+            def command(
+                arguments: list[str | Path],
+                payloads: list[object] = payloads,
+                cwd: Path | None = None,
+                diagnostics: bool = False,
+            ) -> bytes:
                 payloads.append(json.loads(Path(arguments[-1]).read_text()))
                 self.assertIn("example-git", arguments)
+                # The secrets CLI runs through the checkout's Buck2 (ADR-0269).
+                self.assertEqual(
+                    arguments[:3], [root.resolve() / "tools/buck2", "run", "//:secrets"]
+                )
+                self.assertEqual(cwd, root.resolve())
+                self.assertTrue(diagnostics)
                 return b""
 
             with (
