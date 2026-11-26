@@ -14,8 +14,9 @@ defmodule Marshall.Ingress.FleetACMEConfig do
 
   # @cc [owner:ghuntley,label:security;deployment] fleet-acme-issuer-selection
   # Only an explicitly selected serving replica may configure the issuer queue.
-  # Its directory, CA roots and two or more distinct authoritative DNS peers MUST
-  # validate before any ACME operation. Missing configuration MUST disable issuance.
+  # Its directory, CA roots and one to eight distinct authoritative DNS peers
+  # (ADR-0285) MUST validate before any ACME operation. Missing configuration
+  # MUST disable issuance.
   @spec from_env(map()) :: {:ok, t() | nil} | {:error, :invalid_configuration}
   def from_env(env) when is_map(env) do
     case Map.get(env, "MARSHALL_FLEET_ACME_DIRECTORY") do
@@ -31,7 +32,7 @@ defmodule Marshall.Ingress.FleetACMEConfig do
          {:ok, _} <- Transport.new(directory, cacertfile: ca),
          true <- regular_file?(ca) and regular_file?(roots),
          {:ok, peers} <- JSON.decode(Map.get(env, "MARSHALL_FLEET_ACME_NAMESERVERS", "")),
-         true <- is_list(peers) and length(peers) in 2..8,
+         true <- is_list(peers) and length(peers) in 1..8,
          {:ok, peers} <- parse_peers(peers),
          terms when terms in ["true", "false"] <-
            Map.get(env, "MARSHALL_FLEET_ACME_ACCEPT_TERMS") do

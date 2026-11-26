@@ -353,11 +353,11 @@ in
 
       { assertion = cfg.ingress.wildcardAcme == null ||
           (cfg.ingress.zone != null && builtins.elem cfg.ingress.wildcardAcme.issuerInstance names &&
-           builtins.length cfg.ingress.wildcardAcme.nameservers >= 2 &&
+           builtins.length cfg.ingress.wildcardAcme.nameservers >= 1 &&
            builtins.length cfg.ingress.wildcardAcme.nameservers <= 8 &&
            builtins.length (lib.unique cfg.ingress.wildcardAcme.nameservers) == builtins.length cfg.ingress.wildcardAcme.nameservers
            && lib.all (nameserver: (nameserver.address == null) != (nameserver.addressFile == null)) acmeNameservers);
-        message = "Wildcard ACME requires a local issuer instance, ingress zone and two to eight distinct DNS peers."; }
+        message = "Wildcard ACME requires a local issuer instance, ingress zone and one to eight distinct DNS peers."; }
       { assertion = !cfg.crashDumps.enable || cfg.crashDumps.publicKeyFile != null; message = "Encrypted dumps require an operator public key file."; }
       { assertion = names != [] && builtins.length names <= cfg.replicaCount;
         message = "Marshall requires 1..replicaCount local instances."; }

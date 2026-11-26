@@ -368,6 +368,25 @@ let
         };
       };
     });
+    # ADR-0285: one authoritative peer is enough; zero or more than eight is not.
+    wildcardNameserverCount = let
+      withPeers = nameservers: evaluate {
+        imports = [ marshall ];
+        services.marshall.ingress = {
+          zone = "apps.example.test";
+          wildcardAcme = {
+            issuerInstance = "one";
+            directory = "https://ca.example.test/directory";
+            issuerCaFile = "/run/ca.pem";
+            certificateRootsFile = "/run/roots.pem";
+            inherit nameservers;
+          };
+        };
+      };
+      peers = count: builtins.genList (index: { address = "192.0.2.${toString (index + 1)}"; }) count;
+    in valid (withPeers (peers 1)) && valid (withPeers (peers 8))
+      && !valid (withPeers [ ]) && !valid (withPeers (peers 9))
+      && !valid (withPeers [ { address = "192.0.2.1"; } { address = "192.0.2.1"; } ]);
     wildcardIssuerCredentialsOnlyOnSelectedReplica = valid wildcardMarshall
       && (wildcardMarshall.systemd.services.marshall-one.environment ? MARSHALL_FLEET_ACME_DIRECTORY)
       && lib.all (name: !(wildcardMarshall.systemd.services."marshall-${name}".environment ? MARSHALL_FLEET_ACME_DIRECTORY)) [ "two" "three" ];

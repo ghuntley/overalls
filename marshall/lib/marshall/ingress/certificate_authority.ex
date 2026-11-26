@@ -47,7 +47,7 @@ defmodule Marshall.Ingress.CertificateAuthority do
              is_binary(roots_file) and is_list(peers) and is_boolean(terms) ->
         with {:ok, transport} <- Transport.new(directory, cacertfile: ca_file),
              {:ok, roots} when byte_size(roots) in 1..1_048_576 <- File.read(roots_file),
-             true <- length(peers) in 2..8 do
+             true <- length(peers) in 1..8 do
           {:ok,
            %{
              zone: zone,

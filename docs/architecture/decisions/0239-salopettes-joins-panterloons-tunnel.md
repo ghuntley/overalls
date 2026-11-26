@@ -61,6 +61,8 @@ The operator directed both changes on 2026-10-20.
 - Evaluation asserts that tunnel peers share a deployment, and the existing
   fleet transport assertions still apply to a host with no peers.
 - `fleet_acme_test.exs` and the Nix assertion keep the two-to-eight peer bound.
+  (2026-11-26: [ADR-0285](0285-single-dns-peer-wildcard-issuer.md) relaxes the
+  bound to one to eight for single-replica deployments.)
 
 ## Implementation evidence
 

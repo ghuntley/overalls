@@ -1,5 +1,9 @@
 # Architecture decision records
 
+[ADR-0285](0285-single-dns-peer-wildcard-issuer.md) lets the wildcard issuer
+run with one to eight authoritative DNS peers, so single-host `overalls` can
+issue its wildcard with its own Audi replica.
+
 [ADR-0284](0284-overalls-replaces-panterloons-and-dungarees.md) replaces the lost
 Panterloons and Dungarees with the on-premises `overalls` control plane: one
 host with no telemetry worker or build delegation, Salopettes kept in its
@@ -1198,6 +1202,7 @@ ADR-0015/0037 retain their statuses and accepted rationale.
 | [ADR-0282](0282-remove-tribuchet.md) | accepted | partial | Remove tribuchet from fleet builds |
 | [ADR-0283](0283-on-premises-metal-hosts.md) | accepted | partial | On-premises metal hosts |
 | [ADR-0284](0284-overalls-replaces-panterloons-and-dungarees.md) | accepted | partial | Overalls replaces Panterloons and Dungarees |
+| [ADR-0285](0285-single-dns-peer-wildcard-issuer.md) | accepted | partial | Wildcard issuer accepts a single DNS peer |
 
 The [Mila native release readiness review](../reviews/2026-10-24-mila-native-release-readiness.md)
 updates ADR-0249 implementation evidence without changing its accepted/partial status.

@@ -43,7 +43,8 @@ addressing, secrets and Salopettes in the same session.
 - **The control-plane role is retained from ADR-0246.**
   `fleet/hosts/overalls/configuration.nix` imports the shared control-plane
   role with `name = "overalls"` and no peer Audi DNS replicas. The default
-  `peerNameservers` is now empty. The first activation uses
+  `peerNameservers` is now empty, so the wildcard issuer has one DNS peer
+  ([ADR-0285](0285-single-dns-peer-wildcard-issuer.md)). The first activation uses
   `bootstrap = true`, and the second stage follows ADR-0246: once the
   deployment's own Marshall has bound Lilly and issued the Porsche, Audi, Ziggy
   and Galileo credentials, they are committed and `bootstrap` is set to `false`.
