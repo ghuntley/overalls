@@ -2,9 +2,7 @@
 let
   inputs = import ./inputs.nix;
   recipe = pkgs.path + "/pkgs/development/web/nodejs";
-  buildNode = pkgs.callPackage (recipe + "/nodejs.nix") {
-    python = pkgs.python3;
-  };
+  buildNode = pkgs.callPackage (recipe + "/nodejs.nix") { };
   # @cc [owner:ghuntley,label:build] editor-exact-node-source
   # The editor and its maintenance command MUST use the reviewed Node version
   # and source hash with the supplied pinned Nixpkgs builder and patch stack.
